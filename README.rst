@@ -71,7 +71,7 @@ Embed This Project in Astro - Hack Week Sandbox!!!
 1. run ``git clone git@github.com:astronomer/airflow-dbt-blog.git && cd airflow-dbt-blog``
 2. run ``git checkout hack-week``
 3. run ``git clone git@github.com:astronomer/cosmos.git``
-4. add the following ``docker-compose.override.yml`` (in the ``airflow-dbt-blog`` directory):
+4. change the ``docker-compose.override.yml`` (in the ``airflow-dbt-blog`` directory):
 
 .. code-block:: yaml
 

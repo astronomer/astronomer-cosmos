@@ -211,3 +211,22 @@ class DBTBaseOperator(BaseOperator):
         cmd = self.build_command() + target_flag
         result = self.run_command(cmd=cmd, env=env)
         return result.output
+
+
+class DBTLSOperator(DBTBaseOperator):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self):
+        flags = []
+        return flags
+
+    def execute(self, context: Context):
+        self.base_cmd = "ls"
+        self.create_default_profiles()
+        profile, profile_vars = self.map_profile()
+        env = self.get_env(context) | profile_vars
+        target_flag = ["--profile", profile]
+        cmd = self.build_command() + self.add_cmd_flags() + target_flag
+        result = self.run_command(cmd=cmd, env=env)
+        return result.output

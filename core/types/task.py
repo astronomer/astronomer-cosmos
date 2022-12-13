@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import List
+
+from pydantic import BaseModel, Field
 
 
 class Task(BaseModel):
@@ -15,9 +16,9 @@ class Task(BaseModel):
     :param arguments: The arguments to pass to the operator
     :type arguments: dict
     """
+
     task_id: str = Field(
-        ...,
-        description="The human-readable, unique identifier of the task"
+        ..., description="The human-readable, unique identifier of the task"
     )
 
     operator_class: str = Field(

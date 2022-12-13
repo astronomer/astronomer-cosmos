@@ -64,13 +64,14 @@ To run the checks manually, run:
 .. code-block:: bash
 
     pre-commit run --all-files
-    
-Embed This Project in Astro
+
+Embed This Project in Astro - Hack Week Sandbox!!!
 **************
 
 1. run ``git clone git@github.com:astronomer/airflow-dbt-blog.git && cd airflow-dbt-blog``
-2. run ``git clone git@github.com:astronomer/cosmos.git``
-3. add the following ``docker-compose.override.yml``:
+2. run ``git checkout hack-week``
+3. run ``git clone git@github.com:astronomer/cosmos.git``
+4. add the following ``docker-compose.override.yml`` (in the ``airflow-dbt-blog`` directory):
 
 .. code-block:: yaml
 
@@ -91,7 +92,7 @@ Embed This Project in Astro
         - ./dbt:/usr/local/airflow/dbt:rw
         - ./cosmos:/usr/local/airflow/cosmos:rw
 
-4. change the ``Dockerfile`` to be this:
+4. change the ``Dockerfile`` (in the ``airflow-dbt-blog`` directory) to be this:
 
 .. code-block:: docker
 
@@ -108,7 +109,7 @@ Embed This Project in Astro
 
   USER astro
 
+5. After you've made those changes, then run an ``astro dev start`` command (from the ``airflow-dbt-blog`` directory) to
+spin up a sandbox that mounts this cosmos repo for quick e2e testing!
 
-
-
-
+6. Happy hacking!

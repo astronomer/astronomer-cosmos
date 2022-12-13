@@ -1,7 +1,8 @@
+from typing import Sequence
+
 import os
 import shutil
 import sys
-from typing import Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -89,24 +90,16 @@ class DBTBaseOperator(BaseOperator):
         dbt_path = shutil.which("dbt") or "dbt"
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
-                raise AirflowException(
-                    f"Can not find the project_dir: {self.project_dir}"
-                )
+                raise AirflowException(f"Can not find the project_dir: {self.project_dir}")
             if not os.path.isdir(self.project_dir):
-                raise AirflowException(
-                    f"The project_dir {self.project_dir} must be a directory"
-                )
+                raise AirflowException(f"The project_dir {self.project_dir} must be a directory")
         return dbt_path
 
     def exception_handling(self, result):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
-            raise AirflowSkipException(
-                f"dbt command returned exit code {self.skip_exit_code}. Skipping."
-            )
+            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
-            raise AirflowException(
-                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
-            )
+            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
 
     def add_global_flags(self):
 

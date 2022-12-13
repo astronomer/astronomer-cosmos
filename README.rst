@@ -58,6 +58,13 @@ We use pre-commit to run a number of checks on the code before committing. To in
     pip install pre-commit
     pre-commit install
 
+
+To run the checks manually, run:
+
+.. code-block:: bash
+
+    pre-commit run --all-files
+    
 Embed This Project in Astro
 **************
 
@@ -104,8 +111,4 @@ Embed This Project in Astro
 
 
 
-To run the checks manually, run:
 
-.. code-block:: bash
-
-    pre-commit run --all-files

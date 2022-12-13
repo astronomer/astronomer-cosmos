@@ -1,8 +1,7 @@
 from typing import List
 
-from pydantic import BaseModel, Field
-
 from core.types.task import Task
+from pydantic import BaseModel, Field
 
 
 class Group(BaseModel):

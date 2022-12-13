@@ -6,11 +6,16 @@ from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles.postgres import postgres_profile
+from cosmos.providers.dbt.core.profiles.redshift import redshift_profile
 from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
 
 
 def create_default_profiles():
-    profiles = {"postgres_profile": postgres_profile, "snowflake_profile": snowflake_profile}
+    profiles = {
+        "postgres_profile": postgres_profile,
+        "snowflake_profile": snowflake_profile,
+        "redshift_profile": redshift_profile,
+    }
     # Define the path to the directory and file
     directory_path = "/home/astro/.dbt"
     file_path = "/home/astro/.dbt/profiles.yml"
@@ -51,6 +56,17 @@ def create_profile_vars(conn: Connection, schema_override):
             "SNOWFLAKE_DATABASE": conn.extra_dejson.get("database"),
             "SNOWFLAKE_WAREHOUSE": conn.extra_dejson.get("warehouse"),
             "SNOWFLAKE_SCHEMA": conn.schema,
+        }
+
+    elif conn.conn_type == "redshift":
+        profile = "redshift_profile"
+        profile_vars = {
+            "REDSHIFT_HOST": conn.host,
+            "REDSHIFT_PORT": str(conn.port),
+            "REDSHIFT_USER": conn.login,
+            "REDSHIFT_PASSWORD": conn.password,
+            "REDSHIFT_DATABASE": conn.schema,
+            "REDSHIFT_SCHEMA": schema_override,
         }
 
     else:

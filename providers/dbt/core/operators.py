@@ -203,13 +203,16 @@ class DBTBaseOperator(BaseOperator):
 
         return profile, profile_vars
 
-    def execute(self, context: Context):
+    def build_and_run_cmd(self,  env):
         self.create_default_profiles()
         profile, profile_vars = self.map_profile()
-        env = self.get_env(context) | profile_vars
-        target_flag = ["--profile", profile]
-        cmd = self.build_command() + target_flag
+        env = env | profile_vars
+        cmd = self.build_command() + ["--profile", profile]
         result = self.run_command(cmd=cmd, env=env)
+        return result
+
+    def execute(self, context: Context):
+        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 
@@ -223,12 +226,7 @@ class DBTLSOperator(DBTBaseOperator):
 
     def execute(self, context: Context):
         self.base_cmd = "ls"
-        self.create_default_profiles()
-        profile, profile_vars = self.map_profile()
-        env = self.get_env(context) | profile_vars
-        target_flag = ["--profile", profile]
-        cmd = self.build_command() + self.add_cmd_flags() + target_flag
-        result = self.run_command(cmd=cmd, env=env)
+        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 
@@ -246,12 +244,7 @@ class DBTSeedOperator(DBTBaseOperator):
 
     def execute(self, context: Context):
         self.base_cmd = "seed"
-        self.create_default_profiles()
-        profile, profile_vars = self.map_profile()
-        env = self.get_env(context) | profile_vars
-        target_flag = ["--profile", profile]
-        cmd = self.build_command() + self.add_cmd_flags() + target_flag
-        result = self.run_command(cmd=cmd, env=env)
+        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 
@@ -265,12 +258,7 @@ class DBTRunOperator(DBTBaseOperator):
 
     def execute(self, context: Context):
         self.base_cmd = "run"
-        self.create_default_profiles()
-        profile, profile_vars = self.map_profile()
-        env = self.get_env(context) | profile_vars
-        target_flag = ["--profile", profile]
-        cmd = self.build_command() + self.add_cmd_flags() + target_flag
-        result = self.run_command(cmd=cmd, env=env)
+        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 
@@ -284,10 +272,5 @@ class DBTTestOperator(DBTBaseOperator):
 
     def execute(self, context: Context):
         self.base_cmd = "test"
-        self.create_default_profiles()
-        profile, profile_vars = self.map_profile()
-        env = self.get_env(context) | profile_vars
-        target_flag = ["--profile", profile]
-        cmd = self.build_command() + self.add_cmd_flags() + target_flag
-        result = self.run_command(cmd=cmd, env=env)
+        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output

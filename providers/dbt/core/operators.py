@@ -2,16 +2,15 @@ from typing import Sequence
 
 import os
 import shutil
-import sys
 
-import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.base import BaseHook
 from airflow.hooks.subprocess import SubprocessHook
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
+
+from cosmos.providers.dbt.core.utils.profiles_generator import create_default_profiles, map_profile
 
 
 class DBTBaseOperator(BaseOperator):
@@ -149,63 +148,9 @@ class DBTBaseOperator(BaseOperator):
         self.exception_handling(result)
         return result
 
-    def create_default_profiles(self):
-        profile = {
-            "postgres_profile": {
-                "outputs": {
-                    "dev": {
-                        "type": "postgres",
-                        "host": "{{ env_var('POSTGRES_HOST') }}",
-                        "port": "{{ env_var('POSTGRES_PORT') | as_number }}",
-                        "user": "{{ env_var('POSTGRES_USER') }}",
-                        "pass": "{{ env_var('POSTGRES_PASSWORD') }}",
-                        "dbname": "{{ env_var('POSTGRES_DATABASE') }}",
-                        "schema": "{{ env_var('POSTGRES_SCHEMA') }}",
-                    }
-                },
-                "target": "dev",
-            }
-        }
-        # Define the path to the directory and file
-        directory_path = "/home/astro/.dbt"
-        file_path = "/home/astro/.dbt/profiles.yml"
-
-        # Create the directory if it does not exist
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)
-
-        # Create the file if it does not exist
-        if not os.path.exists(file_path):
-            print("profiles.yml not found - initializing.")
-            with open(file_path, "w") as file:
-                yaml.dump(profile, file)
-            print("done")
-        else:
-            print("profiles.yml found - skipping")
-
-    def map_profile(self):
-        conn = BaseHook().get_connection(self.conn_id)
-
-        if conn.conn_type == "postgres":
-            profile = "postgres_profile"
-            profile_vars = {
-                "POSTGRES_HOST": conn.host,
-                "POSTGRES_USER": conn.login,
-                "POSTGRES_PASSWORD": conn.password,
-                "POSTGRES_DATABASE": conn.schema,
-                "POSTGRES_PORT": str(conn.port),
-                "POSTGRES_SCHEMA": self.schema,
-            }
-
-        else:
-            print(f"Connection type {conn.type} is not yet supported.", file=sys.stderr)
-            sys.exit(1)
-
-        return profile, profile_vars
-
-    def build_and_run_cmd(self,  env):
-        self.create_default_profiles()
-        profile, profile_vars = self.map_profile()
+    def build_and_run_cmd(self, env):
+        create_default_profiles()
+        profile, profile_vars = map_profile(self.conn_id, self.schema)
         env = env | profile_vars
         cmd = self.build_command() + ["--profile", profile]
         result = self.run_command(cmd=cmd, env=env)

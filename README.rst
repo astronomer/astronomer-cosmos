@@ -54,9 +54,54 @@ We use pre-commit to run a number of checks on the code before committing. To in
 
     python3 -m venv venv
     source venv/bin/activate
-    pip install -r dev--requirements.txt
+    pip install -r dev-requirements.txt
     pip install pre-commit
     pre-commit install
+
+Embed This Project in Astro
+**************
+
+1. run ``git clone git@github.com:astronomer/airflow-dbt-blog.git && cd airflow-dbt-blog``
+2. run ``git clone git@github.com:astronomer/cosmos.git``
+3. add the following ``docker-compose.override.yml``:
+
+.. code-block:: yaml
+
+  version: "3.1"
+  services:
+    scheduler:
+      volumes:
+        - ./dbt:/usr/local/airflow/dbt:rw
+        - ./cosmos:/usr/local/airflow/cosmos:rw
+
+    webserver:
+      volumes:
+        - ./dbt:/usr/local/airflow/dbt:rw
+        - ./cosmos:/usr/local/airflow/cosmos:rw
+
+    triggerer:
+      volumes:
+        - ./dbt:/usr/local/airflow/dbt:rw
+        - ./cosmos:/usr/local/airflow/cosmos:rw
+
+4. change the ``Dockerfile`` to be this:
+
+.. code-block:: docker
+
+  FROM quay.io/astronomer/astro-runtime:7.0.0
+  ENV AIRFLOW__CORE__ENABLE_XCOM_PICKLING=true
+
+  #Installs locally
+  USER root
+  COPY /cosmos/ /cosmos
+  WORKDIR "/usr/local/airflow/cosmos"
+  RUN pip install -e .
+
+  WORKDIR "/usr/local/airflow"
+
+  USER astro
+
+
 
 
 To run the checks manually, run:

@@ -8,7 +8,7 @@ class Task(BaseModel):
     A task represents a single node in the DAG.
 
     :param task_id: The human-readable, unique identifier of the task
-    :type task_id: str
+    :type id: str
     :param operator_class: The name of the operator class to use for this task
     :type operator_class: str
     :param upstream_task_ids: The task_ids of the tasks that this task is upstream of
@@ -18,7 +18,8 @@ class Task(BaseModel):
     """
 
     task_id: str = Field(
-        ..., description="The human-readable, unique identifier of the task"
+        ...,
+        description="The human-readable, unique identifier of the task",
     )
 
     operator_class: str = Field(

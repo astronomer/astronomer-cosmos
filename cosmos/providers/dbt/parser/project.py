@@ -1,13 +1,13 @@
 import json
-import os
 import logging
+import os
 
 from cosmos.core.graph.group import Group
 from cosmos.core.graph.task import Task
 from cosmos.core.parse.base_parser import BaseParser
+from cosmos.providers.dbt.core.utils.profiles_generator import create_default_profiles, map_profile
 
 from .utils import validate_directory
-from cosmos.providers.dbt.core.utils.profiles_generator import create_default_profiles, map_profile
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class DbtProjectParser(BaseParser):
 
         self.dbt_profiles_dir = dbt_profiles_dir
 
-    def parse(self):
+    def parse(self) -> Group:
         """
         Parses the dbt project in the project_path into `cosmos` entities.
         """
@@ -64,7 +64,7 @@ class DbtProjectParser(BaseParser):
         manifest = self.ensure_manifest()
         nodes = manifest["nodes"]
 
-        base_group = Group(id="dbt_project")
+        base_group = Group(group_id="dbt_project")
 
         for node_name, node in nodes.items():
             if node_name.split(".")[0] == "model":
@@ -95,12 +95,14 @@ class DbtProjectParser(BaseParser):
 
                 # make the group
                 group = Group(
-                    id=node_name,
+                    group_id=node_name,
                     tasks=[run_task, test_task],
                 )
 
                 # do something with the group for now
                 print(group)
+
+        return base_group
 
     def ensure_manifest(self):
         """
@@ -111,23 +113,25 @@ class DbtProjectParser(BaseParser):
         # if the manifest doesn't exist, we need to run dbt list
         if not os.path.exists(manifest_path):
             create_default_profiles()
-            profile, _ = map_profile(conn_id = self.conn_id)
+            profile, _ = map_profile(conn_id=self.conn_id)
 
             # run dbt compile
             logger.info("Running dbt list to generate manifest.json")
-            logger.info(os.popen(
-                f"""
+            logger.info(
+                os.popen(
+                    f"""
                 dbt list \
                 --profiles-dir {self.dbt_profiles_dir} \
                 --project-dir {self.project_path} \
                 --profile {profile}
                 """
-            ))
+                )
+            )
         else:
             logger.info("Using existing manifest.json")
 
         # read the manifest
-        with open(manifest_path, "r", encoding="utf-8") as manifest_contents:
+        with open(manifest_path, encoding="utf-8") as manifest_contents:
             manifest = json.load(manifest_contents)
 
         return manifest

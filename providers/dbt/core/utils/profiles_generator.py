@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sys
 
@@ -40,16 +41,16 @@ def create_default_profiles():
         print("profiles.yml found - skipping")
 
 
-def create_profile_vars(conn: Connection, schema_override):
+def create_profile_vars(conn: Connection, database, schema):
     if conn.conn_type == "postgres":
         profile = "postgres_profile"
         profile_vars = {
             "POSTGRES_HOST": conn.host,
             "POSTGRES_USER": conn.login,
             "POSTGRES_PASSWORD": conn.password,
-            "POSTGRES_DATABASE": conn.schema,
+            "POSTGRES_DATABASE": database,
             "POSTGRES_PORT": str(conn.port),
-            "POSTGRES_SCHEMA": schema_override,
+            "POSTGRES_SCHEMA": schema,
         }
 
     elif conn.conn_type == "snowflake":
@@ -59,9 +60,9 @@ def create_profile_vars(conn: Connection, schema_override):
             "SNOWFLAKE_PASSWORD": conn.password,
             "SNOWFLAKE_ACCOUNT": f"{conn.extra_dejson.get('account')}.{conn.extra_dejson.get('region')}",
             "SNOWFLAKE_ROLE": conn.extra_dejson.get("role"),
-            "SNOWFLAKE_DATABASE": conn.extra_dejson.get("database"),
+            "SNOWFLAKE_DATABASE": database,
             "SNOWFLAKE_WAREHOUSE": conn.extra_dejson.get("warehouse"),
-            "SNOWFLAKE_SCHEMA": conn.schema,
+            "SNOWFLAKE_SCHEMA": schema,
         }
 
     elif conn.conn_type == "redshift":
@@ -71,14 +72,14 @@ def create_profile_vars(conn: Connection, schema_override):
             "REDSHIFT_PORT": str(conn.port),
             "REDSHIFT_USER": conn.login,
             "REDSHIFT_PASSWORD": conn.password,
-            "REDSHIFT_DATABASE": conn.schema,
-            "REDSHIFT_SCHEMA": schema_override,
+            "REDSHIFT_DATABASE": database,
+            "REDSHIFT_SCHEMA": schema,
         }
 
     elif conn.conn_type == "google_cloud_platform":
         profile = "bigquery_profile"
         profile_vars = {
-            "BIGQUERY_DATASET": schema_override,
+            "BIGQUERY_DATASET": schema,
             "BIGQUERY_PROJECT": json.loads(conn.extra_dejson.get("keyfile_dict"))["project_id"],
             "BIGQUERY_TYPE": json.loads(conn.extra_dejson.get("keyfile_dict"))["type"],
             "BIGQUERY_PROJECT_ID": json.loads(conn.extra_dejson.get("keyfile_dict"))["project_id"],
@@ -101,7 +102,45 @@ def create_profile_vars(conn: Connection, schema_override):
     return profile, profile_vars
 
 
-def map_profile(conn_id, schema):
+def map_profile(conn_id, db_override=None, schema_override=None):
     conn = BaseHook().get_connection(conn_id)
-    profile, profile_vars = create_profile_vars(conn, schema_override=schema)
+
+    """
+    A really annoying edge case: snowflake uses the schema field of a connection as an actual schema where every other
+    connection object (bigquery, redshift, postgres) uses the schema field to specify the database. So this logic should
+    handle that and allow users to either specify the target schema in the snowflake connection
+    """
+
+    # set db override
+    if db_override:
+        db = db_override
+    else:
+        if conn.conn_type != "snowflake":
+            db = conn.schema
+        else:
+            db = conn.extra_dejson.get("database")
+
+    # set schema override
+    if conn.conn_type == "snowflake":
+        if conn.schema is not None and schema_override is not None:
+            schema = schema_override
+        elif schema_override is not None:
+            schema = schema_override
+        elif conn.schema is not None and schema_override is None:
+            schema = conn.schema
+        else:
+            logging.getLogger().setLevel(logging.ERROR)
+            logging.error(
+                f"Please specify a target schema in the {conn.id} connection properties or using the schema parameter."
+            )
+            sys.exit(1)
+    else:
+        if schema_override is not None:
+            schema = schema_override
+        else:
+            logging.getLogger().setLevel(logging.ERROR)
+            logging.error("Please specify a target schema using the schema parameter.")
+            sys.exit(1)
+
+    profile, profile_vars = create_profile_vars(conn, database=db, schema=schema)
     return profile, profile_vars

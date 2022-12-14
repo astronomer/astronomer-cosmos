@@ -1,11 +1,12 @@
 import json
 import os
 
-from core.graph.group import Group
-from core.graph.task import Task
-from core.parse.base_parser import BaseParser
+from cosmos.core.graph.group import Group
+from cosmos.core.graph.task import Task
+from cosmos.core.parse.base_parser import BaseParser
 
 from .utils import validate_directory
+from .jinja import extract_deps_from_models
 
 
 class DbtProjectParser(BaseParser):
@@ -15,89 +16,68 @@ class DbtProjectParser(BaseParser):
 
     def __init__(
         self,
-        project_path: str,
-        dbt_root_path: str,
-        dbt_profiles_dir: str,
+        project_name: str,
+        dbt_root_path: str = "/usr/local/airflow/dags/dbt",
     ):
         """
         Initializes the parser.
 
-        :param project_path: The path to the dbt project, relative to the dbt root path
+        :param project_name: The path to the dbt project, relative to the dbt root path
         :type project_path: str
         :param dbt_root_path: The path to the dbt root directory
         :type dbt_root_path: str
-        :param dbt_profiles_dir: The path to the dbt profiles directory
-        :type dbt_profiles_dir: str
         """
-        # Validate the project path
-        validate_directory(project_path, "project_path")
-        self.project_path = project_path
-
-        # Validate the dbt root path
+        # validate the dbt root path
         validate_directory(dbt_root_path, "dbt_root_path")
         self.dbt_root_path = dbt_root_path
 
-        # Validate the dbt profiles directory
-        validate_directory(dbt_profiles_dir, "dbt_profiles_dir")
-        self.dbt_profiles_dir = dbt_profiles_dir
+        # validate the project path
+        project_path = os.path.join(dbt_root_path, project_name)
+        validate_directory(project_path, "project_path")
+        self.project_path = project_path
+            
 
     def parse(self):
         """
         Parses the dbt project in the project_path into `cosmos` entities.
         """
-        manifest = self.get_manifest()
-        nodes = manifest["nodes"]
+        models = extract_deps_from_models(project_path=self.project_path)
+        
+        base_group = Group(group_id="dbt_project")
 
-        for node_name, node in nodes.items():
-            if node_name.split(".")[0] == "model":
-                # make the run task
-                run_task = Task(
-                    task_id=node_name,
-                    operator_class="cosmos.providers.dbt.operators.DbtRunModel",
-                    arguments={
-                        "model_name": node_name,
-                        "project_path": self.project_path,
-                        "dbt_root_path": self.dbt_root_path,
-                        "dbt_profiles_dir": self.dbt_profiles_dir,
-                    },
-                )
+        for model, deps in models.items():
+            # make the run task
+            run_task = Task(
+                task_id=f"{model}",
+                operator_class="airflow.operators.empty.EmptyOperator",
+                arguments={
+                    "model_name": model,
+                    "project_path": self.project_path,
+                    "dbt_root_path": self.dbt_root_path,
+                },
+            )
 
-                # make the test task
-                test_task = Task(
-                    task_id=f"{node_name}_test",
-                    operator_class="cosmos.providers.dbt.operators.DbtTestModel",
-                    upstream_task_ids=[node_name],
-                    arguments={
-                        "model_name": node_name,
-                        "project_path": self.project_path,
-                        "dbt_root_path": self.dbt_root_path,
-                        "dbt_profiles_dir": self.dbt_profiles_dir,
-                    },
-                )
+            # make the test task
+            test_task = Task(
+                task_id=f"{model}_test",
+                operator_class="airflow.operators.empty.EmptyOperator",
+                upstream_task_ids=[model],
+                arguments={
+                    "model_name": model,
+                    "project_path": self.project_path,
+                    "dbt_root_path": self.dbt_root_path,
+                },
+            )
 
-                # make the group
-                group = Group(
-                    group_id=node_name,
-                    tasks=[run_task, test_task],
-                )
+            # make the group
+            # group = Group(
+            #     group_id=model,
+            #     tasks=[run_task, test_task],
+            # )
 
-                # do something with the group for now
-                print(group)
+            # just add to base group for now
+            base_group.add_task(task=run_task)
+            base_group.add_task(task=test_task)
 
-    def get_manifest(self) -> dict:
-        """
-        Gets the dbt manifest for the project.
-
-        :return: The dbt manifest
-        :rtype: dict
-        """
-        manifest_path = os.path.join(
-            self.dbt_root_path,
-            self.project_path,
-            "target/manifest.json",
-        )
-
-        with open(manifest_path) as f:
-            manifest = json.load(f)
-
-        return manifest
+        print(base_group)
+        return base_group

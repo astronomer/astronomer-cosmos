@@ -1,5 +1,5 @@
-from core.render.dag import CosmosDag
-from providers.dbt.parser.project import DbtProjectParser
+from cosmos.core.render.dag import CosmosDag
+from cosmos.providers.dbt.parser.project import DbtProjectParser
 
 
 class DbtDag(CosmosDag):
@@ -7,7 +7,7 @@ class DbtDag(CosmosDag):
     Render a dbt project as an Airflow DAG.
     """
 
-    def __init__(self, project_dir: str, **kwargs):
+    def __init__(self, project_name: str, **kwargs):
         """
         :param project_dir: The path to the dbt project directory
         :type project_dir: str
@@ -17,10 +17,8 @@ class DbtDag(CosmosDag):
         :return: The rendered DAG
         :rtype: airflow.models.DAG
         """
-        self.project_dir = project_dir
+        self.project_name = project_name
         self.kwargs = kwargs
-
-        return self.render()
 
     def render(self):
         """
@@ -31,7 +29,7 @@ class DbtDag(CosmosDag):
         """
         # first, parse the dbt project and get a Group
         parser = DbtProjectParser(
-            project_path=self.project_dir,
+            project_name=self.project_name,
         )
         group = parser.parse()
 

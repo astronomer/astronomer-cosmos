@@ -13,15 +13,18 @@ from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
 
 
 def create_default_profiles():
+
     profiles = {
         "postgres_profile": postgres_profile,
         "snowflake_profile": snowflake_profile,
         "redshift_profile": redshift_profile,
         "bigquery_profile": bigquery_profile,
     }
+
     # Define the path to the directory and file
-    directory_path = "/home/astro/.dbt"
-    file_path = "/home/astro/.dbt/profiles.yml"
+    home_dir = os.path.expanduser("~")
+    directory_path = f"{home_dir}/.dbt"
+    file_path = f"{home_dir}/.dbt/profiles.yml"
 
     # Create the directory if it does not exist
     if not os.path.exists(directory_path):

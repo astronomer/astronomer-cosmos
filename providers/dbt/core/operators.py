@@ -14,6 +14,42 @@ from cosmos.providers.dbt.core.utils.profiles_generator import create_default_pr
 
 
 class DBTBaseOperator(BaseOperator):
+    """
+    Executes a dbt core cli command.
+
+    :param project_dir: Which directory to look in for the dbt_project.yml file. Default is the current working
+    directory and its parents.
+    :param conn_id: The airflow connection to use as the target
+    :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
+    :param select: dbt optional argument that specifies which nodes to include.
+    :param exclude: dbt optional argument that specifies which models to exclude.
+    :param selector: dbt optional argument - the selector name to use, as defined in selectors.yml
+    :param vars: dbt optional argument - Supply variables to the project. This argument overrides variables
+        defined in your dbt_project.yml file. This argument should be a YAML
+        string, eg. '{my_variable: my_value}' (templated)
+    :param models: dbt optional argument that specifies which nodes to include.
+    :param cache_selected_only:
+    :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
+        the dbt_project.yml file ('require-dbt-version')
+    :param fail_fast: dbt optional argument to make dbt exit immediately if a single resource fails to build.
+    :param quiet: dbt optional argument to show only error logs in stdout
+    :param warn_error: dbt optional argument to convert dbt warnings into errors
+    :param db_name: override the target db instead of the one supplied in the airflow connection
+    :param schema: override the target schema instead of the one supplied in the airflow connection
+    :param env: If env is not None, it must be a dict that defines the
+        environment variables for the new process; these are used instead
+        of inheriting the current process environment, which is the default
+        behavior. (templated)
+    :param append_env: If False(default) uses the environment variables passed in env params
+        and does not inherit the current process environment. If True, inherits the environment variables
+        from current passes and then environment variable passed by the user will either update the existing
+        inherited environment variables or the new variables gets appended to it
+    :param output_encoding: Output encoding of bash command
+    :param skip_exit_code: If task exits with this exit code, leave the task
+        in ``skipped`` state (default: 99). If set to ``None``, any non-zero
+        exit code will be treated as a failure.
+
+    """
 
     template_fields: Sequence[str] = ("env", "vars")
     ui_color = "#ed7254"
@@ -150,11 +186,14 @@ class DBTBaseOperator(BaseOperator):
         self.exception_handling(result)
         return result
 
-    def build_and_run_cmd(self, env):
+    def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
         create_default_profiles()
         profile, profile_vars = map_profile(conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema)
         env = env | profile_vars
-        cmd = self.build_command() + ["--profile", profile]
+        if cmd_flags:
+            cmd = self.build_command() + ["--profile", profile] + cmd_flags
+        else:
+            cmd = self.build_command() + ["--profile", profile]
         result = self.run_command(cmd=cmd, env=env)
         return result
 
@@ -164,23 +203,32 @@ class DBTBaseOperator(BaseOperator):
 
 
 class DBTLSOperator(DBTBaseOperator):
+    """
+    Executes a dbt core ls command.
+
+    """
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-
-    def add_cmd_flags(self):
-        flags = []
-        return flags
+        self.base_cmd = "ls"
 
     def execute(self, context: Context):
-        self.base_cmd = "ls"
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 
 class DBTSeedOperator(DBTBaseOperator):
+    """
+    Executes a dbt core seed command.
+
+    :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
+
+    """
+
     def __init__(self, full_refresh: bool = False, **kwargs) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
+        self.base_cmd = "seed"
 
     def add_cmd_flags(self):
         flags = []
@@ -190,34 +238,36 @@ class DBTSeedOperator(DBTBaseOperator):
         return flags
 
     def execute(self, context: Context):
-        self.base_cmd = "seed"
-        result = self.build_and_run_cmd(env=self.get_env(context))
+        cmd_flags = self.add_cmd_flags()
+        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
         return result.output
 
 
 class DBTRunOperator(DBTBaseOperator):
+    """
+    Executes a dbt core run command.
+
+    """
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-
-    def add_cmd_flags(self):
-        flags = []
-        return flags
+        self.base_cmd = "run"
 
     def execute(self, context: Context):
-        self.base_cmd = "run"
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 
 class DBTTestOperator(DBTBaseOperator):
+    """
+    Executes a dbt core test command.
+
+    """
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-
-    def add_cmd_flags(self):
-        flags = []
-        return flags
+        self.base_cmd = "test"
 
     def execute(self, context: Context):
-        self.base_cmd = "test"
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output

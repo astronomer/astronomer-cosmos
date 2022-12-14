@@ -48,7 +48,7 @@ class DBTBaseOperator(BaseOperator):
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
-
+    :param python_venv: Path to venv for dbt command execution (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/activate)
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -75,6 +75,7 @@ class DBTBaseOperator(BaseOperator):
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
+        python_venv: str = None,
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -96,6 +97,7 @@ class DBTBaseOperator(BaseOperator):
         self.append_env = append_env
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
+        self.python_venv = python_venv
         super().__init__(**kwargs)
 
     @cached_property
@@ -124,7 +126,13 @@ class DBTBaseOperator(BaseOperator):
         return env
 
     def get_dbt_path(self):
-        dbt_path = shutil.which("dbt") or "dbt"
+        bash_path = shutil.which("bash") or "bash"
+
+        if self.python_venv:
+            dbt_path = [bash_path, "-c", f"source {self.python_venv} && dbt {self.base_cmd} "]
+        else:
+            dbt_path = [bash_path, "-c", f"dbt {self.base_cmd} "]
+
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
                 raise AirflowException(f"Can not find the project_dir: {self.project_dir}")
@@ -171,11 +179,6 @@ class DBTBaseOperator(BaseOperator):
                 flags.append(dbt_name)
         return flags
 
-    def build_command(self):
-        dbt_path = self.get_dbt_path()
-        cmd = [dbt_path, self.base_cmd] + self.add_global_flags()
-        return cmd
-
     def run_command(self, cmd, env):
         result = self.subprocess_hook.run_command(
             command=cmd,
@@ -189,11 +192,32 @@ class DBTBaseOperator(BaseOperator):
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
         create_default_profiles()
         profile, profile_vars = map_profile(conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema)
-        env = env | profile_vars
+
+        # parse dbt command
+
+        ## get the dbt piece from the bash command so we can add to it
+        dbt_path = self.get_dbt_path()
+        dbt_cmd = dbt_path[-1]
+        dbt_path.pop()
+
+        ## add global flags
+        for item in self.add_global_flags():
+            dbt_cmd += f"{item} "
+
+        ## add command specific flags
         if cmd_flags:
-            cmd = self.build_command() + ["--profile", profile] + cmd_flags
-        else:
-            cmd = self.build_command() + ["--profile", profile]
+            for item in cmd_flags:
+                dbt_cmd += f"{item} "
+
+        ## add profile
+        dbt_cmd += f"--profile {profile}"
+
+        ## and appended dbt command back to bash
+        dbt_path.append(dbt_cmd)
+        cmd = dbt_path
+
+        ## set env vars
+        env = env | profile_vars
         result = self.run_command(cmd=cmd, env=env)
         return result
 

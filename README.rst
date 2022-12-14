@@ -1,5 +1,5 @@
 ******
-cosmos
+Astronomer Cosmos
 ******
 
 A framework for generating Apache Airflow DAGs from other workflows.
@@ -7,21 +7,22 @@ A framework for generating Apache Airflow DAGs from other workflows.
 Principles
 **************
 
-`cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
+`Astronomer Cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
 
 - ``extractors``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
 - ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
 
-``cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
+``Astronomer Cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
 
 Example Usage
-**************
+_____________
+
 
 Imagine we have a dbt project located at ``./dbt/my_project``.
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
+    from astronomer.cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
 
     # render as a DAG
     dag = DbtDag(
@@ -45,71 +46,52 @@ Imagine we have a dbt project located at ``./dbt/my_project``.
             task_id="my_task",
         )
 
-Development
-**************
 
-We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
+Principle
+---------
 
-.. code-block:: bash
+We will only create Async operators for the "sync-version" of operators that do some level of polling
+(take more than a few seconds to complete).
 
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r dev-requirements.txt
-    pip install pre-commit
-    pre-commit install
+For example, we won’t create an async Operator for a ``BigQueryCreateEmptyTableOperator`` but will create one
+for ``BigQueryInsertJobOperator`` that actually runs queries and can take hours in the worst case for task completion.
 
+To create async operators, we need to inherit from the corresponding airflow sync operators.
+If sync version isn't available, then inherit from airflow ``BaseOperator``.
 
-To run the checks manually, run:
+To create async sensors, we need to inherit from the corresponding sync sensors.
+If sync version isn't available, then inherit from airflow ``BaseSensorOperator``.
 
-.. code-block:: bash
+Changelog
+---------
 
-    pre-commit run --all-files
+We follow `Semantic Versioning <https://semver.org/>`_ for releases.
+Check `CHANGELOG.rst <https://github.com/astronomer/cosmos/blob/main/CHANGELOG.rst>`_
+for the latest changes.
 
-Embed This Project in Astro - Hack Week Sandbox!!!
-**************
+Contributing Guide
+__________________
 
-1. run ``git clone git@github.com:astronomer/airflow-dbt-blog.git && cd airflow-dbt-blog``
-2. run ``git checkout hack-week``
-3. run ``git clone git@github.com:astronomer/cosmos.git``
-4. change the ``docker-compose.override.yml`` (in the ``airflow-dbt-blog`` directory):
+All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
 
-.. code-block:: yaml
+A detailed overview an how to contribute can be found in the `Contributing Guide <https://github.com/astronomer/cosmos/blob/main/CONTRIBUTING.rst>`_.
 
-  version: "3.1"
-  services:
-    scheduler:
-      volumes:
-        - ./dbt:/usr/local/airflow/dbt:rw
-        - ./cosmos:/usr/local/airflow/cosmos:rw
+As contributors and maintainers to this project, you are expected to abide by the
+`Contributor Code of Conduct <https://github.com/astronomer/cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
-    webserver:
-      volumes:
-        - ./dbt:/usr/local/airflow/dbt:rw
-        - ./cosmos:/usr/local/airflow/cosmos:rw
+Goals for the project
+_____________________
 
-    triggerer:
-      volumes:
-        - ./dbt:/usr/local/airflow/dbt:rw
-        - ./cosmos:/usr/local/airflow/cosmos:rw
+- Goal 1
+- Goal 2
+- Goal 3
 
-4. change the ``Dockerfile`` (in the ``airflow-dbt-blog`` directory) to be this:
+Limitations
+___________
 
-.. code-block:: docker
+- List any limitations
 
-  FROM quay.io/astronomer/astro-runtime:7.0.0
-  ENV AIRFLOW__CORE__ENABLE_XCOM_PICKLING=true
+License
+_______
 
-  #Installs locally
-  USER root
-  COPY /cosmos/ /cosmos
-  WORKDIR "/usr/local/airflow/cosmos"
-  RUN pip install -e .
-
-  WORKDIR "/usr/local/airflow"
-
-  USER astro
-
-5. After you've made those changes, then run an ``astro dev start`` command (from the ``airflow-dbt-blog`` directory) to
-spin up a sandbox that mounts this cosmos repo for quick e2e testing!
-
-6. Happy hacking!
+`Apache License 2.0 <https://github.com/astronomer/cosmos/blob/main/LICENSE>`_

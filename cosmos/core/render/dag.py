@@ -2,7 +2,6 @@ import importlib
 from datetime import datetime
 
 from airflow.models import DAG
-
 from core.graph.group import Group
 
 

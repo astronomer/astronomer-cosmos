@@ -17,9 +17,7 @@ class Task(BaseModel):
     :type arguments: dict
     """
 
-    task_id: str = Field(
-        ..., description="The human-readable, unique identifier of the task"
-    )
+    task_id: str = Field(..., description="The human-readable, unique identifier of the task")
 
     operator_class: str = Field(
         ...,

@@ -6,7 +6,6 @@ from airflow.operators.empty import EmptyOperator
 
 from cosmos.core.graph.group import Group
 
-
 class CosmosDag:
     """
     Render a Task or Group as an Airflow DAG.
@@ -31,7 +30,8 @@ class CosmosDag:
         with dag:
 
             start = EmptyOperator(task_id="start")
-
+            
+            group_tasks_list = []
             for task in group.tasks:
                 # import the operator class
                 module_name, class_name = task.operator_class.rsplit(".", 1)
@@ -45,7 +45,11 @@ class CosmosDag:
                     t.set_upstream(upstream_task_id)
 
                 t.set_downstream(task.task_id)
+                
+                group_tasks_list.append(t)
 
             end = EmptyOperator(task_id="end")
 
+            start >> group_tasks_list >> end
+            
         return dag

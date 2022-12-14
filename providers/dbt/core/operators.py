@@ -33,6 +33,7 @@ class DBTBaseOperator(BaseOperator):
         fail_fast: bool = False,
         quiet: bool = False,
         warn_error: bool = False,
+        db_name: str = None,
         schema: str = None,
         env: dict = None,
         append_env: bool = False,
@@ -53,6 +54,7 @@ class DBTBaseOperator(BaseOperator):
         self.fail_fast = fail_fast
         self.quiet = quiet
         self.warn_error = warn_error
+        self.db_name = db_name
         self.schema = schema
         self.env = env
         self.append_env = append_env
@@ -150,7 +152,7 @@ class DBTBaseOperator(BaseOperator):
 
     def build_and_run_cmd(self, env):
         create_default_profiles()
-        profile, profile_vars = map_profile(self.conn_id, self.schema)
+        profile, profile_vars = map_profile(conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema)
         env = env | profile_vars
         cmd = self.build_command() + ["--profile", profile]
         result = self.run_command(cmd=cmd, env=env)

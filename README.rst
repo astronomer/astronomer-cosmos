@@ -1,22 +1,52 @@
-******
 Astronomer Cosmos
-******
+=================
 
-A framework for generating Apache Airflow DAGs from other workflows.
+A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other workflows.
 
-Principles
-**************
+Installation
+_____________
 
-`Astronomer Cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
+Install and update using `pip <https://pip.pypa.io/en/stable/getting-started/>`_:
 
-- ``extractors``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
-- ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
+.. code-block:: bash
 
-``Astronomer Cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
+    pip install astronomer-cosmos
+
+This only installs dependencies for core provider. To install all dependencies, run:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[all]'
+
+To only install the dependencies for a specific integration, specify the integration name as extra argument, example
+to install dbt integration dependencies, run:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[dbt]'
+
+Extras
+^^^^^^
+
+.. EXTRA_DOC_START
+
+.. list-table::
+   :header-rows: 1
+
+   * - Extra Name
+     - Installation Command
+     - Dependencies
+
+   * - ``all``
+     - ``pip install 'astronomer-cosmos[all]'``
+     - All
+
+   * - ``dbt``
+     - ``pip install 'astronomer-cosmos[dbt]'``
+     - dbt core
 
 Example Usage
 _____________
-
 
 Imagine we have a dbt project located at ``./dbt/my_project``.
 
@@ -47,26 +77,21 @@ Imagine we have a dbt project located at ``./dbt/my_project``.
         )
 
 
-Principle
----------
+Principles
+_____________
 
-We will only create Async operators for the "sync-version" of operators that do some level of polling
-(take more than a few seconds to complete).
+`Astronomer Cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
 
-For example, we won’t create an async Operator for a ``BigQueryCreateEmptyTableOperator`` but will create one
-for ``BigQueryInsertJobOperator`` that actually runs queries and can take hours in the worst case for task completion.
+- ``extractors``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
+- ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
 
-To create async operators, we need to inherit from the corresponding airflow sync operators.
-If sync version isn't available, then inherit from airflow ``BaseOperator``.
-
-To create async sensors, we need to inherit from the corresponding sync sensors.
-If sync version isn't available, then inherit from airflow ``BaseSensorOperator``.
+``Astronomer Cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
 
 Changelog
----------
+_________
 
 We follow `Semantic Versioning <https://semver.org/>`_ for releases.
-Check `CHANGELOG.rst <https://github.com/astronomer/cosmos/blob/main/CHANGELOG.rst>`_
+Check `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
 for the latest changes.
 
 Contributing Guide
@@ -74,10 +99,10 @@ __________________
 
 All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
 
-A detailed overview an how to contribute can be found in the `Contributing Guide <https://github.com/astronomer/cosmos/blob/main/CONTRIBUTING.rst>`_.
+A detailed overview an how to contribute can be found in the `Contributing Guide <https://github.com/astronomer/astronomer-cosmos/blob/main/CONTRIBUTING.rst>`_.
 
 As contributors and maintainers to this project, you are expected to abide by the
-`Contributor Code of Conduct <https://github.com/astronomer/cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
+`Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
 Goals for the project
 _____________________

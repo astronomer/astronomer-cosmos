@@ -1,27 +1,58 @@
-******
-cosmos
-******
+Astronomer Cosmos
+=================
 
-A framework for generating Apache Airflow DAGs from other workflows.
+A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other workflows.
 
-Principles
-**************
+Installation
+_____________
 
-`cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
+Install and update using `pip <https://pip.pypa.io/en/stable/getting-started/>`_:
 
-- ``extractors``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
-- ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
+.. code-block:: bash
 
-``cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
+    pip install astronomer-cosmos
+
+This only installs dependencies for core provider. To install all dependencies, run:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[all]'
+
+To only install the dependencies for a specific integration, specify the integration name as extra argument, example
+to install dbt integration dependencies, run:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[dbt]'
+
+Extras
+^^^^^^
+
+.. EXTRA_DOC_START
+
+.. list-table::
+   :header-rows: 1
+
+   * - Extra Name
+     - Installation Command
+     - Dependencies
+
+   * - ``all``
+     - ``pip install 'astronomer-cosmos[all]'``
+     - All
+
+   * - ``dbt``
+     - ``pip install 'astronomer-cosmos[dbt]'``
+     - dbt core
 
 Example Usage
-**************
+_____________
 
 Imagine we have a dbt project located at ``./dbt/my_project``.
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
+    from astronomer.cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
 
     # render as a DAG
     dag = DbtDag(
@@ -45,71 +76,47 @@ Imagine we have a dbt project located at ``./dbt/my_project``.
             task_id="my_task",
         )
 
-Development
-**************
 
-We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
+Principles
+_____________
 
-.. code-block:: bash
+`Astronomer Cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
 
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r dev-requirements.txt
-    pip install pre-commit
-    pre-commit install
+- ``extractors``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
+- ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
 
+``Astronomer Cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
 
-To run the checks manually, run:
+Changelog
+_________
 
-.. code-block:: bash
+We follow `Semantic Versioning <https://semver.org/>`_ for releases.
+Check `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
+for the latest changes.
 
-    pre-commit run --all-files
+Contributing Guide
+__________________
 
-Embed This Project in Astro - Hack Week Sandbox!!!
-**************
+All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
 
-1. run ``git clone git@github.com:astronomer/airflow-dbt-blog.git && cd airflow-dbt-blog``
-2. run ``git checkout hack-week``
-3. run ``git clone git@github.com:astronomer/cosmos.git``
-4. change the ``docker-compose.override.yml`` (in the ``airflow-dbt-blog`` directory):
+A detailed overview an how to contribute can be found in the `Contributing Guide <https://github.com/astronomer/astronomer-cosmos/blob/main/CONTRIBUTING.rst>`_.
 
-.. code-block:: yaml
+As contributors and maintainers to this project, you are expected to abide by the
+`Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
-  version: "3.1"
-  services:
-    scheduler:
-      volumes:
-        - ./dbt:/usr/local/airflow/dbt:rw
-        - ./cosmos:/usr/local/airflow/cosmos:rw
+Goals for the project
+_____________________
 
-    webserver:
-      volumes:
-        - ./dbt:/usr/local/airflow/dbt:rw
-        - ./cosmos:/usr/local/airflow/cosmos:rw
+- Goal 1
+- Goal 2
+- Goal 3
 
-    triggerer:
-      volumes:
-        - ./dbt:/usr/local/airflow/dbt:rw
-        - ./cosmos:/usr/local/airflow/cosmos:rw
+Limitations
+___________
 
-4. change the ``Dockerfile`` (in the ``airflow-dbt-blog`` directory) to be this:
+- List any limitations
 
-.. code-block:: docker
+License
+_______
 
-  FROM quay.io/astronomer/astro-runtime:7.0.0
-  ENV AIRFLOW__CORE__ENABLE_XCOM_PICKLING=true
-
-  #Installs locally
-  USER root
-  COPY /cosmos/ /cosmos
-  WORKDIR "/usr/local/airflow/cosmos"
-  RUN pip install -e .
-
-  WORKDIR "/usr/local/airflow"
-
-  USER astro
-
-5. After you've made those changes, then run an ``astro dev start`` command (from the ``airflow-dbt-blog`` directory) to
-spin up a sandbox that mounts this cosmos repo for quick e2e testing!
-
-6. Happy hacking!
+`Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_

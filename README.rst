@@ -52,7 +52,7 @@ Imagine we have a dbt project located at ``./dbt/my_project``.
 
 .. code-block:: python
 
-    from astronomer.cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
+    from cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
 
     # render as a DAG
     dag = DbtDag(

@@ -3,22 +3,14 @@ from datetime import datetime
 
 from airflow.models import DAG
 
-from core.graph.group import Group
+from cosmos.core.graph.group import Group
 
 
 class CosmosDag:
     """
     Render a Task or Group as an Airflow DAG.
     """
-
-    def __init__(self, group: Group):
-        """
-        :param group: The Group to render
-        :type group: Group
-        """
-        self.group = group
-
-    def render(self):
+    def render(self, group: Group):
         """
         Render the DAG.
 
@@ -26,7 +18,7 @@ class CosmosDag:
         :rtype: DAG
         """
         dag = DAG(
-            dag_id=self.entity.task_id,
+            dag_id=group.id,
             default_args={
                 "owner": "airflow",
                 "start_date": datetime(2019, 1, 1),
@@ -34,7 +26,7 @@ class CosmosDag:
             schedule_interval=None,
         )
 
-        for task in self.group.tasks:
+        for task in group.tasks:
             # import the operator class
             module_name, class_name = task.operator_class.rsplit(".", 1)
             module = importlib.import_module(module_name)

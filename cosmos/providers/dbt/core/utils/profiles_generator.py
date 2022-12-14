@@ -12,8 +12,16 @@ from cosmos.providers.dbt.core.profiles.postgres import postgres_profile
 from cosmos.providers.dbt.core.profiles.redshift import redshift_profile
 from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
 
+logger = logging.getLogger(__name__)
+
 
 def create_default_profiles():
+    """
+    Generates a default profiles.yml file if one does not exist.
+
+    :return: The path to the profiles.yml file
+    :rtype: str
+    """
 
     profiles = {
         "postgres_profile": postgres_profile,
@@ -33,12 +41,14 @@ def create_default_profiles():
 
     # Create the file if it does not exist
     if not os.path.exists(file_path):
-        print("profiles.yml not found - initializing.")
+        logging.info("profiles.yml not found - initializing.")
         with open(file_path, "w") as file:
             yaml.dump(profiles, file)
-        print("done")
+        logging.info("done")
     else:
-        print("profiles.yml found - skipping")
+        logging.info("profiles.yml found - skipping")
+
+    return file_path
 
 
 def create_profile_vars(conn: Connection, database, schema):
@@ -96,7 +106,7 @@ def create_profile_vars(conn: Connection, database, schema):
         }
 
     else:
-        print(f"Connection type {conn.type} is not yet supported.", file=sys.stderr)
+        logging.error(f"Connection type {conn.type} is not yet supported.")
         sys.exit(1)
 
     return profile, profile_vars

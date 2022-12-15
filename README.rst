@@ -8,7 +8,7 @@
 Astronomer Cosmos |fury|
 ========================
 
-A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks.
+A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
 
 Current support for:
  - dbt

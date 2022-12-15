@@ -1,9 +1,7 @@
 FROM quay.io/astronomer/astro-runtime:7.0.0
 
-# install the venv for dbt
-# create and activate the virtual environment
-RUN python -m virtualenv dbt_venv && \
-    source dbt_venv/bin/activate && \
-    # update dbt.postgres to the database you are using
-    pip install astronomer-cosmos[dbt.postgres] && \
-    deactivate
+#Install then venv /usr/local/airflow/dbt_venv/bin/activate
+WORKDIR "/usr/local/airflow"
+COPY dbt-requirements.txt ./
+RUN python -m virtualenv dbt_venv && source dbt_venv/bin/activate && \
+    pip install --no-cache-dir -r dbt-requirements.txt && deactivate

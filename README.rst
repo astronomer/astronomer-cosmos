@@ -4,14 +4,42 @@
 Astronomer Cosmos
 =================
 
-A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other workflows.
+A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks.
+
+.. image:: static/cosmos_banner.png
+
+Current support for:
+ - dbt
+
+Coming soon:
+ - Jupyter
+ - Hex
+ - And more...open an issue if you have a request!
+
+Principles
+_____________
+
+`Astronomer Cosmos` is a package to parse and render third-party workflows as Airflow DAGs, `Airflow TaskGroups <https://docs.astronomer.io/learn/task-groups>`, or individual tasks.
+
+.. image:: dbt_dag.png
+
+Cosmos contains `providers` for third-party tools, and each `provider` can be deconstructed into the following components:
+
+- ``parsers``: These are mostly hidden from the end user and are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects. These are executed whenever the Airflow Scheduler heartbeats, allowing us to dynamically render the dependency graph of the workflow.
+- ``operators``: These represent the "user interface" of Cosmos -- lightweight classes the user can import and implement in their DAG to define their target behavior. They are responsible for executing the tasks in the workflow.
+
+Cosmos operates on a few guiding principles:
+
+- **Dynamic**: Cosmos generates DAGs dynamically, meaning that the dependency graph of the workflow is generated at runtime. This allows users to update their workflows without having to restart Airflow.
+- **Flexible**: Cosmos is not opinionated in that it does not enforce a specific rendering method for third-party systems; users can decide whether they'd like to render their workflow as a DAG, TaskGroup, or individual task.
+- **Extensible**: Cosmos is designed to be extensible. Users can add their own parsers and operators to support their own workflows.
+- **Modular**: Cosmos is designed to be modular. Users can install only the dependencies they need for their workflows.
+
 
 Quickstart
 _____________
 
 Clone this repository to set up a local environment. Then, head over to our :code:`astronomer-cosmos/examples` directory and follow its README!
-
-.. image:: static/cosmos_banner.png
 
 Installation
 _____________
@@ -132,16 +160,6 @@ Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTask
         e2 = EmptyOperator(task_id="some_extraction")
 
         e1 >> dbt_tg >> e2
-
-Principles
-_____________
-
-`Astronomer Cosmos` provides a framework for generating Apache Airflow DAGs from other workflows. Every provider comes with two main components:
-
-- ``extractors``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
-- ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
-
-``Astronomer Cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
 
 Changelog
 _________

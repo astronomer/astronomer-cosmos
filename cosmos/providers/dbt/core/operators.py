@@ -52,7 +52,7 @@ class DBTBaseOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("env", "vars")
-    ui_color = "#ed7254"
+    ui_color = "#9370DB"
 
     def __init__(
         self,

@@ -29,6 +29,7 @@ Cosmos contains `providers` for third-party tools, and each `provider` can be de
 - ``operators``: These represent the "user interface" of Cosmos -- lightweight classes the user can import and implement in their DAG to define their target behavior. They are responsible for executing the tasks in the workflow.
 
 Cosmos operates on a few guiding principles:
+
 - **Dynamic**: Cosmos generates DAGs dynamically, meaning that the dependency graph of the workflow is generated at runtime. This allows users to update their workflows without having to restart Airflow.
 - **Flexible**: Cosmos is not opinionated in that it does not enforce a specific rendering method for third-party systems; users can decide whether they'd like to render their workflow as a DAG, TaskGroup, or individual task.
 - **Extensible**: Cosmos is designed to be extensible. Users can add their own parsers and operators to support their own workflows.

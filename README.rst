@@ -1,5 +1,6 @@
-[![PyPI version](https://badge.fury.io/py/apache-airflow.svg)](https://badge.fury.io/py/apache-airflow)
-
+.. image:: https://badge.fury.io/py/astronomer-cosmos.svg
+    :target: https://badge.fury.io/py/astronomer-cosmos
+    
 Astronomer Cosmos
 =================
 

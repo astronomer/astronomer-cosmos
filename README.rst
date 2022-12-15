@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/apache-airflow.svg)](https://badge.fury.io/py/apache-airflow)
+
 Astronomer Cosmos
 =================
 

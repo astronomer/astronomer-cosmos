@@ -1,14 +1,14 @@
-import json
-import os
 import logging
+import os
 
 from cosmos.core.graph.entities import Group, Task
 from cosmos.core.parse.base_parser import BaseParser
 
-from .utils import validate_directory
 from .jinja import extract_deps_from_models
+from .utils import validate_directory
 
 logger = logging.getLogger(__name__)
+
 
 class DbtProjectParser(BaseParser):
     """
@@ -49,7 +49,6 @@ class DbtProjectParser(BaseParser):
         self.conn_id = conn_id
 
         self.dbt_args = dbt_args or {}
-            
 
     def parse(self):
         """
@@ -58,7 +57,7 @@ class DbtProjectParser(BaseParser):
         models = extract_deps_from_models(project_path=self.project_path)
 
         project_name = os.path.basename(self.project_path)
-        
+
         base_group = Group(id=project_name)
 
         entities = {}
@@ -67,7 +66,7 @@ class DbtProjectParser(BaseParser):
             args = {
                 "conn_id": self.conn_id,
                 "project_dir": self.project_path,
-                "models": [model],
+                "models": model,
                 **self.dbt_args,
             }
             # make the run task
@@ -105,6 +104,5 @@ class DbtProjectParser(BaseParser):
                     entities[model].add_upstream(dep_task)
                 except KeyError:
                     logger.error(f"Dependency {dep} not found for model {model}")
-
 
         return base_group

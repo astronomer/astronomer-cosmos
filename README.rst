@@ -1,12 +1,14 @@
-.. image:: https://badge.fury.io/py/astronomer-cosmos.svg
+.. image:: static/banner.svg
+  :align: center
+
+.. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
 
-Astronomer Cosmos
+
+Astronomer Cosmos |fury|
 =================
 
 A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks.
-
-.. image:: static/cosmos_banner.png
 
 Current support for:
  - dbt

@@ -33,10 +33,6 @@ def DbtDag(
     group = parser.parse()
 
     # then, render the Group as a DAG
-    dag = CosmosDag(group=group).render()
-
-    # finally, update the DAG with any additional kwargs
-    for key, value in kwargs.items():
-        setattr(dag, key, value)
+    dag = CosmosDag(group=group, dag_args=kwargs).render()
 
     return dag

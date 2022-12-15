@@ -20,6 +20,11 @@ class CosmosDag(BaseModel):
         description="The Group to render",
     )
 
+    dag_args: dict = Field(
+        {},
+        description="Additional arguments to pass to the DAG",
+    )
+
     def render(self):
         """
         Render the DAG.
@@ -27,14 +32,10 @@ class CosmosDag(BaseModel):
         :return: The rendered DAG
         :rtype: DAG
         """
-        dag = DAG(
-            dag_id=self.group.id,
-            default_args={
-                "owner": "airflow",
-                "start_date": datetime(2019, 1, 1),
-            },
-            schedule_interval=None,
-        )
+        if "dag_id" not in self.dag_args:
+            self.dag_args["dag_id"] = self.group.id
+
+        dag = DAG(**self.dag_args)
 
         entities = {}
 
@@ -52,9 +53,7 @@ class CosmosDag(BaseModel):
 
         # add dependencies
         for ent in self.group.entities:
-            print(f"Adding dependencies for {ent.id}...")
             for upstream_id in ent.upstream_entity_ids:
-                print(f"Setting {upstream_id} as upstream for {ent.id}...")
                 entities[upstream_id] >> entities[ent.id]
 
         return dag
@@ -79,6 +78,11 @@ class CosmosTaskGroup(BaseModel):
         description="The DAG to render the Group into",
     )
 
+    task_group_args: dict = Field(
+        {},
+        description="Additional arguments to pass to the underlying Airflow TaskGroup",
+    )
+
     task_group: TaskGroup = Field(
         None,
         description="The TaskGroup to render the Group into",
@@ -91,11 +95,14 @@ class CosmosTaskGroup(BaseModel):
         :return: The rendered TaskGroup
         :rtype: TaskGroup
         """
+        if "group_id" not in self.task_group_args:
+            self.task_group_args["group_id"] = self.group.id
+
         # first, instantiate the TaskGroup
         task_group = TaskGroup(
-            group_id=self.group.id,
             dag=self.dag,
             parent_group=self.task_group,
+            **self.task_group_args,
         )
 
         entities = {}

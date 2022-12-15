@@ -37,11 +37,8 @@ def DbtTaskGroup(
     task_group = CosmosTaskGroup(
         group=group,
         dag=dag,
-        task_group=kwargs.get("task_group")
+        task_group=kwargs.get("task_group"),
+        task_group_args=kwargs,
     ).render()
-
-    # finally, update the TaskGroup with any additional kwargs
-    for key, value in kwargs.items():
-        setattr(task_group, key, value)
 
     return task_group

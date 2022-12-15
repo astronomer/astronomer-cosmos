@@ -56,7 +56,6 @@ class DbtProjectParser(BaseParser):
         Parses the dbt project in the project_path into `cosmos` entities.
         """
         models = extract_deps_from_models(project_path=self.project_path)
-        print(models)
         
         base_group = Group(id="dbt_project")
 

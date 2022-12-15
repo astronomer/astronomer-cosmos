@@ -4,7 +4,7 @@ This is an Astro CLI project that demonstrates how to use the astronomer-cosmos 
 
 ![DBT Task Group](/static/dbt_task_group.png)
 
-# DBT
+# dbt
 
 This instance includes a `dbt` folder containing multiple dbt projects, as well as a `dags/dbt` folder that uses the astronomer-cosmos package to run dbt projects as Airflow DAGs.
 

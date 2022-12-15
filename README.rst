@@ -55,11 +55,7 @@ General Installation
 
     pip install astronomer-cosmos
 
-This only installs dependencies for core provider. To install all dependencies, run:
-
-.. code-block:: bash
-
-    pip install 'astronomer-cosmos[all]'
+Note that this only installs dependencies for the core provider. Read below for more info on how to install specific providers.
 
 Database Specific Installation (dbt)
 ************************************

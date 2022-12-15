@@ -1,13 +1,12 @@
-from airflow.models import DAG
-
-from cosmos.providers.dbt.parser.project import DbtProjectParser
 from cosmos.core.render import CosmosDag
+from cosmos.providers.dbt.parser.project import DbtProjectParser
 
 
 def DbtDag(
     dbt_project_name: str,
     conn_id: str,
     dbt_args: dict = None,
+    emit_datasets: bool = True,
     **kwargs,
 ):
     """
@@ -19,6 +18,8 @@ def DbtDag(
     :type conn_id: str
     :param dbt_args: Parameters to pass to the underlying dbt operators
     :type dbt_args: dict
+    :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
+    :type emit_datasets: bool
     :param kwargs: Additional kwargs to pass to the DAG
     :type kwargs: dict
     :return: The rendered DAG
@@ -26,9 +27,7 @@ def DbtDag(
     """
     # first, parse the dbt project and get a Group
     parser = DbtProjectParser(
-        project_name=dbt_project_name,
-        conn_id=conn_id,
-        dbt_args=dbt_args,
+        project_name=dbt_project_name, conn_id=conn_id, dbt_args=dbt_args, emit_datasets=emit_datasets
     )
     group = parser.parse()
 

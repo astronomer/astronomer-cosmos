@@ -25,8 +25,8 @@ def DbtTaskGroup(
     :type emit_datasets: bool
     :param kwargs: Additional kwargs to pass to the DAG
     :type kwargs: dict
-    :return: The rendered DAG
-    :rtype: airflow.models.DAG
+    :return: The rendered Task Group
+    :rtype: airflow.utils.task_group.TaskGroup
     """
     # first, parse the dbt project and get a Group
     parser = DbtProjectParser(

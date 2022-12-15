@@ -2,13 +2,12 @@
     :target: https://badge.fury.io/py/astronomer-cosmos
 
 .. image:: static/banner.svg
+  :align: center
 
 Astronomer Cosmos
 =================
 
 A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks.
-
-.. image:: static/cosmos_banner.png
 
 Current support for:
  - dbt

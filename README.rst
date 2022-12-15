@@ -1,6 +1,6 @@
 .. image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
-    
+
 Astronomer Cosmos
 =================
 
@@ -9,7 +9,7 @@ A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs 
 Quickstart
 _____________
 
-Clone this repository to set up a local environment. Then, head over to our :code:`astronomer-cosmos/examples` directory and follow its README! 
+Clone this repository to set up a local environment. Then, head over to our :code:`astronomer-cosmos/examples` directory and follow its README!
 
 .. image:: cosmos_banner.png
 
@@ -17,6 +17,9 @@ Installation
 _____________
 
 Install and update using `pip <https://pip.pypa.io/en/stable/getting-started/>`_:
+
+General Installation
+********************
 
 .. code-block:: bash
 
@@ -28,12 +31,16 @@ This only installs dependencies for core provider. To install all dependencies, 
 
     pip install 'astronomer-cosmos[all]'
 
-To only install the dependencies for a specific integration, specify the integration name as extra argument, example
-to install dbt integration dependencies, run:
+Database Specific Installation (dbt)
+************************************
+
+
+To only install the dependencies for a specific databases, specify it in the extra argument as dbt.<database>. For
+example, for postgres run:
 
 .. code-block:: bash
 
-    pip install 'astronomer-cosmos[dbt]'
+    pip install 'astronomer-cosmos[dbt.postgres]'
 
 Extras
 ^^^^^^
@@ -47,13 +54,29 @@ Extras
      - Installation Command
      - Dependencies
 
+   * - ``core``
+     - ``pip install astronomer-cosmos``
+     - pydantic, Jinja2
+
    * - ``all``
      - ``pip install 'astronomer-cosmos[all]'``
-     - All
+     - pydantic, Jinja2, dbt core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
 
-   * - ``dbt``
-     - ``pip install 'astronomer-cosmos[dbt]'``
-     - dbt core
+   * - ``dbt.postgres``
+     - ``pip install 'astronomer-cosmos[dbt.postgres]'``
+     - pydantic, Jinja2, dbt core, dbt-postgres
+
+   * - ``dbt.bigquery``
+     - ``pip install 'astronomer-cosmos[dbt.postgres]'``
+     - pydantic, Jinja2, dbt core, dbt-bigquery
+
+   * - ``dbt.redshift``
+     - ``pip install 'astronomer-cosmos[dbt.redshift]'``
+     - pydantic, Jinja2, dbt core, dbt-redshift
+
+   * - ``dbt.snowflake``
+     - ``pip install 'astronomer-cosmos[dbt.snowflake]'``
+     - pydantic, Jinja2, dbt core, dbt-snowflake
 
 Example Usage
 _____________

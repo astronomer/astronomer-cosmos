@@ -1,6 +1,8 @@
 import logging
 import os
 
+from airflow.datasets import Dataset
+
 from cosmos.core.graph.entities import Group, Task
 from cosmos.core.parse.base_parser import BaseParser
 
@@ -78,6 +80,7 @@ class DbtProjectParser(BaseParser):
             entities[run_task.id] = run_task
 
             # make the test task
+            args["outlets"] = [Dataset(f"DBT://{model.upper()}")]
             test_task = Task(
                 id=f"{model}_test",
                 operator_class="cosmos.providers.dbt.core.operators.DBTTestOperator",

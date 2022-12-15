@@ -6,7 +6,7 @@
 
 
 Astronomer Cosmos |fury|
-=================
+========================
 
 A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks.
 

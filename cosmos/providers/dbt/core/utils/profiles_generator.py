@@ -2,19 +2,16 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 
 import yaml
 from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
 
-from pathlib import Path
-
 from cosmos.providers.dbt.core.profiles.bigquery import bigquery_profile
 from cosmos.providers.dbt.core.profiles.postgres import postgres_profile
 from cosmos.providers.dbt.core.profiles.redshift import redshift_profile
 from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +57,21 @@ def create_profile_vars(conn: Connection, database, schema):
 
     elif conn.conn_type == "snowflake":
         profile = "snowflake_profile"
+        extras = {"account": "account", "region": "region", "role": "role", "warehouse": "warehouse"}
+
+        # At some point the extras removed a prefix extra__snowflake__ when the provider got updated... handling that
+        # here.
+        if conn.extra_dejson.get("account") is None:
+            for key, value in extras.items():
+                extras[key] = f"extra__snowflake__{value}"
+
         profile_vars = {
             "SNOWFLAKE_USER": conn.login,
             "SNOWFLAKE_PASSWORD": conn.password,
-            "SNOWFLAKE_ACCOUNT": f"{conn.extra_dejson.get('account')}.{conn.extra_dejson.get('region')}",
-            "SNOWFLAKE_ROLE": conn.extra_dejson.get("role"),
+            "SNOWFLAKE_ACCOUNT": f"{conn.extra_dejson.get(extras['account'])}.{conn.extra_dejson.get(extras['region'])}",
+            "SNOWFLAKE_ROLE": conn.extra_dejson.get(extras["role"]),
             "SNOWFLAKE_DATABASE": database,
-            "SNOWFLAKE_WAREHOUSE": conn.extra_dejson.get("warehouse"),
+            "SNOWFLAKE_WAREHOUSE": conn.extra_dejson.get(extras["warehouse"]),
             "SNOWFLAKE_SCHEMA": schema,
         }
 
@@ -123,7 +128,12 @@ def map_profile(conn_id, db_override=None, schema_override=None):
         if conn.conn_type != "snowflake":
             db = conn.schema
         else:
-            db = conn.extra_dejson.get("database")
+            # At some point the extras removed a prefix extra__snowflake__ when the provider got updated... handling
+            # that here.
+            if conn.extra_dejson.get("database") is not None:
+                db = conn.extra_dejson.get("database")
+            else:
+                db = conn.extra_dejson.get("extra__snowflake__database")
 
     # set schema override
     if conn.conn_type == "snowflake":

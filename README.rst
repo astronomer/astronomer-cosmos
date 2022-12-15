@@ -86,10 +86,10 @@ Extras
 
    * - ``core``
      - ``pip install astronomer-cosmos``
-     - pydantic, Jinja2
+     - apache-airflow, pydantic, Jinja2
 
-   * - ``all``
-     - ``pip install 'astronomer-cosmos[all]'``
+   * - ``dbt.all``
+     - ``pip install 'astronomer-cosmos[dbt.all]'``
      - pydantic, Jinja2, dbt core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
 
    * - ``dbt.postgres``
@@ -97,7 +97,7 @@ Extras
      - pydantic, Jinja2, dbt core, dbt-postgres
 
    * - ``dbt.bigquery``
-     - ``pip install 'astronomer-cosmos[dbt.postgres]'``
+     - ``pip install 'astronomer-cosmos[dbt.bigquery]'``
      - pydantic, Jinja2, dbt core, dbt-bigquery
 
    * - ``dbt.redshift``

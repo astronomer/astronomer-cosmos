@@ -52,7 +52,6 @@ class DBTBaseOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("env", "vars")
-    ui_color = "#9370DB"
 
     def __init__(
         self,
@@ -231,6 +230,7 @@ class DBTLSOperator(DBTBaseOperator):
     Executes a dbt core ls command.
 
     """
+    ui_color = "#DBCDF6"
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -248,6 +248,7 @@ class DBTSeedOperator(DBTBaseOperator):
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
 
     """
+    ui_color = "#F58D7E"
 
     def __init__(self, full_refresh: bool = False, **kwargs) -> None:
         self.full_refresh = full_refresh
@@ -272,6 +273,8 @@ class DBTRunOperator(DBTBaseOperator):
     Executes a dbt core run command.
 
     """
+    ui_color = "#7352BA"
+    ui_fgcolor = "#F4F2FC"
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -287,6 +290,7 @@ class DBTTestOperator(DBTBaseOperator):
     Executes a dbt core test command.
 
     """
+    ui_color = "#8194E0"
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)

@@ -7,10 +7,16 @@ import yaml
 from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
 
+from pathlib import Path
+
 from cosmos.providers.dbt.core.profiles.bigquery import bigquery_profile
 from cosmos.providers.dbt.core.profiles.postgres import postgres_profile
 from cosmos.providers.dbt.core.profiles.redshift import redshift_profile
 from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_default_profiles():
@@ -32,13 +38,12 @@ def create_default_profiles():
         os.makedirs(directory_path)
 
     # Create the file if it does not exist
-    if not os.path.exists(file_path):
-        print("profiles.yml not found - initializing.")
+    profile_file = Path(file_path)
+    if not profile_file.exists():
+        # make the parent dir
+        profile_file.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w") as file:
             yaml.dump(profiles, file)
-        print("done")
-    else:
-        print("profiles.yml found - skipping")
 
 
 def create_profile_vars(conn: Connection, database, schema):
@@ -96,7 +101,7 @@ def create_profile_vars(conn: Connection, database, schema):
         }
 
     else:
-        print(f"Connection type {conn.type} is not yet supported.", file=sys.stderr)
+        logger.error(f"Connection type {conn.type} is not yet supported.", file=sys.stderr)
         sys.exit(1)
 
     return profile, profile_vars

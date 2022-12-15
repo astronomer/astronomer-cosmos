@@ -1,17 +1,18 @@
 from airflow.models import DAG
 
 from cosmos.providers.dbt.parser.project import DbtProjectParser
-from cosmos.core.render import CosmosDag
+from cosmos.core.render import CosmosTaskGroup
 
 
-def DbtDag(
+def DbtTaskGroup(
     dbt_project_name: str,
     conn_id: str,
+    dag: DAG,
     dbt_args: dict = None,
     **kwargs,
 ):
     """
-    Render a dbt project as an Airflow DAG.
+    Render a dbt project as an Airflow TaskGroup.
 
     :param dbt_project_name: The name of the dbt project
     :type dbt_project_name: str
@@ -32,7 +33,12 @@ def DbtDag(
     )
     group = parser.parse()
 
-    # then, render the Group as a DAG
-    dag = CosmosDag(group=group, dag_args=kwargs).render()
+    # then, render the Group as an Airflow TaskGroup
+    task_group = CosmosTaskGroup(
+        group=group,
+        dag=dag,
+        task_group=kwargs.get("task_group"),
+        task_group_args=kwargs,
+    ).render()
 
-    return dag
+    return task_group

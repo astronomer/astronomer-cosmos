@@ -17,7 +17,7 @@ jobs:
       run: |
         make install_dev
         cd ${GITHUB_WORKSPACE}
-        make build
+        make package
         make ship
       env:
         TWINE_USER: "__token__"

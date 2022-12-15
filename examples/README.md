@@ -33,4 +33,4 @@ RUN python -m virtualenv dbt_venv && \
     deactivate
 ```
 
-The `dags/dbt` folder contains a few DAGs that demonstrate how to run dbt projects as Airflow DAGs. They're configured to point to the Airflow database (defined in `airflow_settings.yaml`) so they'll work out of the box!
+The `dags/` folder contains a few DAGs that demonstrate how to run dbt projects as Airflow DAGs. They're configured to point to the Airflow database (defined in `airflow_settings.yaml`) so they'll work out of the box!

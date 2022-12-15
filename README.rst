@@ -1,4 +1,4 @@
-.. image:: static/banner.svg
+.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/static/banner.png
   :align: center
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
@@ -23,7 +23,8 @@ _____________
 
 `Astronomer Cosmos` is a package to parse and render third-party workflows as Airflow DAGs, `Airflow TaskGroups <https://docs.astronomer.io/learn/task-groups>`_, or individual tasks.
 
-.. image:: dbt_dag.png
+.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/static/dbt_dag.png
+   :width: 800
 
 Cosmos contains `providers` for third-party tools, and each `provider` can be deconstructed into the following components:
 

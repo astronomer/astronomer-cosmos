@@ -16,7 +16,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/astronomer-cosmos-v')
       run: |
         make install_dev
-        cd ${GITHUB_WORKSPACE}/astronomer-cosmos
+        cd ${GITHUB_WORKSPACE}
         make build
         make ship
       env:

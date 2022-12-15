@@ -1,0 +1,2 @@
+gcc
+python3-dev

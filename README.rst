@@ -6,6 +6,11 @@ Astronomer Cosmos
 
 A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other workflows.
 
+Quickstart
+_____________
+
+Clone this repository to set up a local environment. Then, head over to our :code:`astronomer-cosmos/examples` directory and follow its README! 
+
 .. image:: cosmos_banner.png
 
 Installation

@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: subscription_periods
+    tests:
+      # test that a customer can only have one active subscription at a time
+      - dbt_utils.mutually_exclusive_ranges:
+          lower_bound_column: start_date
+          upper_bound_column: end_date
+          partition_by: customer_id
+      # test that the start date of a subscription is the first of the month
+      - dbt_utils.expression_is_true:
+          expression: date_trunc('month', start_date) = start_date
+      # test that the end date of a subscription is the first of the month
+      - dbt_utils.expression_is_true:
+          expression: date_trunc('month', end_date) = end_date
+
+
+  - name: customer_revenue_by_month
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - customer_id
+            - date_month
+
+  - name: customer_churn_month
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null

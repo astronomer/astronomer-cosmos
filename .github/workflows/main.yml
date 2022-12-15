@@ -11,7 +11,6 @@ jobs:
       with:
         python-version: 3.8
 
-    # run only if 'astronomer-cosmos' was changed
     - name: astronomer-cosmos
       if: startsWith(github.ref, 'refs/tags/astronomer-cosmos-v')
       run: |

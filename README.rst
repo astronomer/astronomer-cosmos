@@ -1,7 +1,12 @@
+.. image:: https://badge.fury.io/py/astronomer-cosmos.svg
+    :target: https://badge.fury.io/py/astronomer-cosmos
+    
 Astronomer Cosmos
 =================
 
 A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other workflows.
+
+.. image:: cosmos_banner.png
 
 Installation
 _____________
@@ -48,34 +53,109 @@ Extras
 Example Usage
 _____________
 
-Imagine we have a dbt project located at ``./dbt/my_project``.
+Imagine we have dbt projects located at ``./dbt/{{DBT_PROJECT_NAME}}``. We can render these projects as a Airflow DAGs using the ``DbtDag`` class:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag, DbtTaskGroup, DbtTask
+    from pendulum import datetime
+    from airflow import DAG
+    from cosmos.providers.dbt.dag import DbtDag
 
-    # render as a DAG
-    dag = DbtDag(
-        project_dir="./dbt/my_project",
-        dag_id="my_dag",
-        schedule_interval="@daily",
-        default_args={"owner": "airflow"},
+    # dag for the project jaffle_shop
+    jaffle_shop = DbtDag(
+        dbt_project_name="jaffle_shop",
+        conn_id="airflow_db",
+        dbt_args={
+            "schema": "public",
+        },
+        dag_id="jaffle_shop",
+        start_date=datetime(2022, 11, 27),
+        schedule="@daily",
+        doc_md=__doc__,
+        catchup=False,
+        default_args={"owner": "01-EXTRACT"},
     )
 
-    # render as a task group
-    with DAG("my_dag", default_args={"owner": "airflow"}) as dag:
-        task_group = DbtTaskGroup(
-            project_dir="./dbt/my_project",
-            task_group_id="my_task_group",
+    # dag for the project attribution-playbook
+    attribution_playbook = DbtDag(
+        dbt_project_name="attribution-playbook",
+        conn_id="airflow_db",
+        dbt_args={
+            "schema": "public",
+        },
+        dag_id="attribution_playbook",
+        start_date=datetime(2022, 11, 27),
+        schedule="@daily",
+        doc_md=__doc__,
+        catchup=False,
+        default_args={"owner": "01-EXTRACT"},
+    )
+
+    # dag for the project mrr-playbook
+    mrr_playbook = DbtDag(
+        dbt_project_name="mrr-playbook",
+        conn_id="airflow_db",
+        dbt_args={
+            "schema": "public",
+        },
+        dag_id="mrr_playbook",
+        start_date=datetime(2022, 11, 27),
+        schedule="@daily",
+        doc_md=__doc__,
+        catchup=False,
+        default_args={"owner": "01-EXTRACT"},
+    )
+
+Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+
+.. code-block:: python
+
+    """
+    ## Extract DAG
+
+    This DAG is used to illustrate setting an upstream dependency from the dbt DAGs. Notice the `outlets` parameter on the
+    `EmptyOperator` object is creating a
+    [Dataset](https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html) that is used in the `schedule`
+    parameter of the dbt DAGs (`attribution-playbook`, `jaffle_shop`, `mrr-playbook`).
+
+    """
+
+    from pendulum import datetime
+
+    from airflow import DAG
+    from airflow.datasets import Dataset
+    from airflow.operators.empty import EmptyOperator
+    from cosmos.providers.dbt.task_group import DbtTaskGroup
+
+
+    with DAG(
+        dag_id="extract_dag",
+        start_date=datetime(2022, 11, 27),
+        schedule="@daily",
+        doc_md=__doc__,
+        catchup=False,
+        default_args={"owner": "01-EXTRACT"},
+    ) as dag:
+
+        e1 = EmptyOperator(
+            task_id="ingestion_workflow", outlets=[Dataset("DAG://EXTRACT_DAG")]
         )
 
-    # render as an individual task
-    with DAG("my_dag", default_args={"owner": "airflow"}) as dag:
-        task = DbtTask(
-            project_dir="./dbt/my_project",
-            task_id="my_task",
+        dbt_tg = DbtTaskGroup(
+            group_id="dbt_tg",
+            dbt_project_name="jaffle_shop",
+            conn_id="airflow_db",
+            dbt_args={
+                "schema": "public",
+            },
+            dag=dag,
         )
 
+        e2 = EmptyOperator(
+            task_id="some_extraction", outlets=[Dataset("DAG://EXTRACT_DAG")]
+        )
+
+        e1 >> dbt_tg >> e2
 
 Principles
 _____________

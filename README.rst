@@ -178,17 +178,6 @@ A detailed overview an how to contribute can be found in the `Contributing Guide
 As contributors and maintainers to this project, you are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
-Goals for the project
-_____________________
-
-- Goal 1
-- Goal 2
-- Goal 3
-
-Limitations
-___________
-
-- List any limitations
 
 License
 _______

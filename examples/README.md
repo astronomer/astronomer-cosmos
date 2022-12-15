@@ -11,6 +11,7 @@ Your Astro project contains the following files and folders:
 - dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes example dags that map one-to-one to the dbt projects shown in /dbt.
 - dbt: This folder contains the dbt projects we're running and rendering in our dags! [These specific projects are all sourced from dbt labs.](https://docs.getdbt.com/faqs/project/example-projects) Go check them out!
 - Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here. This file also creates a virtual environment for your dbt executions.
+- docker-compose.override.yml: This file writes your changes to the dbt directory into your Airflow containers. This temporary solution keeps changes in sync between the dbt directory and your container.
 - include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
 - packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
 - requirements.txt: Install Python packages needed for your project by adding them to this file. It only requires astronomer-cosmos by default.

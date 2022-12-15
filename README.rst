@@ -19,7 +19,7 @@ Coming soon:
 Principles
 _____________
 
-`Astronomer Cosmos` is a package to parse and render third-party workflows as Airflow DAGs, `Airflow TaskGroups https://docs.astronomer.io/learn/task-groups>`_, or individual tasks.
+`Astronomer Cosmos` is a package to parse and render third-party workflows as Airflow DAGs, `Airflow TaskGroups <https://docs.astronomer.io/learn/task-groups>`_, or individual tasks.
 
 .. image:: dbt_dag.png
 

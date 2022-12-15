@@ -35,13 +35,6 @@ Cosmos operates on a few guiding principles:
 - **Modular**: Cosmos is designed to be modular. Users can install only the dependencies they need for their workflows.
 
 
-Every provider comes with two main components:
-
-- ``parsers``: These are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects.
-- ``operators``: These are used when the workflow is converted into a DAG. They are responsible for executing the tasks in the workflow.
-
-``Astronomer Cosmos`` is not opinionated in the sense that it does not enforce any rendering method. Rather, it comes with the tools to render workflows as Airflow DAGs, task groups, or individual tasks.
-
 Quickstart
 _____________
 

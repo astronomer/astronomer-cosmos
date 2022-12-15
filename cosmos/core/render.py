@@ -38,8 +38,6 @@ class CosmosDag(BaseModel):
 
         entities = {}
 
-        print(self.group)
-
         for ent in self.group.entities:
             if isinstance(ent, Group):
                 entities[ent.id] = CosmosTaskGroup(
@@ -105,7 +103,7 @@ class CosmosTaskGroup(BaseModel):
         # then, render all the entities in the group
         for ent in self.group.entities:
             if isinstance(ent, Group):
-                CosmosTaskGroup(
+                entities[ent.id] = CosmosTaskGroup(
                     group=ent,
                     dag=self.dag,
                     task_group=task_group,

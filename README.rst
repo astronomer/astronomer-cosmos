@@ -11,7 +11,7 @@ _____________
 
 Clone this repository to set up a local environment. Then, head over to our :code:`astronomer-cosmos/examples` directory and follow its README!
 
-.. image:: cosmos_banner.png
+.. image:: static/cosmos_banner.png
 
 Installation
 _____________

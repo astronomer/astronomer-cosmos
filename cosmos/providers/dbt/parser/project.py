@@ -40,6 +40,7 @@ class DbtProjectParser(BaseParser):
         :type emit_datasets: bool
         """
         # validate the dbt root path
+        self.project_name = project_name
         validate_directory(dbt_root_path, "dbt_root_path")
         self.dbt_root_path = dbt_root_path
 
@@ -87,7 +88,7 @@ class DbtProjectParser(BaseParser):
 
             # make the test task
             if self.emit_datasets:
-                args["outlets"] = [Dataset(f"DBT://{model.upper()}")]
+                args["outlets"] = [Dataset(f"DBT://{self.conn_id.upper()}/{self.project_name.upper()}/{model.upper()}")]
             test_task = Task(
                 id=f"{model}_test",
                 operator_class="cosmos.providers.dbt.core.operators.DBTTestOperator",

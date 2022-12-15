@@ -40,7 +40,7 @@ build:
 .PHONY: install_dev
 install_dev:
 	python -m pip install --upgrade pip
-	python -m pip install -r dev-requirements.txt
+	python -m pip install -r gha-requirements.txt
 
 .PHONY: pre-commit-install
 pre-commit-install:

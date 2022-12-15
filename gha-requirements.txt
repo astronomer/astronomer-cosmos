@@ -1,0 +1,10 @@
+twine
+pytest
+requests
+
+pre-commit
+black
+isort
+pylint
+pyupgrade
+pytest-cov

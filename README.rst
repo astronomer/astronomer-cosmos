@@ -50,6 +50,12 @@ Extras
      - ``pip install 'astronomer-cosmos[dbt]'``
      - dbt core
 
+Getting Started / Quickstart
+_____________
+
+Feel free to clone this repository to set up a local environment. Then, head over to our /examples directory and follow its README! 
+
+
 Example Usage
 _____________
 

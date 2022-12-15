@@ -86,23 +86,23 @@ Extras
 
    * - ``dbt.all``
      - ``pip install 'astronomer-cosmos[dbt.all]'``
-     - astronomer-comsos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
+     - astronomer-cosmos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
 
    * - ``dbt.postgres``
      - ``pip install 'astronomer-cosmos[dbt.postgres]'``
-     - astronomer-comsos, dbt-core, dbt-postgres
+     - astronomer-cosmos, dbt-core, dbt-postgres
 
    * - ``dbt.bigquery``
      - ``pip install 'astronomer-cosmos[dbt.bigquery]'``
-     - astronomer-comsos, dbt-core, dbt-bigquery
+     - astronomer-cosmos, dbt-core, dbt-bigquery
 
    * - ``dbt.redshift``
      - ``pip install 'astronomer-cosmos[dbt.redshift]'``
-     - astronomer-comsos, dbt-core, dbt-redshift
+     - astronomer-cosmos, dbt-core, dbt-redshift
 
    * - ``dbt.snowflake``
      - ``pip install 'astronomer-cosmos[dbt.snowflake]'``
-     - astronomer-comsos, dbt-core, dbt-snowflake
+     - astronomer-cosmos, dbt-core, dbt-snowflake
 
 Example Usage
 _____________

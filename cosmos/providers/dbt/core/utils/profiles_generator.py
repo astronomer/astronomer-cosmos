@@ -7,6 +7,8 @@ import yaml
 from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
 
+from pathlib import Path
+
 from cosmos.providers.dbt.core.profiles.bigquery import bigquery_profile
 from cosmos.providers.dbt.core.profiles.postgres import postgres_profile
 from cosmos.providers.dbt.core.profiles.redshift import redshift_profile
@@ -32,8 +34,11 @@ def create_default_profiles():
         os.makedirs(directory_path)
 
     # Create the file if it does not exist
-    if not os.path.exists(file_path):
+    profile_file = Path(file_path)
+    if not profile_file.exists():
         print("profiles.yml not found - initializing.")
+        # make the parent dir
+        profile_file.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w") as file:
             yaml.dump(profiles, file)
         print("done")

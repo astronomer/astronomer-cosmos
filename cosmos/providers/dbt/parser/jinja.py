@@ -54,15 +54,12 @@ def extract_deps_from_models(project_path: str) -> Dict[str, List[str]]:
 
         # if there's a dependency, add it to the list
         model_deps = []
-        for node in ast.find_all(jinja2.nodes.Call):
-            if node.node.name == "ref":
-                model_deps.append(node.args[0].value)
+        for base_node in ast.find_all(jinja2.nodes.Call):
+            if hasattr(base_node.node, "name"):
+                if base_node.node.name == "ref":
+                    model_deps.append(base_node.args[0].value)
 
         # add the dependencies to the dictionary, without the .sql extension
         dependencies[Path(model_file).stem] = model_deps
-
-    # pretty print the dependencies
-    # for model, deps in dependencies.items():
-    #     print(f"{model}: {deps}")
 
     return dependencies

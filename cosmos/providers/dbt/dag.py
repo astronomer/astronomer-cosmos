@@ -1,43 +1,42 @@
-from cosmos.core.render.dag import CosmosDag
+from airflow.models import DAG
+
 from cosmos.providers.dbt.parser.project import DbtProjectParser
+from cosmos.core.render import CosmosDag
 
 
-class DbtDag(CosmosDag):
+def DbtDag(
+    dbt_project_name: str,
+    conn_id: str,
+    dbt_args: dict = None,
+    **kwargs,
+):
     """
     Render a dbt project as an Airflow DAG.
+
+    :param dbt_project_name: The name of the dbt project
+    :type dbt_project_name: str
+    :param conn_id: The Airflow connection ID to use for the dbt profile
+    :type conn_id: str
+    :param dbt_args: Parameters to pass to the underlying dbt operators
+    :type dbt_args: dict
+    :param kwargs: Additional kwargs to pass to the DAG
+    :type kwargs: dict
+    :return: The rendered DAG
+    :rtype: airflow.models.DAG
     """
+    # first, parse the dbt project and get a Group
+    parser = DbtProjectParser(
+        project_name=dbt_project_name,
+        conn_id=conn_id,
+        dbt_args=dbt_args,
+    )
+    group = parser.parse()
 
-    def __init__(self, project_name: str, **kwargs):
-        """
-        :param project_dir: The path to the dbt project directory
-        :type project_dir: str
-        :param kwargs: Additional arguments to pass to the DAG constructor
-        :type kwargs: dict
+    # then, render the Group as a DAG
+    dag = CosmosDag(group=group).render()
 
-        :return: The rendered DAG
-        :rtype: airflow.models.DAG
-        """
-        self.project_name = project_name
-        self.kwargs = kwargs
+    # finally, update the DAG with any additional kwargs
+    for key, value in kwargs.items():
+        setattr(dag, key, value)
 
-    def render(self):
-        """
-        Render the DAG.
-
-        :return: The rendered DAG
-        :rtype: airflow.models.DAG
-        """
-        # first, parse the dbt project and get a Group
-        parser = DbtProjectParser(
-            project_name=self.project_name,
-        )
-        group = parser.parse()
-
-        # then, render the Group as a DAG
-        dag = super().render(group)
-
-        # finally, update the DAG with any additional kwargs
-        for key, value in self.kwargs.items():
-            setattr(dag, key, value)
-
-        return dag
+    return dag

@@ -6,6 +6,8 @@ Astronomer Cosmos
 
 A framework for generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other workflows.
 
+.. image:: cosmos_banner.png
+
 Installation
 _____________
 

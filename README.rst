@@ -75,60 +75,15 @@ Imagine we have dbt projects located at ``./dbt/{{DBT_PROJECT_NAME}}``. We can r
         },
         dag_id="jaffle_shop",
         start_date=datetime(2022, 11, 27),
-        schedule="@daily",
-        doc_md=__doc__,
-        catchup=False,
-        default_args={"owner": "01-EXTRACT"},
-    )
-
-    # dag for the project attribution-playbook
-    attribution_playbook = DbtDag(
-        dbt_project_name="attribution-playbook",
-        conn_id="airflow_db",
-        dbt_args={
-            "schema": "public",
-        },
-        dag_id="attribution_playbook",
-        start_date=datetime(2022, 11, 27),
-        schedule="@daily",
-        doc_md=__doc__,
-        catchup=False,
-        default_args={"owner": "01-EXTRACT"},
-    )
-
-    # dag for the project mrr-playbook
-    mrr_playbook = DbtDag(
-        dbt_project_name="mrr-playbook",
-        conn_id="airflow_db",
-        dbt_args={
-            "schema": "public",
-        },
-        dag_id="mrr_playbook",
-        start_date=datetime(2022, 11, 27),
-        schedule="@daily",
-        doc_md=__doc__,
-        catchup=False,
-        default_args={"owner": "01-EXTRACT"},
     )
 
 Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 
-    """
-    ## Extract DAG
-
-    This DAG is used to illustrate setting an upstream dependency from the dbt DAGs. Notice the `outlets` parameter on the
-    `EmptyOperator` object is creating a
-    [Dataset](https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html) that is used in the `schedule`
-    parameter of the dbt DAGs (`attribution-playbook`, `jaffle_shop`, `mrr-playbook`).
-
-    """
-
     from pendulum import datetime
 
     from airflow import DAG
-    from airflow.datasets import Dataset
     from airflow.operators.empty import EmptyOperator
     from cosmos.providers.dbt.task_group import DbtTaskGroup
 
@@ -137,14 +92,9 @@ Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTask
         dag_id="extract_dag",
         start_date=datetime(2022, 11, 27),
         schedule="@daily",
-        doc_md=__doc__,
-        catchup=False,
-        default_args={"owner": "01-EXTRACT"},
     ) as dag:
 
-        e1 = EmptyOperator(
-            task_id="ingestion_workflow", outlets=[Dataset("DAG://EXTRACT_DAG")]
-        )
+        e1 = EmptyOperator(task_id="ingestion_workflow")
 
         dbt_tg = DbtTaskGroup(
             group_id="dbt_tg",
@@ -156,9 +106,7 @@ Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTask
             dag=dag,
         )
 
-        e2 = EmptyOperator(
-            task_id="some_extraction", outlets=[Dataset("DAG://EXTRACT_DAG")]
-        )
+        e2 = EmptyOperator(task_id="some_extraction")
 
         e1 >> dbt_tg >> e2
 

@@ -55,11 +55,7 @@ General Installation
 
     pip install astronomer-cosmos
 
-This only installs dependencies for core provider. To install all dependencies, run:
-
-.. code-block:: bash
-
-    pip install 'astronomer-cosmos[all]'
+Note that this only installs dependencies for the core provider. Read below for more info on how to install specific providers.
 
 Database Specific Installation (dbt)
 ************************************
@@ -86,27 +82,27 @@ Extras
 
    * - ``core``
      - ``pip install astronomer-cosmos``
-     - pydantic, Jinja2
+     - apache-airflow, pydantic, Jinja2
 
-   * - ``all``
-     - ``pip install 'astronomer-cosmos[all]'``
-     - pydantic, Jinja2, dbt core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
+   * - ``dbt.all``
+     - ``pip install 'astronomer-cosmos[dbt.all]'``
+     - astronomer-comsos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
 
    * - ``dbt.postgres``
      - ``pip install 'astronomer-cosmos[dbt.postgres]'``
-     - pydantic, Jinja2, dbt core, dbt-postgres
+     - astronomer-comsos, dbt-core, dbt-postgres
 
    * - ``dbt.bigquery``
-     - ``pip install 'astronomer-cosmos[dbt.postgres]'``
-     - pydantic, Jinja2, dbt core, dbt-bigquery
+     - ``pip install 'astronomer-cosmos[dbt.bigquery]'``
+     - astronomer-comsos, dbt-core, dbt-bigquery
 
    * - ``dbt.redshift``
      - ``pip install 'astronomer-cosmos[dbt.redshift]'``
-     - pydantic, Jinja2, dbt core, dbt-redshift
+     - astronomer-comsos, dbt-core, dbt-redshift
 
    * - ``dbt.snowflake``
      - ``pip install 'astronomer-cosmos[dbt.snowflake]'``
-     - pydantic, Jinja2, dbt core, dbt-snowflake
+     - astronomer-comsos, dbt-core, dbt-snowflake
 
 Example Usage
 _____________

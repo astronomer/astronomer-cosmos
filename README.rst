@@ -1,8 +1,9 @@
+.. image:: static/banner.svg
+  :align: center
+
 .. image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
 
-.. image:: static/banner.svg
-  :align: center
 
 Astronomer Cosmos
 =================

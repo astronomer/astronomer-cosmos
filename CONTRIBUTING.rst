@@ -78,11 +78,16 @@ in your terminal:
           - ./astronomer-cosmos/cosmos:/usr/local/airflow/cosmos:rw
 
 #. ``astro dev start`` (ensure you are running this from ``~/cosmos-sandbox``)
+#. Once the sandbox successfully starts, navigate to localhost:8080 in your browser (username: ``admin``, password: ``admin``) and unpause all of the DAGs
+
+After following the above steps, any changes made in the `~/cosmos-sandbox/astronomer-cosmos` project will be tracked by
+``git`` and can be pushed as commits to your PR.
 
 Pre-Commit
 __________
 
-We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
+We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run the following from
+your cloned ``astronomer-cosmos`` directory:
 
 .. code-block:: bash
 

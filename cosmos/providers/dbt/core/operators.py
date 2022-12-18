@@ -326,3 +326,40 @@ class DbtTestOperator(DbtBaseOperator):
     def execute(self, context: Context):
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
+
+class DbtRunOperationOperator(DbtBaseOperator):
+    """
+    Executes a dbt core run-operation command.
+
+    :param macro_name: name of macro to execute
+    :type macro_name: str
+    :param args: Supply arguments to the macro. This dictionary will be mapped to the keyword arguments defined in the
+        selected macro. This argument should be a YAML string, i.e. '{my_variable: my_value}'
+    :type args: dict
+    """
+    ui_color = "#8194E0"
+    template_fields: Sequence[str] = ("args")
+
+    def __init__(
+        self,
+        macro_name: str,
+        args: dict = None,
+        **kwargs
+    ) -> None:
+        self.macro_name = macro_name
+        self.args = args
+        super().__init__(**kwargs)
+        self.base_cmd = f"run-operation {self.macro_name} "
+
+    def add_cmd_flags(self):
+        flags = []
+        if self.args is not None:
+            dict_string = json.dumps(self.args)
+            flags.append('--args')
+            flags.append(f"'{dict_string}'")
+        return flags
+
+    def execute(self, context: Context):
+        cmd_flags = self.add_cmd_flags()
+        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return result.output

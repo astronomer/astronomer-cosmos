@@ -1,6 +1,7 @@
 from typing import Sequence
 
 import os
+import json
 import shutil
 
 from airflow.compat.functools import cached_property
@@ -19,36 +20,56 @@ class DbtBaseOperator(BaseOperator):
 
     :param project_dir: Which directory to look in for the dbt_project.yml file. Default is the current working
     directory and its parents.
+    :type project_dir: str
     :param conn_id: The airflow connection to use as the target
+    :type conn_id: str
     :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
+    :type base_cmd: str
     :param select: dbt optional argument that specifies which nodes to include.
+    :type select: str
     :param exclude: dbt optional argument that specifies which models to exclude.
+    :type exclude: str
     :param selector: dbt optional argument - the selector name to use, as defined in selectors.yml
+    :type selector: str
     :param vars: dbt optional argument - Supply variables to the project. This argument overrides variables
         defined in your dbt_project.yml file. This argument should be a YAML
         string, eg. '{my_variable: my_value}' (templated)
+    :type vars: dict
     :param models: dbt optional argument that specifies which nodes to include.
+    :type models: str
     :param cache_selected_only:
+    :type cache_selected_only: bool
     :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
         the dbt_project.yml file ('require-dbt-version')
+    :type no_version_check: bool
     :param fail_fast: dbt optional argument to make dbt exit immediately if a single resource fails to build.
+    :type fail_fast: bool
     :param quiet: dbt optional argument to show only error logs in stdout
+    :type quiet: bool
     :param warn_error: dbt optional argument to convert dbt warnings into errors
+    :type warn_error: bool
     :param db_name: override the target db instead of the one supplied in the airflow connection
+    :type db_name: str
     :param schema: override the target schema instead of the one supplied in the airflow connection
+    :type schema: str
     :param env: If env is not None, it must be a dict that defines the
         environment variables for the new process; these are used instead
         of inheriting the current process environment, which is the default
         behavior. (templated)
+    :type env: dict
     :param append_env: If False(default) uses the environment variables passed in env params
         and does not inherit the current process environment. If True, inherits the environment variables
         from current passes and then environment variable passed by the user will either update the existing
         inherited environment variables or the new variables gets appended to it
+    :type append_env: bool
     :param output_encoding: Output encoding of bash command
+    :type output_encoding: str
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
+    :type skip_exit_code: int
     :param python_venv: Path to venv for dbt command execution (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/activate)
+    :type python_venv: str
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -61,7 +82,7 @@ class DbtBaseOperator(BaseOperator):
         select: str = None,
         exclude: str = None,
         selector: str = None,
-        vars: str = None,
+        vars: dict = None,
         models: str = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
@@ -161,8 +182,14 @@ class DbtBaseOperator(BaseOperator):
             dbt_name = f"--{global_flag.replace('_', '-')}"
             global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
-                flags.append(dbt_name)
-                flags.append(str(global_flag_value))
+                if isinstance(global_flag_value, dict):
+                    #handle dict
+                    dict_string = json.dumps(global_flag_value)
+                    flags.append(dbt_name)
+                    flags.append(f"'{dict_string}'")
+                else:
+                    flags.append(dbt_name)
+                    flags.append(str(global_flag_value))
 
         global_boolean_flags = [
             "no_version_check",

@@ -13,7 +13,7 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 from cosmos.providers.dbt.core.utils.profiles_generator import create_default_profiles, map_profile
 
 
-class DBTBaseOperator(BaseOperator):
+class DbtBaseOperator(BaseOperator):
     """
     Executes a dbt core cli command.
 
@@ -225,7 +225,7 @@ class DBTBaseOperator(BaseOperator):
         return result.output
 
 
-class DBTLSOperator(DBTBaseOperator):
+class DbtLSOperator(DbtBaseOperator):
     """
     Executes a dbt core ls command.
 
@@ -241,7 +241,7 @@ class DBTLSOperator(DBTBaseOperator):
         return result.output
 
 
-class DBTSeedOperator(DBTBaseOperator):
+class DbtSeedOperator(DbtBaseOperator):
     """
     Executes a dbt core seed command.
 
@@ -268,7 +268,7 @@ class DBTSeedOperator(DBTBaseOperator):
         return result.output
 
 
-class DBTRunOperator(DBTBaseOperator):
+class DbtRunOperator(DbtBaseOperator):
     """
     Executes a dbt core run command.
 
@@ -285,7 +285,7 @@ class DBTRunOperator(DBTBaseOperator):
         return result.output
 
 
-class DBTTestOperator(DBTBaseOperator):
+class DbtTestOperator(DbtBaseOperator):
     """
     Executes a dbt core test command.
 

@@ -15,7 +15,7 @@ from airflow import DAG
 from airflow.datasets import Dataset
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators import DBTSeedOperator
+from cosmos.providers.dbt.core.operators import DbtSeedOperator
 
 with DAG(
     dag_id="extract_dag",
@@ -28,7 +28,7 @@ with DAG(
 
     for project in ["jaffle_shop", "mrr-playbook", "attribution-playbook"]:
         name_underscores = project.replace("-", "_")
-        DBTSeedOperator(
+        DbtSeedOperator(
             task_id=f"{name_underscores}_seed",
             project_dir=f"/usr/local/airflow/dbt/{project}",
             schema="public",

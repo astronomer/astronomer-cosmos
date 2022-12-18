@@ -81,7 +81,7 @@ class DbtProjectParser(BaseParser):
             # make the run task
             run_task = Task(
                 id=f"{model}_run",
-                operator_class="cosmos.providers.dbt.core.operators.DBTRunOperator",
+                operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
                 arguments=args,
             )
             entities[run_task.id] = run_task
@@ -91,7 +91,7 @@ class DbtProjectParser(BaseParser):
                 args["outlets"] = [Dataset(f"DBT://{self.conn_id.upper()}/{self.project_name.upper()}/{model.upper()}")]
             test_task = Task(
                 id=f"{model}_test",
-                operator_class="cosmos.providers.dbt.core.operators.DBTTestOperator",
+                operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
                 upstream_entity_ids=[run_task.id],
                 arguments=args,
             )

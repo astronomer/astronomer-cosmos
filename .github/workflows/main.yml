@@ -1,5 +1,12 @@
 name: CI
-on: [push]
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - astronomer-cosmos-v*
+
 jobs:
   ship-package-to-pypi:
     runs-on: ubuntu-latest

@@ -41,7 +41,7 @@ with DAG(
                     task_id=f"drop_{seed}_if_exists",
                     macro_name="drop_table",
                     args={"table_name": seed},
-                    project_dir="/usr/local/airflow/dbt/jaffle_shop",
+                    project_dir=f"/usr/local/airflow/dbt/{project['project']}",
                     schema="public",
                     conn_id="airflow_db",
                     python_venv="/usr/local/airflow/dbt_venv/bin/activate",

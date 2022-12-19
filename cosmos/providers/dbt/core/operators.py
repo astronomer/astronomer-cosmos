@@ -251,6 +251,9 @@ class DbtBaseOperator(BaseOperator):
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
+    def on_kill(self) -> None:
+        self.subprocess_hook.send_sigterm()
+
 
 class DbtLSOperator(DbtBaseOperator):
     """

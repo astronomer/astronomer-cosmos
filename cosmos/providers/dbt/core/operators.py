@@ -1,7 +1,7 @@
 from typing import Sequence
 
-import os
 import json
+import os
 import shutil
 
 from airflow.compat.functools import cached_property
@@ -183,7 +183,7 @@ class DbtBaseOperator(BaseOperator):
             global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
-                    #handle dict
+                    # handle dict
                     dict_string = json.dumps(global_flag_value)
                     flags.append(dbt_name)
                     flags.append(f"'{dict_string}'")
@@ -257,6 +257,7 @@ class DbtLSOperator(DbtBaseOperator):
     Executes a dbt core ls command.
 
     """
+
     ui_color = "#DBCDF6"
 
     def __init__(self, **kwargs) -> None:
@@ -275,6 +276,7 @@ class DbtSeedOperator(DbtBaseOperator):
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
 
     """
+
     ui_color = "#F58D7E"
 
     def __init__(self, full_refresh: bool = False, **kwargs) -> None:
@@ -300,6 +302,7 @@ class DbtRunOperator(DbtBaseOperator):
     Executes a dbt core run command.
 
     """
+
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
 
@@ -317,6 +320,7 @@ class DbtTestOperator(DbtBaseOperator):
     Executes a dbt core test command.
 
     """
+
     ui_color = "#8194E0"
 
     def __init__(self, **kwargs) -> None:
@@ -325,4 +329,38 @@ class DbtTestOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(env=self.get_env(context))
+        return result.output
+
+
+class DbtRunOperationOperator(DbtBaseOperator):
+    """
+    Executes a dbt core run-operation command.
+
+    :param macro_name: name of macro to execute
+    :type macro_name: str
+    :param args: Supply arguments to the macro. This dictionary will be mapped to the keyword arguments defined in the
+        selected macro.
+    :type args: dict
+    """
+
+    ui_color = "#8194E0"
+    template_fields: Sequence[str] = "args"
+
+    def __init__(self, macro_name: str, args: dict = None, **kwargs) -> None:
+        self.macro_name = macro_name
+        self.args = args
+        super().__init__(**kwargs)
+        self.base_cmd = f"run-operation {self.macro_name} "
+
+    def add_cmd_flags(self):
+        flags = []
+        if self.args is not None:
+            dict_string = json.dumps(self.args)
+            flags.append("--args")
+            flags.append(f"'{dict_string}'")
+        return flags
+
+    def execute(self, context: Context):
+        cmd_flags = self.add_cmd_flags()
+        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
         return result.output

@@ -11,6 +11,7 @@ from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles.bigquery import bigquery_profile
+from cosmos.providers.dbt.core.profiles.databricks import databricks_profile
 from cosmos.providers.dbt.core.profiles.postgres import postgres_profile
 from cosmos.providers.dbt.core.profiles.redshift import redshift_profile
 from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
@@ -31,6 +32,7 @@ def create_default_profiles():
         "snowflake_profile": snowflake_profile,
         "redshift_profile": redshift_profile,
         "bigquery_profile": bigquery_profile,
+        "databricks_profile": databricks_profile,
     }
 
     # Define the path to the directory and file
@@ -123,6 +125,15 @@ def create_profile_vars(conn: Connection, database, schema):
                 "auth_provider_x509_cert_url"
             ],
             "BIGQUERY_CLIENT_X509_CERT_URL": json.loads(conn.extra_dejson.get("keyfile_dict"))["client_x509_cert_url"],
+        }
+
+    elif conn.conn_type == "databricks":
+        profile = "databricks_profile"
+        profile_vars = {
+            "DATABRICKS_HOST": conn.host,
+            "DATABRICKS_SCHEMA": schema,
+            "DATABRICKS_HTTP_PATH": conn.extra_dejson.get("http_path"),
+            "DATABRICKS_TOKEN": conn.extra_dejson.get("token"),
         }
 
     else:

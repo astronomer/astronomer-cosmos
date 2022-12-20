@@ -1,9 +1,11 @@
+import fcntl
 import json
 import logging
 import os
 import sys
 from pathlib import Path
 
+import pkg_resources
 import yaml
 from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
@@ -18,6 +20,12 @@ logger = logging.getLogger(__name__)
 
 def create_default_profiles():
 
+    # get installed version of astronomer-cosmos
+    try:
+        package = pkg_resources.get_distribution("astronomer-cosmos")
+    except pkg_resources.DistributionNotFound:
+        package = None
+
     profiles = {
         "postgres_profile": postgres_profile,
         "snowflake_profile": snowflake_profile,
@@ -27,20 +35,32 @@ def create_default_profiles():
 
     # Define the path to the directory and file
     home_dir = os.path.expanduser("~")
-    directory_path = f"{home_dir}/.dbt"
     file_path = f"{home_dir}/.dbt/profiles.yml"
-
-    # Create the directory if it does not exist
-    if not os.path.exists(directory_path):
-        os.makedirs(directory_path)
 
     # Create the file if it does not exist
     profile_file = Path(file_path)
-    if not profile_file.exists():
+
+    if profile_file.exists():
+        # check the version of cosmos when it was created
+        with open(file_path) as f:
+            first_line = next(f)
+        if first_line != f"# {package}\n":
+            # if version of cosmos has been updated - re-write the profiles.yml file
+            with open(file_path, "w") as file:
+                fcntl.flock(file, fcntl.LOCK_SH)
+                file.write(f"# {package}\n")
+                yaml.dump(profiles, file)
+                fcntl.flock(file, fcntl.LOCK_UN)
+    else:
         # make the parent dir
         profile_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # if file doesn't exist - write the profiles.yml file
         with open(file_path, "w") as file:
+            fcntl.flock(file, fcntl.LOCK_SH)
+            file.write(f"# {package}\n")
             yaml.dump(profiles, file)
+            fcntl.flock(file, fcntl.LOCK_UN)
 
 
 def create_profile_vars(conn: Connection, database, schema):

@@ -7,6 +7,7 @@ def DbtDag(
     conn_id: str,
     dbt_args: dict = None,
     emit_datasets: bool = True,
+    dbt_root_path: str = "/usr/local/airflow/dbt",
     **kwargs,
 ):
     """
@@ -20,6 +21,8 @@ def DbtDag(
     :type dbt_args: dict
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :type emit_datasets: bool
+    :param dbt_root_path: The path to the dbt root directory
+    :type dbt_root_path: str
     :param kwargs: Additional kwargs to pass to the DAG
     :type kwargs: dict
     :return: The rendered DAG
@@ -27,7 +30,11 @@ def DbtDag(
     """
     # first, parse the dbt project and get a Group
     parser = DbtProjectParser(
-        project_name=dbt_project_name, conn_id=conn_id, dbt_args=dbt_args, emit_datasets=emit_datasets
+        project_name=dbt_project_name,
+        conn_id=conn_id,
+        dbt_args=dbt_args,
+        emit_datasets=emit_datasets,
+        dbt_root_path=dbt_root_path,
     )
     group = parser.parse()
 

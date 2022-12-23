@@ -8,6 +8,7 @@ def DbtDag(
     dbt_args: dict = None,
     emit_datasets: bool = True,
     dbt_root_path: str = "/usr/local/airflow/dbt",
+    include_tags: list = None,
     **kwargs,
 ):
     """
@@ -23,6 +24,8 @@ def DbtDag(
     :type emit_datasets: bool
     :param dbt_root_path: The path to the dbt root directory
     :type dbt_root_path: str
+    :param include_tags: A list of tags to filter the dbt project
+    :type include_tags: list
     :param kwargs: Additional kwargs to pass to the DAG
     :type kwargs: dict
     :return: The rendered DAG
@@ -35,6 +38,7 @@ def DbtDag(
         dbt_args=dbt_args,
         emit_datasets=emit_datasets,
         dbt_root_path=dbt_root_path,
+        include_tags=include_tags,
     )
     group = parser.parse()
 

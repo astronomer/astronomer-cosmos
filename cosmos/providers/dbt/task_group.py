@@ -11,6 +11,7 @@ def DbtTaskGroup(
     dbt_args: dict = None,
     emit_datasets: bool = True,
     dbt_root_path: str = "/usr/local/airflow/dbt",
+    include_tags: list = None,
     **kwargs,
 ):
     """
@@ -27,6 +28,8 @@ def DbtTaskGroup(
     :param kwargs: Additional kwargs to pass to the DAG
     :param dbt_root_path: The path to the dbt root directory
     :type dbt_root_path: str
+    :param include_tags: A list of tags to filter the dbt project
+    :type include_tags: list
     :type kwargs: dict
     :return: The rendered Task Group
     :rtype: airflow.utils.task_group.TaskGroup
@@ -38,6 +41,7 @@ def DbtTaskGroup(
         dbt_args=dbt_args,
         emit_datasets=emit_datasets,
         dbt_root_path=dbt_root_path,
+        include_tags=include_tags,
     )
     group = parser.parse()
 

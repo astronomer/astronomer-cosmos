@@ -14,7 +14,7 @@ jobs:
           pip install sphinx pydata-sphinx-theme
       - name: Sphinx build
         run: |
-          sphinx-build doc _build
+          sphinx-build docs _build
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:

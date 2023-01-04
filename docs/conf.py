@@ -3,7 +3,6 @@ import sys
 
 # Add the project root to the path so we can import the package
 sys.path.insert(0, os.path.abspath("../"))
-sys.path.insert(0, os.path.abspath("../cosmos"))
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -27,6 +26,10 @@ extensions = [
 
 autosummary_generate = True
 add_module_names = False
+autodoc_mock_imports = [
+    'airflow',
+    'pydantic'
+]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

@@ -1,9 +1,8 @@
 name: Deploy to PyPi
 
 on:
-  push:
-    tags:
-      - astronomer-cosmos-v*
+  release:
+    types: [published]
 
 jobs:
   build:

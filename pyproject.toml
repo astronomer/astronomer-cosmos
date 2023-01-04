@@ -71,8 +71,8 @@ dbt-snowflake = [
 ]
 
 [project.urls]
-Homepage = "github.com/astronomer/astronomer-cosmos"
-Documentation = "github.com/astronomer/astronomer-cosmos"
+Homepage = "https://github.com/astronomer/astronomer-cosmos"
+Documentation = "https://github.com/astronomer/astronomer-cosmos"
 
 [tool.hatch.version]
 path = "cosmos/__init__.py"

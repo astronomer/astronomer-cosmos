@@ -3,6 +3,7 @@ import sys
 
 # Add the project root to the path so we can import the package
 sys.path.insert(0, os.path.abspath("../"))
+sys.path.insert(0, os.path.abspath("../cosmos"))
 
 # Configuration file for the Sphinx documentation builder.
 #

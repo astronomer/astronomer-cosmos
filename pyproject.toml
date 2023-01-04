@@ -1,35 +1,90 @@
-[tool.black]
-# https://github.com/psf/black
-target-version = ["py38"]
-line-length = 120
-color = true
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-exclude = '''
-/(
-    \.git
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-    | env
-    | venv
-    | tests/
-)/
-'''
+[project]
+name = "astronomer-cosmos"
+dynamic = ["version"]
+description = "Render 3rd party workflows in Airflow"
+readme = "README.rst"
+license = "Apache-2.0"
+requires-python = ">=3.7"
+authors = [
+    { name = "Astronomer", email = "humans@astronomer.io" },
+]
+keywords = [
+    "airflow",
+    "apache-airflow",
+    "astronomer",
+    "dags",
+    "dbt",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Apache Airflow",
+    "Framework :: Apache Airflow :: Provider",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "apache-airflow>=2.4",
+    "Jinja2>=3.0.0",
+    "pydantic>=1.8.2",
+]
+
+[project.optional-dependencies]
+dbt-all = [
+    "dbt-bigquery",
+    "dbt-core",
+    "dbt-databricks",
+    "dbt-postgres",
+    "dbt-redshift",
+    "dbt-snowflake",
+]
+dbt-bigquery = [
+    "dbt-bigquery",
+    "dbt-core",
+]
+dbt-databricks = [
+    "dbt-core",
+    "dbt-databricks",
+]
+dbt-postgres = [
+    "dbt-core",
+    "dbt-postgres",
+]
+dbt-redshift = [
+    "dbt-core",
+    "dbt-redshift",
+]
+dbt-snowflake = [
+    "dbt-core",
+    "dbt-snowflake",
+]
+
+[project.urls]
+Homepage = "github.com/astronomer/astronomer-cosmos"
+Documentation = "github.com/astronomer/astronomer-cosmos"
+
+[tool.hatch.version]
+path = "cosmos/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/cosmos",
+]
 
 [tool.isort]
-# https://github.com/timothycrosley/isort/
-py_version = 38
-line_length = 120
-
-known_typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
-sections = ["FUTURE", "TYPING", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-include_trailing_comma = true
 profile = "black"
-multi_line_output = 3
-indent = 4
-color_output = true
+known_third_party = ["airflow", "jinja2", "pydantic"]
+
+[tool.mypy]
+strict = true

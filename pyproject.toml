@@ -82,6 +82,17 @@ include = [
     "/cosmos",
 ]
 
+[tool.hatch.envs.docs]
+dependencies = [
+    "sphinx",
+    "pydata-sphinx-theme",
+    "sphinx-autobuild",
+]
+
+[tool.hatch.envs.docs.scripts]
+build = "sphinx-build -b html docs docs/_build"
+serve = "sphinx-autobuild docs docs/_build"
+
 [tool.isort]
 profile = "black"
 known_third_party = ["airflow", "jinja2", "pydantic"]

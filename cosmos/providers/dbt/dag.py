@@ -1,3 +1,6 @@
+"""
+This module contains a function to render a dbt project as an Airflow DAG.
+"""
 from cosmos.core.render import CosmosDag
 from cosmos.providers.dbt.parser.project import DbtProjectParser
 

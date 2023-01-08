@@ -3,9 +3,12 @@
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
+    
+.. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
+    :target: https://ossrank.com/shield/2121
 
 
-Astronomer Cosmos |fury|
+Astronomer Cosmos |fury| |ossrank|
 ========================
 
 A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!

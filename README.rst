@@ -9,7 +9,7 @@
 
 
 Astronomer Cosmos |fury| |ossrank|
-========================
+==================================
 
 A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
 
@@ -22,13 +22,13 @@ Coming soon:
  - And more...open an issue if you have a request!
 
 Quickstart
-_____________
+__________
 
 Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_.
 
 
 Example Usage (dbt)
-_____________
+___________________
 
 Cosmos lets you render dbt projects as Airflow DAGs and Task Groups. To render a DAG, import ``DbtDag`` and point it to your dbt project.
 

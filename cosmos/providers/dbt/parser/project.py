@@ -6,7 +6,9 @@ from airflow.datasets import Dataset
 from cosmos.core.graph.entities import Group, Task
 from cosmos.core.parse.base_parser import BaseParser
 
-from .jinja import extract_deps_from_models
+from .jinja import extract_model_data
+
+# from .jinja import extract_model_tags
 from .utils import validate_directory
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,7 @@ class DbtProjectParser(BaseParser):
         dbt_args: dict = {},
         dbt_root_path: str = "/usr/local/airflow/dbt",
         emit_datasets: bool = True,
+        include_tags: list = None,
     ):
         """
         Initializes the parser.
@@ -38,6 +41,8 @@ class DbtProjectParser(BaseParser):
         :type dbt_root_path: str
         :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
         :type emit_datasets: bool
+        :param include_tags: A list of tags to filter the dbt project
+        :type include_tags: list
         """
         # validate the dbt root path
         self.project_name = project_name
@@ -59,11 +64,14 @@ class DbtProjectParser(BaseParser):
         # emit datasets from test tasks unless false
         self.emit_datasets = emit_datasets
 
+        # list of tags to filter down to
+        self.include_tags = include_tags
+
     def parse(self):
         """
         Parses the dbt project in the project_path into `cosmos` entities.
         """
-        models = extract_deps_from_models(project_path=self.project_path)
+        models = extract_model_data(project_path=self.project_path)
 
         project_name = os.path.basename(self.project_path)
 
@@ -71,49 +79,65 @@ class DbtProjectParser(BaseParser):
 
         entities = {}
 
-        for model, deps in models.items():
-            args = {
-                "conn_id": self.conn_id,
-                "project_dir": self.project_path,
-                "models": model,
-                **self.dbt_args,
-            }
-            # make the run task
-            run_task = Task(
-                id=f"{model}_run",
-                operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
-                arguments=args,
-            )
-            entities[run_task.id] = run_task
+        for model, attr in models.items():
+            included = True
+            if self.include_tags:
+                for item in self.include_tags:
+                    if item not in attr["tags"]:
+                        included = False
 
-            # make the test task
-            if self.emit_datasets:
-                args["outlets"] = [Dataset(f"DBT://{self.conn_id.upper()}/{self.project_name.upper()}/{model.upper()}")]
-            test_task = Task(
-                id=f"{model}_test",
-                operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
-                upstream_entity_ids=[run_task.id],
-                arguments=args,
-            )
-            entities[test_task.id] = test_task
+            if included:
+                args = {
+                    "conn_id": self.conn_id,
+                    "project_dir": self.project_path,
+                    "models": model,
+                    **self.dbt_args,
+                }
+                # make the run task
+                run_task = Task(
+                    id=f"{model}_run",
+                    operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
+                    arguments=args,
+                )
+                entities[run_task.id] = run_task
 
-            # make the group
-            model_group = Group(
-                id=model,
-                entities=[run_task, test_task],
-            )
-            entities[model_group.id] = model_group
+                # make the test task
+                if self.emit_datasets:
+                    args["outlets"] = [
+                        Dataset(f"DBT://{self.conn_id.upper()}/{self.project_name.upper()}/{model.upper()}")
+                    ]
+                test_task = Task(
+                    id=f"{model}_test",
+                    operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+                    upstream_entity_ids=[run_task.id],
+                    arguments=args,
+                )
+                entities[test_task.id] = test_task
 
-            # just add to base group for now
-            base_group.add_entity(entity=model_group)
+                # make the group
+                model_group = Group(
+                    id=model,
+                    entities=[run_task, test_task],
+                )
+                entities[model_group.id] = model_group
+
+                # just add to base group for now
+                base_group.add_entity(entity=model_group)
 
         # add dependencies
-        for model, deps in models.items():
-            for dep in deps:
-                try:
-                    dep_task = entities[dep]
-                    entities[model].add_upstream(dep_task)
-                except KeyError:
-                    logger.error(f"Dependency {dep} not found for model {model}")
+        for model, attr in models.items():
+            included = True
+            if self.include_tags:
+                for item in self.include_tags:
+                    if item not in attr["tags"]:
+                        included = False
+
+            if included:
+                for dep in attr["dependencies"]:
+                    try:
+                        dep_task = entities[dep]
+                        entities[model].add_upstream(dep_task)
+                    except KeyError:
+                        logger.error(f"Dependency {dep} not found for model {model}")
 
         return base_group

@@ -1,4 +1,4 @@
-.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/static/banner.png
+.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/banner.png
   :align: center
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg

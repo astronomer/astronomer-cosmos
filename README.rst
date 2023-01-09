@@ -27,7 +27,7 @@ Check out the Quickstart guide on our `docs <https://astronomer.github.io/astron
 Example Usage (dbt)
 _____________
 
-Imagine we have dbt projects located at ``./dbt/{{DBT_PROJECT_NAME}}``. We can render these projects as a Airflow DAGs using the ``DbtDag`` class:
+Cosmos lets you render dbt projects as Airflow DAGs and Task Groups. To render a DAG, import ``DbtDag`` and point it to your dbt project.
 
 .. code-block:: python
 
@@ -46,7 +46,7 @@ Imagine we have dbt projects located at ``./dbt/{{DBT_PROJECT_NAME}}``. We can r
         start_date=datetime(2022, 11, 27),
     )
 
-Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 

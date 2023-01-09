@@ -87,21 +87,6 @@ class DbtModel:
         # now we can return the upstream models
         return self.config.upstream_models
 
-    @property
-    def tags(self) -> set[str]:
-        """
-        Returns the tags for the model.
-        """
-        # if we've already parsed the file, return the tags
-        if self._parsed_file:
-            return self.config.tags
-
-        # otherwise, we need to parse the file
-        self.parse_file()
-
-        # now we can return the tags
-        return self.config.tags
-
     def __repr__(self) -> str:
         """
         Returns the string representation of the model.

@@ -19,6 +19,7 @@ def render_project(
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
+    dbt_tags: list[str] = [],
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -30,6 +31,7 @@ def render_project(
         Defaults to "after_each"
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
+    :param dbt_tags: A list of dbt tags to filter the dbt models by
     """
     # first, get the dbt project
     project = DbtProject(
@@ -47,6 +49,10 @@ def render_project(
 
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
+        # if we have tags, only include models that have at least one of the tags
+        if dbt_tags and not set(dbt_tags).intersection(model.config.tags):
+            continue
+
         run_args: dict[str, Any] = {**task_args, "models": [model_name]}
         test_args: dict[str, Any] = {**task_args, "models": [model_name]}
 

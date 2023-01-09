@@ -22,6 +22,7 @@ class DbtDag(CosmosDag):
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
+    :param dbt_tags: A list of dbt tags to filter the dbt models by
     """
 
     def __init__(
@@ -32,6 +33,7 @@ class DbtDag(CosmosDag):
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
+        dbt_tags: list[str] = [],
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -49,6 +51,7 @@ class DbtDag(CosmosDag):
             test_behavior=test_behavior,
             emit_datasets=emit_datasets,
             conn_id=conn_id,
+            dbt_tags=dbt_tags,
         )
 
         # call the airflow DAG constructor

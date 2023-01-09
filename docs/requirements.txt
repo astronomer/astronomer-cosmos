@@ -1,3 +1,2 @@
 pydata-sphinx-theme
 apache-airflow
-pydantic

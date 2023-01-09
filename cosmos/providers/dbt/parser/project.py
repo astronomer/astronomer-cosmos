@@ -1,119 +1,216 @@
-import logging
+"""
+Used to parse and extract information from dbt projects.
+"""
+from __future__ import annotations
+
 import os
+import yaml  # type: ignore
+import jinja2
 
-from airflow.datasets import Dataset
-
-from cosmos.core.graph.entities import Group, Task
-from cosmos.core.parse.base_parser import BaseParser
-
-from .jinja import extract_deps_from_models
-from .utils import validate_directory
-
-logger = logging.getLogger(__name__)
+from dataclasses import dataclass, field
+from typing import Any, ClassVar
+from pathlib import Path
 
 
-class DbtProjectParser(BaseParser):
+@dataclass
+class DbtModelConfig:
     """
-    Parses a dbt project into `cosmos` entities.
+    Represents a single model config.
     """
 
-    def __init__(
-        self,
-        project_name: str,
-        conn_id: str,
-        dbt_args: dict = {},
-        dbt_root_path: str = "/usr/local/airflow/dbt",
-        emit_datasets: bool = True,
-    ):
+    tags: set[str] = field(default_factory=set)
+    upstream_models: set[str] = field(default_factory=set)
+
+    def __add__(self, other_config: DbtModelConfig) -> DbtModelConfig:
+        """
+        Add one config to another. Necessary because configs can come from different places
+        """
+        # get the unique combination of each list
+        return DbtModelConfig(
+            tags=self.tags | other_config.tags,
+            upstream_models=self.upstream_models | other_config.upstream_models,
+        )
+
+
+@dataclass
+class DbtModel:
+    """
+    Represents a single dbt model.
+    """
+
+    # instance variables
+    name: str
+    path: Path
+    config: DbtModelConfig = field(default_factory=DbtModelConfig)
+
+    # internal variables to manage state
+    _parsed_file: bool = False
+
+    def parse_file(self) -> None:
+        """
+        Parses the file and extracts metadata (dependencies, tags, etc)
+        """
+        # first, get an empty config
+        config = DbtModelConfig()
+
+        # get the code from the file
+        code = self.path.read_text()
+
+        # get the dependencies
+        env = jinja2.Environment()
+        ast = env.parse(code)
+
+        # if we find a dependency, add it to the list. to do so, we use jinja to find
+        # calls to the ref function, and then we get the first argument to the function
+        for base_node in ast.find_all(jinja2.nodes.Call):
+            # check if it's a ref
+            if hasattr(base_node.node, "name") and base_node.node.name == "ref":
+                # if it is, get the first argument
+                first_arg = base_node.args[0]
+                if isinstance(first_arg, jinja2.nodes.Const):
+                    # and add it to the config
+                    config.upstream_models.add(first_arg.value)
+
+        # get the tags
+        # TODO
+
+        # set the config and set the parsed file flag to true
+        self.config = config
+        self._parsed_file = True
+
+    @property
+    def upstream_models(self) -> set[str]:
+        # if we've already parsed the file, return the upstream models
+        if self._parsed_file:
+            return self.config.upstream_models
+
+        # otherwise, we need to parse the file
+        self.parse_file()
+
+        # now we can return the upstream models
+        return self.config.upstream_models
+
+    @property
+    def tags(self) -> set[str]:
+        """
+        Returns the tags for the model.
+        """
+        # if we've already parsed the file, return the tags
+        if self._parsed_file:
+            return self.config.tags
+
+        # otherwise, we need to parse the file
+        self.parse_file()
+
+        # now we can return the tags
+        return self.config.tags
+
+    def __repr__(self) -> str:
+        """
+        Returns the string representation of the model.
+        """
+        return f"DbtModel(name='{self.name}', path='{self.path}', config={self.config})"
+
+
+@dataclass
+class DbtProject:
+    """
+    Represents a single dbt project.
+    """
+
+    # required, user-specified instance variables
+    project_name: str
+
+    # optional, user-specified instance variables
+    dbt_root_path: str = "/usr/local/airflow/dbt"
+    should_extract: bool = True
+
+    # private instance variables for managing state
+    _models: dict[str, DbtModel] = field(default_factory=dict)
+    _project_dir: Path = field(init=False)
+    _models_dir: Path = field(init=False)
+
+    def __post_init__(self) -> None:
         """
         Initializes the parser.
-
-        :param project_name: The path to the dbt project, relative to the dbt root path
-        :type project_path: str
-        :param conn_id: The Airflow connection ID to use for the dbt profile
-        :type conn_id: str
-        :param dbt_args: Parameters to pass to the underlying dbt operators
-        :type dbt_args: dict
-        :param dbt_root_path: The path to the dbt root directory
-        :type dbt_root_path: str
-        :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-        :type emit_datasets: bool
         """
-        # validate the dbt root path
-        self.project_name = project_name
-        validate_directory(dbt_root_path, "dbt_root_path")
-        self.dbt_root_path = dbt_root_path
+        # set the project and model dirs
+        self._project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
+        self._models_dir = self._project_dir / "models"
 
-        # validate the project path
-        project_path = os.path.join(dbt_root_path, project_name)
-        validate_directory(project_path, "project_path")
-        self.project_path = project_path
+        if self.should_extract:
+            self.extract()
 
-        # validate the conn_id
-        if not conn_id:
-            raise ValueError("conn_id must be provided")
-        self.conn_id = conn_id
-
-        self.dbt_args = dbt_args or {}
-
-        # emit datasets from test tasks unless false
-        self.emit_datasets = emit_datasets
-
-    def parse(self):
+    def extract(self) -> None:
         """
-        Parses the dbt project in the project_path into `cosmos` entities.
+        Extract metadata from the project, including the project config, sql files, and yml files.
         """
-        models = extract_deps_from_models(project_path=self.project_path)
+        # crawl the models in the project
+        for file_name in self._models_dir.rglob("*.sql"):
+            self._handle_sql_file(file_name)
 
-        project_name = os.path.basename(self.project_path)
+        # crawl the config files in the project
+        for file_name in self._models_dir.rglob("*.yml"):
+            self._handle_config_file(file_name)
 
-        base_group = Group(id=project_name)
+    def _handle_sql_file(self, path: Path) -> None:
+        """
+        Handles a single sql file.
+        """
+        # get the model name
+        model_name = path.stem
 
-        entities = {}
+        # construct the model object, which we'll use to store metadata
+        model = DbtModel(
+            name=model_name,
+            path=path,
+        )
 
-        for model, deps in models.items():
-            args = {
-                "conn_id": self.conn_id,
-                "project_dir": self.project_path,
-                "models": model,
-                **self.dbt_args,
-            }
-            # make the run task
-            run_task = Task(
-                id=f"{model}_run",
-                operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
-                arguments=args,
+        # add the model to the project
+        self._models[model_name] = model
+
+    def _handle_config_file(self, path: Path) -> None:
+        """
+        Handles a single config file.
+        """
+        # parse the yml file
+        config_dict = yaml.safe_load(path.read_text())
+
+        # iterate over the models in the config
+        if not config_dict.get("models"):
+            return
+
+        for config in config_dict["models"]:
+            model_name = config.get("name")
+
+            # if the model doesn't exist, we can't do anything
+            if not model_name in self.models:
+                continue
+
+            # parse out the config fields we can recognize
+
+            # 'tags' is either a string or list of strings
+            tags = config.get("tags", [])
+            if isinstance(tags, str):
+                tags = [tags]
+
+            # then, get the model and merge the configs
+            model = self.models[model_name]
+            model.config = model.config + DbtModelConfig(
+                tags=set(tags),
             )
-            entities[run_task.id] = run_task
 
-            # make the test task
-            if self.emit_datasets:
-                args["outlets"] = [Dataset(f"DBT://{self.conn_id.upper()}/{self.project_name.upper()}/{model.upper()}")]
-            test_task = Task(
-                id=f"{model}_test",
-                operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
-                upstream_entity_ids=[run_task.id],
-                arguments=args,
-            )
-            entities[test_task.id] = test_task
+    # getters and setters
+    @property
+    def models(self) -> dict[str, DbtModel]:
+        """
+        Returns the models in the project.
+        """
+        return self._models
 
-            # make the group
-            model_group = Group(
-                id=model,
-                entities=[run_task, test_task],
-            )
-            entities[model_group.id] = model_group
-
-            # just add to base group for now
-            base_group.add_entity(entity=model_group)
-
-        # add dependencies
-        for model, deps in models.items():
-            for dep in deps:
-                try:
-                    dep_task = entities[dep]
-                    entities[model].add_upstream(dep_task)
-                except KeyError:
-                    logger.error(f"Dependency {dep} not found for model {model}")
-
-        return base_group
+    @property
+    def project_dir(self) -> Path:
+        """
+        Returns the project directory.
+        """
+        return self._project_dir

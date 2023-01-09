@@ -1,52 +1,55 @@
+"""
+This module contains a function to render a dbt project as an Airflow Task Group.
+"""
+from typing import Any, Literal
+from cosmos.core.airflow import CosmosTaskGroup
+from cosmos.providers.dbt.parser.project import DbtProject
+from .render import render_project
+
 from airflow.models import DAG
-
-from cosmos.core.render import CosmosTaskGroup
-from cosmos.providers.dbt.parser.project import DbtProjectParser
+from airflow.utils.decorators import apply_defaults
 
 
-def DbtTaskGroup(
-    dbt_project_name: str,
-    conn_id: str,
-    dag: DAG,
-    dbt_args: dict = None,
-    emit_datasets: bool = True,
-    dbt_root_path: str = "/usr/local/airflow/dbt",
-    **kwargs,
-):
+class DbtTaskGroup(CosmosTaskGroup):
     """
-    Render a dbt project as an Airflow TaskGroup.
+    Render a dbt project as an Airflow Task Group. Overrides the Airflow Task Group model to allow
+    for additional configs to be passed.
 
     :param dbt_project_name: The name of the dbt project
-    :type dbt_project_name: str
-    :param conn_id: The Airflow connection ID to use for the dbt profile
-    :type conn_id: str
-    :param dbt_args: Parameters to pass to the underlying dbt operators
-    :type dbt_args: dict
-    :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-    :type emit_datasets: bool
-    :param kwargs: Additional kwargs to pass to the DAG
     :param dbt_root_path: The path to the dbt root directory
-    :type dbt_root_path: str
-    :type kwargs: dict
-    :return: The rendered Task Group
-    :rtype: airflow.utils.task_group.TaskGroup
+    :param conn_id: The Airflow connection ID to use for the dbt profile
+    :param dbt_args: Parameters to pass to the underlying dbt operators
+    :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
+    :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
+        Defaults to "after_each"
     """
-    # first, parse the dbt project and get a Group
-    parser = DbtProjectParser(
-        project_name=dbt_project_name,
-        conn_id=conn_id,
-        dbt_args=dbt_args,
-        emit_datasets=emit_datasets,
-        dbt_root_path=dbt_root_path,
-    )
-    group = parser.parse()
 
-    # then, render the Group as an Airflow TaskGroup
-    task_group = CosmosTaskGroup(
-        group=group,
-        dag=dag,
-        task_group=kwargs.get("task_group"),
-        task_group_args=kwargs,
-    ).render()
+    def __init__(
+        self,
+        dbt_project_name: str,
+        conn_id: str,
+        dbt_args: dict[str, Any] = {},
+        emit_datasets: bool = True,
+        dbt_root_path: str = "/usr/local/airflow/dbt",
+        test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        # add additional args to the dbt_args
+        dbt_args = {
+            **dbt_args,
+            "conn_id": conn_id,
+        }
 
-    return task_group
+        # get the group of the dbt project
+        group = render_project(
+            dbt_project_name=dbt_project_name,
+            dbt_root_path=dbt_root_path,
+            task_args=dbt_args,
+            test_behavior=test_behavior,
+            emit_datasets=emit_datasets,
+            conn_id=conn_id,
+        )
+
+        # call the airflow constructor
+        super().__init__(group, *args, **kwargs)

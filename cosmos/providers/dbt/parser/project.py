@@ -71,9 +71,6 @@ class DbtModel:
                     # and add it to the config
                     config.upstream_models.add(first_arg.value)
 
-        # get the tags
-        # TODO
-
         # set the config and set the parsed file flag to true
         self.config = config
         self._parsed_file = True

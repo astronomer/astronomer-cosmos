@@ -22,12 +22,6 @@ class CosmosDag(DAG):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """
-        Render the DAG.
-
-        :return: The rendered DAG
-        :rtype: DAG
-        """
         # if the user doesn't specify a dag_id, use the entity id
         if "dag_id" not in kwargs:
             kwargs["dag_id"] = cosmos_group.id

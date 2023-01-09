@@ -47,8 +47,8 @@ def render_project(
 
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
-        run_args: dict[str, Any] = {**task_args, "model_name": model_name}
-        test_args: dict[str, Any] = {**task_args, "model_name": model_name}
+        run_args: dict[str, Any] = {**task_args, "models": [model_name]}
+        test_args: dict[str, Any] = {**task_args, "models": [model_name]}
 
         if emit_datasets:
             outlets = [
@@ -108,5 +108,38 @@ def render_project(
                 logger.error(
                     f"Dependency {upstream_model_name} not found for model {model}"
                 )
+
+    if test_behavior == "after_all":
+        # make a test task
+        test_task = Task(
+            id=f"{dbt_project_name}_test",
+            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+            arguments=task_args,
+        )
+        entities[test_task.id] = test_task
+
+        # add it to the base group
+        base_group.add_entity(test_task)
+
+        # add it as an upstream to all the models that don't have downstream tasks
+        # since we don't have downstream info readily available, we have to iterate
+        # start with all models, and remove them as we find downstream tasks
+        models_with_no_downstream_tasks = [
+            model_name for model_name, model in project.models.items()
+        ]
+
+        # iterate over all models
+        for model_name, model in project.models.items():
+            # iterate over all upstream models
+            for upstream_model_name in model.upstream_models:
+                # remove the upstream model from the list of models with no downstream tasks
+                try:
+                    models_with_no_downstream_tasks.remove(upstream_model_name)
+                except ValueError:
+                    pass
+
+        # add the test task as an upstream to all models with no downstream tasks
+        for model_name in models_with_no_downstream_tasks:
+            test_task.add_upstream(entity=entities[model_name])
 
     return base_group

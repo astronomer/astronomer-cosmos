@@ -21,97 +21,16 @@ Coming soon:
  - Hex
  - And more...open an issue if you have a request!
 
-Principles
-_____________
-
-`Astronomer Cosmos` is a package to parse and render third-party workflows as Airflow DAGs, `Airflow TaskGroups <https://docs.astronomer.io/learn/task-groups>`_, or individual tasks.
-
-.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/static/dbt_dag.png
-   :width: 800
-
-Cosmos contains `providers` for third-party tools, and each `provider` can be deconstructed into the following components:
-
-- ``parsers``: These are mostly hidden from the end user and are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects. These are executed whenever the Airflow Scheduler heartbeats, allowing us to dynamically render the dependency graph of the workflow.
-- ``operators``: These represent the "user interface" of Cosmos -- lightweight classes the user can import and implement in their DAG to define their target behavior. They are responsible for executing the tasks in the workflow.
-
-Cosmos operates on a few guiding principles:
-
-- **Dynamic**: Cosmos generates DAGs dynamically, meaning that the dependency graph of the workflow is generated at runtime. This allows users to update their workflows without having to restart Airflow.
-- **Flexible**: Cosmos is not opinionated in that it does not enforce a specific rendering method for third-party systems; users can decide whether they'd like to render their workflow as a DAG, TaskGroup, or individual task.
-- **Extensible**: Cosmos is designed to be extensible. Users can add their own parsers and operators to support their own workflows.
-- **Modular**: Cosmos is designed to be modular. Users can install only the dependencies they need for their workflows.
-
-
 Quickstart
 _____________
 
-Clone this repository to set up a local environment. Then, head over to our :code:`astronomer-cosmos/examples` directory and follow its README!
+Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_.
 
-Installation
+
+Example Usage (dbt)
 _____________
 
-Install and update using `pip <https://pip.pypa.io/en/stable/getting-started/>`_:
-
-General Installation
-********************
-
-.. code-block:: bash
-
-    pip install astronomer-cosmos
-
-Note that this only installs dependencies for the core provider. Read below for more info on how to install specific providers.
-
-Database Specific Installation (dbt)
-************************************
-
-
-To only install the dependencies for a specific databases, specify it in the extra argument as dbt.<database>. For
-example, for postgres run:
-
-.. code-block:: bash
-
-    pip install 'astronomer-cosmos[dbt.postgres]'
-
-Extras
-^^^^^^
-
-.. EXTRA_DOC_START
-
-.. list-table::
-   :header-rows: 1
-
-   * - Extra Name
-     - Installation Command
-     - Dependencies
-
-   * - ``core``
-     - ``pip install astronomer-cosmos``
-     - apache-airflow, pydantic, Jinja2
-
-   * - ``dbt.all``
-     - ``pip install 'astronomer-cosmos[dbt.all]'``
-     - astronomer-cosmos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
-
-   * - ``dbt.postgres``
-     - ``pip install 'astronomer-cosmos[dbt.postgres]'``
-     - astronomer-cosmos, dbt-core, dbt-postgres
-
-   * - ``dbt.bigquery``
-     - ``pip install 'astronomer-cosmos[dbt.bigquery]'``
-     - astronomer-cosmos, dbt-core, dbt-bigquery
-
-   * - ``dbt.redshift``
-     - ``pip install 'astronomer-cosmos[dbt.redshift]'``
-     - astronomer-cosmos, dbt-core, dbt-redshift
-
-   * - ``dbt.snowflake``
-     - ``pip install 'astronomer-cosmos[dbt.snowflake]'``
-     - astronomer-cosmos, dbt-core, dbt-snowflake
-
-Example Usage
-_____________
-
-Imagine we have dbt projects located at ``./dbt/{{DBT_PROJECT_NAME}}``. We can render these projects as a Airflow DAGs using the ``DbtDag`` class:
+Cosmos lets you render dbt projects as Airflow DAGs and Task Groups. To render a DAG, import ``DbtDag`` and point it to your dbt project.
 
 .. code-block:: python
 
@@ -130,7 +49,7 @@ Imagine we have dbt projects located at ``./dbt/{{DBT_PROJECT_NAME}}``. We can r
         start_date=datetime(2022, 11, 27),
     )
 
-Simiarly, we can render these projects as Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 

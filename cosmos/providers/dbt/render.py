@@ -105,7 +105,7 @@ def render_project(
 
     # add dependencies now that we have all the entities
     for model_name, model in project.models.items():
-        upstream_deps = model.upstream_models
+        upstream_deps = model.config.upstream_models
         for upstream_model_name in upstream_deps:
             try:
                 dep_task = entities[upstream_model_name]
@@ -137,7 +137,7 @@ def render_project(
         # iterate over all models
         for model_name, model in project.models.items():
             # iterate over all upstream models
-            for upstream_model_name in model.upstream_models:
+            for upstream_model_name in model.config.upstream_models:
                 # remove the upstream model from the list of models with no downstream tasks
                 try:
                     models_with_no_downstream_tasks.remove(upstream_model_name)

@@ -4,12 +4,15 @@ Used to parse and extract information from dbt projects.
 from __future__ import annotations
 
 import os
+import logging
 import yaml  # type: ignore
 import jinja2
 
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,10 +46,7 @@ class DbtModel:
     path: Path
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
-    # internal variables to manage state
-    _parsed_file: bool = False
-
-    def parse_file(self) -> None:
+    def __post_init__(self) -> None:
         """
         Parses the file and extracts metadata (dependencies, tags, etc)
         """
@@ -60,32 +60,41 @@ class DbtModel:
         env = jinja2.Environment()
         ast = env.parse(code)
 
-        # if we find a dependency, add it to the list. to do so, we use jinja to find
-        # calls to the ref function, and then we get the first argument to the function
+        # iterate over the jinja nodes to extract info
         for base_node in ast.find_all(jinja2.nodes.Call):
-            # check if it's a ref
-            if hasattr(base_node.node, "name") and base_node.node.name == "ref":
-                # if it is, get the first argument
-                first_arg = base_node.args[0]
-                if isinstance(first_arg, jinja2.nodes.Const):
-                    # and add it to the config
-                    config.upstream_models.add(first_arg.value)
+            if hasattr(base_node.node, "name"):
+                # check we have a ref - this indicates a dependency
+                if base_node.node.name == "ref":
+                    # if it is, get the first argument
+                    first_arg = base_node.args[0]
+                    if isinstance(first_arg, jinja2.nodes.Const):
+                        # and add it to the config
+                        config.upstream_models.add(first_arg.value)
+
+                # check if we have a config - this could contain tags
+                if base_node.node.name == "config":
+                    # if it is, check if any kwargs are tags
+                    for kwarg in base_node.kwargs:
+                        if hasattr(kwarg, "key") and kwarg.key == "tags":
+                            try:
+                                # try to convert it to a constant and get the value
+                                value = kwarg.value.as_const()
+
+                                if isinstance(value, str):
+                                    # if it's a string, turn it into a list for consistency
+                                    value = [value]
+
+                                # add the value to the config
+                                config.tags |= set(value)
+                            except Exception as e:
+                                # if we can't convert it to a constant, we can't do anything with it
+                                logger.warning(
+                                    f"Could not parse tags from config in {self.path}: {e}"
+                                )
+                                pass
 
         # set the config and set the parsed file flag to true
         self.config = config
-        self._parsed_file = True
-
-    @property
-    def upstream_models(self) -> set[str]:
-        # if we've already parsed the file, return the upstream models
-        if self._parsed_file:
-            return self.config.upstream_models
-
-        # otherwise, we need to parse the file
-        self.parse_file()
-
-        # now we can return the upstream models
-        return self.config.upstream_models
 
     def __repr__(self) -> str:
         """
@@ -105,34 +114,26 @@ class DbtProject:
 
     # optional, user-specified instance variables
     dbt_root_path: str = "/usr/local/airflow/dbt"
-    should_extract: bool = True
 
     # private instance variables for managing state
-    _models: dict[str, DbtModel] = field(default_factory=dict)
-    _project_dir: Path = field(init=False)
-    _models_dir: Path = field(init=False)
+    models: dict[str, DbtModel] = field(default_factory=dict)
+    project_dir: Path = field(init=False)
+    models_dir: Path = field(init=False)
 
     def __post_init__(self) -> None:
         """
         Initializes the parser.
         """
         # set the project and model dirs
-        self._project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
-        self._models_dir = self._project_dir / "models"
+        self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
+        self.models_dir = self.project_dir / "models"
 
-        if self.should_extract:
-            self.extract()
-
-    def extract(self) -> None:
-        """
-        Extract metadata from the project, including the project config, sql files, and yml files.
-        """
         # crawl the models in the project
-        for file_name in self._models_dir.rglob("*.sql"):
+        for file_name in self.models_dir.rglob("*.sql"):
             self._handle_sql_file(file_name)
 
         # crawl the config files in the project
-        for file_name in self._models_dir.rglob("*.yml"):
+        for file_name in self.models_dir.rglob("*.yml"):
             self._handle_config_file(file_name)
 
     def _handle_sql_file(self, path: Path) -> None:
@@ -149,7 +150,7 @@ class DbtProject:
         )
 
         # add the model to the project
-        self._models[model_name] = model
+        self.models[model_name] = model
 
     def _handle_config_file(self, path: Path) -> None:
         """
@@ -181,18 +182,3 @@ class DbtProject:
             model.config = model.config + DbtModelConfig(
                 tags=set(tags),
             )
-
-    # getters and setters
-    @property
-    def models(self) -> dict[str, DbtModel]:
-        """
-        Returns the models in the project.
-        """
-        return self._models
-
-    @property
-    def project_dir(self) -> Path:
-        """
-        Returns the project directory.
-        """
-        return self._project_dir

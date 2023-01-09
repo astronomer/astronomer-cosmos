@@ -59,7 +59,7 @@ Create a DAG and import the :class:`cosmos.providers.dbt.DbtTaskGroup` class. Th
 The ``DbtTaskGroup`` operator will automatically generate a TaskGroup with the tasks defined in your dbt project. Here's what the DAG looks like in the Airflow UI:
 
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/static/dbt_dag.png
+.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/dbt_dag.png
    :width: 800
    
    dbt's default jaffle_shop project rendered as a TaskGroup in Airflow

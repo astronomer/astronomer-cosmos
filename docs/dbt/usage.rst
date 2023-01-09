@@ -3,6 +3,8 @@ Usage
 
 Cosmos supports two standard way of rendering dbt projects: either as a full DAG or as a Task Group.
 
+By default, Cosmos will look in the ``/usr/local/airflow/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.providers.dbt.DbtDag` or :class:`cosmos.providers.dbt.DbtTaskGroup`.
+
 Rendering
 +++++++++
 

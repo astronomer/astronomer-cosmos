@@ -1,8 +1,8 @@
-from typing import Sequence
-
 import json
 import os
 import shutil
+import subprocess
+from typing import Sequence
 
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -11,7 +11,10 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-from cosmos.providers.dbt.core.utils.profiles_generator import create_default_profiles, map_profile
+from cosmos.providers.dbt.core.utils.profiles_generator import (
+    create_default_profiles,
+    map_profile,
+)
 
 
 class DbtBaseOperator(BaseOperator):
@@ -78,7 +81,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: str = None,
+        base_cmd: list = None,
         select: str = None,
         exclude: str = None,
         selector: str = None,
@@ -146,25 +149,34 @@ class DbtBaseOperator(BaseOperator):
         return env
 
     def get_dbt_path(self):
-        bash_path = shutil.which("bash") or "bash"
+        which_dbt = shutil.which("dbt") or "dbt"
 
         if self.python_venv:
-            dbt_path = [bash_path, "-c", f"source {self.python_venv} && dbt {self.base_cmd} "]
+            dbt_path = f"{self.python_venv}/bin/dbt"
         else:
-            dbt_path = [bash_path, "-c", f"dbt {self.base_cmd} "]
+            dbt_path = which_dbt
 
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
-                raise AirflowException(f"Can not find the project_dir: {self.project_dir}")
+                raise AirflowException(
+                    f"Can not find the project_dir: {self.project_dir}"
+                )
             if not os.path.isdir(self.project_dir):
-                raise AirflowException(f"The project_dir {self.project_dir} must be a directory")
+                raise AirflowException(
+                    f"The project_dir {self.project_dir} must be a directory"
+                )
         return dbt_path
 
-    def exception_handling(self, result):
-        if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
-            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
-        elif result.exit_code != 0:
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+    # TODO: Fix this - CompletedProcess(args=['/usr/local/airflow/dbt_venv/bin/dbt', '--help'], returncode=0)
+    def exception_handling(self, return_code):
+        if self.skip_exit_code is not None and return_code == self.skip_exit_code:
+            raise AirflowSkipException(
+                f"dbt command returned exit code {self.skip_exit_code}. Skipping."
+            )
+        elif return_code != 0:
+            raise AirflowException(
+                f"dbt command failed. The command returned a non-zero exit code {return_code}."
+            )
 
     def add_global_flags(self):
 
@@ -205,53 +217,63 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(dbt_name)
         return flags
 
-    def run_command(self, cmd, env):
-        result = self.subprocess_hook.run_command(
-            command=cmd,
+    def run_command(self, cmd: list, env):
+        result = subprocess.Popen(
+            cmd,
             env=env,
-            output_encoding=self.output_encoding,
-            cwd=self.project_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding=self.output_encoding,
         )
-        self.exception_handling(result)
-        return result
+        result.wait()
+        self.exception_handling(return_code=result.returncode)
+
+        output, error = result.communicate()
+        if output:
+            self.log.info(output)
+        if error:
+            self.log.error(error)
+        return output
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
         create_default_profiles()
-        profile, profile_vars = map_profile(conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema)
+        profile, profile_vars = map_profile(
+            conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
+        )
 
         # parse dbt command
+        dbt_cmd = []
 
         ## get the dbt piece from the bash command so we can add to it
-        dbt_path = self.get_dbt_path()
-        dbt_cmd = dbt_path[-1]
-        dbt_path.pop()
+        dbt_cmd.append(self.get_dbt_path())
 
-        ## add global flags
+        ## add base cmd
+        dbt_cmd.append(self.base_cmd)
+
+        # add global flags
         for item in self.add_global_flags():
-            dbt_cmd += f"{item} "
+            dbt_cmd.append(item)
 
         ## add command specific flags
         if cmd_flags:
             for item in cmd_flags:
-                dbt_cmd += f"{item} "
+                dbt_cmd.append(item)
 
         ## add profile
-        dbt_cmd += f"--profile {profile}"
-
-        ## and appended dbt command back to bash
-        dbt_path.append(dbt_cmd)
-        cmd = dbt_path
+        dbt_cmd.append("--profile")
+        dbt_cmd.append(profile)
 
         ## set env vars
         env = env | profile_vars
-        result = self.run_command(cmd=cmd, env=env)
+        result = self.run_command(cmd=dbt_cmd, env=env)
         return result
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context))
+        return output
 
     def on_kill(self) -> None:
+        # TODO: this will no longer work now that we've switched to subprocess
         self.subprocess_hook.send_sigterm()
 
 
@@ -268,8 +290,8 @@ class DbtLSOperator(DbtBaseOperator):
         self.base_cmd = "ls"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context))
+        return output
 
 
 class DbtSeedOperator(DbtBaseOperator):
@@ -296,8 +318,8 @@ class DbtSeedOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return output
 
 
 class DbtRunOperator(DbtBaseOperator):
@@ -314,8 +336,8 @@ class DbtRunOperator(DbtBaseOperator):
         self.base_cmd = "run"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context))
+        return output
 
 
 class DbtTestOperator(DbtBaseOperator):
@@ -331,8 +353,8 @@ class DbtTestOperator(DbtBaseOperator):
         self.base_cmd = "test"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context))
+        return output
 
 
 class DbtRunOperationOperator(DbtBaseOperator):
@@ -365,8 +387,9 @@ class DbtRunOperationOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return output
+
 
 class DbtDepsOperator(DbtBaseOperator):
     """
@@ -383,7 +406,7 @@ class DbtDepsOperator(DbtBaseOperator):
 
         self.vars = vars
         super().__init__(**kwargs)
-        self.base_cmd = "deps "
+        self.base_cmd = "deps"
 
     def add_cmd_flags(self):
         flags = []
@@ -395,5 +418,5 @@ class DbtDepsOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return result.output
+        output = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return output

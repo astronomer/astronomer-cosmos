@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import subprocess
 from typing import Sequence
 
 from airflow.compat.functools import cached_property
@@ -168,14 +167,14 @@ class DbtBaseOperator(BaseOperator):
         return dbt_path
 
     # TODO: Fix this - CompletedProcess(args=['/usr/local/airflow/dbt_venv/bin/dbt', '--help'], returncode=0)
-    def exception_handling(self, return_code):
-        if self.skip_exit_code is not None and return_code == self.skip_exit_code:
+    def exception_handling(self, result):
+        if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
                 f"dbt command returned exit code {self.skip_exit_code}. Skipping."
             )
-        elif return_code != 0:
+        elif result.exit_code != 0:
             raise AirflowException(
-                f"dbt command failed. The command returned a non-zero exit code {return_code}."
+                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
             )
 
     def add_global_flags(self):
@@ -217,23 +216,15 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(dbt_name)
         return flags
 
-    def run_command(self, cmd: list, env):
-        result = subprocess.Popen(
-            cmd,
+    def run_command(self, cmd, env):
+        result = self.subprocess_hook.run_command(
+            command=cmd,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding=self.output_encoding,
+            output_encoding=self.output_encoding,
+            cwd=self.project_dir,
         )
-        result.wait()
-        self.exception_handling(return_code=result.returncode)
-
-        output, error = result.communicate()
-        if output:
-            self.log.info(output)
-        if error:
-            self.log.error(error)
-        return output
+        self.exception_handling(result)
+        return result
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
         create_default_profiles()

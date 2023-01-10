@@ -367,3 +367,33 @@ class DbtRunOperationOperator(DbtBaseOperator):
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
         return result.output
+
+class DbtDepsOperator(DbtBaseOperator):
+    """
+    Executes a dbt core deps command.
+
+    :param vars: Supply variables to the project. This argument overrides variables defined in your dbt_project.yml file
+    :type vars: dict
+    """
+
+    ui_color = "#8194E0"
+    template_fields: Sequence[str] = "vars"
+
+    def __init__(self, vars: dict = None, **kwargs) -> None:
+
+        self.vars = vars
+        super().__init__(**kwargs)
+        self.base_cmd = "deps "
+
+    def add_cmd_flags(self):
+        flags = []
+        if self.vars is not None:
+            dict_string = json.dumps(self.vars)
+            flags.append("--vars")
+            flags.append(f"'{dict_string}'")
+        return flags
+
+    def execute(self, context: Context):
+        cmd_flags = self.add_cmd_flags()
+        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return result.output

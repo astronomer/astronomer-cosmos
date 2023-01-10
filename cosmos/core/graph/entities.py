@@ -1,77 +1,61 @@
-from typing import List
+from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field
+from typing import List, Any
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class CosmosEntity(BaseModel):
+@dataclass
+class CosmosEntity:
     """
     A CosmosEntity defines a base class for all Cosmos entities.
 
     :param id: The human-readable, unique identifier of the entity
-    :type id: str
     :param upstream_entity_ids: The ids of the entities that this entity is upstream of
-    :type upstream_entity_ids: List[str]
     """
 
-    id: str = Field(..., description="The human-readable, unique identifier of the entity")
+    id: str
+    upstream_entity_ids: list[str] = field(default_factory=list)
 
-    upstream_entity_ids: List[str] = Field(
-        [],
-        description="The ids of the entities that this entity is upstream of",
-    )
-
-    def add_upstream(self, entity: "CosmosEntity"):
+    def add_upstream(self, entity: CosmosEntity) -> None:
         """
         Add an upstream entity to the entity.
 
         :param entity: The entity to add
-        :type entity: CosmosEntity
         """
         self.upstream_entity_ids.append(entity.id)
 
 
+@dataclass
 class Group(CosmosEntity):
     """
     A Group represents a collection of entities that are connected by dependencies.
     """
 
-    entities: List[CosmosEntity] = Field(
-        [],
-        description="The list of entities in the group",
-    )
+    entities: list[CosmosEntity] = field(default_factory=list)
 
-    def add_entity(self, entity: CosmosEntity):
+    def add_entity(self, entity: CosmosEntity) -> None:
         """
         Add an entity to the group.
 
         :param entity: The entity to add
-        :type entity: CosmosEntity
         """
         logger.info(f"Adding entity {entity.id} to group {self.id}...")
 
         self.entities.append(entity)
 
 
+@dataclass
 class Task(CosmosEntity):
     """
     A task represents a single node in the DAG.
 
     :param operator_class: The name of the operator class to use for this task
-    :type operator_class: str
     :param arguments: The arguments to pass to the operator
-    :type arguments: dict
     """
 
-    operator_class: str = Field(
-        ...,
-        description="The name of the operator class to use for this task",
-    )
-
-    arguments: dict = Field(
-        {},
-        description="The arguments to pass to the operator",
-    )
+    operator_class: str = "airflow.operators.dummy.DummyOperator"
+    arguments: dict[str, Any] = field(default_factory=dict)

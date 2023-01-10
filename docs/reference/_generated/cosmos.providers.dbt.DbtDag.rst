@@ -3,4 +3,20 @@
 
 .. currentmodule:: cosmos.providers.dbt
 
-.. autofunction:: DbtDag
+.. autoclass:: DbtDag
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DbtDag.__init__
+   
+   
+
+   
+   
+   

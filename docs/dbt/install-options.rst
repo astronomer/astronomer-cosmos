@@ -28,7 +28,7 @@ Using ``dbt.all`` will install all Cosmos, dbt, and all of the supported databas
      - Dependencies
 
    * - (default)
-     - apache-airflow, pydantic, Jinja2
+     - apache-airflow, Jinja2
 
    * - ``dbt.all``
      - astronomer-cosmos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres

@@ -2,12 +2,12 @@
 This module contains a function to render a dbt project into Cosmos entities.
 """
 import logging
+from typing import Any, Literal
 
 from airflow.datasets import Dataset
 
-from cosmos.core.graph.entities import Group, Task, CosmosEntity
+from cosmos.core.graph.entities import CosmosEntity, Group, Task
 from cosmos.providers.dbt.parser.project import DbtProject
-from typing import Literal, Any
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +146,7 @@ def render_project(
 
         # add the test task as an upstream to all models with no downstream tasks
         for model_name in models_with_no_downstream_tasks:
-            test_task.add_upstream(entity=entities[model_name])
+            if model_name in entities:
+                test_task.add_upstream(entity=entities[model_name])
 
     return base_group

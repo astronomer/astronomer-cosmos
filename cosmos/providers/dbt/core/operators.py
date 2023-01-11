@@ -1,9 +1,9 @@
+from __future__ import annotations
+
+import os
 from typing import Sequence
 
-import json
-import os
-import shutil
-
+import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook
@@ -11,7 +11,10 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-from cosmos.providers.dbt.core.utils.profiles_generator import create_default_profiles, map_profile
+from cosmos.providers.dbt.core.utils.profiles_generator import (
+    create_default_profiles,
+    map_profile,
+)
 
 
 class DbtBaseOperator(BaseOperator):
@@ -24,7 +27,7 @@ class DbtBaseOperator(BaseOperator):
     :param conn_id: The airflow connection to use as the target
     :type conn_id: str
     :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
-    :type base_cmd: str
+    :type base_cmd: str | list[str]
     :param select: dbt optional argument that specifies which nodes to include.
     :type select: str
     :param exclude: dbt optional argument that specifies which models to exclude.
@@ -68,8 +71,8 @@ class DbtBaseOperator(BaseOperator):
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
     :type skip_exit_code: int
-    :param python_venv: Path to venv for dbt command execution (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/activate)
-    :type python_venv: str
+    :param dbt_executable_path: Path to dbt executable can be used with venv (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
+    :type dbt_executable_path: str
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -78,7 +81,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: str = None,
+        base_cmd: str | list[str] = None,
         select: str = None,
         exclude: str = None,
         selector: str = None,
@@ -95,7 +98,7 @@ class DbtBaseOperator(BaseOperator):
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
-        python_venv: str = None,
+        dbt_executable_path: str = "dbt",
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -117,7 +120,7 @@ class DbtBaseOperator(BaseOperator):
         self.append_env = append_env
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
-        self.python_venv = python_venv
+        self.dbt_executable_path = dbt_executable_path
         super().__init__(**kwargs)
 
     @cached_property
@@ -145,26 +148,15 @@ class DbtBaseOperator(BaseOperator):
 
         return env
 
-    def get_dbt_path(self):
-        bash_path = shutil.which("bash") or "bash"
-
-        if self.python_venv:
-            dbt_path = [bash_path, "-c", f"source {self.python_venv} && dbt {self.base_cmd} "]
-        else:
-            dbt_path = [bash_path, "-c", f"dbt {self.base_cmd} "]
-
-        if self.project_dir is not None:
-            if not os.path.exists(self.project_dir):
-                raise AirflowException(f"Can not find the project_dir: {self.project_dir}")
-            if not os.path.isdir(self.project_dir):
-                raise AirflowException(f"The project_dir {self.project_dir} must be a directory")
-        return dbt_path
-
     def exception_handling(self, result):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
-            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
+            raise AirflowSkipException(
+                f"dbt command returned exit code {self.skip_exit_code}. Skipping."
+            )
         elif result.exit_code != 0:
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+            raise AirflowException(
+                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
+            )
 
     def add_global_flags(self):
 
@@ -184,9 +176,9 @@ class DbtBaseOperator(BaseOperator):
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
-                    dict_string = json.dumps(global_flag_value)
+                    yaml_string = yaml.dump(global_flag_value)
                     flags.append(dbt_name)
-                    flags.append(f"'{dict_string}'")
+                    flags.append(yaml_string)
                 else:
                     flags.append(dbt_name)
                     flags.append(str(global_flag_value))
@@ -206,6 +198,18 @@ class DbtBaseOperator(BaseOperator):
         return flags
 
     def run_command(self, cmd, env):
+        # check project_dir
+        if self.project_dir is not None:
+            if not os.path.exists(self.project_dir):
+                raise AirflowException(
+                    f"Can not find the project_dir: {self.project_dir}"
+                )
+            if not os.path.isdir(self.project_dir):
+                raise AirflowException(
+                    f"The project_dir {self.project_dir} must be a directory"
+                )
+
+        # run bash command
         result = self.subprocess_hook.run_command(
             command=cmd,
             env=env,
@@ -217,34 +221,38 @@ class DbtBaseOperator(BaseOperator):
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
         create_default_profiles()
-        profile, profile_vars = map_profile(conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema)
+        profile, profile_vars = map_profile(
+            conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
+        )
 
         # parse dbt command
+        dbt_cmd = []
 
-        ## get the dbt piece from the bash command so we can add to it
-        dbt_path = self.get_dbt_path()
-        dbt_cmd = dbt_path[-1]
-        dbt_path.pop()
+        ## start with the dbt executable
+        dbt_cmd.append(self.dbt_executable_path)
 
-        ## add global flags
+        ## add base cmd
+        if isinstance(self.base_cmd, str):
+            dbt_cmd.append(self.base_cmd)
+        else:
+            [dbt_cmd.append(item) for item in self.base_cmd]
+
+        # add global flags
         for item in self.add_global_flags():
-            dbt_cmd += f"{item} "
+            dbt_cmd.append(item)
 
         ## add command specific flags
         if cmd_flags:
             for item in cmd_flags:
-                dbt_cmd += f"{item} "
+                dbt_cmd.append(item)
 
         ## add profile
-        dbt_cmd += f"--profile {profile}"
-
-        ## and appended dbt command back to bash
-        dbt_path.append(dbt_cmd)
-        cmd = dbt_path
+        dbt_cmd.append("--profile")
+        dbt_cmd.append(profile)
 
         ## set env vars
         env = env | profile_vars
-        result = self.run_command(cmd=cmd, env=env)
+        result = self.run_command(cmd=dbt_cmd, env=env)
         return result
 
     def execute(self, context: Context):
@@ -353,20 +361,20 @@ class DbtRunOperationOperator(DbtBaseOperator):
         self.macro_name = macro_name
         self.args = args
         super().__init__(**kwargs)
-        self.base_cmd = f"run-operation {self.macro_name} "
+        self.base_cmd = ["run-operation", macro_name]
 
     def add_cmd_flags(self):
         flags = []
         if self.args is not None:
-            dict_string = json.dumps(self.args)
             flags.append("--args")
-            flags.append(f"'{dict_string}'")
+            flags.append(yaml.dump(self.args))
         return flags
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
         return result.output
+
 
 class DbtDepsOperator(DbtBaseOperator):
     """
@@ -377,23 +385,11 @@ class DbtDepsOperator(DbtBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = "vars"
 
-    def __init__(self, vars: dict = None, **kwargs) -> None:
-
-        self.vars = vars
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "deps "
-
-    def add_cmd_flags(self):
-        flags = []
-        if self.vars is not None:
-            dict_string = json.dumps(self.vars)
-            flags.append("--vars")
-            flags.append(f"'{dict_string}'")
-        return flags
+        self.base_cmd = "deps"
 
     def execute(self, context: Context):
-        cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output

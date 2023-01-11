@@ -14,7 +14,10 @@ from cosmos.providers.dbt.dag import DbtDag
 mrr_playbook = DbtDag(
     dbt_project_name="mrr-playbook",
     conn_id="airflow_db",
-    dbt_args={"schema": "public", "python_venv": "/usr/local/airflow/dbt_venv/bin/activate"},
+    dbt_args={
+        "schema": "public",
+        "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt",
+    },
     dag_id="mrr_playbook",
     start_date=datetime(2022, 11, 27),
     schedule=[Dataset("SEED://MRR_PLAYBOOK")],

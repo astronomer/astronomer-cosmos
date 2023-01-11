@@ -53,8 +53,8 @@ def render_project(
         if dbt_tags and not set(dbt_tags).intersection(model.config.tags):
             continue
 
-        run_args: dict[str, Any] = {**task_args, "models": [model_name]}
-        test_args: dict[str, Any] = {**task_args, "models": [model_name]}
+        run_args: dict[str, Any] = {**task_args, "models": model_name}
+        test_args: dict[str, Any] = {**task_args, "models": model_name}
 
         if emit_datasets:
             outlets = [

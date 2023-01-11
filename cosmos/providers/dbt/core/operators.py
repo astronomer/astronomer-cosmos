@@ -1,8 +1,8 @@
-import json
 import os
 import shutil
 from typing import Sequence
 
+import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook
@@ -26,7 +26,7 @@ class DbtBaseOperator(BaseOperator):
     :param conn_id: The airflow connection to use as the target
     :type conn_id: str
     :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
-    :type base_cmd: str
+    :type base_cmd: str or list
     :param select: dbt optional argument that specifies which nodes to include.
     :type select: str
     :param exclude: dbt optional argument that specifies which models to exclude.
@@ -80,7 +80,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: list = None,
+        base_cmd: str or list = None,
         select: str = None,
         exclude: str = None,
         selector: str = None,
@@ -166,7 +166,6 @@ class DbtBaseOperator(BaseOperator):
                 )
         return dbt_path
 
-    # TODO: Fix this - CompletedProcess(args=['/usr/local/airflow/dbt_venv/bin/dbt', '--help'], returncode=0)
     def exception_handling(self, result):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
@@ -195,9 +194,9 @@ class DbtBaseOperator(BaseOperator):
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
-                    dict_string = json.dumps(global_flag_value)
+                    yaml_string = yaml.dump(global_flag_value)
                     flags.append(dbt_name)
-                    flags.append(f"'{dict_string}'")
+                    flags.append(yaml_string)
                 else:
                     flags.append(dbt_name)
                     flags.append(str(global_flag_value))
@@ -239,7 +238,10 @@ class DbtBaseOperator(BaseOperator):
         dbt_cmd.append(self.get_dbt_path())
 
         ## add base cmd
-        dbt_cmd.append(self.base_cmd)
+        if isinstance(self.base_cmd, str):
+            dbt_cmd.append(self.base_cmd)
+        else:
+            [dbt_cmd.append(item) for item in self.base_cmd]
 
         # add global flags
         for item in self.add_global_flags():
@@ -260,11 +262,10 @@ class DbtBaseOperator(BaseOperator):
         return result
 
     def execute(self, context: Context):
-        output = self.build_and_run_cmd(env=self.get_env(context))
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context))
+        return result.output
 
     def on_kill(self) -> None:
-        # TODO: this will no longer work now that we've switched to subprocess
         self.subprocess_hook.send_sigterm()
 
 
@@ -281,8 +282,8 @@ class DbtLSOperator(DbtBaseOperator):
         self.base_cmd = "ls"
 
     def execute(self, context: Context):
-        output = self.build_and_run_cmd(env=self.get_env(context))
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context))
+        return result.output
 
 
 class DbtSeedOperator(DbtBaseOperator):
@@ -309,8 +310,8 @@ class DbtSeedOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        output = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return result.output
 
 
 class DbtRunOperator(DbtBaseOperator):
@@ -327,8 +328,8 @@ class DbtRunOperator(DbtBaseOperator):
         self.base_cmd = "run"
 
     def execute(self, context: Context):
-        output = self.build_and_run_cmd(env=self.get_env(context))
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context))
+        return result.output
 
 
 class DbtTestOperator(DbtBaseOperator):
@@ -344,8 +345,8 @@ class DbtTestOperator(DbtBaseOperator):
         self.base_cmd = "test"
 
     def execute(self, context: Context):
-        output = self.build_and_run_cmd(env=self.get_env(context))
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context))
+        return result.output
 
 
 class DbtRunOperationOperator(DbtBaseOperator):
@@ -366,20 +367,19 @@ class DbtRunOperationOperator(DbtBaseOperator):
         self.macro_name = macro_name
         self.args = args
         super().__init__(**kwargs)
-        self.base_cmd = f"run-operation {self.macro_name} "
+        self.base_cmd = ["run-operation", macro_name]
 
     def add_cmd_flags(self):
         flags = []
         if self.args is not None:
-            dict_string = json.dumps(self.args)
             flags.append("--args")
-            flags.append(f"'{dict_string}'")
+            flags.append(yaml.dump(self.args))
         return flags
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        output = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        return result.output
 
 
 class DbtDepsOperator(DbtBaseOperator):
@@ -391,23 +391,11 @@ class DbtDepsOperator(DbtBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = "vars"
 
-    def __init__(self, vars: dict = None, **kwargs) -> None:
-
-        self.vars = vars
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "deps"
 
-    def add_cmd_flags(self):
-        flags = []
-        if self.vars is not None:
-            dict_string = json.dumps(self.vars)
-            flags.append("--vars")
-            flags.append(f"'{dict_string}'")
-        return flags
-
     def execute(self, context: Context):
-        cmd_flags = self.add_cmd_flags()
-        output = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return output
+        result = self.build_and_run_cmd(env=self.get_env(context))
+        return result.output

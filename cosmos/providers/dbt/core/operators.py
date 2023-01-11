@@ -148,10 +148,10 @@ class DbtBaseOperator(BaseOperator):
         return env
 
     def get_dbt_path(self):
-        which_dbt = shutil.which("dbt") or "dbt"
+        which_dbt = shutil.which("dbt-ol") or shutil.which("dbt") or "dbt"
 
         if self.python_venv:
-            dbt_path = f"{self.python_venv}/bin/dbt"
+            dbt_path = self.python_venv
         else:
             dbt_path = which_dbt
 

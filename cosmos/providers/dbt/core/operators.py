@@ -70,8 +70,8 @@ class DbtBaseOperator(BaseOperator):
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
     :type skip_exit_code: int
-    :param python_venv: Path to venv for dbt command execution (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/activate)
-    :type python_venv: str
+    :param dbt_executable_path: Path to dbt executable can be used with venv (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
+    :type dbt_executable_path: str
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -97,7 +97,7 @@ class DbtBaseOperator(BaseOperator):
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
-        python_venv: str = None,
+        dbt_executable_path: str = None,
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -119,7 +119,7 @@ class DbtBaseOperator(BaseOperator):
         self.append_env = append_env
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
-        self.python_venv = python_venv
+        self.dbt_executable_path = dbt_executable_path
         super().__init__(**kwargs)
 
     @cached_property
@@ -150,8 +150,8 @@ class DbtBaseOperator(BaseOperator):
     def get_dbt_path(self):
         which_dbt = shutil.which("dbt-ol") or shutil.which("dbt") or "dbt"
 
-        if self.python_venv:
-            dbt_path = self.python_venv
+        if self.dbt_executable_path:
+            dbt_path = self.dbt_executable_path
         else:
             dbt_path = which_dbt
 

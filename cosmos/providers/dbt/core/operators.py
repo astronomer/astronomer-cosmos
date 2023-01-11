@@ -26,7 +26,7 @@ class DbtBaseOperator(BaseOperator):
     :param conn_id: The airflow connection to use as the target
     :type conn_id: str
     :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
-    :type base_cmd: str or list
+    :type base_cmd: str | list[str]
     :param select: dbt optional argument that specifies which nodes to include.
     :type select: str
     :param exclude: dbt optional argument that specifies which models to exclude.

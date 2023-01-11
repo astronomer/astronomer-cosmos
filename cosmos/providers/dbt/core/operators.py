@@ -80,7 +80,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: str or list = None,
+        base_cmd: str | list[str] = None,
         select: str = None,
         exclude: str = None,
         selector: str = None,

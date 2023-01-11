@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 from typing import Sequence
 
 import yaml
@@ -99,7 +98,7 @@ class DbtBaseOperator(BaseOperator):
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
-        dbt_executable_path: str = None,
+        dbt_executable_path: str = "dbt",
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -148,25 +147,6 @@ class DbtBaseOperator(BaseOperator):
         env.update(airflow_context_vars)
 
         return env
-
-    def get_dbt_path(self):
-        which_dbt = shutil.which("dbt-ol") or shutil.which("dbt") or "dbt"
-
-        if self.dbt_executable_path:
-            dbt_path = self.dbt_executable_path
-        else:
-            dbt_path = which_dbt
-
-        if self.project_dir is not None:
-            if not os.path.exists(self.project_dir):
-                raise AirflowException(
-                    f"Can not find the project_dir: {self.project_dir}"
-                )
-            if not os.path.isdir(self.project_dir):
-                raise AirflowException(
-                    f"The project_dir {self.project_dir} must be a directory"
-                )
-        return dbt_path
 
     def exception_handling(self, result):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
@@ -218,6 +198,18 @@ class DbtBaseOperator(BaseOperator):
         return flags
 
     def run_command(self, cmd, env):
+        # check project_dir
+        if self.project_dir is not None:
+            if not os.path.exists(self.project_dir):
+                raise AirflowException(
+                    f"Can not find the project_dir: {self.project_dir}"
+                )
+            if not os.path.isdir(self.project_dir):
+                raise AirflowException(
+                    f"The project_dir {self.project_dir} must be a directory"
+                )
+
+        # run bash command
         result = self.subprocess_hook.run_command(
             command=cmd,
             env=env,
@@ -236,8 +228,8 @@ class DbtBaseOperator(BaseOperator):
         # parse dbt command
         dbt_cmd = []
 
-        ## get the dbt piece from the bash command so we can add to it
-        dbt_cmd.append(self.get_dbt_path())
+        ## start with the dbt executable
+        dbt_cmd.append(self.dbt_executable_path)
 
         ## add base cmd
         if isinstance(self.base_cmd, str):

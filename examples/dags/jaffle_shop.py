@@ -26,7 +26,10 @@ with DAG(
     jaffle_shop = DbtTaskGroup(
         dbt_project_name="jaffle_shop",
         conn_id="airflow_db",
-        dbt_args={"schema": "public", "python_venv": "/usr/local/airflow/dbt_venv"},
+        dbt_args={
+            "schema": "public",
+            "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt",
+        },
         test_behavior="after_all",
         dag=dag,
     )

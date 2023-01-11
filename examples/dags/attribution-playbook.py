@@ -15,7 +15,7 @@ from cosmos.providers.dbt.dag import DbtDag
 attribution_playbook = DbtDag(
     dbt_project_name="attribution-playbook",
     conn_id="airflow_db",
-    dbt_args={"schema": "public", "python_venv": "/usr/local/airflow/dbt_venv/bin/activate"},
+    dbt_args={"schema": "public", "python_venv": "/usr/local/airflow/dbt_venv"},
     dag_id="attribution-playbook",
     start_date=datetime(2022, 11, 27),
     schedule=[Dataset("SEED://ATTRIBUTION_PLAYBOOK")],

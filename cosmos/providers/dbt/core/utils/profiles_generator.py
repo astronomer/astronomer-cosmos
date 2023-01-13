@@ -28,11 +28,7 @@ def create_default_profiles():
         package = None
 
     profiles = {
-        "postgres_profile": postgres_profile,
         "snowflake_profile": snowflake_profile,
-        "redshift_profile": redshift_profile,
-        "bigquery_profile": bigquery_profile,
-        "databricks_profile": databricks_profile,
     }
 
     # Define the path to the directory and file

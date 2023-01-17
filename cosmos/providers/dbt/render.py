@@ -111,6 +111,14 @@ def render_project(
             else:
                 run_args["outlets"] = outlets
 
+        # make the docs task
+        docs_task = Task(
+            id=f"{model_name}_docs",
+            operator_class="cosmos.providers.dbt.core.operators.DbtDocsOperator",
+            arguments=run_args
+        )
+        entities[docs_task.id] = docs_task
+
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
@@ -122,6 +130,7 @@ def render_project(
         # base group and do nothing else for now
         if test_behavior != "after_each":
             entities[model_name] = run_task
+            base_group.add_entity(entity=docs_task)
             base_group.add_entity(entity=run_task)
             continue
 
@@ -139,7 +148,8 @@ def render_project(
         # make the group
         model_group = Group(
             id=model_name,
-            entities=[run_task, test_task],
+            entities=[docs_task, run_task, test_task],
+            #entities=[run_task]
         )
         entities[model_group.id] = model_group
 

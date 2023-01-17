@@ -329,8 +329,8 @@ class DbtDocsOperator(DbtBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.dbt_executable_path = "dbt"
-        self.base_cmd = "docs"
+        #self.dbt_executable_path = "dbt"
+        self.base_cmd = ["docs", "generate"]
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(env=self.get_env(context))

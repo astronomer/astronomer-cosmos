@@ -329,7 +329,6 @@ class DbtDocsOperator(DbtBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        #self.dbt_executable_path = "dbt"
         self.base_cmd = ["docs", "generate"]
 
     def execute(self, context: Context):
@@ -347,7 +346,6 @@ class DbtRunOperator(DbtBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        #self.dbt_executable_path = "/usr/local/airflow/dbt_venv/bin/dbt-ol"
         self.base_cmd = "run"
 
     def execute(self, context: Context):
@@ -365,7 +363,6 @@ class DbtTestOperator(DbtBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        #self.dbt_executable_path = "dbt-ol"
         self.base_cmd = "test"
 
     def execute(self, context: Context):

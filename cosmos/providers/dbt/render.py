@@ -2,7 +2,13 @@
 This module contains a function to render a dbt project into Cosmos entities.
 """
 import logging
-from typing import Any, Literal
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
+
+from typing import Any, Dict, List
 
 from airflow.datasets import Dataset
 
@@ -15,11 +21,11 @@ logger = logging.getLogger(__name__)
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
-    task_args: dict[str, Any] = {},
+    task_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
-    dbt_tags: list[str] = [],
+    dbt_tags: List[str] = [],
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -40,7 +46,7 @@ def render_project(
     )
 
     base_group = Group(id=dbt_project_name)  # this is the group that will be returned
-    entities: dict[
+    entities: Dict[
         str, CosmosEntity
     ] = {}  # this is a dict of all the entities we create
 
@@ -53,8 +59,8 @@ def render_project(
         if dbt_tags and not set(dbt_tags).intersection(model.config.tags):
             continue
 
-        run_args: dict[str, Any] = {**task_args, "models": model_name}
-        test_args: dict[str, Any] = {**task_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args, "models": model_name}
+        test_args: Dict[str, Any] = {**task_args, "models": model_name}
 
         if emit_datasets:
             outlets = [

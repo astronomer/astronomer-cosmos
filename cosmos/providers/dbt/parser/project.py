@@ -3,14 +3,14 @@ Used to parse and extract information from dbt projects.
 """
 from __future__ import annotations
 
-import os
 import logging
-import yaml  # type: ignore
-import jinja2
-
+import os
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
 from pathlib import Path
+from typing import Dict
+
+import jinja2
+import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ class DbtProject:
     dbt_root_path: str = "/usr/local/airflow/dbt"
 
     # private instance variables for managing state
-    models: dict[str, DbtModel] = field(default_factory=dict)
+    models: Dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
     models_dir: Path = field(init=False)
 
@@ -167,7 +167,7 @@ class DbtProject:
             model_name = config.get("name")
 
             # if the model doesn't exist, we can't do anything
-            if not model_name in self.models:
+            if model_name not in self.models:
                 continue
 
             # parse out the config fields we can recognize

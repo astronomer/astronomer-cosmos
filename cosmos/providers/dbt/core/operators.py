@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Sequence
+from typing import List, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -81,7 +81,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: str | list[str] = None,
+        base_cmd: str | List[str] = None,
         select: str = None,
         exclude: str = None,
         selector: str = None,

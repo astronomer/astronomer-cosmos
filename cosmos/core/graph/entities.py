@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List, Any
-
 import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ class CosmosEntity:
     """
 
     id: str
-    upstream_entity_ids: list[str] = field(default_factory=list)
+    upstream_entity_ids: List[str] = field(default_factory=list)
 
     def add_upstream(self, entity: CosmosEntity) -> None:
         """
@@ -35,7 +34,7 @@ class Group(CosmosEntity):
     A Group represents a collection of entities that are connected by dependencies.
     """
 
-    entities: list[CosmosEntity] = field(default_factory=list)
+    entities: List[CosmosEntity] = field(default_factory=list)
 
     def add_entity(self, entity: CosmosEntity) -> None:
         """
@@ -58,4 +57,4 @@ class Task(CosmosEntity):
     """
 
     operator_class: str = "airflow.operators.dummy.DummyOperator"
-    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments: Dict[str, Any] = field(default_factory=dict)

@@ -251,7 +251,7 @@ class DbtBaseOperator(BaseOperator):
         dbt_cmd.append(profile)
 
         ## set env vars
-        env = env | profile_vars
+        env = {**env, **profile_vars}
         result = self.run_command(cmd=dbt_cmd, env=env)
         return result
 

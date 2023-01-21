@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     "apache-airflow>=2.4",
     "Jinja2>=3.0.0",
-    "typing-extensions; python_version < '3.8'"
+    "typing-extensions; python_version < '3.8'",
 ]
 
 [project.optional-dependencies]

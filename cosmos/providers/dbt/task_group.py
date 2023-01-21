@@ -1,13 +1,16 @@
 """
 This module contains a function to render a dbt project as an Airflow Task Group.
 """
-from typing import Any, Literal
-from cosmos.core.airflow import CosmosTaskGroup
-from cosmos.providers.dbt.parser.project import DbtProject
-from .render import render_project
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
-from airflow.models import DAG
-from airflow.utils.decorators import apply_defaults
+from typing import Any, Dict, List
+
+from cosmos.core.airflow import CosmosTaskGroup
+
+from .render import render_project
 
 
 class DbtTaskGroup(CosmosTaskGroup):
@@ -29,11 +32,11 @@ class DbtTaskGroup(CosmosTaskGroup):
         self,
         dbt_project_name: str,
         conn_id: str,
-        dbt_args: dict[str, Any] = {},
+        dbt_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
-        dbt_tags: list[str] = [],
+        dbt_tags: List[str] = [],
         *args: Any,
         **kwargs: Any,
     ) -> None:

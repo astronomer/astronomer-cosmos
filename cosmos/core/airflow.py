@@ -1,12 +1,12 @@
 import importlib
-from datetime import datetime
 import logging
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
-from cosmos.core.graph.entities import CosmosEntity, Group, Task
+
+from cosmos.core.graph.entities import Group, Task
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class CosmosDag(DAG):
 
         super().__init__(*args, **kwargs)
 
-        entities: dict[str, Any] = {}
+        entities: Dict[str, Any] = {}
 
         # render all the entities in the group
         for ent in cosmos_group.entities:
@@ -63,7 +63,7 @@ class CosmosTaskGroup(TaskGroup):
         kwargs["dag"] = dag
         super().__init__(*args, **kwargs)
 
-        entities: dict[str, Any] = {}
+        entities: Dict[str, Any] = {}
 
         # render all the entities in the group
         for ent in cosmos_group.entities:

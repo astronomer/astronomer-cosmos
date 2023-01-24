@@ -6,7 +6,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from cosmos.core.airflow import CosmosTaskGroup
 
@@ -25,7 +25,7 @@ class DbtTaskGroup(CosmosTaskGroup):
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
-    :param dbt_tags: A list of dbt tags to filter the dbt models by
+    :param select: A dict of dbt selector arguments (i.e., {"paths": ["/path/to/models"]})
     """
 
     def __init__(
@@ -36,7 +36,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
-        dbt_tags: List[str] = [],
+        select: Dict[str, Any] = {},
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -54,7 +54,7 @@ class DbtTaskGroup(CosmosTaskGroup):
             test_behavior=test_behavior,
             emit_datasets=emit_datasets,
             conn_id=conn_id,
-            dbt_tags=dbt_tags,
+            select=select,
         )
 
         # call the airflow constructor

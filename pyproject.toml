@@ -99,3 +99,6 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
+
+[tool.ruff]
+line-length = 120

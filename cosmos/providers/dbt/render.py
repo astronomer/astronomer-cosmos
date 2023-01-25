@@ -11,6 +11,7 @@ except ImportError:
 from typing import Any, Dict, List
 
 from airflow.datasets import Dataset
+from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
 from cosmos.providers.dbt.parser.project import DbtProject
@@ -25,7 +26,8 @@ def render_project(
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
-    dbt_tags: List[str] = [],
+    select: Dict[str, List[str]] = {},
+    exclude: Dict[str, List[str]] = {},
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -37,7 +39,8 @@ def render_project(
         Defaults to "after_each"
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
-    :param dbt_tags: A list of dbt tags to filter the dbt models by
+    :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
+    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
     """
     # first, get the dbt project
     project = DbtProject(
@@ -53,11 +56,26 @@ def render_project(
     # add project_dir arg to task_args
     task_args["project_dir"] = project.project_dir
 
+    # ensures the same tag isn't in select & exclude
+    if "tags" in select and "tags" in exclude:
+        if set(select["tags"]).intersection(exclude["tags"]):
+            raise AirflowException(
+                f"Can't specify the same tag in `select` and `include`: "
+                f"{set(select['tags']).intersection(exclude['tags'])}"
+            )
+
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
         # if we have tags, only include models that have at least one of the tags
-        if dbt_tags and not set(dbt_tags).intersection(model.config.tags):
-            continue
+        # filters down to a set of specified tags
+        if "tags" in select:
+            if not set(select["tags"]).intersection(model.config.tags):
+                continue
+
+        # filters out any specified tags
+        if "tags" in exclude:
+            if set(exclude["tags"]).intersection(model.config.tags):
+                continue
 
         run_args: Dict[str, Any] = {**task_args, "models": model_name}
         test_args: Dict[str, Any] = {**task_args, "models": model_name}

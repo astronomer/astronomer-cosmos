@@ -27,7 +27,7 @@ Example:
 Tags
 ----------------------
 
-Cosmos allows you to filter by tags using the ``dbt_tags`` parameter. If a model contains any of the tags, it gets included as part of the DAG/Task Group. Otherwise, it doesn't get included (even if rendered models depend on a non-tagged model).
+Cosmos allows you to filter by tags using the ``select`` parameter. If a model contains any of the tags, it gets included as part of the DAG/Task Group. Otherwise, it doesn't get included (even if rendered models depend on a non-tagged model).
 
 .. note::
     Cosmos currently reads from (1) config calls in the model code and (2) .yml files in the models directory for tags. It does not read from the dbt_project.yml file.
@@ -40,5 +40,5 @@ Example:
 
     jaffle_shop = DbtDag(
         # ...
-        dbt_tags=['daily'],
+        select={"tags": ['daily']},
     )

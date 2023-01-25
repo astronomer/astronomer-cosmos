@@ -25,7 +25,7 @@ class DbtTaskGroup(CosmosTaskGroup):
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
-    :param select: A dict of dbt selector arguments (i.e., {"paths": ["/path/to/models"]})
+    :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     """
 
     def __init__(

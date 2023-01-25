@@ -56,8 +56,9 @@ def render_project(
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
         # if we have tags, only include models that have at least one of the tags
-        if select["tags"] and not set(select["tags"]).intersection(model.config.tags):
-            continue
+        if "tags" in select:
+            if not set(select["tags"]).intersection(model.config.tags):
+                continue
 
         run_args: Dict[str, Any] = {**task_args, "models": model_name}
         test_args: Dict[str, Any] = {**task_args, "models": model_name}

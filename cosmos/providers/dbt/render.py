@@ -8,7 +8,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from airflow.datasets import Dataset
 
@@ -25,7 +25,8 @@ def render_project(
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
-    select: Dict = None,
+    select: Dict[str, List[str]] = {},
+    exclude: Dict[str, List[str]] = {},
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -38,6 +39,7 @@ def render_project(
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
+    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
     """
     # first, get the dbt project
     project = DbtProject(
@@ -58,6 +60,10 @@ def render_project(
         # if we have tags, only include models that have at least one of the tags
         if "tags" in select:
             if not set(select["tags"]).intersection(model.config.tags):
+                continue
+
+        if "tags" in exclude:
+            if set(exclude["tags"]).intersection(model.config.tags):
                 continue
 
         run_args: Dict[str, Any] = {**task_args, "models": model_name}

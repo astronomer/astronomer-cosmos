@@ -56,18 +56,17 @@ def render_project(
     # add project_dir arg to task_args
     task_args["project_dir"] = project.project_dir
 
+    # ensures the same tag isn't in select & exclude
+    if "tags" in select and "tags" in exclude:
+        if set(select["tags"]).intersection(exclude["tags"]):
+            raise AirflowException(
+                f"Can't specify the same tag in `select` and `include`: "
+                f"{set(select['tags']).intersection(exclude['tags'])}"
+            )
+
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
         # if we have tags, only include models that have at least one of the tags
-
-        # ensures the same tag isn't in select & exclude
-        if "tags" in select and "tags" in exclude:
-            if set(select["tags"]).intersection(exclude["tags"]):
-                raise AirflowException(
-                    f"Can't specify the same tag in `select` and `include`: "
-                    f"{set(select['tags']).intersection(exclude['tags'])}"
-                )
-
         # filters down to a set of specified tags
         if "tags" in select:
             if not set(select["tags"]).intersection(model.config.tags):

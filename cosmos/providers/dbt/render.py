@@ -96,8 +96,7 @@ def render_project(
         # filters out any specified paths
         if "paths" in exclude:
             root_directories = [
-                project.project_dir / path.strip("/")
-                for path in exclude.get("paths", [])
+                project.project_dir / path.strip("/") for path in exclude.get("paths")
             ]
             if set(root_directories).intersection(model.path.parents):
                 continue

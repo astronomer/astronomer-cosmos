@@ -64,6 +64,13 @@ def render_project(
                 f"{set(select['tags']).intersection(exclude['tags'])}"
             )
 
+    if "paths" in select and "paths" in exclude:
+        if set(select["paths"]).intersection(exclude["paths"]):
+            raise AirflowException(
+                f"Can't specify the same path in `select` and `include`: "
+                f"{set(select['paths']).intersection(exclude['paths'])}"
+            )
+
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
         # if we have tags, only include models that have at least one of the tags
@@ -75,6 +82,24 @@ def render_project(
         # filters out any specified tags
         if "tags" in exclude:
             if set(exclude["tags"]).intersection(model.config.tags):
+                continue
+
+        # filters down to a path within the project_dir
+        if "paths" in select:
+            root_directories = [
+                project.project_dir / path.strip("/")
+                for path in select.get("paths", [])
+            ]
+            if not set(root_directories).intersection(model.path.parents):
+                continue
+
+        # filters out any specified paths
+        if "paths" in exclude:
+            root_directories = [
+                project.project_dir / path.strip("/")
+                for path in exclude.get("paths", [])
+            ]
+            if set(root_directories).intersection(model.path.parents):
                 continue
 
         run_args: Dict[str, Any] = {**task_args, "models": model_name}

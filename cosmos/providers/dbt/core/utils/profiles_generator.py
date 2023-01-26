@@ -180,7 +180,10 @@ def map_profile(conn_id, db_override=None, schema_override=None):
         db = db_override
     else:
         if conn.conn_type != "snowflake":
-            db = conn.schema
+            if conn.conn_type == "google_cloud_platform":
+                db = json.loads(conn.extra_dejson.get("keyfile_dict"))["project_id"]
+            else:
+                db = conn.schema
         else:
             # At some point the extras removed a prefix extra__snowflake__ when the provider got updated... handling
             # that here.

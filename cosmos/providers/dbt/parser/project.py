@@ -22,6 +22,7 @@ class DbtModelConfig:
     """
 
     tags: set[str] = field(default_factory=set)
+    materialized: set[str] = field(default_factory=set)
     upstream_models: set[str] = field(default_factory=set)
 
     def __add__(self, other_config: DbtModelConfig) -> DbtModelConfig:
@@ -31,6 +32,7 @@ class DbtModelConfig:
         # get the unique combination of each list
         return DbtModelConfig(
             tags=self.tags | other_config.tags,
+            materialized=self.materialized | other_config.materialized,
             upstream_models=self.upstream_models | other_config.upstream_models,
         )
 
@@ -73,28 +75,40 @@ class DbtModel:
 
                 # check if we have a config - this could contain tags
                 if base_node.node.name == "config":
-                    # if it is, check if any kwargs are tags
+                    # if it is, check for the following configs # tags, # materialized
                     for kwarg in base_node.kwargs:
-                        if hasattr(kwarg, "key") and kwarg.key == "tags":
-                            try:
-                                # try to convert it to a constant and get the value
-                                value = kwarg.value.as_const()
-
-                                if isinstance(value, str):
-                                    # if it's a string, turn it into a list for consistency
-                                    value = [value]
-
-                                # add the value to the config
-                                config.tags |= set(value)
-                            except Exception as e:
-                                # if we can't convert it to a constant, we can't do anything with it
-                                logger.warning(
-                                    f"Could not parse tags from config in {self.path}: {e}"
-                                )
-                                pass
+                        config.tags |= (
+                            self._extract_config(kwarg, "tags")
+                            if self._extract_config(kwarg, "tags")
+                            else set()
+                        )
+                        config.materialized |= (
+                            self._extract_config(kwarg, "materialized")
+                            if self._extract_config(kwarg, "materialized")
+                            else set()
+                        )
 
         # set the config and set the parsed file flag to true
         self.config = config
+
+    def _extract_config(self, kwarg, config_name):
+        if hasattr(kwarg, "key") and kwarg.key == config_name:
+            try:
+                # try to convert it to a constant and get the value
+                value = kwarg.value.as_const()
+
+                if isinstance(value, str):
+                    # if it's a string, turn it into a list for consistency
+                    value = [value]
+
+                # add the value to the config
+                return set(value)
+            except Exception as e:
+                # if we can't convert it to a constant, we can't do anything with it
+                logger.warning(
+                    f"Could not parse {config_name} from config in {self.path}: {e}"
+                )
+                pass
 
     def __repr__(self) -> str:
         """
@@ -163,8 +177,8 @@ class DbtProject:
         if not config_dict.get("models"):
             return
 
-        for config in config_dict["models"]:
-            model_name = config.get("name")
+        for model in config_dict["models"]:
+            model_name = model.get("name")
 
             # if the model doesn't exist, we can't do anything
             if model_name not in self.models:
@@ -172,13 +186,18 @@ class DbtProject:
 
             # parse out the config fields we can recognize
 
-            # 'tags' is either a string or list of strings
-            tags = config.get("tags", [])
+            # tags
+            tags = model.get("config", {}).get("tags", [])
             if isinstance(tags, str):
                 tags = [tags]
+
+            # materialized
+            materialized = model.get("config", {}).get("materialized", [])
+            if isinstance(materialized, str):
+                materialized = [materialized]
 
             # then, get the model and merge the configs
             model = self.models[model_name]
             model.config = model.config + DbtModelConfig(
-                tags=set(tags),
+                tags=set(tags), materialized=set(materialized)
             )

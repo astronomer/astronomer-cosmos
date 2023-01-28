@@ -60,10 +60,14 @@ class DbtModel:
                         ) if self._extract_config(kwarg, "tags") else None
                         materialized.append(
                             self._extract_config(kwarg, "materialized")
-                        ) if self._extract_config(kwarg, "materialized") else None
+                        ) if self._extract_config(
+                            kwarg, "materialized"
+                        ) else None  # TODO: This shouldn't be a list, but a string
                         schema.append(
                             self._extract_config(kwarg, "schema")
-                        ) if self._extract_config(kwarg, "schema") else None
+                        ) if self._extract_config(
+                            kwarg, "schema"
+                        ) else None  # TODO: this shouldn't be a list, but a string
 
         # set the config and set the parsed file flag to true
         self.config = {

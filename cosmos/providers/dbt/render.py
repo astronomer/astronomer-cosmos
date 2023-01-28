@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
+    dbt_models_dir: str = "models",
     task_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
@@ -45,6 +46,7 @@ def render_project(
     # first, get the dbt project
     project = DbtProject(
         dbt_root_path=dbt_root_path,
+        dbt_models_dir=dbt_models_dir,
         project_name=dbt_project_name,
     )
 

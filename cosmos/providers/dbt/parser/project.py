@@ -114,6 +114,7 @@ class DbtProject:
 
     # optional, user-specified instance variables
     dbt_root_path: str = "/usr/local/airflow/dbt"
+    dbt_models_dir: str = "models"
 
     # private instance variables for managing state
     models: Dict[str, DbtModel] = field(default_factory=dict)
@@ -126,7 +127,7 @@ class DbtProject:
         """
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
-        self.models_dir = self.project_dir / "models"
+        self.models_dir = self.project_dir / self.dbt_models_dir
 
         # crawl the models in the project
         for file_name in self.models_dir.rglob("*.sql"):

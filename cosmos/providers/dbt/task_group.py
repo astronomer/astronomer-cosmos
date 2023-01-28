@@ -36,6 +36,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         dbt_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
+        dbt_models_dir: str = "models",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
@@ -52,6 +53,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         group = render_project(
             dbt_project_name=dbt_project_name,
             dbt_root_path=dbt_root_path,
+            dbt_models_dir=dbt_models_dir,
             task_args=dbt_args,
             test_behavior=test_behavior,
             emit_datasets=emit_datasets,

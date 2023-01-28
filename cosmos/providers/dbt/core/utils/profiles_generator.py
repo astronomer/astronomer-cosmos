@@ -92,10 +92,19 @@ def create_profile_vars(conn: Connection, database, schema):
             for key, value in extras.items():
                 extras[key] = f"extra__snowflake__{value}"
 
+        # Region is optional
+        region = conn.extra_dejson.get(extras["region"])
+        account = conn.extra_dejson.get(extras["account"])
+
+        if region and region not in account:
+            account = f"{conn.extra_dejson.get(extras['account'])}.{region}"
+        else:
+            account = conn.extra_dejson.get(extras["account"])
+
         profile_vars = {
             "SNOWFLAKE_USER": conn.login,
             "SNOWFLAKE_PASSWORD": conn.password,
-            "SNOWFLAKE_ACCOUNT": f"{conn.extra_dejson.get(extras['account'])}.{conn.extra_dejson.get(extras['region'])}",
+            "SNOWFLAKE_ACCOUNT": account,
             "SNOWFLAKE_ROLE": conn.extra_dejson.get(extras["role"]),
             "SNOWFLAKE_DATABASE": database,
             "SNOWFLAKE_WAREHOUSE": conn.extra_dejson.get(extras["warehouse"]),

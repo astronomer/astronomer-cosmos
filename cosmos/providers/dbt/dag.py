@@ -20,6 +20,7 @@ class DbtDag(CosmosDag):
 
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The path to the dbt root directory
+    :param dbt_models_dir: The path to the dbt models directory within the project
     :param conn_id: The Airflow connection ID to use for the dbt profile
     :param dbt_args: Parameters to pass to the underlying dbt operators
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies

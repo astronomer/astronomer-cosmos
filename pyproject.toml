@@ -82,6 +82,11 @@ include = [
     "/cosmos",
 ]
 
+[tool.hatch.envs.test]
+dependencies = [
+  "pytest"
+]
+
 [tool.hatch.envs.docs]
 dependencies = [
     "sphinx",

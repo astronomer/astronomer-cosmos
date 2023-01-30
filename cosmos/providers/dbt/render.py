@@ -77,15 +77,14 @@ def render_project(
     for model_name, model in project.models.items():
         # if we have tags, only include models that have at least one of the tags
         # filters down to a set of specified tags
-        if "tags" in model.config:
-            if "tags" in select:
-                if not any(x in select["tags"] for x in model.config["tags"]):
-                    continue
+        if "tags" in select:
+            if not set(select["tags"]).intersection(model.config.tags):
+                continue
 
-            # filters out any specified tags
-            if "tags" in exclude:
-                if any(x in exclude["tags"] for x in model.config["tags"]):
-                    continue
+        # filters out any specified tags
+        if "tags" in exclude:
+            if set(exclude["tags"]).intersection(model.config.tags):
+                continue
 
         # filters down to a path within the project_dir
         if "paths" in select:
@@ -102,6 +101,11 @@ def render_project(
                 project.project_dir / path.strip("/") for path in exclude.get("paths")
             ]
             if set(root_directories).intersection(model.path.parents):
+                continue
+
+        # filters down to a specific config
+        if "configs" in select:
+            if f"materialized:{model.config.materialized}" not in select["configs"]:
                 continue
 
         run_args: Dict[str, Any] = {**task_args, "models": model_name}
@@ -156,7 +160,7 @@ def render_project(
 
     # add dependencies now that we have all the entities
     for model_name, model in project.models.items():
-        upstream_deps = model.config["upstream_models"]
+        upstream_deps = model.config.upstream_models
         for upstream_model_name in upstream_deps:
             try:
                 dep_task = entities[upstream_model_name]
@@ -188,7 +192,7 @@ def render_project(
         # iterate over all models
         for model_name, model in project.models.items():
             # iterate over all upstream models
-            for upstream_model_name in model.config["upstream_models"]:
+            for upstream_model_name in model.config.upstream_models:
                 # remove the upstream model from the list of models with no downstream tasks
                 try:
                     models_with_no_downstream_tasks.remove(upstream_model_name)

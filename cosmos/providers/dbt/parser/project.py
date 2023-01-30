@@ -16,6 +16,32 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class DbtModelConfig:
+    """
+    Represents a single model config.
+    """
+
+    tags: set[str] = field(default_factory=set)
+    materialized: str = field(default_factory=str)
+    schema: str = field(default_factory=str)
+    upstream_models: set[str] = field(default_factory=set)
+
+    def __add__(self, other_config: DbtModelConfig) -> DbtModelConfig:
+        """
+        Add one config to another. Necessary because configs can come from different places
+        """
+        # get the unique combination of each list
+        return DbtModelConfig(
+            tags=self.tags | other_config.tags,
+            materialized=self.materialized
+            or other_config.materialized
+            or "view",  # view is the default in dbt
+            schema=self.schema or other_config.schema,
+            upstream_models=self.upstream_models | other_config.upstream_models,
+        )
+
+
+@dataclass
 class DbtModel:
     """
     Represents a single dbt model.
@@ -24,12 +50,14 @@ class DbtModel:
     # instance variables
     name: str
     path: Path
-    config: Dict = None
+    config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
     def __post_init__(self) -> None:
         """
         Parses the file and extracts metadata (dependencies, tags, etc)
         """
+        # first, get an empty config
+        config = DbtModelConfig()
 
         # get the code from the file
         code = self.path.read_text()
@@ -39,7 +67,6 @@ class DbtModel:
         ast = env.parse(code)
 
         # iterate over the jinja nodes to extract info
-        upstream_models, tags, materialized, schema = [], [], [], []
         for base_node in ast.find_all(jinja2.nodes.Call):
             if hasattr(base_node.node, "name"):
                 # check we have a ref - this indicates a dependency
@@ -48,41 +75,44 @@ class DbtModel:
                     first_arg = base_node.args[0]
                     if isinstance(first_arg, jinja2.nodes.Const):
                         # and add it to the config
-                        upstream_models.append(first_arg.value)
+                        config.upstream_models.add(first_arg.value)
 
                 # check if we have a config - this could contain tags
-
                 if base_node.node.name == "config":
-                    # if it is, check for the following configs # tags, # materialized
+                    # if it is, check if any kwargs are tags
                     for kwarg in base_node.kwargs:
-                        tags.append(
-                            self._extract_config(kwarg, "tags")
-                        ) if self._extract_config(kwarg, "tags") else None
-                        materialized.append(
-                            self._extract_config(kwarg, "materialized")
-                        ) if self._extract_config(
-                            kwarg, "materialized"
-                        ) else None  # TODO: This shouldn't be a list, but a string
-                        schema.append(
-                            self._extract_config(kwarg, "schema")
-                        ) if self._extract_config(
-                            kwarg, "schema"
-                        ) else None  # TODO: this shouldn't be a list, but a string
+                        # tags
+                        tags = self._extract_config(kwarg=kwarg, config_name="tags")
+                        config.tags |= (
+                            set(tags) if isinstance(tags, (str, list)) else set()
+                        )
+
+                        # materialized
+                        materialized = (
+                            self._extract_config(
+                                kwarg=kwarg, config_name="materialized"
+                            )
+                            or None
+                        )
+                        if materialized:
+                            config.materialized = materialized
+
+                        # schema
+                        schema = (
+                            self._extract_config(kwarg=kwarg, config_name="schema")
+                            or None
+                        )
+                        if schema:
+                            config.schema = schema
 
         # set the config and set the parsed file flag to true
-        self.config = {
-            "upstream_models": upstream_models,
-            "tags": tags,
-            "materialized": materialized,
-            "schema": schema,
-        }
+        self.config = config
 
-    def _extract_config(self, kwarg, config_name):
+    def _extract_config(self, kwarg, config_name: str):
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:
                 # try to convert it to a constant and get the value
-                value = kwarg.value.as_const()
-                return value
+                return kwarg.value.as_const()
             except Exception as e:
                 # if we can't convert it to a constant, we can't do anything with it
                 logger.warning(
@@ -173,17 +203,17 @@ class DbtProject:
                 tags = [tags]
 
             # materialized
-            materialized = model.get("config", {}).get("materialized", [])
-            if isinstance(materialized, str):
-                materialized = [materialized]
+            materialized = model.get("config", {}).get("materialized", None)
+            if not isinstance(materialized, str):
+                materialized = None
 
             # schema
-            schema = model.get("config", {}).get("schema", [])
-            if isinstance(schema, str):
-                schema = [schema]
+            schema = model.get("config", {}).get("schema", None)
+            if not isinstance(materialized, str):
+                schema = None
 
             # then, get the model and merge the configs
             model = self.models[model_name]
-            model.config["tags"] = model.config["tags"] + tags
-            model.config["materialized"] = model.config["materialized"] + materialized
-            model.config["schema"] = model.config["schema"] + schema
+            model.config = model.config + DbtModelConfig(
+                tags=set(tags), materialized=materialized, schema=schema
+            )

@@ -139,7 +139,7 @@ def render_project(
         # make the group
         model_group = Group(
             id=model_name,
-            entities=[run_task, test_task]
+            entities=[run_task, test_task],
         )
         entities[model_group.id] = model_group
 

@@ -21,6 +21,9 @@ class DbtModelConfig:
     Represents a single model config.
     """
 
+    config_types: list = field(
+        default_factory=lambda: ["materialized", "schema", "tags"]
+    )
     config_selectors: set[str] = field(default_factory=set)
     upstream_models: set[str] = field(default_factory=set)
 
@@ -31,25 +34,30 @@ class DbtModelConfig:
 
         # ensures proper order of operations between sql models and properties.yml
         result = self._config_selector_ooo(
-            prefixes=["materialized", "schema"],
             sql_configs=self.config_selectors,
             properties_configs=other_config.config_selectors,
         )
 
         # get the unique combination of each list
         return DbtModelConfig(
+            config_types=self.config_types,
             config_selectors=result,
             upstream_models=self.upstream_models | other_config.upstream_models,
         )
 
     def _config_selector_ooo(
-        self, prefixes: list, sql_configs: set[str], properties_configs: set[str]
+        self, sql_configs: set[str], properties_configs: set[str]
     ) -> set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
         # 1. model sql files
         # 2. properties.yml files
         """
+
+        prefixes = self.config_types
+
+        # we are combining tags from properties.yml and sql models - one shouldn't overwrite the other.
+        prefixes.remove("tags")
 
         # iterate on each properties.yml config
         for config in properties_configs:
@@ -114,7 +122,7 @@ class DbtModel:
                 if base_node.node.name == "config":
                     # if it is, check if any kwargs are tags
                     for kwarg in base_node.kwargs:
-                        for selector in ["tags", "materialized", "schema"]:
+                        for selector in self.config.config_types:
                             extracted_config = self._extract_config(
                                 kwarg=kwarg, config_name=selector
                             )
@@ -224,7 +232,7 @@ class DbtProject:
 
             # config_selectors
             config_selectors = []
-            for selector in ["materialized", "schema", "tags"]:
+            for selector in self.models[model_name].config.config_types:
                 config_value = model.get("config", {}).get(selector)
                 if config_value:
                     if isinstance(config_value, str):
@@ -236,7 +244,8 @@ class DbtProject:
                             if item
                         ]
 
-            # dbt default
+            # dbt default ensures "materialized:view" is set for all models if nothing is specified so that it will
+            # work in a select/exclude list
             config_types = [
                 selector_name
                 for selector in config_selectors

@@ -226,7 +226,6 @@ class DbtBaseOperator(BaseOperator):
         return result
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
-        #create_default_profiles()
         profile, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )
@@ -277,11 +276,14 @@ class DbtBaseOperator(BaseOperator):
 class DbtLSOperator(DbtBaseOperator):
     """
     Executes a dbt core ls command.
+
     """
+
     ui_color = "#DBCDF6"
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "ls"
+
     def execute(self, context: Context):
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
@@ -312,24 +314,6 @@ class DbtSeedOperator(DbtBaseOperator):
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
-        return result.output
-
-
-class DbtBuildOperator(DbtBaseOperator):
-    """
-    Executes a dbt core run command.
-
-    """
-
-    ui_color = "#7352BA"
-    ui_fgcolor = "#F4F2FC"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "build"
-
-    def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
 
 

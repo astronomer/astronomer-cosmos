@@ -280,6 +280,7 @@ class DbtLSOperator(DbtBaseOperator):
     """
 
     ui_color = "#DBCDF6"
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "ls"

@@ -274,23 +274,6 @@ class DbtBaseOperator(BaseOperator):
             self.subprocess_hook.send_sigterm()
 
 
-class DbtLSOperator(DbtBaseOperator):
-    """
-    Executes a dbt core ls command.
-
-    """
-
-    ui_color = "#DBCDF6"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "ls"
-
-    def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
-        return result.output
-
-
 class DbtSeedOperator(DbtBaseOperator):
     """
     Executes a dbt core seed command.
@@ -318,9 +301,10 @@ class DbtSeedOperator(DbtBaseOperator):
         result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
         return result.output
 
-class DbtDocsOperator(DbtBaseOperator):
+
+class DbtBuildOperator(DbtBaseOperator):
     """
-    Executes a dbt core docs command.
+    Executes a dbt core run command.
 
     """
 
@@ -329,11 +313,12 @@ class DbtDocsOperator(DbtBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = ["docs", "generate"]
+        self.base_cmd = "build"
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(env=self.get_env(context))
         return result.output
+
 
 class DbtRunOperator(DbtBaseOperator):
     """

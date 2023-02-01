@@ -29,7 +29,11 @@ sessions_before_conversion as (
     left join customer_conversions using (customer_id)
 
     where sessions.started_at <= customer_conversions.converted_at
+       {% if var('conn_type') != 'bigquery' %}
            and sessions.started_at >= (customer_conversions.converted_at + interval '-30 day')
+       {% else %}
+           and sessions.started_at >= date_sub(customer_conversions.converted_at, interval 30 day)
+       {% endif %}
 
 ),
 

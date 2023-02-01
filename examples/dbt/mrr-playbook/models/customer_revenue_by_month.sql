@@ -13,15 +13,21 @@ months as (
 -- determine when a given account had its first and last (or most recent) month
 customers as (
 
-    select
-        customer_id,
-        date_trunc('month', min(start_date)) as date_month_start,
-        date_trunc('month', max(end_date)) as date_month_end
-
-    from subscription_periods
-
-    group by 1
-
+    {% if var('conn_type') != 'bigquery' %}
+      select
+          customer_id,
+          date_trunc('month', min(start_date)) as date_month_start,
+          date_trunc('month', max(end_date)) as date_month_end
+      from subscription_periods
+      group by 1
+    {% else %}
+      select
+          customer_id,
+          date_trunc(min(start_date), MONTH) as date_month_start,
+          date_trunc(max(end_date), MONTH) as date_month_end
+      from subscription_periods
+      group by 1
+    {% endif %}
 ),
 
 -- create one record per month between a customer's first and last month

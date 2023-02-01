@@ -21,24 +21,57 @@ class DbtModelConfig:
     Represents a single model config.
     """
 
-    tags: set[str] = field(default_factory=set)
-    materialized: str = field(default_factory=str)
-    schema: str = field(default_factory=str)
+    config_selectors: set[str] = field(default_factory=set)
     upstream_models: set[str] = field(default_factory=set)
 
     def __add__(self, other_config: DbtModelConfig) -> DbtModelConfig:
         """
         Add one config to another. Necessary because configs can come from different places
         """
+
+        # ensures proper order of operations between sql models and properties.yml
+        result = self._config_selector_ooo(
+            prefixes=["materialized", "schema"],
+            sql_configs=self.config_selectors,
+            properties_configs=other_config.config_selectors,
+        )
+
         # get the unique combination of each list
         return DbtModelConfig(
-            tags=self.tags | other_config.tags,
-            materialized=self.materialized
-            or other_config.materialized
-            or "view",  # view is the default in dbt
-            schema=self.schema or other_config.schema,
+            config_selectors=result,
             upstream_models=self.upstream_models | other_config.upstream_models,
         )
+
+    def _config_selector_ooo(
+        self, prefixes: list, sql_configs: set[str], properties_configs: set[str]
+    ) -> set[str]:
+        """
+        this will force values from the sql files to override whatever is in the properties.yml. So ooo:
+        # 1. model sql files
+        # 2. properties.yml files
+        """
+
+        # iterate on each properties.yml config
+        for config in properties_configs:
+            # identify the config_type and its associated value (i.e. materialized:table)
+            config_type, value = config.split(":")
+            # if the config_type matches is even in a list of prefixes then
+            if config_type in prefixes:
+                # make sure that it's prefix doesn't already exist in the sql configs
+                if not any(
+                    [element.startswith(config_type) for element in sql_configs]
+                ):
+                    # if it does let's double-check against each prefix and add it
+                    for prefix in prefixes:
+                        # if the actual config doesn't exist in the sql_configs then add it
+                        if not any(
+                            [element.startswith(prefix) for element in sql_configs]
+                        ):
+                            sql_configs.add(config)
+            else:
+                sql_configs.add(config)
+
+        return sql_configs
 
 
 @dataclass
@@ -81,29 +114,15 @@ class DbtModel:
                 if base_node.node.name == "config":
                     # if it is, check if any kwargs are tags
                     for kwarg in base_node.kwargs:
-                        # tags
-                        tags = self._extract_config(kwarg=kwarg, config_name="tags")
-                        config.tags |= (
-                            set(tags) if isinstance(tags, (str, list)) else set()
-                        )
-
-                        # materialized
-                        materialized = (
-                            self._extract_config(
-                                kwarg=kwarg, config_name="materialized"
+                        for selector in ["tags", "materialized", "schema"]:
+                            extracted_config = self._extract_config(
+                                kwarg=kwarg, config_name=selector
                             )
-                            or None
-                        )
-                        if materialized:
-                            config.materialized = materialized
-
-                        # schema
-                        schema = (
-                            self._extract_config(kwarg=kwarg, config_name="schema")
-                            or None
-                        )
-                        if schema:
-                            config.schema = schema
+                            config.config_selectors |= (
+                                set(extracted_config)
+                                if isinstance(extracted_config, (str, list))
+                                else set()
+                            )
 
         # set the config and set the parsed file flag to true
         self.config = config
@@ -112,7 +131,15 @@ class DbtModel:
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:
                 # try to convert it to a constant and get the value
-                return kwarg.value.as_const()
+                value = kwarg.value.as_const()
+                if isinstance(value, list):
+                    value = [f"{config_name}:{item}" for item in value]
+
+                if isinstance(value, str):
+                    value = [f"{config_name}:{value}"]
+
+                return value
+
             except Exception as e:
                 # if we can't convert it to a constant, we can't do anything with it
                 logger.warning(
@@ -195,25 +222,31 @@ class DbtProject:
             if model_name not in self.models:
                 continue
 
-            # parse out the config fields we can recognize
+            # config_selectors
+            config_selectors = []
+            for selector in ["materialized", "schema", "tags"]:
+                config_value = model.get("config", {}).get(selector)
+                if config_value:
+                    if isinstance(config_value, str):
+                        config_selectors.append(f"{selector}:{config_value}")
+                    else:
+                        [
+                            config_selectors.append(f"{selector}:{item}")
+                            for item in config_value
+                            if item
+                        ]
 
-            # tags
-            tags = model.get("config", {}).get("tags", [])
-            if isinstance(tags, str):
-                tags = [tags]
-
-            # materialized
-            materialized = model.get("config", {}).get("materialized", None)
-            if not isinstance(materialized, str):
-                materialized = None
-
-            # schema
-            schema = model.get("config", {}).get("schema", None)
-            if not isinstance(materialized, str):
-                schema = None
+            # dbt default
+            config_types = [
+                selector_name
+                for selector in config_selectors
+                for selector_name in [selector.split(":")[0]]
+            ]
+            if "materialized" not in config_types:
+                config_selectors.append("materialized:view")
 
             # then, get the model and merge the configs
             model = self.models[model_name]
             model.config = model.config + DbtModelConfig(
-                tags=set(tags), materialized=materialized, schema=schema
+                config_selectors=set(config_selectors)
             )

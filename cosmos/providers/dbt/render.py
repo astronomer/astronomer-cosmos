@@ -122,8 +122,6 @@ def render_project(
         # base group and do nothing else for now
         if test_behavior != "after_each":
             entities[model_name] = run_task
-            #base_group.add_entity(entity=ls_task)
-            #base_group.add_entity(entity=docs_task)
             base_group.add_entity(entity=run_task)
             continue
 
@@ -141,8 +139,7 @@ def render_project(
         # make the group
         model_group = Group(
             id=model_name,
-            #entities=[docs_task, run_task, test_task],
-            entities=[run_task]
+            entities=[run_task, test_task]
         )
         entities[model_group.id] = model_group
 

@@ -39,8 +39,12 @@ class DbtDag(CosmosDag):
         dbt_root_path: str = "/usr/local/airflow/dbt",
         dbt_models_dir: str = "models",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
+<<<<<<< HEAD
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
+=======
+        dbt_tags: List[str] = [],
+>>>>>>> 6eb87e4 (Updates to profiles generator to ensure multiple tasks can generate a profile, other updates to prep cosmos for OL)
         *args: Any,
         **kwargs: Any,
     ) -> None:

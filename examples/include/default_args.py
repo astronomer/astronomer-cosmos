@@ -8,9 +8,9 @@ if os.getenv("ENVIRONMENT", "DEV") == "PROD":
             "conn_id": "bigquery_default",
             "schema": "cosmos_testing",
         },
-        {"conn_type": "postgres", "conn_id": "airflow_db", "schema": "public"},
+        {"conn_type": "postgres", "conn_id": "postgres_default", "schema": "public"},
+        {"conn_type": "redshift", "conn_id": "redshift_default", "schema": "public"}
         # {"conn_type": "databricks", "conn_id": "databricks_default", "schema": ""},
-        # {"conn_type": "redshift", "conn_id": "redshift_default", "schema": ""}
     ]
 else:
     sources = [{"conn_type": "postgres", "conn_id": "airflow_db", "schema": "public"}]

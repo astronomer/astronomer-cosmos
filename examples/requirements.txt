@@ -1,4 +1,6 @@
 astronomer-cosmos
+astronomer-providers[amazon]==1.14.0
 apache-airflow-providers-amazon==7.1.0
 apache-airflow-providers-google==8.8.0
+apache-airflow-providers-mysql==4.0.0
 apache-airflow-providers-snowflake==4.0.2

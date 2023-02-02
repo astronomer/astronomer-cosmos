@@ -6,6 +6,8 @@ This `dbt_example_dags.py` is used to quickly e2e test against various source sp
 """
 
 from airflow import DAG
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.task_group import TaskGroup
 from include.default_args import sources
 from pendulum import datetime
@@ -39,6 +41,36 @@ for source in sources:
             },
             {"project": "mrr-playbook", "seeds": ["subscription_periods"]},
         ]
+
+        if source["conn_type"] == "redshift":
+            start = TriggerDagRunOperator(
+                task_id="unpause_redshift_cluster",
+                trigger_dag_id="redshift_manager",
+                conf={"cluster_request": "unpause_cluster"},
+                wait_for_completion=True,
+            )
+            finish = TriggerDagRunOperator(
+                task_id="pause_cluster",
+                trigger_dag_id="redshift_manager",
+                conf={"cluster_request": "pause_cluster"},
+                wait_for_completion=True,
+            )
+        elif source["conn_type"] == "postgres":
+            start = TriggerDagRunOperator(
+                task_id="unpause_postgres_instance",
+                trigger_dag_id="postgres_manager",
+                conf={"cluster_request": "unpause_cluster"},
+                wait_for_completion=True,
+            )
+            finish = TriggerDagRunOperator(
+                task_id="pause_postgres_instance",
+                trigger_dag_id="postgres_manager",
+                conf={"cluster_request": "pause_cluster"},
+                wait_for_completion=True,
+            )
+        else:
+            start = EmptyOperator(task_id="start")
+            finish = EmptyOperator(task_id="finish")
 
         for project in projects:
             name_underscores = project["project"].replace("-", "_")
@@ -75,7 +107,7 @@ for source in sources:
             test_behavior = (
                 "none"
                 if project["project"] == "mrr-playbook"
-                and source["conn_type"] == "bigquery"
+                and source["conn_type"] in ["bigquery", "redshift"]
                 else "after_all"
             )
             project_task_group = DbtTaskGroup(
@@ -91,4 +123,4 @@ for source in sources:
                 dag=dag,
             )
 
-            deps >> drop_seeds >> seed >> project_task_group
+            start >> deps >> drop_seeds >> seed >> project_task_group >> finish

@@ -68,6 +68,19 @@ for source in sources:
                 conf={"cluster_request": "pause_cluster"},
                 wait_for_completion=True,
             )
+        elif source["conn_type"] == "databricks":
+            start = TriggerDagRunOperator(
+                task_id="unpause_databricks_instance",
+                trigger_dag_id="databricks_manager",
+                conf={"cluster_request": "unpause_cluster"},
+                wait_for_completion=True,
+            )
+            finish = TriggerDagRunOperator(
+                task_id="pause_databricks_instance",
+                trigger_dag_id="databricks_manager",
+                conf={"cluster_request": "pause_cluster"},
+                wait_for_completion=True,
+            )
         else:
             start = EmptyOperator(task_id="start")
             finish = EmptyOperator(task_id="finish")

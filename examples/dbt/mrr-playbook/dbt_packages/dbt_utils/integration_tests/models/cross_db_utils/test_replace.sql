@@ -1,11 +1,11 @@
 with data as (
 
-    select
-
+    select 
+    
         *,
         coalesce(search_chars, '') as old_chars,
         coalesce(replace_chars, '') as new_chars
-
+        
     from {{ ref('data_replace') }}
 
 )

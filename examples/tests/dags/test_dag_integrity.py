@@ -1,9 +1,8 @@
 """Test the validity of all DAGs. This test ensures that all Dags have tags, retries set to two, and no import errors. Feel free to add and remove tests."""
 
-import logging
 import os
+import logging
 from contextlib import contextmanager
-
 import pytest
 from airflow.models import DagBag
 

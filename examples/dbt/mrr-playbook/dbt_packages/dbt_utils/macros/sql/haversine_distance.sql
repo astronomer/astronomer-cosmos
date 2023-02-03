@@ -48,3 +48,4 @@ The arguments should be float type.
     power(sin(({{ radians_lon2 }} - {{ radians_lon1 }}) / 2), 2))) * {{ conversion_rate }}
 
 {%- endmacro %}
+

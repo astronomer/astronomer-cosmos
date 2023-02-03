@@ -1,9 +1,9 @@
 name: Astronomer CI - Deploy code
 
 on:
+  pull_request:
   push:
-    branches:
-      - dev
+    branches: main
 
 env:
   ## Sets Deployment API key credentials as environment variables
@@ -17,7 +17,7 @@ jobs:
     - name: checkout repo
       uses: actions/checkout@v3
     - name: Deploy to Astro
-      working-directory: ./examples
+      working-directory: ./astro_tests
       run: |
         curl -sSL install.astronomer.io | sudo bash -s
         astro deploy

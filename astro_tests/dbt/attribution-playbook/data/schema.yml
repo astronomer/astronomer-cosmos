@@ -1,0 +1,44 @@
+version: 2
+
+seeds:
+  - name: customer_conversions
+    description: >
+      One record per customer, with a timestamp representing conversion (often a customer's first order)
+
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+      - name: converted_at
+        tests:
+          - not_null
+
+      - name: revenue
+        tests:
+          - not_null
+
+  - name: sessions
+    description: >
+      Sessions are discrete periods of activity by a user on a website. The industry standard
+      is to define a session as a series of activities followed by a 30-minute window without
+      any activity.
+
+      Use a dbt package to turn pageviews into sessions.
+
+    columns:
+      - name: customer_id
+        description: >
+          Typically, some sessions will not have a customer_id associated with them. For this
+          playbook, we've limited data to sessions with known customer_ids.
+        tests:
+          - not_null
+
+      - name: started_at
+        tests:
+          - not_null
+
+      - name: ended_at
+        tests:
+          - not_null

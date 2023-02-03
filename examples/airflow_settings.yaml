@@ -22,4 +22,3 @@ airflow:
   variables:
     - variable_name:
       variable_value:
-

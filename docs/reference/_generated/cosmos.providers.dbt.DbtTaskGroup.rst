@@ -5,18 +5,18 @@
 
 .. autoclass:: DbtTaskGroup
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
-      ~DbtTaskGroup.__init__
-   
-   
 
-   
-   
-   
+      ~DbtTaskGroup.__init__
+
+
+
+
+
+

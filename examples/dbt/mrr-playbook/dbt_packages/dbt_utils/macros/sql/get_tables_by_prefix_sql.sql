@@ -10,5 +10,5 @@
         exclude = exclude,
         database = database
     ) }}
-    
+
 {% endmacro %}

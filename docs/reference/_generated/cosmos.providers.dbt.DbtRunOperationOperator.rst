@@ -5,14 +5,14 @@
 
 .. autoclass:: DbtRunOperationOperator
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~DbtRunOperationOperator.__init__
       ~DbtRunOperationOperator.add_cmd_flags
       ~DbtRunOperationOperator.add_global_flags
@@ -24,16 +24,16 @@
       ~DbtRunOperationOperator.on_kill
       ~DbtRunOperationOperator.run_command
       ~DbtRunOperationOperator.subprocess_hook
-   
-   
 
-   
-   
+
+
+
+
    .. rubric:: Attributes
 
    .. autosummary::
-   
+
       ~DbtRunOperationOperator.template_fields
       ~DbtRunOperationOperator.ui_color
-   
-   
+
+

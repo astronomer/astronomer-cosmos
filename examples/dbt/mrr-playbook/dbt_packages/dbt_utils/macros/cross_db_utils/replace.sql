@@ -10,6 +10,6 @@
         {{ old_chars }},
         {{ new_chars }}
     )
-    
+
 
 {% endmacro %}

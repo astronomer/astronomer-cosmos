@@ -156,7 +156,7 @@
     {% else %} {# older versions #}
         {% set rows_inserted = result['status'].split(" ")[2] | int %}
     {% endif %}
-    
+
     {%- set sum_rows_inserted = loop_vars['sum_rows_inserted'] + rows_inserted -%}
     {%- if loop_vars.update({'sum_rows_inserted': sum_rows_inserted}) %} {% endif -%}
 
@@ -184,6 +184,6 @@
   {%- endcall %}
 
   -- Return the relations created in this materialization
-  {{ return({'relations': [target_relation]}) }}  
+  {{ return({'relations': [target_relation]}) }}
 
 {%- endmaterialization %}

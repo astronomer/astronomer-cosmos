@@ -7,7 +7,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Dict
+from typing import ClassVar, Dict, List, Set
 
 import jinja2
 import yaml  # type: ignore
@@ -21,9 +21,9 @@ class DbtModelConfig:
     Represents a single model config.
     """
 
-    config_types: ClassVar[list[str]] = ["materialized", "schema", "tags"]
-    config_selectors: set[str] = field(default_factory=set)
-    upstream_models: set[str] = field(default_factory=set)
+    config_types: ClassVar[List[str]] = ["materialized", "schema", "tags"]
+    config_selectors: Set[str] = field(default_factory=set)
+    upstream_models: Set[str] = field(default_factory=set)
 
     def __add__(self, other_config: DbtModelConfig) -> DbtModelConfig:
         """
@@ -43,10 +43,10 @@ class DbtModelConfig:
 
     def _config_selector_ooo(
         self,
-        sql_configs: set[str],
-        properties_configs: set[str],
-        prefixes: list[str] = None,
-    ) -> set[str]:
+        sql_configs: Set[str],
+        properties_configs: Set[str],
+        prefixes: List[str] = None,
+    ) -> Set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
         # 1. model sql files
@@ -126,7 +126,7 @@ class DbtModel:
                             )
                             config.config_selectors |= (
                                 set(extracted_config)
-                                if isinstance(extracted_config, (str, list))
+                                if isinstance(extracted_config, (str, List))
                                 else set()
                             )
 
@@ -138,7 +138,7 @@ class DbtModel:
             try:
                 # try to convert it to a constant and get the value
                 value = kwarg.value.as_const()
-                if isinstance(value, list):
+                if isinstance(value, List):
                     value = [f"{config_name}:{item}" for item in value]
 
                 if isinstance(value, str):

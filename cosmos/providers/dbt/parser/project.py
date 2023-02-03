@@ -7,7 +7,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict
+from typing import ClassVar, Dict
 
 import jinja2
 import yaml  # type: ignore
@@ -21,9 +21,7 @@ class DbtModelConfig:
     Represents a single model config.
     """
 
-    config_types: list = field(
-        default_factory=lambda: ["materialized", "schema", "tags"]
-    )
+    config_types: ClassVar[list[str]] = ["materialized", "schema", "tags"]
     config_selectors: set[str] = field(default_factory=set)
     upstream_models: set[str] = field(default_factory=set)
 
@@ -31,7 +29,6 @@ class DbtModelConfig:
         """
         Add one config to another. Necessary because configs can come from different places
         """
-
         # ensures proper order of operations between sql models and properties.yml
         result = self._config_selector_ooo(
             sql_configs=self.config_selectors,
@@ -40,13 +37,15 @@ class DbtModelConfig:
 
         # get the unique combination of each list
         return DbtModelConfig(
-            config_types=self.config_types,
             config_selectors=result,
             upstream_models=self.upstream_models | other_config.upstream_models,
         )
 
     def _config_selector_ooo(
-        self, sql_configs: set[str], properties_configs: set[str]
+        self,
+        sql_configs: set[str],
+        properties_configs: set[str],
+        prefixes: list[str] = None,
     ) -> set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
@@ -54,12 +53,11 @@ class DbtModelConfig:
         # 2. properties.yml files
         """
 
-        prefixes = self.config_types
-
-        # we are combining tags from properties.yml and sql models - one shouldn't overwrite the other.
-        prefixes.remove("tags")
-
         # iterate on each properties.yml config
+        # excluding tags because we just want to collect all of them
+        if prefixes is None:
+            prefixes = ["materialized", "schema"]
+
         for config in properties_configs:
             # identify the config_type and its associated value (i.e. materialized:table)
             config_type, value = config.split(":")

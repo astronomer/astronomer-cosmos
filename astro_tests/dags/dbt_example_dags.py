@@ -5,7 +5,7 @@ This `dbt_example_dags.py` is used to quickly e2e test against various source sp
 
 """
 
-from airflow import DAG
+from airflow import DAG, Dataset
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.task_group import TaskGroup
@@ -24,9 +24,10 @@ for source in sources:
     with DAG(
         dag_id=f"dbt_{source['conn_type']}_example_dag",
         start_date=datetime(2022, 11, 27),
-        schedule=None,
+        schedule=[Dataset("DAG://TRIGGER_ALL_TESTS/TRIGGER_ALL")],
         doc_md=__doc__,
         catchup=False,
+        tags=[source["conn_type"]],
         max_active_runs=1,
     ) as dag:
 

@@ -133,3 +133,7 @@ dmypy.json
 
 # vs code
 .vscode/
+
+# dbt
+logs/
+dbt_packages/

@@ -20,7 +20,7 @@ with DAG(
     schedule=None,  # triggered by dbt_redshift_example_dag
     start_date=pendulum.datetime(2022, 6, 13, tz="UTC"),
     max_active_runs=1,
-    tags=["aws redshift"],
+    tags=["aws", "redshift"],
     params={"cluster_request": ""},  # Set parameters as a dictionary
     catchup=True,
     doc_md=__doc__,

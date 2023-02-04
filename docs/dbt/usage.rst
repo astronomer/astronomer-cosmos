@@ -56,7 +56,6 @@ The :class:`cosmos.providers.dbt.DbtTaskGroup` class can be used to render a tas
             dbt_args={
                 "schema": "public",
             },
-            dag=dag,
         )
 
         e2 = EmptyOperator(task_id="some_extraction")

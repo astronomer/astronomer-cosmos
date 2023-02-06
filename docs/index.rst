@@ -96,4 +96,3 @@ Cosmos operates on a few guiding principles:
 - **Flexible**: Cosmos is not opinionated in that it does not enforce a specific rendering method for third-party systems; users can decide whether they'd like to render their workflow as a DAG, TaskGroup, or individual task.
 - **Extensible**: Cosmos is designed to be extensible. Users can add their own parsers and operators to support their own workflows.
 - **Modular**: Cosmos is designed to be modular. Users can install only the dependencies they need for their workflows.
-

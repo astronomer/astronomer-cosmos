@@ -38,19 +38,23 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
 .. code-block:: python
 
-   from cosmos.providers.dbt import DbtDag
+   from cosmos.providers.dbt import DbtDag, get_dbt_dataset
 
     project_one = DbtDag(
         # ...
         conn_id="my_conn",
         start_date=datetime(2023, 1, 1),
         schedule_interval="@daily",
+        dbt_project_name="project_one",
     )
 
     project_two = DbtDag(
         # ...
         start_date=datetime(2023, 1, 1),
-        schedule=[Dataset("DBT://my_conn/project_one/my_model")]
+        schedule=[
+            get_dbt_dataset("my_conn", "project_one", "my_model")
+        ],
+        dbt_project_name="project_two",
     )
 
 In this scenario, ``project_one`` runs once a day and ``project_two`` runs immediately after ``project_one``. You can view these dependencies in Airflow's UI.

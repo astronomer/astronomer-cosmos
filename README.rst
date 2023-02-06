@@ -67,7 +67,7 @@ Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class.
         dag_id="extract_dag",
         start_date=datetime(2022, 11, 27),
         schedule="@daily",
-    ) as dag:
+    ):
 
         e1 = EmptyOperator(task_id="ingestion_workflow")
 

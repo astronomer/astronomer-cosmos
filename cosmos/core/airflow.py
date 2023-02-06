@@ -51,7 +51,7 @@ class CosmosTaskGroup(TaskGroup):
     def __init__(
         self,
         cosmos_group: Group,
-        dag: DAG,
+        dag: Optional[DAG] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:

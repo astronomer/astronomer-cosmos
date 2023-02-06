@@ -1,9 +1,13 @@
 name: Python Unit Tests
 
-on: [workflow_call]
+on:
+  pull_request:
+  push:
+    branches: main
 
 jobs:
   tests:
+    if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

@@ -1,9 +1,10 @@
 name: Astronomer CI - Deploy code
 
 on:
-  pull_request:
-  push:
-    branches: main
+  workflow_run:
+    workflows: ["Python Unit Tests"]
+    types:
+      - completed
 
 env:
   ## Sets Deployment API key credentials as environment variables
@@ -12,9 +13,8 @@ env:
 
 jobs:
   build:
-    if: github.head_ref == 'dev'
+    if: github.head_ref == 'dev' && ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    needs: [Python Unit Tests]
     steps:
     - name: checkout repo
       uses: actions/checkout@v3

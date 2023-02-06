@@ -64,7 +64,6 @@ Create a DAG and import the ``DbtTaskGroup`` operator. The ``DbtTaskGroup`` oper
             dbt_args={
                 "schema": "public",
             },
-            dag=dag,
         )
 
         e2 = EmptyOperator(task_id="some_extraction")
@@ -77,7 +76,7 @@ The ``DbtTaskGroup`` operator will automatically generate a TaskGroup with the t
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/dbt_dag.png
    :width: 800
-   
+
    dbt's default jaffle_shop project rendered as a TaskGroup in Airflow
 
 

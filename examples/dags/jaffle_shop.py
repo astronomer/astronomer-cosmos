@@ -31,7 +31,6 @@ with DAG(
             "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt",
         },
         test_behavior="after_all",
-        dag=dag,
     )
 
     post_dbt_workflow = EmptyOperator(task_id="post_dbt_workflow")

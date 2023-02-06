@@ -3,10 +3,10 @@
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
-    
+
 .. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
     :target: https://ossrank.com/shield/2121
-    
+
 .. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos.svg
     :target: https://img.shields.io/pypi/dm/astronomer-cosmos
 
@@ -78,7 +78,6 @@ Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class.
             dbt_args={
                 "schema": "public",
             },
-            dag=dag,
         )
 
         e2 = EmptyOperator(task_id="some_extraction")

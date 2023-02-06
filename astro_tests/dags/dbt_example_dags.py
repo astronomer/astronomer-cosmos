@@ -134,7 +134,6 @@ for source in sources:
                 },
                 test_behavior=test_behavior,
                 emit_datasets=False,
-                dag=dag,
             )
 
             start >> deps >> drop_seeds >> seed >> project_task_group >> finish

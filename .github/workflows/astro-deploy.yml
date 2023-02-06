@@ -12,6 +12,7 @@ env:
 
 jobs:
   build:
+    if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
     steps:
     - name: checkout repo

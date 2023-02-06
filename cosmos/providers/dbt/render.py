@@ -75,17 +75,6 @@ def render_project(
 
     # iterate over each model once to create the initial tasks
     for model_name, model in project.models.items():
-        # if we have tags, only include models that have at least one of the tags
-        # filters down to a set of specified tags
-        if "tags" in select:
-            if not set(select["tags"]).intersection(model.config.tags):
-                continue
-
-        # filters out any specified tags
-        if "tags" in exclude:
-            if set(exclude["tags"]).intersection(model.config.tags):
-                continue
-
         # filters down to a path within the project_dir
         if "paths" in select:
             root_directories = [
@@ -101,6 +90,14 @@ def render_project(
                 project.project_dir / path.strip("/") for path in exclude.get("paths")
             ]
             if set(root_directories).intersection(model.path.parents):
+                continue
+
+        if "configs" in select:
+            if not set(select["configs"]).intersection(model.config.config_selectors):
+                continue
+
+        if "configs" in exclude:
+            if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
         run_args: Dict[str, Any] = {**task_args, "models": model_name}

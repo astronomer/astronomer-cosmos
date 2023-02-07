@@ -7,4 +7,4 @@ RUN python -m virtualenv dbt_venv && source dbt_venv/bin/activate && \
     pip install --no-cache-dir -r dbt-requirements.txt && deactivate
 
 # install cosmos from dev branch
-RUN pip install git+https://github.com/astronomer/astronomer-cosmos.git@dev#egg=astronomer-cosmos
+RUN pip install git+https://github.com/astronomer/astronomer-cosmos.git@main#egg=astronomer-cosmos

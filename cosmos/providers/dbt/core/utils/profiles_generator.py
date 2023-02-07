@@ -4,7 +4,6 @@ import logging
 import os
 import sys
 from pathlib import Path
-from time import sleep
 
 import pkg_resources
 import yaml
@@ -20,25 +19,7 @@ from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
 logger = logging.getLogger(__name__)
 
 
-def read_file_safe(file_path):
-# Makes attempts to read the file if it is locked.
-# check the version of cosmos when it was created
-    retries = 3
-    with open(file_path, "r") as f:
-        # try to read the file, if it fails, another model
-        # has likely locked it. We'll wait a moment to see
-        # if the lock gets released.
-        for _ in range(0, retries):
-            try:
-                first_line = next(f)
-                file_contents = [line for line in f]
-                break
-            except:
-                sleep(1)
-                continue
-    return (first_line, file_contents)
-
-def create_default_profiles(profile_name):
+def create_default_profiles():
 
     # get installed version of astronomer-cosmos
     try:
@@ -46,8 +27,12 @@ def create_default_profiles(profile_name):
     except pkg_resources.DistributionNotFound:
         package = None
 
-    profile = {
-        profile_name: globals()[profile_name],
+    profiles = {
+        "postgres_profile": postgres_profile,
+        "snowflake_profile": snowflake_profile,
+        "redshift_profile": redshift_profile,
+        "bigquery_profile": bigquery_profile,
+        "databricks_profile": databricks_profile,
     }
 
     # Define the path to the directory and file
@@ -58,25 +43,16 @@ def create_default_profiles(profile_name):
     profile_file = Path(file_path)
 
     if profile_file.exists():
-        first_line, file_contents = read_file_safe(file_path)
-        if first_line != f"# {package}\n":
-            # if version of cosmos has been updated - re-write the profiles.yml file
-            with open(file_path, "w") as file:
-                fcntl.flock(file, fcntl.LOCK_SH)
-                file.write(f"# {package}\n")
-                yaml.dump(profile_name, file)
-                fcntl.flock(file, fcntl.LOCK_UN)
-                logger.info("Created new profiles file.")
-        else:
-            # check if profile exists, if not write it
-            if f"{profile_name}:\n" not in file_contents:
-                with open(file_path, "a") as file:
-                    # write profile
-                    logger.info(f"New profile to write to profile: {profile_name}")
+        with open(file_path, "r") as f:
+            first_line = next(f)
+            if first_line != f"# {package}\n":
+                # if version of cosmos has been updated - re-write the profiles.yml file
+                with open(file_path, "w") as file:
                     fcntl.flock(file, fcntl.LOCK_SH)
-                    file.write("\n")
-                    yaml.dump(profile_name, file)
+                    file.write(f"# {package}\n")
+                    yaml.dump(profiles, file)
                     fcntl.flock(file, fcntl.LOCK_UN)
+                    logger.info("Created new profiles file.")
     else:
         # make the parent dir
         logger.info("Making new profiles file...")
@@ -86,7 +62,7 @@ def create_default_profiles(profile_name):
         with open(file_path, "w") as file:
             fcntl.flock(file, fcntl.LOCK_SH)
             file.write(f"# {package}\n")
-            yaml.dump(profile, file)
+            yaml.dump(profiles, file)
             fcntl.flock(file, fcntl.LOCK_UN)
 
 
@@ -250,5 +226,4 @@ def map_profile(conn_id, db_override=None, schema_override=None):
             sys.exit(1)
 
     profile, profile_vars = create_profile_vars(conn, database=db, schema=schema)
-    create_default_profiles(profile)
     return profile, profile_vars

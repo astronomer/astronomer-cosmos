@@ -226,6 +226,7 @@ class DbtBaseOperator(BaseOperator):
         return result
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
+        create_default_profiles()
         profile, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )

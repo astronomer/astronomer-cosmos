@@ -2,7 +2,7 @@
 version: 2.1
 
 jobs:
-  
+
   integration-postgres:
     docker:
       - image: cimg/python:3.9.9
@@ -42,8 +42,8 @@ jobs:
           name: "Run Tests - Snowflake"
           command: ./run_test.sh snowflake
       - store_artifacts:
-          path: ./logs          
-  
+          path: ./logs
+
   integration-bigquery:
     environment:
       BIGQUERY_SERVICE_KEY_PATH: "/home/circleci/bigquery-service-key.json"

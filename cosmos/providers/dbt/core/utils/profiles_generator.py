@@ -43,19 +43,17 @@ def create_default_profiles():
     profile_file = Path(file_path)
 
     if profile_file.exists():
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             first_line = next(f)
-            if first_line != f"# {package}\n":
-                # if version of cosmos has been updated - re-write the profiles.yml file
-                with open(file_path, "w") as file:
-                    fcntl.flock(file, fcntl.LOCK_SH)
-                    file.write(f"# {package}\n")
-                    yaml.dump(profiles, file)
-                    fcntl.flock(file, fcntl.LOCK_UN)
-                    logger.info("Created new profiles file.")
+        if first_line != f"# {package}\n":
+            # if version of cosmos has been updated - re-write the profiles.yml file
+            with open(file_path, "w") as file:
+                fcntl.flock(file, fcntl.LOCK_SH)
+                file.write(f"# {package}\n")
+                yaml.dump(profiles, file)
+                fcntl.flock(file, fcntl.LOCK_UN)
     else:
         # make the parent dir
-        logger.info("Making new profiles file...")
         profile_file.parent.mkdir(parents=True, exist_ok=True)
 
         # if file doesn't exist - write the profiles.yml file

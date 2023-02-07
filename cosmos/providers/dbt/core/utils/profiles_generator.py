@@ -43,6 +43,7 @@ def create_default_profiles():
     profile_file = Path(file_path)
 
     if profile_file.exists():
+        # check the version of cosmos when it was created
         with open(file_path) as f:
             first_line = next(f)
         if first_line != f"# {package}\n":

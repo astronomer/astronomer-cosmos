@@ -3,7 +3,7 @@ name: Astronomer CI - Deploy code
 on:
   pull_request:
   push:
-    branches: main
+    branches: release-**
 
 env:
   ## Sets Deployment API key credentials as environment variables
@@ -12,7 +12,7 @@ env:
 
 jobs:
   tests:
-    if: github.head_ref == 'dev'
+    if: github.head_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -30,7 +30,7 @@ jobs:
           pytest tests/validation_tests.py
 
   build:
-    if: github.head_ref == 'dev'
+    if: github.head_ref == 'main'
     needs: tests
     runs-on: ubuntu-latest
     steps:

@@ -1,12 +1,12 @@
-def test_version(package):
-    import configparser
+def test_version():
     import requests
 
-    config = configparser.RawConfigParser()
-    config.read_file(open(fr'{package}/setup.cfg'))
-    local_version = config.get('metadata', 'version')
-    releases = requests.get(f"https://pypi.org/pypi/{package}/json").json()['releases']
+    from cosmos import __version__ as curr_version
+
+    releases = requests.get("https://pypi.org/pypi/astronomer-cosmos/json").json()[
+        "releases"
+    ]
     shipped_versions = []
     [shipped_versions.append(version) for version, details in releases.items()]
 
-    assert local_version not in shipped_versions
+    assert curr_version not in shipped_versions

@@ -29,6 +29,7 @@ def render_project(
     conn_id: str = "default_conn_id",
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
+    execution_mode: str = None,
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -118,7 +119,7 @@ def render_project(
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
-            operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
+            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "kubernetes" if execution_mode == "kubernetes" else ""}.DbtRunOperator',
             arguments=run_args,
         )
 
@@ -134,7 +135,7 @@ def render_project(
 
         test_task = Task(
             id=f"{model_name}_test",
-            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
         )
@@ -166,7 +167,7 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
             arguments=task_args,
         )
         entities[test_task.id] = test_task

@@ -41,6 +41,7 @@ class DbtDag(CosmosDag):
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
+        execution_mode: str = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -61,6 +62,7 @@ class DbtDag(CosmosDag):
             conn_id=conn_id,
             select=select,
             exclude=exclude,
+            execution_mode=execution_mode,
         )
 
         # call the airflow DAG constructor

@@ -10,6 +10,10 @@
 .. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos.svg
     :target: https://img.shields.io/pypi/dm/astronomer-cosmos
 
+.. image:: https://results.pre-commit.ci/badge/github/astronomer/astronomer-cosmos/main.svg
+   :target: https://results.pre-commit.ci/latest/github/astronomer/astronomer-cosmos/main
+   :alt: pre-commit.ci status
+
 
 Astronomer Cosmos |fury| |ossrank| |downloads|
 ==============================================

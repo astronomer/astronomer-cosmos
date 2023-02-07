@@ -5,14 +5,14 @@
 
 .. autoclass:: DbtSeedOperator
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~DbtSeedOperator.__init__
       ~DbtSeedOperator.add_cmd_flags
       ~DbtSeedOperator.add_global_flags
@@ -24,16 +24,14 @@
       ~DbtSeedOperator.on_kill
       ~DbtSeedOperator.run_command
       ~DbtSeedOperator.subprocess_hook
-   
-   
 
-   
-   
+
+
+
+
    .. rubric:: Attributes
 
    .. autosummary::
-   
+
       ~DbtSeedOperator.template_fields
       ~DbtSeedOperator.ui_color
-   
-   

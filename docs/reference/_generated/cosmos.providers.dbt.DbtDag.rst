@@ -5,18 +5,12 @@
 
 .. autoclass:: DbtDag
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
-      ~DbtDag.__init__
-   
-   
 
-   
-   
-   
+      ~DbtDag.__init__

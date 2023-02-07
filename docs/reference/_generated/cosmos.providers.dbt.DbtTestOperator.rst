@@ -5,14 +5,14 @@
 
 .. autoclass:: DbtTestOperator
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~DbtTestOperator.__init__
       ~DbtTestOperator.add_global_flags
       ~DbtTestOperator.build_and_run_cmd
@@ -23,16 +23,14 @@
       ~DbtTestOperator.on_kill
       ~DbtTestOperator.run_command
       ~DbtTestOperator.subprocess_hook
-   
-   
 
-   
-   
+
+
+
+
    .. rubric:: Attributes
 
    .. autosummary::
-   
+
       ~DbtTestOperator.template_fields
       ~DbtTestOperator.ui_color
-   
-   

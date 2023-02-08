@@ -76,7 +76,8 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator):
     :param cancel_query_on_kill: If true, then cancel any running queries when the task's on_kill() is executed.
         Otherwise, the query will keep running when the task is killed.
     :type cancel_query_on_kill: bool
-    :param dbt_executable_path: Path to dbt executable can be used with venv (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
+    :param dbt_executable_path: Path to dbt executable can be used with venv
+        (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
     :type dbt_executable_path: str
     """
 

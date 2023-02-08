@@ -42,7 +42,7 @@ def render_project(
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
-    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
+    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]})
     """
     # first, get the dbt project
     project = DbtProject(
@@ -119,7 +119,7 @@ def render_project(
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
-            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "kubernetes" if execution_mode == "kubernetes" else ""}.DbtRunOperator',
+            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "_kubernetes" if execution_mode == "kubernetes" else ""}.DbtRunOperator',
             arguments=run_args,
         )
 
@@ -135,7 +135,7 @@ def render_project(
 
         test_task = Task(
             id=f"{model_name}_test",
-            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
+            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "_kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
         )
@@ -167,7 +167,7 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
+            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "_kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
             arguments=task_args,
         )
         entities[test_task.id] = test_task

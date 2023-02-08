@@ -8,15 +8,18 @@ import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook
-from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     map_profile,
 )
+from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
+    convert_env_vars,
+)
 
-class DbtDockerBaseOperator(DockerOperator):
+class DbtKubernetesBaseOperator(KubernetesPodOperator):
     """
     Executes a dbt core cli command.
 
@@ -77,7 +80,7 @@ class DbtDockerBaseOperator(DockerOperator):
     :type dbt_executable_path: str
     """
 
-    template_fields: Sequence[str] = ("env", "vars") + DockerOperator.template_fields
+    template_fields: Sequence[str] = ("env", "vars") + KubernetesPodOperator.template_fields
 
     def __init__(
         self,
@@ -206,39 +209,46 @@ class DbtDockerBaseOperator(DockerOperator):
             if global_boolean_flag_value is True:
                 flags.append(dbt_name)
         return flags
+    
+    def build_env_args(self, env: dict):
+        env_vars_dict = {}
+        for env_var in self.env_vars:
+            env_vars_dict[env_var.name] = env_var.value
+        
+        self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
     def build_cmd(self, env: dict, cmd_flags: list = None):
         _, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )
 
-        # parse dbt command
-        dbt_cmd = []
+        # parse dbt args
+        dbt_args = []
 
         ## start with the dbt executable
-        dbt_cmd.append(self.dbt_executable_path)
+        self.cmds = [self.dbt_executable_path]
 
         ## add base cmd
         if isinstance(self.base_cmd, str):
-            dbt_cmd.append(self.base_cmd)
+            dbt_args.append(self.base_cmd)
         else:
-            [dbt_cmd.append(item) for item in self.base_cmd]
+            [dbt_args.append(item) for item in self.base_cmd]
 
         # add global flags
         for item in self.add_global_flags():
-            dbt_cmd.append(item)
+            dbt_args.append(item)
 
         ## add command specific flags
         if cmd_flags:
             for item in cmd_flags:
-                dbt_cmd.append(item)
+                dbt_args.append(item)
 
         ## set env vars
-        self.environment = {**env, **profile_vars, **self.environment}
+        self.build_env_args({**env, **profile_vars})
         
-        self.command = dbt_cmd
+        self.arguments = dbt_args
 
-class DbtLSOperator(DbtDockerBaseOperator):
+class DbtLSOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core ls command.
 
@@ -255,7 +265,7 @@ class DbtLSOperator(DbtDockerBaseOperator):
         return super().execute(context)
 
 
-class DbtSeedOperator(DbtDockerBaseOperator):
+class DbtSeedOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core seed command.
 
@@ -283,7 +293,7 @@ class DbtSeedOperator(DbtDockerBaseOperator):
         return super().execute(context)
 
 
-class DbtRunOperator(DbtDockerBaseOperator):
+class DbtRunOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core run command.
 
@@ -301,7 +311,7 @@ class DbtRunOperator(DbtDockerBaseOperator):
         return super().execute(context)
 
 
-class DbtTestOperator(DbtDockerBaseOperator):
+class DbtTestOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core test command.
 
@@ -318,7 +328,7 @@ class DbtTestOperator(DbtDockerBaseOperator):
         return super().execute(context)
 
 
-class DbtRunOperationOperator(DbtDockerBaseOperator):
+class DbtRunOperationOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core run-operation command.
 
@@ -351,7 +361,7 @@ class DbtRunOperationOperator(DbtDockerBaseOperator):
         return super().execute(context)
 
 
-class DbtDepsOperator(DbtDockerBaseOperator):
+class DbtDepsOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core deps command.
 

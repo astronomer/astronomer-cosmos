@@ -168,7 +168,7 @@ def create_profile_vars(conn: Connection, database, schema):
 
     else:
         logger.error(
-            f"Connection type {conn.type} is not yet supported.", file=sys.stderr
+            f"Connection type {conn.conn_type} is not yet supported.", file=sys.stderr
         )
         sys.exit(1)
 

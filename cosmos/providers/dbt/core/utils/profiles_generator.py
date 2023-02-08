@@ -156,11 +156,21 @@ def create_profile_vars_google_cloud_platform(
 def create_profile_vars_databricks(
     conn: Connection, database: str, schema: str
 ) -> Tuple[str, dict]:
+
+    # airflow throws warning messages if your token is in extras
+    if conn.password:
+        token = conn.password
+    else:
+        token = conn.extra_dejson.get("token")
+
     profile_vars = {
-        "DATABRICKS_HOST": conn.host,
-        "DATABRICKS_SCHEMA": schema,
+        "DATABRICKS_HOST": str(conn.host).replace(
+            "https://", ""
+        ),  # airflow doesn't mind if this is there, but dbt does
+        "DATABRICKS_CATALOG": database,
+        "DATABRICKS_DATABASE": schema,
         "DATABRICKS_HTTP_PATH": conn.extra_dejson.get("http_path"),
-        "DATABRICKS_TOKEN": conn.extra_dejson.get("token"),
+        "DATABRICKS_TOKEN": token,
     }
     return "databricks_profile", profile_vars
 
@@ -176,12 +186,6 @@ def get_db_from_connection(connection_type: str, conn: Connection) -> str:
         db = json.loads(conn.extra_dejson.get("keyfile_dict"))["project_id"]
     else:
         db = conn.schema
-    if not db:
-        logging.getLogger().setLevel(logging.ERROR)
-        logging.error(
-            "Please specify a database in connection properties or using the db override parameter"
-        )
-        sys.exit(1)
 
     return db
 
@@ -212,21 +216,39 @@ def map_profile(
             f"This connection type is currently not supported {connection_type}."
         )
         sys.exit(1)
+
     if db_override:
+        # if there's a db provided as a parameter, use it first
         db = db_override
     else:
+        # otherwise get it from the connection schema
         db = get_db_from_connection(connection_type, conn)
+
+    ## if you weren't provided a db from the connection or as a parameter - get angry
+    if not db:
+        logging.getLogger().setLevel(logging.ERROR)
+        logging.error(
+            "Please specify a database in connection properties or using the db override parameter"
+        )
+        sys.exit(1)
+
+    # if there's a schema provided as a parameter, use it first
     if schema_override:
         schema = schema_override
-    elif connection_type in ("snowflake", "databricks"):
+
+    # snowflake is the only connector where schema is a schema and not a database
+    elif connection_type == "snowflake":
         schema = conn.schema
+        # if you haven't specified the schema in the connection or as a parameter - get angry
         if not schema:
             logging.getLogger().setLevel(logging.ERROR)
             logging.error(
                 f"Please specify a target schema in the {conn.id} connection properties or using the schema parameter."
             )
             sys.exit(1)
+
     else:
+        # if you haven't specified the schema as a parameter - get angry
         logging.getLogger().setLevel(logging.ERROR)
         logging.error("Please specify a target schema using the schema parameter.")
         sys.exit(1)

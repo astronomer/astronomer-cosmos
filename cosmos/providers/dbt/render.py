@@ -67,6 +67,12 @@ def render_project(
                 f"{set(select['tags']).intersection(exclude['tags'])}"
             )
 
+    operator_class = ""
+    if execution_mode == "docker":
+        operator_class = "_docker"
+    elif execution_mode == "kubernetes":
+        operator_class = "_kubernetes" 
+
     if "paths" in select and "paths" in exclude:
         if set(select["paths"]).intersection(exclude["paths"]):
             raise AirflowException(
@@ -115,7 +121,7 @@ def render_project(
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
-            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "_kubernetes" if execution_mode == "kubernetes" else ""}.DbtRunOperator',
+            operator_class=f'cosmos.providers.dbt.core.operators{operator_class}.DbtRunOperator',
             arguments=run_args,
         )
 
@@ -131,7 +137,7 @@ def render_project(
 
         test_task = Task(
             id=f"{model_name}_test",
-            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "_kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
+            operator_class=f'cosmos.providers.dbt.core.operators{operator_class}.DbtTestOperator',
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
         )
@@ -163,7 +169,7 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class=f'cosmos.providers.dbt.core.operators{"_docker" if execution_mode == "docker" else "_kubernetes" if execution_mode == "kubernetes" else ""}.DbtTestOperator',
+            operator_class=f'cosmos.providers.dbt.core.operators{operator_class}.DbtTestOperator',
             arguments=task_args,
         )
         entities[test_task.id] = test_task

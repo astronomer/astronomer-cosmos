@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import os
-import signal
-from typing import Dict, Any, List, Sequence
+from typing import Any, Dict, List, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
-from airflow.utils.context import Context
-from airflow.utils.operator_helpers import context_to_airflow_vars
-
-from cosmos.providers.dbt.core.utils.profiles_generator import (
-    map_profile,
-)
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
     convert_env_vars,
 )
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
+    KubernetesPodOperator,
+)
+from airflow.utils.context import Context
+from airflow.utils.operator_helpers import context_to_airflow_vars
+
+from cosmos.providers.dbt.core.utils.profiles_generator import map_profile
+
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator):
     """
@@ -81,7 +81,10 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator):
     :type dbt_executable_path: str
     """
 
-    template_fields: Sequence[str] = ("env", "vars") + KubernetesPodOperator.template_fields
+    template_fields: Sequence[str] = (
+        "env",
+        "vars",
+    ) + KubernetesPodOperator.template_fields
 
     def __init__(
         self,
@@ -182,11 +185,11 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator):
         flags = []
         for global_flag in global_flags:
             dbt_name = f"--{global_flag.replace('_', '-')}"
-            
+
             global_flag_value = self.container_flags.get(global_flag)
             if global_flag_value is None:
                 global_flag_value = self.__getattribute__(global_flag)
-            
+
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
@@ -210,12 +213,12 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator):
             if global_boolean_flag_value is True:
                 flags.append(dbt_name)
         return flags
-    
+
     def build_env_args(self, env: dict):
         env_vars_dict = {}
         for env_var in self.env_vars:
             env_vars_dict[env_var.name] = env_var.value
-        
+
         self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
     def build_cmd(self, env: dict, cmd_flags: list = None):
@@ -246,8 +249,9 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator):
 
         ## set env vars
         self.build_env_args({**env, **profile_vars})
-        
+
         self.arguments = dbt_args
+
 
 class DbtLSOperator(DbtKubernetesBaseOperator):
     """

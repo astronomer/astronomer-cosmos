@@ -10,10 +10,10 @@ except ImportError:
 
 from typing import Any, Dict, List
 
-from airflow.datasets import Dataset
 from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
+from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
 from cosmos.providers.dbt.parser.project import DbtProject
 
 logger = logging.getLogger(__name__)
@@ -105,11 +105,7 @@ def render_project(
         test_args: Dict[str, Any] = {**task_args, "models": model_name}
 
         if emit_datasets:
-            outlets = [
-                Dataset(
-                    f"DBT://{conn_id.upper()}/{dbt_project_name.upper()}/{model_name.upper()}"
-                )
-            ]
+            outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]
 
             if test_behavior == "after_each":
                 test_args["outlets"] = outlets

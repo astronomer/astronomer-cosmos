@@ -3,16 +3,20 @@
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
-    
+
 .. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
     :target: https://ossrank.com/shield/2121
-    
+
 .. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos.svg
     :target: https://img.shields.io/pypi/dm/astronomer-cosmos
 
+.. |pre-commit| image:: https://results.pre-commit.ci/badge/github/astronomer/astronomer-cosmos/main.svg
+   :target: https://results.pre-commit.ci/latest/github/astronomer/astronomer-cosmos/main
+   :alt: pre-commit.ci status
 
-Astronomer Cosmos |fury| |ossrank| |downloads|
-==============================================
+
+Astronomer Cosmos |fury| |ossrank| |downloads| |pre-commit|
+===========================================================
 
 A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
 
@@ -67,7 +71,7 @@ Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class.
         dag_id="extract_dag",
         start_date=datetime(2022, 11, 27),
         schedule="@daily",
-    ) as dag:
+    ):
 
         e1 = EmptyOperator(task_id="ingestion_workflow")
 
@@ -78,7 +82,6 @@ Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class.
             dbt_args={
                 "schema": "public",
             },
-            dag=dag,
         )
 
         e2 = EmptyOperator(task_id="some_extraction")

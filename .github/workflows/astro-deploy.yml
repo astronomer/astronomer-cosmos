@@ -1,0 +1,43 @@
+name: Astronomer CI - Deploy code
+
+on:
+  pull_request:
+  push:
+    branches: release-**
+
+env:
+  ## Sets Deployment API key credentials as environment variables
+  ASTRONOMER_KEY_ID: ${{ secrets.ASTRONOMER_KEY_ID }}
+  ASTRONOMER_KEY_SECRET: ${{ secrets.ASTRONOMER_KEY_SECRET }}
+
+jobs:
+  tests:
+    if: github.head_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Check PyPi Version
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          python -m pip install requests
+          pytest tests/validation_tests.py
+
+  build:
+    if: github.head_ref == 'main'
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout repo
+      uses: actions/checkout@v3
+    - name: Deploy to Astro
+      working-directory: ./astro_tests
+      run: |
+        curl -sSL install.astronomer.io | sudo bash -s
+        astro deploy

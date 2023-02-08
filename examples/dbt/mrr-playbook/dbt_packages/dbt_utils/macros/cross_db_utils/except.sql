@@ -8,7 +8,7 @@
     except
 
 {% endmacro %}
-    
+
 {% macro bigquery__except() %}
 
     except distinct

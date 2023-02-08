@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import os
-import signal
-from typing import Dict, Any, List, Sequence
+from typing import Any, Dict, List, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -12,9 +11,8 @@ from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-from cosmos.providers.dbt.core.utils.profiles_generator import (
-    map_profile,
-)
+from cosmos.providers.dbt.core.utils.profiles_generator import map_profile
+
 
 class DbtDockerBaseOperator(DockerOperator):
     """
@@ -179,11 +177,11 @@ class DbtDockerBaseOperator(DockerOperator):
         flags = []
         for global_flag in global_flags:
             dbt_name = f"--{global_flag.replace('_', '-')}"
-            
+
             global_flag_value = self.container_flags.get(global_flag)
             if global_flag_value is None:
                 global_flag_value = self.__getattribute__(global_flag)
-            
+
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
@@ -236,8 +234,9 @@ class DbtDockerBaseOperator(DockerOperator):
 
         ## set env vars
         self.environment = {**env, **profile_vars, **self.environment}
-        
+
         self.command = dbt_cmd
+
 
 class DbtLSOperator(DbtDockerBaseOperator):
     """

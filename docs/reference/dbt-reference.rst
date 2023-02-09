@@ -7,7 +7,7 @@ Cosmos provides a set of classes and operators to interact with dbt.
 
 DAGs and Task Groups
 ---------------------
-    
+
 .. autosummary::
     :toctree: _generated/
     :caption: DAGs and Task Groups
@@ -18,7 +18,7 @@ DAGs and Task Groups
 
 Operators
 ---------------------
-    
+
 .. autosummary::
     :toctree: _generated/
     :caption: Operators

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import os
 import signal
-from typing import List, Sequence
+from typing import Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessHook
+from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
@@ -25,69 +25,63 @@ class DbtBaseOperator(BaseOperator):
 
     :param project_dir: Which directory to look in for the dbt_project.yml file. Default is the current working
     directory and its parents.
-    :type project_dir: str
     :param conn_id: The airflow connection to use as the target
-    :type conn_id: str
     :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
-    :type base_cmd: str | list[str]
     :param select: dbt optional argument that specifies which nodes to include.
-    :type select: str
     :param exclude: dbt optional argument that specifies which models to exclude.
-    :type exclude: str
     :param selector: dbt optional argument - the selector name to use, as defined in selectors.yml
-    :type selector: str
     :param vars: dbt optional argument - Supply variables to the project. This argument overrides variables
         defined in your dbt_project.yml file. This argument should be a YAML
         string, eg. '{my_variable: my_value}' (templated)
-    :type vars: dict
     :param models: dbt optional argument that specifies which nodes to include.
-    :type models: str
     :param cache_selected_only:
-    :type cache_selected_only: bool
     :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
         the dbt_project.yml file ('require-dbt-version')
-    :type no_version_check: bool
     :param fail_fast: dbt optional argument to make dbt exit immediately if a single resource fails to build.
-    :type fail_fast: bool
     :param quiet: dbt optional argument to show only error logs in stdout
-    :type quiet: bool
     :param warn_error: dbt optional argument to convert dbt warnings into errors
-    :type warn_error: bool
     :param db_name: override the target db instead of the one supplied in the airflow connection
-    :type db_name: str
     :param schema: override the target schema instead of the one supplied in the airflow connection
-    :type schema: str
     :param env: If env is not None, it must be a dict that defines the
         environment variables for the new process; these are used instead
         of inheriting the current process environment, which is the default
         behavior. (templated)
-    :type env: dict
     :param append_env: If False(default) uses the environment variables passed in env params
         and does not inherit the current process environment. If True, inherits the environment variables
         from current passes and then environment variable passed by the user will either update the existing
         inherited environment variables or the new variables gets appended to it
-    :type append_env: bool
     :param output_encoding: Output encoding of bash command
-    :type output_encoding: str
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
-    :type skip_exit_code: int
     :param cancel_query_on_kill: If true, then cancel any running queries when the task's on_kill() is executed.
         Otherwise, the query will keep running when the task is killed.
-    :type cancel_query_on_kill: bool
     :param dbt_executable_path: Path to dbt executable can be used with venv
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
-    :type dbt_executable_path: str
     """
 
     template_fields: Sequence[str] = ("env", "vars")
+    global_flags = (
+        "project_dir",
+        "select",
+        "exclude",
+        "selector",
+        "vars",
+        "models",
+    )
+    global_boolean_flags = (
+        "no_version_check",
+        "cache_selected_only",
+        "fail_fast",
+        "quiet",
+        "warn_error",
+    )
 
     def __init__(
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: str | List[str] = None,
+        base_cmd: str | list[str] = None,
         select: str = None,
         exclude: str = None,
         selector: str = None,
@@ -136,27 +130,40 @@ class DbtBaseOperator(BaseOperator):
         """Returns hook for running the bash command."""
         return SubprocessHook()
 
-    def get_env(self, context):
-        """Builds the set of environment variables to be exposed for the bash command."""
+    def get_env(self, context: Context, profile_vars: dict[str, str]) -> dict[str, str]:
+        """
+        Builds the set of environment variables to be exposed for the bash command.
+        The order of determination is:
+            1. Environment variables created for dbt profiles, `profile_vars`.
+            2. The Airflow context as environment variables.
+            3. System environment variables if dbt_args{"append_env": True}
+            4. User specified environment variables, through dbt_args{"vars": {"key": "val"}}
+        If a user accidentally uses a key that is found earlier in the determination order then it is overwritten.
+        """
         system_env = os.environ.copy()
         env = self.env
         if env is None:
             env = system_env
-        else:
-            if self.append_env:
-                system_env.update(env)
-                env = system_env
-
+        elif self.append_env:
+            system_env.update(env)
+            env = system_env
         airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
         self.log.debug(
             "Exporting the following env vars:\n%s",
             "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),
         )
-        env.update(airflow_context_vars)
+        combined_env = {**env, **airflow_context_vars, **profile_vars}
+        # Eventually the keys & values in the env dict get passed through os.fsencode which enforces this.
+        accepted_types = (str, bytes, os.PathLike)
+        filtered_env = {
+            k: v
+            for k, v in combined_env.items()
+            if all((isinstance(k, accepted_types), isinstance(v, accepted_types)))
+        }
 
-        return env
+        return filtered_env
 
-    def exception_handling(self, result):
+    def exception_handling(self, result: SubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
                 f"dbt command returned exit code {self.skip_exit_code}. Skipping."
@@ -166,45 +173,27 @@ class DbtBaseOperator(BaseOperator):
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
             )
 
-    def add_global_flags(self):
-        global_flags = [
-            "project_dir",
-            "select",
-            "exclude",
-            "selector",
-            "vars",
-            "models",
-        ]
-
+    def add_global_flags(self) -> list[str]:
         flags = []
-        for global_flag in global_flags:
+        for global_flag in self.global_flags:
             dbt_name = f"--{global_flag.replace('_', '-')}"
             global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
-                    # handle dict
                     yaml_string = yaml.dump(global_flag_value)
-                    flags.append(dbt_name)
-                    flags.append(yaml_string)
+                    flags.extend([dbt_name, yaml_string])
                 else:
-                    flags.append(dbt_name)
-                    flags.append(str(global_flag_value))
-
-        global_boolean_flags = [
-            "no_version_check",
-            "cache_selected_only",
-            "fail_fast",
-            "quiet",
-            "warn_error",
-        ]
-        for global_boolean_flag in global_boolean_flags:
-            dbt_name = f"--{global_boolean_flag.replace('_', '-')}"
-            global_boolean_flag_value = self.__getattribute__(global_boolean_flag)
-            if global_boolean_flag_value is True:
-                flags.append(dbt_name)
+                    flags.extend([dbt_name, str(global_flag_value)])
+        for global_boolean_flag in self.global_boolean_flags:
+            if self.__getattribute__(global_boolean_flag):
+                flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(self, cmd, env):
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -227,45 +216,33 @@ class DbtBaseOperator(BaseOperator):
         self.exception_handling(result)
         return result
 
-    def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
+    def build_and_run_cmd(
+        self, context: Context, cmd_flags: list[str] | None = None
+    ) -> SubprocessResult:
         create_default_profiles(DBT_PROFILE_PATH)
+        create_default_profiles()
         profile, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )
-
-        # parse dbt command
-        dbt_cmd = []
-
-        ## start with the dbt executable
-        dbt_cmd.append(self.dbt_executable_path)
-
-        ## add base cmd
+        dbt_cmd = [self.dbt_executable_path]
         if isinstance(self.base_cmd, str):
             dbt_cmd.append(self.base_cmd)
         else:
-            [dbt_cmd.append(item) for item in self.base_cmd]
-
-        # add global flags
-        for item in self.add_global_flags():
-            dbt_cmd.append(item)
-
-        ## add command specific flags
+            dbt_cmd.extend(self.base_cmd)
+        dbt_cmd.extend(self.add_global_flags())
+        # add command specific flags
         if cmd_flags:
-            for item in cmd_flags:
-                dbt_cmd.append(item)
+            dbt_cmd.extend(cmd_flags)
+        # add profile
+        dbt_cmd.extend(["--profile", profile])
+        # set env vars
+        env = self.get_env(context, profile_vars)
 
-        ## add profile
-        dbt_cmd.append("--profile")
-        dbt_cmd.append(profile)
+        return self.run_command(cmd=dbt_cmd, env=env)
 
-        ## set env vars
-        env = {**env, **profile_vars}
-        result = self.run_command(cmd=dbt_cmd, env=env)
-        return result
-
-    def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
-        return result.output
+    def execute(self, context: Context) -> str:
+        # TODO is this going to put loads of unnecessary stuff in to xcom?
+        return self.build_and_run_cmd(context=context).output
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -283,7 +260,6 @@ class DbtBaseOperator(BaseOperator):
 class DbtLSOperator(DbtBaseOperator):
     """
     Executes a dbt core ls command.
-
     """
 
     ui_color = "#DBCDF6"
@@ -293,7 +269,7 @@ class DbtLSOperator(DbtBaseOperator):
         self.base_cmd = "ls"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
+        result = self.build_and_run_cmd(context=context)
         return result.output
 
 
@@ -302,7 +278,6 @@ class DbtSeedOperator(DbtBaseOperator):
     Executes a dbt core seed command.
 
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
-
     """
 
     ui_color = "#F58D7E"
@@ -321,14 +296,13 @@ class DbtSeedOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
         return result.output
 
 
 class DbtRunOperator(DbtBaseOperator):
     """
     Executes a dbt core run command.
-
     """
 
     ui_color = "#7352BA"
@@ -339,14 +313,13 @@ class DbtRunOperator(DbtBaseOperator):
         self.base_cmd = "run"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
+        result = self.build_and_run_cmd(context=context)
         return result.output
 
 
 class DbtTestOperator(DbtBaseOperator):
     """
     Executes a dbt core test command.
-
     """
 
     ui_color = "#8194E0"
@@ -356,7 +329,7 @@ class DbtTestOperator(DbtBaseOperator):
         self.base_cmd = "test"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
+        result = self.build_and_run_cmd(context=context)
         return result.output
 
 
@@ -365,10 +338,8 @@ class DbtRunOperationOperator(DbtBaseOperator):
     Executes a dbt core run-operation command.
 
     :param macro_name: name of macro to execute
-    :type macro_name: str
     :param args: Supply arguments to the macro. This dictionary will be mapped to the keyword arguments defined in the
         selected macro.
-    :type args: dict
     """
 
     ui_color = "#8194E0"
@@ -389,16 +360,13 @@ class DbtRunOperationOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
         return result.output
 
 
 class DbtDepsOperator(DbtBaseOperator):
     """
     Executes a dbt core deps command.
-
-    :param vars: Supply variables to the project. This argument overrides variables defined in your dbt_project.yml file
-    :type vars: dict
     """
 
     ui_color = "#8194E0"
@@ -408,5 +376,5 @@ class DbtDepsOperator(DbtBaseOperator):
         self.base_cmd = "deps"
 
     def execute(self, context: Context):
-        result = self.build_and_run_cmd(env=self.get_env(context))
+        result = self.build_and_run_cmd(context=context)
         return result.output

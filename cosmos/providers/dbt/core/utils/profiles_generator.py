@@ -161,14 +161,7 @@ def create_profile_vars_databricks(
     if conn.password:
         token = conn.password
     else:
-<<<<<<< HEAD
-        logger.error(
-            f"Connection type {conn.conn_type} is not yet supported.", file=sys.stderr
-        )
-        sys.exit(1)
-=======
         token = conn.extra_dejson.get("token")
->>>>>>> main
 
     profile_vars = {
         "DATABRICKS_HOST": str(conn.host).replace(

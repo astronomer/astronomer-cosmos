@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import signal
+from pathlib import Path
 from typing import List, Sequence
 
 import yaml
@@ -227,7 +228,9 @@ class DbtBaseOperator(BaseOperator):
         return result
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
-        create_default_profiles()
+        create_default_profiles(
+            Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
+        )
         profile, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )

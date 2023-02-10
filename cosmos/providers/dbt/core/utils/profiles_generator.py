@@ -8,9 +8,9 @@ from typing import Optional, Tuple
 
 import pkg_resources
 import yaml
+from airflow.exceptions import AirflowNotFoundException
 from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
-from airflow.exceptions import AirflowNotFoundException
 
 from cosmos.providers.dbt.core.profiles.bigquery import bigquery_profile
 from cosmos.providers.dbt.core.profiles.databricks import databricks_profile
@@ -255,6 +255,7 @@ def map_profile(
         sys.exit(1)
 
     return profile_vars_func(conn, database=db, schema=schema)
+
 
 def conn_exists(conn_id: str) -> bool:
     try:

@@ -11,10 +11,8 @@ from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-from cosmos.providers.dbt.core.utils.profiles_generator import (
-    map_profile,
-    conn_exists
-)
+from cosmos.providers.dbt.core.utils.profiles_generator import conn_exists, map_profile
+
 
 class DbtDockerBaseOperator(DockerOperator):
     """
@@ -210,9 +208,11 @@ class DbtDockerBaseOperator(DockerOperator):
 
     def build_cmd(self, env: dict, cmd_flags: list = None):
         profile_vars = {}
-        if (conn_exists(conn_id=self.conn_id)):
+        if conn_exists(conn_id=self.conn_id):
             _, profile_vars = map_profile(
-                conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
+                conn_id=self.conn_id,
+                db_override=self.db_name,
+                schema_override=self.schema,
             )
 
         # parse dbt command

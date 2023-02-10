@@ -139,4 +139,3 @@ dmypy.json
 
 # dbt
 logs/
-dbt_packages/

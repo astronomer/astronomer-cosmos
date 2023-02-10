@@ -16,8 +16,10 @@ from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-from cosmos.providers.dbt.core.utils.profiles_generator import map_profile
-
+from cosmos.providers.dbt.core.utils.profiles_generator import (
+    map_profile, 
+    conn_exists
+)
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator):
     """
@@ -222,9 +224,11 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator):
         self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
     def build_cmd(self, env: dict, cmd_flags: list = None):
-        _, profile_vars = map_profile(
-            conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
-        )
+        profile_vars = {}
+        if (conn_exists(conn_id=self.conn_id)):
+            _, profile_vars = map_profile(
+                conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
+            )
 
         # parse dbt args
         dbt_args = []

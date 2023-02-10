@@ -9,6 +9,7 @@ except ImportError:
 from typing import Any, Dict, List
 
 from cosmos.core.airflow import CosmosTaskGroup
+from cosmos.providers.dbt.core.operators import DbtArgs
 
 from .render import render_project
 
@@ -34,7 +35,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         self,
         dbt_project_name: str,
         conn_id: str,
-        dbt_args: Dict[str, Any] = {},
+        dbt_args: DbtArgs = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         dbt_models_dir: str = "models",

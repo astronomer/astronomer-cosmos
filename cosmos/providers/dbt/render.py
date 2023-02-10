@@ -1,6 +1,8 @@
 """
 This module contains a function to render a dbt project into Cosmos entities.
 """
+from __future__ import annotations
+
 import logging
 
 try:
@@ -8,11 +10,12 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List
+from typing import Any
 
 from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
+from cosmos.providers.dbt.core.operators import DbtArgs
 from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
 from cosmos.providers.dbt.parser.project import DbtProject
 
@@ -23,18 +26,19 @@ def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
     dbt_models_dir: str = "models",
-    task_args: Dict[str, Any] = {},
+    task_args: DbtArgs | None = None,
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
-    select: Dict[str, List[str]] = {},
-    exclude: Dict[str, List[str]] = {},
+    select: dict[str, list[str]] | None = None,
+    exclude: dict[str, list[str]] | None = None,
 ) -> Group:
     """
     Turn a dbt project into a Group
 
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dbt
+    :param dbt_models_dir: The directory name containing models, defaults to "models"
     :param task_args: Arguments to pass to the underlying dbt operators
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
@@ -43,6 +47,12 @@ def render_project(
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
     """
+    if exclude is None:
+        exclude = {}
+    if select is None:
+        select = {}
+    if task_args is None:
+        task_args = {}
     # first, get the dbt project
     project = DbtProject(
         dbt_root_path=dbt_root_path,
@@ -51,7 +61,7 @@ def render_project(
     )
 
     base_group = Group(id=dbt_project_name)  # this is the group that will be returned
-    entities: Dict[
+    entities: dict[
         str, CosmosEntity
     ] = {}  # this is a dict of all the entities we create
 
@@ -100,8 +110,8 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args, "models": model_name}
+        run_args: dict[str, Any] = {**task_args, "models": model_name}
+        test_args: dict[str, Any] = {**task_args, "models": model_name}
 
         if emit_datasets:
             outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]

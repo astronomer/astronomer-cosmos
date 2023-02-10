@@ -88,9 +88,11 @@ def get_airflow_task(
     task: Task, dag: DAG, task_group: Optional[TaskGroup] = None
 ) -> BaseOperator:
     """
-    Get the Airflow Operator class for a Task.
+    Get the Airflow operator class for a task.
 
-    :param task: The Task to get the Operator for
+    :param task: The Task to get the operator for.
+    :param dag: The DAG to get the operator for.
+    :param task_group: The Task Group to get the operator for.
 
     :return: The Operator class
     :rtype: BaseOperator
@@ -99,18 +101,14 @@ def get_airflow_task(
     # fully qualified name defined in the task
     module_name, class_name = task.operator_class.rsplit(".", 1)
     module = importlib.import_module(module_name)
-    Operator = getattr(module, class_name)
-
-    airflow_task = Operator(
-        task_id=task.id,
-        dag=dag,
-        task_group=task_group,
-        **task.arguments,
-    )
-
-    if not isinstance(airflow_task, BaseOperator):
-        raise TypeError(
-            f"Operator class {task.operator_class} is not a subclass of BaseOperator"
+    operator = getattr(module, class_name)
+    if issubclass(operator, BaseOperator):
+        return operator(
+            task_id=task.id,
+            dag=dag,
+            task_group=task_group,
+            **task.arguments,
         )
-
-    return airflow_task
+    raise TypeError(
+        f"Operator class {task.operator_class} is not a subclass of BaseOperator"
+    )

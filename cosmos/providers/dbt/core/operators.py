@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import signal
 import shutil
+import signal
 from typing import List, Sequence
 
 import yaml

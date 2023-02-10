@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import signal
+import shutil
 from typing import List, Sequence
 
 import yaml
@@ -127,7 +128,11 @@ class DbtBaseOperator(BaseOperator):
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
         self.cancel_query_on_kill = cancel_query_on_kill
-        self.dbt_executable_path = dbt_executable_path
+        dbt_ol_path = shutil.which("dbt-ol")
+        if dbt_executable_path == "dbt" and shutil.which("dbt-ol"):
+            self.dbt_executable_path = dbt_ol_path
+        else:
+            self.dbt_executable_path = dbt_executable_path
         super().__init__(**kwargs)
 
     @cached_property

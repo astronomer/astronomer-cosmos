@@ -3,12 +3,28 @@ dbt support for Airflow. Contains dags, task groups, and operators.
 """
 
 # re-export the operators
-from .core.operators import (
-    DbtLSOperator,
-    DbtRunOperationOperator,
-    DbtRunOperator,
-    DbtSeedOperator,
-    DbtTestOperator,
+from .core.operators_local import (
+    DbtLSLocalOperator,
+    DbtRunOperationLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtTestLocalOperator,
+)
+
+from .core.operators_docker import (
+    DbtLSDockerOperator,
+    DbtRunOperationDockerOperator,
+    DbtRunDockerOperator,
+    DbtSeedDockerOperator,
+    DbtTestDockerOperator,
+)
+
+from .core.operators_kubernetes import (
+    DbtLSKubernetesOperator,
+    DbtRunOperationKubernetesOperator,
+    DbtRunKubernetesOperator,
+    DbtSeedKubernetesOperator,
+    DbtTestKubernetesOperator,
 )
 
 # re-export user facing utilities
@@ -19,11 +35,21 @@ from .dag import DbtDag
 from .task_group import DbtTaskGroup
 
 __all__ = [
-    DbtLSOperator,
-    DbtRunOperationOperator,
-    DbtRunOperator,
-    DbtSeedOperator,
-    DbtTestOperator,
+    DbtLSLocalOperator,
+    DbtRunOperationLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtTestLocalOperator,
+    DbtLSDockerOperator,
+    DbtRunOperationDockerOperator,
+    DbtRunDockerOperator,
+    DbtSeedDockerOperator,
+    DbtTestDockerOperator,
+    DbtLSKubernetesOperator,
+    DbtRunOperationKubernetesOperator,
+    DbtRunKubernetesOperator,
+    DbtSeedKubernetesOperator,
+    DbtTestKubernetesOperator,
     get_dbt_dataset,
     DbtDag,
     DbtTaskGroup,

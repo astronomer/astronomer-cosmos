@@ -19,6 +19,17 @@ from cosmos.providers.dbt.parser.project import DbtProject
 logger = logging.getLogger(__name__)
 
 
+def calculate_operator_class(
+    execution_mode: str = None,
+    dbt_class: str = None,
+) -> str:
+    if execution_mode == "kubernetes":
+        return f"cosmos.providers.dbt.core.operators_kubernetes.{dbt_class}KubernetesOperator"
+    elif execution_mode == "docker":
+        return f"cosmos.providers.dbt.core.operators_docker.{dbt_class}DockerOperator"
+    else:
+        return f"cosmos.providers.dbt.core.operators_local.{dbt_class}LocalOperator"
+
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
@@ -43,6 +54,7 @@ def render_project(
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]})
+    :param execution_mode: Execution mode of the Airflow task (local, docker or kubernetes)
     """
     # first, get the dbt project
     project = DbtProject(
@@ -66,12 +78,6 @@ def render_project(
                 f"Can't specify the same tag in `select` and `include`: "
                 f"{set(select['tags']).intersection(exclude['tags'])}"
             )
-
-    operator_class = ""
-    if execution_mode == "docker":
-        operator_class = "_docker"
-    elif execution_mode == "kubernetes":
-        operator_class = "_kubernetes"
 
     if "paths" in select and "paths" in exclude:
         if set(select["paths"]).intersection(exclude["paths"]):
@@ -121,7 +127,7 @@ def render_project(
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
-            operator_class=f"cosmos.providers.dbt.core.operators{operator_class}.DbtRunOperator",
+            operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtRun"),
             arguments=run_args,
         )
 
@@ -137,7 +143,7 @@ def render_project(
 
         test_task = Task(
             id=f"{model_name}_test",
-            operator_class=f"cosmos.providers.dbt.core.operators{operator_class}.DbtTestOperator",
+            operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest"),
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
         )
@@ -169,7 +175,7 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class=f"cosmos.providers.dbt.core.operators{operator_class}.DbtTestOperator",
+            operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest"),
             arguments=task_args,
         )
         entities[test_task.id] = test_task

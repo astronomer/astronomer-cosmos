@@ -168,7 +168,7 @@ to the desired Cosmos component.
 
    .. tab:: Databricks
 
-        Here are the specific steps that you should take if you are configuring Cosmos to run against Databricks:
+        Follow these steps when configuring Cosmos to run against Databricks:
 
         1. Add Cosmos and the Databricks Provider to your `requirements.txt`
 

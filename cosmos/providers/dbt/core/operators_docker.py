@@ -7,10 +7,6 @@ from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.profiles_generator import (
-    map_profile,
-    conn_exists
-)
 
 class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
     """
@@ -49,7 +45,7 @@ class DbtLSDockerOperator(DbtDockerBaseOperator):
         self.base_cmd = "ls"
 
     def execute(self, context: Context):
-        self.build_cmd(env=self.get_env(context))
+        self.build_cmd_and_args(env=self.get_env(context))
         return super().execute(context)
 
 
@@ -77,7 +73,7 @@ class DbtSeedDockerOperator(DbtDockerBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        self.build_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        self.build_cmd_and_args(env=self.get_env(context), cmd_flags=cmd_flags)
         return super().execute(context)
 
 
@@ -95,7 +91,7 @@ class DbtRunDockerOperator(DbtDockerBaseOperator):
         self.base_cmd = "run"
 
     def execute(self, context: Context):
-        self.build_cmd(env=self.get_env(context))
+        self.build_cmd_and_args(env=self.get_env(context))
         return super().execute(context)
 
 
@@ -112,7 +108,7 @@ class DbtTestDockerOperator(DbtDockerBaseOperator):
         self.base_cmd = "test"
 
     def execute(self, context: Context):
-        self.build_cmd(env=self.get_env(context))
+        self.build_cmd_and_args(env=self.get_env(context))
         return super().execute(context)
 
 
@@ -145,7 +141,7 @@ class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        self.build_cmd(env=self.get_env(context), cmd_flags=cmd_flags)
+        self.build_cmd_and_args(env=self.get_env(context), cmd_flags=cmd_flags)
         return super().execute(context)
 
 
@@ -164,5 +160,5 @@ class DbtDepsDockerOperator(DbtDockerBaseOperator):
         self.base_cmd = "deps"
 
     def execute(self, context: Context):
-        self.build_cmd(env=self.get_env(context))
+        self.build_cmd_and_args(env=self.get_env(context))
         return super().execute(context)

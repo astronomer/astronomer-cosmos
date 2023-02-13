@@ -21,7 +21,7 @@ from cosmos.providers.dbt.core.profiles.snowflake import snowflake_profile
 logger = logging.getLogger(__name__)
 
 
-def create_default_profiles():
+def create_default_profiles(profiles_dir: str = None):
     # get installed version of astronomer-cosmos
     try:
         package = pkg_resources.get_distribution("astronomer-cosmos")
@@ -36,9 +36,12 @@ def create_default_profiles():
         "databricks_profile": databricks_profile,
     }
 
-    # Define the path to the directory and file
-    home_dir = os.path.expanduser("~")
-    file_path = f"{home_dir}/.dbt/profiles.yml"
+    # Define the path to the directory and file    
+    if profiles_dir != None:
+        file_path = f"{profiles_dir}/profiles.yml"
+    else:
+        home_dir = os.path.expanduser("~")
+        file_path = f"{home_dir}/.dbt/profiles.yml"
 
     # Create the file if it does not exist
     profile_file = Path(file_path)

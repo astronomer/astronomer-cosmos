@@ -75,7 +75,7 @@ class DbtBaseOperator(BaseOperator):
     :type dbt_executable_path: str
     :param dbt_cmd_flags: Flags passed to dbt command override those that are calculated.
     :type dbt_cmd_flags: dict
-    :param profiles_dir: Which directory to look in for the profiles.yml file.
+    :param profiles_dir: Which directory to look in for the profiles.yml file. Default is ~/.dbt/profiles.yml.
     :type profiles_dir: str
     """
 
@@ -225,7 +225,7 @@ class DbtBaseOperator(BaseOperator):
 
         ## add profile
         if handle_profile:            
-            create_default_profiles()        
+            create_default_profiles(self.profiles_dir)        
             profile, profile_vars = map_profile(
                 conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
             )

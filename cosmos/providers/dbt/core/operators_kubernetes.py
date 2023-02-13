@@ -12,10 +12,6 @@ from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.profiles_generator import (
-    map_profile, 
-    conn_exists
-)
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):

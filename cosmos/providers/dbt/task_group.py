@@ -28,6 +28,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         Defaults to "after_each"
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2"]})
+    :param dbt_profiles_dir: Which directory to look in for the profiles.yml file. Default is ~/.dbt/profiles.yml.
     """
 
     def __init__(
@@ -42,6 +43,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
         execution_mode: str = None,
+        dbt_profiles_dir: str = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -63,6 +65,7 @@ class DbtTaskGroup(CosmosTaskGroup):
             select=select,
             exclude=exclude,
             execution_mode=execution_mode,
+            dbt_profiles_dir=dbt_profiles_dir,
         )
 
         # call the airflow constructor

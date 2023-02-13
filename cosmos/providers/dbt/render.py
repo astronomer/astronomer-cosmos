@@ -41,6 +41,7 @@ def render_project(
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
     execution_mode: str = None,
+    dbt_profiles_dir: str = None,
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -55,6 +56,7 @@ def render_project(
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]})
     :param execution_mode: Execution mode of the Airflow task (local, docker or kubernetes)
+    :param dbt_profiles_dir: Which directory to look in for the profiles.yml file. Default is ~/.dbt/profiles.yml.
     """
     # first, get the dbt project
     project = DbtProject(
@@ -70,6 +72,9 @@ def render_project(
 
     # add project_dir arg to task_args
     task_args["project_dir"] = project.project_dir
+    
+    # add profiles_dir arg to task_args
+    task_args["profiles_dir"] = dbt_profiles_dir
 
     # ensures the same tag isn't in select & exclude
     if "tags" in select and "tags" in exclude:

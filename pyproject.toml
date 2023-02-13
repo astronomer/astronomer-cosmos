@@ -86,6 +86,7 @@ dependencies = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
+    "sphinx-tabs"
 ]
 
 [tool.hatch.envs.docs.scripts]

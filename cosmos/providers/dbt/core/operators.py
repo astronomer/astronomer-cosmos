@@ -166,7 +166,6 @@ class DbtBaseOperator(BaseOperator):
             )
 
     def add_global_flags(self):
-
         global_flags = [
             "project_dir",
             "select",

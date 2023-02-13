@@ -31,7 +31,6 @@ with DAG(
     max_active_runs=1,
     default_args={"owner": "01-EXTRACT"},
 ) as dag:
-
     project_seeds = [
         {
             "project": "jaffle_shop",

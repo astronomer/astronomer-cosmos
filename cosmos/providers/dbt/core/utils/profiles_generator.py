@@ -156,7 +156,6 @@ def create_profile_vars_google_cloud_platform(
 def create_profile_vars_databricks(
     conn: Connection, database: str, schema: str
 ) -> Tuple[str, dict]:
-
     # airflow throws warning messages if your token is in extras
     if conn.password:
         token = conn.password

@@ -25,7 +25,6 @@ with DAG(
     catchup=True,
     doc_md=__doc__,
 ):
-
     finish = EmptyOperator(task_id="finish")
 
     resume = RedshiftResumeClusterOperatorAsync(

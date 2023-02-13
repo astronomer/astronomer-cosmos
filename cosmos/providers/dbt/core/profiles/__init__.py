@@ -21,6 +21,10 @@ from cosmos.providers.dbt.core.profiles.snowflake import (
     create_profile_vars_snowflake,
     snowflake_profile,
 )
+from cosmos.providers.dbt.core.profiles.trino import (
+    create_profile_vars_trino,
+    trino_profile,
+)
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -53,5 +57,8 @@ def get_available_adapters() -> Dict[str, AdapterConfig]:
         ),
         "databricks": AdapterConfig(
             "databricks_profile", databricks_profile, create_profile_vars_databricks
+        ),
+        "trino": AdapterConfig(
+            "trino_profile", trino_profile, create_profile_vars_trino
         ),
     }

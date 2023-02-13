@@ -257,7 +257,7 @@ to the desired Cosmos component.
 
 Overriding connection Parameters
 --------------------------------
-Although setting up a database name in your Airflow Connection is required, The database/schema values from the
+To use Airflow with Cosmos, you must set up a database name in your Airflow Connection. However, when you instantiate a Cosmos Object, you can choose to override the database/schema values from the Connection object.```
 connection object can be overriden when instantiating a Cosmos Object:
 
 .. code-block:: python

@@ -214,7 +214,7 @@ to the desired Cosmos component.
 
    .. tab:: Postgres
 
-        Here are the specific steps that you should take if you are configuring Cosmos to run against Postgres:
+        Follow these steps when configuring Cosmos to run against Postgres:
 
         1. Add Cosmos and the Postgres Provider to your `requirements.txt`
 

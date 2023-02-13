@@ -75,6 +75,8 @@ class DbtBaseOperator(BaseOperator):
     :type dbt_executable_path: str
     :param dbt_cmd_flags: Flags passed to dbt command override those that are calculated.
     :type dbt_cmd_flags: dict
+    :param profiles_dir: Which directory to look in for the profiles.yml file.
+    :type profiles_dir: str
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -103,6 +105,7 @@ class DbtBaseOperator(BaseOperator):
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
         dbt_cmd_flags: Dict[str, Any] = {},
+        profiles_dir: str = None,
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -127,6 +130,7 @@ class DbtBaseOperator(BaseOperator):
         self.cancel_query_on_kill = cancel_query_on_kill
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
+        self.profiles_dir = profiles_dir
         super().__init__(**kwargs)
 
     def get_env(self, context):

@@ -34,6 +34,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
         self.environment = {**env_vars, **self.environment}
 
         self.command = dbt_cmd
+        self.log.info(f"Building command: {self.command}")
         
 class DbtLSDockerOperator(DbtDockerBaseOperator):
     """

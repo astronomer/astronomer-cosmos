@@ -45,7 +45,6 @@ dependencies = [
 [project.optional-dependencies]
 dbt-all = [
     "dbt-bigquery",
-    "dbt-core",
     "dbt-databricks",
     "dbt-postgres",
     "dbt-redshift",
@@ -53,22 +52,17 @@ dbt-all = [
 ]
 dbt-bigquery = [
     "dbt-bigquery",
-    "dbt-core",
 ]
 dbt-databricks = [
-    "dbt-core",
     "dbt-databricks",
 ]
 dbt-postgres = [
-    "dbt-core",
     "dbt-postgres",
 ]
 dbt-redshift = [
-    "dbt-core",
     "dbt-redshift",
 ]
 dbt-snowflake = [
-    "dbt-core",
     "dbt-snowflake",
 ]
 

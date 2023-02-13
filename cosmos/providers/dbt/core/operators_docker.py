@@ -8,29 +8,35 @@ from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators import DbtBaseOperator
 
+
 class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
     """
     Executes a dbt core cli command in a Docker container.
 
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + DockerOperator.template_fields
+    template_fields: Sequence[str] = (
+        DbtBaseOperator.template_fields + DockerOperator.template_fields
+    )
 
     def __init__(
         self,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        
+
     def build_cmd_and_args(self, env: dict, cmd_flags: list = None):
-        dbt_cmd, env_vars = self.build_cmd(env=env, cmd_flags=cmd_flags, handle_profile=False)
-        
+        dbt_cmd, env_vars = self.build_cmd(
+            env=env, cmd_flags=cmd_flags, handle_profile=False
+        )
+
         ## set env vars
         self.environment = {**env_vars, **self.environment}
 
         self.command = dbt_cmd
         self.log.info(f"Building command: {self.command}")
-        
+
+
 class DbtLSDockerOperator(DbtDockerBaseOperator):
     """
     Executes a dbt core ls command.

@@ -20,7 +20,9 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
 
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
+    template_fields: Sequence[str] = (
+        DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
+    )
 
     def __init__(
         self,
@@ -36,14 +38,17 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
     def build_cmd_and_args(self, env: dict, cmd_flags: list = None):
-        dbt_cmd, env_vars = self.build_cmd(env=env, cmd_flags=cmd_flags, handle_profile=False)
+        dbt_cmd, env_vars = self.build_cmd(
+            env=env, cmd_flags=cmd_flags, handle_profile=False
+        )
         self.cmds = [dbt_cmd.pop(0)]
-        
+
         ## set env vars
         self.build_env_args(env_vars)
-        
-        self.arguments = dbt_cmd        
+
+        self.arguments = dbt_cmd
         self.log.info(f"Building command: {self.cmds} {self.arguments}")
+
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
     """

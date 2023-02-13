@@ -36,8 +36,8 @@ def create_default_profiles(profiles_dir: str = None):
         "databricks_profile": databricks_profile,
     }
 
-    # Define the path to the directory and file    
-    if profiles_dir != None:
+    # Define the path to the directory and file
+    if profiles_dir is not None:
         file_path = f"{profiles_dir}/profiles.yml"
     else:
         home_dir = os.path.expanduser("~")

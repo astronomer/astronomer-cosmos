@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import List, Dict, Any, Sequence
+from typing import Any, Dict, List, Sequence
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
@@ -168,11 +168,11 @@ class DbtBaseOperator(BaseOperator):
         flags = []
         for global_flag in global_flags:
             dbt_name = f"--{global_flag.replace('_', '-')}"
-            
+
             global_flag_value = self.dbt_cmd_flags.get(global_flag)
             if global_flag_value is None:
                 global_flag_value = self.__getattribute__(global_flag)
-            
+
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
@@ -192,11 +192,11 @@ class DbtBaseOperator(BaseOperator):
         ]
         for global_boolean_flag in global_boolean_flags:
             dbt_name = f"--{global_boolean_flag.replace('_', '-')}"
-            
+
             global_boolean_flag_value = self.dbt_cmd_flags.get(global_boolean_flag)
             if global_boolean_flag_value is None:
                 global_boolean_flag_value = self.__getattribute__(global_boolean_flag)
-            
+
             if global_boolean_flag_value is True:
                 flags.append(dbt_name)
         return flags
@@ -224,15 +224,17 @@ class DbtBaseOperator(BaseOperator):
                 dbt_cmd.append(item)
 
         ## add profile
-        if handle_profile:            
-            create_default_profiles(self.profiles_dir)        
+        if handle_profile:
+            create_default_profiles(self.profiles_dir)
             profile, profile_vars = map_profile(
-                conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
+                conn_id=self.conn_id,
+                db_override=self.db_name,
+                schema_override=self.schema,
             )
-            
+
             dbt_cmd.append("--profile")
-            dbt_cmd.append(profile)           
-                
+            dbt_cmd.append(profile)
+
             ## set env vars
             env = {**env, **profile_vars}
 

@@ -30,6 +30,7 @@ def calculate_operator_class(
     else:
         return f"cosmos.providers.dbt.core.operators_local.{dbt_class}LocalOperator"
 
+
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
@@ -72,7 +73,7 @@ def render_project(
 
     # add project_dir arg to task_args
     task_args["project_dir"] = project.project_dir
-    
+
     # add profiles_dir arg to task_args
     task_args["profiles_dir"] = dbt_profiles_dir
 
@@ -132,7 +133,9 @@ def render_project(
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
-            operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtRun"),
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class="DbtRun"
+            ),
             arguments=run_args,
         )
 
@@ -148,7 +151,9 @@ def render_project(
 
         test_task = Task(
             id=f"{model_name}_test",
-            operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest"),
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class="DbtTest"
+            ),
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
         )
@@ -180,7 +185,9 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest"),
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class="DbtTest"
+            ),
             arguments=task_args,
         )
         entities[test_task.id] = test_task

@@ -12,12 +12,13 @@ from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators import DbtBaseOperator
 
+
 class DbtLocalBaseOperator(DbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
     """
-    
+
     template_fields: Sequence[str] = DbtBaseOperator.template_fields
 
     def __init__(
@@ -62,7 +63,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         )
         self.exception_handling(result)
         return result
-        
+
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
         dbt_cmd, env = self.build_cmd(env=env, cmd_flags=cmd_flags)
         result = self.run_command(cmd=dbt_cmd, env=env)

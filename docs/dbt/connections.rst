@@ -121,7 +121,7 @@ to the desired Cosmos component.
             authentication methods will be added soon. If there is an authentication method that your organization requires, open a
             PR/Issue on the Cosmos GitHub repo `here <https://github.com/astronomer/astronomer-cosmos>`_.
 
-        Here are the specific steps that you should take if you are configuring Cosmos to run against BigQuery:
+        Follow these steps when configuring Cosmos to run against BigQuery:
 
         1. Add Cosmos and the Google Provider to your `requirements.txt`
 

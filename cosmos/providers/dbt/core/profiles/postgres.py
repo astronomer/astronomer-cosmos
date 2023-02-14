@@ -28,18 +28,19 @@ def create_profile_vars_postgres(
     https://docs.getdbt.com/reference/warehouse-setups/postgres-setup
     https://airflow.apache.org/docs/apache-airflow-providers-postgres/stable/connections/postgres.html
     """
-    schema_options = [schema_override, database_override, conn.schema]
-    try:
-        schema = next(schema for schema in schema_options if schema is not None)
-    except StopIteration as e:
-        msg = "A schema must be provided as either `db_name`, `schema` or in the schema field of the connection"
-        raise ValueError(msg) from e
+
+    if not schema_override:
+        raise ValueError(
+            "A postgres schema must be provided via the `schema` parameter"
+        )
+
     profile_vars = {
         "POSTGRES_HOST": conn.host,
         "POSTGRES_USER": conn.login,
         "POSTGRES_PASSWORD": conn.password,
-        "POSTGRES_DATABASE": schema,
+        # airflow uses schema connection field for db - except Snowflake
+        "POSTGRES_DATABASE": database_override if database_override else conn.schema,
         "POSTGRES_PORT": str(conn.port),
-        "POSTGRES_SCHEMA": schema,  # TODO can we remove this? it's unused...
+        "POSTGRES_SCHEMA": schema_override,
     }
     return "postgres_profile", profile_vars

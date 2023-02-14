@@ -1,7 +1,10 @@
+import logging
 from typing import TYPE_CHECKING, Optional, Tuple
 
 if TYPE_CHECKING:
     from airflow.models import Connection
+
+logger = logging.getLogger(__name__)
 
 databricks_profile = {
     "outputs": {
@@ -29,16 +32,33 @@ def create_profile_vars_databricks(
 
     Database override is used to reference a Unity Catalog which was made available in dbt-databricks>=1.1.1
     Airflow recommends specifying token in the password field as it's more secure.
-    If the host contains the scheme then we remove it.
+    If the host contains the https then we remove it.
     """
     if conn.password:
         token = conn.password
     else:
         token = conn.extra_dejson.get("token")
+
+    if not schema_override:
+        raise ValueError(
+            "A databricks database must be provided via the `schema` parameter"
+        )
+
+    if database_override:
+        catalog = database_override
+    elif conn.schema:
+        catalog = conn.schema
+    else:
+        # see https://docs.databricks.com/data-governance/unity-catalog/hive-metastore.html#default-catalog
+        catalog = "hive_metastore"
+        logging.info(
+            f"Using catalog: {catalog} as default since none specified in db_name or connection schema"
+        )
+
     profile_vars = {
         "DATABRICKS_HOST": str(conn.host).replace("https://", ""),
-        "DATABRICKS_CATALOG": database_override if database_override else "",
-        "DATABRICKS_SCHEMA": schema_override if schema_override else conn.schema,
+        "DATABRICKS_CATALOG": catalog,
+        "DATABRICKS_SCHEMA": schema_override,
         "DATABRICKS_HTTP_PATH": conn.extra_dejson.get("http_path"),
         "DATABRICKS_TOKEN": token,
     }

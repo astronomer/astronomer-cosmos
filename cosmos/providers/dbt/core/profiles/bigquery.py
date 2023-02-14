@@ -39,8 +39,14 @@ def create_profile_vars_google_cloud_platform(
     https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
     bigquery_key_file = json.loads(conn.extra_dejson.get("keyfile_dict"))
+
+    if not schema_override:
+        raise ValueError(
+            "A bigquery dataset must be provided via the `schema` parameter"
+        )
+
     profile_vars = {
-        "BIGQUERY_DATASET": schema_override if schema_override else conn.schema,
+        "BIGQUERY_DATASET": schema_override,
         "BIGQUERY_PROJECT": database_override
         if database_override
         else bigquery_key_file["project_id"],

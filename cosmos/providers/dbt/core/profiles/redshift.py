@@ -29,19 +29,19 @@ def create_profile_vars_redshift(
     https://docs.getdbt.com/reference/warehouse-setups/redshift-setup
     https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/connections/redshift.html
     """
-    schema_options = [schema_override, database_override, conn.schema]
-    try:
-        schema = next(schema for schema in schema_options if schema is not None)
-    except StopIteration as e:
-        msg = "A schema must be provided as either `db_name`, `schema` or in the schema field of the connection"
-        raise ValueError(msg) from e
+
+    if not schema_override:
+        raise ValueError(
+            "A redshift schema must be provided via the `schema` parameter"
+        )
 
     profile_vars = {
         "REDSHIFT_HOST": conn.host,
         "REDSHIFT_PORT": str(conn.port),
         "REDSHIFT_USER": conn.login,
         "REDSHIFT_PASSWORD": conn.password,
-        "REDSHIFT_DATABASE": schema,
-        "REDSHIFT_SCHEMA": schema_override if schema_override else conn.schema,
+        # airflow uses schema connection field for db - except Snowflake
+        "REDSHIFT_DATABASE": database_override if database_override else conn.schema,
+        "REDSHIFT_SCHEMA": schema_override,
     }
     return "redshift_profile", profile_vars

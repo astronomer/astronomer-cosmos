@@ -3,13 +3,14 @@ from __future__ import annotations
 import os
 import signal
 from pathlib import Path
-from typing import List, Sequence, TypedDict
+from typing import List, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook
 from airflow.models.baseoperator import BaseOperator
+from airflow.typing_compat import TypedDict
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
@@ -176,7 +177,6 @@ class DbtBaseOperator(BaseOperator):
             )
 
     def add_global_flags(self):
-
         global_flags = [
             "project_dir",
             "select",

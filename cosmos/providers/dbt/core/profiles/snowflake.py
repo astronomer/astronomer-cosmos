@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -21,7 +23,7 @@ snowflake_profile = {
 }
 
 
-def get_snowflake_account(account: str, region: Optional[str] = None) -> str:
+def get_snowflake_account(account: str, region: str | None = None) -> str:
     # Region is optional
     if region and region not in account:
         account = f"{account}.{region}"
@@ -29,10 +31,10 @@ def get_snowflake_account(account: str, region: Optional[str] = None) -> str:
 
 
 def create_profile_vars_snowflake(
-    conn: "Connection",
-    database_override: Optional[str] = None,
-    schema_override: Optional[str] = None,
-) -> Tuple[str, dict]:
+    conn: Connection,
+    database_override: str | None = None,
+    schema_override: str | None = None,
+) -> tuple[str, dict[str, str]]:
     """
     https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html

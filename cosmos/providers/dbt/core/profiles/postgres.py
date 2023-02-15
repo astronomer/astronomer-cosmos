@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -20,10 +22,10 @@ postgres_profile = {
 
 
 def create_profile_vars_postgres(
-    conn: "Connection",
-    database_override: Optional[str] = None,
-    schema_override: Optional[str] = None,
-) -> Tuple[str, dict]:
+    conn: Connection,
+    database_override: str | None = None,
+    schema_override: str | None = None,
+) -> tuple[str, dict[str, str]]:
     """
     https://docs.getdbt.com/reference/warehouse-setups/postgres-setup
     https://airflow.apache.org/docs/apache-airflow-providers-postgres/stable/connections/postgres.html

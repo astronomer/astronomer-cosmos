@@ -20,7 +20,6 @@ from cosmos.providers.dbt.core.operators import (
 from cosmos.providers.dbt.task_group import DbtTaskGroup
 
 for source in sources:
-
     with DAG(
         dag_id=f"dbt_{source['conn_type']}_example_dag",
         start_date=datetime(2022, 11, 27),
@@ -30,7 +29,6 @@ for source in sources:
         tags=[source["conn_type"]],
         max_active_runs=1,
     ) as dag:
-
         projects = [
             {
                 "project": "jaffle_shop",

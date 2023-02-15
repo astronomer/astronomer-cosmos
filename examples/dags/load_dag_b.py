@@ -23,5 +23,4 @@ with DAG(
     catchup=False,
     default_args={"owner": "03-LOAD"},
 ) as dag:
-
     EmptyOperator(task_id="reporting_workflow")

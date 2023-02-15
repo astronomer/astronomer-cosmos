@@ -13,6 +13,7 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
+from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
@@ -171,7 +172,6 @@ class DbtBaseOperator(BaseOperator):
             )
 
     def add_global_flags(self):
-
         global_flags = [
             "project_dir",
             "select",
@@ -220,7 +220,8 @@ class DbtBaseOperator(BaseOperator):
                 raise AirflowException(
                     f"The project_dir {self.project_dir} must be a directory"
                 )
-
+        # Fix the profile path, so it's not accidentally superseded by the end user.
+        env["DBT_PROFILES_DIR"] = DBT_PROFILE_PATH.parent
         # run bash command
         result = self.subprocess_hook.run_command(
             command=cmd,
@@ -232,7 +233,7 @@ class DbtBaseOperator(BaseOperator):
         return result
 
     def build_and_run_cmd(self, env: dict, cmd_flags: list = None):
-        create_default_profiles()
+        create_default_profiles(DBT_PROFILE_PATH)
         profile, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )

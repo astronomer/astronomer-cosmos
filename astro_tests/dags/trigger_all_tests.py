@@ -15,7 +15,6 @@ with DAG(
     catchup=False,
     doc_md=__doc__,
 ):
-
     trigger_all = EmptyOperator(
         task_id="trigger_all", outlets=[Dataset("DAG://TRIGGER_ALL_TESTS/TRIGGER_ALL")]
     )

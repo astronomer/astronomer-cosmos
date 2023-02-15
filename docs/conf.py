@@ -22,6 +22,8 @@ author = "Astronomer"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.autosectionlabel",
+    "sphinx_tabs.tabs",
 ]
 
 autosummary_generate = True

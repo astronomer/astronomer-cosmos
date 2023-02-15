@@ -20,7 +20,6 @@ with DAG(
     catchup=False,
     default_args={"owner": "02-TRANSFORM"},
 ) as dag:
-
     pre_dbt_workflow = EmptyOperator(task_id="pre_dbt_workflow")
 
     jaffle_shop = DbtTaskGroup(

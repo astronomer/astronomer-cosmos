@@ -1,2 +1,3 @@
-pydata-sphinx-theme
 apache-airflow
+pydata-sphinx-theme
+sphinx-tabs

@@ -55,13 +55,12 @@ class DatabricksNotebookOperator(BaseOperator):
 
         :param notebook_path: the path to the notebook in Databricks
         :param source: Optional location type of the notebook. When set to WORKSPACE, the notebook will be retrieved
-        from the local Databricks workspace. When set to GIT, the notebook will be retrieved from a Git repository
-        defined in git_source. If the value is empty, the task will use GIT if git_source is defined
-        and WORKSPACE otherwise. For more information please visit
-        https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsCreate
+            from the local Databricks workspace. When set to GIT, the notebook will be retrieved from a Git repository
+            defined in git_source. If the value is empty, the task will use GIT if git_source is defined
+            and WORKSPACE otherwise. For more information please visit
+            https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsCreate
         :param databricks_conn_id: the connection id to use to connect to Databricks
         :param notebook_params: the parameters to pass to the notebook
-        :param kwargs:
     """
 
     template_fields = ("databricks_run_id",)
@@ -77,22 +76,6 @@ class DatabricksNotebookOperator(BaseOperator):
         existing_cluster_id: str | None = None,
         **kwargs,
     ):
-        """
-        Create a Databricks notebook operator.
-
-        :param notebook_path: the path to the notebook in Databricks
-        :param source: Optional location type of the notebook. When set to WORKSPACE, the notebook will be retrieved
-        from the local Databricks workspace. When set to GIT, the notebook will be retrieved from a Git repository
-        defined in git_source. If the value is empty, the task will use GIT if git_source is defined
-        and WORKSPACE otherwise. For more information please visit
-        https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsCreate
-        :param databricks_conn_id: the connection id to use to connect to Databricks
-        :param notebook_params: the parameters to pass to the notebook
-        :param job_cluster_key: used only for Databricks Jobs. The key to the job cluster to use for this task
-        :param new_cluster: dictionary containing the cluster configuration
-        :param existing_cluster_id: the id of an existing all-purpose cluster to use for this task
-        :param kwargs:
-        """
         self.notebook_path = notebook_path
         self.source = source
         self.notebook_params = notebook_params or {}
@@ -104,11 +87,11 @@ class DatabricksNotebookOperator(BaseOperator):
 
         super().__init__(**kwargs)
 
-    def convert_to_databricks_workflow_task(self, relevant_upstreams):
+    def convert_to_databricks_workflow_task(
+        self, relevant_upstreams: list[BaseOperator]
+    ):
         """
         Convert the operator to a Databricks workflow task that can be task in a workflow
-        :type relevant_upstreams: list[BaseOperator]
-        :type job_cluster_key: dict
         """
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),

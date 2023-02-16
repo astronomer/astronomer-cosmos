@@ -20,6 +20,7 @@ attribution_playbook = DbtDag(
         "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt",
     },
     dag_id="attribution-playbook",
+    dbt_root_path="/usr/local/airflow/dags/dbt",
     start_date=datetime(2022, 11, 27),
     schedule=[Dataset("SEED://ATTRIBUTION_PLAYBOOK")],
     doc_md=__doc__,

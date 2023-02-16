@@ -18,7 +18,7 @@ There are a few changes made to the default Astro CLI project to support this:
 USER root
 
 # mount the local dbt directory to the container, rw for dbt to write logs
-ADD dbt /usr/local/airflow/dbt
+ADD dags/dbt /usr/local/airflow/dbt
 # make sure the dbt directory is owned by the astro user
 RUN chown -R astro:astro /usr/local/airflow/dbt
 

@@ -22,6 +22,8 @@ from cosmos.providers.dbt.core.operators import (
     DbtSeedOperator,
 )
 
+dbt_root_path = "/usr/local/airflow/dags/dbt"
+
 with DAG(
     dag_id="extract_dag",
     start_date=datetime(2022, 11, 27),
@@ -47,7 +49,7 @@ with DAG(
         for project in project_seeds:
             DbtDepsOperator(
                 task_id=f"{project['project']}_install_deps",
-                project_dir=f"/usr/local/airflow/dbt/{project['project']}",
+                project_dir=f"{dbt_root_path}/{project['project']}",
                 schema="public",
                 dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt",
                 conn_id="airflow_db",
@@ -60,7 +62,7 @@ with DAG(
                     task_id=f"drop_{seed}_if_exists",
                     macro_name="drop_table",
                     args={"table_name": seed},
-                    project_dir=f"/usr/local/airflow/dbt/{project['project']}",
+                    project_dir=f"{dbt_root_path}/{project['project']}",
                     schema="public",
                     dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt",
                     conn_id="airflow_db",
@@ -71,7 +73,7 @@ with DAG(
             name_underscores = project.replace("-", "_")
             DbtSeedOperator(
                 task_id=f"{name_underscores}_seed",
-                project_dir=f"/usr/local/airflow/dbt/{project}",
+                project_dir=f"{dbt_root_path}/{project}",
                 schema="public",
                 dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt",
                 conn_id="airflow_db",

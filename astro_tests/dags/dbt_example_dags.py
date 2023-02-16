@@ -89,7 +89,7 @@ for source in sources:
 
             deps = DbtDepsOperator(
                 task_id=f"{project['project']}_install_deps",
-                project_dir=f"/usr/local/airflow/dbt/{project['project']}",
+                project_dir=f"/usr/local/airflow/dags/dbt/{project['project']}",
                 schema=source["schema"],
                 dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt",
                 conn_id=source["conn_id"],
@@ -101,7 +101,7 @@ for source in sources:
                         task_id=f"drop_{seed}_if_exists",
                         macro_name="drop_table",
                         args={"table_name": seed, "conn_type": source["conn_type"]},
-                        project_dir=f"/usr/local/airflow/dbt/{project['project']}",
+                        project_dir=f"/usr/local/airflow/dags/dbt/{project['project']}",
                         schema=source["schema"],
                         dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt",
                         conn_id=source["conn_id"],
@@ -109,7 +109,7 @@ for source in sources:
 
             seed = DbtSeedOperator(
                 task_id=f"{name_underscores}_seed",
-                project_dir=f"/usr/local/airflow/dbt/{project['project']}",
+                project_dir=f"/usr/local/airflow/dags/dbt/{project['project']}",
                 schema=source["schema"],
                 dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt",
                 conn_id=source["conn_id"],
@@ -125,6 +125,7 @@ for source in sources:
             project_task_group = DbtTaskGroup(
                 dbt_project_name=project["project"],
                 conn_id=source["conn_id"],
+                dbt_root_path="/usr/local/airflow/dags/dbt",
                 dbt_args={
                     "schema": source["schema"],
                     "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt",

@@ -87,7 +87,9 @@ class DatabricksNotebookOperator(BaseOperator):
 
         super().__init__(**kwargs)
 
-    def convert_to_databricks_workflow_task(self, relevant_upstreams: list[BaseOperator]):
+    def convert_to_databricks_workflow_task(
+        self, relevant_upstreams: list[BaseOperator]
+    ):
         """
         Convert the operator to a Databricks workflow task that can be task in a workflow
         """

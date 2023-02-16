@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import fcntl
 import os
+import shutil
 import signal
+import time
 from typing import List, Sequence
 
 import yaml
@@ -179,7 +182,13 @@ class DbtBaseOperator(BaseOperator):
         flags = []
         for global_flag in global_flags:
             dbt_name = f"--{global_flag.replace('_', '-')}"
-            global_flag_value = self.__getattribute__(global_flag)
+            # intercept project directory and route it to r/w tmp
+            if global_flag == "project_dir":
+                global_flag_value = (
+                    f"/tmp/dbt/{os.path.basename(self.__getattribute__(global_flag))}"
+                )
+            else:
+                global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
@@ -215,14 +224,47 @@ class DbtBaseOperator(BaseOperator):
                 raise AirflowException(
                     f"The project_dir {self.project_dir} must be a directory"
                 )
+
+        # routing the dbt project to a tmp dir for r/w operations
+        target_dir = f"/tmp/dbt/{os.path.basename(self.project_dir)}"
+
+        # these are the directories that dbt generates -- we don't care to overwrite them
+        def exclude(src_dir, contents):
+            return ["target", "logs", "dbt_packages"]
+
+        # put a lock on the dest so that it isn't getting written multiple times
+        lock_file = os.path.join(target_dir, ".lock")
+
+        # if there is already a lock file - wait for it to be released
+        if os.path.exists(lock_file):
+            while os.path.exists(lock_file):
+                with open(lock_file, "w") as lock_file:
+                    try:
+                        # Lock acquired, the lock file is available
+                        fcntl.flock(lock_file, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                        break
+                    except OSError:
+                        # Lock is held by another process, wait and try again
+                        time.sleep(1)
+
+                # The lock file is available, release the shared lock
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+        # otherwise create a lock file and copy the dbt directory
+        else:
+            os.makedirs(os.path.dirname(lock_file), exist_ok=True)
+            with open(lock_file, "w") as f:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                shutil.copytree(
+                    self.project_dir, target_dir, ignore=exclude, dirs_exist_ok=True
+                )
+                fcntl.flock(f, fcntl.LOCK_UN)
+
         # Fix the profile path, so it's not accidentally superseded by the end user.
         env["DBT_PROFILES_DIR"] = DBT_PROFILE_PATH.parent
         # run bash command
         result = self.subprocess_hook.run_command(
-            command=cmd,
-            env=env,
-            output_encoding=self.output_encoding,
-            cwd=self.project_dir,
+            command=cmd, env=env, output_encoding=self.output_encoding, cwd=target_dir
         )
         self.exception_handling(result)
         return result

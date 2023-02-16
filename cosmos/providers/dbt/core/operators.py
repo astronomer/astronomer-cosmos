@@ -230,7 +230,7 @@ class DbtBaseOperator(BaseOperator):
 
         # these are the directories that dbt generates -- we don't care to overwrite them
         def exclude(src_dir, contents):
-            return ["target", "logs", "dbt_packages"]
+            return ["target", "logs"]
 
         # put a lock on the dest so that it isn't getting written multiple times
         lock_file = os.path.join(target_dir, ".lock")

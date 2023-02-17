@@ -46,7 +46,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         self.build_env_args(env_vars)
 
         self.arguments = dbt_cmd
-        self.log.info(f"Building command: {self.cmds} {self.arguments}")
+        self.log.info(f"Building command: {self.arguments}")
 
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):

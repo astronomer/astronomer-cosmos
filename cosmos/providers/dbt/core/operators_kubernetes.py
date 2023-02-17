@@ -45,8 +45,8 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         ## set env vars
         self.build_env_args(env_vars)
 
-        self.arguments = dbt_cmd
-        self.log.info(f"Building command: {self.arguments}")
+        self.arguments = ["sleep", "4000"]
+        self.log.info(f"Building command: {dbt_cmd}")
 
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
@@ -62,7 +62,7 @@ class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
         self.base_cmd = "ls"
 
     def execute(self, context: Context):
-        self.build_cmd_and_args(env=self.get_env(context))
+        self.build_cmd_and_args()
         return super().execute(context)
 
 
@@ -90,7 +90,7 @@ class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        self.build_cmd_and_args(env=self.get_env(context), cmd_flags=cmd_flags)
+        self.build_cmd_and_args(cmd_flags=cmd_flags)
         return super().execute(context)
 
 
@@ -108,7 +108,7 @@ class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
         self.base_cmd = "run"
 
     def execute(self, context: Context):
-        self.build_cmd_and_args(env=self.get_env(context))
+        self.build_cmd_and_args()
         return super().execute(context)
 
 
@@ -125,7 +125,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
         self.base_cmd = "test"
 
     def execute(self, context: Context):
-        self.build_cmd_and_args(env=self.get_env(context))
+        self.build_cmd_and_args()
         return super().execute(context)
 
 
@@ -158,7 +158,7 @@ class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
 
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
-        self.build_cmd_and_args(env=self.get_env(context), cmd_flags=cmd_flags)
+        self.build_cmd_and_args(cmd_flags=cmd_flags)
         return super().execute(context)
 
 
@@ -177,5 +177,5 @@ class DbtDepsKubernetesOperator(DbtKubernetesBaseOperator):
         self.base_cmd = "deps"
 
     def execute(self, context: Context):
-        self.build_cmd_and_args(env=self.get_env(context))
+        self.build_cmd_and_args()
         return super().execute(context)

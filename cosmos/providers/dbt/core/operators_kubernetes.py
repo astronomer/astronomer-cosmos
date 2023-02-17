@@ -37,7 +37,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
 
         self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
-    def build_cmd_and_args(self, env: dict, cmd_flags: list = None):
+    def build_cmd_and_args(self, env: dict = {}, cmd_flags: list = None):
         dbt_cmd, env_vars = self.build_cmd(
             env=env, cmd_flags=cmd_flags, handle_profile=False
         )

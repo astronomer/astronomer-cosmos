@@ -13,7 +13,6 @@ with DAG(
     catchup=False,
     doc_md=__doc__,
 ):
-
     for manager_dag in ["postgres_manager", "redshift_manager", "databricks_manager"]:
         TriggerDagRunOperator(
             task_id=f"pause_{manager_dag}",

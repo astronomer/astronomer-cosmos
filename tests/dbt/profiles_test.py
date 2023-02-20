@@ -1,25 +1,89 @@
+import inspect
 import json
+import os
+import typing
+from pathlib import Path
+from time import sleep
 from typing import Generator, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 from airflow.models.connection import Connection
 
-from cosmos.providers.dbt.core.utils.profiles_generator import (
+from cosmos.providers.dbt.core.profiles import (
     create_profile_vars_databricks,
     create_profile_vars_google_cloud_platform,
     create_profile_vars_postgres,
     create_profile_vars_redshift,
     create_profile_vars_snowflake,
-    get_db_from_connection,
-    get_snowflake_account,
+    get_available_adapters,
+)
+from cosmos.providers.dbt.core.profiles.snowflake import get_snowflake_account
+from cosmos.providers.dbt.core.utils.profiles_generator import (
+    create_default_profiles,
     map_profile,
 )
+
+
+def test_create_default_profiles(tmp_path: Path) -> None:
+    """
+    Ensure we create the file and that we can return it load it back afterwards.
+    """
+    profile_file = tmp_path.joinpath("profiles.yml")
+    create_default_profiles(profile_file)
+    with open(profile_file) as f:
+        package_line = next(f)
+        assert "astronomer-cosmos" in package_line
+    with open(profile_file) as f:
+        assert yaml.full_load(f) is not None
+
+
+def test_create_default_profiles_exist(tmp_path: Path) -> None:
+    """
+    If the file exists and the version of astronomer-cosmos is the same then do nothing.
+    """
+    profile_file = tmp_path.joinpath("profiles.yml")
+    create_default_profiles(profile_file)
+    sleep(1)
+    created_time = os.path.getctime(profile_file)
+    create_default_profiles(profile_file)
+    modified_time = os.path.getmtime(profile_file)
+    assert created_time == modified_time
+
+
+@patch(
+    "cosmos.providers.dbt.core.utils.profiles_generator.pkg_resources.get_distribution"
+)
+def test_create_default_profiles_exist_library_update(
+    p_get_distribution: MagicMock, tmp_path: Path
+) -> None:
+    """
+    If the version of astronomer-cosmos has been updated then we ensure that the profiles are re-written.
+    """
+    p_get_distribution.side_effect = [
+        "astronomer-cosmos 0.3.2",
+        "astronomer-cosmos 0.4.0",
+    ]
+    profile_file = tmp_path.joinpath("profiles.yml")
+    create_default_profiles(profile_file)
+    sleep(1)
+    created_time = os.path.getctime(profile_file)
+    create_default_profiles(profile_file)
+    modified_time = os.path.getmtime(profile_file)
+    assert created_time != modified_time
 
 
 @pytest.fixture()
 def airflow_connection() -> Generator[Connection, None, None]:
     yield MagicMock(spec=Connection)
+
+
+@pytest.fixture()
+def airflow_schemaless_connection() -> Generator[Connection, None, None]:
+    airflow_connection = MagicMock(spec=Connection)
+    airflow_connection.schema = None
+    yield airflow_connection
 
 
 @pytest.fixture()
@@ -84,29 +148,11 @@ def postgres_connection(
 
 
 @pytest.fixture()
-def postgres_schemaless_connection(
-    airflow_connection: Connection,
-) -> Generator[Connection, None, None]:
-    airflow_connection.conn_type = "postgres"
-    airflow_connection.schema = None
-    yield airflow_connection
-
-
-@pytest.fixture()
 def databricks_connection(
     airflow_connection: Connection,
 ) -> Generator[Connection, None, None]:
     airflow_connection.conn_type = "databricks"
     airflow_connection.schema = "test_database"
-    yield airflow_connection
-
-
-@pytest.fixture()
-def databricks_schemaless_connection(
-    airflow_connection: Connection,
-) -> Generator[Connection, None, None]:
-    airflow_connection.conn_type = "databricks"
-    airflow_connection.schema = None
     yield airflow_connection
 
 
@@ -122,15 +168,18 @@ def random_connection(
 def test_create_profile_vars_databricks(
     airflow_connection: Generator[Connection, None, None]
 ) -> None:
-    host = 1234
+    catalog = "my-catalog"
+    host = "dbc-abcd123-1234.cloud.databricks.com"
     schema = "jaffle_shop"
     http_path = "sql/protocolv1/o/1234567891234567/1234-123456-a1bc2d3e"
     token = "dapiab123456cdefgh78910"
     airflow_connection.host = host
     airflow_connection.schema = schema
     airflow_connection.extra_dejson = {"http_path": http_path, "token": token}
+    airflow_connection.password = None
 
     expected_profile_vars = {
+        "DATABRICKS_CATALOG": catalog,
         "DATABRICKS_HOST": host,
         "DATABRICKS_SCHEMA": schema,
         "DATABRICKS_HTTP_PATH": http_path,
@@ -138,14 +187,14 @@ def test_create_profile_vars_databricks(
     }
 
     profile, profile_vars = create_profile_vars_databricks(
-        airflow_connection, "reporting", schema
+        airflow_connection, catalog, schema
     )
     assert profile == "databricks_profile"
     assert profile_vars == expected_profile_vars
 
 
 def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
-    host = 1234
+    host = "my-hostname.com"
     login = "my-user"
     schema = "jaffle_shop"
     password = "abcdef12345"
@@ -160,7 +209,7 @@ def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
         "POSTGRES_HOST": host,
         "POSTGRES_USER": login,
         "POSTGRES_PASSWORD": password,
-        "POSTGRES_DATABASE": database,
+        "POSTGRES_DATABASE": schema,
         "POSTGRES_PORT": str(port),
         "POSTGRES_SCHEMA": schema,
     }
@@ -170,6 +219,13 @@ def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
     )
     assert profile == "postgres_profile"
     assert profile_vars == expected_profile_vars
+
+
+def test_create_profile_vars_postgres_no_schema(
+    airflow_schemaless_connection: Connection,
+) -> None:
+    with pytest.raises(ValueError):
+        create_profile_vars_postgres(airflow_schemaless_connection, None, None)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +321,7 @@ def test_create_profile_vars_redshift(airflow_connection: Connection) -> None:
         "REDSHIFT_PORT": str(port),
         "REDSHIFT_USER": login,
         "REDSHIFT_PASSWORD": password,
-        "REDSHIFT_DATABASE": database,
+        "REDSHIFT_DATABASE": schema,
         "REDSHIFT_SCHEMA": schema,
     }
 
@@ -274,6 +330,13 @@ def test_create_profile_vars_redshift(airflow_connection: Connection) -> None:
     )
     assert profile == "redshift_profile"
     assert profile_vars == expected_profile_vars
+
+
+def test_create_profile_vars_redshift_no_schema(
+    airflow_schemaless_connection: Connection,
+) -> None:
+    with pytest.raises(ValueError):
+        create_profile_vars_redshift(airflow_schemaless_connection, None, None)
 
 
 def test_create_profile_vars_google_cloud_platform(
@@ -332,26 +395,6 @@ def test_create_profile_vars_google_cloud_platform(
     assert profile_vars == expected_profile_vars
 
 
-@pytest.mark.parametrize(
-    "fixture_name",
-    [
-        "snowflake_connection",
-        "snowflake_extra_connection",
-        "google_cloud_platform_connection",
-        pytest.param("redshift_connection", marks=pytest.mark.xfail),
-        "postgres_connection",
-        "databricks_connection",
-    ],
-)
-def test_get_db_from_connection(
-    fixture_name: str,
-    request: pytest.FixtureRequest,
-):
-    connection: Connection = request.getfixturevalue(fixture_name)
-    database = get_db_from_connection(connection.conn_type, connection)
-    assert database == "test_database"
-
-
 @patch("cosmos.providers.dbt.core.utils.profiles_generator.BaseHook")
 @pytest.mark.parametrize(
     "fixture_name",
@@ -376,30 +419,13 @@ def test_map_profile(
     assert result is not None
 
 
-@patch("cosmos.providers.dbt.core.utils.profiles_generator.BaseHook")
-@pytest.mark.parametrize(
-    "fixture_name",
-    [
-        "postgres_schemaless_connection",
-        "databricks_schemaless_connection",
-    ],
-)
-def test_map_profile_no_schema(
-    p_base_hook: MagicMock, request: pytest.FixtureRequest, fixture_name: str
-):
-    connection: Connection = request.getfixturevalue(fixture_name)
-    p_base_hook.return_value.get_connection.return_value = connection
-    with pytest.raises(SystemExit):
-        map_profile("my_connection")
-
-
-@patch("cosmos.providers.dbt.core.utils.profiles_generator.BaseHook")
-def test_map_profile_no_db(
-    p_base_hook: MagicMock,
-    postgres_schemaless_connection: Connection,
-) -> None:
-    p_base_hook.return_value.get_connection.return_value = (
-        postgres_schemaless_connection
-    )
-    with pytest.raises(SystemExit):
-        map_profile("my_connection", schema_override="jaffle_shop")
+def test_get_available_adapters():
+    """
+    To ensure consistency between the adapters. They should all take the same arguments regardless of whether they are
+    used or not and should all return the same data structure.
+    """
+    adapters = get_available_adapters()
+    for _, adapter_config in adapters.items():
+        function_signature = inspect.signature(adapter_config.create_profile_function)
+        assert len(function_signature.parameters) == 3
+        assert function_signature.return_annotation == typing.Tuple[str, dict]

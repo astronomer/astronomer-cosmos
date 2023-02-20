@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
+from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
@@ -154,7 +156,6 @@ class DbtBaseOperator(BaseOperator):
         return env
 
     def add_global_flags(self):
-
         global_flags = [
             "project_dir",
             "profiles_dir",
@@ -225,7 +226,7 @@ class DbtBaseOperator(BaseOperator):
 
         ## add profile
         if handle_profile:
-            create_default_profiles(self.profiles_dir)
+            create_default_profiles(DBT_PROFILE_PATH if self.profiles_dir is None else Path(self.profiles_dir).joinpath("profiles.yml"))
             profile, profile_vars = map_profile(
                 conn_id=self.conn_id,
                 db_override=self.db_name,

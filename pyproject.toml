@@ -66,6 +66,12 @@ dbt-snowflake = [
     "dbt-snowflake",
 ]
 
+databricks = [
+    "databricks-sql-connector>=2.0.4;python_version>='3.10'",
+    "databricks-cli",
+    "apache-airflow-providers-databricks>=2.2.0"
+]
+
 [project.urls]
 Homepage = "https://github.com/astronomer/astronomer-cosmos"
 Documentation = "https://github.com/astronomer/astronomer-cosmos"
@@ -88,6 +94,7 @@ dependencies = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
+    "sphinx-tabs"
 ]
 
 [tool.hatch.envs.docs.scripts]
@@ -103,3 +110,6 @@ strict = true
 
 [tool.ruff]
 line-length = 120
+
+[tool.distutils.bdist_wheel]
+universal = true

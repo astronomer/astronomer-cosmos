@@ -18,6 +18,7 @@ from airflow.utils.task_group import TaskGroup
 from databricks_cli.jobs.api import JobsApi
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
+from mergedeep import merge
 
 
 def _get_job_by_name(job_name: str, jobs_api: JobsApi) -> dict | None:
@@ -38,6 +39,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     :param max_concurrent_runs: The maximum number of concurrent runs
     :param tasks_to_convert: A list of tasks to convert to a workflow. This list can also
     be populated after initialization by calling add_task.
+    :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow Job definitions.
     """
 
     def __init__(
@@ -48,6 +50,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         existing_clusters: list[str] = None,
         max_concurrent_runs: int = 1,
         tasks_to_convert: list[BaseOperator] = None,
+        extra_job_params: dict[str, Any] = None,
         **kwargs,
     ):
         self.existing_clusters = existing_clusters or []
@@ -58,6 +61,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = None
         self.max_concurrent_runs = max_concurrent_runs
+        self.extra_job_params = extra_job_params
         super().__init__(task_id=task_id, **kwargs)
 
     def add_task(self, task: BaseOperator):
@@ -89,6 +93,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             "job_clusters": self.job_clusters,
             "max_concurrent_runs": self.max_concurrent_runs,
         }
+        full_json = merge(full_json, self.extra_job_params)
         return full_json
 
     @property
@@ -110,7 +115,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             raise AirflowException("Task group must be a DatabricksWorkflowTaskGroup")
         if job_id:
             self.log.info(
-                "Updating exising job with spec %s",
+                "Updating existing job with spec %s",
                 json.dumps(current_job_spec, indent=4),
             )
 
@@ -122,6 +127,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
                 "Creating new job with spec %s", json.dumps(current_job_spec, indent=4)
             )
             job_id = jobs_api.create_job(json=current_job_spec)["job_id"]
+
         run_id = jobs_api.run_now(
             job_id=job_id,
             jar_params=self.task_group.jar_params,
@@ -223,6 +229,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
     in the workflow.
     :param spark_submit_params: A list of spark submit parameters to pass to the workflow. These parameters
         will be passed to all spark submit tasks
+    :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow Job definitions.
     :param max_concurrent_runs: The maximum number of concurrent runs for this workflow.
 
     """
@@ -244,6 +251,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         python_params: list = None,
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
+        extra_job_params: dict = None,
         **kwargs,
     ):
         """
@@ -263,6 +271,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         :param spark_submit_params: A list of spark submit parameters to pass to the workflow.
          These parameters will be passed to all spark submit tasks
         :param max_concurrent_runs: The maximum number of concurrent runs for this workflow.
+        :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow Job definitions.
         """
         self.databricks_conn_id = databricks_conn_id
         self.existing_clusters = existing_clusters or []
@@ -272,6 +281,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         self.spark_submit_params = spark_submit_params or []
         self.jar_params = jar_params or []
         self.max_concurrent_runs = max_concurrent_runs
+        self.extra_job_params = extra_job_params or {}
         super().__init__(**kwargs)
 
     def __exit__(self, _type, _value, _tb):
@@ -284,6 +294,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 databricks_conn_id=self.databricks_conn_id,
                 job_clusters=self.job_clusters,
                 existing_clusters=self.existing_clusters,
+                extra_job_params=self.extra_job_params
             )
         )
 

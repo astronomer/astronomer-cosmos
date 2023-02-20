@@ -226,7 +226,11 @@ class DbtBaseOperator(BaseOperator):
 
         ## add profile
         if handle_profile:
-            create_default_profiles(DBT_PROFILE_PATH if self.profiles_dir is None else Path(self.profiles_dir).joinpath("profiles.yml"))
+            create_default_profiles(
+                DBT_PROFILE_PATH
+                if self.profiles_dir is None
+                else Path(self.profiles_dir).joinpath("profiles.yml")
+            )
             profile, profile_vars = map_profile(
                 conn_id=self.conn_id,
                 db_override=self.db_name,

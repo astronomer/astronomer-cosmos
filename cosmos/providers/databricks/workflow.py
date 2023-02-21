@@ -39,7 +39,8 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     :param max_concurrent_runs: The maximum number of concurrent runs
     :param tasks_to_convert: A list of tasks to convert to a workflow. This list can also
     be populated after initialization by calling add_task.
-    :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow Job definitions.
+    :param extra_job_params: A dictionary containing properties which will override the 
+    default Databricks Workflow Job definitions.
     """
 
     def __init__(
@@ -229,7 +230,8 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
     in the workflow.
     :param spark_submit_params: A list of spark submit parameters to pass to the workflow. These parameters
         will be passed to all spark submit tasks
-    :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow Job definitions.
+    :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow
+    Job definitions.
     :param max_concurrent_runs: The maximum number of concurrent runs for this workflow.
 
     """
@@ -251,7 +253,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         python_params: list = None,
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
-        extra_job_params: dict = None,
+        extra_job_params: dict[str, Any] = None,
         **kwargs,
     ):
         """
@@ -271,7 +273,8 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         :param spark_submit_params: A list of spark submit parameters to pass to the workflow.
          These parameters will be passed to all spark submit tasks
         :param max_concurrent_runs: The maximum number of concurrent runs for this workflow.
-        :param extra_job_params: A dictionary containing properties which will override the default Databricks Workflow Job definitions.
+        :param extra_job_params: A dictionary containing properties which will override the default Databricks
+        Workflow Job definitions.
         """
         self.databricks_conn_id = databricks_conn_id
         self.existing_clusters = existing_clusters or []

@@ -380,3 +380,74 @@ def test_monitor_databricks_job_fail(
     databricks_notebook_operator.databricks_run_id = "1234"
     with pytest.raises(AirflowException):
         databricks_notebook_operator.monitor_databricks_job()
+
+
+@mock.patch("cosmos.providers.databricks.notebook.JobsService")
+@mock.patch(
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_api_client"
+)
+@mock.patch(
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_current_databricks_task"
+)
+def test_repair_task(
+    mock_databricks_task,
+    api_client_mock,
+    jobs_service_mock,
+    databricks_notebook_operator,
+):
+    # Set up mock return values
+    run_id = 1234
+    repair_history_id = 67890
+    databricks_task_id = "adhoc_airflow__notebook"
+    current_job = {"repair_history": {"id": repair_history_id}}
+    jobs_service_mock.return_value.get_run.return_value = current_job
+
+    # Call the function
+    databricks_notebook_operator.databricks_run_id = run_id
+    databricks_notebook_operator._repair_task()
+
+    # Check that the expected API calls were made
+    jobs_service_mock.return_value.get_run.assert_called_once_with(
+        run_id=run_id, include_history=True
+    )
+    jobs_service_mock.return_value.repair.assert_called_once_with(
+        run_id=run_id,
+        version="2.1",
+        latest_repair_id=repair_history_id,
+        rerun_tasks=[databricks_task_id],
+    )
+
+
+@mock.patch("cosmos.providers.databricks.notebook.JobsService")
+@mock.patch(
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_api_client"
+)
+@mock.patch(
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_current_databricks_task"
+)
+def test_repair_task_no_repair_id(
+    mock_databricks_task,
+    api_client_mock,
+    jobs_service_mock,
+    databricks_notebook_operator,
+):
+    # Set up mock return values
+    run_id = 1234
+    databricks_task_id = "adhoc_airflow__notebook"
+    current_job = {"repair_history": {}}
+    jobs_service_mock.return_value.get_run.return_value = current_job
+
+    # Call the function
+    databricks_notebook_operator.databricks_run_id = run_id
+    databricks_notebook_operator._repair_task()
+
+    # Check that the expected API calls were made
+    jobs_service_mock.return_value.get_run.assert_called_once_with(
+        run_id=run_id, include_history=True
+    )
+    jobs_service_mock.return_value.repair.assert_called_once_with(
+        run_id=run_id,
+        version="2.1",
+        latest_repair_id=None,
+        rerun_tasks=[databricks_task_id],
+    )

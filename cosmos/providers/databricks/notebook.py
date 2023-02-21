@@ -9,6 +9,7 @@ from airflow.models.operator import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
+from databricks_cli.sdk import JobsService
 from databricks_cli.sdk.api_client import ApiClient
 
 
@@ -84,8 +85,25 @@ class DatabricksNotebookOperator(BaseOperator):
         self.job_cluster_key = job_cluster_key or ""
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
-
+        kwargs["on_retry_callback"] = self._repair_task
         super().__init__(**kwargs)
+
+    def _repair_task(self):
+        api_client = self._get_api_client()
+        jobs_service = JobsService(api_client)
+        current_job = jobs_service.get_run(
+            run_id=self.databricks_run_id, include_history=True
+        )
+        repair_history = current_job.get("repair_history")
+        repair_history_id = None
+        if repair_history:
+            repair_history_id = repair_history["id"]
+        jobs_service.repair(
+            run_id=self.databricks_run_id,
+            version="2.1",
+            latest_repair_id=repair_history_id,
+            rerun_tasks=[self._get_databricks_task_id()],
+        )
 
     def convert_to_databricks_workflow_task(
         self, relevant_upstreams: list[BaseOperator]
@@ -94,7 +112,7 @@ class DatabricksNotebookOperator(BaseOperator):
         Convert the operator to a Databricks workflow task that can be task in a workflow
         """
         result = {
-            "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
+            "task_key": self._get_databricks_task_id(),
             "depends_on": [
                 {"task_key": self.dag_id + "__" + t.replace(".", "__")}
                 for t in self.upstream_task_ids
@@ -111,6 +129,9 @@ class DatabricksNotebookOperator(BaseOperator):
         }
         return result
 
+    def _get_databricks_task_id(self):
+        return self.dag_id + "__" + self.task_id.replace(".", "__")
+
     def monitor_databricks_job(self):
         """Monitor the Databricks job until it completes. Raises Airflow exception if the job fails."""
         api_client = self._get_api_client()
@@ -125,7 +146,7 @@ class DatabricksNotebookOperator(BaseOperator):
     def _get_current_databricks_task(self, runs_api):
         return {
             x["task_key"]: x for x in runs_api.get_run(self.databricks_run_id)["tasks"]
-        }[self.dag_id + "__" + self.task_id.replace(".", "__")]
+        }[self._get_databricks_task_id()]
 
     def _handle_final_state(self, final_state):
         if final_state.get("life_cycle_state", None) != "TERMINATED":

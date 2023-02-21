@@ -155,14 +155,12 @@ def test_create_workflow_with_arbitrary_extra_job_params(
 
     extra_job_params = {
         "timeout_seconds": 10,  # default: 0
-        "email_notifications": {
-            "no_alert_for_skipped_runs": True  # default: False
-        },
+        "email_notifications": {"no_alert_for_skipped_runs": True},  # default: False
         "git_source": {  # no default value
             "git_url": "https://github.com/astronomer/astronomer-cosmos",
             "git_provider": "gitHub",
-            "git_branch": "main"
-        }
+            "git_branch": "main",
+        },
     }
     with dag:
         task_group = DatabricksWorkflowTaskGroup(
@@ -170,7 +168,7 @@ def test_create_workflow_with_arbitrary_extra_job_params(
             databricks_conn_id="foo",
             job_clusters=[{"job_cluster_key": "foo"}],
             notebook_params=[{"notebook_path": "/foo/bar"}],
-            extra_job_params=extra_job_params
+            extra_job_params=extra_job_params,
         )
         with task_group:
             notebook_with_extra = DatabricksNotebookOperator(
@@ -179,18 +177,23 @@ def test_create_workflow_with_arbitrary_extra_job_params(
                 notebook_path="/foo/bar",
                 source="WORKSPACE",
                 job_cluster_key="foo",
-           )
+            )
             notebook_with_extra
 
     assert len(task_group.children) == 2
 
-    computed_workflow_json = task_group.children["test_workflow.launch"].create_workflow_json()
+    task_group.children["test_workflow.launch"].create_workflow_json()
     task_group.children["test_workflow.launch"].execute(context={})
 
     mock_jobs_api.return_value.reset_job.assert_called_once()
     kwargs = mock_jobs_api.return_value.reset_job.call_args_list[0].kwargs["json"]
 
     assert kwargs["job_id"] == 862519602273592
-    assert kwargs["new_settings"]["email_notifications"] == extra_job_params["email_notifications"]
-    assert kwargs["new_settings"]["timeout_seconds"] == extra_job_params["timeout_seconds"]
+    assert (
+        kwargs["new_settings"]["email_notifications"]
+        == extra_job_params["email_notifications"]
+    )
+    assert (
+        kwargs["new_settings"]["timeout_seconds"] == extra_job_params["timeout_seconds"]
+    )
     assert kwargs["new_settings"]["git_source"] == extra_job_params["git_source"]

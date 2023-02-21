@@ -39,7 +39,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     :param max_concurrent_runs: The maximum number of concurrent runs
     :param tasks_to_convert: A list of tasks to convert to a workflow. This list can also
     be populated after initialization by calling add_task.
-    :param extra_job_params: A dictionary containing properties which will override the 
+    :param extra_job_params: A dictionary containing properties which will override the
     default Databricks Workflow Job definitions.
     """
 
@@ -297,7 +297,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 databricks_conn_id=self.databricks_conn_id,
                 job_clusters=self.job_clusters,
                 existing_clusters=self.existing_clusters,
-                extra_job_params=self.extra_job_params
+                extra_job_params=self.extra_job_params,
             )
         )
 

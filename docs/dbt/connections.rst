@@ -362,7 +362,7 @@ to the desired Cosmos component.
                 conn_id="postgres_default",
             )
 
-Presedence Order of Connection Parameters
+Precedence Order of Connection Parameters
 -----------------------------------------
 The precedence order is: dbt project files > dbt_args on Cosmos Class > Airflow Connection
 

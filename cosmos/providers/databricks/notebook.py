@@ -146,6 +146,7 @@ class DatabricksNotebookOperator(BaseOperator):
         return result
 
     def _get_databricks_task_id(self):
+        """Get the databricks task ID using dag_id and task_id. removes illegal characters."""
         return self.dag_id + "__" + self.task_id.replace(".", "__")
 
     def monitor_databricks_job(self):

@@ -44,7 +44,7 @@ reference the ``base`` tab instructions
 
             # wrap the executable from the venv so that dbt-ol can access it
             RUN echo -e '#!/bin/bash' > /usr/bin/dbt && \
-                echo -e "source /usr/local/airflow/dbt_venv/bin/activate && dbt \$@" >> /usr/bin/dbt
+                echo -e 'source /usr/local/airflow/dbt_venv/bin/activate && dbt "$@"' >> /usr/bin/dbt
 
             # ensure all users have access to the executable
             RUN chmod -R 777 /usr/bin/dbt

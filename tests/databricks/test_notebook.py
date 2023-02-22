@@ -3,8 +3,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from airflow.exceptions import AirflowException
+from airflow.models.taskinstance import TaskInstance
 
-from cosmos.providers.databricks.notebook import DatabricksNotebookOperator
+from cosmos.providers.databricks.notebook import (
+    DatabricksNotebookOperator,
+    _repair_task_retry_callback,
+)
 from cosmos.providers.databricks.workflow import DatabricksWorkflowTaskGroup
 
 
@@ -399,12 +403,13 @@ def test_repair_task(
     run_id = 1234
     repair_history_id = 67890
     databricks_task_id = "adhoc_airflow__notebook"
-    current_job = {"repair_history": {"id": repair_history_id}}
+    current_job = {"repair_history": [{}, {"id": repair_history_id}]}
     jobs_service_mock.return_value.get_run.return_value = current_job
 
     # Call the function
     databricks_notebook_operator.databricks_run_id = run_id
-    databricks_notebook_operator._repair_task()
+    context = {"ti": TaskInstance(task=databricks_notebook_operator)}
+    _repair_task_retry_callback(context)
 
     # Check that the expected API calls were made
     jobs_service_mock.return_value.get_run.assert_called_once_with(
@@ -434,12 +439,13 @@ def test_repair_task_no_repair_id(
     # Set up mock return values
     run_id = 1234
     databricks_task_id = "adhoc_airflow__notebook"
-    current_job = {"repair_history": {}}
+    current_job = {"repair_history": [{}]}
     jobs_service_mock.return_value.get_run.return_value = current_job
 
     # Call the function
     databricks_notebook_operator.databricks_run_id = run_id
-    databricks_notebook_operator._repair_task()
+    context = {"ti": TaskInstance(task=databricks_notebook_operator)}
+    _repair_task_retry_callback(context)
 
     # Check that the expected API calls were made
     jobs_service_mock.return_value.get_run.assert_called_once_with(

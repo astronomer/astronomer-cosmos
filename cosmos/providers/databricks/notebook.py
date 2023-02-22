@@ -13,6 +13,39 @@ from databricks_cli.sdk import JobsService
 from databricks_cli.sdk.api_client import ApiClient
 
 
+def _repair_task_retry_callback(context: Context) -> None:
+    """
+    This function allows the Airflow retry function to create a repair job for Databricks.
+    It uses the Databricks API to get the latest repair ID before sending the repair query.
+
+    Note that we use the `JobsService` class instead of the `RunsApi` class. This is because the
+    `RunsApi` class does not allow sending the `include_history` parameter which is necessary for
+    repair jobs.
+
+    Also for the moment we don't allow custom retry_callbacks. We might implement this in
+    the future if users ask for it, but for the moment we want to keep things simple while the API
+    stabilizes.
+    :return: None
+    """
+    current_task = context["ti"].task
+    api_client = current_task._get_api_client()
+    jobs_service = JobsService(api_client)
+    current_job = jobs_service.get_run(
+        run_id=current_task.databricks_run_id, include_history=True
+    )
+    repair_history = current_job.get("repair_history")
+    repair_history_id = None
+    if repair_history and len(repair_history) > 1:
+        # We use the last item in the array to get the latest repair ID
+        repair_history_id = repair_history[-1]["id"]
+    jobs_service.repair(
+        run_id=current_task.databricks_run_id,
+        version="2.1",
+        latest_repair_id=repair_history_id,
+        rerun_tasks=[current_task._get_databricks_task_id()],
+    )
+
+
 class DatabricksNotebookOperator(BaseOperator):
     """
     Launches a notebook to databricks using an Airflow operator.
@@ -85,25 +118,8 @@ class DatabricksNotebookOperator(BaseOperator):
         self.job_cluster_key = job_cluster_key or ""
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
-        kwargs["on_retry_callback"] = self._repair_task
+        kwargs["on_retry_callback"] = _repair_task_retry_callback
         super().__init__(**kwargs)
-
-    def _repair_task(self):
-        api_client = self._get_api_client()
-        jobs_service = JobsService(api_client)
-        current_job = jobs_service.get_run(
-            run_id=self.databricks_run_id, include_history=True
-        )
-        repair_history = current_job.get("repair_history")
-        repair_history_id = None
-        if repair_history:
-            repair_history_id = repair_history["id"]
-        jobs_service.repair(
-            run_id=self.databricks_run_id,
-            version="2.1",
-            latest_repair_id=repair_history_id,
-            rerun_tasks=[self._get_databricks_task_id()],
-        )
 
     def convert_to_databricks_workflow_task(
         self, relevant_upstreams: list[BaseOperator]

@@ -24,6 +24,17 @@ users can define the individual tasks that make up the workflow. Currently the o
 DatabricksNotebookOperator, but other operators can be used as long as they contain the ``convert_to_databricks_workflow_task``
 function. In the future we plan to support SQL and python functions via the ref:`https://github.com/astronomer/astro-sdk<Astro SDK>`.
 
+Retries
+=======
+
+To retry a task, go to the Airflow UI and click on the "retry" button. This will initiate the task retry.
+Once the task is retried, it will run a repair job using the Databricks "repair" endpoint.
+
+The Databricks only allows one repair at a time. This means that once you retry a task,
+you cannot retry other tasks until that task completes.
+
+In the future we will support "repair all failed tasks" and "repair downstream tasks".
+
 
 Limitations
 ===========

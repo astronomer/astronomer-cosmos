@@ -80,7 +80,7 @@ class DatabricksNotebookOperator(BaseOperator):
         self.notebook_path = notebook_path
         self.source = source
         self.notebook_params = notebook_params or {}
-        self.notebook_packages = self._collate_notebook_packages(notebook_packages)
+        self.notebook_packages = notebook_packages or []
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = ""
         self.job_cluster_key = job_cluster_key or ""
@@ -110,6 +110,9 @@ class DatabricksNotebookOperator(BaseOperator):
         print(self.task_group.notebook_packages)
         print(self.notebook_packages)
         print("Has attribute", hasattr(self.task_group, "notebook_packages"))
+        if hasattr(self.task_group, "notebook_packages"):
+            self.notebook_packages.extend(self.task_group.notebook_packages)
+            print("Post attribute check and extension", self.notebook_packages)
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "depends_on": [

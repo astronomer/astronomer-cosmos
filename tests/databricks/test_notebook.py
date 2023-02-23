@@ -97,7 +97,9 @@ def test_databricks_notebook_operator_with_taskgroup(
             assert notebook.source == "WORKSPACE"
             assert notebook.job_cluster_key == "foo"
             assert notebook.notebook_params == {"foo": "bar"}
-            assert notebook.notebook_packages == [{"nb_index": {"package": "nb_package"}}]
+            assert notebook.notebook_packages == [
+                {"nb_index": {"package": "nb_package"}}
+            ]
     dag.test()
     mock_launch.assert_not_called()
     mock_monitor.assert_called_once()
@@ -135,7 +137,7 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
                 "base_parameters": {"source": "WORKSPACE"},
             },
             "new_cluster": {"foo": "bar"},
-            "libraries": [{"nb_index": {"package": "nb_package"}}]
+            "libraries": [{"nb_index": {"package": "nb_package"}}],
         }
     )
     mock_monitor.assert_called_once()

@@ -14,7 +14,10 @@ expected_workflow_json = {
             "depends_on": [],
             "email_notifications": {},
             "job_cluster_key": "foo",
-            "libraries": [{"nb_index": {"package": "nb_package"}}, {"tg_index": {"package": "tg_package"}}],
+            "libraries": [
+                {"nb_index": {"package": "nb_package"}},
+                {"tg_index": {"package": "tg_package"}},
+            ],
             "notebook_task": {
                 "base_parameters": {},
                 "notebook_path": "/foo/bar",

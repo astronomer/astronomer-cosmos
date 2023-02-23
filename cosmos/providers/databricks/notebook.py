@@ -109,6 +109,7 @@ class DatabricksNotebookOperator(BaseOperator):
         """
         print(self.task_group.notebook_packages)
         print(self.notebook_packages)
+        print("Has attribute", hasattr(self.task_group, "notebook_packages"))
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "depends_on": [

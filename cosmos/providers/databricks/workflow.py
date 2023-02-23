@@ -186,6 +186,13 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
             databricks_conn_id="databricks_conn",
             job_clusters=job_cluster_spec,
             notebook_params=[],
+            notebook_packages=[
+                {
+                    "pypi": {
+                        "package": "simplejson"
+                    }
+                },
+            ]
         )
         with task_group:
             notebook_1 = DatabricksNotebookOperator(
@@ -194,6 +201,13 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 notebook_path="/Users/<user>/Test workflow",
                 source="WORKSPACE",
                 job_cluster_key="Shared_job_cluster",
+                notebook_packages=[
+                    {
+                        "pypi": {
+                            "package": "Faker"
+                        }
+                    }
+                ]
             )
             notebook_2 = DatabricksNotebookOperator(
                 task_id="notebook_2",
@@ -222,6 +236,9 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
     :param job_clusters: A list of job clusters to use for this workflow.
     :param notebook_params: A list of notebook parameters to pass to the workflow.These parameters will be passed to
     all notebook tasks in the workflow.
+    :param notebook_packages: A list of dictionary of Python packages to be installed. Packages defined at the
+    workflow task group level are installed for each of the notebook tasks under it. And packages defined at the
+    notebook task level are installed specific for the notebook task.
     :param jar_params: A list of jar parameters to pass to the workflow. These parameters will be passed to all jar
         tasks
     in the workflow.

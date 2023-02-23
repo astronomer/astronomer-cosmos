@@ -90,10 +90,15 @@ class DatabricksNotebookOperator(BaseOperator):
         super().__init__(**kwargs)
 
     def _collate_notebook_packages(self, notebook_packages: list[dict[str, Any]] = None):
+        print("Getting collated packages")
         collated_notebook_packages = notebook_packages or []
+        print("Pass 1", collated_notebook_packages)
         if hasattr(self.task_group, "notebook_packages"):
+            print("Pass 2")
             task_group_notebook_packages = self.task_group.notebook_packages or []
+            print("task group notebook_packages", task_group_notebook_packages)
             collated_notebook_packages.extend(task_group_notebook_packages)
+            print("Post extending", collated_notebook_packages)
         return collated_notebook_packages
 
     def convert_to_databricks_workflow_task(

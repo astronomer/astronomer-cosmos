@@ -93,6 +93,8 @@ class DatabricksNotebookOperator(BaseOperator):
         """
         Convert the operator to a Databricks workflow task that can be task in a workflow
         """
+        print(self.task_group)
+        print(self.task_group.notebook_packages)
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "depends_on": [

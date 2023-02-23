@@ -250,6 +250,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         job_clusters=None,
         jar_params: dict = None,
         notebook_params: list = None,
+        notebook_packages: list[dict[str, Any]] = None,
         python_params: list = None,
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
@@ -264,6 +265,8 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         :param job_clusters: A list of job clusters to use for this workflow.
         :param notebook_params: A list of notebook parameters to pass to the workflow.These parameters will be passed to
         all notebook tasks in the workflow.
+        :param notebook_packages: A list of dictionary of Python packages to be installed. These packages will be passed
+         to all notebook tasks in the workflow.
         :param jar_params: A list of jar parameters to pass to the workflow.
          These parameters will be passed to all jar tasks
         in the workflow.
@@ -280,6 +283,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         self.existing_clusters = existing_clusters or []
         self.job_clusters = job_clusters or []
         self.notebook_params = notebook_params or []
+        self.notebook_packages = notebook_packages or []
         self.python_params = python_params or []
         self.spark_submit_params = spark_submit_params or []
         self.jar_params = jar_params or []

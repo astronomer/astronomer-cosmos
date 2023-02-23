@@ -31,6 +31,13 @@ class DatabricksNotebookOperator(BaseOperator):
                 databricks_conn_id="databricks_conn",
                 job_clusters=job_cluster_spec,
                 notebook_params=[],
+                notebook_packages=[
+                    {
+                        "pypi": {
+                            "package": "simplejson"
+                        }
+                    },
+                ]
             )
             with task_group:
                 notebook_1 = DatabricksNotebookOperator(
@@ -39,6 +46,13 @@ class DatabricksNotebookOperator(BaseOperator):
                     notebook_path="/Users/daniel@astronomer.io/Test workflow",
                     source="WORKSPACE",
                     job_cluster_key="Shared_job_cluster",
+                    notebook_packages=[
+                        {
+                            "pypi": {
+                                "package": "Faker"
+                            }
+                        }
+                    ]
                 )
                 notebook_2 = DatabricksNotebookOperator(
                     task_id="notebook_2",
@@ -61,6 +75,9 @@ class DatabricksNotebookOperator(BaseOperator):
             https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsCreate
         :param databricks_conn_id: the connection id to use to connect to Databricks
         :param notebook_params: the parameters to pass to the notebook
+        :param notebook_packages: A list of dictionary of Python packages to be installed for the notebook task.
+            These are combined with the notebook_packages defined for the DatabricksWorkflowTaskGroup if present and
+            supplied to the notebook to be installed for the run.
     """
 
     template_fields = ("databricks_run_id",)
@@ -89,30 +106,14 @@ class DatabricksNotebookOperator(BaseOperator):
 
         super().__init__(**kwargs)
 
-    def _collate_notebook_packages(self, notebook_packages: list[dict[str, Any]] = None):
-        print("Getting collated packages")
-        collated_notebook_packages = notebook_packages or []
-        print("Pass 1", collated_notebook_packages)
-        if hasattr(self.task_group, "notebook_packages"):
-            print("Pass 2")
-            task_group_notebook_packages = self.task_group.notebook_packages or []
-            print("task group notebook_packages", task_group_notebook_packages)
-            collated_notebook_packages.extend(task_group_notebook_packages)
-            print("Post extending", collated_notebook_packages)
-        return collated_notebook_packages
-
     def convert_to_databricks_workflow_task(
         self, relevant_upstreams: list[BaseOperator]
     ):
         """
-        Convert the operator to a Databricks workflow task that can be task in a workflow
+        Convert the operator to a Databricks workflow task that can be a task in a workflow
         """
-        print(self.task_group.notebook_packages)
-        print(self.notebook_packages)
-        print("Has attribute", hasattr(self.task_group, "notebook_packages"))
         if hasattr(self.task_group, "notebook_packages"):
             self.notebook_packages.extend(self.task_group.notebook_packages)
-            print("Post attribute check and extension", self.notebook_packages)
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "depends_on": [

@@ -71,6 +71,7 @@ class DatabricksNotebookOperator(BaseOperator):
         source: str,
         databricks_conn_id: str,
         notebook_params: dict | None = None,
+        notebook_packages: list[dict[str, Any]] = None,
         job_cluster_key: str | None = None,
         new_cluster: dict | None = None,
         existing_cluster_id: str | None = None,
@@ -79,6 +80,7 @@ class DatabricksNotebookOperator(BaseOperator):
         self.notebook_path = notebook_path
         self.source = source
         self.notebook_params = notebook_params or {}
+        self.notebook_packages = self._collate_notebook_packages(notebook_packages)
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = ""
         self.job_cluster_key = job_cluster_key or ""
@@ -87,14 +89,21 @@ class DatabricksNotebookOperator(BaseOperator):
 
         super().__init__(**kwargs)
 
+    def _collate_notebook_packages(self, notebook_packages: list[dict[str, Any]] = None):
+        collated_notebook_packages = notebook_packages or []
+        if hasattr(self.task_group, "notebook_packages"):
+            task_group_notebook_packages = self.task_group.notebook_packages or []
+            collated_notebook_packages.extend(task_group_notebook_packages)
+        return collated_notebook_packages
+
     def convert_to_databricks_workflow_task(
         self, relevant_upstreams: list[BaseOperator]
     ):
         """
         Convert the operator to a Databricks workflow task that can be task in a workflow
         """
-        print(self.task_group)
         print(self.task_group.notebook_packages)
+        print(self.notebook_packages)
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "depends_on": [
@@ -110,6 +119,7 @@ class DatabricksNotebookOperator(BaseOperator):
                 "source": self.source,
                 "base_parameters": self.notebook_params,
             },
+            "libraries": self.notebook_packages,
         }
         return result
 

@@ -14,6 +14,7 @@ expected_workflow_json = {
             "depends_on": [],
             "email_notifications": {},
             "job_cluster_key": "foo",
+            "libraries": [{"nb_index": {"package": "nb_package"}}, {"tg_index": {"package": "tg_package"}}],
             "notebook_task": {
                 "base_parameters": {},
                 "notebook_path": "/foo/bar",
@@ -26,6 +27,7 @@ expected_workflow_json = {
             "depends_on": [{"task_key": "unit_test_dag__test_workflow__notebook_1"}],
             "email_notifications": {},
             "job_cluster_key": "foo",
+            "libraries": [{"tg_index": {"package": "tg_package"}}],
             "notebook_task": {
                 "base_parameters": {"foo": "bar"},
                 "notebook_path": "/foo/bar",
@@ -52,12 +54,14 @@ def test_create_workflow_from_notebooks_with_create(
             databricks_conn_id="foo",
             job_clusters=[{"job_cluster_key": "foo"}],
             notebook_params=[{"notebook_path": "/foo/bar"}],
+            notebook_packages=[{"tg_index": {"package": "tg_package"}}],
         )
         with task_group:
             notebook_1 = DatabricksNotebookOperator(
                 task_id="notebook_1",
                 databricks_conn_id="foo",
                 notebook_path="/foo/bar",
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
                 source="WORKSPACE",
                 job_cluster_key="foo",
             )
@@ -74,10 +78,6 @@ def test_create_workflow_from_notebooks_with_create(
             notebook_1 >> notebook_2
 
     assert len(task_group.children) == 3
-    assert (
-        task_group.children["test_workflow.launch"].create_workflow_json()
-        == expected_workflow_json
-    )
     task_group.children["test_workflow.launch"].execute(context={})
     mock_jobs_api.return_value.create_job.assert_called_once_with(
         json=expected_workflow_json,
@@ -105,12 +105,14 @@ def test_create_workflow_from_notebooks_existing_job(
             databricks_conn_id="foo",
             job_clusters=[{"job_cluster_key": "foo"}],
             notebook_params=[{"notebook_path": "/foo/bar"}],
+            notebook_packages=[{"tg_index": {"package": "tg_package"}}],
         )
         with task_group:
             notebook_1 = DatabricksNotebookOperator(
                 task_id="notebook_1",
                 databricks_conn_id="foo",
                 notebook_path="/foo/bar",
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
                 source="WORKSPACE",
                 job_cluster_key="foo",
             )
@@ -127,10 +129,6 @@ def test_create_workflow_from_notebooks_existing_job(
             notebook_1 >> notebook_2
 
     assert len(task_group.children) == 3
-    assert (
-        task_group.children["test_workflow.launch"].create_workflow_json()
-        == expected_workflow_json
-    )
     task_group.children["test_workflow.launch"].execute(context={})
     mock_jobs_api.return_value.reset_job.assert_called_once_with(
         json={"job_id": 1, "new_settings": expected_workflow_json},

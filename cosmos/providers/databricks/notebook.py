@@ -195,6 +195,7 @@ class DatabricksNotebookOperator(BaseOperator):
                 "notebook_path": self.notebook_path,
                 "base_parameters": {"source": self.source},
             },
+            "libraries": self.notebook_packages,
         }
         if self.new_cluster and self.existing_cluster_id:
             raise ValueError(

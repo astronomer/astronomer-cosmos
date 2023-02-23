@@ -24,6 +24,7 @@ def databricks_notebook_operator():
         notebook_params={
             "foo": "bar",
         },
+        notebook_packages=[{"nb_index": {"package": "nb_package"}}],
     )
 
 
@@ -44,6 +45,7 @@ def test_databricks_notebook_operator_without_taskgroup(mock_monitor, mock_launc
             notebook_params={
                 "foo": "bar",
             },
+            notebook_packages=[{"nb_index": {"package": "nb_package"}}],
         )
         assert notebook.task_id == "notebook"
         assert notebook.databricks_conn_id == "foo"
@@ -51,6 +53,7 @@ def test_databricks_notebook_operator_without_taskgroup(mock_monitor, mock_launc
         assert notebook.source == "WORKSPACE"
         assert notebook.job_cluster_key == "foo"
         assert notebook.notebook_params == {"foo": "bar"}
+        assert notebook.notebook_packages == [{"nb_index": {"package": "nb_package"}}]
     dag.test()
     mock_launch.assert_called_once()
     mock_monitor.assert_called_once()
@@ -86,6 +89,7 @@ def test_databricks_notebook_operator_with_taskgroup(
                 notebook_params={
                     "foo": "bar",
                 },
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             )
             assert notebook.task_id == "test_workflow.notebook"
             assert notebook.databricks_conn_id == "foo"
@@ -93,6 +97,7 @@ def test_databricks_notebook_operator_with_taskgroup(
             assert notebook.source == "WORKSPACE"
             assert notebook.job_cluster_key == "foo"
             assert notebook.notebook_params == {"foo": "bar"}
+            assert notebook.notebook_packages == [{"nb_index": {"package": "nb_package"}}]
     dag.test()
     mock_launch.assert_not_called()
     mock_monitor.assert_called_once()
@@ -119,6 +124,7 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
             notebook_params={
                 "foo": "bar",
             },
+            notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             new_cluster={"foo": "bar"},
         )
     dag.test()
@@ -129,6 +135,7 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
                 "base_parameters": {"source": "WORKSPACE"},
             },
             "new_cluster": {"foo": "bar"},
+            "libraries": [{"nb_index": {"package": "nb_package"}}]
         }
     )
     mock_monitor.assert_called_once()
@@ -155,6 +162,7 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster(
             notebook_params={
                 "foo": "bar",
             },
+            notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             existing_cluster_id="123",
         )
     dag.test()
@@ -165,6 +173,7 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster(
                 "base_parameters": {"source": "WORKSPACE"},
             },
             "existing_cluster_id": "123",
+            "libraries": [{"nb_index": {"package": "nb_package"}}],
         }
     )
     mock_monitor.assert_called_once()
@@ -191,6 +200,7 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster_and_new
                 notebook_params={
                     "foo": "bar",
                 },
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
                 existing_cluster_id="123",
                 new_cluster={"foo": "bar"},
             )
@@ -218,6 +228,7 @@ def test_databricks_notebook_operator_without_taskgroup_no_cluster(
                 notebook_params={
                     "foo": "bar",
                 },
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             )
         dag.test()
 

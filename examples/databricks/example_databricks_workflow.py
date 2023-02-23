@@ -54,25 +54,15 @@ with dag:
         job_clusters=job_cluster_spec,
         notebook_params=[],
         notebook_packages=[
-            {
-                "pypi": {
-                    "package": "simplejson"
-                }
-            },
-        ]
+            {"pypi": {"package": "simplejson"}},
+        ],
     )
     with task_group:
         notebook_1 = DatabricksNotebookOperator(
             task_id="notebook_1",
             databricks_conn_id=DATABRICKS_CONN_ID,
             notebook_path="/Users/pankaj.koti@astronomer.io/Notebook1",
-            notebook_packages=[
-                {
-                    "pypi": {
-                        "package": "Faker"
-                    }
-                }
-            ],
+            notebook_packages=[{"pypi": {"package": "Faker"}}],
             source="WORKSPACE",
             job_cluster_key="Shared_job_cluster",
         )

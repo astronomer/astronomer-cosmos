@@ -61,7 +61,7 @@ with dag:
         notebook_1 = DatabricksNotebookOperator(
             task_id="notebook_1",
             databricks_conn_id=DATABRICKS_CONN_ID,
-            notebook_path="/Users/pankaj.koti@astronomer.io/Notebook1",
+            notebook_path="/Shared/Notebook_1",
             notebook_packages=[{"pypi": {"package": "Faker"}}],
             source="WORKSPACE",
             job_cluster_key="Shared_job_cluster",
@@ -69,7 +69,7 @@ with dag:
         notebook_2 = DatabricksNotebookOperator(
             task_id="notebook_2",
             databricks_conn_id=DATABRICKS_CONN_ID,
-            notebook_path="/Users/pankaj.koti@astronomer.io/Notebook2",
+            notebook_path="/Shared/Notebook_2",
             source="WORKSPACE",
             job_cluster_key="Shared_job_cluster",
             notebook_params={

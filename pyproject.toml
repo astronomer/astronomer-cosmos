@@ -67,7 +67,8 @@ dbt-snowflake = [
 databricks = [
     "databricks-sql-connector>=2.0.4;python_version>='3.10'",
     "databricks-cli",
-    "apache-airflow-providers-databricks>=2.2.0"
+    "apache-airflow-providers-databricks>=2.2.0",
+    "mergedeep"
 ]
 
 [project.urls]

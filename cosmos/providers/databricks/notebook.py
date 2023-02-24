@@ -31,13 +31,6 @@ class DatabricksNotebookOperator(BaseOperator):
                 databricks_conn_id="databricks_conn",
                 job_clusters=job_cluster_spec,
                 notebook_params=[],
-                notebook_packages=[
-                    {
-                        "pypi": {
-                            "package": "simplejson"
-                        }
-                    },
-                ]
             )
             with task_group:
                 notebook_1 = DatabricksNotebookOperator(
@@ -46,13 +39,6 @@ class DatabricksNotebookOperator(BaseOperator):
                     notebook_path="/Users/daniel@astronomer.io/Test workflow",
                     source="WORKSPACE",
                     job_cluster_key="Shared_job_cluster",
-                    notebook_packages=[
-                        {
-                            "pypi": {
-                                "package": "Faker"
-                            }
-                        }
-                    ]
                 )
                 notebook_2 = DatabricksNotebookOperator(
                     task_id="notebook_2",
@@ -75,9 +61,6 @@ class DatabricksNotebookOperator(BaseOperator):
             https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsCreate
         :param databricks_conn_id: the connection id to use to connect to Databricks
         :param notebook_params: the parameters to pass to the notebook
-        :param notebook_packages: A list of dictionary of Python packages to be installed for the notebook task.
-            These are combined with the notebook_packages defined for the DatabricksWorkflowTaskGroup if present and
-            supplied to the notebook to be installed for the run.
     """
 
     template_fields = ("databricks_run_id",)

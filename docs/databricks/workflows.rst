@@ -18,12 +18,16 @@ An example of how to use the DatabricksWorkflowTaskGroup can be seen in the foll
     :start-after: [START howto_databricks_workflow_notebook]
     :end-before: [END howto_databricks_workflow_notebook]
 
-At the top-level Taskgroup definition, users can define workflow-level parameters such as ``notebook_params`` or
-``spark_submit_params``. These parameters will be applied to all tasks within the Workflow. Inside of the taskgroup,
-users can define the individual tasks that make up the workflow. Currently the only officially supported operator is the
-DatabricksNotebookOperator, but other operators can be used as long as they contain the ``convert_to_databricks_workflow_task``
-function. In the future we plan to support SQL and python functions via the ref:`https://github.com/astronomer/astro-sdk<Astro SDK>`.
+At the top-level Taskgroup definition, users can define workflow-level parameters such as ``notebook_params``,
+``notebook_packages`` or ``spark_submit_params``. These parameters will be applied to all tasks within the Workflow.
+Inside of the taskgroup, users can define the individual tasks that make up the workflow. Currently the only officially
+supported operator is the DatabricksNotebookOperator, but other operators can be used as long as they contain the
+``convert_to_databricks_workflow_task`` function. In the future we plan to support SQL and python functions via the
+ref:`https://github.com/astronomer/astro-sdk<Astro SDK>`.
 
+For each notebook task, packages defined with the ``notebook_packages`` parameter defined at the task level are
+installed and additionally, all the packages supplied via the workflow-level parameter ``notebook_packages`` are also
+installed for its run.
 
 Limitations
 ===========

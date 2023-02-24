@@ -27,7 +27,10 @@ ref:`https://github.com/astronomer/astro-sdk<Astro SDK>`.
 
 For each notebook task, packages defined with the ``notebook_packages`` parameter defined at the task level are
 installed and additionally, all the packages supplied via the workflow-level parameter ``notebook_packages`` are also
-installed for its run.
+installed for its run. The collated ``notebook_packages`` list type parameter is transformed into the ``libraries`` list
+type parameter accepted by the Databricks API and a list of supported library types and their format for the API
+specification is mentioned at the Databricks documentation:
+https://docs.databricks.com/dev-tools/api/latest/libraries.html#managedlibrarieslibrary
 
 Limitations
 ===========

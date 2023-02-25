@@ -7,11 +7,12 @@ from typing import Any
 from airflow.exceptions import AirflowException
 from airflow.models.operator import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
-from cosmos.providers.databricks.workflow import DatabricksMetaData
 from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk import JobsService
 from databricks_cli.sdk.api_client import ApiClient
+
+from cosmos.providers.databricks.workflow import DatabricksMetaData
 
 
 def _repair_task_retry_callback(context: Context) -> None:

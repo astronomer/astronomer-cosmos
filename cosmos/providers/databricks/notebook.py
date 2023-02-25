@@ -179,6 +179,7 @@ class DatabricksNotebookOperator(BaseOperator):
         """Launch the notebook as a one-time job to Databricks."""
         api_client = self._get_api_client()
         run_json = {
+            "run_name": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "notebook_task": {
                 "notebook_path": self.notebook_path,
                 "base_parameters": {"source": self.source},

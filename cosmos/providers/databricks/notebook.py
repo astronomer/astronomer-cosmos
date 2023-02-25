@@ -128,6 +128,7 @@ class DatabricksNotebookOperator(BaseOperator):
         self._handle_final_state(final_state)
 
     def _get_current_databricks_task(self, runs_api):
+        print(self.databricks_run_id, runs_api.get_run(self.databricks_run_id))
         return {
             x["task_key"]: x for x in runs_api.get_run(self.databricks_run_id)["tasks"]
         }[self.dag_id + "__" + self.task_id.replace(".", "__")]
@@ -193,7 +194,7 @@ class DatabricksNotebookOperator(BaseOperator):
         runs_api = RunsApi(api_client)
         run = runs_api.submit_run(run_json)
         self.databricks_run_id = run["run_id"]
-        print(run)
+        print(run, self.databricks_run_id)
         return run
 
     def execute(self, context: Context) -> Any:

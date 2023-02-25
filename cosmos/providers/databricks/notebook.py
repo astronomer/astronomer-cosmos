@@ -128,9 +128,13 @@ class DatabricksNotebookOperator(BaseOperator):
         self._handle_final_state(final_state)
 
     def _get_current_databricks_task(self, runs_api):
-        print(self.databricks_run_id, runs_api.get_run(self.databricks_run_id))
+        print(
+            self.databricks_run_id,
+            runs_api.get_run(self.databricks_run_id, version="2.1"),
+        )
         return {
-            x["task_key"]: x for x in runs_api.get_run(self.databricks_run_id)["tasks"]
+            x["task_key"]: x
+            for x in runs_api.get_run(self.databricks_run_id, version="2.1")["tasks"]
         }[self.dag_id + "__" + self.task_id.replace(".", "__")]
 
     def _handle_final_state(self, final_state):

@@ -10,16 +10,74 @@ import json
 import time
 from typing import Any
 
+from airflow.plugins_manager import AirflowPlugin
 from airflow.exceptions import AirflowException
-from airflow.models.operator import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.utils.context import Context
 from airflow.utils.task_group import TaskGroup
 from databricks_cli.jobs.api import JobsApi
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
+from airflow.models.taskinstance import TaskInstanceKey, TaskInstance
+from airflow.models import BaseOperator, BaseOperatorLink
+from flask import Blueprint
+from airflow.www.views import AirflowBaseView, dag_edges
+from flask_appbuilder.api import expose
+from airflow.www.auth import has_access
+from airflow.security import permissions
+from flask import request
+from flask import redirect
+from flask import flash
+from airflow.utils.session import provide_session, create_session
 from mergedeep import merge
+from databricks_cli.sdk import JobsService
+from airflow.utils.airflow_flask_app import get_airflow_app
+from airflow.models.xcom import XCom
 
+def _repair_task(databricks_conn_id, databricks_run_id) -> None:
+    """
+    This function allows the Airflow retry function to create a repair job for Databricks.
+    It uses the Databricks API to get the latest repair ID before sending the repair query.
+
+    Note that we use the `JobsService` class instead of the `RunsApi` class. This is because the
+    `RunsApi` class does not allow sending the `include_history` parameter which is necessary for
+    repair jobs.
+
+    Also for the moment we don't allow custom retry_callbacks. We might implement this in
+    the future if users ask for it, but for the moment we want to keep things simple while the API
+    stabilizes.
+    :return: None
+    """
+    def _get_api_client():
+        hook = DatabricksHook(databricks_conn_id)
+        databricks_conn = hook.get_conn()
+        return ApiClient(
+            user=databricks_conn.login,
+            password=databricks_conn.password,
+            host=databricks_conn.host,
+        )
+
+    print("getting api client")
+    api_client = _get_api_client()
+    print("got api client")
+    jobs_service = JobsService(api_client)
+    current_job = jobs_service.get_run(
+        run_id=databricks_run_id, include_history=True
+    )
+    print(f"got current job {current_job}")
+    repair_history = current_job.get("repair_history")
+    repair_history_id = None
+    if repair_history and len(repair_history) > 1:
+        # We use the last item in the array to get the latest repair ID
+        repair_history_id = repair_history[-1]["id"]
+        print(f"got repair history id {repair_history_id}")
+    print("sending repair request")
+    return jobs_service.repair(
+        run_id=databricks_run_id,
+        version="2.1",
+        latest_repair_id=repair_history_id,
+        # rerun_tasks=[current_task._get_databricks_task_id()],
+    )
 
 def _get_job_by_name(job_name: str, jobs_api: JobsApi) -> dict | None:
     jobs = jobs_api.list_jobs().get("jobs", [])
@@ -28,6 +86,88 @@ def _get_job_by_name(job_name: str, jobs_api: JobsApi) -> dict | None:
             return job
     return None
 
+class DatabricksJobRunLinkLocal(BaseOperatorLink):
+    """Constructs a link to monitor a Databricks Job Run."""
+
+    name = "See Databricks Job Run"
+
+    def get_link(
+        self,
+        operator: BaseOperator,
+        dttm=None,
+        *,
+        ti_key: TaskInstanceKey | None = None,
+    ) -> str:
+        return f"/foo/bar?dag_id={operator.dag_id}&task_id={operator.task_id}"
+
+class DatabricksJobRepairLink(BaseOperatorLink):
+    """Constructs a link to monitor a Databricks Job Run."""
+
+    name = "Repair All Failed Tasks"
+
+    def get_link(
+        self,
+        operator,
+        dttm=None,
+        *,
+        ti_key: TaskInstanceKey | None = None,
+    ) -> str:
+        dag = get_airflow_app().dag_bag.get_dag(ti_key.dag_id)
+        task = dag.get_task(ti_key.task_id)
+        metadata = XCom.get_many(task_id=ti_key.task_id, dag_id=ti_key.dag_id, run_id=ti_key.run_id)
+        print(f"metadata: {metadata}")
+        return f"/foo/bar?dag_id={ti_key.dag_id}&databricks_conn_id={task.databricks_conn_id}&databricks_run_id={task.databricks_run_id}"
+
+
+
+    @provide_session
+    def get_ti(self, ti_key: TaskInstanceKey, session=None) -> TaskInstance:
+        return session.query(TaskInstance).where(TaskInstance.filter_for_tis([ti_key])).one()
+
+bp = Blueprint(
+    "test_plugin",
+    __name__,
+    template_folder="templates",  # registers airflow/plugins/templates as a Jinja template folder
+    static_url_path="/dags/<string:dag_id>/graph",
+)
+
+
+class DagGraphView(AirflowBaseView):
+    default_view = "test"
+    @expose("/foo/bar", methods=["GET"])
+    @has_access(
+        [
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
+        ]
+    )
+    @provide_session
+    def test(self, session=None):
+        databricks_conn_id = request.values.get("databricks_conn_id")
+        databricks_run_id = request.values.get("databricks_run_id")
+        dag_id = request.values.get("dag_id")
+        res = _repair_task(databricks_conn_id=databricks_conn_id, databricks_run_id=databricks_run_id)
+        flash("Databricks repair job is starting!: " + res)
+        return redirect(f"/dags/{dag_id}/grid")
+
+v_appbuilder_view = DagGraphView()
+
+v_appbuilder_package = {
+    "name": "Test View",
+    "category": "Test Plugin",
+    "view": v_appbuilder_view,
+}
+
+class MyAirflowPlugin(AirflowPlugin):
+    name = "my_namespace"
+    operator_extra_links = [DatabricksJobRepairLink(), DatabricksJobRunLinkLocal()]
+    flask_blueprints = [bp]
+    appbuilder_views = [v_appbuilder_package]
+
+from attrs import define
+@define
+class DatabricksMetaData():
+    databricks_conn_id: str
+    databricks_run_id: str
 
 class _CreateDatabricksWorkflowOperator(BaseOperator):
     """Creates a databricks workflow from a DatabricksWorkflowTaskGroup.
@@ -42,6 +182,10 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     :param extra_job_params: A dictionary containing properties which will override the
     default Databricks Workflow Job definitions.
     """
+
+    operator_extra_links = (DatabricksJobRunLinkLocal(),DatabricksJobRepairLink())
+    databricks_conn_id: str
+    databricks_run_id: str
 
     def __init__(
         self,
@@ -141,7 +285,8 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         while runs_api.get_run(run_id)["state"]["life_cycle_state"] == "PENDING":
             print("job pending")
             time.sleep(5)
-        return run_id
+        self.databricks_run_id = run_id
+        return DatabricksMetaData(databricks_conn_id=self.databricks_conn_id, databricks_run_id=run_id)
 
 
 class DatabricksWorkflowTaskGroup(TaskGroup):
@@ -317,7 +462,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
             if task_id != f"{self.group_id}.launch":
                 create_databricks_workflow_task.relevant_upstreams.append(task_id)
                 create_databricks_workflow_task.add_task(task)
-                task.databricks_run_id = create_databricks_workflow_task.output
+                task.databricks_metadata = create_databricks_workflow_task.output
 
         create_databricks_workflow_task.set_downstream(roots)
         super().__exit__(_type, _value, _tb)

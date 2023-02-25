@@ -7,6 +7,7 @@ from typing import Any
 from airflow.exceptions import AirflowException
 from airflow.models.operator import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
+from cosmos.providers.databricks.workflow import DatabricksMetaData
 from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk import JobsService
@@ -97,7 +98,7 @@ class DatabricksNotebookOperator(BaseOperator):
         :param notebook_params: the parameters to pass to the notebook
     """
 
-    template_fields = ("databricks_run_id",)
+    template_fields = ("databricks_metadata",)
 
     def __init__(
         self,
@@ -114,11 +115,11 @@ class DatabricksNotebookOperator(BaseOperator):
         self.source = source
         self.notebook_params = notebook_params or {}
         self.databricks_conn_id = databricks_conn_id
-        self.databricks_run_id = ""
+        self.databricks_metadata: DatabricksMetaData | None = None
         self.job_cluster_key = job_cluster_key or ""
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
-        kwargs["on_retry_callback"] = _repair_task_retry_callback
+        # kwargs["on_retry_callback"] = _repair_task_retry_callback
         super().__init__(**kwargs)
 
     def convert_to_databricks_workflow_task(
@@ -243,4 +244,7 @@ class DatabricksNotebookOperator(BaseOperator):
             and getattr(self.task_group, "is_databricks")
         ):
             self.launch_notebook_job()
+        else:
+            self.databricks_run_id = self.databricks_metadata.databricks_run_id
+            self.databricks_conn_id = self.databricks_metadata.databricks_conn_id
         self.monitor_databricks_job()

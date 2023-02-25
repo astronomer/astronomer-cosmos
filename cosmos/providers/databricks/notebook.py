@@ -193,6 +193,7 @@ class DatabricksNotebookOperator(BaseOperator):
         runs_api = RunsApi(api_client)
         run = runs_api.submit_run(run_json)
         self.databricks_run_id = run["run_id"]
+        print(run)
         return run
 
     def execute(self, context: Context) -> Any:

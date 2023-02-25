@@ -11,6 +11,8 @@ from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
 
+from cosmos.providers.databricks.constants import JOBS_API_VERSION
+
 
 class DatabricksNotebookOperator(BaseOperator):
     """
@@ -128,13 +130,11 @@ class DatabricksNotebookOperator(BaseOperator):
         self._handle_final_state(final_state)
 
     def _get_current_databricks_task(self, runs_api):
-        print(
-            self.databricks_run_id,
-            runs_api.get_run(self.databricks_run_id, version="2.1"),
-        )
         return {
             x["task_key"]: x
-            for x in runs_api.get_run(self.databricks_run_id, version="2.1")["tasks"]
+            for x in runs_api.get_run(self.databricks_run_id, version=JOBS_API_VERSION)[
+                "tasks"
+            ]
         }[self.dag_id + "__" + self.task_id.replace(".", "__")]
 
     def _handle_final_state(self, final_state):
@@ -199,7 +199,6 @@ class DatabricksNotebookOperator(BaseOperator):
         runs_api = RunsApi(api_client)
         run = runs_api.submit_run(run_json)
         self.databricks_run_id = run["run_id"]
-        print(run, self.databricks_run_id)
         return run
 
     def execute(self, context: Context) -> Any:

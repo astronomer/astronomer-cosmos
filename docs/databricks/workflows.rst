@@ -32,6 +32,11 @@ type parameter accepted by the Databricks API and a list of supported library ty
 specification is mentioned at the Databricks documentation:
 https://docs.databricks.com/dev-tools/api/latest/libraries.html#managedlibrarieslibrary
 
+.. warning::
+    Make sure that you do not specify duplicate libraries across workflow-level and task-level ``notebook-packages`` as
+    the Databricks task will then fail complaining about duplicate installation of the library.
+
+
 Limitations
 ===========
 The DatabricksWorkflowTaskGroup is currently in beta and has the following limitations:

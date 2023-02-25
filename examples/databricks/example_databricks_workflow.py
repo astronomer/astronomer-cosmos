@@ -54,7 +54,12 @@ with dag:
         job_clusters=job_cluster_spec,
         notebook_params=[],
         notebook_packages=[
-            {"pypi": {"package": "simplejson"}},
+            {
+                "pypi": {
+                    "package": "simplejson==3.18.0",  # Pin specification version of a package like this.
+                    "repo": "https://pypi.org/simple",  # You can specify your required Pypi index here.
+                }
+            },
         ],
     )
     with task_group:

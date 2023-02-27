@@ -2,3 +2,7 @@
 	path = examples
 	url = https://github.com/astronomer/cosmos-dev.git
 	branch = base-example
+[submodule "astro_tests"]
+	path = astro_tests
+	url = https://github.com/astronomer/cosmos-dev.git
+	branch = astro-tests

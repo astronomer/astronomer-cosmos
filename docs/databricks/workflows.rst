@@ -12,7 +12,7 @@ The DatabricksWorkflowTaskGroup is designed to look and function like a standard
 with the added ability to include specific Databricks arguments.
 An example of how to use the DatabricksWorkflowTaskGroup can be seen in the following code snippet:
 
-.. exampleinclude:: /../astronomer/providers/databricks/example_dags/example_databricks_workflow.py
+.. literalinclude:: /../examples/databricks/example_databricks_workflow.py
     :language: python
     :dedent: 4
     :start-after: [START howto_databricks_workflow_notebook]

@@ -9,7 +9,10 @@ from cosmos.providers.databricks.notebook import (
     DatabricksNotebookOperator,
     _repair_task_retry_callback,
 )
-from cosmos.providers.databricks.workflow import DatabricksWorkflowTaskGroup
+from cosmos.providers.databricks.workflow import (
+    DatabricksMetaData,
+    DatabricksWorkflowTaskGroup,
+)
 
 
 @pytest.fixture
@@ -72,7 +75,11 @@ def test_databricks_notebook_operator_without_taskgroup(mock_monitor, mock_launc
 def test_databricks_notebook_operator_with_taskgroup(
     mock_create, mock_monitor, mock_launch, dag
 ):
-    mock_create.return_value = {"job_id": 1}
+    mock_create.return_value = DatabricksMetaData(
+        databricks_job_id="job_id",
+        databricks_conn_id="conn_id",
+        databricks_run_id="run_id",
+    )
     with dag:
         task_group = DatabricksWorkflowTaskGroup(
             group_id="test_workflow",

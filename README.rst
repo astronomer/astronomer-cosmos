@@ -5,7 +5,7 @@
     :target: https://badge.fury.io/py/astronomer-cosmos
 
 .. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
-    :target: https://ossrank.com/shield/2121
+    :target: https://ossrank.com/p/2121-astronomer-cosmos
 
 .. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos.svg
     :target: https://img.shields.io/pypi/dm/astronomer-cosmos

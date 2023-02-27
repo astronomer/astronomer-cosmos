@@ -114,4 +114,4 @@ line-length = 120
 universal = true
 
 [project.entry-points."airflow.plugins"]
-my_plugin = "cosmos.providers.databricks.workflow:MyAirflowPlugin"
+my_plugin = "cosmos.providers.databricks.plugin:CosmosDatabricksPlugin"

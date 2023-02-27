@@ -201,7 +201,7 @@ class DatabricksNotebookOperator(BaseOperator):
         databricks_conn = hook.get_conn()
         return ApiClient(
             user=databricks_conn.login,
-            password=databricks_conn.password,
+            token=databricks_conn.password,
             host=databricks_conn.host,
         )
 

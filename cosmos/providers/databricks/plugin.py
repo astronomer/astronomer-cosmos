@@ -110,6 +110,17 @@ class DatabricksJobRunLink(BaseOperatorLink):
         *,
         ti_key: TaskInstanceKey | None = None,
     ) -> str:
+        dag = get_airflow_app().dag_bag.get_dag(ti_key.dag_id)
+        dag.get_task(ti_key.task_id)
+        # Should we catch the exception here if there is no return value?
+        metadata = XCom.get_one(
+            task_id=ti_key.task_id,
+            dag_id=ti_key.dag_id,
+            run_id=ti_key.run_id,
+            key="return_value",
+        )
+        hook = DatabricksHook(metadata.databricks_conn_id)
+        return f"https://{hook.host}/#job/{metadata.databricks_job_id}/run/{metadata.databricks_run_id}"
         return f"/foo/bar?dag_id={operator.dag_id}&task_id={operator.task_id}"
 
 
@@ -125,8 +136,6 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink):
         *,
         ti_key: TaskInstanceKey | None = None,
     ) -> str:
-        dag = get_airflow_app().dag_bag.get_dag(ti_key.dag_id)
-        task = dag.get_task(ti_key.task_id)
         # Should we catch the exception here if there is no return value?
         metadata = XCom.get_one(
             task_id=ti_key.task_id,
@@ -135,19 +144,7 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink):
             key="return_value",
         )
 
-        dr = self.get_dagrun(dag, ti_key.run_id)
-
-        failed_and_skipped_tasks = self._get_failed_and_skipped_tasks(dr)
-        print(f"Failed tasks = {failed_and_skipped_tasks}")
-
-        tasks_to_run = {
-            ti: t
-            for ti, t in task.task_group.children.items()
-            if ti in failed_and_skipped_tasks
-        }
-        tasks_str = ",".join(
-            get_databricks_task_ids(task.task_group.group_id, tasks_to_run)
-        )
+        tasks_str = self.get_tasks_to_run(ti_key, operator)
         print(f"tasks to rerun {tasks_str}")
         return (
             f"/repair_databricks_job?dag_id={ti_key.dag_id}&"
@@ -155,6 +152,20 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink):
             f"databricks_run_id={metadata.databricks_run_id}&"
             f"tasks_to_repair={tasks_str}"
         )
+
+    def get_tasks_to_run(self, ti_key: TaskInstanceKey, operator: BaseOperator) -> str:
+        dag = get_airflow_app().dag_bag.get_dag(ti_key.dag_id)
+        dr = self.get_dagrun(dag, ti_key.run_id)
+        failed_and_skipped_tasks = self._get_failed_and_skipped_tasks(dr)
+        tasks_to_run = {
+            ti: t
+            for ti, t in operator.task_group.children.items()
+            if ti in failed_and_skipped_tasks
+        }
+        tasks_str = ",".join(
+            get_databricks_task_ids(operator.task_group.group_id, tasks_to_run)
+        )
+        return tasks_str
 
     def _get_failed_and_skipped_tasks(self, dr: DagRun):
         """

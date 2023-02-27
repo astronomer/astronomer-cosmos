@@ -31,6 +31,7 @@ from cosmos.providers.databricks.plugin import (
 class DatabricksMetaData:
     databricks_conn_id: str
     databricks_run_id: str
+    databricks_job_id: str
 
 
 def _get_job_by_name(job_name: str, jobs_api: JobsApi) -> dict | None:
@@ -58,6 +59,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     operator_extra_links = (DatabricksJobRunLink(), DatabricksJobRepairAllFailedLink())
     databricks_conn_id: str
     databricks_run_id: str
+    databricks_job_id: str
 
     def __init__(
         self,
@@ -159,7 +161,9 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             time.sleep(5)
         self.databricks_run_id = run_id
         return DatabricksMetaData(
-            databricks_conn_id=self.databricks_conn_id, databricks_run_id=run_id
+            databricks_conn_id=self.databricks_conn_id,
+            databricks_run_id=run_id,
+            databricks_job_id=job_id,
         )
 
 

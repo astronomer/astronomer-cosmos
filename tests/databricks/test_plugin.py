@@ -1,4 +1,3 @@
-import unittest
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -6,7 +5,6 @@ import pytest
 from airflow import DAG
 from airflow.models.dagrun import DagRun
 from airflow.models.taskinstance import TaskInstanceKey
-from airflow.models.xcom import XCom
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.dates import days_ago
 
@@ -52,37 +50,6 @@ def test_databricks_job_run_link(mock_hook, mock_xcom, mock_get_airflow_app):
 
     expected_result = "https://test_host/#job/test_job/run/test_run"
     assert result == expected_result
-
-
-def test_get_link(self):
-    # Mock XCom.get_one
-    with unittest.mock.patch.object(XCom, "get_one", self.mock_xcom_get_one):
-        # Test with no tasks to repair
-        expected_link = (
-            "/repair_databricks_job?dag_id=test_dag&"
-            "databricks_conn_id=test_conn&"
-            "databricks_run_id=1234&tasks_to_repair="
-        )
-        self.assertEqual(
-            self.link.get_link(None, ti_key=self.mock_ti_key), expected_link
-        )
-
-        # Test with tasks to repair
-        mock_tasks_to_run = "test_task_1,test_task_2"
-        with unittest.mock.patch.object(
-            DatabricksJobRepairAllFailedLink,
-            "get_tasks_to_run",
-            return_value=mock_tasks_to_run,
-        ):
-            expected_link = (
-                "/repair_databricks_job?dag_id=test_dag&"
-                "databricks_conn_id=test_conn&"
-                "databricks_run_id=1234&"
-                "tasks_to_repair=test_task_1,test_task_2"
-            )
-            self.assertEqual(
-                self.link.get_link(None, ti_key=self.mock_ti_key), expected_link
-            )
 
 
 @pytest.fixture

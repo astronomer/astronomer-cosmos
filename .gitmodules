@@ -1,0 +1,4 @@
+[submodule "examples"]
+	path = examples
+	url = https://github.com/astronomer/cosmos-dev.git
+	branch = base-example

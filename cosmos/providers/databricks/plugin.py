@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass
+from operator import itemgetter
 
 from airflow.models import BaseOperator, BaseOperatorLink
 from airflow.models.dag import DAG
@@ -247,11 +248,9 @@ class RepairDatabricksTasks(AirflowBaseView):
         ]
     )
     def repair(self):
-        databricks_conn_id = request.values.get("databricks_conn_id")
-        databricks_run_id = request.values.get("databricks_run_id")
-        dag_id = request.values.get("dag_id")
-        tasks_to_repair = request.values.get("tasks_to_repair").split(",")
-        print(f"tasks_to_repair from params: {tasks_to_repair}")
+        databricks_conn_id, databricks_run_id, dag_id, tasks_to_repair = itemgetter(
+            "databricks_conn_id", "databricks_run_id", "dag_id", "tasks_to_repair"
+        )(request.values)
         res = _repair_task(
             databricks_conn_id=databricks_conn_id,
             databricks_run_id=databricks_run_id,

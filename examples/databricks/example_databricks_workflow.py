@@ -70,6 +70,7 @@ with dag:
             notebook_packages=[{"pypi": {"package": "Faker"}}],
             source="WORKSPACE",
             job_cluster_key="Shared_job_cluster",
+            execution_timeout=timedelta(seconds=600),
         )
         notebook_2 = DatabricksNotebookOperator(
             task_id="notebook_2",

@@ -193,6 +193,7 @@ class DatabricksNotebookOperator(BaseOperator):
                 "base_parameters": {"source": self.source},
             },
             "libraries": self.notebook_packages,
+            "timeout_seconds": int(self.execution_timeout.total_seconds()),
         }
         if self.new_cluster and self.existing_cluster_id:
             raise ValueError(

@@ -88,7 +88,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         full_json = {
             "name": self.databricks_job_name,
             "email_notifications": {"no_alert_for_skipped_runs": False},
-            "timeout_seconds": 0,
+            "timeout_seconds": int(self.execution_timeout.total_seconds()),
             "tasks": task_json,
             "format": "MULTI_TASK",
             "job_clusters": self.job_clusters,

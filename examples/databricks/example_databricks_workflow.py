@@ -53,19 +53,28 @@ with dag:
         databricks_conn_id=DATABRICKS_CONN_ID,
         job_clusters=job_cluster_spec,
         notebook_params=[],
+        notebook_packages=[
+            {
+                "pypi": {
+                    "package": "simplejson==3.18.0",  # Pin specification version of a package like this.
+                    "repo": "https://pypi.org/simple",  # You can specify your required Pypi index here.
+                }
+            },
+        ],
     )
     with task_group:
         notebook_1 = DatabricksNotebookOperator(
             task_id="notebook_1",
             databricks_conn_id=DATABRICKS_CONN_ID,
-            notebook_path="/Users/daniel@astronomer.io/Test workflow",
+            notebook_path="/Shared/Notebook_1",
+            notebook_packages=[{"pypi": {"package": "Faker"}}],
             source="WORKSPACE",
             job_cluster_key="Shared_job_cluster",
         )
         notebook_2 = DatabricksNotebookOperator(
             task_id="notebook_2",
             databricks_conn_id=DATABRICKS_CONN_ID,
-            notebook_path="/Users/daniel@astronomer.io/Test workflow",
+            notebook_path="/Shared/Notebook_2",
             source="WORKSPACE",
             job_cluster_key="Shared_job_cluster",
             notebook_params={

@@ -71,6 +71,7 @@ class DatabricksNotebookOperator(BaseOperator):
         source: str,
         databricks_conn_id: str,
         notebook_params: dict | None = None,
+        notebook_packages: list[dict[str, Any]] = None,
         job_cluster_key: str | None = None,
         new_cluster: dict | None = None,
         existing_cluster_id: str | None = None,
@@ -79,6 +80,7 @@ class DatabricksNotebookOperator(BaseOperator):
         self.notebook_path = notebook_path
         self.source = source
         self.notebook_params = notebook_params or {}
+        self.notebook_packages = notebook_packages or []
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = ""
         self.job_cluster_key = job_cluster_key or ""
@@ -91,8 +93,10 @@ class DatabricksNotebookOperator(BaseOperator):
         self, relevant_upstreams: list[BaseOperator]
     ):
         """
-        Convert the operator to a Databricks workflow task that can be task in a workflow
+        Convert the operator to a Databricks workflow task that can be a task in a workflow
         """
+        if hasattr(self.task_group, "notebook_packages"):
+            self.notebook_packages.extend(self.task_group.notebook_packages)
         result = {
             "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
             "depends_on": [
@@ -108,6 +112,7 @@ class DatabricksNotebookOperator(BaseOperator):
                 "source": self.source,
                 "base_parameters": self.notebook_params,
             },
+            "libraries": self.notebook_packages,
         }
         return result
 
@@ -173,6 +178,7 @@ class DatabricksNotebookOperator(BaseOperator):
                 "notebook_path": self.notebook_path,
                 "base_parameters": {"source": self.source},
             },
+            "libraries": self.notebook_packages,
         }
         if self.new_cluster and self.existing_cluster_id:
             raise ValueError(

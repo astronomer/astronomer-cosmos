@@ -18,11 +18,23 @@ An example of how to use the DatabricksWorkflowTaskGroup can be seen in the foll
     :start-after: [START howto_databricks_workflow_notebook]
     :end-before: [END howto_databricks_workflow_notebook]
 
-At the top-level Taskgroup definition, users can define workflow-level parameters such as ``notebook_params`` or
-``spark_submit_params``. These parameters will be applied to all tasks within the Workflow. Inside of the taskgroup,
-users can define the individual tasks that make up the workflow. Currently the only officially supported operator is the
-DatabricksNotebookOperator, but other operators can be used as long as they contain the ``convert_to_databricks_workflow_task``
-function. In the future we plan to support SQL and python functions via the ref:`https://github.com/astronomer/astro-sdk<Astro SDK>`.
+At the top-level Taskgroup definition, users can define workflow-level parameters such as ``notebook_params``,
+``notebook_packages`` or ``spark_submit_params``. These parameters will be applied to all tasks within the Workflow.
+Inside of the taskgroup, users can define the individual tasks that make up the workflow. Currently the only officially
+supported operator is the DatabricksNotebookOperator, but other operators can be used as long as they contain the
+``convert_to_databricks_workflow_task`` function. In the future we plan to support SQL and python functions via the
+ref:`https://github.com/astronomer/astro-sdk<Astro SDK>`.
+
+For each notebook task, packages defined with the ``notebook_packages`` parameter defined at the task level are
+installed and additionally, all the packages supplied via the workflow-level parameter ``notebook_packages`` are also
+installed for its run. The collated ``notebook_packages`` list type parameter is transformed into the ``libraries`` list
+type parameter accepted by the Databricks API and a list of supported library types and their format for the API
+specification is mentioned at the Databricks documentation:
+https://docs.databricks.com/dev-tools/api/latest/libraries.html#managedlibrarieslibrary
+
+.. warning::
+    Make sure that you do not specify duplicate libraries across workflow-level and task-level ``notebook-packages`` as
+    the Databricks task will then fail complaining about duplicate installation of the library.
 
 
 Limitations

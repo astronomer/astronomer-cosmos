@@ -11,6 +11,8 @@ from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
 
+from cosmos.providers.databricks.constants import JOBS_API_VERSION
+
 
 class DatabricksNotebookOperator(BaseOperator):
     """
@@ -98,9 +100,9 @@ class DatabricksNotebookOperator(BaseOperator):
         if hasattr(self.task_group, "notebook_packages"):
             self.notebook_packages.extend(self.task_group.notebook_packages)
         result = {
-            "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
+            "task_key": self._get_databricks_task_id(self.task_id),
             "depends_on": [
-                {"task_key": self.dag_id + "__" + t.replace(".", "__")}
+                {"task_key": self._get_databricks_task_id(t)}
                 for t in self.upstream_task_ids
                 if t in relevant_upstreams
             ],
@@ -116,6 +118,10 @@ class DatabricksNotebookOperator(BaseOperator):
         }
         return result
 
+    def _get_databricks_task_id(self, task_id: str):
+        """Get the databricks task ID using dag_id and task_id. removes illegal characters."""
+        return self.dag_id + "__" + task_id.replace(".", "__")
+
     def monitor_databricks_job(self):
         """Monitor the Databricks job until it completes. Raises Airflow exception if the job fails."""
         api_client = self._get_api_client()
@@ -124,13 +130,18 @@ class DatabricksNotebookOperator(BaseOperator):
         self._wait_for_pending_task(current_task, runs_api)
         self._wait_for_running_task(current_task, runs_api)
         self._wait_for_terminating_task(current_task, runs_api)
-        final_state = runs_api.get_run(current_task["run_id"])["state"]
+        final_state = runs_api.get_run(
+            current_task["run_id"], version=JOBS_API_VERSION
+        )["state"]
         self._handle_final_state(final_state)
 
     def _get_current_databricks_task(self, runs_api):
         return {
-            x["task_key"]: x for x in runs_api.get_run(self.databricks_run_id)["tasks"]
-        }[self.dag_id + "__" + self.task_id.replace(".", "__")]
+            x["task_key"]: x
+            for x in runs_api.get_run(self.databricks_run_id, version=JOBS_API_VERSION)[
+                "tasks"
+            ]
+        }[self._get_databricks_task_id(self.task_id)]
 
     def _handle_final_state(self, final_state):
         if final_state.get("life_cycle_state", None) != "TERMINATED":
@@ -145,7 +156,9 @@ class DatabricksNotebookOperator(BaseOperator):
             )
 
     def _get_lifestyle_state(self, current_task, runs_api):
-        return runs_api.get_run(current_task["run_id"])["state"]["life_cycle_state"]
+        return runs_api.get_run(current_task["run_id"], version=JOBS_API_VERSION)[
+            "state"
+        ]["life_cycle_state"]
 
     def _wait_on_state(self, current_task, runs_api, state):
         while self._get_lifestyle_state(current_task, runs_api) == state:
@@ -174,6 +187,7 @@ class DatabricksNotebookOperator(BaseOperator):
         """Launch the notebook as a one-time job to Databricks."""
         api_client = self._get_api_client()
         run_json = {
+            "run_name": self._get_databricks_task_id(self.task_id),
             "notebook_task": {
                 "notebook_path": self.notebook_path,
                 "base_parameters": {"source": self.source},

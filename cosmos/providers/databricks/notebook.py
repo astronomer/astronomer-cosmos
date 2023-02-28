@@ -107,7 +107,7 @@ class DatabricksNotebookOperator(BaseOperator):
                 if t in relevant_upstreams
             ],
             "job_cluster_key": self.job_cluster_key,
-            "timeout_seconds": 0,
+            "timeout_seconds": int(self.execution_timeout.total_seconds()),
             "email_notifications": {},
             "notebook_task": {
                 "notebook_path": self.notebook_path,

@@ -1,11 +1,8 @@
 """DatabricksWorkflowTaskGroup for submitting jobs to Databricks."""
 from __future__ import annotations
 
-from datetime import timedelta
 from logging import Logger
 from typing import TYPE_CHECKING
-
-from airflow.models.abstractoperator import DEFAULT_TASK_EXECUTION_TIMEOUT
 
 if TYPE_CHECKING:
     pass
@@ -275,7 +272,6 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
         extra_job_params: dict[str, Any] = None,
-        execution_timeout: timedelta | None = DEFAULT_TASK_EXECUTION_TIMEOUT,
         **kwargs,
     ):
         """
@@ -298,8 +294,6 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
          These parameters will be passed to all spark submit tasks
         :param max_concurrent_runs: The maximum number of concurrent runs for this workflow.
         :param extra_job_params: A dictionary containing properties which will override the default Databricks
-        :param execution_timeout: max time allowed for the execution of this task group job, if it goes beyond it will
-         raise Timeout exception, and it will fail both in Airflow and Databricks after this elapsed timeout duration.
         Workflow Job definitions.
         """
         self.databricks_conn_id = databricks_conn_id
@@ -312,7 +306,6 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         self.jar_params = jar_params or []
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params or {}
-        self.execution_timeout = execution_timeout
         super().__init__(**kwargs)
 
     def __exit__(self, _type, _value, _tb):
@@ -326,7 +319,6 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 job_clusters=self.job_clusters,
                 existing_clusters=self.existing_clusters,
                 extra_job_params=self.extra_job_params,
-                execution_timeout=self.execution_timeout,
             )
         )
 

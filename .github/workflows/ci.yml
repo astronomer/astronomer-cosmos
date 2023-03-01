@@ -1,0 +1,45 @@
+name: Build and test cosmos providers
+on:
+  push:
+    branches: [ 'main', 'release-**' ]
+    paths:
+      - 'cosmos/**'
+
+  pull_request:
+    branches: [ 'main', 'release-**' ]
+    paths:
+      - 'cosmos/**'
+  # Run on PRs from forks
+  pull_request_target:
+    branches: [ 'main' ]
+    types: ['labeled']
+  release:
+    types: [ 'created' ]
+
+# This allows a subsequently queued workflow run to interrupt and cancel previous runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Run-Unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [ 3.7, 3.8, 3.9, '3.10' ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '${{ matrix.python }}'
+          architecture: 'x64'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      # TODO: deduplicate this step with the one in pyproject.toml hatchling environment
+      - run: pip install -U pip wheel hatch pytest pytest-cov
+      - run: pytest --junit-xml=test-report/report.xml tests
+      # TODO: add step for uploading coverage report to codecov.io

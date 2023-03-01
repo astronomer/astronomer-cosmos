@@ -41,5 +41,5 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
       # TODO: deduplicate this step with the one in pyproject.toml hatchling environment
       - run: pip install -U pip wheel hatch pytest pytest-cov
-      - run: pytest --junit-xml=test-report/report.xml tests
+      - run: hatch env run test
       # TODO: add step for uploading coverage report to codecov.io

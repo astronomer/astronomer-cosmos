@@ -12,6 +12,11 @@ from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
 
 from cosmos.providers.databricks.constants import JOBS_API_VERSION
+from cosmos.providers.databricks.plugin import (
+    DatabricksJobRepairSingleFailedLink,
+    DatabricksJobRunLink,
+)
+from cosmos.providers.databricks.workflow import DatabricksMetaData
 
 
 class DatabricksNotebookOperator(BaseOperator):
@@ -65,7 +70,11 @@ class DatabricksNotebookOperator(BaseOperator):
         :param notebook_params: the parameters to pass to the notebook
     """
 
-    template_fields = ("databricks_run_id",)
+    operator_extra_links = (
+        DatabricksJobRunLink(),
+        DatabricksJobRepairSingleFailedLink(),
+    )
+    template_fields = ("databricks_metadata",)
 
     def __init__(
         self,
@@ -84,11 +93,10 @@ class DatabricksNotebookOperator(BaseOperator):
         self.notebook_params = notebook_params or {}
         self.notebook_packages = notebook_packages or []
         self.databricks_conn_id = databricks_conn_id
-        self.databricks_run_id = ""
+        self.databricks_metadata: DatabricksMetaData | None = None
         self.job_cluster_key = job_cluster_key or ""
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
-
         super().__init__(**kwargs)
 
     def convert_to_databricks_workflow_task(
@@ -179,7 +187,7 @@ class DatabricksNotebookOperator(BaseOperator):
         databricks_conn = hook.get_conn()
         return ApiClient(
             user=databricks_conn.login,
-            password=databricks_conn.password,
+            token=databricks_conn.password,
             host=databricks_conn.host,
         )
 
@@ -225,4 +233,7 @@ class DatabricksNotebookOperator(BaseOperator):
             and getattr(self.task_group, "is_databricks")
         ):
             self.launch_notebook_job()
+        else:
+            self.databricks_run_id = self.databricks_metadata.databricks_run_id
+            self.databricks_conn_id = self.databricks_metadata.databricks_conn_id
         self.monitor_databricks_job()

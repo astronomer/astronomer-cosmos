@@ -11,14 +11,27 @@ import time
 from typing import Any
 
 from airflow.exceptions import AirflowException
-from airflow.models.operator import BaseOperator
+from airflow.models import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.utils.context import Context
 from airflow.utils.task_group import TaskGroup
+from attrs import define
 from databricks_cli.jobs.api import JobsApi
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
 from mergedeep import merge
+
+from cosmos.providers.databricks.plugin import (
+    DatabricksJobRepairAllFailedLink,
+    DatabricksJobRunLink,
+)
+
+
+@define
+class DatabricksMetaData:
+    databricks_conn_id: str
+    databricks_run_id: str
+    databricks_job_id: str
 
 
 def _get_job_by_name(job_name: str, jobs_api: JobsApi) -> dict | None:
@@ -42,6 +55,11 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     :param extra_job_params: A dictionary containing properties which will override the
     default Databricks Workflow Job definitions.
     """
+
+    operator_extra_links = (DatabricksJobRunLink(), DatabricksJobRepairAllFailedLink())
+    databricks_conn_id: str
+    databricks_run_id: str
+    databricks_job_id: str
 
     def __init__(
         self,
@@ -141,7 +159,12 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         while runs_api.get_run(run_id)["state"]["life_cycle_state"] == "PENDING":
             print("job pending")
             time.sleep(5)
-        return run_id
+        self.databricks_run_id = run_id
+        return DatabricksMetaData(
+            databricks_conn_id=self.databricks_conn_id,
+            databricks_run_id=run_id,
+            databricks_job_id=job_id,
+        )
 
 
 class DatabricksWorkflowTaskGroup(TaskGroup):
@@ -338,7 +361,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
             if task_id != f"{self.group_id}.launch":
                 create_databricks_workflow_task.relevant_upstreams.append(task_id)
                 create_databricks_workflow_task.add_task(task)
-                task.databricks_run_id = create_databricks_workflow_task.output
+                task.databricks_metadata = create_databricks_workflow_task.output
 
         create_databricks_workflow_task.set_downstream(roots)
         super().__exit__(_type, _value, _tb)

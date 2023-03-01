@@ -36,7 +36,22 @@ https://docs.databricks.com/dev-tools/api/latest/libraries.html#managedlibraries
     Make sure that you do not specify duplicate libraries across workflow-level and task-level ``notebook-packages`` as
     the Databricks task will then fail complaining about duplicate installation of the library.
 
+Retries
+=======
 
+When repairing a DatabBricks workflow, we need to submit a repair request using databricks' Jobs API. One core difference between how databricks repairs work v.s. Airflow retries is that Airflow is able to retry one task at a time, while Databricks expects a single repair request for all tasks you want to rerun (this is because databricks starts a new job cluster for each repair request, and jobs clusters can't be modified once they are started).
+
+To avoid creating multiple clusters for each failed task, we do not use Airflow's built-in retries. Instead, we offer a "Repair all tasks" button in the "launch" task's grid and graph node on the Airflow UI. This button finds all failed and skipped tasks and sends them to Databricks for repair. By using this approach, we can save time and resources, as we do not need to create a new cluster for each failed task.
+
+![](img/repair-all-failed.png)
+
+In addition to the "Repair all tasks" button, we also provide a "Repair single task" button to repair a specific failed task. This button can be used if we want to retry a single task rather than all failed tasks.
+
+![](img/repair-single-failed.png)
+
+It is important to note that Databricks does not support repairing a task that has a failing upstream. Therefore, if we want to skip a notebook and run downstream tasks, we need to add a "dbutils.notebook.exit("success")" at the top of the notebook inside of databricks. This will ensure that the notebook does not run and the downstream tasks can continue to execute.
+
+![](img/dbutils-notebook-success.png)
 Limitations
 ===========
 The DatabricksWorkflowTaskGroup is currently in beta and has the following limitations:

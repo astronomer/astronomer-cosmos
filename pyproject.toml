@@ -95,7 +95,7 @@ features = [
 
 [tool.hatch.envs.test.scripts]
 cov = "pytest tests --cov-report=term-missing --cov-config=pyproject.toml --cov=cosmos"
-run-unit-tests = ["pip freeze", "cov"]
+run-unit-tests = ["pip freeze", "airflow db init", "cov"]
 
 [[tool.hatch.envs.test.matrix]]
 python = ["3.8", "3.9"]

@@ -21,6 +21,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES: "airflow.* astro.* cosmos.*"
+
 jobs:
   Run-Unit-tests:
     runs-on: ubuntu-latest

@@ -210,20 +210,18 @@ def test_create_workflow_with_webhook_notifications(
 ):
     mock_get_jobs.return_value = {"job_id": 123}
 
-    webhook_notifications = [{
-        "on_failure": [
-            {
-                "id": "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"
-            }
-        ],
-    }] 
+    webhook_notifications = [
+        {
+            "on_failure": [{"id": "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"}],
+        }
+    ]
     with dag:
         task_group = DatabricksWorkflowTaskGroup(
             group_id="test_workflow",
             databricks_conn_id="foo",
             job_clusters=[{"job_cluster_key": "foo"}],
             notebook_params=[{"notebook_path": "/foo/bar"}],
-            webhook_notifications=webhook_notifications
+            webhook_notifications=webhook_notifications,
         )
         with task_group:
             notebook_with_extra = DatabricksNotebookOperator(
@@ -244,6 +242,4 @@ def test_create_workflow_with_webhook_notifications(
     kwargs = mock_jobs_api.return_value.reset_job.call_args_list[0].kwargs["json"]
 
     assert kwargs["job_id"] == 123
-    assert (
-        kwargs["new_settings"]["webhook_notifications"] == webhook_notifications
-    )
+    assert kwargs["new_settings"]["webhook_notifications"] == webhook_notifications

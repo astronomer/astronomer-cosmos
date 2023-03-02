@@ -113,7 +113,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             "format": "MULTI_TASK",
             "job_clusters": self.job_clusters,
             "max_concurrent_runs": self.max_concurrent_runs,
-            "webhook_notifications": self.webhook_notifications
+            "webhook_notifications": self.webhook_notifications,
         }
         full_json = merge(full_json, self.extra_job_params)
         return full_json
@@ -347,7 +347,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 job_clusters=self.job_clusters,
                 existing_clusters=self.existing_clusters,
                 extra_job_params=self.extra_job_params,
-                webhook_notifications=self.webhook_notifications
+                webhook_notifications=self.webhook_notifications,
             )
         )
 

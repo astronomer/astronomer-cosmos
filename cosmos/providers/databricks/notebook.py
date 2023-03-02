@@ -91,22 +91,11 @@ class DatabricksNotebookOperator(BaseOperator):
 
         super().__init__(**kwargs)
 
-    def convert_to_databricks_workflow_task(
-        self, relevant_upstreams: list[BaseOperator]
-    ):
-        """
-        Convert the operator to a Databricks workflow task that can be a task in a workflow
-        """
-        if hasattr(self.task_group, "notebook_packages"):
-            self.notebook_packages.extend(self.task_group.notebook_packages)
-        result = {
-            "task_key": self._get_databricks_task_id(self.task_id),
-            "depends_on": [
-                {"task_key": self._get_databricks_task_id(t)}
-                for t in self.upstream_task_ids
-                if t in relevant_upstreams
-            ],
-            "job_cluster_key": self.job_cluster_key,
+    def _get_task_base_json(self) -> dict[str, Any]:
+        """Get task base json to be used for task group tasks and single task submissions."""
+        return {
+            # Timeout seconds value of 0 for the Databricks Jobs API means the job runs forever.
+            # That is also the default behavior of Databricks jobs to run a job forever without a default timeout value.
             "timeout_seconds": int(self.execution_timeout.total_seconds())
             if self.execution_timeout
             else 0,
@@ -117,6 +106,26 @@ class DatabricksNotebookOperator(BaseOperator):
                 "base_parameters": self.notebook_params,
             },
             "libraries": self.notebook_packages,
+        }
+
+    def convert_to_databricks_workflow_task(
+        self, relevant_upstreams: list[BaseOperator]
+    ):
+        """
+        Convert the operator to a Databricks workflow task that can be a task in a workflow
+        """
+        if hasattr(self.task_group, "notebook_packages"):
+            self.notebook_packages.extend(self.task_group.notebook_packages)
+        base_task_json = self._get_task_base_json()
+        result = {
+            "task_key": self._get_databricks_task_id(self.task_id),
+            "depends_on": [
+                {"task_key": self._get_databricks_task_id(t)}
+                for t in self.upstream_task_ids
+                if t in relevant_upstreams
+            ],
+            "job_cluster_key": self.job_cluster_key,
+            **base_task_json,
         }
         return result
 
@@ -188,16 +197,10 @@ class DatabricksNotebookOperator(BaseOperator):
     def launch_notebook_job(self):
         """Launch the notebook as a one-time job to Databricks."""
         api_client = self._get_api_client()
+        base_task_json = self._get_task_base_json()
         run_json = {
             "run_name": self._get_databricks_task_id(self.task_id),
-            "notebook_task": {
-                "notebook_path": self.notebook_path,
-                "base_parameters": {"source": self.source},
-            },
-            "libraries": self.notebook_packages,
-            "timeout_seconds": int(self.execution_timeout.total_seconds())
-            if self.execution_timeout
-            else 0,
+            **base_task_json,
         }
         if self.new_cluster and self.existing_cluster_id:
             raise ValueError(

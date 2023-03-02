@@ -139,11 +139,13 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
             "run_name": "1234",
             "notebook_task": {
                 "notebook_path": "/foo/bar",
-                "base_parameters": {"source": "WORKSPACE"},
+                "source": "WORKSPACE",
+                "base_parameters": {"foo": "bar"},
             },
             "new_cluster": {"foo": "bar"},
             "libraries": [{"nb_index": {"package": "nb_package"}}],
             "timeout_seconds": 0,
+            "email_notifications": {},
         }
     )
     mock_monitor.assert_called_once()
@@ -183,11 +185,13 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster(
             "run_name": "1234",
             "notebook_task": {
                 "notebook_path": "/foo/bar",
-                "base_parameters": {"source": "WORKSPACE"},
+                "source": "WORKSPACE",
+                "base_parameters": {"foo": "bar"},
             },
             "existing_cluster_id": "123",
             "libraries": [{"nb_index": {"package": "nb_package"}}],
             "timeout_seconds": 0,
+            "email_notifications": {},
         }
     )
     mock_monitor.assert_called_once()

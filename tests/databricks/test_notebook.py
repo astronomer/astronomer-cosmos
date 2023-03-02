@@ -143,6 +143,7 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
             },
             "new_cluster": {"foo": "bar"},
             "libraries": [{"nb_index": {"package": "nb_package"}}],
+            "timeout_seconds": 0,
         }
     )
     mock_monitor.assert_called_once()
@@ -186,6 +187,7 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster(
             },
             "existing_cluster_id": "123",
             "libraries": [{"nb_index": {"package": "nb_package"}}],
+            "timeout_seconds": 0,
         }
     )
     mock_monitor.assert_called_once()

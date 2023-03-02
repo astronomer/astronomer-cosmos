@@ -107,7 +107,9 @@ class DatabricksNotebookOperator(BaseOperator):
                 if t in relevant_upstreams
             ],
             "job_cluster_key": self.job_cluster_key,
-            "timeout_seconds": int(self.execution_timeout.total_seconds()),
+            "timeout_seconds": int(self.execution_timeout.total_seconds())
+            if self.execution_timeout
+            else 0,
             "email_notifications": {},
             "notebook_task": {
                 "notebook_path": self.notebook_path,
@@ -193,7 +195,9 @@ class DatabricksNotebookOperator(BaseOperator):
                 "base_parameters": {"source": self.source},
             },
             "libraries": self.notebook_packages,
-            "timeout_seconds": int(self.execution_timeout.total_seconds()),
+            "timeout_seconds": int(self.execution_timeout.total_seconds())
+            if self.execution_timeout
+            else 0,
         }
         if self.new_cluster and self.existing_cluster_id:
             raise ValueError(

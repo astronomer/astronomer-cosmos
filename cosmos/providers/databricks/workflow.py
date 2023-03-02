@@ -70,6 +70,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         max_concurrent_runs: int = 1,
         tasks_to_convert: list[BaseOperator] = None,
         extra_job_params: dict[str, Any] = None,
+        webhook_notifications: dict[str, list] = None,
         **kwargs,
     ):
         self.existing_clusters = existing_clusters or []
@@ -81,6 +82,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.databricks_run_id = None
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params
+        self.webhook_notifications = webhook_notifications or {}
         super().__init__(task_id=task_id, **kwargs)
 
     def add_task(self, task: BaseOperator):
@@ -111,6 +113,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             "format": "MULTI_TASK",
             "job_clusters": self.job_clusters,
             "max_concurrent_runs": self.max_concurrent_runs,
+            "webhook_notifications": self.webhook_notifications
         }
         full_json = merge(full_json, self.extra_job_params)
         return full_json
@@ -295,6 +298,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
         extra_job_params: dict[str, Any] = None,
+        webhook_notifications: dict[str, list] = None,
         **kwargs,
     ):
         """
@@ -329,6 +333,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         self.jar_params = jar_params or []
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params or {}
+        self.webhook_notifications = webhook_notifications or {}
         super().__init__(**kwargs)
 
     def __exit__(self, _type, _value, _tb):
@@ -342,6 +347,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 job_clusters=self.job_clusters,
                 existing_clusters=self.existing_clusters,
                 extra_job_params=self.extra_job_params,
+                webhook_notifications=self.webhook_notifications
             )
         )
 

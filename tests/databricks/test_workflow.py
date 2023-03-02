@@ -40,6 +40,7 @@ expected_workflow_json = {
             "timeout_seconds": 0,
         },
     ],
+    "webhook_notifications": {},
     "timeout_seconds": 0,
 }
 
@@ -198,3 +199,51 @@ def test_create_workflow_with_arbitrary_extra_job_params(
         kwargs["new_settings"]["timeout_seconds"] == extra_job_params["timeout_seconds"]
     )
     assert kwargs["new_settings"]["git_source"] == extra_job_params["git_source"]
+
+
+@mock.patch("cosmos.providers.databricks.workflow.DatabricksHook")
+@mock.patch("cosmos.providers.databricks.workflow.ApiClient")
+@mock.patch("cosmos.providers.databricks.workflow.JobsApi")
+@mock.patch("cosmos.providers.databricks.workflow._get_job_by_name")
+def test_create_workflow_with_webhook_notifications(
+    mock_get_jobs, mock_jobs_api, mock_api, mock_hook, dag
+):
+    mock_get_jobs.return_value = {"job_id": 123}
+
+    webhook_notifications = [{
+        "on_failure": [
+            {
+                "id": "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"
+            }
+        ],
+    }] 
+    with dag:
+        task_group = DatabricksWorkflowTaskGroup(
+            group_id="test_workflow",
+            databricks_conn_id="foo",
+            job_clusters=[{"job_cluster_key": "foo"}],
+            notebook_params=[{"notebook_path": "/foo/bar"}],
+            webhook_notifications=webhook_notifications
+        )
+        with task_group:
+            notebook_with_extra = DatabricksNotebookOperator(
+                task_id="notebook_with_extra",
+                databricks_conn_id="foo",
+                notebook_path="/foo/bar",
+                source="WORKSPACE",
+                job_cluster_key="foo",
+            )
+            notebook_with_extra
+
+    assert len(task_group.children) == 2
+
+    task_group.children["test_workflow.launch"].create_workflow_json()
+    task_group.children["test_workflow.launch"].execute(context={})
+
+    mock_jobs_api.return_value.reset_job.assert_called_once()
+    kwargs = mock_jobs_api.return_value.reset_job.call_args_list[0].kwargs["json"]
+
+    assert kwargs["job_id"] == 123
+    assert (
+        kwargs["new_settings"]["webhook_notifications"] == webhook_notifications
+    )

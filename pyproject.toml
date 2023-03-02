@@ -84,9 +84,22 @@ include = [
 ]
 
 [tool.hatch.envs.test]
+matrix-name-format = "{variable}_{value}"
 dependencies = [
-  "pytest"
+    "pytest",
+    "pytest-cov",
 ]
+features = [
+    "databricks",
+]
+
+[tool.hatch.envs.test.scripts]
+cov = "pytest tests --cov-report=term-missing --cov-config=pyproject.toml --cov=cosmos"
+run-unit-tests = ["pip freeze", "cov"]
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.8", "3.9"]
+
 
 [tool.hatch.envs.docs]
 dependencies = [

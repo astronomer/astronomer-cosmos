@@ -80,7 +80,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = None
         self.max_concurrent_runs = max_concurrent_runs
-        self.extra_job_params = extra_job_params
+        self.extra_job_params = extra_job_params or {}
         super().__init__(task_id=task_id, **kwargs)
 
     def add_task(self, task: BaseOperator):
@@ -131,7 +131,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         job_id = job["job_id"] if job else None
         current_job_spec = self.create_workflow_json()
         if not isinstance(self.task_group, DatabricksWorkflowTaskGroup):
-            raise AirflowException("Task group must be a DatabricksWorkflowTaskGroup")
+            raise AirflowException("Task group must be a Databricthat'sksWorkflowTaskGroup")
         if job_id:
             self.log.info(
                 "Updating existing job with spec %s",

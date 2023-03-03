@@ -131,7 +131,9 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         job_id = job["job_id"] if job else None
         current_job_spec = self.create_workflow_json()
         if not isinstance(self.task_group, DatabricksWorkflowTaskGroup):
-            raise AirflowException("Task group must be a Databricthat'sksWorkflowTaskGroup")
+            raise AirflowException(
+                "Task group must be a Databricthat'sksWorkflowTaskGroup"
+            )
         if job_id:
             self.log.info(
                 "Updating existing job with spec %s",

@@ -74,12 +74,12 @@ jobs:
       - run: pip3 install nox
       - run: nox -s build_docs
 
-  Run-Unit-tests-Airflow-2-5:
+  Run-Unit-tests-Airflow-2.5:
     strategy:
       fail-fast: false
       matrix:
         version: [ '3.8', '3.9', '3.10' ]
-        airflow: [ 2.4, 2.5 ]
+        airflow: [ 2.5 ]
     if: >-
       github.event_name == 'push' ||
       (
@@ -115,7 +115,7 @@ jobs:
           key: tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
-      - run: nox -s "test-${{ matrix.version }}(airflow='${{ matrix.airflow }}')" -- tests/ --cov=cosmos --cov-report=xml --cov-branch
+      - run: nox -s "test-${{ matrix.version }}(airflow='${{ matrix.airflow }}')" -- tests/ --cov=cosmos --cov-report=xml --cov-branch term-missing
       - name: Upload coverage
         uses: actions/upload-artifact@v2
         with:

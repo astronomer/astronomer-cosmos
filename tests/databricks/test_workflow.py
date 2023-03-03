@@ -4,11 +4,11 @@ from cosmos.providers.databricks.notebook import DatabricksNotebookOperator
 from cosmos.providers.databricks.workflow import DatabricksWorkflowTaskGroup
 
 expected_workflow_json = {
+    "name": "unit_test_dag.test_workflow",
     "email_notifications": {"no_alert_for_skipped_runs": False},
     "format": "MULTI_TASK",
     "job_clusters": [{"job_cluster_key": "foo"}],
     "max_concurrent_runs": 1,
-    "name": "unit_test_dag.test_workflow",
     "tasks": [
         {
             "depends_on": [],
@@ -156,7 +156,13 @@ def test_create_workflow_with_arbitrary_extra_job_params(
 
     extra_job_params = {
         "timeout_seconds": 10,  # default: 0
-        "email_notifications": {"no_alert_for_skipped_runs": True},  # default: False
+        "webhook_notifications": {
+            "on_failure": [{"id": "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"}],
+        },
+        "email_notifications": {
+            "no_alert_for_skipped_runs": True,  # default: False
+            "on_start": ["user.name@databricks.com"],
+        },
         "git_source": {  # no default value
             "git_url": "https://github.com/astronomer/astronomer-cosmos",
             "git_provider": "gitHub",
@@ -198,3 +204,11 @@ def test_create_workflow_with_arbitrary_extra_job_params(
         kwargs["new_settings"]["timeout_seconds"] == extra_job_params["timeout_seconds"]
     )
     assert kwargs["new_settings"]["git_source"] == extra_job_params["git_source"]
+    assert (
+        kwargs["new_settings"]["webhook_notifications"]
+        == extra_job_params["webhook_notifications"]
+    )
+    assert (
+        kwargs["new_settings"]["email_notifications"]
+        == extra_job_params["email_notifications"]
+    )

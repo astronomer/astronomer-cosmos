@@ -47,6 +47,7 @@ dbt-all = [
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
+    "dbt-openlineage"
 ]
 dbt-bigquery = [
     "dbt-bigquery",
@@ -62,6 +63,10 @@ dbt-redshift = [
 ]
 dbt-snowflake = [
     "dbt-snowflake",
+]
+dbt-openlineage = [
+    "dbt-core",
+    "openlineage-dbt>=0.21.1"
 ]
 
 databricks = [

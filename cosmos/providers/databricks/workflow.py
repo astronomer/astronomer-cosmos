@@ -132,7 +132,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         current_job_spec = self.create_workflow_json()
         if not isinstance(self.task_group, DatabricksWorkflowTaskGroup):
             raise AirflowException(
-                "Task group must be a Databricthat'sksWorkflowTaskGroup"
+                "Task group must be a DatabricksWorkflowTaskGroup"
             )
         if job_id:
             self.log.info(

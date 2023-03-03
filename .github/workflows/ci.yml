@@ -25,33 +25,99 @@ env:
   AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES: "airflow.* astro.* cosmos.*"
 
 jobs:
-  Run-Unit-tests:
+  Markdown-link-check:
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python: [ "3.8", "3.9" ]
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+      - uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
-          python-version: '${{ matrix.python }}'
-          architecture: 'x64'
+          config-file: '.github/workflows/mlc_config.json'
 
+  Type-Check:
+    if: github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    env:
+      MYPY_FORCE_COLOR: 1
+      TERM: xterm-color
+      SETUPTOOLS_USE_DISTUTILS: stdlib
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.8'
+          architecture: 'x64'
       - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/pip
+            .nox
           key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      - run: pip3 install nox
+      - run: nox -s type_check
 
-      - name: Ensure latest pip
-        run: python -m pip install --upgrade pip
+  Build-Docs:
+    if: github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+          architecture: 'x64'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            .nox
+          key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      - run: pip3 install nox
+      - run: nox -s build_docs
 
-      - name: Install Hatch
-        run: pip install hatch
+  Run-Unit-tests-Airflow-2-5:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [ '3.8', '3.9', '3.10' ]
+        airflow: [ 2.4, 2.5 ]
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.fork == false
+      ) ||
+      (
+        github.event_name == 'pull_request_target' &&
+        contains(github.event.pull_request.labels.*.name, 'safe to test')
+      ) ||
+      (
+        github.event_name == 'release'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        if: github.event_name != 'pull_request_target'
 
-      - name: Run unit tests
-        run: hatch run test:run-unit-tests
-      # TODO: add step for uploading coverage report to codecov.io
+      - name: Checkout pull/${{ github.event.number }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+        if: github.event_name == 'pull_request_target'
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.version }}
+          architecture: 'x64'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            .nox
+          key: tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
+      - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
+      - run: pip3 install nox
+      - run: nox -s "test-${{ matrix.version }}(airflow=${{ matrix.airflow }}')" -- tests/ --cov=cosmos --cov-report=xml --cov-branch
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage-${{ matrix.python }}-${{ matrix.airflow }}
+          path: ./.coverage

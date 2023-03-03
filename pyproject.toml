@@ -63,12 +63,32 @@ dbt-redshift = [
 dbt-snowflake = [
     "dbt-snowflake",
 ]
-
 databricks = [
     "databricks-sql-connector>=2.0.4;python_version>='3.10'",
     "databricks-cli",
     "apache-airflow-providers-databricks>=2.2.0",
     "mergedeep"
+]
+all = [
+    "astronomer-cosmos[dbt-all]",
+    "astronomer-cosmos[databricks]",
+]
+docs =[
+    "sphinx",
+    "pydata-sphinx-theme",
+    "sphinx-autobuild",
+    "sphinx-tabs"
+]
+tests = [
+    "pytest>=6.0",
+    "pytest-split",
+    "pytest-dotenv",
+    "requests-mock",
+    "pytest-cov",
+    "pytest-describe",
+    "types-requests",
+    "mypy",
+    "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
 ]
 
 [project.urls]
@@ -82,24 +102,6 @@ path = "cosmos/__init__.py"
 include = [
     "/cosmos",
 ]
-
-[tool.hatch.envs.test]
-matrix-name-format = "{variable}_{value}"
-dependencies = [
-    "pytest",
-    "pytest-cov",
-]
-features = [
-    "databricks",
-]
-
-[tool.hatch.envs.test.scripts]
-cov = "pytest tests --cov-report=term-missing --cov-config=pyproject.toml --cov=cosmos"
-run-unit-tests = ["pip freeze", "airflow db init", "cov"]
-
-[[tool.hatch.envs.test.matrix]]
-python = ["3.8", "3.9"]
-
 
 [tool.hatch.envs.docs]
 dependencies = [

@@ -205,22 +205,25 @@ def test_create_workflow_with_arbitrary_extra_job_params(
 @mock.patch("cosmos.providers.databricks.workflow.ApiClient")
 @mock.patch("cosmos.providers.databricks.workflow.JobsApi")
 @mock.patch("cosmos.providers.databricks.workflow._get_job_by_name")
-def test_create_workflow_with_webhook_notifications(
+def test_create_workflow_with_webhook_and_email_notifications(
     mock_get_jobs, mock_jobs_api, mock_api, mock_hook, dag
 ):
     mock_get_jobs.return_value = {"job_id": 123}
 
-    webhook_notifications = [
-        {
-            "on_failure": [{"id": "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"}],
-        }
-    ]
+    webhook_notifications = {
+        "on_failure": [{"id": "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"}],
+    }
+    email_notifications = {
+        "no_alert_for_skipped_runs": False,
+        "on_start": ["user.name@databricks.com"],
+    }
     with dag:
         task_group = DatabricksWorkflowTaskGroup(
             group_id="test_workflow",
             databricks_conn_id="foo",
             job_clusters=[{"job_cluster_key": "foo"}],
             notebook_params=[{"notebook_path": "/foo/bar"}],
+            email_notifications=email_notifications,
             webhook_notifications=webhook_notifications,
         )
         with task_group:
@@ -243,3 +246,4 @@ def test_create_workflow_with_webhook_notifications(
 
     assert kwargs["job_id"] == 123
     assert kwargs["new_settings"]["webhook_notifications"] == webhook_notifications
+    assert kwargs["new_settings"]["email_notifications"] == email_notifications

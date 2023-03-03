@@ -54,6 +54,11 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     be populated after initialization by calling add_task.
     :param extra_job_params: A dictionary containing properties which will override the
     default Databricks Workflow Job definitions.
+    :param email_notifications: An optional set of email addresses that is notified when runs
+    of this job begin or complete as well as when this job is deleted. The default behavior is
+    to not send any emails.
+    :param webhook_notifications: A collection of system notification IDs to notify when the
+    run begins or completes. The default behavior is to not send any system notifications.
     """
 
     operator_extra_links = (DatabricksJobRunLink(), DatabricksJobRepairAllFailedLink())
@@ -70,6 +75,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         max_concurrent_runs: int = 1,
         tasks_to_convert: list[BaseOperator] = None,
         extra_job_params: dict[str, Any] = None,
+        email_notifications: dict[str, Any] = None,
         webhook_notifications: dict[str, list] = None,
         **kwargs,
     ):
@@ -82,6 +88,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.databricks_run_id = None
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params
+        self.email_notifications = email_notifications or {}
         self.webhook_notifications = webhook_notifications or {}
         super().__init__(task_id=task_id, **kwargs)
 
@@ -107,12 +114,13 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         ]
         full_json = {
             "name": self.databricks_job_name,
-            "email_notifications": {"no_alert_for_skipped_runs": False},
             "timeout_seconds": 0,
             "tasks": task_json,
             "format": "MULTI_TASK",
             "job_clusters": self.job_clusters,
             "max_concurrent_runs": self.max_concurrent_runs,
+            "email_notifications": self.email_notifications
+            or {"no_alert_for_skipped_runs": False},
             "webhook_notifications": self.webhook_notifications,
         }
         full_json = merge(full_json, self.extra_job_params)
@@ -298,6 +306,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
         extra_job_params: dict[str, Any] = None,
+        email_notifications: dict[str, Any] = None,
         webhook_notifications: dict[str, list] = None,
         **kwargs,
     ):
@@ -322,6 +331,10 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         :param max_concurrent_runs: The maximum number of concurrent runs for this workflow.
         :param extra_job_params: A dictionary containing properties which will override the default Databricks
         Workflow Job definitions.
+        :param email_notifications: An optional set of email addresses that is notified when runs of this
+        job begin or complete as well as when this job is deleted. The default behavior is to not send any emails.
+        :param webhook_notifications: A collection of system notification IDs to notify when the run begins or
+        completes. The default behavior is to not send any system notifications.
         """
         self.databricks_conn_id = databricks_conn_id
         self.existing_clusters = existing_clusters or []
@@ -333,6 +346,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         self.jar_params = jar_params or []
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params or {}
+        self.email_notifications = email_notifications or {}
         self.webhook_notifications = webhook_notifications or {}
         super().__init__(**kwargs)
 
@@ -347,6 +361,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 job_clusters=self.job_clusters,
                 existing_clusters=self.existing_clusters,
                 extra_job_params=self.extra_job_params,
+                email_notifications=self.email_notifications,
                 webhook_notifications=self.webhook_notifications,
             )
         )

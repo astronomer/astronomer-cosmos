@@ -68,11 +68,13 @@ with dag:
                 }
             },
         ],
-        email_notifications={
-            "on_start": [DATABRICKS_NOTIFICATION_EMAIL],
-        },
-        webhook_notifications={
-            "on_start": [{"id": DATABRICKS_DESTINATION_ID}],
+        extra_job_params={
+            "email_notifications": {
+                "on_start": [DATABRICKS_NOTIFICATION_EMAIL],
+            },
+            "webhook_notifications": {
+                "on_start": [{"id": DATABRICKS_DESTINATION_ID}],
+            },
         },
     )
     with task_group:

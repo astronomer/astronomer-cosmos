@@ -117,3 +117,6 @@ line-length = 120
 
 [tool.distutils.bdist_wheel]
 universal = true
+
+[project.entry-points."airflow.plugins"]
+my_plugin = "cosmos.providers.databricks.plugin:CosmosDatabricksPlugin"

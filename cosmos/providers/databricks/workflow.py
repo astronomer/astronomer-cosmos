@@ -11,14 +11,27 @@ import time
 from typing import Any
 
 from airflow.exceptions import AirflowException
-from airflow.models.operator import BaseOperator
+from airflow.models import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.utils.context import Context
 from airflow.utils.task_group import TaskGroup
+from attrs import define
 from databricks_cli.jobs.api import JobsApi
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
 from mergedeep import merge
+
+from cosmos.providers.databricks.plugin import (
+    DatabricksJobRepairAllFailedLink,
+    DatabricksJobRunLink,
+)
+
+
+@define
+class DatabricksMetaData:
+    databricks_conn_id: str
+    databricks_run_id: str
+    databricks_job_id: str
 
 
 def _get_job_by_name(job_name: str, jobs_api: JobsApi) -> dict | None:
@@ -43,6 +56,11 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
     default Databricks Workflow Job definitions.
     """
 
+    operator_extra_links = (DatabricksJobRunLink(), DatabricksJobRepairAllFailedLink())
+    databricks_conn_id: str
+    databricks_run_id: str
+    databricks_job_id: str
+
     def __init__(
         self,
         task_id,
@@ -62,7 +80,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = None
         self.max_concurrent_runs = max_concurrent_runs
-        self.extra_job_params = extra_job_params
+        self.extra_job_params = extra_job_params or {}
         super().__init__(task_id=task_id, **kwargs)
 
     def add_task(self, task: BaseOperator):
@@ -85,7 +103,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             )
             for task in self.tasks_to_convert
         ]
-        full_json = {
+        default_json = {
             "name": self.databricks_job_name,
             "email_notifications": {"no_alert_for_skipped_runs": False},
             "timeout_seconds": 0,
@@ -94,8 +112,8 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             "job_clusters": self.job_clusters,
             "max_concurrent_runs": self.max_concurrent_runs,
         }
-        full_json = merge(full_json, self.extra_job_params)
-        return full_json
+        merged_json = merge(default_json, self.extra_job_params)
+        return merged_json
 
     @property
     def databricks_job_name(self):
@@ -141,7 +159,12 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         while runs_api.get_run(run_id)["state"]["life_cycle_state"] == "PENDING":
             print("job pending")
             time.sleep(5)
-        return run_id
+        self.databricks_run_id = run_id
+        return DatabricksMetaData(
+            databricks_conn_id=self.databricks_conn_id,
+            databricks_run_id=run_id,
+            databricks_job_id=job_id,
+        )
 
 
 class DatabricksWorkflowTaskGroup(TaskGroup):
@@ -186,6 +209,13 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
             databricks_conn_id="databricks_conn",
             job_clusters=job_cluster_spec,
             notebook_params=[],
+            notebook_packages=[
+                {
+                    "pypi": {
+                        "package": "simplejson"
+                    }
+                },
+            ]
         )
         with task_group:
             notebook_1 = DatabricksNotebookOperator(
@@ -194,6 +224,13 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
                 notebook_path="/Users/<user>/Test workflow",
                 source="WORKSPACE",
                 job_cluster_key="Shared_job_cluster",
+                notebook_packages=[
+                    {
+                        "pypi": {
+                            "package": "Faker"
+                        }
+                    }
+                ]
             )
             notebook_2 = DatabricksNotebookOperator(
                 task_id="notebook_2",
@@ -222,6 +259,9 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
     :param job_clusters: A list of job clusters to use for this workflow.
     :param notebook_params: A list of notebook parameters to pass to the workflow.These parameters will be passed to
     all notebook tasks in the workflow.
+    :param notebook_packages: A list of dictionary of Python packages to be installed. Packages defined at the
+    workflow task group level are installed for each of the notebook tasks under it. And packages defined at the
+    notebook task level are installed specific for the notebook task.
     :param jar_params: A list of jar parameters to pass to the workflow. These parameters will be passed to all jar
         tasks
     in the workflow.
@@ -250,6 +290,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         job_clusters=None,
         jar_params: dict = None,
         notebook_params: list = None,
+        notebook_packages: list[dict[str, Any]] = None,
         python_params: list = None,
         spark_submit_params: list = None,
         max_concurrent_runs: int = 1,
@@ -264,6 +305,8 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         :param job_clusters: A list of job clusters to use for this workflow.
         :param notebook_params: A list of notebook parameters to pass to the workflow.These parameters will be passed to
         all notebook tasks in the workflow.
+        :param notebook_packages: A list of dictionary of Python packages to be installed. These packages will be passed
+         to all notebook tasks in the workflow.
         :param jar_params: A list of jar parameters to pass to the workflow.
          These parameters will be passed to all jar tasks
         in the workflow.
@@ -280,6 +323,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
         self.existing_clusters = existing_clusters or []
         self.job_clusters = job_clusters or []
         self.notebook_params = notebook_params or []
+        self.notebook_packages = notebook_packages or []
         self.python_params = python_params or []
         self.spark_submit_params = spark_submit_params or []
         self.jar_params = jar_params or []
@@ -317,7 +361,7 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
             if task_id != f"{self.group_id}.launch":
                 create_databricks_workflow_task.relevant_upstreams.append(task_id)
                 create_databricks_workflow_task.add_task(task)
-                task.databricks_run_id = create_databricks_workflow_task.output
+                task.databricks_metadata = create_databricks_workflow_task.output
 
         create_databricks_workflow_task.set_downstream(roots)
         super().__exit__(_type, _value, _tb)

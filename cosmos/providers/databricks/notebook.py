@@ -11,6 +11,13 @@ from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
 
+from cosmos.providers.databricks.constants import JOBS_API_VERSION
+from cosmos.providers.databricks.plugin import (
+    DatabricksJobRepairSingleFailedLink,
+    DatabricksJobRunLink,
+)
+from cosmos.providers.databricks.workflow import DatabricksMetaData
+
 
 class DatabricksNotebookOperator(BaseOperator):
     """
@@ -63,7 +70,11 @@ class DatabricksNotebookOperator(BaseOperator):
         :param notebook_params: the parameters to pass to the notebook
     """
 
-    template_fields = ("databricks_run_id",)
+    operator_extra_links = (
+        DatabricksJobRunLink(),
+        DatabricksJobRepairSingleFailedLink(),
+    )
+    template_fields = ("databricks_metadata",)
 
     def __init__(
         self,
@@ -71,6 +82,7 @@ class DatabricksNotebookOperator(BaseOperator):
         source: str,
         databricks_conn_id: str,
         notebook_params: dict | None = None,
+        notebook_packages: list[dict[str, Any]] = None,
         job_cluster_key: str | None = None,
         new_cluster: dict | None = None,
         existing_cluster_id: str | None = None,
@@ -79,37 +91,55 @@ class DatabricksNotebookOperator(BaseOperator):
         self.notebook_path = notebook_path
         self.source = source
         self.notebook_params = notebook_params or {}
+        self.notebook_packages = notebook_packages or []
         self.databricks_conn_id = databricks_conn_id
-        self.databricks_run_id = ""
+        self.databricks_metadata: DatabricksMetaData | None = None
         self.job_cluster_key = job_cluster_key or ""
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
-
         super().__init__(**kwargs)
 
-    def convert_to_databricks_workflow_task(
-        self, relevant_upstreams: list[BaseOperator]
-    ):
-        """
-        Convert the operator to a Databricks workflow task that can be task in a workflow
-        """
-        result = {
-            "task_key": self.dag_id + "__" + self.task_id.replace(".", "__"),
-            "depends_on": [
-                {"task_key": self.dag_id + "__" + t.replace(".", "__")}
-                for t in self.upstream_task_ids
-                if t in relevant_upstreams
-            ],
-            "job_cluster_key": self.job_cluster_key,
-            "timeout_seconds": 0,
+    def _get_task_base_json(self) -> dict[str, Any]:
+        """Get task base json to be used for task group tasks and single task submissions."""
+        return {
+            # Timeout seconds value of 0 for the Databricks Jobs API means the job runs forever.
+            # That is also the default behavior of Databricks jobs to run a job forever without a default timeout value.
+            "timeout_seconds": int(self.execution_timeout.total_seconds())
+            if self.execution_timeout
+            else 0,
             "email_notifications": {},
             "notebook_task": {
                 "notebook_path": self.notebook_path,
                 "source": self.source,
                 "base_parameters": self.notebook_params,
             },
+            "libraries": self.notebook_packages,
+        }
+
+    def convert_to_databricks_workflow_task(
+        self, relevant_upstreams: list[BaseOperator]
+    ):
+        """
+        Convert the operator to a Databricks workflow task that can be a task in a workflow
+        """
+        if hasattr(self.task_group, "notebook_packages"):
+            self.notebook_packages.extend(self.task_group.notebook_packages)
+        base_task_json = self._get_task_base_json()
+        result = {
+            "task_key": self._get_databricks_task_id(self.task_id),
+            "depends_on": [
+                {"task_key": self._get_databricks_task_id(t)}
+                for t in self.upstream_task_ids
+                if t in relevant_upstreams
+            ],
+            "job_cluster_key": self.job_cluster_key,
+            **base_task_json,
         }
         return result
+
+    def _get_databricks_task_id(self, task_id: str):
+        """Get the databricks task ID using dag_id and task_id. removes illegal characters."""
+        return self.dag_id + "__" + task_id.replace(".", "__")
 
     def monitor_databricks_job(self):
         """Monitor the Databricks job until it completes. Raises Airflow exception if the job fails."""
@@ -119,13 +149,18 @@ class DatabricksNotebookOperator(BaseOperator):
         self._wait_for_pending_task(current_task, runs_api)
         self._wait_for_running_task(current_task, runs_api)
         self._wait_for_terminating_task(current_task, runs_api)
-        final_state = runs_api.get_run(current_task["run_id"])["state"]
+        final_state = runs_api.get_run(
+            current_task["run_id"], version=JOBS_API_VERSION
+        )["state"]
         self._handle_final_state(final_state)
 
     def _get_current_databricks_task(self, runs_api):
         return {
-            x["task_key"]: x for x in runs_api.get_run(self.databricks_run_id)["tasks"]
-        }[self.dag_id + "__" + self.task_id.replace(".", "__")]
+            x["task_key"]: x
+            for x in runs_api.get_run(self.databricks_run_id, version=JOBS_API_VERSION)[
+                "tasks"
+            ]
+        }[self._get_databricks_task_id(self.task_id)]
 
     def _handle_final_state(self, final_state):
         if final_state.get("life_cycle_state", None) != "TERMINATED":
@@ -140,7 +175,9 @@ class DatabricksNotebookOperator(BaseOperator):
             )
 
     def _get_lifestyle_state(self, current_task, runs_api):
-        return runs_api.get_run(current_task["run_id"])["state"]["life_cycle_state"]
+        return runs_api.get_run(current_task["run_id"], version=JOBS_API_VERSION)[
+            "state"
+        ]["life_cycle_state"]
 
     def _wait_on_state(self, current_task, runs_api, state):
         while self._get_lifestyle_state(current_task, runs_api) == state:
@@ -161,18 +198,17 @@ class DatabricksNotebookOperator(BaseOperator):
         databricks_conn = hook.get_conn()
         return ApiClient(
             user=databricks_conn.login,
-            password=databricks_conn.password,
+            token=databricks_conn.password,
             host=databricks_conn.host,
         )
 
     def launch_notebook_job(self):
         """Launch the notebook as a one-time job to Databricks."""
         api_client = self._get_api_client()
+        base_task_json = self._get_task_base_json()
         run_json = {
-            "notebook_task": {
-                "notebook_path": self.notebook_path,
-                "base_parameters": {"source": self.source},
-            },
+            "run_name": self._get_databricks_task_id(self.task_id),
+            **base_task_json,
         }
         if self.new_cluster and self.existing_cluster_id:
             raise ValueError(
@@ -205,4 +241,7 @@ class DatabricksNotebookOperator(BaseOperator):
             and getattr(self.task_group, "is_databricks")
         ):
             self.launch_notebook_job()
+        else:
+            self.databricks_run_id = self.databricks_metadata.databricks_run_id
+            self.databricks_conn_id = self.databricks_metadata.databricks_conn_id
         self.monitor_databricks_job()

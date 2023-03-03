@@ -74,7 +74,7 @@ jobs:
       - run: pip3 install nox
       - run: nox -s build_docs
 
-  Run-Unit-tests-Airflow-2.5:
+  Run-Unit-tests-Airflow-2-5:
     strategy:
       fail-fast: false
       matrix:

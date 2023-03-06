@@ -86,5 +86,5 @@ with dag:
     # [END howto_databricks_workflow_notebook]
 
 
-def test_databricks_workflow_notebook():
+def test_databricks_workflow():
     dag.test(conn_file_path="test-connections.yaml")

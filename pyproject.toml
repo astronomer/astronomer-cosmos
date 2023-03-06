@@ -68,12 +68,32 @@ dbt-openlineage = [
     "dbt-core",
     "openlineage-dbt>=0.21.1"
 ]
-
 databricks = [
     "databricks-sql-connector>=2.0.4;python_version>='3.10'",
     "databricks-cli",
     "apache-airflow-providers-databricks>=2.2.0",
     "mergedeep"
+]
+all = [
+    "astronomer-cosmos[dbt-all]",
+    "astronomer-cosmos[databricks]",
+]
+docs =[
+    "sphinx",
+    "pydata-sphinx-theme",
+    "sphinx-autobuild",
+    "sphinx-tabs"
+]
+tests = [
+    "pytest>=6.0",
+    "pytest-split",
+    "pytest-dotenv",
+    "requests-mock",
+    "pytest-cov",
+    "pytest-describe",
+    "types-requests",
+    "mypy",
+    "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
 ]
 
 [project.urls]
@@ -86,11 +106,6 @@ path = "cosmos/__init__.py"
 [tool.hatch.build.targets.sdist]
 include = [
     "/cosmos",
-]
-
-[tool.hatch.envs.test]
-dependencies = [
-  "pytest"
 ]
 
 [tool.hatch.envs.docs]

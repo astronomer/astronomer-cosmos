@@ -12,6 +12,7 @@ Cosmos allows you to render your dbt models as Airflow DAGs and Task Groups.
     Scheduling <scheduling>
     Configuration <configuration>
     Connections <connections>
+    Lineage <lineage>
 
 
 Quickstart

@@ -80,7 +80,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.databricks_conn_id = databricks_conn_id
         self.databricks_run_id = None
         self.max_concurrent_runs = max_concurrent_runs
-        self.extra_job_params = extra_job_params
+        self.extra_job_params = extra_job_params or {}
         super().__init__(task_id=task_id, **kwargs)
 
     def add_task(self, task: BaseOperator):
@@ -103,7 +103,7 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             )
             for task in self.tasks_to_convert
         ]
-        full_json = {
+        default_json = {
             "name": self.databricks_job_name,
             "email_notifications": {"no_alert_for_skipped_runs": False},
             "timeout_seconds": 0,
@@ -112,8 +112,8 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
             "job_clusters": self.job_clusters,
             "max_concurrent_runs": self.max_concurrent_runs,
         }
-        full_json = merge(full_json, self.extra_job_params)
-        return full_json
+        merged_json = merge(default_json, self.extra_job_params)
+        return merged_json
 
     @property
     def databricks_job_name(self):

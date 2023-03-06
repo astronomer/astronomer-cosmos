@@ -1,10 +1,17 @@
 """Nox automation definitions."""
-
+import os
+from pathlib import Path
 
 import nox
 
+from tests.example_dags.constants import TEST_CONNECTIONS_YAML_FILE
+
 nox.options.sessions = ["dev"]
 nox.options.reuse_existing_virtualenvs = True
+
+os.environ[
+    "AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES"
+] = "airflow.* astro.* cosmos.*"
 
 
 @nox.session(python="3.10")
@@ -16,6 +23,15 @@ def dev(session: nox.Session) -> None:
     """
     session.install("nox")
     session.install("-e", ".[all,tests]")
+
+
+def _expand_env_vars(file_path: str):
+    """Expand environment variables in the given file."""
+    file_path = Path(file_path)
+    with file_path.open() as fp:
+        yaml_with_env = os.path.expandvars(fp.read())
+    with file_path.open("w") as fp:
+        fp.write(yaml_with_env)
 
 
 @nox.session(python=["3.8", "3.9", "3.10"])
@@ -33,6 +49,8 @@ def test(session: nox.Session, airflow) -> None:
     # Log all the installed dependencies
     session.log("Installed Dependencies:")
     session.run("pip3", "freeze")
+
+    _expand_env_vars(TEST_CONNECTIONS_YAML_FILE)
 
     session.run("airflow", "db", "init", env=env)
 

@@ -23,6 +23,7 @@ concurrency:
 
 env:
   AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES: "airflow.* astro.* cosmos.*"
+  CI_ENABLED: true
 
 jobs:
   Markdown-link-check:
@@ -121,3 +122,46 @@ jobs:
         with:
           name: coverage-${{ matrix.python }}-${{ matrix.airflow }}
           path: ./.coverage
+
+  Run-example-dag-tests-Airflow-2-5:
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.fork == false
+      ) ||
+      (
+        github.event_name == 'pull_request_target' &&
+        contains(github.event.pull_request.labels.*.name, 'safe to test')
+      )||
+      (
+        github.event_name == 'release'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        if: github.event_name != 'pull_request_target'
+
+      - name: Checkout pull/${{ github.event.number }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+        if: github.event_name == 'pull_request_target'
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.8'
+          architecture: 'x64'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            .nox
+          key: ${{ runner.os }}-2.5-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+      - run: cat ../.github/ci-test-connections.yaml > tests/ci-test-connections.yaml
+      - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
+      - run: pip3 install nox
+      - run: nox -s "test-3.8(airflow='2.5')" -- "tests/example_dags"
+    env:
+      DATABRICKS_CONN_TOKEN: ${{ secrets.DATABRICKS_CONN_TOKEN }}
+      DATABRICKS_CONN_HOST: https://dbc-9c390870-65ef.cloud.databricks.com/

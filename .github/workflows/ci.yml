@@ -116,7 +116,7 @@ jobs:
           key: tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
-      - run: nox -s "test-${{ matrix.version }}(airflow='${{ matrix.airflow }}')" -- tests/ -k "not tests/example_dags" --cov=cosmos --cov-report=xml --cov-branch
+      - run: nox -s "test-${{ matrix.version }}(airflow='${{ matrix.airflow }}')" -- tests/ --ignore "tests/example_dags" --cov=cosmos --cov-report=xml --cov-branch
       - name: Upload coverage
         uses: actions/upload-artifact@v2
         with:

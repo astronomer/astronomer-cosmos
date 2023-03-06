@@ -47,7 +47,7 @@ dbt-all = [
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
-    "astronomer-cosmos[dbt-openlineage]"
+"dbt-openlineage"
 ]
 dbt-bigquery = [
     "dbt-bigquery",

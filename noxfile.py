@@ -23,9 +23,8 @@ def dev(session: nox.Session) -> None:
     session.install("-e", ".[all,tests]")
 
 
-def _expand_env_vars(file_path: str):
+def _expand_env_vars(file_path: Path):
     """Expand environment variables in the given file."""
-    file_path = Path(file_path)
     with file_path.open() as fp:
         yaml_with_env = os.path.expandvars(fp.read())
     with file_path.open("w") as fp:
@@ -49,7 +48,9 @@ def test(session: nox.Session, airflow) -> None:
     session.log("Installed Dependencies:")
     session.run("pip3", "freeze")
 
-    _expand_env_vars("test-connections.yaml")
+    test_connections_file = Path("test-connections.yaml")
+    if test_connections_file.exists():
+        _expand_env_vars(test_connections_file)
 
     session.run("airflow", "db", "init", env=env)
 

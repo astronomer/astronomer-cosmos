@@ -106,6 +106,7 @@ path = "cosmos/__init__.py"
 [tool.hatch.build.targets.sdist]
 include = [
     "/cosmos",
+    "/tests"
 ]
 
 [tool.hatch.envs.docs]

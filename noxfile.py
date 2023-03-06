@@ -38,6 +38,7 @@ def _expand_env_vars(file_path: str):
 @nox.parametrize("airflow", ["2.4", "2.5"])
 def test(session: nox.Session, airflow) -> None:
     """Run both unit and integration tests."""
+    session.run("echo", "$PWD")
     env = {
         "AIRFLOW_HOME": f"~/airflow-{airflow}-python-{session.python}",
         "AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES": "airflow\\.* astro\\.* cosmos\\.*",

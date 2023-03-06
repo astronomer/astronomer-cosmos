@@ -26,7 +26,7 @@ env:
   CI_ENABLED: true
 
 jobs:
-# TODO: Fix Markdown-link-check failures
+# TODO: Fix Markdown-link-check failures https://github.com/astronomer/astronomer-cosmos/issues/172
 #  Markdown-link-check:
 #    if: github.event.action != 'labeled'
 #    runs-on: ubuntu-latest
@@ -36,7 +36,7 @@ jobs:
 #        with:
 #          config-file: '.github/workflows/mlc_config.json'
 #
-# TODO: Fix Type-check failures
+# TODO: Fix Type-check failures https://github.com/astronomer/astronomer-cosmos/issues/173
 #  Type-Check:
 #    if: github.event.action != 'labeled'
 #    runs-on: ubuntu-latest

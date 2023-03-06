@@ -158,7 +158,7 @@ jobs:
             ~/.cache/pip
             .nox
           key: ${{ runner.os }}-2.5-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
-      - run: cat .github/ci-test-connections.yaml > tests/ci-test-connections.yaml
+      - run: cat .github/ci-test-connections.yaml > test-connections.yaml
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
       - run: ls

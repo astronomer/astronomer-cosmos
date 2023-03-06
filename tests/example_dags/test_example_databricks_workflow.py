@@ -7,7 +7,6 @@ from airflow.utils.timezone import datetime
 
 from cosmos.providers.databricks.notebook import DatabricksNotebookOperator
 from cosmos.providers.databricks.workflow import DatabricksWorkflowTaskGroup
-from tests.example_dags.constants import TEST_CONNECTIONS_YAML_FILE
 
 EXECUTION_TIMEOUT = int(os.getenv("EXECUTION_TIMEOUT", 6))
 default_args = {
@@ -88,4 +87,4 @@ with dag:
 
 
 def test_databricks_workflow_notebook():
-    dag.test(conn_file_path=TEST_CONNECTIONS_YAML_FILE)
+    dag.test(conn_file_path="test-connections.yaml")

@@ -4,8 +4,6 @@ from pathlib import Path
 
 import nox
 
-from tests.example_dags.constants import TEST_CONNECTIONS_YAML_FILE
-
 nox.options.sessions = ["dev"]
 nox.options.reuse_existing_virtualenvs = True
 
@@ -51,7 +49,7 @@ def test(session: nox.Session, airflow) -> None:
     session.log("Installed Dependencies:")
     session.run("pip3", "freeze")
 
-    _expand_env_vars(TEST_CONNECTIONS_YAML_FILE)
+    _expand_env_vars("test-connections.yaml")
 
     session.run("airflow", "db", "init", env=env)
 

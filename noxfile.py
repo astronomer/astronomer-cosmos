@@ -43,7 +43,7 @@ def test(session: nox.Session, airflow) -> None:
     session.install("-e", ".[all,tests]")
     session.install(f"apache-airflow=={airflow}")
 
-    if airflow == "2.2.4":
+    if airflow in ("2.2.4", "2.3", "2.4"):
         env["AIRFLOW__CORE__ENABLE_XCOM_PICKLING"] = "True"
 
     # Log all the installed dependencies

@@ -115,7 +115,7 @@ jobs:
           path: |
             ~/.cache/pip
             .nox
-          key: tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
+          key: unit-tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
       - run: nox -s "test-${{ matrix.version }}(airflow='${{ matrix.airflow }}')" -- tests/ --ignore "tests/example_dags" --cov=cosmos --cov-report=xml --cov-branch
@@ -164,7 +164,7 @@ jobs:
           path: |
             ~/.cache/pip
             .nox
-          key: tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
+          key: example-dags-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
       - run: cat .github/ci-test-connections.yaml > test-connections.yaml
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox

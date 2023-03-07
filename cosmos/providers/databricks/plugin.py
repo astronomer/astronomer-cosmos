@@ -28,10 +28,14 @@ from databricks_cli.sdk.api_client import ApiClient
 from flask import flash, redirect, request
 from flask_appbuilder.api import expose
 
-try:
-    AIRFLOW_FLASK_APP = get_airflow_app()
-except NameError:
-    AIRFLOW_FLASK_APP = current_app
+
+def _get_flask_app():
+    """Get the Airflow flask app instance"""
+    try:
+        flask_app = get_airflow_app()
+    except NameError:
+        flask_app = current_app
+    return flask_app
 
 
 def _get_databricks_task_id(task: BaseOperator) -> str:
@@ -85,7 +89,7 @@ def _get_dagrun(dag: DAG, run_id, session=None) -> DagRun:
 def _clear_task_instances(
     dag_id: str, run_id: str, task_ids: list[str], log: logging.Logger, session=None
 ):
-    dag = AIRFLOW_FLASK_APP.dag_bag.get_dag(dag_id)
+    dag = _get_flask_app().dag_bag.get_dag(dag_id)
     log.debug("task_ids to clear", task_ids)
     dr: DagRun = _get_dagrun(dag, run_id)
     tis_to_clear = [
@@ -176,7 +180,7 @@ class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
         *,
         ti_key: TaskInstanceKey | None = None,
     ) -> str:
-        dag = AIRFLOW_FLASK_APP.dag_bag.get_dag(ti_key.dag_id)
+        dag = _get_flask_app().dag_bag.get_dag(ti_key.dag_id)
         dag.get_task(ti_key.task_id)
         self.log.info("Getting link for task %s", ti_key.task_id)
         if ".launch" not in ti_key.task_id:
@@ -227,7 +231,7 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink, LoggingMixin):
     def get_tasks_to_run(
         self, ti_key: TaskInstanceKey, operator: BaseOperator, log: logging.Logger
     ) -> str:
-        dag = AIRFLOW_FLASK_APP.dag_bag.get_dag(ti_key.dag_id)
+        dag = _get_flask_app().dag_bag.get_dag(ti_key.dag_id)
         dr = _get_dagrun(dag, ti_key.run_id)
         log.debug("Getting failed and skipped tasks for dag run %s", dr.run_id)
         failed_and_skipped_tasks = self._get_failed_and_skipped_tasks(dr)
@@ -288,7 +292,7 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
             operator.task_group.group_id,
             ti_key.task_id,
         )
-        dag = AIRFLOW_FLASK_APP.dag_bag.get_dag(ti_key.dag_id)
+        dag = _get_flask_app().dag_bag.get_dag(ti_key.dag_id)
         task = dag.get_task(ti_key.task_id)
         # Should we catch the exception here if there is no return value?
         if ".launch" not in ti_key.task_id:

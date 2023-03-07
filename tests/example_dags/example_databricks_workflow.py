@@ -52,7 +52,7 @@ dag = DAG(
 with dag:
     # [START howto_databricks_workflow_notebook]
     task_group = DatabricksWorkflowTaskGroup(
-        group_id="test_workflow",
+        group_id=f"test_workflow_{JOB_CLUSTER_KEY}",
         databricks_conn_id=DATABRICKS_CONN_ID,
         job_clusters=job_cluster_spec,
         notebook_params=[],

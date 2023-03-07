@@ -32,17 +32,19 @@ def _expand_env_vars(file_path: Path):
 
 
 @nox.session(python=["3.8", "3.9", "3.10"])
-@nox.parametrize("airflow", ["2.4", "2.5"])
+@nox.parametrize("airflow", ["2.2.4", "2.3", "2.4", "2.5"])
 def test(session: nox.Session, airflow) -> None:
     """Run both unit and integration tests."""
-    session.run("echo", "$PWD")
     env = {
         "AIRFLOW_HOME": f"~/airflow-{airflow}-python-{session.python}",
         "AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES": "airflow\\.* astro\\.* cosmos\\.*",
     }
 
-    session.install(f"apache-airflow=={airflow}")
     session.install("-e", ".[all,tests]")
+    session.install(f"apache-airflow=={airflow}")
+
+    if airflow == "2.2.4":
+        env["AIRFLOW__CORE__ENABLE_XCOM_PICKLING"] = "True"
 
     # Log all the installed dependencies
     session.log("Installed Dependencies:")

@@ -15,7 +15,12 @@ from airflow.models import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.utils.context import Context
 from airflow.utils.task_group import TaskGroup
-from attrs import define
+
+try:
+    from attrs import define
+except ModuleNotFoundError:
+    from attr import define
+
 from databricks_cli.jobs.api import JobsApi
 from databricks_cli.runs.api import RunsApi
 from databricks_cli.sdk.api_client import ApiClient
@@ -82,6 +87,10 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params or {}
         super().__init__(task_id=task_id, **kwargs)
+        if not hasattr(self, "task_group"):
+            from airflow.utils.task_group import TaskGroupContext
+
+            self.task_group = TaskGroupContext.get_current_task_group(self.dag)
 
     def add_task(self, task: BaseOperator):
         """
@@ -334,6 +343,10 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
     def __exit__(self, _type, _value, _tb):
         """Exit the context manager and add tasks to a single _CreateDatabricksWorkflowOperator."""
         roots = self.roots
+        if not hasattr(self, "dag"):
+            from airflow.models.dag import DagContext
+
+            self.dag = DagContext.get_current_dag()
         create_databricks_workflow_task: _CreateDatabricksWorkflowOperator = (
             _CreateDatabricksWorkflowOperator(
                 dag=self.dag,

@@ -1,6 +1,12 @@
 import pytest
 from airflow.models import DAG
-from airflow.operators.empty import EmptyOperator
+
+try:
+    from airflow.operators.empty import EmptyOperator
+except ModuleNotFoundError:
+    # For older versions of Airflow which do not contain the EmptyOperator.
+    from airflow.operators.dummy import DummyOperator as EmptyOperator
+
 from airflow.utils.timezone import datetime
 
 TEST_DAG_ID = "unit_test_dag"

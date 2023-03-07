@@ -1,5 +1,6 @@
 """Example DAG for using the DatabricksNotebookOperator."""
 import os
+import uuid
 from datetime import timedelta
 
 from airflow.models.dag import DAG
@@ -56,10 +57,6 @@ with dag:
             {"pypi": {"package": "Faker"}},
         ],
         source="WORKSPACE",
-        job_cluster_key="random_cluster_key",
+        job_cluster_key=str(uuid.uuid4()),
         new_cluster=NEW_CLUSTER_SPEC,
     )
-
-
-def test_databricks_notebook():
-    dag.test(conn_file_path="test-connections.yaml")

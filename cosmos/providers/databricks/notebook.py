@@ -5,7 +5,7 @@ import time
 from typing import Any
 
 from airflow.exceptions import AirflowException
-from airflow.models.operator import BaseOperator
+from airflow.models import BaseOperator
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.utils.context import Context
 from databricks_cli.runs.api import RunsApi
@@ -98,6 +98,10 @@ class DatabricksNotebookOperator(BaseOperator):
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
         super().__init__(**kwargs)
+        if not hasattr(self, "task_group"):
+            from airflow.utils.task_group import TaskGroupContext
+
+            self.task_group = TaskGroupContext.get_current_task_group(self.dag)
 
     def _get_task_base_json(self) -> dict[str, Any]:
         """Get task base json to be used for task group tasks and single task submissions."""

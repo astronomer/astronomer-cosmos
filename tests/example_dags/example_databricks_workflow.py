@@ -1,5 +1,6 @@
 """Example DAG for using the DatabricksWorkflowTaskGroup and DatabricksNotebookOperator."""
 import os
+import uuid
 from datetime import timedelta
 
 from airflow.models.dag import DAG
@@ -16,9 +17,11 @@ default_args = {
 }
 
 DATABRICKS_CONN_ID = os.getenv("ASTRO_DATABRICKS_CONN_ID", "databricks_conn")
+
+JOB_CLUSTER_KEY = str(uuid.uuid4())
 job_cluster_spec = [
     {
-        "job_cluster_key": "Shared_job_cluster",
+        "job_cluster_key": JOB_CLUSTER_KEY,
         "new_cluster": {
             "cluster_name": "",
             "spark_version": "11.3.x-scala2.12",
@@ -69,7 +72,7 @@ with dag:
             notebook_path="/Shared/Notebook_1",
             notebook_packages=[{"pypi": {"package": "Faker"}}],
             source="WORKSPACE",
-            job_cluster_key="Shared_job_cluster",
+            job_cluster_key=JOB_CLUSTER_KEY,
             execution_timeout=timedelta(seconds=600),
         )
         notebook_2 = DatabricksNotebookOperator(
@@ -77,14 +80,10 @@ with dag:
             databricks_conn_id=DATABRICKS_CONN_ID,
             notebook_path="/Shared/Notebook_2",
             source="WORKSPACE",
-            job_cluster_key="Shared_job_cluster",
+            job_cluster_key=JOB_CLUSTER_KEY,
             notebook_params={
                 "foo": "bar",
             },
         )
         notebook_1 >> notebook_2
     # [END howto_databricks_workflow_notebook]
-
-
-def test_databricks_workflow():
-    dag.test(conn_file_path="test-connections.yaml")

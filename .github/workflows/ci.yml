@@ -125,7 +125,12 @@ jobs:
           name: coverage-${{ matrix.python }}-${{ matrix.airflow }}
           path: ./.coverage
 
-  Run-example-dag-tests-Airflow-2-5:
+  Run-example-dag-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [ '3.8', '3.9']
+        airflow: [ '2.2.4', '2.3', '2.4', '2.5' ]
     if: >-
       github.event_name == 'push' ||
       (
@@ -159,13 +164,11 @@ jobs:
           path: |
             ~/.cache/pip
             .nox
-          key: ${{ runner.os }}-2.5-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+          key: tests-os-${{ runner.os }}-python-${{ matrix.python }}-airflow-${{ matrix.airflow }}-deps-${{ hashFiles('pyproject.toml') }}-version-${{ hashFiles('cosmos/__init__.py') }}
       - run: cat .github/ci-test-connections.yaml > test-connections.yaml
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
-      - run: ls
-      - run: echo $PWD
-      - run: nox -s "test-3.8(airflow='2.5')" -- "tests/example_dags"
+      - run: nox -s "test-${{ matrix.version }}(airflow='${{ matrix.airflow }}')" -- "tests/example_dags"
     env:
       DATABRICKS_CONN_TOKEN: ${{ secrets.DATABRICKS_CONN_TOKEN }}
       DATABRICKS_CONN_HOST: https://dbc-9c390870-65ef.cloud.databricks.com/

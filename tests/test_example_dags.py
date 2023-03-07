@@ -23,7 +23,7 @@ def session():
 
 def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
-    example_dags_dir = Path(__file__).parent.parent / "example_dags"
+    example_dags_dir = Path(__file__).parent / "example_dags"
     airflow_ignore_file = example_dags_dir / ".airflowignore"
 
     print(".airflowignore contents: ")

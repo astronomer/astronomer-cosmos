@@ -35,7 +35,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
-    "apache-airflow>=2.4",
+    "apache-airflow>=2.2.4",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
 ]

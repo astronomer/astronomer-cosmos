@@ -16,10 +16,10 @@ To install Cosmos with a dbt selector from PyPI, run the following command:
 
 .. code-block:: bash
 
-    pip install astronomer-cosmos[dbt.all]
+    pip install astronomer-cosmos[dbt-all]
 
 
-Using ``dbt.all`` will install all Cosmos, dbt, and all of the supported database types. If you only need a subset of the supported database types, you can use the following selectors:
+Using ``dbt-all`` will install all Cosmos, dbt, and all of the supported database types. If you only need a subset of the supported database types, you can use the following selectors:
 
 .. list-table::
    :header-rows: 1
@@ -30,19 +30,19 @@ Using ``dbt.all`` will install all Cosmos, dbt, and all of the supported databas
    * - (default)
      - apache-airflow, Jinja2
 
-   * - ``dbt.all``
+   * - ``dbt-all``
      - astronomer-cosmos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
 
-   * - ``dbt.postgres``
+   * - ``dbt-postgres``
      - astronomer-cosmos, dbt-core, dbt-postgres
 
-   * - ``dbt.bigquery``
+   * - ``dbt-bigquery``
      - astronomer-cosmos, dbt-core, dbt-bigquery
 
-   * - ``dbt.redshift``
+   * - ``dbt-redshift``
      - astronomer-cosmos, dbt-core, dbt-redshift
 
-   * - ``dbt.snowflake``
+   * - ``dbt-snowflake``
      - astronomer-cosmos, dbt-core, dbt-snowflake
 
 
@@ -50,7 +50,7 @@ For example, to install Cosmos with dbt and the Postgres adapter, run the follow
 
 .. code-block:: bash
 
-    pip install 'astronomer-cosmos[dbt.postgres]'
+    pip install 'astronomer-cosmos[dbt-postgres]'
 
 
 Virtual Environment

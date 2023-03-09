@@ -16,13 +16,6 @@ default_args = {
 }
 
 DATABRICKS_CONN_ID = os.getenv("ASTRO_DATABRICKS_CONN_ID", "databricks_conn")
-DATABRICKS_NOTIFICATION_EMAIL = os.getenv(
-    "ASTRO_DATABRICKS_NOTIFICATION_EMAIL", "tatiana.alchueyr@astronomer.io"
-)
-DATABRICKS_DESTINATION_ID = os.getenv(
-    "ASTRO_DATABRICKS_DESTINATION_ID", "b0aea8ab-ea8c-4a45-a2e9-9a26753fd702"
-)
-
 job_cluster_spec = [
     {
         "job_cluster_key": "Shared_job_cluster",
@@ -68,14 +61,6 @@ with dag:
                 }
             },
         ],
-        extra_job_params={
-            "email_notifications": {
-                "on_start": [DATABRICKS_NOTIFICATION_EMAIL],
-            },
-            "webhook_notifications": {
-                "on_start": [{"id": DATABRICKS_DESTINATION_ID}],
-            },
-        },
     )
     with task_group:
         notebook_1 = DatabricksNotebookOperator(
@@ -100,5 +85,6 @@ with dag:
         notebook_1 >> notebook_2
     # [END howto_databricks_workflow_notebook]
 
-if __name__ == "__main__":
-    dag.test()
+
+def test_databricks_workflow():
+    dag.test(conn_file_path="test-connections.yaml")

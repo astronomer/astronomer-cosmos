@@ -141,3 +141,6 @@ dmypy.json
 
 # dbt
 logs/
+
+# Airflow connections file
+test-connections.yaml

@@ -1,5 +1,6 @@
 import pytest
 from airflow.models import DAG
+from airflow.operators.empty import EmptyOperator
 from airflow.utils.timezone import datetime
 
 TEST_DAG_ID = "unit_test_dag"
@@ -23,4 +24,6 @@ def dag():
     Creates a test DAG with default arguments.
     """
     dag = DAG(TEST_DAG_ID, start_date=datetime(2022, 1, 1))
+    with dag:
+        EmptyOperator(task_id="foo")
     yield dag

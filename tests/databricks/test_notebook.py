@@ -5,7 +5,10 @@ import pytest
 from airflow.exceptions import AirflowException
 
 from cosmos.providers.databricks.notebook import DatabricksNotebookOperator
-from cosmos.providers.databricks.workflow import DatabricksWorkflowTaskGroup
+from cosmos.providers.databricks.workflow import (
+    DatabricksMetaData,
+    DatabricksWorkflowTaskGroup,
+)
 
 
 @pytest.fixture
@@ -24,6 +27,7 @@ def databricks_notebook_operator():
         notebook_params={
             "foo": "bar",
         },
+        notebook_packages=[{"nb_index": {"package": "nb_package"}}],
     )
 
 
@@ -44,6 +48,7 @@ def test_databricks_notebook_operator_without_taskgroup(mock_monitor, mock_launc
             notebook_params={
                 "foo": "bar",
             },
+            notebook_packages=[{"nb_index": {"package": "nb_package"}}],
         )
         assert notebook.task_id == "notebook"
         assert notebook.databricks_conn_id == "foo"
@@ -51,6 +56,7 @@ def test_databricks_notebook_operator_without_taskgroup(mock_monitor, mock_launc
         assert notebook.source == "WORKSPACE"
         assert notebook.job_cluster_key == "foo"
         assert notebook.notebook_params == {"foo": "bar"}
+        assert notebook.notebook_packages == [{"nb_index": {"package": "nb_package"}}]
     dag.test()
     mock_launch.assert_called_once()
     mock_monitor.assert_called_once()
@@ -68,7 +74,11 @@ def test_databricks_notebook_operator_without_taskgroup(mock_monitor, mock_launc
 def test_databricks_notebook_operator_with_taskgroup(
     mock_create, mock_monitor, mock_launch, dag
 ):
-    mock_create.return_value = {"job_id": 1}
+    mock_create.return_value = DatabricksMetaData(
+        databricks_job_id="job_id",
+        databricks_conn_id="conn_id",
+        databricks_run_id="run_id",
+    )
     with dag:
         task_group = DatabricksWorkflowTaskGroup(
             group_id="test_workflow",
@@ -86,6 +96,7 @@ def test_databricks_notebook_operator_with_taskgroup(
                 notebook_params={
                     "foo": "bar",
                 },
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             )
             assert notebook.task_id == "test_workflow.notebook"
             assert notebook.databricks_conn_id == "foo"
@@ -93,6 +104,9 @@ def test_databricks_notebook_operator_with_taskgroup(
             assert notebook.source == "WORKSPACE"
             assert notebook.job_cluster_key == "foo"
             assert notebook.notebook_params == {"foo": "bar"}
+            assert notebook.notebook_packages == [
+                {"nb_index": {"package": "nb_package"}}
+            ]
     dag.test()
     mock_launch.assert_not_called()
     mock_monitor.assert_called_once()
@@ -102,12 +116,16 @@ def test_databricks_notebook_operator_with_taskgroup(
     "cosmos.providers.databricks.notebook.DatabricksNotebookOperator.monitor_databricks_job"
 )
 @mock.patch(
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_databricks_task_id"
+)
+@mock.patch(
     "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_api_client"
 )
 @mock.patch("cosmos.providers.databricks.notebook.RunsApi")
 def test_databricks_notebook_operator_without_taskgroup_new_cluster(
-    mock_runs_api, mock_api_client, mock_monitor, dag
+    mock_runs_api, mock_api_client, mock_get_databricks_task_id, mock_monitor, dag
 ):
+    mock_get_databricks_task_id.return_value = "1234"
     mock_runs_api.return_value = mock.MagicMock()
     with dag:
         DatabricksNotebookOperator(
@@ -119,16 +137,22 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
             notebook_params={
                 "foo": "bar",
             },
+            notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             new_cluster={"foo": "bar"},
         )
     dag.test()
     mock_runs_api.return_value.submit_run.assert_called_once_with(
         {
+            "run_name": "1234",
             "notebook_task": {
                 "notebook_path": "/foo/bar",
-                "base_parameters": {"source": "WORKSPACE"},
+                "source": "WORKSPACE",
+                "base_parameters": {"foo": "bar"},
             },
             "new_cluster": {"foo": "bar"},
+            "libraries": [{"nb_index": {"package": "nb_package"}}],
+            "timeout_seconds": 0,
+            "email_notifications": {},
         }
     )
     mock_monitor.assert_called_once()
@@ -138,12 +162,16 @@ def test_databricks_notebook_operator_without_taskgroup_new_cluster(
     "cosmos.providers.databricks.notebook.DatabricksNotebookOperator.monitor_databricks_job"
 )
 @mock.patch(
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_databricks_task_id"
+)
+@mock.patch(
     "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_api_client"
 )
 @mock.patch("cosmos.providers.databricks.notebook.RunsApi")
 def test_databricks_notebook_operator_without_taskgroup_existing_cluster(
-    mock_runs_api, mock_api_client, mock_monitor, dag
+    mock_runs_api, mock_api_client, mock_get_databricks_task_id, mock_monitor, dag
 ):
+    mock_get_databricks_task_id.return_value = "1234"
     mock_runs_api.return_value = mock.MagicMock()
     with dag:
         DatabricksNotebookOperator(
@@ -155,16 +183,22 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster(
             notebook_params={
                 "foo": "bar",
             },
+            notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             existing_cluster_id="123",
         )
     dag.test()
     mock_runs_api.return_value.submit_run.assert_called_once_with(
         {
+            "run_name": "1234",
             "notebook_task": {
                 "notebook_path": "/foo/bar",
-                "base_parameters": {"source": "WORKSPACE"},
+                "source": "WORKSPACE",
+                "base_parameters": {"foo": "bar"},
             },
             "existing_cluster_id": "123",
+            "libraries": [{"nb_index": {"package": "nb_package"}}],
+            "timeout_seconds": 0,
+            "email_notifications": {},
         }
     )
     mock_monitor.assert_called_once()
@@ -191,6 +225,7 @@ def test_databricks_notebook_operator_without_taskgroup_existing_cluster_and_new
                 notebook_params={
                     "foo": "bar",
                 },
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
                 existing_cluster_id="123",
                 new_cluster={"foo": "bar"},
             )
@@ -218,6 +253,7 @@ def test_databricks_notebook_operator_without_taskgroup_no_cluster(
                 notebook_params={
                     "foo": "bar",
                 },
+                notebook_packages=[{"nb_index": {"package": "nb_package"}}],
             )
         dag.test()
 
@@ -260,7 +296,7 @@ def test_wait_for_pending_task(mock_sleep, mock_runs_api, databricks_notebook_op
         {"state": {"life_cycle_state": "RUNNING"}},
     ]
     databricks_notebook_operator._wait_for_pending_task(current_task, mock_runs_api)
-    mock_runs_api.get_run.assert_called_with("123")
+    mock_runs_api.get_run.assert_called_with("123", version="2.1")
     assert mock_runs_api.get_run.call_count == 2
     mock_runs_api.reset_mock()
 
@@ -277,7 +313,7 @@ def test_wait_for_terminating_task(
         {"state": {"life_cycle_state": "TERMINATED"}},
     ]
     databricks_notebook_operator._wait_for_terminating_task(current_task, mock_runs_api)
-    mock_runs_api.get_run.assert_called_with("123")
+    mock_runs_api.get_run.assert_called_with("123", version="2.1")
     assert mock_runs_api.get_run.call_count == 3
     mock_runs_api.reset_mock()
 
@@ -292,7 +328,7 @@ def test_wait_for_running_task(mock_sleep, mock_runs_api, databricks_notebook_op
         {"state": {"life_cycle_state": "TERMINATED"}},
     ]
     databricks_notebook_operator._wait_for_running_task(current_task, mock_runs_api)
-    mock_runs_api.get_run.assert_called_with("123")
+    mock_runs_api.get_run.assert_called_with("123", version="2.1")
     assert mock_runs_api.get_run.call_count == 3
     mock_runs_api.reset_mock()
 
@@ -315,15 +351,16 @@ def test_get_lifestyle_state(databricks_notebook_operator):
     "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_api_client"
 )
 @mock.patch(
-    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_current_databricks_task"
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_databricks_task_id"
 )
 def test_monitor_databricks_job_success(
-    mock_get_task_name,
+    mock_get_databricks_task_id,
     mock_get_api_client,
     mock_runs_api,
     mock_databricks_hook,
     databricks_notebook_operator,
 ):
+    mock_get_databricks_task_id.return_value = "1"
     # Define the expected response
     response = {
         "run_page_url": "https://databricks-instance-xyz.cloud.databricks.com/#job/1234/run/1",
@@ -341,8 +378,11 @@ def test_monitor_databricks_job_success(
     }
     mock_runs_api.return_value.get_run.return_value = response
 
-    databricks_notebook_operator.databricks_run_id = "1234"
+    databricks_notebook_operator.databricks_run_id = "1"
     databricks_notebook_operator.monitor_databricks_job()
+    mock_runs_api.return_value.get_run.assert_called_with(
+        databricks_notebook_operator.databricks_run_id, version="2.1"
+    )
 
 
 @mock.patch("cosmos.providers.databricks.notebook.DatabricksHook")
@@ -351,15 +391,16 @@ def test_monitor_databricks_job_success(
     "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_api_client"
 )
 @mock.patch(
-    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_current_databricks_task"
+    "cosmos.providers.databricks.notebook.DatabricksNotebookOperator._get_databricks_task_id"
 )
 def test_monitor_databricks_job_fail(
-    mock_get_task_name,
+    mock_get_databricks_task_id,
     mock_get_api_client,
     mock_runs_api,
     mock_databricks_hook,
     databricks_notebook_operator,
 ):
+    mock_get_databricks_task_id.return_value = "1"
     # Define the expected response
     response = {
         "run_page_url": "https://databricks-instance-xyz.cloud.databricks.com/#job/1234/run/1",
@@ -377,6 +418,6 @@ def test_monitor_databricks_job_fail(
     }
     mock_runs_api.return_value.get_run.return_value = response
 
-    databricks_notebook_operator.databricks_run_id = "1234"
+    databricks_notebook_operator.databricks_run_id = "1"
     with pytest.raises(AirflowException):
         databricks_notebook_operator.monitor_databricks_job()

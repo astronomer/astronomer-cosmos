@@ -140,7 +140,13 @@ class DbtBaseOperator(BaseOperator):
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
         self.cancel_query_on_kill = cancel_query_on_kill
-        self.dbt_executable_path = dbt_executable_path
+        # dbt-ol is the OpenLineage wrapper for dbt, which automatically
+        # generates and emits lineage data to a specified backend.
+        dbt_ol_path = shutil.which("dbt-ol")
+        if dbt_executable_path == "dbt" and shutil.which("dbt-ol"):
+            self.dbt_executable_path = dbt_ol_path
+        else:
+            self.dbt_executable_path = dbt_executable_path
         super().__init__(**kwargs)
 
     @cached_property

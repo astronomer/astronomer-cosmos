@@ -1,4 +1,0 @@
-gcc
-python3-dev
-libmariadb-dev
-git

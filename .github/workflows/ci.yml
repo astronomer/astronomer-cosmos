@@ -168,7 +168,7 @@ jobs:
       - run: cat .github/ci-test-connections.yaml > test-connections.yaml
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
-      - run: DATABRICKS_GROUP_ID="{{github.run_id}}_{{matrix.python}}_{{matrix.airflow}}" nox -s "test-${{ matrix.python }}(airflow='${{ matrix.airflow }}')" -- "tests/test_example_dags.py"
+      - run: DATABRICKS_GROUP_ID="${{github.run_id}}_${{matrix.python}}_${{matrix.airflow}}" nox -s "test-${{ matrix.python }}(airflow='${{ matrix.airflow }}')" -- "tests/test_example_dags.py"
     env:
       DATABRICKS_CONN_TOKEN: ${{ secrets.DATABRICKS_CONN_TOKEN }}
       DATABRICKS_CONN_HOST: https://dbc-9c390870-65ef.cloud.databricks.com/

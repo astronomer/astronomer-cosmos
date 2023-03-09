@@ -24,6 +24,8 @@ def run_dag(dag: DAG, conn_file_path: str) -> DagRun:
     return test_dag(dag=dag, conn_file_path=conn_file_path)
 
 
+# DAG.test() was added in Airflow version 2.5.0. And to test on older Airflow versions, we need to copy the
+# implementation here.
 @provide_session
 def test_dag(
     dag,

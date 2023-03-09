@@ -87,6 +87,8 @@ class _CreateDatabricksWorkflowOperator(BaseOperator):
         self.max_concurrent_runs = max_concurrent_runs
         self.extra_job_params = extra_job_params or {}
         super().__init__(task_id=task_id, **kwargs)
+
+        # For Airflow versions <2.3, the `task_group` attribute is unassociated, and hence we need to add that.
         if not hasattr(self, "task_group"):
             from airflow.utils.task_group import TaskGroupContext
 
@@ -343,10 +345,13 @@ class DatabricksWorkflowTaskGroup(TaskGroup):
     def __exit__(self, _type, _value, _tb):
         """Exit the context manager and add tasks to a single _CreateDatabricksWorkflowOperator."""
         roots = self.roots
+
+        # For Airflow versions <2.3, the `dag` attribute is unassociated, and hence we need to add that.
         if not hasattr(self, "dag"):
             from airflow.models.dag import DagContext
 
             self.dag = DagContext.get_current_dag()
+
         create_databricks_workflow_task: _CreateDatabricksWorkflowOperator = (
             _CreateDatabricksWorkflowOperator(
                 dag=self.dag,

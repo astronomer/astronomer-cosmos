@@ -14,9 +14,10 @@ from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.security import permissions
 
 try:
+    # The following utility was included in Airflow version 2.3.3; we handle the needed import in the exception block.
     from airflow.utils.airflow_flask_app import get_airflow_app
 except ModuleNotFoundError:
-    # For older versions of airflow that don't have the utility.
+    # For older versions of airflow < 2.3.3 that don't have the utility.
     from flask import current_app
 
 from airflow.utils.log.logging_mixin import LoggingMixin

@@ -98,6 +98,8 @@ class DatabricksNotebookOperator(BaseOperator):
         self.new_cluster = new_cluster or {}
         self.existing_cluster_id = existing_cluster_id or ""
         super().__init__(**kwargs)
+
+        # For Airflow versions <2.3, the `task_group` attribute is unassociated, and hence we need to add that.
         if not hasattr(self, "task_group"):
             from airflow.utils.task_group import TaskGroupContext
 

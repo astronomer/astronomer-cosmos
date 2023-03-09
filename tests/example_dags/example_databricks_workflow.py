@@ -17,7 +17,7 @@ default_args = {
 
 DATABRICKS_CONN_ID = os.getenv("ASTRO_DATABRICKS_CONN_ID", "databricks_conn")
 
-GROUP_ID = os.getenv("GITHUB_JOB", "job_1234") + os.getenv("GITHUB_RUN_ID", "run_1234")
+GROUP_ID = os.getenv("DATABRICKS_GROUP_ID", "1234").replace(".", "_")
 job_cluster_spec = [
     {
         "job_cluster_key": "Shared_job_cluster",

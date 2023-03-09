@@ -20,14 +20,16 @@ except ModuleNotFoundError:
     # For older versions of airflow < 2.3.3 that don't have the utility.
     from flask import current_app
 
+from airflow.exceptions import TaskInstanceNotFound
 from airflow.utils.log.logging_mixin import LoggingMixin
-from airflow.utils.session import provide_session
+from airflow.utils.session import NEW_SESSION, provide_session
 from airflow.www.auth import has_access
 from airflow.www.views import AirflowBaseView
 from databricks_cli.sdk import JobsService
 from databricks_cli.sdk.api_client import ApiClient
 from flask import flash, redirect, request
 from flask_appbuilder.api import expose
+from sqlalchemy.orm.session import Session
 
 
 def _get_flask_app():
@@ -169,6 +171,24 @@ def _get_launch_task_key(current_task_key: TaskInstanceKey, group_id: str):
         return current_task_key
 
 
+@provide_session
+def get_task_instance(operator, dttm, session: Session = NEW_SESSION):
+    dag_id = operator.dag.dag_id
+    dag_run = DagRun.find(dag_id, execution_date=dttm)[0]
+    ti = (
+        session.query(TaskInstance)
+        .filter(
+            TaskInstance.dag_id == dag_id,
+            TaskInstance.run_id == dag_run.run_id,
+            TaskInstance.task_id == operator.task_id,
+        )
+        .one_or_none()
+    )
+    if not ti:
+        raise TaskInstanceNotFound("Task instance not found")
+    return ti
+
+
 class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
     """Constructs a link to monitor a Databricks Job Run."""
 
@@ -181,6 +201,15 @@ class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
         *,
         ti_key: TaskInstanceKey | None = None,
     ) -> str:
+        ti = None
+        if not ti_key:
+            ti = get_task_instance(operator, dttm)
+            ti_key = ti.key
+        if not hasattr(operator, "task_group"):
+            from airflow.utils.task_group import TaskGroupContext
+
+            operator.task_group = TaskGroupContext.get_current_task_group(operator.dag)
+
         dag = _get_flask_app().dag_bag.get_dag(ti_key.dag_id)
         dag.get_task(ti_key.task_id)
         self.log.info("Getting link for task %s", ti_key.task_id)
@@ -190,10 +219,26 @@ class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
             )
             ti_key = _get_launch_task_key(ti_key, group_id=operator.task_group.group_id)
         # Should we catch the exception here if there is no return value?
-        metadata = XCom.get_value(
-            ti_key=ti_key,
-            key="return_value",
-        )
+        try:
+            metadata = XCom.get_value(
+                ti_key=ti_key,
+                key="return_value",
+            )
+        except AttributeError:
+            if not ti:
+                raise TaskInstanceNotFound()
+            self.log.info("Getting XCOM")
+            self.log.info("Getting task_id %s", ti_key.task_id)
+            self.log.info("Getting dag_id %s", ti_key.dag_id)
+            self.log.info("Getting execution_date %s", ti.execution_date)
+            metadata = XCom.get_one(
+                task_id=ti_key.task_id,
+                dag_id=ti_key.dag_id,
+                execution_date=ti.execution_date,
+                key="return_value",
+            )
+        self.log.info("metadata %s", metadata)
+
         hook = DatabricksHook(metadata.databricks_conn_id)
         return f"https://{hook.host}/#job/{metadata.databricks_job_id}/run/{metadata.databricks_run_id}"
 
@@ -210,15 +255,35 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink, LoggingMixin):
         *,
         ti_key: TaskInstanceKey | None = None,
     ) -> str:
+        ti = None
+        if not ti_key:
+            ti = get_task_instance(operator, dttm)
+            ti_key = ti.key
+        if not hasattr(operator, "task_group"):
+            from airflow.utils.task_group import TaskGroupContext
+
+            operator.task_group = TaskGroupContext.get_current_task_group(operator.dag)
+
         self.log.debug(
             "Creating link to repair all tasks for databricks job run %s",
             operator.task_group.group_id,
         )
         # Should we catch the exception here if there is no return value?
-        metadata = XCom.get_value(
-            ti_key=ti_key,
-            key="return_value",
-        )
+        try:
+            metadata = XCom.get_value(
+                ti_key=ti_key,
+                key="return_value",
+            )
+        except AttributeError:
+            if not ti:
+                raise TaskInstanceNotFound()
+            metadata = XCom.get_one(
+                task_id=ti_key.task_id,
+                dag_id=ti_key.dag_id,
+                execution_date=ti.execution_date,
+                key="return_value",
+            )
+
         tasks_str = self.get_tasks_to_run(ti_key, operator, self.log)
         self.log.debug("tasks to rerun: %s", tasks_str)
         return (
@@ -267,13 +332,13 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink, LoggingMixin):
             )
         ]
 
-    @provide_session
-    def get_ti(self, ti_key: TaskInstanceKey, session=None) -> TaskInstance:
-        return (
-            session.query(TaskInstance)
-            .where(TaskInstance.filter_for_tis([ti_key]))
-            .one()
-        )
+    # @provide_session
+    # def get_ti(self, ti_key: TaskInstanceKey, session=None) -> TaskInstance:
+    #     return (
+    #         session.query(TaskInstance)
+    #         .where(TaskInstance.filter_for_tis([ti_key]))
+    #         .one()
+    #     )
 
 
 class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
@@ -288,6 +353,20 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
         *,
         ti_key: TaskInstanceKey | None = None,
     ) -> str:
+        ti = None
+        if not ti_key:
+            ti = get_task_instance(operator, dttm)
+            ti_key = ti.key
+
+        if not hasattr(operator, "task_group"):
+            self.log.info("does not have task group attr")
+            from airflow.utils.task_group import TaskGroupContext
+
+            operator.task_group = TaskGroupContext.get_current_task_group(operator.dag)
+            self.log.info("operator group %s", operator.task_group)
+            self.log.info("operator group dict %s", operator.task_group.__dict__)
+            self.log.info("group Id %s", operator.task_group.group_id)
+
         self.log.info(
             "Creating link to repair a single task for databricks job run %s task %s",
             operator.task_group.group_id,
@@ -298,10 +377,27 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
         # Should we catch the exception here if there is no return value?
         if ".launch" not in ti_key.task_id:
             ti_key = _get_launch_task_key(ti_key, group_id=operator.task_group.group_id)
-        metadata = XCom.get_value(
-            ti_key=ti_key,
-            key="return_value",
-        )
+        try:
+            metadata = XCom.get_value(
+                ti_key=ti_key,
+                key="return_value",
+            )
+
+        except AttributeError:
+            if not ti:
+                raise TaskInstanceNotFound()
+            self.log.info("Getting XCOM")
+            self.log.info("Getting task_id %s", ti_key.task_id)
+            self.log.info("Getting dag_id %s", ti_key.dag_id)
+            self.log.info("Getting execution_date %s", ti.execution_date)
+            metadata = XCom.get_one(
+                task_id=ti_key.task_id,
+                dag_id=ti_key.dag_id,
+                execution_date=ti.execution_date,
+                key="return_value",
+            )
+
+        self.log.info("metadata %s", metadata)
 
         return (
             f"/repair_databricks_job?dag_id={ti_key.dag_id}&"

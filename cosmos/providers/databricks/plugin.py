@@ -418,7 +418,6 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
                 key="return_value",
             )
 
-
         return (
             f"/repair_databricks_job?dag_id={ti_key.dag_id}&"
             f"databricks_conn_id={metadata.databricks_conn_id}&"

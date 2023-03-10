@@ -13,6 +13,8 @@ from airflow.models.xcom import XCom
 from airflow.plugins_manager import AirflowPlugin
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.security import permissions
+from airflow.version import version as airflow_version
+from packaging import version
 
 try:
     # The following utility was included in Airflow version 2.3.3; we handle the needed import in the exception block.
@@ -95,7 +97,7 @@ def _clear_task_instances(
     dag_id: str, run_id: str, task_ids: list[str], log: logging.Logger, session=None
 ):
     dag = _get_flask_app().dag_bag.get_dag(dag_id)
-    log.debug("task_ids to clear", task_ids)
+    log.debug("task_ids to clear", str(task_ids))
     dr: DagRun = _get_dagrun(dag, run_id)
     tis_to_clear = [
         ti for ti in dr.get_task_instances() if _get_databricks_task_id(ti) in task_ids
@@ -445,13 +447,14 @@ class RepairDatabricksTasks(AirflowBaseView, LoggingMixin):
             "databricks_conn_id", "databricks_run_id", "dag_id", "tasks_to_repair"
         )(request.values)
         view = conf.get("webserver", "dag_default_view")
+        return_url = self._get_return_url(dag_id, view)
         run_id = request.values.get("run_id").replace(
             " ", "+"
         )  # get run id separately since we need to modify it
         if tasks_to_repair == "":
             # If there are no tasks to repair, we return.
             flash("No tasks to repair. Not sending repair request.")
-            return redirect(f"/dags/{dag_id}/{view}")
+            return redirect(return_url)
         self.log.info("Repairing databricks job %s", databricks_run_id)
         res = _repair_task(
             databricks_conn_id=databricks_conn_id,
@@ -465,7 +468,15 @@ class RepairDatabricksTasks(AirflowBaseView, LoggingMixin):
         self.log.info("Clearing tasks to rerun in airflow")
         _clear_task_instances(dag_id, run_id, tasks_to_repair.split(","), self.log)
         flash(f"Databricks repair job is starting!: {res}")
-        return redirect(f"/dags/{dag_id}/{view}")
+        return redirect(return_url)
+
+    @staticmethod
+    def _get_return_url(dag_id, view):
+        if version.parse(airflow_version) < version.parse("2.3.0"):
+            return_url = f"/{view}?dag_id={dag_id}"
+        else:
+            return_url = f"/dags/{dag_id}/{view}"
+        return return_url
 
 
 repair_databricks_view = RepairDatabricksTasks()

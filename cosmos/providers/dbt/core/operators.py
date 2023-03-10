@@ -227,7 +227,6 @@ class DbtBaseOperator(BaseOperator):
         self, context: Context, cmd_flags: list[str] | None = None
     ) -> SubprocessResult:
         create_default_profiles(DBT_PROFILE_PATH)
-        create_default_profiles()
         profile, profile_vars = map_profile(
             conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
         )

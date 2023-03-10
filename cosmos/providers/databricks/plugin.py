@@ -274,17 +274,12 @@ class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
         except AttributeError:
             if not ti:
                 raise TaskInstanceNotFound()
-            self.log.info("Getting XCOM")
-            self.log.info("Getting task_id %s", ti_key.task_id)
-            self.log.info("Getting dag_id %s", ti_key.dag_id)
-            self.log.info("Getting execution_date %s", ti.execution_date)
             metadata = XCom.get_one(
                 task_id=ti_key.task_id,
                 dag_id=ti_key.dag_id,
                 execution_date=ti.execution_date,
                 key="return_value",
             )
-        self.log.info("metadata %s", metadata)
 
         hook = DatabricksHook(metadata.databricks_conn_id)
         return f"https://{hook.host}/#job/{metadata.databricks_job_id}/run/{metadata.databricks_run_id}"
@@ -416,10 +411,6 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
         except AttributeError:
             if not ti:
                 raise TaskInstanceNotFound()
-            self.log.info("Getting XCOM")
-            self.log.info("Getting task_id %s", ti_key.task_id)
-            self.log.info("Getting dag_id %s", ti_key.dag_id)
-            self.log.info("Getting execution_date %s", ti.execution_date)
             metadata = XCom.get_one(
                 task_id=ti_key.task_id,
                 dag_id=ti_key.dag_id,
@@ -427,7 +418,6 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
                 key="return_value",
             )
 
-        self.log.info("metadata %s", metadata)
 
         return (
             f"/repair_databricks_job?dag_id={ti_key.dag_id}&"

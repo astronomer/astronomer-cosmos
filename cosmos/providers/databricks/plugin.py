@@ -169,6 +169,9 @@ def get_task_group_legacy(operator: BaseOperator) -> TaskGroup:
     Unfortunately in Airflow 2.2.4 the task_group property is not set on the operator, so we
     have to get the taskgroup tree from the DAG and search for the operator. This allows us to
     return the operators group, so we can find the xcom result of the launch task.
+
+    :param operator: The operator to get the task group for.
+    :return: The task group for the given operator.
     """
 
     def find_my_group(group: TaskGroup, task_id: str):
@@ -187,10 +190,16 @@ def get_task_group_legacy(operator: BaseOperator) -> TaskGroup:
     return find_my_group(operator.dag.task_group, operator.task_id)
 
 
-def _get_launch_task_key(current_task_key: TaskInstanceKey, task_id: str):
+def _get_launch_task_key(
+    current_task_key: TaskInstanceKey, task_id: str
+) -> TaskInstanceKey:
     """
     Returns the task key for the launch task. This allows us to gather databricks Metadata
     even if the current task has failed (since tasks only create xcom values if they succeed).
+
+    :param current_task_key: The task key for the current task.
+    :param task_id: The task ID for the current task.
+    :return: The task key for the launch task.
     """
     if task_id:
         return TaskInstanceKey(
@@ -221,6 +230,14 @@ def get_task_instance(operator, dttm, session: Session = NEW_SESSION):
     return ti
 
 
+def get_task_group(operator):
+    if not hasattr(operator, "task_group"):
+        task_group = get_task_group_legacy(operator)
+    else:
+        task_group = operator.task_group
+    return task_group
+
+
 class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
     """Constructs a link to monitor a Databricks Job Run."""
 
@@ -237,10 +254,7 @@ class DatabricksJobRunLink(BaseOperatorLink, LoggingMixin):
         if not ti_key:
             ti = get_task_instance(operator, dttm)
             ti_key = ti.key
-        if not hasattr(operator, "task_group"):
-            task_group = get_task_group_legacy(operator)
-        else:
-            task_group = operator.task_group
+        task_group = get_task_group(operator)
 
         dag = _get_flask_app().dag_bag.get_dag(ti_key.dag_id)
         dag.get_task(ti_key.task_id)
@@ -292,10 +306,7 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink, LoggingMixin):
         if not ti_key:
             ti = get_task_instance(operator, dttm)
             ti_key = ti.key
-        if not hasattr(operator, "task_group"):
-            task_group = get_task_group_legacy(operator)
-        else:
-            task_group = operator.task_group
+        task_group = get_task_group(operator)
         self.log.debug(
             "Creating link to repair all tasks for databricks job run %s",
             task_group.group_id,
@@ -329,10 +340,7 @@ class DatabricksJobRepairAllFailedLink(BaseOperatorLink, LoggingMixin):
     def get_tasks_to_run(
         self, ti_key: TaskInstanceKey, operator: BaseOperator, log: logging.Logger
     ) -> str:
-        if not hasattr(operator, "task_group"):
-            task_group = get_task_group_legacy(operator)
-        else:
-            task_group = operator.task_group
+        task_group = get_task_group(operator)
         dag = _get_flask_app().dag_bag.get_dag(ti_key.dag_id)
         dr = _get_dagrun(dag, ti_key.run_id)
         log.debug("Getting failed and skipped tasks for dag run %s", dr.run_id)
@@ -386,10 +394,7 @@ class DatabricksJobRepairSingleFailedLink(BaseOperatorLink, LoggingMixin):
             ti = get_task_instance(operator, dttm)
             ti_key = ti.key
 
-        if not hasattr(operator, "task_group"):
-            task_group = get_task_group_legacy(operator)
-        else:
-            task_group = operator.task_group
+        task_group = get_task_group(operator)
 
         self.log.info(
             "Creating link to repair a single task for databricks job run %s task %s",

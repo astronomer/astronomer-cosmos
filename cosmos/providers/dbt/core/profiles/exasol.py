@@ -36,9 +36,7 @@ def create_profile_vars_exasol(
     """
 
     if not schema_override:
-        raise ValueError(
-            "A exasol schema must be provided via the `schema` parameter"
-        )
+        raise ValueError("A exasol schema must be provided via the `schema` parameter")
 
     extras = conn.extra_dejson
 

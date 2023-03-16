@@ -228,6 +228,7 @@ def test_create_profile_vars_postgres_no_schema(
     with pytest.raises(ValueError):
         create_profile_vars_postgres(airflow_schemaless_connection, None, None)
 
+
 def test_create_profile_vars_exasol(airflow_connection: Connection) -> None:
     host = "my-hostname.com"
     login = "my-user"
@@ -255,9 +256,7 @@ def test_create_profile_vars_exasol(airflow_connection: Connection) -> None:
         "EXASOL_CONNECTION_TIMEOUT": "30",
     }
 
-    profile, profile_vars = create_profile_vars_exasol(
-        airflow_connection, None, schema
-    )
+    profile, profile_vars = create_profile_vars_exasol(airflow_connection, None, schema)
     assert profile == "exasol_profile"
     assert profile_vars == expected_profile_vars
 

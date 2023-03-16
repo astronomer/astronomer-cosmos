@@ -9,6 +9,10 @@ from cosmos.providers.dbt.core.profiles.databricks import (
     create_profile_vars_databricks,
     databricks_profile,
 )
+from cosmos.providers.dbt.core.profiles.exasol import (
+    create_profile_vars_exasol,
+    exasol_profile,
+)
 from cosmos.providers.dbt.core.profiles.postgres import (
     create_profile_vars_postgres,
     postgres_profile,
@@ -53,5 +57,8 @@ def get_available_adapters() -> Dict[str, AdapterConfig]:
         ),
         "databricks": AdapterConfig(
             "databricks_profile", databricks_profile, create_profile_vars_databricks
+        ),
+        "exasol": AdapterConfig(
+            "exasol_profile", exasol_profile, create_profile_vars_exasol
         ),
     }

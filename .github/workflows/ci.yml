@@ -166,6 +166,3 @@ jobs:
       - run: ls
       - run: echo $PWD
       - run: nox -s "test-3.8(airflow='2.5')" -- "tests/example_dags"
-    env:
-      DATABRICKS_CONN_TOKEN: ${{ secrets.DATABRICKS_CONN_TOKEN }}
-      DATABRICKS_CONN_HOST: https://dbc-9c390870-65ef.cloud.databricks.com/

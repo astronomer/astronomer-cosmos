@@ -68,15 +68,8 @@ dbt-openlineage = [
     "dbt-core",
     "openlineage-dbt>=0.21.1"
 ]
-databricks = [
-    "databricks-sql-connector>=2.0.4;python_version>='3.10'",
-    "databricks-cli",
-    "apache-airflow-providers-databricks>=2.2.0",
-    "mergedeep"
-]
 all = [
     "astronomer-cosmos[dbt-all]",
-    "astronomer-cosmos[databricks]",
 ]
 docs =[
     "sphinx",
@@ -132,6 +125,3 @@ line-length = 120
 
 [tool.distutils.bdist_wheel]
 universal = true
-
-[project.entry-points."airflow.plugins"]
-my_plugin = "cosmos.providers.databricks.plugin:CosmosDatabricksPlugin"

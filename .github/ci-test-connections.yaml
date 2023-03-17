@@ -1,4 +1,0 @@
-databricks_conn:
-  conn_type: databricks
-  host: $DATABRICKS_CONN_HOST
-  password: $DATABRICKS_CONN_TOKEN

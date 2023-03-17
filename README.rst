@@ -22,7 +22,6 @@ A framework for dynamically generating `Apache Airflow <https://airflow.apache.o
 
 Current support for:
  - dbt
- - databricks
 
 Coming soon:
  - Jupyter

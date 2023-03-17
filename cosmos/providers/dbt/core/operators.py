@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import fcntl
+import logging
 import os
 import shutil
 import signal
+import time
+from filecmp import dircmp
 from typing import List, Sequence
 
 import yaml
@@ -14,10 +18,17 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
+from cosmos.providers.dbt.core.utils.file_syncing import (
+    exclude,
+    has_differences,
+    is_file_locked,
+)
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DbtBaseOperator(BaseOperator):
@@ -186,7 +197,13 @@ class DbtBaseOperator(BaseOperator):
         flags = []
         for global_flag in global_flags:
             dbt_name = f"--{global_flag.replace('_', '-')}"
-            global_flag_value = self.__getattribute__(global_flag)
+            # intercept project directory and route it to r/w tmp
+            if global_flag == "project_dir":
+                global_flag_value = (
+                    f"/tmp/dbt/{os.path.basename(self.__getattribute__(global_flag))}"
+                )
+            else:
+                global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     # handle dict
@@ -222,14 +239,60 @@ class DbtBaseOperator(BaseOperator):
                 raise AirflowException(
                     f"The project_dir {self.project_dir} must be a directory"
                 )
+
+        # routing the dbt project to a tmp dir for r/w operations
+        target_dir = f"/tmp/dbt/{os.path.basename(self.project_dir)}"
+
+        changes = True  # set changes to true by default
+        if os.path.exists(target_dir):
+            # if the directory doesn't exist or if there are changes -- keep changes as true
+            comparison = dircmp(
+                self.project_dir, target_dir, ignore=["logs", "target", ".lock"]
+            )  # compares tmp and project dir
+            changes = has_differences(comparison)  # check for changes
+
+        # if there are changes between tmp and project_dir then copy them over
+        if changes:
+            logging.info(
+                f"Changes detected - copying {self.project_dir} to {target_dir}"
+            )
+            # put a lock on the dest so that it isn't getting written multiple times
+            lock_file = os.path.join(target_dir, ".lock")
+
+            # if there is already a lock file - then just wait for it to be released and continue without copying
+            if os.path.exists(lock_file) and is_file_locked(lock_file):
+                while os.path.exists(lock_file):
+                    with open(lock_file, "w") as lock_file:
+                        try:
+                            # Lock acquired, the lock file is available
+                            fcntl.flock(lock_file, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                            break
+                        except OSError:
+                            # Lock is held by another process, wait and try again
+                            time.sleep(1)
+
+                    # The lock file is available, release the shared lock
+                    fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+            # otherwise create a lock file and copy the dbt directory
+            else:
+                os.makedirs(os.path.dirname(lock_file), exist_ok=True)
+                with open(lock_file, "w") as f:
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                    shutil.copytree(
+                        self.project_dir, target_dir, ignore=exclude, dirs_exist_ok=True
+                    )
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        else:
+            logging.info(
+                f"No differences detected between {self.project_dir} and {target_dir}"
+            )
+
         # Fix the profile path, so it's not accidentally superseded by the end user.
         env["DBT_PROFILES_DIR"] = DBT_PROFILE_PATH.parent
         # run bash command
         result = self.subprocess_hook.run_command(
-            command=cmd,
-            env=env,
-            output_encoding=self.output_encoding,
-            cwd=self.project_dir,
+            command=cmd, env=env, output_encoding=self.output_encoding, cwd=target_dir
         )
         self.exception_handling(result)
         return result

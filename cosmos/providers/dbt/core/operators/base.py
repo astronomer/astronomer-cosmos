@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from typing import Sequence, Dict, Any, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
@@ -11,7 +11,6 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
-
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
@@ -156,8 +155,7 @@ class DbtBaseOperator(BaseOperator):
         elif self.append_env:
             system_env.update(env)
             env = system_env
-        airflow_context_vars = context_to_airflow_vars(
-            context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
         self.log.debug(
             "Exporting the following env vars:\n%s",
             "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),
@@ -195,11 +193,13 @@ class DbtBaseOperator(BaseOperator):
                     flags.extend([dbt_name, yaml_string])
                 else:
                     flags.extend([dbt_name, str(global_flag_value)])
-        for global_boolean_flag in self.global_boolean_flags:            
+        for global_boolean_flag in self.global_boolean_flags:
             global_boolean_flag_value = self.dbt_cmd_flags.get(global_boolean_flag)
             if global_boolean_flag_value is None:
                 try:
-                    global_boolean_flag_value = self.__getattribute__(global_boolean_flag)
+                    global_boolean_flag_value = self.__getattribute__(
+                        global_boolean_flag
+                    )
                 except AttributeError:
                     pass
             if global_boolean_flag_value:
@@ -210,7 +210,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-        handle_profile: bool = True
+        handle_profile: bool = True,
     ) -> Tuple[list[str], dict]:
         dbt_cmd = [self.dbt_executable_path]
         if isinstance(self.base_cmd, str):
@@ -225,7 +225,9 @@ class DbtBaseOperator(BaseOperator):
         if handle_profile:
             create_default_profiles(DBT_PROFILE_PATH)
             profile, profile_vars = map_profile(
-                conn_id=self.conn_id, db_override=self.db_name, schema_override=self.schema
+                conn_id=self.conn_id,
+                db_override=self.db_name,
+                schema_override=self.schema,
             )
             dbt_cmd.extend(["--profile", profile])
             # set env vars

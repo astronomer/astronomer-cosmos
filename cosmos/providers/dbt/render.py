@@ -25,6 +25,7 @@ def calculate_operator_class(
 ) -> str:
     return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
+
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
@@ -144,8 +145,7 @@ def render_project(
         test_task = Task(
             id=f"{model_name}_test",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode,
-                dbt_class="DbtTest"
+                execution_mode=execution_mode, dbt_class="DbtTest"
             ),
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
@@ -179,8 +179,7 @@ def render_project(
         test_task = Task(
             id=f"{dbt_project_name}_test",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode,
-                dbt_class="DbtTest"
+                execution_mode=execution_mode, dbt_class="DbtTest"
             ),
             arguments=task_args,
         )

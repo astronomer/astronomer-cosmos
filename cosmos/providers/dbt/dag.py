@@ -40,8 +40,7 @@ class DbtDag(CosmosDag):
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         dbt_models_dir: str = "models",
-        test_behavior: Literal["none", "after_each",
-                               "after_all"] = "after_each",
+        test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
         execution_mode: Literal["local", "docker", "kubernetes"] = "local",
@@ -65,7 +64,7 @@ class DbtDag(CosmosDag):
             conn_id=conn_id,
             select=select,
             exclude=exclude,
-            execution_mode=execution_mode
+            execution_mode=execution_mode,
         )
 
         # call the airflow DAG constructor

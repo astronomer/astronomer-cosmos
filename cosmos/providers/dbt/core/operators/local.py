@@ -14,10 +14,9 @@ from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.utils.context import Context
-from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
-
+from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.utils.file_syncing import (
     exclude,
     has_differences,
@@ -41,12 +40,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     ) -> None:
         super().__init__(**kwargs)
 
-
     @cached_property
     def subprocess_hook(self):
         """Returns hook for running the bash command."""
         return SubprocessHook()
-    
+
     def exception_handling(self, result: SubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
@@ -80,8 +78,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         if os.path.exists(target_dir):
             # if the directory doesn't exist or if there are changes -- keep changes as true
             comparison = dircmp(
-                self.project_dir, target_dir, ignore=[
-                    "logs", "target", ".lock"]
+                self.project_dir, target_dir, ignore=["logs", "target", ".lock"]
             )  # compares tmp and project dir
             changes = has_differences(comparison)  # check for changes
 
@@ -99,8 +96,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     with open(lock_file, "w") as lock_file:
                         try:
                             # Lock acquired, the lock file is available
-                            fcntl.flock(lock_file, fcntl.LOCK_SH |
-                                        fcntl.LOCK_NB)
+                            fcntl.flock(lock_file, fcntl.LOCK_SH | fcntl.LOCK_NB)
                             break
                         except OSError:
                             # Lock is held by another process, wait and try again
@@ -133,9 +129,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         return result
 
     def build_and_run_cmd(
-            self,
-            context: Context,
-            cmd_flags: list[str] | None = None) -> SubprocessResult:
+        self, context: Context, cmd_flags: list[str] | None = None
+    ) -> SubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         return self.run_command(cmd=dbt_cmd, env=env)
 
@@ -145,14 +140,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info(
-                "Sending SIGINT signal to process group")
+            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(
                 self.subprocess_hook.sub_process, "pid"
             ):
                 os.killpg(
-                    os.getpgid(
-                        self.subprocess_hook.sub_process.pid), signal.SIGINT
+                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
                 )
         else:
             self.subprocess_hook.send_sigterm()

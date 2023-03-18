@@ -4,15 +4,16 @@ import logging
 from typing import Sequence
 
 import yaml
-from airflow.utils.context import Context
-from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
-from kubernetes.client import models as k8s
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
     convert_env_vars,
 )
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
     KubernetesPodOperator,
 )
+from airflow.utils.context import Context
+from kubernetes.client import models as k8s
+
+from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 
 logger = logging.getLogger(__name__)
 
@@ -42,15 +43,9 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
 
         self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
-    def build_and_run_cmd(
-            self,
-            context: Context,
-            cmd_flags: list[str] | None = None):
-
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None):
         dbt_cmd, env_vars = self.build_cmd(
-            context=context,
-            cmd_flags=cmd_flags,
-            handle_profile=False
+            context=context, cmd_flags=cmd_flags, handle_profile=False
         )
 
         # set env vars
@@ -59,6 +54,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         self.arguments = dbt_cmd
         self.log.info(f"Running command: {self.arguments}")
         return super().execute(context)
+
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
     """
@@ -73,6 +69,7 @@ class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
 
     def execute(self, context: Context):
         return self.build_and_run_cmd(context=context)
+
 
 class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
     """

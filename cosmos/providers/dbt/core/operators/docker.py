@@ -4,9 +4,10 @@ import logging
 from typing import Sequence
 
 import yaml
-from airflow.utils.context import Context
-from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.utils.context import Context
+
+from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +30,9 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
     ) -> None:
         super().__init__(**kwargs)
 
-    def build_and_run_cmd(
-            self,
-            context: Context,
-            cmd_flags: list[str] | None = None):
-
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None):
         dbt_cmd, env_vars = self.build_cmd(
-            context=context,
-            cmd_flags=cmd_flags,
-            handle_profile=False
+            context=context, cmd_flags=cmd_flags, handle_profile=False
         )
 
         # set env vars

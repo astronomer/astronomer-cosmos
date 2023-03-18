@@ -2,28 +2,29 @@
 dbt support for Airflow. Contains dags, task groups, and operators.
 """
 
-from .core.operators_docker import (
+# re-export the operators
+from .core.operators.local import (
+    DbtLSLocalOperator,
+    DbtRunOperationLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtTestLocalOperator,
+)
+
+from .core.operators.docker import (
     DbtLSDockerOperator,
-    DbtRunDockerOperator,
     DbtRunOperationDockerOperator,
+    DbtRunDockerOperator,
     DbtSeedDockerOperator,
     DbtTestDockerOperator,
 )
-from .core.operators_kubernetes import (
+
+from .core.operators.kubernetes import (
     DbtLSKubernetesOperator,
-    DbtRunKubernetesOperator,
     DbtRunOperationKubernetesOperator,
+    DbtRunKubernetesOperator,
     DbtSeedKubernetesOperator,
     DbtTestKubernetesOperator,
-)
-
-# re-export the operators
-from .core.operators_local import (
-    DbtLSLocalOperator,
-    DbtRunLocalOperator,
-    DbtRunOperationLocalOperator,
-    DbtSeedLocalOperator,
-    DbtTestLocalOperator,
 )
 
 # re-export user facing utilities

@@ -22,13 +22,14 @@ class DbtDag(CosmosDag):
     :param dbt_root_path: The path to the dbt root directory
     :param dbt_models_dir: The path to the dbt models directory within the project
     :param conn_id: The Airflow connection ID to use for the dbt profile
-    :param dbt_args: Parameters to pass to the underlying dbt operators
+    :param dbt_args: Parameters to pass to the underlying dbt operators, can include dbt_executable_path to utilize venv
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2"]})
-    :param dbt_profiles_dir: Which directory to look in for the profiles.yml file. Default is ~/.dbt/profiles.yml.
+    :param execution_mode: The execution mode in which the dbt project should be run. Options are "local", "docker", and "kubernetes".
+        Defaults to "local"
     """
 
     def __init__(
@@ -39,11 +40,11 @@ class DbtDag(CosmosDag):
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         dbt_models_dir: str = "models",
-        test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
+        test_behavior: Literal["none", "after_each",
+                               "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
-        execution_mode: str = None,
-        dbt_profiles_dir: str = None,
+        execution_mode: Literal["local", "docker", "kubernetes"] = "local",
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -64,8 +65,7 @@ class DbtDag(CosmosDag):
             conn_id=conn_id,
             select=select,
             exclude=exclude,
-            execution_mode=execution_mode,
-            dbt_profiles_dir=dbt_profiles_dir,
+            execution_mode=execution_mode
         )
 
         # call the airflow DAG constructor

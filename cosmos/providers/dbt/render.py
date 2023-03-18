@@ -20,16 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_operator_class(
-    execution_mode: str = None,
-    dbt_class: str = None,
+    execution_mode: str,
+    dbt_class: str,
 ) -> str:
-    if execution_mode == "kubernetes":
-        return f"cosmos.providers.dbt.core.operators_kubernetes.{dbt_class}KubernetesOperator"
-    elif execution_mode == "docker":
-        return f"cosmos.providers.dbt.core.operators_docker.{dbt_class}DockerOperator"
-    else:
-        return f"cosmos.providers.dbt.core.operators_local.{dbt_class}LocalOperator"
-
+    return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 def render_project(
     dbt_project_name: str,
@@ -41,8 +35,7 @@ def render_project(
     conn_id: str = "default_conn_id",
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
-    execution_mode: str = None,
-    dbt_profiles_dir: str = None,
+    execution_mode: Literal["local", "docker", "kubernetes"] = "local",
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -55,9 +48,9 @@ def render_project(
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
-    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]})
-    :param execution_mode: Execution mode of the Airflow task (local, docker or kubernetes)
-    :param dbt_profiles_dir: Which directory to look in for the profiles.yml file. Default is ~/.dbt/profiles.yml.
+    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
+    :param execution_mode: The execution mode in which the dbt project should be run. Options are "local", "docker", and "kubernetes".
+        Defaults to "local"
     """
     # first, get the dbt project
     project = DbtProject(
@@ -66,16 +59,14 @@ def render_project(
         project_name=dbt_project_name,
     )
 
-    base_group = Group(id=dbt_project_name)  # this is the group that will be returned
+    # this is the group that will be returned
+    base_group = Group(id=dbt_project_name)
     entities: Dict[
         str, CosmosEntity
     ] = {}  # this is a dict of all the entities we create
 
     # add project_dir arg to task_args
     task_args["project_dir"] = project.project_dir
-
-    # add profiles_dir arg to task_args
-    task_args["profiles_dir"] = dbt_profiles_dir
 
     # ensures the same tag isn't in select & exclude
     if "tags" in select and "tags" in exclude:
@@ -134,7 +125,8 @@ def render_project(
         run_task = Task(
             id=f"{model_name}_run",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class="DbtRun"
+                execution_mode=execution_mode,
+                dbt_class="DbtRun",
             ),
             arguments=run_args,
         )
@@ -152,7 +144,8 @@ def render_project(
         test_task = Task(
             id=f"{model_name}_test",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class="DbtTest"
+                execution_mode=execution_mode,
+                dbt_class="DbtTest"
             ),
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
@@ -186,7 +179,8 @@ def render_project(
         test_task = Task(
             id=f"{dbt_project_name}_test",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class="DbtTest"
+                execution_mode=execution_mode,
+                dbt_class="DbtTest"
             ),
             arguments=task_args,
         )

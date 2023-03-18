@@ -67,7 +67,6 @@ def map_profile(
     logging.error(f"This connection type is currently not supported {connection_type}.")
     sys.exit(1)
 
-
 def conn_exists(conn_id: str) -> bool:
     try:
         BaseHook().get_connection(conn_id)

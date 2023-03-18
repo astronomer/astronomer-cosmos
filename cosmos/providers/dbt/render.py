@@ -50,7 +50,8 @@ def render_project(
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
-    :param execution_mode: The execution mode in which the dbt project should be run. Options are "local", "docker", and "kubernetes".
+    :param execution_mode: The execution mode in which the dbt project should be run.
+        Options are "local", "docker", and "kubernetes".
         Defaults to "local"
     """
     # first, get the dbt project

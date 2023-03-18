@@ -63,7 +63,7 @@ def test_dbt_base_operator_exception_handling(
         )
 
 
-@patch("cosmos.providers.dbt.core.operators.context_to_airflow_vars")
+@patch("cosmos.providers.dbt.core.operators.base.context_to_airflow_vars")
 def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
     """
     If an end user passes in a

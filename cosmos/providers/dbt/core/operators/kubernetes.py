@@ -44,16 +44,17 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         self.env_vars = convert_env_vars({**env, **env_vars_dict})
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None):
+        self.build_kube_args(cmd_flags, context)
+        self.log.info(f"Running command: {self.arguments}")
+        return super().execute(context)
+
+    def build_kube_args(self, cmd_flags, context):
         dbt_cmd, env_vars = self.build_cmd(
             context=context, cmd_flags=cmd_flags, handle_profile=False
         )
-
         # set env vars
         self.build_env_args(env_vars)
-
         self.arguments = dbt_cmd
-        self.log.info(f"Running command: {self.arguments}")
-        return super().execute(context)
 
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):

@@ -119,3 +119,114 @@ def test_dbt_kubernetes_build_command():
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
             "--no-version-check",
         ]
+
+
+@patch(
+    "airflow.providers.cncf.kubernetes.operators.kubernetes_pod.KubernetesPodOperator.hook"
+)
+def test_created_pod(test_hook):
+    test_hook.is_in_cluster = False
+    test_hook._get_namespace.return_value.to_dict.return_value = "foo"
+    ls_operator = DbtLSKubernetesOperator(**base_kwargs)
+    ls_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+    pod_obj = ls_operator.build_pod_request_obj()
+    expected_result = {
+        "api_version": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "annotations": {},
+            "cluster_name": None,
+            "creation_timestamp": None,
+            "deletion_grace_period_seconds": None,
+            "deletion_timestamp": None,
+            "finalizers": None,
+            "generate_name": None,
+            "generation": None,
+            "labels": {"airflow_kpo_in_cluster": "False", "airflow_version": "2.5.1"},
+            "managed_fields": None,
+            "name": pod_obj.metadata.name,
+            "namespace": "foo",
+            "owner_references": None,
+            "resource_version": None,
+            "self_link": None,
+            "uid": None,
+        },
+        "spec": {
+            "active_deadline_seconds": None,
+            "affinity": {},
+            "automount_service_account_token": None,
+            "containers": [
+                {
+                    "args": [
+                        "dbt",
+                        "ls",
+                        "--project-dir",
+                        "my/dir",
+                        "--vars",
+                        "end_time: '{{ "
+                        "data_interval_end.strftime(''%Y%m%d%H%M%S'') "
+                        "}}'\n"
+                        "start_time: '{{ "
+                        "data_interval_start.strftime(''%Y%m%d%H%M%S'') "
+                        "}}'\n",
+                        "--no-version-check",
+                    ],
+                    "command": [],
+                    "env": [],
+                    "env_from": [],
+                    "image": "my_image",
+                    "image_pull_policy": None,
+                    "lifecycle": None,
+                    "liveness_probe": None,
+                    "name": "base",
+                    "ports": [],
+                    "readiness_probe": None,
+                    "resources": None,
+                    "security_context": None,
+                    "startup_probe": None,
+                    "stdin": None,
+                    "stdin_once": None,
+                    "termination_message_path": None,
+                    "termination_message_policy": None,
+                    "tty": None,
+                    "volume_devices": None,
+                    "volume_mounts": [],
+                    "working_dir": None,
+                }
+            ],
+            "dns_config": None,
+            "dns_policy": None,
+            "enable_service_links": None,
+            "ephemeral_containers": None,
+            "host_aliases": None,
+            "host_ipc": None,
+            "host_network": False,
+            "host_pid": None,
+            "hostname": None,
+            "image_pull_secrets": [],
+            "init_containers": [],
+            "node_name": None,
+            "node_selector": {},
+            "os": None,
+            "overhead": None,
+            "preemption_policy": None,
+            "priority": None,
+            "priority_class_name": None,
+            "readiness_gates": None,
+            "restart_policy": "Never",
+            "runtime_class_name": None,
+            "scheduler_name": None,
+            "security_context": {},
+            "service_account": None,
+            "service_account_name": None,
+            "set_hostname_as_fqdn": None,
+            "share_process_namespace": None,
+            "subdomain": None,
+            "termination_grace_period_seconds": None,
+            "tolerations": [],
+            "topology_spread_constraints": None,
+            "volumes": [],
+        },
+        "status": None,
+    }
+    assert pod_obj.to_dict() == expected_result

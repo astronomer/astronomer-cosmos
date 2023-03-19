@@ -26,21 +26,23 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
 
     def __init__(
         self,
+        image: str,  # Make image a required argument since it's required by DockerOperator
         **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(image=image, **kwargs)
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None):
+        self.build_command(cmd_flags, context)
+        self.log.info(f"Running command: {self.command}")
+        return super().execute(context)
+
+    def build_command(self, cmd_flags, context):
         dbt_cmd, env_vars = self.build_cmd(
             context=context, cmd_flags=cmd_flags, handle_profile=False
         )
-
         # set env vars
         self.environment = {**env_vars, **self.environment}
-
         self.command = dbt_cmd
-        self.log.info(f"Running command: {self.command}")
-        return super().execute(context)
 
 
 class DbtLSDockerOperator(DbtDockerBaseOperator):

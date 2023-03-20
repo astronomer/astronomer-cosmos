@@ -23,7 +23,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
     )
     assert dbt_base_operator.add_global_flags() == [
         "--project-dir",
-        "my/dir",
+        "/tmp/dbt/dir",
         "--vars",
         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",

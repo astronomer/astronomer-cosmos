@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest import mock
 from unittest.mock import MagicMock, patch
 
 from airflow.utils.context import Context
@@ -145,7 +144,10 @@ def test_created_pod(test_hook):
             "finalizers": None,
             "generate_name": None,
             "generation": None,
-            "labels": {"airflow_kpo_in_cluster": "False", "airflow_version": mock.ANY},
+            "labels": {
+                "airflow_kpo_in_cluster": "False",
+                "airflow_version": pod_obj.metadata.labels["airflow_version"],
+            },
             "managed_fields": None,
             "name": pod_obj.metadata.name,
             "namespace": "foo",

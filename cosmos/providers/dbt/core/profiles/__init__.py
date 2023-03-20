@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
+from cosmos.providers.dbt.community.profiles import (
+    create_profile_vars_trino,
+    trino_profile,
+)
 from cosmos.providers.dbt.core.profiles.bigquery import (
     bigquery_profile,
     create_profile_vars_google_cloud_platform,
@@ -20,10 +24,6 @@ from cosmos.providers.dbt.core.profiles.redshift import (
 from cosmos.providers.dbt.core.profiles.snowflake import (
     create_profile_vars_snowflake,
     snowflake_profile,
-)
-from cosmos.providers.dbt.core.profiles.trino import (
-    create_profile_vars_trino,
-    trino_profile,
 )
 
 if TYPE_CHECKING:

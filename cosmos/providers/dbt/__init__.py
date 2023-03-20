@@ -2,14 +2,14 @@
 dbt support for Airflow. Contains dags, task groups, and operators.
 """
 
-from .core.operators.docker import (
+from cosmos.providers.dbt.core.operators.docker import (
     DbtLSDockerOperator,
     DbtRunDockerOperator,
     DbtRunOperationDockerOperator,
     DbtSeedDockerOperator,
     DbtTestDockerOperator,
 )
-from .core.operators.kubernetes import (
+from cosmos.providers.dbt.core.operators.kubernetes import (
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
     DbtRunOperationKubernetesOperator,
@@ -18,7 +18,7 @@ from .core.operators.kubernetes import (
 )
 
 # re-export the operators
-from .core.operators.local import (
+from cosmos.providers.dbt.core.operators.local import (
     DbtLSLocalOperator,
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
@@ -27,11 +27,11 @@ from .core.operators.local import (
 )
 
 # re-export user facing utilities
-from .core.utils.data_aware_scheduling import get_dbt_dataset
+from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
 
 # re-export the dag and task group
-from .dag import DbtDag
-from .task_group import DbtTaskGroup
+from cosmos.providers.dbt.dag import DbtDag
+from cosmos.providers.dbt.task_group import DbtTaskGroup
 
 __all__ = [
     DbtLSLocalOperator,

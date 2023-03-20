@@ -3,7 +3,7 @@ Configuring Lineage
 
 Cosmos uses the `dbt-ol <https://openlineage.io/blog/dbt-with-marquez/>`_ wrapper to emit lineage events to OpenLineage.
 Follow the instructions below to ensure Cosmos is configured properly to do this. If you are using a virtual environment
-to separate dbt requirements from Airflow as outlined `here <>`_, then please follow the ``venv`` tab below. Otherwise,
+to separate dbt requirements from Airflow as outlined `here </astronomer-cosmos/dbt/install-options.html#virtual-environment>`_, then please follow the ``venv`` tab below. Otherwise,
 reference the ``base`` tab instructions
 
 .. tabs::

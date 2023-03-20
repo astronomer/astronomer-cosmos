@@ -127,7 +127,9 @@ def test_dbt_kubernetes_build_command():
 def test_created_pod(test_hook):
     test_hook.is_in_cluster = False
     test_hook._get_namespace.return_value.to_dict.return_value = "foo"
-    ls_operator = DbtLSKubernetesOperator(**base_kwargs)
+    ls_kwargs = {"env_vars": {"FOO": "BAR"}}
+    ls_kwargs.update(base_kwargs)
+    ls_operator = DbtLSKubernetesOperator(**ls_kwargs)
     ls_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
     pod_obj = ls_operator.build_pod_request_obj()
     expected_result = {
@@ -172,7 +174,7 @@ def test_created_pod(test_hook):
                         "--no-version-check",
                     ],
                     "command": [],
-                    "env": [],
+                    "env": [{"name": "FOO", "value": "BAR", "value_from": None}],
                     "env_from": [],
                     "image": "my_image",
                     "image_pull_policy": None,

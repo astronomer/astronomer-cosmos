@@ -19,7 +19,6 @@
       ~DbtSeedOperator.build_and_run_cmd
       ~DbtSeedOperator.exception_handling
       ~DbtSeedOperator.execute
-      ~DbtSeedOperator.get_dbt_path
       ~DbtSeedOperator.get_env
       ~DbtSeedOperator.on_kill
       ~DbtSeedOperator.run_command
@@ -33,5 +32,7 @@
 
    .. autosummary::
 
+      ~DbtSeedOperator.global_boolean_flags
+      ~DbtSeedOperator.global_flags
       ~DbtSeedOperator.template_fields
       ~DbtSeedOperator.ui_color

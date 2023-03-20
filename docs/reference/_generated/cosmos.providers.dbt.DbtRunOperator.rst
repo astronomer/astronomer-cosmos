@@ -18,7 +18,6 @@
       ~DbtRunOperator.build_and_run_cmd
       ~DbtRunOperator.exception_handling
       ~DbtRunOperator.execute
-      ~DbtRunOperator.get_dbt_path
       ~DbtRunOperator.get_env
       ~DbtRunOperator.on_kill
       ~DbtRunOperator.run_command
@@ -32,6 +31,8 @@
 
    .. autosummary::
 
+      ~DbtRunOperator.global_boolean_flags
+      ~DbtRunOperator.global_flags
       ~DbtRunOperator.template_fields
       ~DbtRunOperator.ui_color
       ~DbtRunOperator.ui_fgcolor

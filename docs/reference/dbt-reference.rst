@@ -23,8 +23,18 @@ Operators
     :toctree: _generated/
     :caption: Operators
 
-    DbtRunOperator
-    DbtTestOperator
-    DbtLSOperator
-    DbtSeedOperator
-    DbtRunOperationOperator
+    DbtLSLocalOperator,
+    DbtRunOperationLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtTestLocalOperator,
+    DbtLSDockerOperator,
+    DbtRunOperationDockerOperator,
+    DbtRunDockerOperator,
+    DbtSeedDockerOperator,
+    DbtTestDockerOperator,
+    DbtLSKubernetesOperator,
+    DbtRunOperationKubernetesOperator,
+    DbtRunKubernetesOperator,
+    DbtSeedKubernetesOperator,
+    DbtTestKubernetesOperator,

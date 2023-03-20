@@ -2,6 +2,6 @@ API Reference
 =============
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 5
 
     dbt <dbt-reference>

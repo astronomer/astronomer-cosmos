@@ -18,7 +18,6 @@
       ~DbtLSOperator.build_and_run_cmd
       ~DbtLSOperator.exception_handling
       ~DbtLSOperator.execute
-      ~DbtLSOperator.get_dbt_path
       ~DbtLSOperator.get_env
       ~DbtLSOperator.on_kill
       ~DbtLSOperator.run_command
@@ -32,5 +31,7 @@
 
    .. autosummary::
 
+      ~DbtLSOperator.global_boolean_flags
+      ~DbtLSOperator.global_flags
       ~DbtLSOperator.template_fields
       ~DbtLSOperator.ui_color

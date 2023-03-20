@@ -49,6 +49,10 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         return super().execute(context)
 
     def build_kube_args(self, cmd_flags, context):
+        # For the first round, we're going to assume that the command is dbt
+        # This means that we don't have openlineage support, but we will create a ticket
+        # to add that in the future
+        self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(
             context=context, cmd_flags=cmd_flags, handle_profile=False
         )

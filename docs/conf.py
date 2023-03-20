@@ -28,7 +28,7 @@ extensions = [
 
 autosummary_generate = True
 add_module_names = False
-autodoc_mock_imports = ["airflow", "cosmos.providers.dbt"]
+autodoc_mock_imports = ["airflow"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

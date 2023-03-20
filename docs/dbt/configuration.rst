@@ -31,7 +31,7 @@ Cosmos allows you to filter by configs (e.g. ``materialized``, ``tags``) using t
 
 The ``select`` and ``exclude`` parameters are dictionaries with the following keys:
 
-- ``configs``: a list of configs to filter by. The configs are in the format ``key:value``. For example, ``tag:daily`` or ``materialized:table``.
+- ``configs``: a list of configs to filter by. The configs are in the format ``key:value``. For example, ``tags:daily`` or ``materialized:table``.
 - ``paths``: a list of paths to filter by. The paths are in the format ``path/to/dir``. For example, ``analytics`` or ``analytics/tables``.
 
 .. note::
@@ -45,7 +45,7 @@ Examples:
 
     jaffle_shop = DbtDag(
         # ...
-        select={"configs": ['tag:daily']},
+        select={"configs": ['tags:daily']},
     )
 
 .. code-block:: python

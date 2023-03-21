@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
+from cosmos.providers.dbt.community.profiles.exasol import (
+    create_profile_vars_exasol,
+    exasol_profile,
+)
 from cosmos.providers.dbt.core.profiles.bigquery import (
     bigquery_profile,
     create_profile_vars_google_cloud_platform,
@@ -8,10 +12,6 @@ from cosmos.providers.dbt.core.profiles.bigquery import (
 from cosmos.providers.dbt.core.profiles.databricks import (
     create_profile_vars_databricks,
     databricks_profile,
-)
-from cosmos.providers.dbt.core.profiles.exasol import (
-    create_profile_vars_exasol,
-    exasol_profile,
 )
 from cosmos.providers.dbt.core.profiles.postgres import (
     create_profile_vars_postgres,

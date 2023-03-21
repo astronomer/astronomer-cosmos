@@ -19,6 +19,13 @@ from cosmos.providers.dbt.parser.project import DbtProject
 logger = logging.getLogger(__name__)
 
 
+def calculate_operator_class(
+    execution_mode: str,
+    dbt_class: str,
+) -> str:
+    return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
+
+
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
@@ -29,6 +36,7 @@ def render_project(
     conn_id: str = "default_conn_id",
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
+    execution_mode: Literal["local", "docker", "kubernetes"] = "local",
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -42,6 +50,9 @@ def render_project(
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
+    :param execution_mode: The execution mode in which the dbt project should be run.
+        Options are "local", "docker", and "kubernetes".
+        Defaults to "local"
     """
     # first, get the dbt project
     project = DbtProject(
@@ -50,7 +61,8 @@ def render_project(
         project_name=dbt_project_name,
     )
 
-    base_group = Group(id=dbt_project_name)  # this is the group that will be returned
+    # this is the group that will be returned
+    base_group = Group(id=dbt_project_name)
     entities: Dict[
         str, CosmosEntity
     ] = {}  # this is a dict of all the entities we create
@@ -114,7 +126,10 @@ def render_project(
         # make the run task
         run_task = Task(
             id=f"{model_name}_run",
-            operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode,
+                dbt_class="DbtRun",
+            ),
             arguments=run_args,
         )
 
@@ -130,7 +145,9 @@ def render_project(
 
         test_task = Task(
             id=f"{model_name}_test",
-            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class="DbtTest"
+            ),
             upstream_entity_ids=[run_task.id],
             arguments=test_args,
         )
@@ -162,7 +179,9 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class="DbtTest"
+            ),
             arguments=task_args,
         )
         entities[test_task.id] = test_task

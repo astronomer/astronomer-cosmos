@@ -25,7 +25,7 @@ Pre-requisites
 #. `git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
 
 Local Sandbox
-*************
+************
 To create a sandbox where you can do real-time testing for your proposed to changes to Cosmos, see the corresponding
 development repository: `cosmos-dev <https://github.com/astronomer/cosmos-dev>`_.
 

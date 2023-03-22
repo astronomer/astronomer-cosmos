@@ -28,9 +28,6 @@ class DbtDag(CosmosDag):
         Defaults to "after_each"
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2"]})
-    :param execution_mode: The execution mode in which the dbt project should be run.
-        Options are "local", "docker", and "kubernetes".
-        Defaults to "local"
     """
 
     def __init__(
@@ -44,7 +41,6 @@ class DbtDag(CosmosDag):
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
-        execution_mode: Literal["local", "docker", "kubernetes"] = "local",
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -65,7 +61,6 @@ class DbtDag(CosmosDag):
             conn_id=conn_id,
             select=select,
             exclude=exclude,
-            execution_mode=execution_mode,
         )
 
         # call the airflow DAG constructor

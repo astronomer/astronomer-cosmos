@@ -7,11 +7,11 @@ from airflow.hooks.subprocess import SubprocessResult
 from airflow.utils.context import Context
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators.local import DbtLocalBaseOperator
+from cosmos.providers.dbt.core.operators import DbtBaseOperator
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = DbtBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         project_dir="my/dir",
@@ -47,7 +47,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
 def test_dbt_base_operator_exception_handling(
     skip_exception, exception_code_returned, expected_exception
 ) -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = DbtBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         project_dir="my/dir",
@@ -63,12 +63,12 @@ def test_dbt_base_operator_exception_handling(
         )
 
 
-@patch("cosmos.providers.dbt.core.operators.base.context_to_airflow_vars")
+@patch("cosmos.providers.dbt.core.operators.context_to_airflow_vars")
 def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
     """
     If an end user passes in a
     """
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = DbtBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         project_dir="my/dir",

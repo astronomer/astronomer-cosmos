@@ -20,14 +20,17 @@ author = "Astronomer"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "autoapi.extension",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.autosectionlabel",
     "sphinx_tabs.tabs",
 ]
 
+autosummary_generate = True
 add_module_names = False
-autoapi_dirs = ["../cosmos"]
-autoapi_generate_api_docs = False
-autodoc_mock_imports = ["airflow"]
+autodoc_mock_imports = [
+    "airflow",
+]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

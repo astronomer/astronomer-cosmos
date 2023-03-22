@@ -36,8 +36,6 @@ classifiers = [
 ]
 dependencies = [
     "apache-airflow>=2.4",
-    "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
 ]
@@ -77,7 +75,6 @@ docs =[
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-autoapi",
     "sphinx-tabs"
 ]
 tests = [

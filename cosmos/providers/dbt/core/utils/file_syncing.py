@@ -18,12 +18,15 @@ def has_differences(dcmp):
     return any([has_differences(subdcmp) for subdcmp in dcmp.subdirs.values()])
 
 
-def is_file_locked(file_path):
+def is_file_locked(filename):
     # checks a lock file to see if a lock is being held by another process
-    try:
-        with open(file_path, "w") as f:
+    with open(filename, "w") as f:
+        try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        fcntl.flock(f, fcntl.LOCK_UN)
-        return False
-    except OSError:
-        return True
+            fcntl.flock(f, fcntl.LOCK_UN)
+            return False
+        except OSError:
+            return True
+        finally:
+            if not f.closed:
+                f.close()

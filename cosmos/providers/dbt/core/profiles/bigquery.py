@@ -40,7 +40,7 @@ def create_profile_vars_google_cloud_platform(
     https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup
     https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
-    bigquery_key_file = json.loads(conn.extra_dejson.get("keyfile_dict"))
+    bigquery_key_file = json.loads(conn.extra_dejson.get("extra__google_cloud_platform__keyfile_dict"))
 
     if not schema_override:
         raise ValueError(

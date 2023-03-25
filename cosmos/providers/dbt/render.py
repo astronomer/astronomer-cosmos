@@ -14,8 +14,7 @@ from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
 from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
-from cosmos.providers.dbt.parser.project import DbtProject
-from cosmos.providers.dbt.parser.project import DbtModelType
+from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
 
 logger = logging.getLogger(__name__)
 
@@ -129,9 +128,7 @@ def render_project(
                 arguments=run_args,
             )
         else:
-            logger.error(
-                f"Unknown DBT type."
-            )
+            logger.error("Unknown DBT type.")
 
         # if test_behavior isn't "after_each", we can just add the task to the
         # base group and do nothing else for now

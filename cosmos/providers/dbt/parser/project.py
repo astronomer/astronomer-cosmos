@@ -6,22 +6,25 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Dict, List, Set
-from enum import Enum
 
 import jinja2
 import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
+
 class DbtModelType(Enum):
     """
     Represents type of DBT unit (model, snapshot, seed)
     """
+
     DBT_MODEL = 1
     DBT_SNAPSHOT = 2
     DBT_SEED = 3
+
 
 @dataclass
 class DbtModelConfig:
@@ -111,10 +114,10 @@ class DbtModel:
         code = self.path.read_text()
 
         # detecting code type (model / snapshot)
-        if 'endsnapshot' in code:
+        if "endsnapshot" in code:
             # we remove first and last line if the code is a snapshot
-            code = code.split('%}')[1]
-            code = code.split('{%')[0]
+            code = code.split("%}")[1]
+            code = code.split("{%")[0]
             self.type = DbtModelType.DBT_SNAPSHOT
         else:
             self.type = DbtModelType.DBT_MODEL

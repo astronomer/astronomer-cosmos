@@ -15,6 +15,7 @@ from airflow.exceptions import AirflowException
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
 from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
 from cosmos.providers.dbt.parser.project import DbtProject
+from cosmos.providers.dbt.parser.project import DbtModelType
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
     dbt_models_dir: str = "models",
+    dbt_snapshots_dir: str = "snapshots",
     task_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
@@ -47,6 +49,7 @@ def render_project(
     project = DbtProject(
         dbt_root_path=dbt_root_path,
         dbt_models_dir=dbt_models_dir,
+        dbt_snapshots_dir=dbt_snapshots_dir,
         project_name=dbt_project_name,
     )
 
@@ -111,12 +114,24 @@ def render_project(
             else:
                 run_args["outlets"] = outlets
 
-        # make the run task
-        run_task = Task(
-            id=f"{model_name}_run",
-            operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
-            arguments=run_args,
-        )
+        if model.type == DbtModelType.DBT_MODEL:
+            # make the run task for model
+            run_task = Task(
+                id=f"{model_name}_run",
+                operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
+                arguments=run_args,
+            )
+        elif model.type == DbtModelType.DBT_SNAPSHOT:
+            # make the run task for snapshot
+            run_task = Task(
+                id=f"{model_name}_snapshot",
+                operator_class="cosmos.providers.dbt.core.operators.DbtSnapshotOperator",
+                arguments=run_args,
+            )
+        else:
+            logger.error(
+                f"Unknown DBT type."
+            )
 
         # if test_behavior isn't "after_each", we can just add the task to the
         # base group and do nothing else for now

@@ -8,12 +8,20 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, Dict, List, Set
+from enum import Enum
 
 import jinja2
 import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
+class DbtModelType(Enum):
+    """
+    Represents type of DBT unit (model, snapshot, seed)
+    """
+    DBT_MODEL = 1
+    DBT_SNAPSHOT = 2
+    DBT_SEED = 3
 
 @dataclass
 class DbtModelConfig:
@@ -83,11 +91,12 @@ class DbtModelConfig:
 @dataclass
 class DbtModel:
     """
-    Represents a single dbt model.
+    Represents a single dbt model. (This class also hold snapshots)
     """
 
     # instance variables
     name: str
+    type: DbtModelType
     path: Path
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
@@ -100,6 +109,15 @@ class DbtModel:
 
         # get the code from the file
         code = self.path.read_text()
+
+        # detecting code type (model / snapshot)
+        if 'endsnapshot' in code:
+            # we remove first and last line if the code is a snapshot
+            code = code.split('%}')[1]
+            code = code.split('{%')[0]
+            self.type = DbtModelType.DBT_SNAPSHOT
+        else:
+            self.type = DbtModelType.DBT_MODEL
 
         # get the dependencies
         env = jinja2.Environment()
@@ -157,7 +175,7 @@ class DbtModel:
         """
         Returns the string representation of the model.
         """
-        return f"DbtModel(name='{self.name}', path='{self.path}', config={self.config})"
+        return f"DbtModel(name='{self.name}', type='{self.type}', path='{self.path}', config={self.config})"
 
 
 @dataclass
@@ -172,11 +190,13 @@ class DbtProject:
     # optional, user-specified instance variables
     dbt_root_path: str = "/usr/local/airflow/dbt"
     dbt_models_dir: str = "models"
+    dbt_snapshots_dir: str = "snapshots"
 
     # private instance variables for managing state
     models: Dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
     models_dir: Path = field(init=False)
+    snapshots_dir: Path = field(init=False)
 
     def __post_init__(self) -> None:
         """
@@ -185,9 +205,14 @@ class DbtProject:
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
         self.models_dir = self.project_dir / self.dbt_models_dir
+        self.snapshots_dir = self.project_dir / self.dbt_snapshots_dir
 
         # crawl the models in the project
         for file_name in self.models_dir.rglob("*.sql"):
+            self._handle_sql_file(file_name)
+
+        # crawl the snapshots in the project
+        for file_name in self.snapshots_dir.rglob("*.sql"):
             self._handle_sql_file(file_name)
 
         # crawl the config files in the project
@@ -202,10 +227,19 @@ class DbtProject:
         model_name = path.stem
 
         # construct the model object, which we'll use to store metadata
-        model = DbtModel(
-            name=model_name,
-            path=path,
-        )
+        if str(self.models_dir) in str(path):
+            model = DbtModel(
+                name=model_name,
+                type=DbtModelType.DBT_MODEL,
+                path=path,
+            )
+
+        if str(self.snapshots_dir) in str(path):
+            model = DbtModel(
+                name=model_name,
+                type=DbtModelType.DBT_SNAPSHOT,
+                path=path,
+            )
 
         # add the model to the project
         self.models[model_name] = model

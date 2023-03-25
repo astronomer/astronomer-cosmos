@@ -113,14 +113,10 @@ class DbtModel:
         # get the code from the file
         code = self.path.read_text()
 
-        # detecting code type (model / snapshot)
-        if "endsnapshot" in code:
-            # we remove first and last line if the code is a snapshot
+        # we remove first and last line if the code is a snapshot
+        if self.type == DbtModelType.DBT_SNAPSHOT:
             code = code.split("%}")[1]
             code = code.split("{%")[0]
-            self.type = DbtModelType.DBT_SNAPSHOT
-        else:
-            self.type = DbtModelType.DBT_MODEL
 
         # get the dependencies
         env = jinja2.Environment()

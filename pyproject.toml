@@ -75,7 +75,8 @@ docs =[
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-tabs"
+    "sphinx-tabs",
+    "sphinx-autoapi"
 ]
 tests = [
     "pytest>=6.0",
@@ -106,7 +107,8 @@ dependencies = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-tabs"
+    "sphinx-tabs",
+    "sphinx-autoapi"
 ]
 
 [tool.hatch.envs.docs.scripts]

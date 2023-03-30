@@ -271,9 +271,9 @@ class DbtBaseOperator(BaseOperator):
                 os.makedirs(os.path.dirname(lock_file), exist_ok=True)
                 lock_path = Path(target_dir) / ".lock"
                 with FileLock(str(lock_path), timeout=15):
-                    shutil.copytree(
-                        self.project_dir, target_dir, ignore=exclude, dirs_exist_ok=True
-                    )
+                    if os.path.exists(target_dir):
+                        shutil.rmtree(target_dir)
+                    shutil.copytree(self.project_dir, target_dir, ignore=exclude)
         else:
             logging.info(
                 f"No differences detected between {self.project_dir} and {target_dir}"

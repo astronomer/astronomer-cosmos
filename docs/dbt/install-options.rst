@@ -68,7 +68,7 @@ To install dbt into a virtual environment, you can use the following steps:
 
     # install dbt into a virtual environment
     # replace dbt-postgres with the adapter you need
-    RUN python -m virtualenv dbt_venv && source dbt_venv/bin/activate && \
+    RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \
         pip install --no-cache-dir dbt-core dbt-postgres && deactivate
 
 2. Use the ``dbt_executable_path`` argument in the Cosmos operator to point to the virtual environment

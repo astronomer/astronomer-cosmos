@@ -5,13 +5,9 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators.kubernetes import (
-    DbtDepsKubernetesOperator,
-    DbtKubernetesBaseOperator,
-    DbtLSKubernetesOperator,
-    DbtRunKubernetesOperator,
-    DbtSeedKubernetesOperator,
-    DbtTestKubernetesOperator,
-)
+    DbtDepsKubernetesOperator, DbtKubernetesBaseOperator,
+    DbtLSKubernetesOperator, DbtRunKubernetesOperator,
+    DbtSeedKubernetesOperator, DbtTestKubernetesOperator)
 
 
 def test_dbt_kubernetes_operator_add_global_flags() -> None:

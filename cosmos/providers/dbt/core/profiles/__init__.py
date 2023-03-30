@@ -2,25 +2,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
 from cosmos.providers.dbt.core.profiles.bigquery import (
-    bigquery_profile,
-    create_profile_vars_google_cloud_platform,
-)
+    bigquery_profile, create_profile_vars_google_cloud_platform)
 from cosmos.providers.dbt.core.profiles.databricks import (
-    create_profile_vars_databricks,
-    databricks_profile,
-)
+    create_profile_vars_databricks, databricks_profile)
 from cosmos.providers.dbt.core.profiles.postgres import (
-    create_profile_vars_postgres,
-    postgres_profile,
-)
+    create_profile_vars_postgres, postgres_profile)
 from cosmos.providers.dbt.core.profiles.redshift import (
-    create_profile_vars_redshift,
-    redshift_profile,
-)
+    create_profile_vars_redshift, redshift_profile)
 from cosmos.providers.dbt.core.profiles.snowflake import (
-    create_profile_vars_snowflake,
-    snowflake_profile,
-)
+    create_profile_vars_snowflake, snowflake_profile)
 
 if TYPE_CHECKING:
     from airflow.models import Connection

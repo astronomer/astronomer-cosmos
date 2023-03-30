@@ -4,12 +4,10 @@ import logging
 from typing import Sequence
 
 import yaml
-from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
-    convert_env_vars,
-)
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
-    KubernetesPodOperator,
-)
+from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import \
+    convert_env_vars
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import \
+    KubernetesPodOperator
 from airflow.utils.context import Context
 from kubernetes.client import models as k8s
 

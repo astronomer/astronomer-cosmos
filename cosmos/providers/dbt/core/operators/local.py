@@ -19,11 +19,9 @@ from filelock import FileLock
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.file_syncing import (
-    exclude,
-    has_differences,
-    is_file_locked,
-)
+from cosmos.providers.dbt.core.utils.file_syncing import (exclude,
+                                                          has_differences,
+                                                          is_file_locked)
 
 logger = logging.getLogger(__name__)
 

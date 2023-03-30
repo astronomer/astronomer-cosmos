@@ -12,18 +12,12 @@ import yaml
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import (
-    create_profile_vars_databricks,
-    create_profile_vars_google_cloud_platform,
-    create_profile_vars_postgres,
-    create_profile_vars_redshift,
-    create_profile_vars_snowflake,
-    get_available_adapters,
-)
+    create_profile_vars_databricks, create_profile_vars_google_cloud_platform,
+    create_profile_vars_postgres, create_profile_vars_redshift,
+    create_profile_vars_snowflake, get_available_adapters)
 from cosmos.providers.dbt.core.profiles.snowflake import get_snowflake_account
 from cosmos.providers.dbt.core.utils.profiles_generator import (
-    create_default_profiles,
-    map_profile,
-)
+    create_default_profiles, map_profile)
 
 
 def test_create_default_profiles(tmp_path: Path) -> None:

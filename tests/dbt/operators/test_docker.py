@@ -4,14 +4,12 @@ from unittest.mock import MagicMock, patch
 from airflow.utils.context import Context
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators.docker import (
-    DbtDepsDockerOperator,
-    DbtDockerBaseOperator,
-    DbtLSDockerOperator,
-    DbtRunDockerOperator,
-    DbtSeedDockerOperator,
-    DbtTestDockerOperator,
-)
+from cosmos.providers.dbt.core.operators.docker import (DbtDepsDockerOperator,
+                                                        DbtDockerBaseOperator,
+                                                        DbtLSDockerOperator,
+                                                        DbtRunDockerOperator,
+                                                        DbtSeedDockerOperator,
+                                                        DbtTestDockerOperator)
 
 
 def test_dbt_docker_operator_add_global_flags() -> None:

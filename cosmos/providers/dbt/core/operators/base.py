@@ -12,9 +12,7 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.utils.profiles_generator import (
-    create_default_profiles,
-    map_profile,
-)
+    create_default_profiles, map_profile)
 
 logger = logging.getLogger(__name__)
 

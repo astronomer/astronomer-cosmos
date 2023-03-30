@@ -13,8 +13,7 @@ from typing import Any, Dict, List
 from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
-from cosmos.providers.dbt.core.utils.data_aware_scheduling import \
-    get_dbt_dataset
+from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
 from cosmos.providers.dbt.parser.project import DbtProject
 
 logger = logging.getLogger(__name__)

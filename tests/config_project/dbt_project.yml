@@ -1,0 +1,9 @@
+name: 'config_project'
+models:
+  config_project:
+    mart:
+      +tags: daily
+    modelling:
+      +materialized: table
+    staging:
+      +schema: jaffle_staging

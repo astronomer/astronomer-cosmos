@@ -161,18 +161,3 @@ class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
         return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-
-
-class DbtDepsKubernetesOperator(DbtKubernetesBaseOperator):
-    """
-    Executes a dbt core deps command.
-    """
-
-    ui_color = "#8194E0"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "deps"
-
-    def execute(self, context: Context):
-        return self.build_and_run_cmd(context=context)

@@ -24,6 +24,7 @@ from cosmos.providers.dbt.core.operators.local import (
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtTestLocalOperator,
+    DbtDepsLocalOperator,
 )
 
 # re-export user facing utilities
@@ -39,6 +40,7 @@ __all__ = [
     DbtRunLocalOperator,
     DbtSeedLocalOperator,
     DbtTestLocalOperator,
+    DbtDepsLocalOperator,
     DbtLSDockerOperator,
     DbtRunOperationDockerOperator,
     DbtRunDockerOperator,

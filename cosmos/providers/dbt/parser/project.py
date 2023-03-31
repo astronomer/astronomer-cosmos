@@ -117,9 +117,9 @@ class DbtModel:
         # we remove first and last line if the code is a snapshot
         elif self.type == DbtModelType.DBT_SNAPSHOT:
             code = self.path.read_text()
-            snapshot_name = code.split('{%')[1]
-            snapshot_name = snapshot_name.split('%}')[0]
-            snapshot_name = snapshot_name.split(' ')[2]
+            snapshot_name = code.split("{%")[1]
+            snapshot_name = snapshot_name.split("%}")[0]
+            snapshot_name = snapshot_name.split(" ")[2]
             snapshot_name = snapshot_name.strip()
             self.name = snapshot_name
             code = code.split("%}")[1]
@@ -246,9 +246,9 @@ class DbtProject:
 
         # construct the model object, which we'll use to store metadata
         model = DbtModel(
-                name=model_name,
-                type=DbtModelType.DBT_SEED,
-                path=path,
+            name=model_name,
+            type=DbtModelType.DBT_SEED,
+            path=path,
         )
         # add the model to the project
         self.seeds[model_name] = model

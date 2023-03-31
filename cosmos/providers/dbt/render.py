@@ -1,8 +1,8 @@
 """
 This module contains a function to render a dbt project into Cosmos entities.
 """
-import logging
 import itertools
+import logging
 
 try:
     from typing import Literal
@@ -77,7 +77,9 @@ def render_project(
             )
 
     # iterate over each model once to create the initial tasks
-    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
+    for model_name, model in itertools.chain(
+        project.models.items(), project.snapshots.items(), project.seeds.items()
+    ):
         # filters down to a path within the project_dir
         if "paths" in select:
             root_directories = [
@@ -167,7 +169,9 @@ def render_project(
         base_group.add_entity(entity=model_group)
 
     # add dependencies now that we have all the entities
-    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
+    for model_name, model in itertools.chain(
+        project.models.items(), project.snapshots.items(), project.seeds.items()
+    ):
         upstream_deps = model.config.upstream_models
         for upstream_model_name in upstream_deps:
             try:

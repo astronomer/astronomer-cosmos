@@ -2,6 +2,7 @@
 This module contains a function to render a dbt project into Cosmos entities.
 """
 import logging
+import itertools
 
 try:
     from typing import Literal
@@ -76,7 +77,7 @@ def render_project(
             )
 
     # iterate over each model once to create the initial tasks
-    for model_name, model in project.models.items():
+    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
         # filters down to a path within the project_dir
         if "paths" in select:
             root_directories = [
@@ -127,6 +128,13 @@ def render_project(
                 operator_class="cosmos.providers.dbt.core.operators.DbtSnapshotOperator",
                 arguments=run_args,
             )
+        elif model.type == DbtModelType.DBT_SEED:
+            # make the run task for snapshot
+            run_task = Task(
+                id=f"{model_name}_seed",
+                operator_class="cosmos.providers.dbt.core.operators.DbtSeedOperator",
+                arguments=run_args,
+            )
         else:
             logger.error("Unknown DBT type.")
 
@@ -159,7 +167,7 @@ def render_project(
         base_group.add_entity(entity=model_group)
 
     # add dependencies now that we have all the entities
-    for model_name, model in project.models.items():
+    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
         upstream_deps = model.config.upstream_models
         for upstream_model_name in upstream_deps:
             try:

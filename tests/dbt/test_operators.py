@@ -1,3 +1,6 @@
+import os.path
+from concurrent.futures import ThreadPoolExecutor
+from filecmp import dircmp
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +11,7 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators import DbtBaseOperator
+from cosmos.providers.dbt.core.utils.file_syncing import has_differences
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
@@ -105,3 +109,68 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         "SNOWFLAKE_SCHEMA": "jaffle_shop",
     }
     assert env == expected_env
+
+
+def test_first_sync(tmp_path: Path) -> None:
+    project_path = Path(__file__).parent.parent.joinpath("example_project")
+    dbt_base_operator = DbtBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir=str(project_path),
+    )
+    dbt_base_operator.tmp_path = tmp_path
+    synced_path = dbt_base_operator.sync_temp_project()
+    assert synced_path == tmp_path.joinpath(os.path.basename(project_path))
+    comparison = dircmp(project_path, synced_path)
+    assert not has_differences(comparison)
+
+
+def test_update_sync(tmp_path: Path) -> None:
+    project_path = Path(__file__).parent.parent.joinpath("example_project")
+    dbt_base_operator = DbtBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir=str(project_path),
+    )
+    dbt_base_operator.tmp_path = tmp_path
+    synced_path = dbt_base_operator.sync_temp_project()
+    new_file = project_path.joinpath("some_file.yml")
+    new_file.touch(exist_ok=True)
+    new_directory = project_path.joinpath("macros")
+    new_directory.mkdir(exist_ok=True)
+    dbt_base_operator.sync_temp_project()
+    comparison = dircmp(project_path, synced_path)
+    assert not has_differences(comparison)
+    # Tear down test artifacts
+    os.remove(new_file)
+    new_directory.rmdir()
+
+
+def test_multiple_tasks_sync(tmp_path: Path) -> None:
+    """I'm not entirely confident that this test does what it should, integration testing mandatory."""
+    project_path = Path(__file__).parent.parent.joinpath("example_project")
+    dbt_base_operator_1 = DbtBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir=str(project_path),
+    )
+    dbt_base_operator_2 = DbtBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="another-task",
+        project_dir=str(project_path),
+    )
+    dbt_base_operator_1.tmp_path = tmp_path
+    dbt_base_operator_2.tmp_path = tmp_path
+    synced_path = dbt_base_operator_1.sync_temp_project()
+    new_file = project_path.joinpath("some_file.yml")
+    new_file.touch(exist_ok=True)
+    with ThreadPoolExecutor(2) as tpe:
+        tpe.submit(dbt_base_operator_1.sync_temp_project)
+        new_directory = project_path.joinpath("macros")
+        new_directory.mkdir(exist_ok=True)
+        tpe.submit(dbt_base_operator_2.sync_temp_project)
+    comparison = dircmp(project_path, synced_path)
+    assert not has_differences(comparison)
+    # Tear down test artifacts
+    os.remove(new_file)
+    new_directory.rmdir()

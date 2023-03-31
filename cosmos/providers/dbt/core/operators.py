@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import fcntl
 import logging
 import os
 import shutil
 import signal
-import time
+from contextlib import suppress
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
@@ -17,14 +16,10 @@ from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
-from filelock import FileLock
+from filelock import FileLock, Timeout
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
-from cosmos.providers.dbt.core.utils.file_syncing import (
-    exclude,
-    has_differences,
-    is_file_locked,
-)
+from cosmos.providers.dbt.core.utils.file_syncing import exclude, has_differences
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
@@ -143,6 +138,7 @@ class DbtBaseOperator(BaseOperator):
             self.dbt_executable_path = dbt_ol_path
         else:
             self.dbt_executable_path = dbt_executable_path
+        self.tmp_path = Path("/tmp/dbt")
         super().__init__(**kwargs)
 
     @cached_property
@@ -215,75 +211,75 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
+    def sync_temp_project(self) -> Path:
+        """Keeps a synchronised copy of the dbt project in a temporary location for read/write operations.
+
+        The order of events is:
+            1. Check if the dbt project exists and is a directory.
+            2. Create the temporary project top level path if it doesn't exist.
+            3. Acquire a lock on the top level of the directory.
+            4. Compare the contents to where the files are deployed with some omissions.
+            5. If there are differences then delete everything out, with some omissions, and create everything.
+            6. Release the lock.
+
+        :raises:
+            AirflowException: If the dbt project cannot be found or the dbt project is not a directory.
+        :return: The temporary dbt project path
+        """
+        source_path = Path(
+            self.project_dir
+        )  # Path will throw a TypeError if None is passed in
+        if not source_path.exists():
+            raise AirflowException(f"Can not find the project_dir: {str(source_path)}")
+        if not source_path.is_dir():
+            raise AirflowException(
+                f"The project_dir {self.project_dir} must be a directory"
+            )
+        target_path = self.tmp_path.joinpath(os.path.basename(source_path))
+        if not target_path.exists():
+            target_path.mkdir(parents=True, exist_ok=True)
+        lock = FileLock(target_path / ".lock", timeout=10)
+        with suppress(Timeout):
+            lock.acquire(timeout=15)
+            comparison = dircmp(
+                source_path, target_path, ignore=["logs", "target", ".lock"]
+            )
+            if has_differences(comparison):
+                logging.info(
+                    f"Changes detected - copying {str(source_path)} to {str(target_path)}"
+                )
+                for dir_object in os.listdir(target_path):
+                    dir_object: str
+                    child_path = target_path.joinpath(dir_object)
+                    if child_path.is_dir():
+                        if dir_object not in ["logs", "target"]:
+                            shutil.rmtree(child_path)
+                    elif dir_object not in [".lock"]:
+                        os.remove(child_path)
+                shutil.copytree(
+                    source_path, target_path, ignore=exclude, dirs_exist_ok=True
+                )
+            else:
+                logging.info(
+                    f"No differences detected between {str(source_path)} and {str(target_path)}"
+                )
+            lock.release(force=True)
+        return target_path
+
     def run_command(
         self,
         cmd: list[str],
         env: dict[str, str],
+        dbt_project_path: Path,
     ) -> SubprocessResult:
-        # check project_dir
-        if self.project_dir is not None:
-            if not os.path.exists(self.project_dir):
-                raise AirflowException(
-                    f"Can not find the project_dir: {self.project_dir}"
-                )
-            if not os.path.isdir(self.project_dir):
-                raise AirflowException(
-                    f"The project_dir {self.project_dir} must be a directory"
-                )
-
-        # routing the dbt project to a tmp dir for r/w operations
-        target_dir = f"/tmp/dbt/{os.path.basename(self.project_dir)}"
-
-        changes = True  # set changes to true by default
-        if os.path.exists(target_dir):
-            # if the directory doesn't exist or if there are changes -- keep changes as true
-            comparison = dircmp(
-                self.project_dir, target_dir, ignore=["logs", "target", ".lock"]
-            )  # compares tmp and project dir
-            changes = has_differences(comparison)  # check for changes
-
-        # if there are changes between tmp and project_dir then copy them over
-        if changes:
-            logging.info(
-                f"Changes detected - copying {self.project_dir} to {target_dir}"
-            )
-            # put a lock on the dest so that it isn't getting written multiple times
-            lock_file = os.path.join(target_dir, ".lock")
-
-            # if there is already a lock file - then just wait for it to be released and continue without copying
-            if os.path.exists(lock_file) and is_file_locked(lock_file):
-                while os.path.exists(lock_file):
-                    with open(lock_file, "w") as lock_f:
-                        try:
-                            # Lock acquired, the lock file is available
-                            fcntl.flock(lock_f, fcntl.LOCK_SH | fcntl.LOCK_NB)
-                            break
-                        except OSError:
-                            # Lock is held by another process, wait and try again
-                            time.sleep(1)
-
-                # The lock file is available, release the shared lock
-                with open(lock_file, "w") as lock_f:
-                    fcntl.flock(lock_f, fcntl.LOCK_UN)
-
-            # otherwise create a lock file and copy the dbt directory
-            else:
-                os.makedirs(os.path.dirname(lock_file), exist_ok=True)
-                lock_path = Path(target_dir) / ".lock"
-                with FileLock(str(lock_path), timeout=15):
-                    if os.path.exists(target_dir):
-                        shutil.rmtree(target_dir)
-                    shutil.copytree(self.project_dir, target_dir, ignore=exclude)
-        else:
-            logging.info(
-                f"No differences detected between {self.project_dir} and {target_dir}"
-            )
-
         # Fix the profile path, so it's not accidentally superseded by the end user.
         env["DBT_PROFILES_DIR"] = DBT_PROFILE_PATH.parent
         # run bash command
         result = self.subprocess_hook.run_command(
-            command=cmd, env=env, output_encoding=self.output_encoding, cwd=target_dir
+            command=cmd,
+            env=env,
+            output_encoding=self.output_encoding,
+            cwd=str(dbt_project_path),
         )
         self.exception_handling(result)
         return result
@@ -308,8 +304,9 @@ class DbtBaseOperator(BaseOperator):
         dbt_cmd.extend(["--profile", profile])
         # set env vars
         env = self.get_env(context, profile_vars)
+        dbt_project_path = self.sync_temp_project()
 
-        return self.run_command(cmd=dbt_cmd, env=env)
+        return self.run_command(dbt_cmd, env, dbt_project_path)
 
     def execute(self, context: Context) -> str:
         # TODO is this going to put loads of unnecessary stuff in to xcom?

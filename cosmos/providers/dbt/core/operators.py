@@ -9,16 +9,18 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
-
+import logging
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.models.baseoperator import BaseOperator
+from airflow.hooks.base import BaseHook
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from filelock import FileLock
-
+import requests
+import json
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.utils.file_syncing import (
     exclude,
@@ -387,7 +389,6 @@ class DbtRunOperator(DbtBaseOperator):
         result = self.build_and_run_cmd(context=context)
         return result.output
 
-
 class DbtTestOperator(DbtBaseOperator):
     """
     Executes a dbt core test command.
@@ -398,9 +399,78 @@ class DbtTestOperator(DbtBaseOperator):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
+        self.slack_conn_id = "slack_conn_id"
+        self.warning_alert = False
+
+    def get_warnings(self, output) -> int:
+        """
+        Get the number of warnings from the DBT test output message
+        """
+        num_warns = int(output.split("WARN=")[1].split()[0])
+        return num_warns
+
+    def get_errors(self, output) -> int:
+        """
+        Get the number of errors from the DBT test output message
+        """
+        num_errors = int(output.split("ERROR=")[1].split()[0])
+        return num_errors
+    
+    def send_slack_alert(
+    self, alert_title, alert_description, alert_color
+    ):
+        """
+        Sends a slack message to a designated slack channel using slack webhook
+
+        :param alert_title: String containing Alert title
+        :param alert_description: String containing Alert message
+        :param alert_color: RGB code of the color to be displayed on the side bar
+        :return: None
+        """
+
+        # message metadata
+        message_data = {
+        "attachments": [
+                {
+                "color": alert_color,
+                "pretext": alert_title,
+                "fields": [{"value": alert_description, "short": "false",},],
+                }
+            ]
+        }
+
+        # get connection
+        slack_service = BaseHook.get_connection(f"{self.slack_conn_id}").host
+        slack_token = BaseHook.get_connection(f"{self.slack_conn_id}").password
+        slack_webhook_url = slack_service + slack_token
+
+        # send message
+        requests.post(
+        slack_webhook_url,
+        data=json.dumps(message_data),
+        headers={"Content-Type": "application/json"},
+        )
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
+        
+        # create a function that is called if there are warnings otherwise just return he result.output
+        warnings = self.get_warnings(result.output)
+        errors = self.get_errors(result.output)
+
+        if self.warning_alert:
+            dag_id = self.dag.dag_id
+            task_id = self.task_id
+            execution_date = context['execution_date'].strftime('%Y-%m-%d %H:%M:%S')
+
+            if warnings > 0 and errors == 0:
+                self.send_slack_alert(f"WARNING - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
+                                f"Total number of warnings = {warnings}",
+                                "#eed202")
+            elif warnings > 0 and errors > 0:
+                self.send_slack_alert(f"ERROR - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
+                                f"Total number of warnings = {warnings} \nTotal number of errors = {errors}",
+                                "#FF0000")
         return result.output
 
 

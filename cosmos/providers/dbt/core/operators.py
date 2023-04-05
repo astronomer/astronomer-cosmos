@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import logging
 import os
 import shutil
@@ -9,17 +10,18 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
+
+import requests
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.hooks.base import BaseHook
 from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.models.baseoperator import BaseOperator
-from airflow.hooks.base import BaseHook
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from filelock import FileLock
-import requests
-import json
+
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.utils.file_syncing import (
     exclude,
@@ -388,6 +390,7 @@ class DbtRunOperator(DbtBaseOperator):
         result = self.build_and_run_cmd(context=context)
         return result.output
 
+
 class DbtTestOperator(DbtBaseOperator):
     """
     Executes a dbt core test command.
@@ -409,7 +412,7 @@ class DbtTestOperator(DbtBaseOperator):
             num_warns = int(output.split("WARN=")[1].split()[0])
         except:
             ValueError("Could not parse number of warnings. Check your DBT version")
-        
+
         return num_warns
 
     def get_errors(self, output) -> int:
@@ -421,10 +424,8 @@ class DbtTestOperator(DbtBaseOperator):
         except:
             ValueError("Could not parse number of errors. Check your DBT version")
         return num_errors
-    
-    def send_slack_alert(
-    self, alert_title, alert_description, alert_color
-    ) -> None:
+
+    def send_slack_alert(self, alert_title, alert_description, alert_color) -> None:
         """
         Sends a slack message to a designated slack channel using slack webhook
 
@@ -436,11 +437,16 @@ class DbtTestOperator(DbtBaseOperator):
 
         # message metadata
         message_data = {
-        "attachments": [
+            "attachments": [
                 {
-                "color": alert_color,
-                "pretext": alert_title,
-                "fields": [{"value": alert_description, "short": "false",},],
+                    "color": alert_color,
+                    "pretext": alert_title,
+                    "fields": [
+                        {
+                            "value": alert_description,
+                            "short": "false",
+                        },
+                    ],
                 }
             ]
         }
@@ -452,14 +458,14 @@ class DbtTestOperator(DbtBaseOperator):
 
         # send message
         requests.post(
-        slack_webhook_url,
-        data=json.dumps(message_data),
-        headers={"Content-Type": "application/json"},
+            slack_webhook_url,
+            data=json.dumps(message_data),
+            headers={"Content-Type": "application/json"},
         )
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
-        
+
         # create a function that is called if there are warnings otherwise just return he result.output
         warnings = self.get_warnings(result.output)
         errors = self.get_errors(result.output)
@@ -467,16 +473,20 @@ class DbtTestOperator(DbtBaseOperator):
         if self.warning_alert:
             dag_id = self.dag.dag_id
             task_id = self.task_id
-            execution_date = context['execution_date'].strftime('%Y-%m-%d %H:%M:%S')
+            execution_date = context["execution_date"].strftime("%Y-%m-%d %H:%M:%S")
 
             if warnings > 0 and errors == 0:
-                self.send_slack_alert(f"WARNING - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
-                                f"Total number of warnings = {warnings}",
-                                "#eed202")
+                self.send_slack_alert(
+                    f"WARNING - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
+                    f"Total number of warnings = {warnings}",
+                    "#eed202",
+                )
             elif warnings > 0 and errors > 0:
-                self.send_slack_alert(f"ERROR - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
-                                f"Total number of warnings = {warnings} \nTotal number of errors = {errors}",
-                                "#FF0000")
+                self.send_slack_alert(
+                    f"ERROR - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
+                    f"Total number of warnings = {warnings} \nTotal number of errors = {errors}",
+                    "#FF0000",
+                )
         return result.output
 
 

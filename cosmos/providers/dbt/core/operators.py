@@ -9,7 +9,6 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
-import logging
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException

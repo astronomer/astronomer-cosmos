@@ -405,19 +405,26 @@ class DbtTestOperator(DbtBaseOperator):
         """
         Get the number of warnings from the DBT test output message
         """
-        num_warns = int(output.split("WARN=")[1].split()[0])
+        try:
+            num_warns = int(output.split("WARN=")[1].split()[0])
+        except:
+            ValueError("Could not parse number of warnings. Check your DBT version")
+        
         return num_warns
 
     def get_errors(self, output) -> int:
         """
         Get the number of errors from the DBT test output message
         """
-        num_errors = int(output.split("ERROR=")[1].split()[0])
+        try:
+            num_errors = int(output.split("ERROR=")[1].split()[0])
+        except:
+            ValueError("Could not parse number of errors. Check your DBT version")
         return num_errors
     
     def send_slack_alert(
     self, alert_title, alert_description, alert_color
-    ):
+    ) -> None:
         """
         Sends a slack message to a designated slack channel using slack webhook
 

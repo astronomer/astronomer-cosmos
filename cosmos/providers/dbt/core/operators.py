@@ -9,7 +9,6 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
-
 import requests
 import yaml
 from airflow.compat.functools import cached_property
@@ -456,12 +455,12 @@ class DbtTestOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
-
         # create a function that is called if there are warnings otherwise just return he result.output
-        warnings = self.get_warnings(result.output)
-        errors = self.get_errors(result.output)
 
-        if self.warning_alert:
+        no_tests_message="Nothing to do"
+        if self.warning_alert and no_tests_message not in result.output:
+            warnings = self.get_warnings(result.output)
+            errors = self.get_errors(result.output)     
             dag_id = self.dag.dag_id
             task_id = self.task_id
             execution_date = context["execution_date"].strftime("%Y-%m-%d %H:%M:%S")

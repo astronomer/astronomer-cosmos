@@ -8,7 +8,7 @@ import signal
 import time
 from filecmp import dircmp
 from pathlib import Path
-from typing import Sequence, Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -30,10 +30,7 @@ from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
 )
-from cosmos.providers.dbt.core.utils.slack import (
-    extract_log_issues,
-    parse_output,
-)
+from cosmos.providers.dbt.core.utils.slack import extract_log_issues, parse_output
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +217,11 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -397,7 +398,9 @@ class DbtTestOperator(DbtBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(
-        self, on_warning_callback: Optional[Callable] = None, **kwargs,
+        self,
+        on_warning_callback: Optional[Callable] = None,
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"

@@ -6,7 +6,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List,Callable,Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from cosmos.core.airflow import CosmosDag
 
@@ -62,7 +62,7 @@ class DbtDag(CosmosDag):
             conn_id=conn_id,
             select=select,
             exclude=exclude,
-            on_warning_callback=on_warning_callback
+            on_warning_callback=on_warning_callback,
         )
 
         # call the airflow DAG constructor

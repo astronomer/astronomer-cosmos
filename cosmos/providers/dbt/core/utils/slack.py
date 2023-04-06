@@ -1,8 +1,5 @@
-import json
 import logging
 import re
-import requests
-from airflow.hooks.base import BaseHook
 
 
 def parse_output(output: str, keyword: str) -> int:

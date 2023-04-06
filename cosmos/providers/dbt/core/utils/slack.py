@@ -38,8 +38,7 @@ def extract_log_issues(log_list: list[str]) -> str:
     Extracts warning messages from the log list and returns them as a formatted string.
 
     This function searches for warning messages in DBT test. It reverses the log list for performance
-    improvement. For each warning message found, it extracts and formats the relevant information and appends it to a list of
-    warnings.
+    improvement.It extracts and formats the relevant information and appends it to a list of warnings.
 
     :param log_list: List of strings, where each string is a log line from DBT test.
     :param key: String containing the key to search for in the log list. it can be "Warning" or "Error".

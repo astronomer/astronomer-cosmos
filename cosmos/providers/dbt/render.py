@@ -8,7 +8,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List,Callable,Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from airflow.exceptions import AirflowException
 
@@ -111,7 +111,6 @@ def render_project(
                 test_args["outlets"] = outlets
             else:
                 run_args["outlets"] = outlets
-
 
         # make the run task
         run_task = Task(

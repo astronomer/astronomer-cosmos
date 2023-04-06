@@ -31,6 +31,7 @@ def render_project(
     dbt_root_path: str = "/usr/local/airflow/dbt",
     dbt_models_dir: str = "models",
     task_args: Dict[str, Any] = {},
+    operator_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
@@ -44,6 +45,7 @@ def render_project(
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dbt
     :param task_args: Arguments to pass to the underlying dbt operators
+    :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator or DockerOperator parameters
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
@@ -68,7 +70,8 @@ def render_project(
     ] = {}  # this is a dict of all the entities we create
 
     # add project_dir arg to task_args
-    task_args["project_dir"] = project.project_dir
+    if execution_mode == "local":
+        task_args["project_dir"] = project.project_dir
 
     # ensures the same tag isn't in select & exclude
     if "tags" in select and "tags" in exclude:
@@ -112,8 +115,10 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args,
+                                    **operator_args, "models": model_name}
+        test_args: Dict[str, Any] = {**task_args,
+                                     **operator_args, "models": model_name}
 
         if emit_datasets:
             outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]
@@ -182,7 +187,7 @@ def render_project(
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class="DbtTest"
             ),
-            arguments=task_args,
+            arguments={**task_args, **operator_args},
         )
         entities[test_task.id] = test_task
 

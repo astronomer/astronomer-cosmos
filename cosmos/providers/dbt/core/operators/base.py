@@ -34,6 +34,8 @@ class DbtBaseOperator(BaseOperator):
         defined in your dbt_project.yml file. This argument should be a YAML
         string, eg. '{my_variable: my_value}' (templated)
     :param models: dbt optional argument that specifies which nodes to include.
+    :param profiles_dir: dbt optional argument that specifies which directory to look in for the profiles.yml file.
+    :param profile: dbt optional argument that specifies which profile of the profiles.yml file to use.
     :param cache_selected_only:
     :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
         the dbt_project.yml file ('require-dbt-version')
@@ -92,6 +94,8 @@ class DbtBaseOperator(BaseOperator):
         selector: str = None,
         vars: dict = None,
         models: str = None,
+        profiles_dir: str = None,
+        profile: str = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
         fail_fast: bool = False,
@@ -116,6 +120,8 @@ class DbtBaseOperator(BaseOperator):
         self.selector = selector
         self.vars = vars
         self.models = models
+        self.profiles_dir = profiles_dir
+        self.profile = profile
         self.cache_selected_only = cache_selected_only
         self.no_version_check = no_version_check
         self.fail_fast = fail_fast
@@ -155,7 +161,8 @@ class DbtBaseOperator(BaseOperator):
         elif self.append_env:
             system_env.update(env)
             env = system_env
-        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(
+            context, in_env_var_format=True)
         self.log.debug(
             "Exporting the following env vars:\n%s",
             "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),
@@ -181,12 +188,7 @@ class DbtBaseOperator(BaseOperator):
                     f"/tmp/dbt/{os.path.basename(self.__getattribute__(global_flag))}"
                 )
             else:
-                global_flag_value = self.dbt_cmd_flags.get(global_flag)
-                if global_flag_value is None:
-                    try:
-                        global_flag_value = self.__getattribute__(global_flag)
-                    except AttributeError:
-                        pass
+                global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     yaml_string = yaml.dump(global_flag_value)
@@ -194,15 +196,7 @@ class DbtBaseOperator(BaseOperator):
                 else:
                     flags.extend([dbt_name, str(global_flag_value)])
         for global_boolean_flag in self.global_boolean_flags:
-            global_boolean_flag_value = self.dbt_cmd_flags.get(global_boolean_flag)
-            if global_boolean_flag_value is None:
-                try:
-                    global_boolean_flag_value = self.__getattribute__(
-                        global_boolean_flag
-                    )
-                except AttributeError:
-                    pass
-            if global_boolean_flag_value:
+            if self.__getattribute__(global_boolean_flag):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 

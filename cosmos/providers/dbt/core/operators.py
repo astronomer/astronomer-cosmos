@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import re
 import fcntl
 import json
 import logging
@@ -10,18 +10,21 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
-
-import requests
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.base import BaseHook
-from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
+from airflow.hooks.subprocess import SubprocessResult
+from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from filelock import FileLock
-
+from cosmos.providers.dbt.core.utils.slack import (
+    parse_output,
+    extract_log_issues,
+    send_slack_alert,
+)
+import logging
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.utils.file_syncing import (
     exclude,
@@ -218,11 +221,7 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(
-        self,
-        cmd: list[str],
-        env: dict[str, str],
-    ) -> SubprocessResult:
+    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -399,60 +398,15 @@ class DbtTestOperator(DbtBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(
-        self, slack_conn_id="slack_conn_id", warning_alert=False, **kwargs
+        self,
+        slack_conn_id: str = "slack_conn_id",
+        warning_alert: bool = False,
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
         self.slack_conn_id = slack_conn_id
         self.warning_alert = warning_alert
-
-    def parse_output(output, keyword) -> int:
-        try:
-            num = int(output.split(f"{keyword}=")[1].split()[0])
-        except ValueError:
-            logging.error(
-                f"Could not parse number of {keyword}s. Please, check your DBT version"
-            )
-            num = 0
-        return num
-
-    def send_slack_alert(self, alert_title, alert_description, alert_color) -> None:
-        """
-        Sends a slack message to a designated slack channel using slack webhook
-
-        :param alert_title: String containing Alert title
-        :param alert_description: String containing Alert message
-        :param alert_color: RGB code of the color to be displayed on the side bar
-        :return: None
-        """
-
-        # message metadata
-        message_data = {
-            "attachments": [
-                {
-                    "color": alert_color,
-                    "pretext": alert_title,
-                    "fields": [
-                        {
-                            "value": alert_description,
-                            "short": "false",
-                        },
-                    ],
-                }
-            ]
-        }
-
-        # get connection
-        slack_service = BaseHook.get_connection(f"{self.slack_conn_id}").host
-        slack_token = BaseHook.get_connection(f"{self.slack_conn_id}").password
-        slack_webhook_url = slack_service + slack_token
-
-        # send message
-        requests.post(
-            slack_webhook_url,
-            data=json.dumps(message_data),
-            headers={"Content-Type": "application/json"},
-        )
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
@@ -460,23 +414,17 @@ class DbtTestOperator(DbtBaseOperator):
         # check if there are any tests to run in the DAG
         no_tests_message = "Nothing to do"
         if self.warning_alert and no_tests_message not in result.output:
-            warnings = self.parse_output(result.output, "WARN")
-            errors = self.parse_output(result.output, "ERROR")
+            warnings = parse_output(result.output, "WARN")
             dag_id = self.dag.dag_id
             task_id = self.task_id
             execution_date = context["execution_date"].strftime("%Y-%m-%d %H:%M:%S")
 
-            if warnings > 0 and errors == 0:
-                self.send_slack_alert(
-                    f"WARNING - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
-                    f"Total number of warnings = {warnings}",
+            if warnings > 0:
+                send_slack_alert(
+                    f"DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
+                    f"{extract_log_issues(result.full_output)}",
                     "#eed202",
-                )
-            elif warnings > 0 and errors > 0:
-                self.send_slack_alert(
-                    f"ERROR - DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
-                    f"Total number of warnings = {warnings} \nTotal number of errors = {errors}",
-                    "#FF0000",
+                    self.slack_conn_id,
                 )
 
         return result.output

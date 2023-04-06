@@ -27,6 +27,8 @@ def render_project(
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
+    slack_conn_id: str = "slack_conn_id",
+    warning_alert: bool = False,    
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
 ) -> Group:
@@ -110,6 +112,10 @@ def render_project(
                 test_args["outlets"] = outlets
             else:
                 run_args["outlets"] = outlets
+
+        # add slack-related args to DBT test task
+        test_args["slack_conn_id"] = slack_conn_id
+        test_args["warning_alert"] = warning_alert
 
         # make the run task
         run_task = Task(

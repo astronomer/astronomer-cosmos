@@ -34,6 +34,8 @@ class DbtDag(CosmosDag):
         self,
         dbt_project_name: str,
         conn_id: str,
+        slack_conn_id: str = "slack_conn_id",
+        warning_alert: bool = False,
         dbt_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
@@ -59,6 +61,8 @@ class DbtDag(CosmosDag):
             test_behavior=test_behavior,
             emit_datasets=emit_datasets,
             conn_id=conn_id,
+            slack_conn_id=slack_conn_id,
+            warning_alert=warning_alert,
             select=select,
             exclude=exclude,
         )

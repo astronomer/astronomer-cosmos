@@ -45,7 +45,7 @@ def render_project(
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dbt
     :param task_args: Arguments to pass to the underlying dbt operators
-    :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator 
+    :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"

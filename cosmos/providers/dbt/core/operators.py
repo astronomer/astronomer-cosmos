@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import fcntl
 import json
 import logging
@@ -216,7 +217,11 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -436,7 +441,12 @@ class DbtTestOperator(DbtBaseOperator):
                 {
                     "color": alert_color,
                     "pretext": alert_title,
-                    "fields": [{"value": alert_description, "short": "false",},],
+                    "fields": [
+                        {
+                            "value": alert_description,
+                            "short": "false",
+                        },
+                    ],
                 }
             ]
         }

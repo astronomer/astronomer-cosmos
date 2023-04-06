@@ -6,7 +6,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List,Callable,Optional
 
 from cosmos.core.airflow import CosmosDag
 
@@ -34,8 +34,6 @@ class DbtDag(CosmosDag):
         self,
         dbt_project_name: str,
         conn_id: str,
-        slack_conn_id: str = "slack_conn_id",
-        warning_alert: bool = False,
         dbt_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
@@ -43,6 +41,7 @@ class DbtDag(CosmosDag):
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
+        on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -61,10 +60,9 @@ class DbtDag(CosmosDag):
             test_behavior=test_behavior,
             emit_datasets=emit_datasets,
             conn_id=conn_id,
-            slack_conn_id=slack_conn_id,
-            warning_alert=warning_alert,
             select=select,
             exclude=exclude,
+            on_warning_callback=on_warning_callback
         )
 
         # call the airflow DAG constructor

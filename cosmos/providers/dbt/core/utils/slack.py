@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-
 import requests
 from airflow.hooks.base import BaseHook
 
@@ -57,7 +56,8 @@ def extract_log_issues(log_list: list[str]) -> str:
     # Output:
     # *Warning in test example_test*: Got 10 results, configured to warn if <15
     """
-    warnings = []
+    test_names = []
+    test_results = []
     for i, line in enumerate(reversed(log_list)):
         cleaned_line = line.replace("\x1b[33m", "").replace("\x1b[0m", "").strip()
 
@@ -66,54 +66,16 @@ def extract_log_issues(log_list: list[str]) -> str:
             break
 
         if "Warning in test" in cleaned_line:
-            pattern1 = r"\d{2}:\d{2}:\d{2}\s+(Warning in test [\w_]+).*"
-            warning_test = cleaned_line
-            warning_test = re.sub(pattern1, r"\1", warning_test).strip()
-            warning_next_line = (
+            pattern1 = r"\d{2}:\d{2}:\d{2}\s+Warning in test ([\w_]+).*"
+            test_name = cleaned_line
+            test_name = re.sub(pattern1, r"\1", test_name).strip()
+            test_result = (
                 log_list[-(i + 1) + 1].replace("\x1b[33m", "").replace("\x1b[0m", "")
             )
             pattern2 = (
                 r"\d{2}:\d{2}:\d{2}\s+(Got \d+ results, configured to warn if .+)"
             )
-            warning_next_line = re.sub(pattern2, r"\1", warning_next_line).strip()
-            warnings.insert(0, f"*{warning_test}*: {warning_next_line}")
-    return "\n".join(warnings)
-
-
-def send_slack_alert(
-    alert_title: str, alert_description: str, alert_color: str, slack_conn_id: str
-) -> None:
-    """
-    Sends a slack message to a designated slack channel using slack webhook
-
-    :param alert_title: String containing Alert title
-    :param alert_description: String containing Alert message
-    :param alert_color: RGB code of the color to be displayed on the side bar
-    :return: None
-    """
-    message_data = {
-        "attachments": [
-            {
-                "color": alert_color,
-                "pretext": f"{alert_title}",
-                "fields": [
-                    {
-                        "value": f"{alert_description}",
-                        "short": "false",
-                    }
-                ],
-            }
-        ]
-    }
-
-    # get connection
-    slack_service = BaseHook.get_connection(f"{slack_conn_id}").host
-    slack_token = BaseHook.get_connection(f"{slack_conn_id}").password
-    slack_webhook_url = slack_service + slack_token
-
-    # send message
-    requests.post(
-        slack_webhook_url,
-        data=json.dumps(message_data),
-        headers={"Content-Type": "application/json"},
-    )
+            test_result = re.sub(pattern2, r"\1", test_result).strip()
+            test_names.append(test_name)
+            test_results.append(test_result)
+    return test_names, test_results

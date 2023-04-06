@@ -8,7 +8,7 @@ import signal
 import time
 from filecmp import dircmp
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Callable, Optional
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -33,7 +33,6 @@ from cosmos.providers.dbt.core.utils.profiles_generator import (
 from cosmos.providers.dbt.core.utils.slack import (
     extract_log_issues,
     parse_output,
-    send_slack_alert,
 )
 
 logger = logging.getLogger(__name__)
@@ -221,11 +220,7 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(
-        self,
-        cmd: list[str],
-        env: dict[str, str],
-    ) -> SubprocessResult:
+    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -402,34 +397,27 @@ class DbtTestOperator(DbtBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(
-        self,
-        slack_conn_id: str = "slack_conn_id",
-        warning_alert: bool = False,
-        **kwargs,
+        self, on_warning_callback: Optional[Callable] = None, **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
-        self.slack_conn_id = slack_conn_id
-        self.warning_alert = warning_alert
+        self.on_warning_callback = on_warning_callback
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
 
         # check if there are any tests to run in the DAG
         no_tests_message = "Nothing to do"
-        if self.warning_alert and no_tests_message not in result.output:
+        if self.on_warning_callback and no_tests_message not in result.output:
             warnings = parse_output(result.output, "WARN")
-            dag_id = self.dag.dag_id
-            task_id = self.task_id
-            execution_date = context["execution_date"].strftime("%Y-%m-%d %H:%M:%S")
-
             if warnings > 0:
-                send_slack_alert(
-                    f"DAG: *{dag_id}* task: *{task_id}* execution_date: *{execution_date}*",
-                    f"{extract_log_issues(result.full_output)}",
-                    "#eed202",
-                    self.slack_conn_id,
-                )
+                # Add custom context variables to the context
+                test_names, test_results = extract_log_issues(result.full_output)
+                warning_context = dict(context)
+                warning_context["test_names"] = test_names
+                warning_context["test_results"] = test_results
+
+                self.on_warning_callback(warning_context)
 
         return result.output
 

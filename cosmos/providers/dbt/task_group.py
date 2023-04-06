@@ -6,7 +6,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List,Callable,Optional
 
 from cosmos.core.airflow import CosmosTaskGroup
 
@@ -41,6 +41,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
+        on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -61,6 +62,7 @@ class DbtTaskGroup(CosmosTaskGroup):
             conn_id=conn_id,
             select=select,
             exclude=exclude,
+            on_warning_callback=on_warning_callback,
         )
 
         # call the airflow constructor

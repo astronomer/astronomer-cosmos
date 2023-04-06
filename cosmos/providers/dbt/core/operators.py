@@ -217,11 +217,7 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(
-        self,
-        cmd: list[str],
-        env: dict[str, str],
-    ) -> SubprocessResult:
+    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -397,33 +393,23 @@ class DbtTestOperator(DbtBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self, slack_conn_id="slack_conn_id", warning_alert=False, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
-        self.slack_conn_id = "slack_conn_id"
-        self.warning_alert = False
+        self.slack_conn_id = slack_conn_id
+        self.warning_alert = warning_alert
 
-    def get_warnings(self, output) -> int:
-        """
-        Get the number of warnings from the DBT test output message
-        """
+    def parse_output(output, keyword) -> int:
         try:
-            num_warns = int(output.split("WARN=")[1].split()[0])
+            num = int(output.split(f"{keyword}=")[1].split()[0])
         except ValueError:
-            logging.error("Could not parse number of warnings. Check your DBT version")
-
-        return num_warns
-
-    def get_errors(self, output) -> int:
-        """
-        Get the number of errors from the DBT test output message
-        """
-        try:
-            num_errors = int(output.split("ERROR=")[1].split()[0])
-        except ValueError:
-            logging.error("Could not parse number of errors. Check your DBT version")
-
-        return num_errors
+            logging.error(
+                f"Could not parse number of {keyword}s. Please, check your DBT version"
+            )
+            num = 0
+        return num
 
     def send_slack_alert(self, alert_title, alert_description, alert_color) -> None:
         """
@@ -441,12 +427,7 @@ class DbtTestOperator(DbtBaseOperator):
                 {
                     "color": alert_color,
                     "pretext": alert_title,
-                    "fields": [
-                        {
-                            "value": alert_description,
-                            "short": "false",
-                        },
-                    ],
+                    "fields": [{"value": alert_description, "short": "false",},],
                 }
             ]
         }
@@ -465,12 +446,12 @@ class DbtTestOperator(DbtBaseOperator):
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
-        # create a function that is called if there are warnings otherwise just return he result.output
 
-        no_tests_message="Nothing to do"
+        # check if there are any tests to run in the DAG
+        no_tests_message = "Nothing to do"
         if self.warning_alert and no_tests_message not in result.output:
-            warnings = self.get_warnings(result.output)
-            errors = self.get_errors(result.output)     
+            warnings = self.parse_output(result.output, "WARN")
+            errors = self.parse_output(result.output, "ERROR")
             dag_id = self.dag.dag_id
             task_id = self.task_id
             execution_date = context["execution_date"].strftime("%Y-%m-%d %H:%M:%S")
@@ -487,6 +468,7 @@ class DbtTestOperator(DbtBaseOperator):
                     f"Total number of warnings = {warnings} \nTotal number of errors = {errors}",
                     "#FF0000",
                 )
+
         return result.output
 
 

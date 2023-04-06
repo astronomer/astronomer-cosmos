@@ -23,7 +23,8 @@ class DbtDag(CosmosDag):
     :param dbt_models_dir: The path to the dbt models directory within the project
     :param conn_id: The Airflow connection ID to use for the dbt profile
     :param dbt_args: Parameters to pass to the underlying dbt operators, can include dbt_executable_path to utilize venv
-    :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator or DockerOperator parameters
+    :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator 
+        or DockerOperator parameters
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"

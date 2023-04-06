@@ -1,7 +1,6 @@
 from __future__ import annotations
-import re
+
 import fcntl
-import json
 import logging
 import os
 import shutil
@@ -10,22 +9,18 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Sequence
+
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessResult
-from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from filelock import FileLock
-from cosmos.providers.dbt.core.utils.slack import (
-    parse_output,
-    extract_log_issues,
-    send_slack_alert,
-)
-import logging
+
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
+from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
 from cosmos.providers.dbt.core.utils.file_syncing import (
     exclude,
     has_differences,
@@ -34,6 +29,11 @@ from cosmos.providers.dbt.core.utils.file_syncing import (
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
+)
+from cosmos.providers.dbt.core.utils.slack import (
+    extract_log_issues,
+    parse_output,
+    send_slack_alert,
 )
 
 logger = logging.getLogger(__name__)
@@ -221,7 +221,11 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):

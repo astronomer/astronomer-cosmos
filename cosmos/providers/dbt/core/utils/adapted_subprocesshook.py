@@ -22,6 +22,7 @@ import signal
 from collections import namedtuple
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
+
 from airflow.hooks.base import BaseHook
 
 SubprocessResult = namedtuple(

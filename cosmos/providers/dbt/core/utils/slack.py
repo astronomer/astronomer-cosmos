@@ -1,12 +1,12 @@
-from airflow.hooks.base import BaseHook
-import requests
 import json
-import re
 import logging
+import re
+
+import requests
+from airflow.hooks.base import BaseHook
 
 
 def parse_output(output: str, keyword: str) -> int:
-
     """
     Parses the DBT test output message and returns the number of errors or warnings.
 
@@ -42,7 +42,7 @@ def extract_log_issues(log_list: list[str]) -> str:
     warnings.
 
     :param log_list: List of strings, where each string is a log line from DBT test.
-    :param key: String containing the key to search for in the log list. it can be "Warning" or "Error". 
+    :param key: String containing the key to search for in the log list. it can be "Warning" or "Error".
     :return: A string containing the formatted warning messages
 
     Usage:
@@ -66,7 +66,7 @@ def extract_log_issues(log_list: list[str]) -> str:
             # No need to keep checking the log lines
             break
 
-        if f"Warning in test" in cleaned_line:
+        if "Warning in test" in cleaned_line:
             pattern1 = r"\d{2}:\d{2}:\d{2}\s+(Warning in test [\w_]+).*"
             warning_test = cleaned_line
             warning_test = re.sub(pattern1, r"\1", warning_test).strip()
@@ -85,19 +85,24 @@ def send_slack_alert(
     alert_title: str, alert_description: str, alert_color: str, slack_conn_id: str
 ) -> None:
     """
-        Sends a slack message to a designated slack channel using slack webhook
+    Sends a slack message to a designated slack channel using slack webhook
 
-        :param alert_title: String containing Alert title
-        :param alert_description: String containing Alert message
-        :param alert_color: RGB code of the color to be displayed on the side bar
-        :return: None
-        """
+    :param alert_title: String containing Alert title
+    :param alert_description: String containing Alert message
+    :param alert_color: RGB code of the color to be displayed on the side bar
+    :return: None
+    """
     message_data = {
         "attachments": [
             {
                 "color": alert_color,
                 "pretext": f"{alert_title}",
-                "fields": [{"value": f"{alert_description}", "short": "false",}],
+                "fields": [
+                    {
+                        "value": f"{alert_description}",
+                        "short": "false",
+                    }
+                ],
             }
         ]
     }

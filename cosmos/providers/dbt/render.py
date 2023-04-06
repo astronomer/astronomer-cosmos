@@ -28,7 +28,7 @@ def render_project(
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
     slack_conn_id: str = "slack_conn_id",
-    warning_alert: bool = False,    
+    warning_alert: bool = False,
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
 ) -> Group:

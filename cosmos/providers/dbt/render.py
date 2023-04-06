@@ -115,10 +115,8 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args,
-                                    **operator_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args,
-                                     **operator_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
+        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
 
         if emit_datasets:
             outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]

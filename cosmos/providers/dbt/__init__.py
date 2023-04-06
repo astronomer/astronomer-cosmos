@@ -19,12 +19,12 @@ from cosmos.providers.dbt.core.operators.kubernetes import (
 
 # re-export the operators
 from cosmos.providers.dbt.core.operators.local import (
+    DbtDepsLocalOperator,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtTestLocalOperator,
-    DbtDepsLocalOperator,
 )
 
 # re-export user facing utilities

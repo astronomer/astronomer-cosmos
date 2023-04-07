@@ -36,6 +36,7 @@ classifiers = [
 ]
 dependencies = [
     "apache-airflow>=2.4",
+    "filelock",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
 ]
@@ -107,7 +108,8 @@ dependencies = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-tabs"
+    "sphinx-tabs",
+    "sphinx-autoapi"
 ]
 
 [tool.hatch.envs.docs.scripts]

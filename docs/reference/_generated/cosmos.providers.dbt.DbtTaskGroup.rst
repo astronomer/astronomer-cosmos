@@ -3,14 +3,4 @@
 
 .. currentmodule:: cosmos.providers.dbt
 
-.. autoclass:: DbtTaskGroup
-
-
-   .. automethod:: __init__
-
-
-   .. rubric:: Methods
-
-   .. autosummary::
-
-      ~DbtTaskGroup.__init__
+.. autodata:: DbtTaskGroup

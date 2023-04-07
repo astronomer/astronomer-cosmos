@@ -220,7 +220,11 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -393,14 +397,16 @@ class DbtTestOperator(DbtBaseOperator):
     """
     Executes a dbt core test command.
 
-    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names" 
+    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
     ui_color = "#8194E0"
 
     def __init__(
-        self, on_warning_callback: Optional[Callable] = None, **kwargs,
+        self,
+        on_warning_callback: Optional[Callable] = None,
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"

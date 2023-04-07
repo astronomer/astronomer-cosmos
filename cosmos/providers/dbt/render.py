@@ -147,26 +147,32 @@ def render_project(
             base_group.add_entity(entity=run_task)
             continue
 
-        # otherwise, we need to make a test task and turn them into a group
+        # otherwise, we need to make a test task after run tasks and turn them into a group
         entities[run_task.id] = run_task
 
-        test_task = Task(
-            id=f"{model_name}_test",
-            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
-            upstream_entity_ids=[run_task.id],
-            arguments=test_args,
-        )
-        entities[test_task.id] = test_task
+        if (
+            run_task.operator_class
+            == "cosmos.providers.dbt.core.operators.DbtRunOperator"
+        ):
+            test_task = Task(
+                id=f"{model_name}_test",
+                operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+                upstream_entity_ids=[run_task.id],
+                arguments=test_args,
+            )
+            entities[test_task.id] = test_task
+            # make the group
+            model_group = Group(
+                id=f"{model_name}",
+                entities=[run_task, test_task],
+            )
+            entities[model_group.id] = model_group
+            base_group.add_entity(entity=model_group)
 
-        # make the group
-        model_group = Group(
-            id=model_name,
-            entities=[run_task, test_task],
-        )
-        entities[model_group.id] = model_group
-
-        # just add to base group for now
-        base_group.add_entity(entity=model_group)
+        # all other non-run tasks don't need to be grouped with test tasks
+        else:
+            entities[model_name] = run_task
+            base_group.add_entity(entity=run_task)
 
     # add dependencies now that we have all the entities
     for model_name, model in itertools.chain(

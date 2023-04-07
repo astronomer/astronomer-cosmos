@@ -23,6 +23,54 @@ Example:
         test_behavior='after_all',
     )
 
+Warn Notification
+----------------------
+Cosmos enables you to receive warning notifications from tests and process them using a callback function.
+The ``on_warning_callback`` parameter adds two extra context variables to the callback function: ``test_names`` and ``test_results``.
+``test_names`` contains the names of the tests that generated a warning, while ``test_results`` holds the corresponding test results
+at the same index. Both are List of strings.
+Example:
+
+.. code-block:: python
+
+   from cosmos.providers.dbt import DbtDag
+   from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
+
+    def warning_callback_func(context):
+        tests = context.get('test_names')
+        results = context.get('test_results')
+
+        warning_msgs = ""
+        for test, result in zip(tests, results):
+            warning_msg = f"""
+            *Test*: {test}
+            *Result*: {result}
+            """
+            warning_msgs += warning_msg
+
+        if warning_msgs:
+            slack_msg = f"""
+            :large_yellow_circle: Airflow-DBT task with WARN.
+            *Task*: {context.get('task_instance').task_id}
+            *Dag*: {context.get('task_instance').dag_id}
+            *Execution Time*: {context.get('execution_date')}
+            *Log Url*: {context.get('task_instance').log_url}
+            {warning_msgs}
+            """
+
+            slack_hook = SlackWebhookHook(slack_webhook_conn_id='slack_conn_id')
+            slack_hook.send(text=slack_msg)
+
+    mrr_playbook = DbtDag(
+        # ...
+        on_warning_callback=warning_callback_func,
+    )
+
+When at least one WARN message is present, the function passed to ``on_warning_callback`` will be triggered
+and the following message will be sent to Slack in the example above:
+
+.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/callback-slack.png
+   :width: 600
 
 Selecting and Excluding
 ----------------------

@@ -38,21 +38,10 @@ def extract_log_issues(log_list: list[str]) -> str:
 
     :param log_list: List of strings, where each string is a log line from DBT test.
     :param key: String containing the key to search for in the log list. it can be "Warning" or "Error".
-    :return: A string containing the formatted warning messages
-
-    Usage:
-    -----
-    log_lines = [
-        "12:30:00 Warning in test example_test",
-        "12:30:01 Got 10 results, configured to warn if <15",
-        "12:30:02 Finished running",
-        "12:30:03 Another log line"
-    ]
-    extracted_warnings = extract_log_issues(log_lines)
-    print(extracted_warnings)
-    # Output:
-    # *Warning in test example_test*: Got 10 results, configured to warn if <15
+    :return: two lists of strings, the first one containing the test names and the second one
+        containing the test results.
     """
+
     test_names = []
     test_results = []
     for i, line in enumerate(reversed(log_list)):
@@ -69,9 +58,7 @@ def extract_log_issues(log_list: list[str]) -> str:
             test_result = (
                 log_list[-(i + 1) + 1].replace("\x1b[33m", "").replace("\x1b[0m", "")
             )
-            pattern2 = (
-                r"\d{2}:\d{2}:\d{2}\s+(Got \d+ results, configured to warn if .+)"
-            )
+            pattern2 = r"\d{2}:\d{2}:\d{2}\s+(.*)"
             test_result = re.sub(pattern2, r"\1", test_result).strip()
             test_names.append(test_name)
             test_results.append(test_result)

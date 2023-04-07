@@ -30,7 +30,10 @@ from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
 )
-from cosmos.providers.dbt.core.utils.slack import extract_log_issues, parse_output
+from cosmos.providers.dbt.core.utils.warn_parsing import (
+    extract_log_issues,
+    parse_output,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -217,11 +220,7 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
-    def run_command(
-        self,
-        cmd: list[str],
-        env: dict[str, str],
-    ) -> SubprocessResult:
+    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -393,34 +392,58 @@ class DbtRunOperator(DbtBaseOperator):
 class DbtTestOperator(DbtBaseOperator):
     """
     Executes a dbt core test command.
+
+    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names" 
+        and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
     ui_color = "#8194E0"
 
     def __init__(
-        self,
-        on_warning_callback: Optional[Callable] = None,
-        **kwargs,
+        self, on_warning_callback: Optional[Callable] = None, **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
         self.on_warning_callback = on_warning_callback
 
+    def _should_run_tests(self, result: str) -> bool:
+        """
+        Check if any tests are defined to run in the DAG. If tests are defined
+        and on_warning_callback is set, then function returns True.
+
+        :param
+            output (str): The output from the build and run command.
+        """
+
+        no_tests_message = "Nothing to do"
+        return self.on_warning_callback and no_tests_message not in result.output
+
+    def _handle_warnings(self, result, context: Context) -> None:
+        """
+        Handles warnings by extracting log issues, creating additional context, and calling the
+        on_warning_callback with the updated context.
+
+        Args:
+            result: The result object from the build and run command.
+            context (Context): The original airflow context in which the build and run command was executed.
+        """
+        test_names, test_results = extract_log_issues(result.full_output)
+
+        warning_context = dict(context)
+        warning_context["test_names"] = test_names
+        warning_context["test_results"] = test_results
+
+        self.on_warning_callback(warning_context)
+
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
 
-        # check if there are any tests to run in the DAG
-        no_tests_message = "Nothing to do"
-        if self.on_warning_callback and no_tests_message not in result.output:
-            warnings = parse_output(result.output, "WARN")
-            if warnings > 0:
-                # Add custom context variables to the context
-                test_names, test_results = extract_log_issues(result.full_output)
-                warning_context = dict(context)
-                warning_context["test_names"] = test_names
-                warning_context["test_results"] = test_results
+        if not self._should_run_tests(result):
+            return result.output
 
-                self.on_warning_callback(warning_context)
+        warnings = parse_output(result.output, "WARN")
+        if warnings > 0:
+            self._handle_warnings(result, context)
 
         return result.output
 

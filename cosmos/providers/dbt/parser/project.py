@@ -287,7 +287,7 @@ class DbtProject:
         config_dict = yaml.safe_load(path.read_text())
 
         # iterate over the models in the config
-        if not config_dict.get("models"):
+        if not (config_dict and config_dict.get("models")):
             return
 
         for model in config_dict["models"]:

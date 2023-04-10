@@ -371,6 +371,23 @@ class DbtSeedOperator(DbtBaseOperator):
         return result.output
 
 
+class DbtSnapshotOperator(DbtBaseOperator):
+    """
+    Executes a dbt core snapshot command.
+
+    """
+
+    ui_color = "#964B00"
+
+    def __init__(self, full_refresh: bool = False, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.base_cmd = "snapshot"
+
+    def execute(self, context: Context):
+        result = self.build_and_run_cmd(context=context)
+        return result.output
+
+
 class DbtRunOperator(DbtBaseOperator):
     """
     Executes a dbt core run command.

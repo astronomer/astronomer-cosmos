@@ -8,6 +8,7 @@ from .core.operators import (
     DbtRunOperationOperator,
     DbtRunOperator,
     DbtSeedOperator,
+    DbtSnapshotOperator,
     DbtTestOperator,
 )
 
@@ -23,6 +24,7 @@ __all__ = [
     DbtRunOperationOperator,
     DbtRunOperator,
     DbtSeedOperator,
+    DbtSnapshotOperator,
     DbtTestOperator,
     get_dbt_dataset,
     DbtDag,

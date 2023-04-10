@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Dict, List, Set
 
@@ -13,6 +14,16 @@ import jinja2
 import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+
+class DbtModelType(Enum):
+    """
+    Represents type of DBT unit (model, snapshot, seed)
+    """
+
+    DBT_MODEL = 1
+    DBT_SNAPSHOT = 2
+    DBT_SEED = 3
 
 
 @dataclass
@@ -83,11 +94,12 @@ class DbtModelConfig:
 @dataclass
 class DbtModel:
     """
-    Represents a single dbt model.
+    Represents a single dbt model. (This class also hold snapshots)
     """
 
     # instance variables
     name: str
+    type: DbtModelType
     path: Path
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
@@ -98,8 +110,23 @@ class DbtModel:
         # first, get an empty config
         config = DbtModelConfig()
 
-        # get the code from the file
-        code = self.path.read_text()
+        if self.type == DbtModelType.DBT_MODEL:
+            # get the code from the file
+            code = self.path.read_text()
+
+        # we remove first and last line if the code is a snapshot
+        elif self.type == DbtModelType.DBT_SNAPSHOT:
+            code = self.path.read_text()
+            snapshot_name = code.split("{%")[1]
+            snapshot_name = snapshot_name.split("%}")[0]
+            snapshot_name = snapshot_name.split(" ")[2]
+            snapshot_name = snapshot_name.strip()
+            self.name = snapshot_name
+            code = code.split("%}")[1]
+            code = code.split("{%")[0]
+
+        elif self.type == DbtModelType.DBT_SEED:
+            code = None
 
         # get the dependencies
         env = jinja2.Environment()
@@ -157,7 +184,7 @@ class DbtModel:
         """
         Returns the string representation of the model.
         """
-        return f"DbtModel(name='{self.name}', path='{self.path}', config={self.config})"
+        return f"DbtModel(name='{self.name}', type='{self.type}', path='{self.path}', config={self.config})"
 
 
 @dataclass
@@ -172,11 +199,17 @@ class DbtProject:
     # optional, user-specified instance variables
     dbt_root_path: str = "/usr/local/airflow/dbt"
     dbt_models_dir: str = "models"
+    dbt_snapshots_dir: str = "snapshots"
+    dbt_seeds_dir: str = "seeds"
 
     # private instance variables for managing state
     models: Dict[str, DbtModel] = field(default_factory=dict)
+    snapshots: Dict[str, DbtModel] = field(default_factory=dict)
+    seeds: Dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
     models_dir: Path = field(init=False)
+    snapshots_dir: Path = field(init=False)
+    seeds_dir: Path = field(init=False)
 
     def __post_init__(self) -> None:
         """
@@ -185,16 +218,26 @@ class DbtProject:
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
         self.models_dir = self.project_dir / self.dbt_models_dir
+        self.snapshots_dir = self.project_dir / self.dbt_snapshots_dir
+        self.seeds_dir = self.project_dir / self.dbt_seeds_dir
 
         # crawl the models in the project
         for file_name in self.models_dir.rglob("*.sql"):
             self._handle_sql_file(file_name)
 
+        # crawl the snapshots in the project
+        for file_name in self.snapshots_dir.rglob("*.sql"):
+            self._handle_sql_file(file_name)
+
+        # crawl the seeds in the project
+        for file_name in self.seeds_dir.rglob("*.csv"):
+            self._handle_csv_file(file_name)
+
         # crawl the config files in the project
         for file_name in self.models_dir.rglob("*.yml"):
             self._handle_config_file(file_name)
 
-    def _handle_sql_file(self, path: Path) -> None:
+    def _handle_csv_file(self, path: Path) -> None:
         """
         Handles a single sql file.
         """
@@ -204,11 +247,37 @@ class DbtProject:
         # construct the model object, which we'll use to store metadata
         model = DbtModel(
             name=model_name,
+            type=DbtModelType.DBT_SEED,
             path=path,
         )
-
         # add the model to the project
-        self.models[model_name] = model
+        self.seeds[model_name] = model
+
+    def _handle_sql_file(self, path: Path) -> None:
+        """
+        Handles a single sql file.
+        """
+        # get the model name
+        model_name = path.stem
+
+        # construct the model object, which we'll use to store metadata
+        if str(self.models_dir) in str(path):
+            model = DbtModel(
+                name=model_name,
+                type=DbtModelType.DBT_MODEL,
+                path=path,
+            )
+            # add the model to the project
+            self.models[model.name] = model
+
+        elif str(self.snapshots_dir) in str(path):
+            model = DbtModel(
+                name=model_name,
+                type=DbtModelType.DBT_SNAPSHOT,
+                path=path,
+            )
+            # add the snapshot to the project
+            self.snapshots[model.name] = model
 
     def _handle_config_file(self, path: Path) -> None:
         """

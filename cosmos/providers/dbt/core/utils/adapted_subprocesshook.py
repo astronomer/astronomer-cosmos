@@ -59,8 +59,10 @@ class SubprocessHook(BaseHook):
         :param output_encoding: encoding to use for decoding stdout
         :param cwd: Working directory to run the command in.
             If None (default), the command is run in a temporary directory.
-        :return: :class:`namedtuple` containing ``exit_code`` and ``output``, the last line from stderr
-            or stdout
+        :return: :class:`namedtuple` containing:
+                                    ``exit_code``
+                                    ``output``: the last line from stderr or stdout
+                                    ``full_output``: all lines from stderr or stdout.
         """
         self.log.info("Tmp dir root location: \n %s", gettempdir())
         log_lines = []

@@ -48,7 +48,7 @@ def extract_log_issues(log_list: list[str]) -> str:
         cleaned_line = line.replace("\x1b[33m", "").replace("\x1b[0m", "").strip()
 
         if "Finished running" in cleaned_line:
-            # No need to keep checking the log lines
+            # No need to keep checking the log lines once all warnings are found
             break
 
         if "Warning in test" in cleaned_line:

@@ -27,4 +27,5 @@ Operators
     DbtTestOperator
     DbtLSOperator
     DbtSeedOperator
+    DbtSnapshotOperator
     DbtRunOperationOperator

@@ -1,6 +1,6 @@
 import logging
 import re
-
+from typing import List, Tuple
 
 def parse_output(output: str, keyword: str) -> int:
     """
@@ -29,37 +29,39 @@ def parse_output(output: str, keyword: str) -> int:
     return num
 
 
-def extract_log_issues(log_list: list[str]) -> str:
+def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
     """
     Extracts warning messages from the log list and returns them as a formatted string.
 
     This function searches for warning messages in DBT test. It reverses the log list for performance
-    improvement.It extracts and formats the relevant information and appends it to a list of warnings.
+    improvement. It extracts and formats the relevant information and appends it to a list of warnings.
 
     :param log_list: List of strings, where each string is a log line from DBT test.
-    :param key: String containing the key to search for in the log list. it can be "Warning" or "Error".
     :return: two lists of strings, the first one containing the test names and the second one
         containing the test results.
     """
 
+    def clean_line(line: str) -> str:
+        return line.replace("\x1b[33m", "").replace("\x1b[0m", "").strip()
+
     test_names = []
     test_results = []
-    for i, line in enumerate(reversed(log_list)):
-        cleaned_line = line.replace("\x1b[33m", "").replace("\x1b[0m", "").strip()
+    pattern1 = re.compile(r"\d{2}:\d{2}:\d{2}\s+Warning in test ([\w_]+).*")
+    pattern2 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(.*)")
+
+    for line_index, line in enumerate(reversed(log_list)):
+        cleaned_line = clean_line(line)
 
         if "Finished running" in cleaned_line:
             # No need to keep checking the log lines once all warnings are found
             break
 
         if "Warning in test" in cleaned_line:
-            pattern1 = r"\d{2}:\d{2}:\d{2}\s+Warning in test ([\w_]+).*"
-            test_name = cleaned_line
-            test_name = re.sub(pattern1, r"\1", test_name).strip()
-            test_result = (
-                log_list[-(i + 1) + 1].replace("\x1b[33m", "").replace("\x1b[0m", "")
-            )
-            pattern2 = r"\d{2}:\d{2}:\d{2}\s+(.*)"
-            test_result = re.sub(pattern2, r"\1", test_result).strip()
+            test_name = pattern1.sub(r"\1", cleaned_line)
+            # test_result is on the next line by default
+            test_result = pattern2.sub(r"\1", clean_line(log_list[-(line_index + 1) + 1]))
+
             test_names.append(test_name)
             test_results.append(test_result)
+
     return test_names, test_results

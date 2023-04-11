@@ -2,6 +2,7 @@ import logging
 import re
 from typing import List, Tuple
 
+
 def parse_output(output: str, keyword: str) -> int:
     """
     Parses the DBT test output message and returns the number of errors or warnings.
@@ -59,7 +60,9 @@ def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
         if "Warning in test" in cleaned_line:
             test_name = pattern1.sub(r"\1", cleaned_line)
             # test_result is on the next line by default
-            test_result = pattern2.sub(r"\1", clean_line(log_list[-(line_index + 1) + 1]))
+            test_result = pattern2.sub(
+                r"\1", clean_line(log_list[-(line_index + 1) + 1])
+            )
 
             test_names.append(test_name)
             test_results.append(test_result)

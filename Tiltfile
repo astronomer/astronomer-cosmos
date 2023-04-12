@@ -1,9 +1,9 @@
 docker_compose('dev/docker-compose.yaml')
 
-sync_pyproj_toml = sync('./pyproject.toml', '/usr/local/airflow/cosmos/pyproject.toml')
-sync_readme = sync('./README.md', '/usr/local/airflow/cosmos/README.md')
-sync_src = sync('./src', '/usr/local/airflow/cosmos/src')
-sync_dev_dir = sync('./dev', '/usr/local/airflow/cosmos/dev')
+sync_pyproj_toml = sync('./pyproject.toml', '/usr/local/airflow/astronomer_cosmos/pyproject.toml')
+sync_readme = sync('./README.md', '/usr/local/airflow/astronomer_cosmos/README.md')
+sync_src = sync('./cosmos', '/usr/local/airflow/astronomer_cosmos/cosmos')
+sync_dev_dir = sync('./dev', '/usr/local/airflow/astronomer_cosmos/dev')
 
 docker_build(
     'cosmos',
@@ -15,7 +15,7 @@ docker_build(
         sync_readme,
         sync_dev_dir,
         run(
-            'cd /usr/local/airflow/astro_databricks && pip install -e .',
+            'cd /usr/local/airflow/astronomer_cosmos && pip install -e .',
             trigger=['pyproject.toml']
         ),
     ]

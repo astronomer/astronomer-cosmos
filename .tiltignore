@@ -4,5 +4,6 @@
 airflow_settings.yaml
 __pycache__/
 astro
-logs
+**/logs
 .mypy_cache/
+**/*.tmp

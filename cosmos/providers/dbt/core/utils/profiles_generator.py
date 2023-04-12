@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 import pkg_resources
 import yaml
+from airflow.exceptions import AirflowNotFoundException
 from airflow.hooks.base import BaseHook
 
 from cosmos.providers.dbt.core.profiles import get_available_adapters
@@ -65,3 +66,11 @@ def map_profile(
     logging.getLogger().setLevel(logging.ERROR)
     logging.error(f"This connection type is currently not supported {connection_type}.")
     sys.exit(1)
+
+
+def conn_exists(conn_id: str) -> bool:
+    try:
+        BaseHook().get_connection(conn_id)
+        return True
+    except AirflowNotFoundException:
+        return False

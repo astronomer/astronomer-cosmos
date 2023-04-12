@@ -1,6 +1,7 @@
 """
 This module contains a function to render a dbt project into Cosmos entities.
 """
+import itertools
 import logging
 
 try:
@@ -14,7 +15,7 @@ from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
 from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
-from cosmos.providers.dbt.parser.project import DbtProject
+from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
     dbt_models_dir: str = "models",
+    dbt_snapshots_dir: str = "snapshots",
     task_args: Dict[str, Any] = {},
     operator_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
@@ -61,6 +63,7 @@ def render_project(
     project = DbtProject(
         dbt_root_path=dbt_root_path,
         dbt_models_dir=dbt_models_dir,
+        dbt_snapshots_dir=dbt_snapshots_dir,
         project_name=dbt_project_name,
     )
 
@@ -90,7 +93,9 @@ def render_project(
             )
 
     # iterate over each model once to create the initial tasks
-    for model_name, model in project.models.items():
+    for model_name, model in itertools.chain(
+        project.models.items(), project.snapshots.items(), project.seeds.items()
+    ):
         # filters down to a path within the project_dir
         if "paths" in select:
             root_directories = [
@@ -116,8 +121,10 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args,
+                                    **operator_args, "models": model_name}
+        test_args: Dict[str, Any] = {**task_args,
+                                     **operator_args, "models": model_name}
 
         if emit_datasets:
             outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]
@@ -127,15 +134,38 @@ def render_project(
             else:
                 run_args["outlets"] = outlets
 
-        # make the run task
-        run_task = Task(
-            id=f"{model_name}_run",
-            operator_class=calculate_operator_class(
-                execution_mode=execution_mode,
-                dbt_class="DbtRun",
-            ),
-            arguments=run_args,
-        )
+        if model.type == DbtModelType.DBT_MODEL:
+            # make the run task for model
+            run_task = Task(
+                id=f"{model_name}_run",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtRun",
+                ),
+                arguments=run_args,
+            )
+        elif model.type == DbtModelType.DBT_SNAPSHOT:
+            # make the run task for snapshot
+            run_task = Task(
+                id=f"{model_name}_snapshot",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtSnapshot",
+                ),
+                arguments=run_args,
+            )
+        elif model.type == DbtModelType.DBT_SEED:
+            # make the run task for snapshot
+            run_task = Task(
+                id=f"{model_name}_seed",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtSeed",
+                ),
+                arguments=run_args,
+            )
+        else:
+            logger.error("Unknown DBT type.")
 
         # if test_behavior isn't "after_each", we can just add the task to the
         # base group and do nothing else for now
@@ -144,31 +174,37 @@ def render_project(
             base_group.add_entity(entity=run_task)
             continue
 
-        # otherwise, we need to make a test task and turn them into a group
+        # otherwise, we need to make a test task after run tasks and turn them into a group
         entities[run_task.id] = run_task
 
-        test_task = Task(
-            id=f"{model_name}_test",
-            operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class="DbtTest"
-            ),
-            upstream_entity_ids=[run_task.id],
-            arguments=test_args,
-        )
-        entities[test_task.id] = test_task
+        if (model.type == DbtModelType.DBT_MODEL):
+            test_task = Task(
+                id=f"{model_name}_test",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtTest",
+                ),
+                upstream_entity_ids=[run_task.id],
+                arguments=test_args,
+            )
+            entities[test_task.id] = test_task
+            # make the group
+            model_group = Group(
+                id=f"{model_name}",
+                entities=[run_task, test_task],
+            )
+            entities[model_group.id] = model_group
+            base_group.add_entity(entity=model_group)
 
-        # make the group
-        model_group = Group(
-            id=model_name,
-            entities=[run_task, test_task],
-        )
-        entities[model_group.id] = model_group
-
-        # just add to base group for now
-        base_group.add_entity(entity=model_group)
+        # all other non-run tasks don't need to be grouped with test tasks
+        else:
+            entities[model_name] = run_task
+            base_group.add_entity(entity=run_task)
 
     # add dependencies now that we have all the entities
-    for model_name, model in project.models.items():
+    for model_name, model in itertools.chain(
+        project.models.items(), project.snapshots.items(), project.seeds.items()
+    ):
         upstream_deps = model.config.upstream_models
         for upstream_model_name in upstream_deps:
             try:
@@ -184,7 +220,8 @@ def render_project(
         test_task = Task(
             id=f"{dbt_project_name}_test",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class="DbtTest"
+                execution_mode=execution_mode,
+                dbt_class="DbtTest",
             ),
             arguments={**task_args, **operator_args},
         )

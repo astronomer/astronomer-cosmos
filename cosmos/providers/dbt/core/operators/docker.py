@@ -89,6 +89,20 @@ class DbtSeedDockerOperator(DbtDockerBaseOperator):
         cmd_flags = self.add_cmd_flags()
         return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
+class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
+    """
+    Executes a dbt core snapshot command.
+
+    """
+
+    ui_color = "#964B00"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.base_cmd = "snapshot"
+
+    def execute(self, context: Context):
+        return self.build_and_run_cmd(context=context)
 
 class DbtRunDockerOperator(DbtDockerBaseOperator):
     """

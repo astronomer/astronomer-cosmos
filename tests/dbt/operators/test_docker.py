@@ -5,7 +5,6 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators.docker import (
-    DbtDepsDockerOperator,
     DbtDockerBaseOperator,
     DbtLSDockerOperator,
     DbtRunDockerOperator,
@@ -97,7 +96,6 @@ result_map = {
     "ls": DbtLSDockerOperator(**base_kwargs),
     "run": DbtRunDockerOperator(**base_kwargs),
     "test": DbtTestDockerOperator(**base_kwargs),
-    "deps": DbtDepsDockerOperator(**base_kwargs),
     "seed": DbtSeedDockerOperator(**base_kwargs),
 }
 

@@ -21,28 +21,35 @@ __________________________________
 
 Pre-requisites
 **************
-#. `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_
+#. `tilt <https://docs.tilt.dev>`_
 #. `git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
 
 Local Sandbox
 ************
-To create a sandbox where you can do real-time testing for your proposed to changes to Cosmos, see the corresponding
-development repository: `cosmos-dev <https://github.com/astronomer/cosmos-dev>`_.
+
+For local development, we use `Tilt <https://docs.tilt.dev>`_. To use Tilt, first clone the ``astronomer-cosmos`` repo:
+
+.. code-block:: bash
+
+    git clone https://github.com/astronomer/astronomer-cosmos.git
+
+Then, run the following from the ``astronomer-cosmos`` directory:
+
+.. code-block:: bash
+
+    tilt up
+
+You can press ``space`` to open the Tilt UI and see the status of the sandbox. Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
+
 
 Pre-Commit
 ************
 
-We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run the following from
-your cloned ``astronomer-cosmos`` directory:
+We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
 
 .. code-block:: bash
 
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r dev-requirements.txt
-    pip install pre-commit
     pre-commit install
-
 
 To run the checks manually, run:
 

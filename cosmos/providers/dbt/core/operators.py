@@ -231,6 +231,19 @@ class DbtBaseOperator(BaseOperator):
                     f"The project_dir {self.project_dir} must be a directory"
                 )
 
+        # check if tmp dir exists, if not create it
+        if not os.path.exists("/tmp/dbt"):
+            os.mkdir("/tmp/dbt")
+
+        # check if the project_dir exists in the tmp dir, if not copy it over
+        if not os.path.exists(f"/tmp/dbt/{os.path.basename(self.project_dir)}"):
+            logging.info(
+                f"Copying {self.project_dir} to /tmp/dbt/{os.path.basename(self.project_dir)}"
+            )
+            shutil.copytree(
+                self.project_dir, f"/tmp/dbt/{os.path.basename(self.project_dir)}"
+            )
+
         # routing the dbt project to a tmp dir for r/w operations
         target_dir = f"/tmp/dbt/{os.path.basename(self.project_dir)}"
 

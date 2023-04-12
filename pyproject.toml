@@ -103,7 +103,8 @@ include = [
     "/cosmos",
 ]
 
-[tool.hatch.envs.tests]
+[tool.hatch.envs.test]
+python = "3.7"
 dependencies = [
     "pytest>=6.0",
     "pytest-split",

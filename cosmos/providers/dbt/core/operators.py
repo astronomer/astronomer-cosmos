@@ -18,8 +18,11 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from filelock import FileLock, Timeout
 
-from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
-from cosmos.providers.dbt.core.utils.file_syncing import exclude, has_differences
+from cosmos.providers.dbt.constants import (
+    DBT_PROFILE_PATH,
+    FILE_SYSTEM_OBJECTS_TO_IGNORE,
+)
+from cosmos.providers.dbt.core.utils.file_syncing import has_differences
 from cosmos.providers.dbt.core.utils.profiles_generator import (
     create_default_profiles,
     map_profile,
@@ -242,29 +245,45 @@ class DbtBaseOperator(BaseOperator):
         with suppress(Timeout):
             lock.acquire(timeout=15)
             comparison = dircmp(
-                source_path, target_path, ignore=["logs", "target", ".lock"]
+                source_path, target_path, ignore=FILE_SYSTEM_OBJECTS_TO_IGNORE
             )
             if has_differences(comparison):
                 logging.info(
-                    f"Changes detected - copying {str(source_path)} to {str(target_path)}"
+                    f"Changes detected - updating {str(target_path)} from {str(source_path)}"
                 )
-                for dir_object in os.listdir(target_path):
-                    dir_object: str
-                    child_path = target_path.joinpath(dir_object)
-                    if child_path.is_dir():
-                        if dir_object not in ["logs", "target"]:
-                            shutil.rmtree(child_path)
-                    elif dir_object not in [".lock"]:
-                        os.remove(child_path)
-                shutil.copytree(
-                    source_path, target_path, ignore=exclude, dirs_exist_ok=True
-                )
+                self.delete_target(target_path)
+                self.copy_source(source_path, target_path)
             else:
                 logging.info(
                     f"No differences detected between {str(source_path)} and {str(target_path)}"
                 )
             lock.release(force=True)
         return target_path
+
+    @staticmethod
+    def delete_target(target_path: Path):
+        """Deletes everything in the target except for certain dbt owned objects or the lock."""
+        for file_system_object in os.listdir(target_path):
+            file_system_object: str
+            if file_system_object not in FILE_SYSTEM_OBJECTS_TO_IGNORE:
+                child_path = target_path.joinpath(file_system_object)
+                if child_path.is_dir():
+                    shutil.rmtree(child_path)
+                else:
+                    os.remove(child_path)
+
+    @staticmethod
+    def copy_source(source_path: Path, target_path: Path):
+        """Copies everything from the source to the target except for certain dbt owned objects or the lock."""
+        for file_system_object in os.listdir(source_path):
+            file_system_object: str
+            if file_system_object not in FILE_SYSTEM_OBJECTS_TO_IGNORE:
+                child_source_path = source_path.joinpath(file_system_object)
+                child_target_path = target_path.joinpath(file_system_object)
+                if child_source_path.is_dir():
+                    shutil.copytree(child_source_path, child_target_path)
+                else:
+                    shutil.copyfile(child_source_path, child_target_path)
 
     def run_command(
         self,

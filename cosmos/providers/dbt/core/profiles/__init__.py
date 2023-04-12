@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
-from cosmos.providers.dbt.community.profiles import (
+from cosmos.providers.dbt.community.profiles.trino import (
     create_profile_vars_trino,
     trino_profile,
 )

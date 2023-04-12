@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
 AVAILABLE_AUTH_TYPES = ("certs", "kerberos", "jwt", "ldap")
-TRINO_PROFILE_VARS_TYPE = dict[str, str | Path]
+TRINO_PROFILE_VARS_TYPE = dict[str, Union[str, Path]]
 
 # Optional environment variables have to have a default value with the same data type that an expected value would have.
 trino_profile = {

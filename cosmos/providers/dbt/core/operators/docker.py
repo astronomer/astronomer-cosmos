@@ -89,6 +89,7 @@ class DbtSeedDockerOperator(DbtDockerBaseOperator):
         cmd_flags = self.add_cmd_flags()
         return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
+
 class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
     """
     Executes a dbt core snapshot command.
@@ -103,6 +104,7 @@ class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
 
     def execute(self, context: Context):
         return self.build_and_run_cmd(context=context)
+
 
 class DbtRunDockerOperator(DbtDockerBaseOperator):
     """

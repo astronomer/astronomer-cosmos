@@ -195,6 +195,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
         return result.output
 
+
 class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core snapshot command.
@@ -210,6 +211,7 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
         return result.output
+
 
 class DbtRunLocalOperator(DbtLocalBaseOperator):
     """

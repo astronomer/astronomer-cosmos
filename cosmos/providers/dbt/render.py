@@ -121,10 +121,8 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args,
-                                    **operator_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args,
-                                     **operator_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
+        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
 
         if emit_datasets:
             outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]
@@ -177,7 +175,7 @@ def render_project(
         # otherwise, we need to make a test task after run tasks and turn them into a group
         entities[run_task.id] = run_task
 
-        if (model.type == DbtModelType.DBT_MODEL):
+        if model.type == DbtModelType.DBT_MODEL:
             test_task = Task(
                 id=f"{model_name}_test",
                 operator_class=calculate_operator_class(

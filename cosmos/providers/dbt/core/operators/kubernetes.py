@@ -117,6 +117,7 @@ class DbtSnapshotKubernetesOperator(DbtKubernetesBaseOperator):
     def execute(self, context: Context):
         return self.build_and_run_cmd(context=context)
 
+
 class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core run command.

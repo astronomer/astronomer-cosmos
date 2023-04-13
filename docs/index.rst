@@ -8,7 +8,7 @@ Cosmos
 
    Home <self>
    dbt <dbt/index>
-   API Reference <reference/index>
+   API Reference <autoapi/index>
    Contributing <contributing>
 
 .. note::

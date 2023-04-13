@@ -20,17 +20,26 @@ from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
 logger = logging.getLogger(__name__)
 
 
+def calculate_operator_class(
+    execution_mode: str,
+    dbt_class: str,
+) -> str:
+    return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
+
+
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dbt",
     dbt_models_dir: str = "models",
     dbt_snapshots_dir: str = "snapshots",
     task_args: Dict[str, Any] = {},
+    operator_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
+    execution_mode: Literal["local", "docker", "kubernetes"] = "local",
     on_warning_callback: Optional[Callable] = None,
 ) -> Group:
     """
@@ -39,12 +48,19 @@ def render_project(
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dbt
     :param task_args: Arguments to pass to the underlying dbt operators
+    :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
+        or DockerOperator parameters
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param conn_id: The Airflow connection ID to use in Airflow Datasets
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
+    :param execution_mode: The execution mode in which the dbt project should be run.
+        Options are "local", "docker", and "kubernetes".
+        Defaults to "local"
+     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+        and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
     # first, get the dbt project
     project = DbtProject(
@@ -54,13 +70,15 @@ def render_project(
         project_name=dbt_project_name,
     )
 
-    base_group = Group(id=dbt_project_name)  # this is the group that will be returned
+    # this is the group that will be returned
+    base_group = Group(id=dbt_project_name)
     entities: Dict[
         str, CosmosEntity
     ] = {}  # this is a dict of all the entities we create
 
     # add project_dir arg to task_args
-    task_args["project_dir"] = project.project_dir
+    if execution_mode == "local":
+        task_args["project_dir"] = project.project_dir
 
     # ensures the same tag isn't in select & exclude
     if "tags" in select and "tags" in exclude:
@@ -106,8 +124,8 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
+        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
         # DbtTestOperator specific arg
         test_args["on_warning_callback"] = on_warning_callback
         if emit_datasets:
@@ -122,21 +140,30 @@ def render_project(
             # make the run task for model
             run_task = Task(
                 id=f"{model_name}_run",
-                operator_class="cosmos.providers.dbt.core.operators.DbtRunOperator",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtRun",
+                ),
                 arguments=run_args,
             )
         elif model.type == DbtModelType.DBT_SNAPSHOT:
             # make the run task for snapshot
             run_task = Task(
                 id=f"{model_name}_snapshot",
-                operator_class="cosmos.providers.dbt.core.operators.DbtSnapshotOperator",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtSnapshot",
+                ),
                 arguments=run_args,
             )
         elif model.type == DbtModelType.DBT_SEED:
             # make the run task for snapshot
             run_task = Task(
                 id=f"{model_name}_seed",
-                operator_class="cosmos.providers.dbt.core.operators.DbtSeedOperator",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtSeed",
+                ),
                 arguments=run_args,
             )
         else:
@@ -152,13 +179,13 @@ def render_project(
         # otherwise, we need to make a test task after run tasks and turn them into a group
         entities[run_task.id] = run_task
 
-        if (
-            run_task.operator_class
-            == "cosmos.providers.dbt.core.operators.DbtRunOperator"
-        ):
+        if model.type == DbtModelType.DBT_MODEL:
             test_task = Task(
                 id=f"{model_name}_test",
-                operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
+                operator_class=calculate_operator_class(
+                    execution_mode=execution_mode,
+                    dbt_class="DbtTest",
+                ),
                 upstream_entity_ids=[run_task.id],
                 arguments=test_args,
             )
@@ -194,8 +221,11 @@ def render_project(
         # make a test task
         test_task = Task(
             id=f"{dbt_project_name}_test",
-            operator_class="cosmos.providers.dbt.core.operators.DbtTestOperator",
-            arguments=task_args,
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode,
+                dbt_class="DbtTest",
+            ),
+            arguments={**task_args, **operator_args},
         )
         entities[test_task.id] = test_task
 

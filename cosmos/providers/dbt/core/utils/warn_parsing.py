@@ -2,11 +2,11 @@ import logging
 import re
 from typing import List, Tuple
 
-def parse_output(output: str, keyword: str) -> int:
+def parse_output(result, keyword: str) -> int:
     """
     Parses the DBT test output message and returns the number of errors or warnings.
 
-    :param output: String containing the output to be parsed.
+    :param result: String containing the output to be parsed.
     :param keyword: String representing the keyword to search for in the output (WARN, ERROR).
     :return: An integer value associated with the keyword, or 0 if parsing fails.
 
@@ -18,7 +18,7 @@ def parse_output(output: str, keyword: str) -> int:
     print(num_warns)
     # Output: 1
     """
-
+    output = result.output
     try:
         num = int(output.split(f"{keyword}=")[1].split()[0])
     except ValueError:

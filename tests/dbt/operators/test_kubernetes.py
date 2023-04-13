@@ -159,8 +159,6 @@ def test_created_pod(test_hook):
                     "args": [
                         "dbt",
                         "ls",
-                        "--project-dir",
-                        "my/dir",
                         "--vars",
                         "end_time: '{{ "
                         "data_interval_end.strftime(''%Y%m%d%H%M%S'') "

@@ -51,8 +51,7 @@ def test_dbt_docker_operator_get_env(p_context_to_airflow_vars: MagicMock) -> No
         "retries": 3,
         ("tuple", "key"): "some_value",
     }
-    p_context_to_airflow_vars.return_value = {
-        "START_DATE": "2023-02-15 12:30:00"}
+    p_context_to_airflow_vars.return_value = {"START_DATE": "2023-02-15 12:30:00"}
     env = dbt_base_operator.get_env(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
         profile_vars={
@@ -105,8 +104,7 @@ def test_dbt_docker_build_command():
     command is built correctly.
     """
     for command_name, command_operator in result_map.items():
-        command_operator.build_command(
-            context=MagicMock(), cmd_flags=MagicMock())
+        command_operator.build_command(context=MagicMock(), cmd_flags=MagicMock())
         assert command_operator.command == [
             "dbt",
             command_name,

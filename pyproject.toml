@@ -47,6 +47,7 @@ dependencies = [
 dbt-all = [
     "dbt-bigquery",
     "dbt-databricks",
+    "dbt-exasol",
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
@@ -57,6 +58,9 @@ dbt-bigquery = [
 ]
 dbt-databricks = [
     "dbt-databricks",
+]
+dbt-exasol = [
+    "dbt-exasol",
 ]
 dbt-postgres = [
     "dbt-postgres",

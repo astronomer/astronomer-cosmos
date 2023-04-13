@@ -9,17 +9,17 @@ import time
 from filecmp import dircmp
 from pathlib import Path
 from typing import Callable, Optional, Sequence
+
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessResult
-from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
-from airflow.compat.functools import cached_property
 from airflow.utils.context import Context
 from filelock import FileLock
 
 from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
+from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
 from cosmos.providers.dbt.core.utils.file_syncing import (
     exclude,
     has_differences,
@@ -41,7 +41,10 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     template_fields: Sequence[str] = DbtBaseOperator.template_fields
 
-    def __init__(self, **kwargs,) -> None:
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
 
     @cached_property
@@ -59,7 +62,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
             )
 
-    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         # check project_dir
         if self.project_dir is not None:
             if not os.path.exists(self.project_dir):
@@ -239,7 +246,9 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(
-        self, on_warning_callback: Optional[Callable] = None, **kwargs,
+        self,
+        on_warning_callback: Optional[Callable] = None,
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"

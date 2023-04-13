@@ -135,7 +135,7 @@ class DbtTestDockerOperator(DbtDockerBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = "test"
         # as of now, on_warning_callback in docker executor does nothing
-        self.on_warning_callback = (on_warning_callback,)
+        self.on_warning_callback = on_warning_callback
 
     def execute(self, context: Context):
         return self.build_and_run_cmd(context=context)

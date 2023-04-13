@@ -20,7 +20,10 @@ from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
 logger = logging.getLogger(__name__)
 
 
-def calculate_operator_class(execution_mode: str, dbt_class: str,) -> str:
+def calculate_operator_class(
+    execution_mode: str,
+    dbt_class: str,
+) -> str:
     return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 
@@ -138,7 +141,8 @@ def render_project(
             run_task = Task(
                 id=f"{model_name}_run",
                 operator_class=calculate_operator_class(
-                    execution_mode=execution_mode, dbt_class="DbtRun",
+                    execution_mode=execution_mode,
+                    dbt_class="DbtRun",
                 ),
                 arguments=run_args,
             )
@@ -147,7 +151,8 @@ def render_project(
             run_task = Task(
                 id=f"{model_name}_snapshot",
                 operator_class=calculate_operator_class(
-                    execution_mode=execution_mode, dbt_class="DbtSnapshot",
+                    execution_mode=execution_mode,
+                    dbt_class="DbtSnapshot",
                 ),
                 arguments=run_args,
             )
@@ -156,7 +161,8 @@ def render_project(
             run_task = Task(
                 id=f"{model_name}_seed",
                 operator_class=calculate_operator_class(
-                    execution_mode=execution_mode, dbt_class="DbtSeed",
+                    execution_mode=execution_mode,
+                    dbt_class="DbtSeed",
                 ),
                 arguments=run_args,
             )
@@ -177,14 +183,18 @@ def render_project(
             test_task = Task(
                 id=f"{model_name}_test",
                 operator_class=calculate_operator_class(
-                    execution_mode=execution_mode, dbt_class="DbtTest",
+                    execution_mode=execution_mode,
+                    dbt_class="DbtTest",
                 ),
                 upstream_entity_ids=[run_task.id],
                 arguments=test_args,
             )
             entities[test_task.id] = test_task
             # make the group
-            model_group = Group(id=f"{model_name}", entities=[run_task, test_task],)
+            model_group = Group(
+                id=f"{model_name}",
+                entities=[run_task, test_task],
+            )
             entities[model_group.id] = model_group
             base_group.add_entity(entity=model_group)
 
@@ -212,7 +222,8 @@ def render_project(
         test_task = Task(
             id=f"{dbt_project_name}_test",
             operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class="DbtTest",
+                execution_mode=execution_mode,
+                dbt_class="DbtTest",
             ),
             arguments={**task_args, **operator_args},
         )

@@ -26,8 +26,6 @@ def test_dbt_docker_operator_add_global_flags() -> None:
         no_version_check=True,
     )
     assert dbt_base_operator.add_global_flags() == [
-        "--project-dir",
-        "my/dir",
         "--vars",
         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
@@ -53,7 +51,8 @@ def test_dbt_docker_operator_get_env(p_context_to_airflow_vars: MagicMock) -> No
         "retries": 3,
         ("tuple", "key"): "some_value",
     }
-    p_context_to_airflow_vars.return_value = {"START_DATE": "2023-02-15 12:30:00"}
+    p_context_to_airflow_vars.return_value = {
+        "START_DATE": "2023-02-15 12:30:00"}
     env = dbt_base_operator.get_env(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
         profile_vars={
@@ -106,12 +105,11 @@ def test_dbt_docker_build_command():
     command is built correctly.
     """
     for command_name, command_operator in result_map.items():
-        command_operator.build_command(context=MagicMock(), cmd_flags=MagicMock())
+        command_operator.build_command(
+            context=MagicMock(), cmd_flags=MagicMock())
         assert command_operator.command == [
             "dbt",
             command_name,
-            "--project-dir",
-            "my/dir",
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",

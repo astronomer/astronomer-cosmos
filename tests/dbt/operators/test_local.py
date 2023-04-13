@@ -22,8 +22,6 @@ def test_dbt_base_operator_add_global_flags() -> None:
         no_version_check=True,
     )
     assert dbt_base_operator.add_global_flags() == [
-        "--project-dir",
-        "/tmp/dbt/dir",
         "--vars",
         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
@@ -80,7 +78,8 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         "retries": 3,
         ("tuple", "key"): "some_value",
     }
-    p_context_to_airflow_vars.return_value = {"START_DATE": "2023-02-15 12:30:00"}
+    p_context_to_airflow_vars.return_value = {
+        "START_DATE": "2023-02-15 12:30:00"}
     env = dbt_base_operator.get_env(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
         profile_vars={

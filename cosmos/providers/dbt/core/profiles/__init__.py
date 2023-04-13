@@ -5,6 +5,10 @@ from cosmos.providers.dbt.community.profiles.exasol import (
     create_profile_vars_exasol,
     exasol_profile,
 )
+from cosmos.providers.dbt.community.profiles.trino import (
+    create_profile_vars_trino,
+    trino_profile,
+)
 from cosmos.providers.dbt.core.profiles.bigquery import (
     bigquery_profile,
     create_profile_vars_google_cloud_platform,
@@ -60,5 +64,8 @@ def get_available_adapters() -> Dict[str, AdapterConfig]:
         ),
         "exasol": AdapterConfig(
             "exasol_profile", exasol_profile, create_profile_vars_exasol
+        ),    
+        "trino": AdapterConfig(
+            "trino_profile", trino_profile, create_profile_vars_trino
         ),
     }

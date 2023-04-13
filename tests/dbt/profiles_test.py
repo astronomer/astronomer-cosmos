@@ -13,6 +13,7 @@ from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import (
     create_profile_vars_databricks,
+    create_profile_vars_exasol,
     create_profile_vars_google_cloud_platform,
     create_profile_vars_postgres,
     create_profile_vars_redshift,
@@ -227,6 +228,38 @@ def test_create_profile_vars_postgres_no_schema(
 ) -> None:
     with pytest.raises(ValueError):
         create_profile_vars_postgres(airflow_schemaless_connection, None, None)
+
+
+def test_create_profile_vars_exasol(airflow_connection: Connection) -> None:
+    host = "my-hostname.com"
+    login = "my-user"
+    schema = "jaffle_shop"
+    password = "abcdef12345"
+    port = 8563
+    airflow_connection.host = host
+    airflow_connection.login = login
+    airflow_connection.password = password
+    airflow_connection.schema = schema
+    airflow_connection.port = port
+    airflow_connection.extra_dejson = {"encryption": True, "compression": True}
+
+    expected_profile_vars = {
+        "EXASOL_HOST": host,
+        "EXASOL_USER": login,
+        "EXASOL_PASSWORD": password,
+        "EXASOL_DATABASE": schema,
+        "EXASOL_PORT": str(port),
+        "EXASOL_SCHEMA": schema,
+        "EXASOL_ENCRYPTION": True,
+        "EXASOL_COMPRESSION": True,
+        "EXASOL_PROTOCOL_VERSION": "V3",
+        "EXASOL_SOCKET_TIMEOUT": "30",
+        "EXASOL_CONNECTION_TIMEOUT": "30",
+    }
+
+    profile, profile_vars = create_profile_vars_exasol(airflow_connection, None, schema)
+    assert profile == "exasol_profile"
+    assert profile_vars == expected_profile_vars
 
 
 @pytest.mark.parametrize(

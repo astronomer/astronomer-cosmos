@@ -14,9 +14,7 @@ from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.file_syncing import (
-    exclude,
-)
+from cosmos.providers.dbt.core.utils.file_syncing import exclude
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +58,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_project_dir = shutil.copytree(
-                self.project_dir,
-                tmp_dir,
-                ignore=exclude,
-                dirs_exist_ok=True
+                self.project_dir, tmp_dir, ignore=exclude, dirs_exist_ok=True
             )
 
             result = self.subprocess_hook.run_command(
@@ -89,14 +84,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info(
-                "Sending SIGINT signal to process group")
+            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(
                 self.subprocess_hook.sub_process, "pid"
             ):
                 os.killpg(
-                    os.getpgid(
-                        self.subprocess_hook.sub_process.pid), signal.SIGINT
+                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
                 )
         else:
             self.subprocess_hook.send_sigterm()

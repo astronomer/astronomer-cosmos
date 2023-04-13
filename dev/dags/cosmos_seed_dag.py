@@ -32,17 +32,17 @@ with DAG(
                 task_id=f"drop_{seed}_if_exists",
                 macro_name="drop_table",
                 args={"table_name": seed},
-                project_dir=f"/usr/local/airflow/dags/dbt/jaffle_shop",
+                project_dir="/usr/local/airflow/dags/dbt/jaffle_shop",
                 schema="public",
                 conn_id="airflow_db",
             )
 
     jaffle_shop_seed = DbtSeedOperator(
         task_id="seed_jaffle_shop",
-        project_dir=f"/usr/local/airflow/dags/dbt/jaffle_shop",
+        project_dir="/usr/local/airflow/dags/dbt/jaffle_shop",
         schema="public",
         conn_id="airflow_db",
-        outlets=[Dataset(f"SEED://JAFFLE_SHOP")],
+        outlets=[Dataset("SEED://JAFFLE_SHOP")],
     )
 
     drop_seeds >> jaffle_shop_seed

@@ -157,3 +157,16 @@ Cosmos supports the dbt User/Password authentication `method <https://docs.getdb
 
 Supports both pre and post apache-airflow-providers-snowflake v4.0.2 changes for Snowflake extra arguments implemented
 by this `pull request <https://github.com/apache/airflow/pull/26764>`__.
+
+Trino
+______
+
+Cosmos supports ldap, certificate, jwt and kerberos authentication which are common between dbt and Airflow.
+
+Kerberos authentication does not support keytabs so a password is required instead.
+
+To provide a default Trino catalog this should come from extras in the Airflow connection or it can be provided/overriden
+using `dbt_args = {"db_name": "my_catalog"}}`
+
+To provide a default Trino schema a.k.a database this will come from the Airflow connection schema or it can be provided/overriden
+using `dbt_args = {"schema": "my_schema"}}`

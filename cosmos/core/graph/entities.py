@@ -56,5 +56,5 @@ class Task(CosmosEntity):
     :param arguments: The arguments to pass to the operator
     """
 
-    operator_class: str = "airflow.operators.dummy.DummyOperator"
+    operator_class: str = "airflow.operators.empty.EmptyOperator"
     arguments: Dict[str, Any] = field(default_factory=dict)

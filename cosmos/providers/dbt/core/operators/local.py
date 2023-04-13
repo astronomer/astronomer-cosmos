@@ -254,19 +254,19 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = "test"
         self.on_warning_callback = on_warning_callback
 
-    def _should_run_tests(self, result) -> bool:
+    def _should_run_tests(self, result: SubprocessResult) -> bool:
         """
         Check if any tests are defined to run in the DAG. If tests are defined
         and on_warning_callback is set, then function returns True.
 
         :param
-            output (str): The output from the build and run command.
+            result (SubprocessResult): The output from the build and run command.
         """
 
         no_tests_message = "Nothing to do"
         return self.on_warning_callback and no_tests_message not in result.output
 
-    def _handle_warnings(self, result, context: Context) -> None:
+    def _handle_warnings(self, result: SubprocessResult, context: Context) -> None:
         """
         Handles warnings by extracting log issues, creating additional context, and calling the
         on_warning_callback with the updated context.

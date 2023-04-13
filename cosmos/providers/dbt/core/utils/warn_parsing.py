@@ -1,8 +1,9 @@
 import logging
 import re
 from typing import List, Tuple
+from airflow.hooks.subprocess import SubprocessResult
 
-def parse_output(result, keyword: str) -> int:
+def parse_output(result: SubprocessResult, keyword: str) -> int:
     """
     Parses the DBT test output message and returns the number of errors or warnings.
 

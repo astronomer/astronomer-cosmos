@@ -161,7 +161,8 @@ class DbtBaseOperator(BaseOperator):
         elif self.append_env:
             system_env.update(env)
             env = system_env
-        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(
+            context, in_env_var_format=True)
         self.log.debug(
             "Exporting the following env vars:\n%s",
             "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),
@@ -180,14 +181,12 @@ class DbtBaseOperator(BaseOperator):
     def add_global_flags(self) -> list[str]:
         flags = []
         for global_flag in self.global_flags:
+            # for now, skip the project_dir flag
+            if global_flag == "project_dir":
+                continue
+
             dbt_name = f"--{global_flag.replace('_', '-')}"
-            # intercept project directory and route it to r/w tmp
-            if self.intercept_flag and global_flag == "project_dir":
-                global_flag_value = (
-                    f"/tmp/dbt/{os.path.basename(self.__getattribute__(global_flag))}"
-                )
-            else:
-                global_flag_value = self.__getattribute__(global_flag)
+            global_flag_value = self.__getattribute__(global_flag)
             if global_flag_value is not None:
                 if isinstance(global_flag_value, dict):
                     yaml_string = yaml.dump(global_flag_value)

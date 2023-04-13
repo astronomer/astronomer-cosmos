@@ -30,7 +30,10 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
 
     intercept_flag = False
 
-    def __init__(self, **kwargs,) -> None:
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
 
     def build_env_args(self, env: dict) -> list[k8s.V1EnvVar]:

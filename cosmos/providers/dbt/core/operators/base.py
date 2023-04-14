@@ -61,7 +61,6 @@ class DbtBaseOperator(BaseOperator):
     :param dbt_executable_path: Path to dbt executable can be used with venv
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
     :param dbt_cmd_flags: Flags passed to dbt command override those that are calculated.
-    :param install_deps: If true, then install dbt dependencies before running the command.
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -205,18 +204,14 @@ class DbtBaseOperator(BaseOperator):
         handle_profile: bool = True,
     ) -> Tuple[list[str], dict]:
         dbt_cmd = [self.dbt_executable_path]
-
         if isinstance(self.base_cmd, str):
             dbt_cmd.append(self.base_cmd)
         else:
             dbt_cmd.extend(self.base_cmd)
-
         dbt_cmd.extend(self.add_global_flags())
-
         # add command specific flags
         if cmd_flags:
             dbt_cmd.extend(cmd_flags)
-
         # add profile
         if handle_profile:
             create_default_profiles(DBT_PROFILE_PATH)

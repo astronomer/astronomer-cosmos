@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import fcntl
 import logging
 import os
 import shutil
 import signal
-import time
-from filecmp import dircmp
-from pathlib import Path
+import tempfile
 from typing import Sequence
 
 import yaml
@@ -15,15 +12,8 @@ from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.utils.context import Context
-from filelock import FileLock
 
-from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.file_syncing import (
-    exclude,
-    has_differences,
-    is_file_locked,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -62,73 +52,27 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         cmd: list[str],
         env: dict[str, str],
     ) -> SubprocessResult:
-        # check project_dir
-        if self.project_dir is not None:
-            if not os.path.exists(self.project_dir):
-                raise AirflowException(
-                    f"Can not find the project_dir: {self.project_dir}"
-                )
-            if not os.path.isdir(self.project_dir):
-                raise AirflowException(
-                    f"The project_dir {self.project_dir} must be a directory"
-                )
-
-        # routing the dbt project to a tmp dir for r/w operations
-        target_dir = f"/tmp/dbt/{os.path.basename(self.project_dir)}"
-
-        changes = True  # set changes to true by default
-        if os.path.exists(target_dir):
-            # if the directory doesn't exist or if there are changes -- keep changes as true
-            comparison = dircmp(
-                self.project_dir, target_dir, ignore=["logs", "target", ".lock"]
-            )  # compares tmp and project dir
-            changes = has_differences(comparison)  # check for changes
-
-        # if there are changes between tmp and project_dir then copy them over
-        if changes:
-            logging.info(
-                f"Changes detected - copying {self.project_dir} to {target_dir}"
-            )
-            # put a lock on the dest so that it isn't getting written multiple times
-            lock_file = os.path.join(target_dir, ".lock")
-
-            # if there is already a lock file - then just wait for it to be released and continue without copying
-            if os.path.exists(lock_file) and is_file_locked(lock_file):
-                while os.path.exists(lock_file):
-                    with open(lock_file, "w") as lock_f:
-                        try:
-                            # Lock acquired, the lock file is available
-                            fcntl.flock(lock_f, fcntl.LOCK_SH | fcntl.LOCK_NB)
-                            break
-                        except OSError:
-                            # Lock is held by another process, wait and try again
-                            time.sleep(1)
-
-                # The lock file is available, release the shared lock
-                with open(lock_file, "w") as lock_f:
-                    fcntl.flock(lock_f, fcntl.LOCK_UN)
-
-            # otherwise create a lock file and copy the dbt directory
-            else:
-                os.makedirs(os.path.dirname(lock_file), exist_ok=True)
-                lock_path = Path(target_dir) / ".lock"
-                with FileLock(str(lock_path), timeout=15):
-                    if os.path.exists(target_dir):
-                        shutil.rmtree(target_dir)
-                    shutil.copytree(self.project_dir, target_dir, ignore=exclude)
-        else:
-            logging.info(
-                f"No differences detected between {self.project_dir} and {target_dir}"
+        """
+        Copies the dbt project to a temporary directory and runs the command.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # need a subfolder because shutil.copytree will fail if the destination dir already exists
+            tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
+            shutil.copytree(
+                self.project_dir,
+                tmp_project_dir,
             )
 
-        # Fix the profile path, so it's not accidentally superseded by the end user.
-        env["DBT_PROFILES_DIR"] = DBT_PROFILE_PATH.parent
-        # run bash command
-        result = self.subprocess_hook.run_command(
-            command=cmd, env=env, output_encoding=self.output_encoding, cwd=target_dir
-        )
-        self.exception_handling(result)
-        return result
+            result = self.subprocess_hook.run_command(
+                command=cmd,
+                env=env,
+                output_encoding=self.output_encoding,
+                cwd=tmp_project_dir,
+            )
+
+            self.exception_handling(result)
+
+            return result
 
     def build_and_run_cmd(
         self, context: Context, cmd_flags: list[str] | None = None

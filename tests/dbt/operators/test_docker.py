@@ -26,8 +26,6 @@ def test_dbt_docker_operator_add_global_flags() -> None:
         no_version_check=True,
     )
     assert dbt_base_operator.add_global_flags() == [
-        "--project-dir",
-        "my/dir",
         "--vars",
         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
@@ -110,8 +108,6 @@ def test_dbt_docker_build_command():
         assert command_operator.command == [
             "dbt",
             command_name,
-            "--project-dir",
-            "my/dir",
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",

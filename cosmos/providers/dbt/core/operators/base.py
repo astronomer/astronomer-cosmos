@@ -61,6 +61,7 @@ class DbtBaseOperator(BaseOperator):
     :param dbt_executable_path: Path to dbt executable can be used with venv
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
     :param dbt_cmd_flags: Flags passed to dbt command override those that are calculated.
+    :param install_deps: If true, then install dbt dependencies before running the command.
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -110,6 +111,7 @@ class DbtBaseOperator(BaseOperator):
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
         dbt_cmd_flags: Dict[str, Any] = {},
+        install_deps: bool = False,
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -134,6 +136,7 @@ class DbtBaseOperator(BaseOperator):
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
         self.cancel_query_on_kill = cancel_query_on_kill
+        self.install_deps = install_deps
         # dbt-ol is the OpenLineage wrapper for dbt, which automatically
         # generates and emits lineage data to a specified backend.
         dbt_ol_path = shutil.which("dbt-ol")
@@ -161,7 +164,8 @@ class DbtBaseOperator(BaseOperator):
         elif self.append_env:
             system_env.update(env)
             env = system_env
-        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(
+            context, in_env_var_format=True)
         self.log.debug(
             "Exporting the following env vars:\n%s",
             "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),
@@ -204,14 +208,26 @@ class DbtBaseOperator(BaseOperator):
         handle_profile: bool = True,
     ) -> Tuple[list[str], dict]:
         dbt_cmd = [self.dbt_executable_path]
+
+        # if we need to install deps, add that to the beginning of the command
+        if self.install_deps:
+            dbt_cmd = [
+                self.dbt_executable_path,
+                "deps",
+                "&&",
+            ] + dbt_cmd
+
         if isinstance(self.base_cmd, str):
             dbt_cmd.append(self.base_cmd)
         else:
             dbt_cmd.extend(self.base_cmd)
+
         dbt_cmd.extend(self.add_global_flags())
+
         # add command specific flags
         if cmd_flags:
             dbt_cmd.extend(cmd_flags)
+
         # add profile
         if handle_profile:
             create_default_profiles(DBT_PROFILE_PATH)

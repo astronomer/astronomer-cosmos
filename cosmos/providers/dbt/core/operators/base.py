@@ -162,8 +162,7 @@ class DbtBaseOperator(BaseOperator):
         elif self.append_env:
             system_env.update(env)
             env = system_env
-        airflow_context_vars = context_to_airflow_vars(
-            context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
         self.log.debug(
             "Exporting the following env vars:\n%s",
             "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),

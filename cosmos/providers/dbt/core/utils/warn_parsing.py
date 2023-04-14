@@ -28,7 +28,6 @@ def parse_output(result: SubprocessResult, keyword: str) -> int:
         logging.error(
             f"Could not parse number of {keyword}s. Please, check your DBT or Airflow version"
         )
-        num = 0
     return num
 
 

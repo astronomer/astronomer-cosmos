@@ -70,6 +70,7 @@ Cosmos currently supports the following connection types.
 
 * bigquery
 * databricks
+* exasol
 * postgres
 * redshift
 * snowflake
@@ -149,6 +150,14 @@ Redshift
 Builds upon Postgres so the details on schemas are the same.
 
 Cosmos supports the password based authentication `method <https://docs.getdbt.com/reference/warehouse-setups/redshift-setup#password-based-authentication>`__
+
+Exasol
+---------
+
+Builds upon Postgres so the details on schemas are the same.
+
+Cosmos supports the password based authentication `method <https://docs.getdbt.com/reference/warehouse-setups/exasol-setup>`__
+
 
 Snowflake
 ----------

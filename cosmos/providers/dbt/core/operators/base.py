@@ -111,7 +111,6 @@ class DbtBaseOperator(BaseOperator):
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
         dbt_cmd_flags: Dict[str, Any] = {},
-        install_deps: bool = False,
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -136,7 +135,6 @@ class DbtBaseOperator(BaseOperator):
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
         self.cancel_query_on_kill = cancel_query_on_kill
-        self.install_deps = install_deps
         # dbt-ol is the OpenLineage wrapper for dbt, which automatically
         # generates and emits lineage data to a specified backend.
         dbt_ol_path = shutil.which("dbt-ol")
@@ -208,14 +206,6 @@ class DbtBaseOperator(BaseOperator):
         handle_profile: bool = True,
     ) -> Tuple[list[str], dict]:
         dbt_cmd = [self.dbt_executable_path]
-
-        # if we need to install deps, add that to the beginning of the command
-        if self.install_deps:
-            dbt_cmd = [
-                self.dbt_executable_path,
-                "deps",
-                "&&",
-            ] + dbt_cmd
 
         if isinstance(self.base_cmd, str):
             dbt_cmd.append(self.base_cmd)

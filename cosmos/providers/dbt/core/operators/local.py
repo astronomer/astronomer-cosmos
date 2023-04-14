@@ -15,7 +15,6 @@ from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
-
 from cosmos.providers.dbt.core.utils.warn_parsing import (
     extract_log_issues,
     parse_output,
@@ -32,7 +31,10 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     template_fields: Sequence[str] = DbtBaseOperator.template_fields
 
-    def __init__(self, **kwargs,) -> None:
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
 
     @cached_property
@@ -50,7 +52,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
             )
 
-    def run_command(self, cmd: list[str], env: dict[str, str],) -> SubprocessResult:
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+    ) -> SubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
@@ -58,7 +64,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             # need a subfolder because shutil.copytree will fail if the destination dir already exists
             tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
             shutil.copytree(
-                self.project_dir, tmp_project_dir,
+                self.project_dir,
+                tmp_project_dir,
             )
 
             result = self.subprocess_hook.run_command(
@@ -182,7 +189,9 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(
-        self, on_warning_callback: Optional[Callable] = None, **kwargs,
+        self,
+        on_warning_callback: Optional[Callable] = None,
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"

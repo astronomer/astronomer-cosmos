@@ -56,8 +56,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         Copies the dbt project to a temporary directory and runs the command.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_project_dir = shutil.copytree(
-                self.project_dir, tmp_dir, dirs_exist_ok=True
+            # need a subfolder because shutil.copytree will fail if the destination dir already exists
+            tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
+            shutil.copytree(
+                self.project_dir,
+                tmp_project_dir,
             )
 
             result = self.subprocess_hook.run_command(
@@ -83,12 +86,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
+            self.subprocess_hook.log.info(
+                "Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(
                 self.subprocess_hook.sub_process, "pid"
             ):
                 os.killpg(
-                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
+                    os.getpgid(
+                        self.subprocess_hook.sub_process.pid), signal.SIGINT
                 )
         else:
             self.subprocess_hook.send_sigterm()

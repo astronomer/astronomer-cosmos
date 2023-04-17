@@ -216,8 +216,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         Check if any tests are defined to run in the DAG. If tests are defined
         and on_warning_callback is set, then function returns True.
 
-        :param
-            result (SubprocessResult): The output from the build and run command.
+        :param result (SubprocessResult): The output from the build and run command.
         """
 
         return self.on_warning_callback and no_tests_message not in result.output

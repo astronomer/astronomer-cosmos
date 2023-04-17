@@ -26,7 +26,7 @@ def parse_output(result: SubprocessResult, keyword: str) -> int:
         num = int(output.split(f"{keyword}=")[1].split()[0])
     except ValueError:
         logging.error(
-            f"Could not parse number of {keyword}s. Please, check your DBT or Airflow version"
+            f"Could not parse number of {keyword}s. Check your dbt/airflow version or if --quiet is not being used"
         )
     return num
 

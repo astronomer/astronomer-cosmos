@@ -227,9 +227,8 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         Handles warnings by extracting log issues, creating additional context, and calling the
         on_warning_callback with the updated context.
 
-        Args:
-            result: The result object from the build and run command.
-            context (Context): The original airflow context in which the build and run command was executed.
+       :param result: The result object from the build and run command.
+       :param context: The original airflow context in which the build and run command was executed.
         """
         test_names, test_results = extract_log_issues(result.full_output)
 

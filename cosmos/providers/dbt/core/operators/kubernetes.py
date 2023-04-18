@@ -20,7 +20,7 @@ try:
     )
     from kubernetes.client import models as k8s
 except ImportError:
-    logger.warning(
+    raise ImportError(
         "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
         "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
     )

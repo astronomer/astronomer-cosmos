@@ -10,7 +10,6 @@ from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_datase
 from cosmos.providers.dbt.dag import DbtDag
 from cosmos.providers.dbt.task_group import DbtTaskGroup
 
-
 # re-export the operators
 from .core.operators.local import (
     DbtDepsLocalOperator,
@@ -47,18 +46,26 @@ try:
 
 except ImportError:
     from .core.operators.lazy_load import MissingPackage
+
     DbtLSDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtLSDockerOperator", "docker")
+        "cosmos.providers.dbt.core.operators.docker.DbtLSDockerOperator", "docker"
+    )
     DbtRunDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtRunDockerOperator", "docker")
+        "cosmos.providers.dbt.core.operators.docker.DbtRunDockerOperator", "docker"
+    )
     DbtRunOperationDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtRunOperationDockerOperator", "docker")
+        "cosmos.providers.dbt.core.operators.docker.DbtRunOperationDockerOperator",
+        "docker",
+    )
     DbtSeedDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtSeedDockerOperator", "docker")
+        "cosmos.providers.dbt.core.operators.docker.DbtSeedDockerOperator", "docker"
+    )
     DbtSnapshotDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtSnapshotDockerOperator", "docker")
+        "cosmos.providers.dbt.core.operators.docker.DbtSnapshotDockerOperator", "docker"
+    )
     DbtTestDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtTestDockerOperator", "docker")
+        "cosmos.providers.dbt.core.operators.docker.DbtTestDockerOperator", "docker"
+    )
 
 __all__ += [
     "DbtLSDockerOperator",
@@ -81,18 +88,31 @@ try:
     )
 except ImportError:
     from .core.operators.lazy_load import MissingPackage
+
     DbtLSKubernetesOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.kubernetes.DbtLSKubernetesOperator", "kubernetes")
+        "cosmos.providers.dbt.core.operators.kubernetes.DbtLSKubernetesOperator",
+        "kubernetes",
+    )
     DbtRunKubernetesOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.kubernetes.DbtRunKubernetesOperator", "kubernetes")
+        "cosmos.providers.dbt.core.operators.kubernetes.DbtRunKubernetesOperator",
+        "kubernetes",
+    )
     DbtRunOperationKubernetesOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.kubernetes.DbtRunOperationKubernetesOperator", "kubernetes")
+        "cosmos.providers.dbt.core.operators.kubernetes.DbtRunOperationKubernetesOperator",
+        "kubernetes",
+    )
     DbtSeedKubernetesOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.kubernetes.DbtSeedKubernetesOperator", "kubernetes")
+        "cosmos.providers.dbt.core.operators.kubernetes.DbtSeedKubernetesOperator",
+        "kubernetes",
+    )
     DbtSnapshotKubernetesOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.kubernetes.DbtSnapshotKubernetesOperator", "kubernetes")
+        "cosmos.providers.dbt.core.operators.kubernetes.DbtSnapshotKubernetesOperator",
+        "kubernetes",
+    )
     DbtTestKubernetesOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.kubernetes.DbtTestKubernetesOperator", "kubernetes")
+        "cosmos.providers.dbt.core.operators.kubernetes.DbtTestKubernetesOperator",
+        "kubernetes",
+    )
 
 __all__ += [
     "DbtLSKubernetesOperator",

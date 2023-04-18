@@ -32,6 +32,7 @@ def render_project(
     dbt_root_path: str = "/usr/local/airflow/dbt",
     dbt_models_dir: str = "models",
     dbt_snapshots_dir: str = "snapshots",
+    dbt_seeds_dir: str = "seeds",
     task_args: Dict[str, Any] = {},
     operator_args: Dict[str, Any] = {},
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
@@ -64,6 +65,7 @@ def render_project(
         dbt_root_path=dbt_root_path,
         dbt_models_dir=dbt_models_dir,
         dbt_snapshots_dir=dbt_snapshots_dir,
+        dbt_seeds_dir=dbt_seeds_dir,
         project_name=dbt_project_name,
     )
 

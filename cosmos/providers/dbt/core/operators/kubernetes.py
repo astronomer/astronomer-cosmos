@@ -1,12 +1,5 @@
 from __future__ import annotations
 
-# kubernetes is an optional dependency, so we use lazy loading to avoid import errors
-from .lazy_load import (
-    KubernetesPodOperator,
-    convert_env_vars,
-    k8s,
-)
-
 import logging
 from typing import Sequence
 
@@ -14,6 +7,9 @@ import yaml
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
+
+# kubernetes is an optional dependency, so we use lazy loading to avoid import errors
+from .lazy_load import KubernetesPodOperator, convert_env_vars, k8s
 
 logger = logging.getLogger(__name__)
 

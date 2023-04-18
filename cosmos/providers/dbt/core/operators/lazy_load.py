@@ -1,4 +1,4 @@
-class MissingPackage(object):
+class MissingPackage:
     def __init__(self, module_name, optional_dependency_name):
         self.module_name = module_name
         self.optional_dependency_name = optional_dependency_name
@@ -15,8 +15,7 @@ try:
     from airflow.providers.docker.operators.docker import DockerOperator
 except ImportError:
     DockerOperator = MissingPackage(
-        "airflow.providers.docker.operators.docker.DockerOperator",
-        "docker"
+        "airflow.providers.docker.operators.docker.DockerOperator", "docker"
     )
 
 try:
@@ -30,13 +29,10 @@ try:
 except ImportError:
     KubernetesPodOperator = MissingPackage(
         "airflow.providers.cncf.kubernetes.operators.kubernetes_pod.KubernetesPodOperator",
-        "kubernetes"
+        "kubernetes",
     )
     convert_env_vars = MissingPackage(
         "airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters.convert_env_vars",
-        "kubernetes"
+        "kubernetes",
     )
-    k8s = MissingPackage(
-        "kubernetes.client.models",
-        "kubernetes"
-    )
+    k8s = MissingPackage("kubernetes.client.models", "kubernetes")

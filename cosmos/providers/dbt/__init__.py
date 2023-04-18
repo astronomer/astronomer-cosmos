@@ -21,18 +21,6 @@ from .core.operators.local import (
     DbtTestLocalOperator,
 )
 
-__all__ = [
-    "DbtLSLocalOperator",
-    "DbtRunOperationLocalOperator",
-    "DbtRunLocalOperator",
-    "DbtSeedLocalOperator",
-    "DbtTestLocalOperator",
-    "DbtDepsLocalOperator",
-    "DbtSnapshotLocalOperator",
-    "get_dbt_dataset",
-    "DbtDag",
-    "DbtTaskGroup",
-]
 
 try:
     from .core.operators.docker import (
@@ -43,7 +31,6 @@ try:
         DbtSnapshotDockerOperator,
         DbtTestDockerOperator,
     )
-
 except ImportError:
     from .core.operators.lazy_load import MissingPackage
 
@@ -66,16 +53,6 @@ except ImportError:
     DbtTestDockerOperator = MissingPackage(
         "cosmos.providers.dbt.core.operators.docker.DbtTestDockerOperator", "docker"
     )
-
-__all__ += [
-    "DbtLSDockerOperator",
-    "DbtRunOperationDockerOperator",
-    "DbtRunDockerOperator",
-    "DbtSeedDockerOperator",
-    "DbtTestDockerOperator",
-    "DbtSnapshotDockerOperator",
-]
-
 
 try:
     from .core.operators.kubernetes import (
@@ -114,7 +91,23 @@ except ImportError:
         "kubernetes",
     )
 
-__all__ += [
+__all__ = [
+    "DbtLSLocalOperator",
+    "DbtRunOperationLocalOperator",
+    "DbtRunLocalOperator",
+    "DbtSeedLocalOperator",
+    "DbtTestLocalOperator",
+    "DbtDepsLocalOperator",
+    "DbtSnapshotLocalOperator",
+    "get_dbt_dataset",
+    "DbtDag",
+    "DbtTaskGroup",
+    "DbtLSDockerOperator",
+    "DbtRunOperationDockerOperator",
+    "DbtRunDockerOperator",
+    "DbtSeedDockerOperator",
+    "DbtTestDockerOperator",
+    "DbtSnapshotDockerOperator",
     "DbtLSKubernetesOperator",
     "DbtRunOperationKubernetesOperator",
     "DbtRunKubernetesOperator",

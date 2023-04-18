@@ -15,7 +15,8 @@ try:
     from airflow.providers.docker.operators.docker import DockerOperator
 except ImportError:
     raise ImportError(
-        "Could not import DockerOperator. Ensure you've installed the docker provider separately or with with `pip install astronomer-cosmos[...,docker]`."
+        "Could not import DockerOperator. Ensure you've installed the docker provider separately or "
+        "with with `pip install astronomer-cosmos[...,docker]`."
     )
 
 

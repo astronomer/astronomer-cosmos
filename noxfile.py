@@ -20,7 +20,7 @@ def dev(session: nox.Session) -> None:
     development environment to ``.nox/dev``.
     """
     session.install("nox")
-    session.install("-e", ".[all,tests]")
+    session.install("-e", ".[all,tests,docker,kubernetes]")
 
 
 def _expand_env_vars(file_path: Path):

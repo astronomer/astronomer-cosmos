@@ -29,6 +29,8 @@ Warn Notification
 
     As of now, this feature is only available for the default execution mode ``local``
 
+    Only warnings in tests are currently supported
+
 Cosmos enables you to receive warning notifications from tests and process them using a callback function.
 The ``on_warning_callback`` parameter adds two extra context variables to the callback function: ``test_names`` and ``test_results``.
 ``test_names`` contains the names of the tests that generated a warning, while ``test_results`` holds the corresponding test results

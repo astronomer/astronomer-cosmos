@@ -42,7 +42,7 @@ def test(session: nox.Session, airflow) -> None:
     }
 
     session.install(f"apache-airflow=={airflow}")
-    session.install("-e", ".[all,tests]")
+    session.install("-e", ".[all,tests,docker,kubernetes]")
 
     # Log all the installed dependencies
     session.log("Installed Dependencies:")
@@ -67,7 +67,7 @@ def test(session: nox.Session, airflow) -> None:
 @nox.session(python=["3.8"])
 def type_check(session: nox.Session) -> None:
     """Run MyPy checks."""
-    session.install("-e", ".[all,tests]")
+    session.install("-e", ".[all,tests,docker,kubernetes]")
     session.run("mypy", "--version")
     session.run("mypy", "cosmos")
 

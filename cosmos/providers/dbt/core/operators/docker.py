@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# docker is an optional dependency, so we use lazy loading to avoid import errors
+from .lazy_load import DockerOperator
+
 import logging
 from typing import Sequence
 
@@ -9,15 +12,6 @@ from airflow.utils.context import Context
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 
 logger = logging.getLogger(__name__)
-
-# docker is an optional dependency, so we need to check if it's installed
-try:
-    from airflow.providers.docker.operators.docker import DockerOperator
-except ImportError:
-    raise ImportError(
-        "Could not import DockerOperator. Ensure you've installed the docker provider separately or "
-        "with with `pip install astronomer-cosmos[...,docker]`."
-    )
 
 
 class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):

@@ -87,3 +87,21 @@ To install dbt into a virtual environment, you can use the following steps:
     )
 
 Note that you don't need to install Cosmos into the virtual environment - only dbt and the adapter you need.
+
+
+Docker and Kubernetes Execution Methods
+---------------------------------------
+
+If you intend to use Cosmos with the Docker or Kubernetes execution methods, you will need to install Cosmos with the right optional dependency.
+
+For Kubernetes, you will need to install the ``kubernetes`` extra:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[..., kubernetes]'
+
+For Docker, you will need to install the ``docker`` extra:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[..., docker]'

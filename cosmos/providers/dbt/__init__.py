@@ -21,7 +21,6 @@ from .core.operators.local import (
     DbtTestLocalOperator,
 )
 
-
 try:
     from .core.operators.docker import (
         DbtLSDockerOperator,

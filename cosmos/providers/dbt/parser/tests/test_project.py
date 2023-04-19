@@ -1,10 +1,13 @@
+import logging
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import List
 
 import pytest
 import yaml
 
-from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
+from cosmos.providers.dbt.parser.project import DbtModel, DbtModelType, DbtProject
 
 DBT_PROJECT_PATH = Path("./dev/dags/dbt/")
 SAMPLE_CSV_PATH = DBT_PROJECT_PATH / "jaffle_shop/seeds/raw_customers.csv"
@@ -109,3 +112,71 @@ def test_dbtproject__handle_config_file_with_selector(
             dbt_project.models["orders"].config.config_selectors
             == expected_config_selectors
         )
+
+
+def test_dbtmodelconfig___repr__():
+    dbt_model = DbtModel(
+        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
+    )
+    expected_start = "DbtModel(name='some_name', type='DbtModelType.DBT_MODEL', path='dev/dags/dbt/jaffle_shop/models/customers.sql', config=DbtModelConfig(config_selectors=set(), upstream_models={'stg_"
+    assert str(dbt_model).startswith(expected_start)
+
+
+class KeywordArgValue:
+    def as_const(self):
+        return self
+
+class KeywordArgValueList(KeywordArgValue, list):
+    pass
+
+class KeywordArgValueStr(KeywordArgValue, str):
+    pass
+
+@dataclass
+class KeywordArg:
+    key: str
+    value: KeywordArgValue | List
+
+
+def test_dbtmodelconfig_extract_config_non_kwarg():
+    dbt_model = DbtModel(
+        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
+    )
+    kwarg = {}
+    config_name = "abc"
+    computed = dbt_model._extract_config(kwarg, config_name)
+    assert computed is None
+
+def test_dbtmodelconfig_extract_config_with_kwarg_list_without_as_const(caplog):
+    dbt_model = DbtModel(
+        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
+    )
+    kwarg = KeywordArg(key="some_conf", value=[1, 2])
+    config_name = "some_conf"
+    with caplog.at_level(logging.WARN):
+        computed = dbt_model._extract_config(kwarg, config_name)
+    assert computed is None
+    expected_log = "Could not parse some_conf from config in dev/dags/dbt/jaffle_shop/models/customers.sql: 'list' object has no attribute 'as_const'"
+    assert expected_log in caplog.text
+
+
+def test_dbtmodelconfig_extract_config_with_kwarg_list():
+    dbt_model = DbtModel(
+        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
+    )
+    kwarg = KeywordArg(key="some_conf", value=KeywordArgValueList([1, 2]))
+    config_name = "some_conf"
+    computed = dbt_model._extract_config(kwarg, config_name)
+    expected = ["some_conf:1", "some_conf:2"]
+    assert computed == expected
+
+
+def test_dbtmodelconfig_extract_config_with_kwarg_str():
+    dbt_model = DbtModel(
+        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
+    )
+    kwarg = KeywordArg(key="some_conf", value=KeywordArgValueStr("abc"))
+    config_name = "some_conf"
+    computed = dbt_model._extract_config(kwarg, config_name)
+    expected = ["some_conf:abc"]
+    assert computed == expected

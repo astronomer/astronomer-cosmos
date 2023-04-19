@@ -181,7 +181,6 @@ class DbtModel:
                 )
                 pass
 
-    # TODO: following needs coverage:
     def __repr__(self) -> str:
         """
         Returns the string representation of the model.

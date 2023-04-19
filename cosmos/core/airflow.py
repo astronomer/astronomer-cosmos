@@ -81,6 +81,16 @@ class CosmosTaskGroup(TaskGroup):
         # add dependencies
         for ent in cosmos_group.entities:
             for upstream_id in ent.upstream_entity_ids:
+                if upstream_id not in entities:
+                    raise ValueError(
+                        f"Entity {upstream_id} is not in the group {cosmos_group.id}"
+                    )
+
+                if ent.id not in entities:
+                    raise ValueError(
+                        f"Entity {ent.id} is not in the group {cosmos_group.id}"
+                    )
+
                 entities[upstream_id] >> entities[ent.id]
 
 

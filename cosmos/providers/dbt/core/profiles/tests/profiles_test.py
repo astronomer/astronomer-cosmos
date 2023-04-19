@@ -2,7 +2,6 @@ import inspect
 import json
 import os
 from pathlib import Path
-from time import sleep
 from typing import Generator, Optional
 from unittest.mock import MagicMock, patch
 
@@ -46,7 +45,6 @@ def test_create_default_profiles_exist(tmp_path: Path) -> None:
     """
     profile_file = tmp_path.joinpath("profiles.yml")
     create_default_profiles(profile_file)
-    sleep(1)
     created_time = os.path.getctime(profile_file)
     create_default_profiles(profile_file)
     modified_time = os.path.getmtime(profile_file)
@@ -66,7 +64,6 @@ def test_create_default_profiles_exist_library_update(
     ]
     profile_file = tmp_path.joinpath("profiles.yml")
     create_default_profiles(profile_file)
-    sleep(1)
     created_time = os.path.getctime(profile_file)
     create_default_profiles(profile_file)
     modified_time = os.path.getmtime(profile_file)
@@ -99,7 +96,8 @@ def snowflake_extra_connection(
     airflow_connection: Connection,
 ) -> Generator[Connection, None, None]:
     airflow_connection.conn_type = "snowflake"
-    airflow_connection.extra_dejson = {"extra__snowflake__database": "test_database"}
+    airflow_connection.extra_dejson = {
+        "extra__snowflake__database": "test_database"}
     yield airflow_connection
 
 
@@ -252,7 +250,8 @@ def test_create_profile_vars_exasol(airflow_connection: Connection) -> None:
         "EXASOL_CONNECTION_TIMEOUT": "30",
     }
 
-    profile, profile_vars = create_profile_vars_exasol(airflow_connection, None, schema)
+    profile, profile_vars = create_profile_vars_exasol(
+        airflow_connection, None, schema)
     assert profile == "exasol_profile"
     assert profile_vars == expected_profile_vars
 
@@ -400,7 +399,8 @@ def test_create_profile_vars_google_cloud_platform(
             "client_x509_cert_url": client_x509_cert_url,
         }
     )
-    airflow_connection.extra_dejson = {"keyfile_dict": bigquery_key_file_contents}
+    airflow_connection.extra_dejson = {
+        "keyfile_dict": bigquery_key_file_contents}
 
     expected_profile_vars = {
         "BIGQUERY_DATASET": schema,
@@ -469,7 +469,8 @@ def test_create_profile_vars_trino(airflow_connection: Connection) -> None:
         "redshift_connection",
         "postgres_connection",
         "databricks_connection",
-        pytest.param("random_connection", marks=pytest.mark.xfail(raises=SystemExit)),
+        pytest.param("random_connection",
+                     marks=pytest.mark.xfail(raises=SystemExit)),
     ],
 )
 def test_map_profile(
@@ -490,6 +491,7 @@ def test_get_available_adapters():
     """
     adapters = get_available_adapters()
     for _, adapter_config in adapters.items():
-        function_signature = inspect.signature(adapter_config.create_profile_function)
+        function_signature = inspect.signature(
+            adapter_config.create_profile_function)
         assert len(function_signature.parameters) == 3
         assert function_signature.return_annotation == "tuple[str, dict[str, str]]"

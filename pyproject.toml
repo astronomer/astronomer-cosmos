@@ -138,6 +138,7 @@ python = ["3.7", "3.8", "3.9", "3.10"]
 
 [tool.hatch.envs.tests.scripts]
 test = "pytest ."
+test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml ."
 
 ######################################
 # DOCS

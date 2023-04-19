@@ -113,6 +113,20 @@ include = [
     "/cosmos",
 ]
 
+[tool.hatch.envs.test]
+python = "3.7"
+dependencies = [
+    "pytest>=6.0",
+    "pytest-split",
+    "pytest-dotenv",
+    "requests-mock",
+    "pytest-cov",
+    "pytest-describe",
+    "types-requests",
+    "mypy",
+    "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
+]
+
 [tool.hatch.envs.docs]
 dependencies = [
     "sphinx",

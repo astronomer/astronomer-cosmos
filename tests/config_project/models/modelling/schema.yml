@@ -1,0 +1,6 @@
+models:
+  - name: customer_order
+    config:
+      tags:
+        - finance
+        - confidential

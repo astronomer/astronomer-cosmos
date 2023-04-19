@@ -6,13 +6,12 @@ try:
 except ImportError:
     from typing_extensions import TypedDict
 
-import pytest
 import pendulum
-
-from cosmos.core.graph.entities import Group, Task, CosmosEntity
-
+import pytest
 from airflow.models import DAG
-from cosmos.core.airflow import CosmosDag, CosmosTaskGroup, get_airflow_task
+
+from cosmos.core.airflow import CosmosDag, CosmosTaskGroup
+from cosmos.core.graph.entities import CosmosEntity, Group, Task
 
 
 def simple_group() -> Group:
@@ -172,7 +171,8 @@ def test_cosmos_dag_and_task_group(
                 }
             elif isinstance(entity, Group):
                 flatten_entities(
-                    entity.entities, upstreams + entity.upstream_entity_ids)
+                    entity.entities, upstreams + entity.upstream_entity_ids
+                )
 
     flatten_entities(group.entities)
 
@@ -231,9 +231,7 @@ def test_invalid_operator() -> None:
     """Tests that an invalid operator raises an error."""
     with pytest.raises(ValueError):
         group = Group(id="group_1")
-        group.add_entity(
-            Task(id="task_1", operator_class="InvalidOperator")
-        )
+        group.add_entity(Task(id="task_1", operator_class="InvalidOperator"))
 
         CosmosDag(
             start_date=pendulum.datetime(2021, 1, 1),

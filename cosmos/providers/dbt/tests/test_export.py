@@ -1,10 +1,11 @@
 """
 Tests exports from the dbt provider.
 """
-import sys
-import pytest
-from unittest import mock
 import importlib
+import sys
+from unittest import mock
+
+import pytest
 
 docker_operators = [
     "DbtLSDockerOperator",
@@ -35,9 +36,12 @@ def test_failed_docker_import(operator: str, reset_docker_operators: None) -> No
     Test that the docker operators are not imported when docker is not installed.
     Should raise a RuntimeError.
     """
-    with mock.patch.dict(sys.modules, {"airflow.providers.docker.operators.docker": None}):
+    with mock.patch.dict(
+        sys.modules, {"airflow.providers.docker.operators.docker": None}
+    ):
         with pytest.raises(RuntimeError):
             from cosmos.providers import dbt
+
             importlib.reload(dbt)
             getattr(dbt, operator)()
 
@@ -66,17 +70,23 @@ def reset_kubernetes_operators() -> None:
     "operator",
     kubernetes_operators,
 )
-def test_failed_kubernetes_import(operator: str, reset_kubernetes_operators: None) -> None:
+def test_failed_kubernetes_import(
+    operator: str, reset_kubernetes_operators: None
+) -> None:
     """
     Test that the kubernetes operators are not imported when kubernetes is not installed.
     Should raise a RuntimeError.
     """
-    with mock.patch.dict(sys.modules, {
-        "airflow.providers.cncf.kubernetes.operators.kubernetes_pod": None,
-        "airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters": None,
-        "kubernetes.client.models": None,
-    }):
+    with mock.patch.dict(
+        sys.modules,
+        {
+            "airflow.providers.cncf.kubernetes.operators.kubernetes_pod": None,
+            "airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters": None,
+            "kubernetes.client.models": None,
+        },
+    ):
         with pytest.raises(RuntimeError):
             from cosmos.providers import dbt
+
             importlib.reload(dbt)
             getattr(dbt, operator)()

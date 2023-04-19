@@ -3,6 +3,7 @@ Tests related to the package version.
 """
 
 import re
+
 import cosmos
 
 

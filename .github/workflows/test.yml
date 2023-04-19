@@ -1,6 +1,10 @@
 name: test
 
-on: [push, pull_request]
+on:
+  push: # Run on pushes to the default branch
+    branches: [main]
+  pull_request: # Run on pull requests targeting the default branch
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

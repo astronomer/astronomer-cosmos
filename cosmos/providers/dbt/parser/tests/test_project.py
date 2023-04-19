@@ -118,7 +118,11 @@ def test_dbtmodelconfig___repr__():
     dbt_model = DbtModel(
         name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
     )
-    expected_start = "DbtModel(name='some_name', type='DbtModelType.DBT_MODEL', path='dev/dags/dbt/jaffle_shop/models/customers.sql', config=DbtModelConfig(config_selectors=set(), upstream_models={'stg_"
+    expected_start = (
+        "DbtModel(name='some_name', type='DbtModelType.DBT_MODEL', "
+        "path='dev/dags/dbt/jaffle_shop/models/customers.sql', config=DbtModelConfig(config_selectors=set(), "
+        "upstream_models={'stg_"
+    )
     assert str(dbt_model).startswith(expected_start)
 
 
@@ -160,7 +164,10 @@ def test_dbtmodelconfig_extract_config_with_kwarg_list_without_as_const(caplog):
     with caplog.at_level(logging.WARN):
         computed = dbt_model._extract_config(kwarg, config_name)
     assert computed is None
-    expected_log = "Could not parse some_conf from config in dev/dags/dbt/jaffle_shop/models/customers.sql: 'list' object has no attribute 'as_const'"
+    expected_log = (
+        "Could not parse some_conf from config in dev/dags/dbt/jaffle_shop/models/customers.sql: "
+        "'list' object has no attribute 'as_const'"
+    )
     assert expected_log in caplog.text
 
 

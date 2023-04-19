@@ -24,7 +24,7 @@ except ImportError:
     )
 
 
-class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
+class DbtKubernetesBaseOperators(KubernetesPodOperator, DbtBaseOperator):
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
 
 DBT_PROJECT_PATH = Path("./dev/dags/dbt/")
@@ -19,6 +20,7 @@ def test_dbtproject__handle_csv_file():
     assert raw_customers.name == "raw_customers"
     assert raw_customers.type == DbtModelType.DBT_SEED
     assert raw_customers.path == SAMPLE_CSV_PATH
+
 
 def test_dbtproject__handle_sql_file_model():
     dbt_project = DbtProject(
@@ -50,5 +52,3 @@ def test_dbtproject__handle_sql_file_snapshot():
     assert raw_customers.name == "orders"
     assert raw_customers.type == DbtModelType.DBT_MODEL
     assert raw_customers.path == SAMPLE_SNAPSHOT_SQL_PATH
-
-

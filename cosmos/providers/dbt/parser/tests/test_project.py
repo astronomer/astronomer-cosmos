@@ -126,11 +126,14 @@ class KeywordArgValue:
     def as_const(self):
         return self
 
+
 class KeywordArgValueList(KeywordArgValue, list):
     pass
 
+
 class KeywordArgValueStr(KeywordArgValue, str):
     pass
+
 
 @dataclass
 class KeywordArg:
@@ -146,6 +149,7 @@ def test_dbtmodelconfig_extract_config_non_kwarg():
     config_name = "abc"
     computed = dbt_model._extract_config(kwarg, config_name)
     assert computed is None
+
 
 def test_dbtmodelconfig_extract_config_with_kwarg_list_without_as_const(caplog):
     dbt_model = DbtModel(

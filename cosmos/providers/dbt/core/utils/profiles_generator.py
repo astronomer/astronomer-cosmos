@@ -20,6 +20,7 @@ def cosmos_version() -> str:
     Returns the current version of astronomer-cosmos.
     """
     import cosmos
+
     return cosmos.__version__
 
 
@@ -69,8 +70,7 @@ def map_profile(
         )
 
     logging.getLogger().setLevel(logging.ERROR)
-    logging.error(
-        f"This connection type is currently not supported {connection_type}.")
+    logging.error(f"This connection type is currently not supported {connection_type}.")
     sys.exit(1)
 
 

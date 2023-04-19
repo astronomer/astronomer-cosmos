@@ -99,8 +99,7 @@ def snowflake_extra_connection(
     airflow_connection: Connection,
 ) -> Generator[Connection, None, None]:
     airflow_connection.conn_type = "snowflake"
-    airflow_connection.extra_dejson = {
-        "extra__snowflake__database": "test_database"}
+    airflow_connection.extra_dejson = {"extra__snowflake__database": "test_database"}
     yield airflow_connection
 
 
@@ -165,9 +164,7 @@ def random_connection(
     yield airflow_connection
 
 
-def test_create_profile_vars_databricks(
-    airflow_connection: Connection
-) -> None:
+def test_create_profile_vars_databricks(airflow_connection: Connection) -> None:
     catalog = "my-catalog"
     host = "dbc-abcd123-1234.cloud.databricks.com"
     schema = "jaffle_shop"
@@ -255,8 +252,7 @@ def test_create_profile_vars_exasol(airflow_connection: Connection) -> None:
         "EXASOL_CONNECTION_TIMEOUT": "30",
     }
 
-    profile, profile_vars = create_profile_vars_exasol(
-        airflow_connection, None, schema)
+    profile, profile_vars = create_profile_vars_exasol(airflow_connection, None, schema)
     assert profile == "exasol_profile"
     assert profile_vars == expected_profile_vars
 
@@ -404,8 +400,7 @@ def test_create_profile_vars_google_cloud_platform(
             "client_x509_cert_url": client_x509_cert_url,
         }
     )
-    airflow_connection.extra_dejson = {
-        "keyfile_dict": bigquery_key_file_contents}
+    airflow_connection.extra_dejson = {"keyfile_dict": bigquery_key_file_contents}
 
     expected_profile_vars = {
         "BIGQUERY_DATASET": schema,
@@ -474,8 +469,7 @@ def test_create_profile_vars_trino(airflow_connection: Connection) -> None:
         "redshift_connection",
         "postgres_connection",
         "databricks_connection",
-        pytest.param("random_connection",
-                     marks=pytest.mark.xfail(raises=SystemExit)),
+        pytest.param("random_connection", marks=pytest.mark.xfail(raises=SystemExit)),
     ],
 )
 def test_map_profile(
@@ -496,7 +490,6 @@ def test_get_available_adapters():
     """
     adapters = get_available_adapters()
     for _, adapter_config in adapters.items():
-        function_signature = inspect.signature(
-            adapter_config.create_profile_function)
+        function_signature = inspect.signature(adapter_config.create_profile_function)
         assert len(function_signature.parameters) == 3
-        assert function_signature.return_annotation == 'tuple[str, dict[str, str]]'
+        assert function_signature.return_annotation == "tuple[str, dict[str, str]]"

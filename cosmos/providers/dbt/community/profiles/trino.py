@@ -45,7 +45,8 @@ trino_profile = {
 
 
 def create_profile_vars_kerberos(
-    conn: Connection, common_profile_vars: dict[str, str],
+    conn: Connection,
+    common_profile_vars: dict[str, str],
 ) -> dict[str, str]:
     """
     Key tab is not supported by the Trino Airflow connection, in dbt it's set as an env var.
@@ -76,33 +77,34 @@ def create_profile_vars_kerberos(
     common_profile_vars["TRINO_KRB5_CONFIG"] = krb5_config
     common_profile_vars["TRINO_PRINCIPAL"] = principal
     # Optional fields
-    common_profile_vars["TRINO_SERVICE_NAME"] = str(extra_dejson.get(
-        "kerberos__service_name"
-    ))
-    common_profile_vars["TRINO_MUTUAL_AUTHENTICATION"] = str(extra_dejson.get(
-        "kerberos__mutual_authentication"
-    ))
-    common_profile_vars["TRINO_FORCE_PREEMPTIVE"] = str(extra_dejson.get(
-        "kerberos__force_preemptive"
-    ))
-    common_profile_vars["TRINO_HOSTNAME_OVERRIDE"] = str(extra_dejson.get(
-        "kerberos__hostname_override"
-    ))
-    common_profile_vars["TRINO_SANITIZE_MUTUAL_ERROR_RESPONSE"] = str(extra_dejson.get(
-        "kerberos__sanitize_mutual_error_response"
-    ))
-    common_profile_vars["TRINO_DELEGATE"] = str(extra_dejson.get(
-        "kerberos__delegate"))
+    common_profile_vars["TRINO_SERVICE_NAME"] = str(
+        extra_dejson.get("kerberos__service_name")
+    )
+    common_profile_vars["TRINO_MUTUAL_AUTHENTICATION"] = str(
+        extra_dejson.get("kerberos__mutual_authentication")
+    )
+    common_profile_vars["TRINO_FORCE_PREEMPTIVE"] = str(
+        extra_dejson.get("kerberos__force_preemptive")
+    )
+    common_profile_vars["TRINO_HOSTNAME_OVERRIDE"] = str(
+        extra_dejson.get("kerberos__hostname_override")
+    )
+    common_profile_vars["TRINO_SANITIZE_MUTUAL_ERROR_RESPONSE"] = str(
+        extra_dejson.get("kerberos__sanitize_mutual_error_response")
+    )
+    common_profile_vars["TRINO_DELEGATE"] = str(extra_dejson.get("kerberos__delegate"))
     # Not sure if this is supposed to be a file or not.
     # https://github.com/trinodb/trino-python-client/blob/0.321.0/trino/auth.py#L84
-    common_profile_vars["TRINO_CA_BUNDLE"] = str(extra_dejson.get(
-        "kerberos__ca_bundle"))
+    common_profile_vars["TRINO_CA_BUNDLE"] = str(
+        extra_dejson.get("kerberos__ca_bundle")
+    )
 
     return common_profile_vars
 
 
 def create_profile_vars_ldap(
-    conn: Connection, common_profile_vars: dict[str, str],
+    conn: Connection,
+    common_profile_vars: dict[str, str],
 ) -> dict[str, str]:
     """
     All we need here is a user and password.
@@ -129,8 +131,7 @@ def create_profile_vars_certs(
     cert_path = Path(str(extra_dejson.get("certs__client_cert_path")))
     key_path = Path(str(extra_dejson.get("certs__client_key_path")))
     if not cert_path.exists():
-        raise ValueError(
-            f"certs__client_cert_path: {cert_path} does not exist")
+        raise ValueError(f"certs__client_cert_path: {cert_path} does not exist")
     if not key_path.exists():
         raise ValueError(f"certs__client_key_path: {key_path} does not exist")
     common_profile_vars["TRINO_CLIENT_CERTIFICATE"] = str(cert_path)

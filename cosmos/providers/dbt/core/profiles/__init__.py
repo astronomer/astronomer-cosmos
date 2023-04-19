@@ -41,7 +41,7 @@ class AdapterConfig:
     profile_name: str
     profile: dict[str, str]
     create_profile_function: Callable[
-        ["Connection", Optional[str], Optional[str]], tuple[str, dict[str, str]]
+        [Connection, Optional[str], Optional[str]], tuple[str, dict[str, str]]
     ]
 
 

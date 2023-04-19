@@ -160,6 +160,7 @@ class DbtModel:
         # set the config and set the parsed file flag to true
         self.config = config
 
+    # TODO following needs coverage:
     def _extract_config(self, kwarg, config_name: str):
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:
@@ -180,6 +181,7 @@ class DbtModel:
                 )
                 pass
 
+    # TODO: following needs coverage:
     def __repr__(self) -> str:
         """
         Returns the string representation of the model.

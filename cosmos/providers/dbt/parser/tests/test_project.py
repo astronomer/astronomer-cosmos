@@ -1,4 +1,8 @@
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+import pytest
+import yaml
 
 from cosmos.providers.dbt.parser.project import DbtModelType, DbtProject
 
@@ -52,3 +56,56 @@ def test_dbtproject__handle_sql_file_snapshot():
     assert raw_customers.name == "orders"
     assert raw_customers.type == DbtModelType.DBT_MODEL
     assert raw_customers.path == SAMPLE_SNAPSHOT_SQL_PATH
+
+
+def test_dbtproject__handle_config_file_empty_file():
+    with NamedTemporaryFile("w") as tmp_fp:
+        tmp_fp.flush()
+        sample_config_file_path = Path(tmp_fp.name)
+
+        dbt_project = DbtProject(project_name="empty_project")
+        assert not dbt_project.models
+        dbt_project._handle_config_file(sample_config_file_path)
+        assert not dbt_project.models
+
+
+def test_dbtproject__handle_config_file_with_unknown_name():
+    yaml_data = {"models": [{"name": "unknown"}]}
+    with NamedTemporaryFile("w") as tmp_fp:
+        yaml.dump(yaml_data, tmp_fp)
+        tmp_fp.flush()
+
+        sample_config_file_path = Path(tmp_fp.name)
+        dbt_project = DbtProject(project_name="empty_project")
+        assert not dbt_project.models
+        dbt_project._handle_config_file(sample_config_file_path)
+        assert not dbt_project.models
+
+
+@pytest.mark.parametrize(
+    "input_tags,expected_config_selectors",
+    [
+        ("some_tag", {"materialized:view", "tags:some_tag"}),
+        (["tag1", "tag2"], {"materialized:view", "tags:tag1", "tags:tag2"}),
+    ],
+)
+def test_dbtproject__handle_config_file_with_selector(
+    input_tags, expected_config_selectors
+):
+    dbt_project = DbtProject(
+        project_name="jaffle_shop",
+        dbt_root_path=DBT_PROJECT_PATH,
+    )
+    assert dbt_project.models["orders"].config.config_selectors == {"materialized:view"}
+
+    with NamedTemporaryFile("w") as tmp_fp:
+        yaml_data = {"models": [{"name": "orders", "config": {"tags": input_tags}}]}
+        yaml.dump(yaml_data, tmp_fp)
+        tmp_fp.flush()
+
+        sample_config_file_path = Path(tmp_fp.name)
+        dbt_project._handle_config_file(sample_config_file_path)
+        assert (
+            dbt_project.models["orders"].config.config_selectors
+            == expected_config_selectors
+        )

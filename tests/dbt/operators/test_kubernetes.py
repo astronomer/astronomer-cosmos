@@ -51,7 +51,8 @@ def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -
         "retries": 3,
         ("tuple", "key"): "some_value",
     }
-    p_context_to_airflow_vars.return_value = {"START_DATE": "2023-02-15 12:30:00"}
+    p_context_to_airflow_vars.return_value = {
+        "START_DATE": "2023-02-15 12:30:00"}
     env = dbt_kube_operator.get_env(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
         profile_vars={
@@ -104,7 +105,8 @@ def test_dbt_kubernetes_build_command():
     command is built correctly and added to the "arguments" parameter.
     """
     for command_name, command_operator in result_map.items():
-        command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+        command_operator.build_kube_args(
+            context=MagicMock(), cmd_flags=MagicMock())
         assert command_operator.arguments == [
             "dbt",
             command_name,
@@ -116,7 +118,7 @@ def test_dbt_kubernetes_build_command():
 
 
 @patch(
-    "airflow.providers.cncf.kubernetes.operators.kubernetes_pod.KubernetesPodOperator.hook"
+    "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook"
 )
 def test_created_pod(test_hook):
     test_hook.is_in_cluster = False

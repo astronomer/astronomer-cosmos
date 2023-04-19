@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Optional
 
 from cosmos.providers.dbt.community.profiles.exasol import (
     create_profile_vars_exasol,
@@ -37,13 +39,13 @@ if TYPE_CHECKING:
 @dataclass
 class AdapterConfig:
     profile_name: str
-    profile: Dict[str, str]
+    profile: dict[str, str]
     create_profile_function: Callable[
-        ["Connection", Optional[str], Optional[str]], Tuple[str, Dict[str, str]]
+        ["Connection", Optional[str], Optional[str]], tuple[str, dict[str, str]]
     ]
 
 
-def get_available_adapters() -> Dict[str, AdapterConfig]:
+def get_available_adapters() -> dict[str, AdapterConfig]:
     return {
         "postgres": AdapterConfig(
             "postgres_profile", postgres_profile, create_profile_vars_postgres

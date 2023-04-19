@@ -289,9 +289,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "deps"
-
-    def execute(self, context: Context):
-        result = self.build_and_run_cmd(context=context)
-        return result.output
+        raise DeprecationWarning(
+            "The DbtDepsOperator has been deprecated. "
+            "Please use the `install_deps` flag in dbt_args instead."
+        )

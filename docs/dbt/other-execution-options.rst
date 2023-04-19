@@ -1,7 +1,20 @@
 Other execution options
 =======================
 
-Follow the instructions below to setup your environment as a reference for the operator(s) you would need to use in your DAG.
+Follow the instructions below to setup your environment as a reference for the operator(s) you would need to use in your DAG. Note that you may need to install optional dependencies depending on the operator you choose.
+
+For Kubernetes, you will need to install the ``kubernetes`` extra:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[..., kubernetes]'
+
+For Docker, you will need to install the ``docker`` extra:
+
+.. code-block:: bash
+
+    pip install 'astronomer-cosmos[..., docker]'
+
 
 Kubernetes operators
 --------------------

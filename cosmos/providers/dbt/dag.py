@@ -21,6 +21,7 @@ class DbtDag(CosmosDag):
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The path to the dbt root directory
     :param dbt_models_dir: The path to the dbt models directory within the project
+    :param dbt_seeds_dir: The path to the dbt seeds directory within the project
     :param conn_id: The Airflow connection ID to use for the dbt profile
     :param dbt_args: Parameters to pass to the underlying dbt operators, can include dbt_executable_path to utilize venv
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
@@ -46,6 +47,7 @@ class DbtDag(CosmosDag):
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dbt",
         dbt_models_dir: str = "models",
+        dbt_seeds_dir: str = "seeds",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
@@ -65,6 +67,7 @@ class DbtDag(CosmosDag):
             dbt_project_name=dbt_project_name,
             dbt_root_path=dbt_root_path,
             dbt_models_dir=dbt_models_dir,
+            dbt_seeds_dir=dbt_seeds_dir,
             task_args=dbt_args,
             operator_args=operator_args,
             test_behavior=test_behavior,

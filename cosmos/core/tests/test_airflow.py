@@ -1,5 +1,6 @@
 """Tests for the Airflow integration."""
 from __future__ import annotations
+
 from airflow.models.baseoperator import BaseOperator
 from airflow.models.taskmixin import DAGNode
 
@@ -14,6 +15,7 @@ from airflow.models import DAG
 
 from cosmos.core.airflow import CosmosDag, CosmosTaskGroup
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
+
 
 def get_tasks(dag_node: DAGNode) -> list[BaseOperator]:
     """

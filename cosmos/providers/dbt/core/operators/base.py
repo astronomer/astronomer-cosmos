@@ -213,7 +213,7 @@ class DbtBaseOperator(BaseOperator):
         if cmd_flags:
             dbt_cmd.extend(cmd_flags)
         # add profile
-        if not self.profile and handle_profile:
+        if handle_profile:
             create_default_profiles(DBT_PROFILE_PATH)
             profile, profile_vars = map_profile(
                 conn_id=self.conn_id,

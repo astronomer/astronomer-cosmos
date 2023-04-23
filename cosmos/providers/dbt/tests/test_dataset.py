@@ -4,9 +4,9 @@ Tests Dataset export override
 import sys
 from unittest import mock
 
+import airflow
 import pytest
 
-import airflow
 
 @pytest.fixture(autouse=False)
 def reset_dataset_import() -> None:

@@ -6,11 +6,7 @@ from unittest import mock
 
 import pytest
 
-<<<<<<< HEAD
-=======
 import airflow
-
->>>>>>> cb8e324 (update datasets)
 
 @pytest.fixture(autouse=False)
 def reset_dataset_import() -> None:

@@ -19,18 +19,19 @@ jobs:
         airflow-version: ["2.3", "2.4", "2.5"]
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+      
+      - name: Install Airflow
 
       - name: Install packages and dependencies
         run: |
           python -m pip install .[tests,docker,kubernetes]
           python -m pip install "apache-airflow==${{ matrix.airflow-version }}"
           python -m pip list
-        with:
-          airflow-version: ${{ matrix.airflow-version }}
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |

@@ -12,8 +12,5 @@ except ImportError:
             self.id = id
             logger.warning("Datasets are not supported in Airflow < 2.5.0")
 
-        def __call__(self, *args, **kwargs):
-            return self
-
         def __eq__(self, other) -> bool:
             return self.id == other.id

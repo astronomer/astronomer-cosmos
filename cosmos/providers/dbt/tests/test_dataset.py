@@ -6,6 +6,10 @@ from unittest import mock
 
 import pytest
 
+<<<<<<< HEAD
+=======
+import airflow
+>>>>>>> cb8e324 (update datasets)
 
 @pytest.fixture(autouse=False)
 def reset_dataset_import() -> None:
@@ -24,12 +28,22 @@ def test_failed_dataset_import(reset_dataset_import: None) -> None:
     with mock.patch.dict(sys.modules, {"airflow.datasets": None}):
         from cosmos.providers.dbt.dataset import Dataset
 
-        print(Dataset)
-
         assert Dataset.cosmos_override is True
         assert Dataset.__module__ == "cosmos.providers.dbt.dataset"
 
+        dataset = Dataset("my_dataset")
+        assert dataset.id == "my_dataset"
 
+        dataset_two = Dataset("my_dataset")
+        assert dataset_two.id == "my_dataset"
+
+        assert dataset == dataset_two
+
+
+@pytest.mark.skipif(
+    airflow.__version__ < "2.5.0",
+    reason="This test only applies to Airflow 2.5.0 and above",
+)
 def test_successful_dataset_import() -> None:
     """
     Test that you can still import the Dataset class even if Airflow <= 2.5 is installed.

@@ -1,11 +1,11 @@
 """
 Tests Dataset export override
 """
-import importlib
 import sys
 from unittest import mock
 
 import pytest
+
 
 @pytest.fixture(autouse=False)
 def reset_dataset_import() -> None:
@@ -21,10 +21,9 @@ def test_failed_dataset_import(reset_dataset_import: None) -> None:
     """
     Test that you can still import the Dataset class even if Airflow <= 2.5 is installed.
     """
-    with mock.patch.dict(
-        sys.modules, {"airflow.datasets": None}
-    ):
+    with mock.patch.dict(sys.modules, {"airflow.datasets": None}):
         from cosmos.providers.dbt.dataset import Dataset
+
         print(Dataset)
 
         assert Dataset.cosmos_override is True

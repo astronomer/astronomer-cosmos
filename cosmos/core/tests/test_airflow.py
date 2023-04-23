@@ -1,5 +1,7 @@
 """Tests for the Airflow integration."""
 from __future__ import annotations
+from airflow.models.baseoperator import BaseOperator
+from airflow.models.taskmixin import DAGNode
 
 try:
     from typing import TypedDict
@@ -12,6 +14,23 @@ from airflow.models import DAG
 
 from cosmos.core.airflow import CosmosDag, CosmosTaskGroup
 from cosmos.core.graph.entities import CosmosEntity, Group, Task
+
+def get_tasks(dag_node: DAGNode) -> list[BaseOperator]:
+    """
+    Get a list of all tasks in a DAGNode.
+    """
+    tasks = []
+    if isinstance(dag_node, BaseOperator):
+        tasks.append(dag_node)
+    elif isinstance(dag_node, DAG):
+        tasks.extend(dag_node.tasks)
+    elif isinstance(dag_node, CosmosTaskGroup):
+        for task in dag_node.children.values():
+            tasks.extend(get_tasks(task))
+    else:
+        raise TypeError(f"Unknown type: {type(dag_node)}")
+
+    return tasks
 
 
 def simple_group() -> Group:
@@ -208,11 +227,13 @@ def test_cosmos_dag_and_task_group(
             cosmos_group=group,
         )
 
+    tasks = get_tasks(task_group)
+
     # basic task group checks
     assert task_group.group_id == group.id
-    assert len(list(task_group.iter_tasks())) == num_tasks
+    assert len(tasks) == num_tasks
 
-    for tg_task in task_group.iter_tasks():
+    for tg_task in tasks:
         task_id = tg_task.task_id.split(".")[-1]
         cosmos_task = expected[task_id]
 

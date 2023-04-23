@@ -31,3 +31,8 @@ jobs:
       - name: Test Cosmos
         run: |
           pytest --doctest-modules --durations=10 --pyargs .
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -33,7 +33,7 @@ jobs:
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
-          pytest --doctest-modules --durations=10 --pyargs --cov cosmos/
+          pytest --doctest-modules --durations=10 --pyargs --cov=cosmos/ cosmos/
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

@@ -197,6 +197,7 @@ def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
     airflow_connection.host = host
     airflow_connection.login = login
     airflow_connection.password = password
+    airflow_connection.schema = database
     airflow_connection.port = port
 
     expected_profile_vars = {
@@ -210,6 +211,41 @@ def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
 
     profile, profile_vars = create_profile_vars_postgres(
         airflow_connection, database, schema
+    )
+    assert profile == "postgres_profile"
+    assert profile_vars == expected_profile_vars
+
+
+def test_create_profile_vars_postgres_no_database(
+    airflow_connection: Connection,
+) -> None:
+    """
+    Test that create_profile_vars_postgres uses the schema as the database if no database is provided
+    """
+    # postgres variables
+    host = "my-hostname.com"
+    login = "my-user"
+    database = "reporting"
+    schema = "jaffle_shop"
+    password = "abcdef12345"
+    port = 5432
+    airflow_connection.host = host
+    airflow_connection.login = login
+    airflow_connection.password = password
+    airflow_connection.schema = database
+    airflow_connection.port = port
+
+    expected_profile_vars = {
+        "POSTGRES_HOST": host,
+        "POSTGRES_USER": login,
+        "POSTGRES_PASSWORD": password,
+        "POSTGRES_DATABASE": database,
+        "POSTGRES_PORT": str(port),
+        "POSTGRES_SCHEMA": schema,
+    }
+
+    profile, profile_vars = create_profile_vars_postgres(
+        airflow_connection, None, schema
     )
     assert profile == "postgres_profile"
     assert profile_vars == expected_profile_vars

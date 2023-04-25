@@ -17,7 +17,6 @@ spark_profile = {
             "method": "{{ env_var('SPARK_METHOD', 'thrift') }}",
             "port": "{{ env_var('SPARK_PORT') | as_number }}",
             "schema": "{{ env_var('SPARK_SCHEMA') }}",
-            "threads": "{{ env_var('SPARK_THREADS') | as_number }}",
             "user": "{{ env_var('SPARK_USER') }}",
         }
     },
@@ -50,7 +49,6 @@ def create_profile_vars_spark_thrift(
         "SPARK_METHOD": "thrift",
         "SPARK_PORT": str(conn.port),
         "SPARK_SCHEMA": schema,
-        "SPARK_THREADS": str(conn.extra_dejson.get("threads", 3)),
     }
 
     return "spark_profile", profile_vars

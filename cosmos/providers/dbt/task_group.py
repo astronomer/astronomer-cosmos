@@ -43,7 +43,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         dbt_args: Dict[str, Any] = {},
         operator_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
-        dbt_root_path: str = "/usr/local/airflow/dbt",
+        dbt_root_path: str = "/usr/local/airflow/dags/dbt",
         dbt_models_dir: str = "models",
         dbt_snapshots_dir: str = "snapshots",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",

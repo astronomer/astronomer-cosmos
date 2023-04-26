@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push: # Run on pushes to the default branch
+    branches: [main]
+  pull_request: # Run on pull requests targeting the default branch
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  default:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        airflow-version: ["2.3", "2.4", "2.5"]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install .[tests,docker,kubernetes]
+          python -m pip install "apache-airflow==${{ matrix.airflow-version }}"
+          python -m pip list
+
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
+        run: |
+          pytest --doctest-modules --durations=10 --pyargs --cov=cosmos/ cosmos/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

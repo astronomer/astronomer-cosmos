@@ -4,18 +4,24 @@ import logging
 from typing import Sequence
 
 import yaml
-from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
-    convert_env_vars,
-)
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
-    KubernetesPodOperator,
-)
 from airflow.utils.context import Context
-from kubernetes.client import models as k8s
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 
 logger = logging.getLogger(__name__)
+
+# kubernetes is an optional dependency, so we need to check if it's installed
+try:
+    from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
+        convert_env_vars,
+    )
+    from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+    from kubernetes.client import models as k8s
+except ImportError:
+    raise ImportError(
+        "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
+        "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
+    )
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):

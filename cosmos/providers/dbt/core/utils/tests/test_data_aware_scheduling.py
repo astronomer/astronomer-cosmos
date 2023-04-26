@@ -1,7 +1,7 @@
 import pytest
-from airflow.models.dataset import Dataset
 
 from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
+from cosmos.providers.dbt.dataset import Dataset
 
 
 @pytest.mark.parametrize(

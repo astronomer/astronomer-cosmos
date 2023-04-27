@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import fcntl
 import logging
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
-import pkg_resources
 import yaml
 from airflow.exceptions import AirflowNotFoundException
 from airflow.hooks.base import BaseHook
@@ -14,6 +15,15 @@ from cosmos.providers.dbt.core.profiles import get_available_adapters
 logger = logging.getLogger(__name__)
 
 
+def cosmos_version() -> str:
+    """
+    Returns the current version of astronomer-cosmos.
+    """
+    import cosmos
+
+    return cosmos.__version__
+
+
 def create_default_profiles(profile_path: Path) -> None:
     """
     Write all the available profiles out to the profile path.
@@ -21,15 +31,11 @@ def create_default_profiles(profile_path: Path) -> None:
     :return: Nothing
     """
     # get installed version of astronomer-cosmos
-    try:
-        package = pkg_resources.get_distribution("astronomer-cosmos")
-    except pkg_resources.DistributionNotFound:
-        package = None
     profiles = {}
     for adapter_config in get_available_adapters().values():
         profiles[adapter_config.profile_name] = adapter_config.profile
     write_file = False
-    package_comment_line = f"# {package}\n"
+    package_comment_line = f"# astronomer-cosmos {cosmos_version()}\n"
     if profile_path.exists():
         # check the version of cosmos when it was created
         with open(profile_path) as f:
@@ -54,7 +60,7 @@ def map_profile(
     conn_id: str,
     db_override: Optional[str] = None,
     schema_override: Optional[str] = None,
-) -> Tuple[str, dict]:
+) -> tuple[str, dict[str, str]]:
     conn = BaseHook().get_connection(conn_id)
     connection_type = conn.conn_type
     adapters = get_available_adapters()

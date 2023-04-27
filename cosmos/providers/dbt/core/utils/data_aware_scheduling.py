@@ -1,4 +1,4 @@
-from airflow.models.dataset import Dataset
+from cosmos.providers.dbt.dataset import Dataset
 
 
 def get_dbt_dataset(connection_id: str, project_name: str, model_name: str):

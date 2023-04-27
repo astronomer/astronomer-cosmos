@@ -1,9 +1,7 @@
 import inspect
 import json
 import os
-import typing
 from pathlib import Path
-from time import sleep
 from typing import Generator, Optional
 from unittest.mock import MagicMock, patch
 
@@ -47,29 +45,25 @@ def test_create_default_profiles_exist(tmp_path: Path) -> None:
     """
     profile_file = tmp_path.joinpath("profiles.yml")
     create_default_profiles(profile_file)
-    sleep(1)
     created_time = os.path.getctime(profile_file)
     create_default_profiles(profile_file)
     modified_time = os.path.getmtime(profile_file)
     assert created_time == modified_time
 
 
-@patch(
-    "cosmos.providers.dbt.core.utils.profiles_generator.pkg_resources.get_distribution"
-)
+@patch("cosmos.providers.dbt.core.utils.profiles_generator.cosmos_version")
 def test_create_default_profiles_exist_library_update(
-    p_get_distribution: MagicMock, tmp_path: Path
+    cosmos_version: MagicMock, tmp_path: Path
 ) -> None:
     """
     If the version of astronomer-cosmos has been updated then we ensure that the profiles are re-written.
     """
-    p_get_distribution.side_effect = [
-        "astronomer-cosmos 0.3.2",
-        "astronomer-cosmos 0.4.0",
+    cosmos_version.side_effect = [
+        "0.0.1",
+        "0.0.2",
     ]
     profile_file = tmp_path.joinpath("profiles.yml")
     create_default_profiles(profile_file)
-    sleep(1)
     created_time = os.path.getctime(profile_file)
     create_default_profiles(profile_file)
     modified_time = os.path.getmtime(profile_file)
@@ -167,9 +161,7 @@ def random_connection(
     yield airflow_connection
 
 
-def test_create_profile_vars_databricks(
-    airflow_connection: Generator[Connection, None, None]
-) -> None:
+def test_create_profile_vars_databricks(airflow_connection: Connection) -> None:
     catalog = "my-catalog"
     host = "dbc-abcd123-1234.cloud.databricks.com"
     schema = "jaffle_shop"
@@ -205,19 +197,55 @@ def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
     airflow_connection.host = host
     airflow_connection.login = login
     airflow_connection.password = password
+    airflow_connection.schema = database
     airflow_connection.port = port
 
     expected_profile_vars = {
         "POSTGRES_HOST": host,
         "POSTGRES_USER": login,
         "POSTGRES_PASSWORD": password,
-        "POSTGRES_DATABASE": schema,
+        "POSTGRES_DATABASE": database,
         "POSTGRES_PORT": str(port),
         "POSTGRES_SCHEMA": schema,
     }
 
     profile, profile_vars = create_profile_vars_postgres(
         airflow_connection, database, schema
+    )
+    assert profile == "postgres_profile"
+    assert profile_vars == expected_profile_vars
+
+
+def test_create_profile_vars_postgres_no_database(
+    airflow_connection: Connection,
+) -> None:
+    """
+    Test that create_profile_vars_postgres uses the schema as the database if no database is provided
+    """
+    # postgres variables
+    host = "my-hostname.com"
+    login = "my-user"
+    database = "reporting"
+    schema = "jaffle_shop"
+    password = "abcdef12345"
+    port = 5432
+    airflow_connection.host = host
+    airflow_connection.login = login
+    airflow_connection.password = password
+    airflow_connection.schema = database
+    airflow_connection.port = port
+
+    expected_profile_vars = {
+        "POSTGRES_HOST": host,
+        "POSTGRES_USER": login,
+        "POSTGRES_PASSWORD": password,
+        "POSTGRES_DATABASE": database,
+        "POSTGRES_PORT": str(port),
+        "POSTGRES_SCHEMA": schema,
+    }
+
+    profile, profile_vars = create_profile_vars_postgres(
+        airflow_connection, None, schema
     )
     assert profile == "postgres_profile"
     assert profile_vars == expected_profile_vars
@@ -355,7 +383,7 @@ def test_create_profile_vars_redshift(airflow_connection: Connection) -> None:
         "REDSHIFT_PORT": str(port),
         "REDSHIFT_USER": login,
         "REDSHIFT_PASSWORD": password,
-        "REDSHIFT_DATABASE": schema,
+        "REDSHIFT_DATABASE": database,
         "REDSHIFT_SCHEMA": schema,
     }
 
@@ -453,7 +481,8 @@ def test_create_profile_vars_trino(airflow_connection: Connection) -> None:
         "TRINO_DATABASE": "delta",
         "TRINO_SCHEMA": schema,
         "TRINO_HOST": host,
-        "TRINO_PORT": port,
+        "TRINO_PORT": str(port),
+        "TRINO_AUTH_TYPE": "ldap",
     }
 
     profile, profile_vars = create_profile_vars_trino(
@@ -496,4 +525,4 @@ def test_get_available_adapters():
     for _, adapter_config in adapters.items():
         function_signature = inspect.signature(adapter_config.create_profile_function)
         assert len(function_signature.parameters) == 3
-        assert function_signature.return_annotation == typing.Tuple[str, dict]
+        assert function_signature.return_annotation == "tuple[str, dict[str, str]]"

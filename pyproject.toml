@@ -35,7 +35,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
-    "apache-airflow>=2.4",
+    "apache-airflow>=2.3.0",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
 ]
@@ -48,6 +48,7 @@ dbt-all = [
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
+    "dbt-spark",
     "astronomer-cosmos[dbt-openlineage]"
 ]
 dbt-bigquery = [
@@ -67,6 +68,9 @@ dbt-redshift = [
 ]
 dbt-snowflake = [
     "dbt-snowflake",
+]
+dbt-spark = [
+    "dbt-spark",
 ]
 dbt-openlineage = [
     "dbt-core",
@@ -113,8 +117,11 @@ include = [
     "/cosmos",
 ]
 
-[tool.hatch.envs.test]
-python = "3.7"
+######################################
+# TESTING
+######################################
+
+[tool.hatch.envs.tests]
 dependencies = [
     "pytest>=6.0",
     "pytest-split",
@@ -125,7 +132,29 @@ dependencies = [
     "types-requests",
     "mypy",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
+    "apache-airflow-providers-docker>=3.5.0",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
+
+[[tool.hatch.envs.tests.matrix]]
+python = ["3.7", "3.8", "3.9", "3.10"]
+airflow = ["2.3", "2.4", "2.5"]
+
+[tool.hatch.envs.tests.overrides]
+matrix.airflow.dependencies = [
+    { value = "apache-airflow==2.3", if = ["2.3"] },
+    { value = "apache-airflow==2.4", if = ["2.4"] },
+    { value = "apache-airflow==2.5", if = ["2.5"] },
+]
+
+[tool.hatch.envs.tests.scripts]
+freeze = "pip freeze"
+test = "pytest ."
+test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml ."
+
+######################################
+# DOCS
+######################################
 
 [tool.hatch.envs.docs]
 dependencies = [
@@ -139,6 +168,10 @@ dependencies = [
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html docs docs/_build"
 serve = "sphinx-autobuild docs docs/_build"
+
+######################################
+# THIRD PARTY TOOLS
+######################################
 
 [tool.isort]
 profile = "black"

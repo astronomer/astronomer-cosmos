@@ -115,9 +115,7 @@ def test_dbt_kubernetes_build_command():
         ]
 
 
-@patch(
-    "airflow.providers.cncf.kubernetes.operators.kubernetes_pod.KubernetesPodOperator.hook"
-)
+@patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
 def test_created_pod(test_hook):
     test_hook.is_in_cluster = False
     test_hook._get_namespace.return_value.to_dict.return_value = "foo"

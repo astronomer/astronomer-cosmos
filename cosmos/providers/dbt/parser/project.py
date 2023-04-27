@@ -151,6 +151,8 @@ class DbtModel:
 
         self.config = config
 
+
+    # TODO following needs coverage:
     def _extract_config(self, kwarg: Keyword, config_name: str):
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:

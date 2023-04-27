@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Optional
 
 from cosmos.providers.dbt.community.profiles.exasol import (
     create_profile_vars_exasol,
     exasol_profile,
+)
+from cosmos.providers.dbt.community.profiles.spark import (
+    create_profile_vars_spark_thrift,
+    spark_profile,
 )
 from cosmos.providers.dbt.community.profiles.trino import (
     create_profile_vars_trino,
@@ -37,13 +43,13 @@ if TYPE_CHECKING:
 @dataclass
 class AdapterConfig:
     profile_name: str
-    profile: Dict[str, str]
+    profile: dict[str, str]
     create_profile_function: Callable[
-        ["Connection", Optional[str], Optional[str]], Tuple[str, Dict[str, str]]
+        [Connection, Optional[str], Optional[str]], tuple[str, dict[str, str]]
     ]
 
 
-def get_available_adapters() -> Dict[str, AdapterConfig]:
+def get_available_adapters() -> dict[str, AdapterConfig]:
     return {
         "postgres": AdapterConfig(
             "postgres_profile", postgres_profile, create_profile_vars_postgres
@@ -67,5 +73,8 @@ def get_available_adapters() -> Dict[str, AdapterConfig]:
         ),
         "trino": AdapterConfig(
             "trino_profile", trino_profile, create_profile_vars_trino
+        ),
+        "spark": AdapterConfig(
+            "spark_profile", spark_profile, create_profile_vars_spark_thrift
         ),
     }

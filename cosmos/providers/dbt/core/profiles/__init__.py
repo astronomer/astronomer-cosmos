@@ -7,6 +7,10 @@ from cosmos.providers.dbt.community.profiles.exasol import (
     create_profile_vars_exasol,
     exasol_profile,
 )
+from cosmos.providers.dbt.community.profiles.spark import (
+    create_profile_vars_spark_thrift,
+    spark_profile,
+)
 from cosmos.providers.dbt.community.profiles.trino import (
     create_profile_vars_trino,
     trino_profile,
@@ -69,5 +73,8 @@ def get_available_adapters() -> dict[str, AdapterConfig]:
         ),
         "trino": AdapterConfig(
             "trino_profile", trino_profile, create_profile_vars_trino
+        ),
+        "spark": AdapterConfig(
+            "spark_profile", spark_profile, create_profile_vars_spark_thrift
         ),
     }

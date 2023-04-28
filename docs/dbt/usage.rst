@@ -74,6 +74,7 @@ Cosmos currently supports the following connection types.
 * postgres
 * redshift
 * snowflake
+* spark
 
 For specific details on the different connections please see below.
 
@@ -179,3 +180,15 @@ using `dbt_args = {"db_name": "my_catalog"}}`
 
 To provide a default Trino schema a.k.a database this will come from the Airflow connection schema or it can be provided/overriden
 using `dbt_args = {"schema": "my_schema"}}`
+
+Spark Thrift
+______
+
+Spark Thrift uses Airflow Spark JDBC connection.
+
+The schema name is determined in the following order.
+
+#. schema from dbt_args.
+#. schema from Airflow connection.
+
+schema and database is interchangeable in dbt-spark.

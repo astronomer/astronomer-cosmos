@@ -15,6 +15,12 @@
    :alt: pre-commit.ci status
 
 
+.. raw:: html
+  <h1 text-align="center">
+    Astronomer Cosmos
+  </h1>
+
+
 Astronomer Cosmos |fury| |ossrank| |downloads| |pre-commit|
 ===========================================================
 

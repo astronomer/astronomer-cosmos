@@ -1,7 +1,3 @@
-.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/banner.png
-  :align: center
-  :width: 50%
-
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
 
@@ -16,8 +12,10 @@
    :alt: pre-commit.ci status
 
 
-Cosmos |fury| |ossrank| |downloads| |pre-commit|
+🌌 Cosmos 
 ===========================================================
+
+|fury| |ossrank| |downloads| |pre-commit|
 
 A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
 

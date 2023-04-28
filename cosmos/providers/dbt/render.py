@@ -29,7 +29,7 @@ def calculate_operator_class(
 
 def render_project(
     dbt_project_name: str,
-    dbt_root_path: str = "/usr/local/airflow/dbt",
+    dbt_root_path: str = "/usr/local/airflow/dags/dbt",
     dbt_models_dir: str = "models",
     dbt_snapshots_dir: str = "snapshots",
     dbt_seeds_dir: str = "seeds",
@@ -46,7 +46,7 @@ def render_project(
     Turn a dbt project into a Group
 
     :param dbt_project_name: The name of the dbt project
-    :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dbt
+    :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dags/dbt
     :param task_args: Arguments to pass to the underlying dbt operators
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters

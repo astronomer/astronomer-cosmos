@@ -29,7 +29,7 @@ def calculate_operator_class(
 
 def render_project(
     dbt_project_name: str,
-    dbt_root_path: str = "/usr/local/airflow/dbt",
+    dbt_root_path: str = "/usr/local/airflow/dags/dbt",
     dbt_models_dir: str = "models",
     dbt_snapshots_dir: str = "snapshots",
     dbt_seeds_dir: str = "seeds",
@@ -47,7 +47,7 @@ def render_project(
     Turn a dbt project into a Group
 
     :param dbt_project_name: The name of the dbt project
-    :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dbt
+    :param dbt_root_path: The root path to your dbt folder. Defaults to /usr/local/airflow/dags/dbt
     :param task_args: Arguments to pass to the underlying dbt operators
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
@@ -119,10 +119,12 @@ def render_project(
                 continue
 
         if "configs" in select:
+            # TODO: coverme
             if not set(select["configs"]).intersection(model.config.config_selectors):
                 continue
 
         if "configs" in exclude:
+            # TODO: coverme
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
@@ -136,6 +138,7 @@ def render_project(
             if test_behavior == "after_each":
                 test_args["outlets"] = outlets
             else:
+                # TODO: coverme
                 run_args["outlets"] = outlets
 
         if model.type == DbtModelType.DBT_MODEL:
@@ -169,6 +172,7 @@ def render_project(
                 arguments=run_args,
             )
         else:
+            # TODO: coverme
             logger.error("Unknown DBT type.")
 
         # if test_behavior isn't "after_each", we can just add the task to the
@@ -218,7 +222,6 @@ def render_project(
                 logger.error(
                     f"Dependency {upstream_model_name} not found for model {model}"
                 )
-
     if test_behavior == "after_all":
         # make a test task
         test_task = Task(

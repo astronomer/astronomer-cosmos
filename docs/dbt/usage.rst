@@ -3,7 +3,7 @@ Usage
 
 Cosmos supports two standard way of rendering dbt projects: either as a full DAG or as a Task Group.
 
-By default, Cosmos will look in the ``/usr/local/airflow/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.providers.dbt.DbtDag` or :class:`cosmos.providers.dbt.DbtTaskGroup`. You can also override the default models directory, which is ``"models"`` by default, using the ``dbt_models_dir`` argument.
+By default, Cosmos will look in the ``/usr/local/airflow/dags/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.providers.dbt.DbtDag` or :class:`cosmos.providers.dbt.DbtTaskGroup`. You can also override the default models directory, which is ``"models"`` by default, using the ``dbt_models_dir`` argument.
 
 Rendering
 +++++++++
@@ -74,6 +74,7 @@ Cosmos currently supports the following connection types.
 * postgres
 * redshift
 * snowflake
+* spark
 
 For specific details on the different connections please see below.
 
@@ -179,3 +180,15 @@ using `dbt_args = {"db_name": "my_catalog"}}`
 
 To provide a default Trino schema a.k.a database this will come from the Airflow connection schema or it can be provided/overriden
 using `dbt_args = {"schema": "my_schema"}}`
+
+Spark Thrift
+______
+
+Spark Thrift uses Airflow Spark JDBC connection.
+
+The schema name is determined in the following order.
+
+#. schema from dbt_args.
+#. schema from Airflow connection.
+
+schema and database is interchangeable in dbt-spark.

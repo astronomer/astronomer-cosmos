@@ -160,6 +160,7 @@ class DbtModel:
         # set the config and set the parsed file flag to true
         self.config = config
 
+    # TODO following needs coverage:
     def _extract_config(self, kwarg, config_name: str):
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:
@@ -197,7 +198,7 @@ class DbtProject:
     project_name: str
 
     # optional, user-specified instance variables
-    dbt_root_path: str = "/usr/local/airflow/dbt"
+    dbt_root_path: str = "/usr/local/airflow/dags/dbt"
     dbt_models_dir: str = "models"
     dbt_snapshots_dir: str = "snapshots"
     dbt_seeds_dir: str = "seeds"

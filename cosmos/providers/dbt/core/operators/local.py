@@ -14,7 +14,7 @@ from airflow.hooks.subprocess import SubprocessResult
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.adapted_subprocesshook import SubprocessHook
+from cosmos.providers.dbt.core.utils.adapted_subprocesshook import FullOutputSubprocessHook
 from cosmos.providers.dbt.core.utils.warn_parsing import (
     extract_log_issues,
     parse_output,
@@ -43,7 +43,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     @cached_property
     def subprocess_hook(self):
         """Returns hook for running the bash command."""
-        return SubprocessHook()
+        return FullOutputSubprocessHook()
 
     def exception_handling(self, result: SubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:

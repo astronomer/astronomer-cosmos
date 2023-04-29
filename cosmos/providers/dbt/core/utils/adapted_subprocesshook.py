@@ -1,3 +1,7 @@
+# This hook has been refined from the Airflow SubprocessHook, offering an added functionality to the original.
+# It presents an alternative option to return the complete command output, as opposed to solely the last line from
+# stdout or stderr. This option proves to be highly beneficial for any text analysis that depends on the stdout or
+# stderr output of a dbt command.
 from __future__ import annotations
 
 import contextlib
@@ -14,7 +18,7 @@ SubprocessResult = namedtuple(
 )
 
 
-class SubprocessHook(BaseHook):
+class FullOutputSubprocessHook(BaseHook):
     """Hook for running processes with the ``subprocess`` module."""
 
     def __init__(self) -> None:

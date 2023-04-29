@@ -14,7 +14,9 @@ from airflow.hooks.subprocess import SubprocessResult
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
-from cosmos.providers.dbt.core.utils.adapted_subprocesshook import FullOutputSubprocessHook
+from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
+    FullOutputSubprocessHook,
+)
 from cosmos.providers.dbt.core.utils.warn_parsing import (
     extract_log_issues,
     parse_output,

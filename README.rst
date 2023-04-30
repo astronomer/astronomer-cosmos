@@ -13,7 +13,7 @@
 
 
 
-.. image:: ./docs/cosmos-logo.svg
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/cosmos-logo.svg
 
 
 ===========================================================
@@ -70,7 +70,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
 
 This will generate an Airflow Task Group that looks like this:
 
-.. image:: ./docs/jaffle_shop_task_group.png
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/jaffle_shop_task_group.png
 
 
 Changelog

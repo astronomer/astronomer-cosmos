@@ -88,6 +88,11 @@ Simiarly, you can render an Airflow Task Group using the ``DbtTaskGroup`` class.
 
         e1 >> dbt_tg >> e2
 
+This will generate an Airflow Task Group that looks like this:
+
+.. image:: ./docs/jaffle_shop_task_group.png
+
+
 Changelog
 _________
 

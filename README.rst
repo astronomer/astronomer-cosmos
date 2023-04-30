@@ -17,18 +17,13 @@
 
 
 ===========================================================
-
 |fury| |ossrank| |downloads| |pre-commit|
 
-A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
-
-Current support for:
- - dbt
-
-Coming soon:
- - Jupyter
- - Hex
- - And more...open an issue if you have a request!
+Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
+- Run dbt projects against Airflow connections instead of dbt profiles
+- Run tests immediately after a model is done to catch issues early
+- Utilize Airflow's data-aware scheduling to run models immediately after upstream ingestion
+- Turn each dbt model into a task/task group complete with retries, alerting, etc.
 
 Quickstart
 __________
@@ -36,10 +31,10 @@ __________
 Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_.
 
 
-Example Usage (dbt)
+Example Usage
 ___________________
 
-Cosmos lets you render dbt projects as Airflow DAGs and Task Groups. To render a DAG, import ``DbtDag`` and point it to your dbt project.
+To render your dbt project as a DAG, import ``DbtDag`` and point it to your dbt project.
 
 .. code-block:: python
 
@@ -58,7 +53,7 @@ Cosmos lets you render dbt projects as Airflow DAGs and Task Groups. To render a
         start_date=datetime(2022, 11, 27),
     )
 
-Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+Simiarly, you can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 

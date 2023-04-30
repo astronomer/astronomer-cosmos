@@ -12,7 +12,10 @@
    :alt: pre-commit.ci status
 
 
-🌌 Cosmos 
+
+.. image:: ./docs/cosmos-logo.svg
+
+
 ===========================================================
 
 |fury| |ossrank| |downloads| |pre-commit|

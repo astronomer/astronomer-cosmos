@@ -37,26 +37,7 @@ Check out the Quickstart guide on our `docs <https://astronomer.github.io/astron
 Example Usage
 ___________________
 
-To render your dbt project as a DAG, import ``DbtDag`` and point it to your dbt project.
-
-.. code-block:: python
-
-    from pendulum import datetime
-    from airflow import DAG
-    from cosmos.providers.dbt.dag import DbtDag
-
-    # dag for the project jaffle_shop
-    jaffle_shop = DbtDag(
-        dbt_project_name="jaffle_shop",
-        conn_id="airflow_db",
-        dbt_args={
-            "schema": "public",
-        },
-        dag_id="jaffle_shop",
-        start_date=datetime(2022, 11, 27),
-    )
-
-Simiarly, you can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 

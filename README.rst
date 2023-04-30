@@ -73,7 +73,7 @@ Simiarly, you can render an Airflow Task Group using the ``DbtTaskGroup`` class.
         schedule="@daily",
     ):
 
-        e1 = EmptyOperator(task_id="pre_dbt_workflow")
+        e1 = EmptyOperator(task_id="pre_dbt")
 
         dbt_tg = DbtTaskGroup(
             dbt_project_name="jaffle_shop",
@@ -83,7 +83,7 @@ Simiarly, you can render an Airflow Task Group using the ``DbtTaskGroup`` class.
             },
         )
 
-        e2 = EmptyOperator(task_id="post_dbt_workflow")
+        e2 = EmptyOperator(task_id="post_dbt")
 
         e1 >> dbt_tg >> e2
 

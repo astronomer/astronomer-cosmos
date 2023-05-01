@@ -1,6 +1,3 @@
-.. image:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/banner.png
-  :align: center
-
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
 
@@ -15,18 +12,21 @@
    :alt: pre-commit.ci status
 
 
-Astronomer Cosmos |fury| |ossrank| |downloads| |pre-commit|
+
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/cosmos-logo.svg
+
+
 ===========================================================
 
-A framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
+|fury| |ossrank| |downloads| |pre-commit|
 
-Current support for:
- - dbt
+Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
 
-Coming soon:
- - Jupyter
- - Hex
- - And more...open an issue if you have a request!
+- Run dbt projects against Airflow connections instead of dbt profiles
+- Native support for installing and running dbt in a virtual environment to avoid dependency conflicts with Airflow
+- Run tests immediately after a model is done to catch issues early
+- Utilize Airflow's data-aware scheduling to run models immediately after upstream ingestion
+- Turn each dbt model into a task/task group complete with retries, alerting, etc.
 
 Quickstart
 __________
@@ -34,29 +34,10 @@ __________
 Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_.
 
 
-Example Usage (dbt)
+Example Usage
 ___________________
 
-Cosmos lets you render dbt projects as Airflow DAGs and Task Groups. To render a DAG, import ``DbtDag`` and point it to your dbt project.
-
-.. code-block:: python
-
-    from pendulum import datetime
-    from airflow import DAG
-    from cosmos.providers.dbt.dag import DbtDag
-
-    # dag for the project jaffle_shop
-    jaffle_shop = DbtDag(
-        dbt_project_name="jaffle_shop",
-        conn_id="airflow_db",
-        dbt_args={
-            "schema": "public",
-        },
-        dag_id="jaffle_shop",
-        start_date=datetime(2022, 11, 27),
-    )
-
-Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 
@@ -73,10 +54,9 @@ Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class.
         schedule="@daily",
     ):
 
-        e1 = EmptyOperator(task_id="ingestion_workflow")
+        e1 = EmptyOperator(task_id="pre_dbt")
 
         dbt_tg = DbtTaskGroup(
-            group_id="dbt_tg",
             dbt_project_name="jaffle_shop",
             conn_id="airflow_db",
             dbt_args={
@@ -84,9 +64,14 @@ Simiarly, you can render an Airflow TaskGroups using the ``DbtTaskGroup`` class.
             },
         )
 
-        e2 = EmptyOperator(task_id="some_extraction")
+        e2 = EmptyOperator(task_id="post_dbt")
 
         e1 >> dbt_tg >> e2
+
+This will generate an Airflow Task Group that looks like this:
+
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/jaffle_shop_task_group.png
+
 
 Changelog
 _________

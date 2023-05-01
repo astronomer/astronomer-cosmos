@@ -13,8 +13,8 @@ from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
 
-SubprocessResult = namedtuple(
-    "SubprocessResult", ["exit_code", "output", "full_output"]
+FullOutputSubprocessResult = namedtuple(
+    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
 )
 
 
@@ -31,7 +31,7 @@ class FullOutputSubprocessHook(BaseHook):
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
-    ) -> SubprocessResult:
+    ) -> FullOutputSubprocessResult:
         """
         Execute the command.
 
@@ -97,7 +97,7 @@ class FullOutputSubprocessHook(BaseHook):
             )
             return_code: int = self.sub_process.returncode
 
-        return SubprocessResult(
+        return FullOutputSubprocessResult(
             exit_code=return_code, output=line, full_output=log_lines
         )
 

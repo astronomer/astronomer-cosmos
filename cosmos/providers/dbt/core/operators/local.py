@@ -10,9 +10,8 @@ from typing import Callable, Optional, Sequence
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessResult
 from airflow.utils.context import Context
-
+from collections import namedtuple
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
     FullOutputSubprocessHook,
@@ -24,6 +23,9 @@ from cosmos.providers.dbt.core.utils.warn_parsing import (
 
 logger = logging.getLogger(__name__)
 
+FullOutputSubprocessResult = namedtuple(
+    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
+)
 
 class DbtLocalBaseOperator(DbtBaseOperator):
     """
@@ -47,7 +49,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         """Returns hook for running the bash command."""
         return FullOutputSubprocessHook()
 
-    def exception_handling(self, result: SubprocessResult):
+    def exception_handling(self, result: FullOutputSubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
                 f"dbt command returned exit code {self.skip_exit_code}. Skipping."
@@ -61,7 +63,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self,
         cmd: list[str],
         env: dict[str, str],
-    ) -> SubprocessResult:
+    ) -> FullOutputSubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
@@ -95,7 +97,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def build_and_run_cmd(
         self, context: Context, cmd_flags: list[str] | None = None
-    ) -> SubprocessResult:
+    ) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         return self.run_command(cmd=dbt_cmd, env=env)
 
@@ -212,18 +214,18 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         self.on_warning_callback = on_warning_callback
 
     def _should_run_tests(
-        self, result: SubprocessResult, no_tests_message: str = "Nothing to do"
+        self, result: FullOutputSubprocessResult, no_tests_message: str = "Nothing to do"
     ) -> bool:
         """
         Check if any tests are defined to run in the DAG. If tests are defined
         and on_warning_callback is set, then function returns True.
 
-        :param result (SubprocessResult): The output from the build and run command.
+        :param result: The output from the build and run command.
         """
 
         return self.on_warning_callback and no_tests_message not in result.output
 
-    def _handle_warnings(self, result: SubprocessResult, context: Context) -> None:
+    def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
          on_warning_callback with the updated context.

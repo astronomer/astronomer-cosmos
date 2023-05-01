@@ -74,7 +74,7 @@ For example, the following code snippet shows how to send a Slack message when a
 
 When at least one WARN message is present, the function passed to ``on_warning_callback`` will be triggered. In the example above, the following message will be sent to Slack:
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/callback-slack.png
+.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/callback_slack.png
    :width: 600
 
 .. note::

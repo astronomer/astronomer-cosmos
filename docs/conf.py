@@ -44,8 +44,8 @@ html_css_files = [
 ]
 html_theme_options = {
     "logo": {
-        "image_light": "cosmos-logo.svg",
-        "image_dark": "cosmos-logo.svg",
+        "image_light": "cosmos-icon.svg",
+        "image_dark": "cosmos-icon.svg",
     },
     "footer_items": ["copyright"],
 }

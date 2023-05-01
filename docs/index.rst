@@ -1,6 +1,3 @@
-.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
-========================
-
 .. toctree::
    :hidden:
    :maxdepth: 2
@@ -11,34 +8,42 @@
    API Reference <autoapi/index>
    Contributing <contributing>
 
-.. note::
+.. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
+    :target: https://badge.fury.io/py/astronomer-cosmos
 
-   Cosmos is under active development. Please open an issue if you have any questions or feedback!
+.. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
+    :target: https://ossrank.com/p/2121-astronomer-cosmos
 
-Cosmos is a framework for dynamically generating `Apache Airflow <https://airflow.apache.org/>`_ DAGs from other tools and frameworks. Develop your workflow in your tool of choice and render it in Airflow as a DAG or Task Group!
+.. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos.svg
+    :target: https://img.shields.io/pypi/dm/astronomer-cosmos
 
-Current support for:
- - dbt
+.. |pre-commit| image:: https://results.pre-commit.ci/badge/github/astronomer/astronomer-cosmos/main.svg
+   :target: https://results.pre-commit.ci/latest/github/astronomer/astronomer-cosmos/main
+   :alt: pre-commit.ci status
 
-Coming soon:
- - Jupyter
- - Hex
- - And more...open an issue if you have a request!
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
+===========================================================
+
+|fury| |ossrank| |downloads| |pre-commit|
+
+Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
+
+- Run dbt projects against Airflow connections instead of dbt profiles
+- Native support for installing and running dbt in a virtual environment to avoid dependency conflicts with Airflow
+- Run tests immediately after a model is done to catch issues early
+- Utilize Airflow's data-aware scheduling to run models immediately after upstream ingestion
+- Turn each dbt model into a task/task group complete with retries, alerting, etc.
 
 Quickstart
-========================
+__________
 
-dbt
-____________________
-
-Install the package:
-
-.. code-block:: bash
-
-    pip install astronomer-cosmos[dbt-all]
+Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_.
 
 
-Create a DAG and import the ``DbtTaskGroup`` operator. The ``DbtTaskGroup`` operator requires a the name of your dbt project, an Airflow connection ID, a schema, and any additional arguments you'd like to pass to dbt.
+Example Usage
+___________________
+
+You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
 .. code-block:: python
 
@@ -53,12 +58,11 @@ Create a DAG and import the ``DbtTaskGroup`` operator. The ``DbtTaskGroup`` oper
         dag_id="extract_dag",
         start_date=datetime(2022, 11, 27),
         schedule="@daily",
-    ) as dag:
+    ):
 
-        e1 = EmptyOperator(task_id="ingestion_workflow")
+        e1 = EmptyOperator(task_id="pre_dbt")
 
         dbt_tg = DbtTaskGroup(
-            group_id="dbt_tg",
             dbt_project_name="jaffle_shop",
             conn_id="airflow_db",
             dbt_args={
@@ -66,33 +70,34 @@ Create a DAG and import the ``DbtTaskGroup`` operator. The ``DbtTaskGroup`` oper
             },
         )
 
-        e2 = EmptyOperator(task_id="some_extraction")
+        e2 = EmptyOperator(task_id="post_dbt")
 
         e1 >> dbt_tg >> e2
 
+This will generate an Airflow Task Group that looks like this:
 
-The ``DbtTaskGroup`` operator will automatically generate a TaskGroup with the tasks defined in your dbt project. Here's what the DAG looks like in the Airflow UI:
-
-
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/dbt_dag.png
-   :width: 800
-
-   dbt's default jaffle_shop project rendered as a TaskGroup in Airflow
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/jaffle_shop_task_group.png
 
 
-Principles
-========================
+Changelog
+_________
 
-`Astronomer Cosmos` is a package to parse and render third-party workflows as Airflow DAGs, `Airflow TaskGroups <https://docs.astronomer.io/learn/task-groups>`_, or individual tasks.
+We follow `Semantic Versioning <https://semver.org/>`_ for releases.
+Check `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
+for the latest changes.
 
-Cosmos contains `providers` for third-party tools, and each `provider` can be deconstructed into the following components:
+Contributing Guide
+__________________
 
-- ``parsers``: These are mostly hidden from the end user and are responsible for extracting the workflow from the provider and converting it into ``Task`` and ``Group`` objects. These are executed whenever the Airflow Scheduler heartbeats, allowing us to dynamically render the dependency graph of the workflow.
-- ``operators``: These represent the "user interface" of Cosmos -- lightweight classes the user can import and implement in their DAG to define their target behavior. They are responsible for executing the tasks in the workflow.
+All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
 
-Cosmos operates on a few guiding principles:
+A detailed overview an how to contribute can be found in the `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/contributing>`_.
 
-- **Dynamic**: Cosmos generates DAGs dynamically, meaning that the dependency graph of the workflow is generated at runtime. This allows users to update their workflows without having to restart Airflow.
-- **Flexible**: Cosmos is not opinionated in that it does not enforce a specific rendering method for third-party systems; users can decide whether they'd like to render their workflow as a DAG, TaskGroup, or individual task.
-- **Extensible**: Cosmos is designed to be extensible. Users can add their own parsers and operators to support their own workflows.
-- **Modular**: Cosmos is designed to be modular. Users can install only the dependencies they need for their workflows.
+As contributors and maintainers to this project, you are expected to abide by the
+`Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
+
+
+License
+_______
+
+`Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_

@@ -32,15 +32,17 @@ Warn Notification
 Cosmos enables you to receive warning notifications from tests and process them using a callback function.
 The ``on_warning_callback`` parameter adds two extra context variables to the callback function: ``test_names`` and ``test_results``.
 ``test_names`` contains the names of the tests that generated a warning, while ``test_results`` holds the corresponding test results
-at the same index. Both are List of strings.
-Example:
+at the same index. Both the ``test_names`` and ``test_results`` variables are lists of strings.
+
+For example, the following code snippet shows how to send a Slack message when a warning occurs:
 
 .. code-block:: python
 
    from cosmos.providers.dbt import DbtDag
    from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
+   from airflow.utils.context import Context
 
-    def warning_callback_func(context):
+    def warning_callback_func(context: Context):
         tests = context.get('test_names')
         results = context.get('test_results')
 
@@ -70,8 +72,7 @@ Example:
         on_warning_callback=warning_callback_func,
     )
 
-When at least one WARN message is present, the function passed to ``on_warning_callback`` will be triggered
-and the following message will be sent to Slack in the example above:
+When at least one WARN message is present, the function passed to ``on_warning_callback`` will be triggered. In the example above, the following message will be sent to Slack:
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/callback-slack.png
    :width: 600

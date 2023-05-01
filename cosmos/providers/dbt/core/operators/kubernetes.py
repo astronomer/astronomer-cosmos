@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from typing import Callable, Optional, Sequence
 
 import yaml
 from airflow.utils.context import Context
@@ -147,9 +147,13 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self, on_warning_callback: Optional[Callable] = None, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
+        # as of now, on_warning_callback in kubernetes executor does nothing
+        self.on_warning_callback = on_warning_callback
 
     def execute(self, context: Context):
         return self.build_and_run_cmd(context=context)

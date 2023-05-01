@@ -9,7 +9,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from airflow.exceptions import AirflowException
 
@@ -41,6 +41,7 @@ def render_project(
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
     execution_mode: Literal["local", "docker", "kubernetes"] = "local",
+    on_warning_callback: Optional[Callable] = None,
 ) -> Group:
     """
     Turn a dbt project into a Group
@@ -59,6 +60,8 @@ def render_project(
     :param execution_mode: The execution mode in which the dbt project should be run.
         Options are "local", "docker", and "kubernetes".
         Defaults to "local"
+     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+        and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
     # first, get the dbt project
     project = DbtProject(
@@ -127,7 +130,8 @@ def render_project(
 
         run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
         test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
-
+        # DbtTestOperator specific arg
+        test_args["on_warning_callback"] = on_warning_callback
         if emit_datasets:
             outlets = [get_dbt_dataset(conn_id, dbt_project_name, model_name)]
 

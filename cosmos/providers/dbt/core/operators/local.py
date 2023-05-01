@@ -5,17 +5,28 @@ import os
 import shutil
 import signal
 import tempfile
-from typing import Sequence
+from collections import namedtuple
+from typing import Callable, Optional, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessHook, SubprocessResult
 from airflow.utils.context import Context
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
+from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
+    FullOutputSubprocessHook,
+)
+from cosmos.providers.dbt.core.utils.warn_parsing import (
+    extract_log_issues,
+    parse_output,
+)
 
 logger = logging.getLogger(__name__)
+
+FullOutputSubprocessResult = namedtuple(
+    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
+)
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):
@@ -38,9 +49,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     @cached_property
     def subprocess_hook(self):
         """Returns hook for running the bash command."""
-        return SubprocessHook()
+        return FullOutputSubprocessHook()
 
-    def exception_handling(self, result: SubprocessResult):
+    def exception_handling(self, result: FullOutputSubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
                 f"dbt command returned exit code {self.skip_exit_code}. Skipping."
@@ -54,7 +65,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self,
         cmd: list[str],
         env: dict[str, str],
-    ) -> SubprocessResult:
+    ) -> FullOutputSubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
@@ -88,7 +99,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def build_and_run_cmd(
         self, context: Context, cmd_flags: list[str] | None = None
-    ) -> SubprocessResult:
+    ) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         return self.run_command(cmd=dbt_cmd, env=env)
 
@@ -189,16 +200,63 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 class DbtTestLocalOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core test command.
+    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+        and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
     ui_color = "#8194E0"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self,
+        on_warning_callback: Optional[Callable] = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
+        self.on_warning_callback = on_warning_callback
+
+    def _should_run_tests(
+        self,
+        result: FullOutputSubprocessResult,
+        no_tests_message: str = "Nothing to do",
+    ) -> bool:
+        """
+        Check if any tests are defined to run in the DAG. If tests are defined
+        and on_warning_callback is set, then function returns True.
+
+        :param result: The output from the build and run command.
+        """
+
+        return self.on_warning_callback and no_tests_message not in result.output
+
+    def _handle_warnings(
+        self, result: FullOutputSubprocessResult, context: Context
+    ) -> None:
+        """
+         Handles warnings by extracting log issues, creating additional context, and calling the
+         on_warning_callback with the updated context.
+
+        :param result: The result object from the build and run command.
+        :param context: The original airflow context in which the build and run command was executed.
+        """
+        test_names, test_results = extract_log_issues(result.full_output)
+
+        warning_context = dict(context)
+        warning_context["test_names"] = test_names
+        warning_context["test_results"] = test_results
+
+        self.on_warning_callback(warning_context)
 
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
+
+        if not self._should_run_tests(result):
+            return result.output
+
+        warnings = parse_output(result, "WARN")
+        if warnings > 0:
+            self._handle_warnings(result, context)
+
         return result.output
 
 

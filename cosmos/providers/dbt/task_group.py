@@ -6,7 +6,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from cosmos.core.airflow import CosmosTaskGroup
 
@@ -35,6 +35,8 @@ class DbtTaskGroup(CosmosTaskGroup):
     :param execution_mode: The execution mode in which the dbt project should be run.
         Options are "local", "docker", and "kubernetes".
         Defaults to "local"
+    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+        and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
     def __init__(
@@ -52,6 +54,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
         execution_mode: Literal["local", "docker", "kubernetes"] = "local",
+        on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -76,6 +79,7 @@ class DbtTaskGroup(CosmosTaskGroup):
             select=select,
             exclude=exclude,
             execution_mode=execution_mode,
+            on_warning_callback=on_warning_callback,
         )
 
         # call the airflow constructor

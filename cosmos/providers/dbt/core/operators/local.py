@@ -5,13 +5,14 @@ import os
 import shutil
 import signal
 import tempfile
+from collections import namedtuple
 from typing import Callable, Optional, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.utils.context import Context
-from collections import namedtuple
+
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
     FullOutputSubprocessHook,
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 FullOutputSubprocessResult = namedtuple(
     "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
 )
+
 
 class DbtLocalBaseOperator(DbtBaseOperator):
     """
@@ -214,7 +216,9 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         self.on_warning_callback = on_warning_callback
 
     def _should_run_tests(
-        self, result: FullOutputSubprocessResult, no_tests_message: str = "Nothing to do"
+        self,
+        result: FullOutputSubprocessResult,
+        no_tests_message: str = "Nothing to do",
     ) -> bool:
         """
         Check if any tests are defined to run in the DAG. If tests are defined
@@ -225,7 +229,9 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         return self.on_warning_callback and no_tests_message not in result.output
 
-    def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
+    def _handle_warnings(
+        self, result: FullOutputSubprocessResult, context: Context
+    ) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
          on_warning_callback with the updated context.

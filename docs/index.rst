@@ -1,4 +1,4 @@
-Cosmos
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 ========================
 
 .. toctree::

@@ -13,7 +13,7 @@
 
 
 
-.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/cosmos-logo.svg
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 
 
 ===========================================================

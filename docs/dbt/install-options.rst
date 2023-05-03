@@ -56,37 +56,130 @@ For example, to install Cosmos with dbt and the Postgres adapter, run the follow
 Virtual Environment
 -------------------
 
-.. note::
+.. tabs::
 
-    This assumes you are running Airflow using Docker. If you are running Airflow using a different method, you may need to modify the steps.
+   .. tab:: Astronomer
 
-To install dbt into a virtual environment, you can use the following steps:
+        To install dbt into a virtual environment, you can use the following steps:
 
-1. Create the virtual environment in your Dockerfile
+        1. Create the virtual environment in your Dockerfile (be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``, etc.)
 
-.. code-block:: bash
+        .. code-block:: docker
 
-    # install dbt into a virtual environment
-    # replace dbt-postgres with the adapter you need
-    RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \
-        pip install --no-cache-dir dbt-core dbt-postgres && deactivate
+            FROM quay.io/astronomer/astro-runtime:8.0.0
 
-2. Use the ``dbt_executable_path`` argument in the Cosmos operator to point to the virtual environment
+            # install dbt into a virtual environment
+            RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \
+                pip install --no-cache-dir <your-dbt-adapter> && deactivate
 
-.. code-block:: python
+        2. Add the following to your base project ``requirements.txt`` (preferably pinned)
 
-    from cosmos.providers.dbt import DbtTaskGroup
+        .. code-block:: text
 
-    tg = DbtTaskGroup(
-        # ...
-        dbt_args = {
-            # ...
-            'dbt_executable_path': '/usr/local/airflow/dbt_venv/bin/dbt'
-        }
-        # ...
-    )
+            astronomer-cosmos
 
-Note that you don't need to install Cosmos into the virtual environment - only dbt and the adapter you need.
+        3. Use the ``dbt_executable_path`` argument in the Cosmos operator to point to the virtual environment
+
+        .. code-block:: python
+
+            from cosmos.providers.dbt import DbtTaskGroup
+
+            tg = DbtTaskGroup(
+                # ...
+                dbt_args = {
+                    # ...
+                    'dbt_executable_path': f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
+                }
+                # ...
+            )
+
+
+   .. tab:: Docker Image
+
+        To install dbt into a virtual environment on an Airflow Docker Image, you can use the following steps:
+
+        1. Create the virtual environment in your Dockerfile (be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``, etc.)
+
+        .. code-block:: docker
+
+            FROM apache/airflow:2.4.3-python3.10
+
+            # install dbt into a venv to avoid package dependency conflicts
+            ENV PIP_USER=false
+            RUN python3 -m venv ${AIRFLOW_HOME}/dbt_venv
+            RUN ${AIRFLOW_HOME}/dbt_venv/bin/pip install <your-dbt-adapter>
+            ENV PIP_USER=true
+
+        3. Add the following to your base project ``requirements.txt`` (preferably pinned)
+
+        .. code-block:: text
+
+            astronomer-cosmos
+
+        4. Use the ``dbt_executable_path`` argument in the Cosmos operator to point to the virtual environment
+
+        .. code-block:: python
+
+            import os
+            from cosmos.providers.dbt import DbtTaskGroup
+
+            tg = DbtTaskGroup(
+                # ...
+                dbt_args = {
+                    # ...
+                    'dbt_executable_path': f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
+                }
+                # ...
+            )
+
+   .. tab:: MWAA
+
+        .. note::
+
+            This method uses a `startup script with Amazon MWAA <https://docs.aws.amazon.com/mwaa/latest/userguide/using-startup-script.html>`_
+
+        To install dbt into a virtual environment on MWAA, you can use the following steps:
+
+        1. Initialize a startup script as outlined in MWAA's documentation `here <https://docs.aws.amazon.com/mwaa/latest/userguide/using-startup-script.html>`_
+
+        2. Add the following to your startup script (be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``, etc.)
+
+        .. code-block:: shell
+
+            #!/bin/sh
+
+            export DBT_VENV_PATH="${AIRFLOW_HOME}/dbt_venv"
+            export PIP_USER=false
+
+            python3 -m venv "${DBT_VENV_PATH}"
+
+            ${DBT_VENV_PATH}/bin/pip install <your-dbt-adapter>
+
+            export PIP_USER=true
+
+        3. Add the following to your base project ``requirements.txt`` **preferably pinned to a version that's compatible with your MWAA environment**. To check compatibility, use the `aws mwaa local runner <https://github.com/aws/aws-mwaa-local-runner>`_
+
+        .. code-block:: text
+
+            astronomer-cosmos
+
+        4. Use the ``dbt_executable_path`` argument in the Cosmos operator to point to the virtual environment
+
+        .. code-block:: python
+
+            import os
+            from cosmos.providers.dbt import DbtTaskGroup
+
+            tg = DbtTaskGroup(
+                # ...
+                dbt_args = {
+                    # ...
+                    'dbt_executable_path': f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
+                }
+                # ...
+            )
+
+
 
 
 Docker and Kubernetes Execution Methods

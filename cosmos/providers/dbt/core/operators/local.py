@@ -6,12 +6,15 @@ import shutil
 import signal
 import tempfile
 from collections import namedtuple
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.utils.context import Context
+from airflow.utils.session import NEW_SESSION, provide_session
+from sqlalchemy.orm import Session
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
@@ -36,7 +39,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param install_deps: If true, install dependencies before running the command
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields
+    template_fields: Sequence[str] = DbtBaseOperator.template_fields + (
+        "compiled_sql",
+    )
+    template_fields_renderers = {
+        "compiled_sql": "sql",
+    }
 
     def __init__(
         self,
@@ -44,6 +52,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
+        self.compiled_sql = ""
         super().__init__(**kwargs)
 
     @cached_property
@@ -61,10 +70,49 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
             )
 
+    @provide_session
+    def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
+        """
+        Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template. Gets called after
+        every dbt run.
+        """
+        compiled_queries = {}
+        # dbt compiles sql files and stores them in the target directory
+        for root, _, files in os.walk(os.path.join(tmp_project_dir, "target")):
+            for file in files:
+                if not file.endswith(".sql"):
+                    continue
+
+                compiled_sql_path = Path(os.path.join(root, file))
+                compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
+                compiled_queries[file] = compiled_sql.strip()
+
+        for name, query in compiled_queries.items():
+            self.compiled_sql += f"-- {name}\n{query}\n\n"
+
+        self.compiled_sql = self.compiled_sql.strip()
+
+        # need to refresh the rendered task field record in the db because Airflow only does this
+        # before executing the task, not after
+        from airflow.models.renderedtifields import RenderedTaskInstanceFields
+
+        ti = context["ti"]
+        ti.task.template_fields = self.template_fields
+        rtif = RenderedTaskInstanceFields(ti, render_templates=False)
+
+        # delete the old records
+        session.query(RenderedTaskInstanceFields).filter(
+            RenderedTaskInstanceFields.dag_id == self.dag_id,
+            RenderedTaskInstanceFields.task_id == self.task_id,
+            RenderedTaskInstanceFields.run_id == ti.run_id,
+        ).delete()
+        session.add(rtif)
+
     def run_command(
         self,
         cmd: list[str],
         env: dict[str, str],
+        context: Context,
     ) -> FullOutputSubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -94,6 +142,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
 
             self.exception_handling(result)
+            self.store_compiled_sql(tmp_project_dir, context)
 
             return result
 
@@ -101,7 +150,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self, context: Context, cmd_flags: list[str] | None = None
     ) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
-        return self.run_command(cmd=dbt_cmd, env=env)
+        return self.run_command(cmd=dbt_cmd, env=env, context=context)
 
     def execute(self, context: Context) -> str:
         # TODO is this going to put loads of unnecessary stuff in to xcom?
@@ -109,12 +158,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
+            self.subprocess_hook.log.info(
+                "Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(
                 self.subprocess_hook.sub_process, "pid"
             ):
                 os.killpg(
-                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
+                    os.getpgid(
+                        self.subprocess_hook.sub_process.pid), signal.SIGINT
                 )
         else:
             self.subprocess_hook.send_sigterm()

@@ -73,8 +73,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION
     ) -> None:
         """
-        Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template. Gets called after
-        every dbt run.
+        Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
+        Gets called after every dbt run.
         """
         compiled_queries = {}
         # dbt compiles sql files and stores them in the target directory

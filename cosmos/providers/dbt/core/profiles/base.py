@@ -4,16 +4,14 @@ inherit from to ensure consistency.
 """
 from __future__ import annotations
 
-import yaml
-
 from typing import Any
-from typing_extensions import TYPE_CHECKING
 
-from airflow.hooks.base import BaseHook
-from airflow.exceptions import AirflowNotFoundException
+import yaml
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from airflow.models import Connection
+
 
 class InvalidMappingException(Exception):
     "Raised when a connection is not valid for a profile mapping."
@@ -53,7 +51,9 @@ class BaseProfileMapping:
         """
         raise NotImplementedError
 
-    def get_profile_file_contents(self, profile_name: str, target_name: str = "cosmos_target"):
+    def get_profile_file_contents(
+        self, profile_name: str, target_name: str = "cosmos_target"
+    ):
         """
         Translates the profile into a string that can be written to a profiles.yml file.
         """
@@ -65,9 +65,7 @@ class BaseProfileMapping:
         profile_contents = {
             profile_name: {
                 "target": target_name,
-                "outputs": {
-                    target_name: profile_vars
-                }
+                "outputs": {target_name: profile_vars},
             }
         }
 

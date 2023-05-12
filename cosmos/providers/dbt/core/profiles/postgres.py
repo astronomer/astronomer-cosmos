@@ -3,13 +3,15 @@ Contains the Airflow Snowflake connection -> dbt profile mapping.
 """
 from __future__ import annotations
 
-from .base import BaseProfileMapping
+from typing import Any
 
-from typing import Any, Callable
 from typing_extensions import TYPE_CHECKING
 
+from .base import BaseProfileMapping
+
 if TYPE_CHECKING:
-    from airflow.models import Connection
+    pass
+
 
 class PostgresProfileMapping(BaseProfileMapping):
     """
@@ -67,7 +69,7 @@ class PostgresProfileMapping(BaseProfileMapping):
             "type": "postgres",
             "host": self.conn.host,
             "user": self.conn.login,
-            "password": self.get_env_var_format('password'),
+            "password": self.get_env_var_format("password"),
             "port": self.conn.port or 5432,
             "dbname": self.database,
             "schema": self.schema,
@@ -81,5 +83,5 @@ class PostgresProfileMapping(BaseProfileMapping):
         Returns a dictionary of environment variables that should be set.
         """
         return {
-            self.get_env_var_name('password'): str(self.conn.password),
+            self.get_env_var_name("password"): str(self.conn.password),
         }

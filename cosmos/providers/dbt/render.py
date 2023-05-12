@@ -130,8 +130,18 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name, "profile_args": profile_args}
-        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name, "profile_args": profile_args}
+        run_args: Dict[str, Any] = {
+            **task_args,
+            **operator_args,
+            "models": model_name,
+            "profile_args": profile_args,
+        }
+        test_args: Dict[str, Any] = {
+            **task_args,
+            **operator_args,
+            "models": model_name,
+            "profile_args": profile_args,
+        }
         # DbtTestOperator specific arg
         test_args["on_warning_callback"] = on_warning_callback
         if emit_datasets:

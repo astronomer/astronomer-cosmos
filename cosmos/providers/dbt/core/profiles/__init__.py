@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional, Type
+from typing import Type
 
 from .base import BaseProfileMapping
 from .postgres import PostgresProfileMapping
@@ -22,6 +21,7 @@ def get_profile_mapping(
     """
     # get the connection from Airflow
     from airflow.hooks.base import BaseHook
+
     hook = BaseHook.get_hook(conn_id)
     conn = hook.get_connection(conn_id)
 
@@ -33,5 +33,4 @@ def get_profile_mapping(
         if mapping.validate_connection():
             return mapping
 
-    raise ValueError(
-        f"Could not find a profile mapping for connection {conn_id}.")
+    raise ValueError(f"Could not find a profile mapping for connection {conn_id}.")

@@ -40,13 +40,14 @@ with DAG(
                 project_dir=DBT_ROOT_PATH / "jaffle_shop",
                 schema="public",
                 conn_id="airflow_db",
+                profile_args={"schema": "public"},
             )
 
     jaffle_shop_seed = DbtSeedOperator(
         task_id="seed_jaffle_shop",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
-        schema="public",
+        profile_args={"schema": "public"},
         outlets=[Dataset("SEED://JAFFLE_SHOP")],
     )
 

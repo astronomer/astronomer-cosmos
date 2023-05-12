@@ -1,65 +1,140 @@
+"""
+Contains the Airflow Snowflake connection -> dbt profile mapping.
+"""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from .base import BaseProfileMapping
+
+from typing import Any, Callable
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
-snowflake_profile = {
-    "target": "dev",
-    "outputs": {
-        "dev": {
+class SnowflakeUserPassProfileMapping(BaseProfileMapping):
+    """
+    Class responsible for mapping Airflow Snowflake connections to dbt profiles.
+    """
+
+    connection_type: str = "snowflake"
+
+    def validate_connection(self) -> bool:
+        """
+        Return whether the connection is valid for this profile mapping.
+
+        Required by dbt:
+        https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#user--password-authentication
+        https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#all-configurations
+        - user
+        - password
+        - account
+        - database
+        - warehouse
+        - schema
+        """
+        if self.conn.conn_type != self.connection_type:
+            return False
+
+        if not self.conn.login:
+            return False
+
+        if not self.conn.password:
+            return False
+
+        if not self.account:
+            return False
+
+        if not self.conn_dejson.get("database"):
+            return False
+
+        if not self.conn_dejson.get("warehouse"):
+            return False
+
+        if not self.conn.schema:
+            return False
+
+        return True
+
+    @property
+    def conn_dejson(self) -> dict[str, Any]:
+        """
+        Return the connection's extra_dejson dict. Snowflake can be odd because
+        the fields used to be stored with keys in the format 'extra__snowflake__account',
+        but now are stored as 'account'.
+
+        This standardizes the keys to be 'account', 'database', etc.
+        """
+        conn_dejson = self.conn.extra_dejson
+
+        # check if the keys are in the old format
+        if conn_dejson.get("extra__snowflake__account"):
+            # if so, update the keys to the new format
+            conn_dejson = {
+                key.replace("extra__snowflake__", ""): value
+                for key, value in conn_dejson.items()
+            }
+
+        return conn_dejson
+
+    @property
+    def account(self) -> str | None:
+        """
+        Returns the Snowflake account, formatted how dbt expects it.
+        """
+        account = self.conn_dejson.get("account")
+
+        if not account:
+            return None
+
+        # dbt expects the account to be in the format:
+        # <account>.<region>
+        # https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#account
+        # but airflow doesn't necessarily require this, so we need to reconcile
+        region = self.conn_dejson.get("region")
+        if region and not region in account:
+            account = f"{account}.{region}"
+
+        return account
+
+    def get_profile(self) -> dict[str, Any | None]:
+        """
+        Return a dbt Snowflake profile based on the Airflow Snowflake connection.
+
+        Password is stored in an environment variable to avoid writing it to disk.
+
+        https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
+        https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
+        """
+        return {
             "type": "snowflake",
-            "account": "{{ env_var('SNOWFLAKE_ACCOUNT') }}",
-            "user": "{{ env_var('SNOWFLAKE_USER') }}",
-            "password": "{{ env_var('SNOWFLAKE_PASSWORD') }}",
-            "role": "{{ env_var('SNOWFLAKE_ROLE') }}",
-            "database": "{{ env_var('SNOWFLAKE_DATABASE') }}",
-            "warehouse": "{{ env_var('SNOWFLAKE_WAREHOUSE') }}",
-            "schema": "{{ env_var('SNOWFLAKE_SCHEMA') }}",
-            "client_session_keep_alive": False,
+            "account": self.account,
+            "user": self.conn.login,
+            "password": self.get_env_var_format('password'),
+            "role": self.conn_dejson.get("role"),
+            "database": self.database,
+            "warehouse": self.conn_dejson.get("warehouse"),
+            "schema": self.schema,
+            **self.profile_args,
         }
-    },
-}
 
+    def get_env_vars(self) -> dict[str, str]:
+        """
+        Returns a dictionary of environment variables that should be set.
+        """
+        return {
+            self.get_env_var_name('password'): str(self.conn.password),
+        }
 
-def get_snowflake_account(account: str, region: str | None = None) -> str:
-    # Region is optional
-    if region and region not in account:
-        account = f"{account}.{region}"
-    return account
+    @property
+    def schema(self) -> str:
+        """
+        In an Airflow Snowflake connection, the schema property is truly the schema.
+        """
+        return str(self.conn.schema)
 
-
-def create_profile_vars_snowflake(
-    conn: Connection,
-    database_override: str | None = None,
-    schema_override: str | None = None,
-) -> tuple[str, dict[str, str]]:
-    """
-    https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
-    https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
-    """
-    extras = {
-        "account": "account",
-        "database": "database",
-        "region": "region",
-        "role": "role",
-        "warehouse": "warehouse",
-    }
-    snowflake_dejson = conn.extra_dejson
-    # At some point the extras removed a prefix extra__snowflake__ when the provider got updated... handling that
-    # here.
-    if snowflake_dejson.get("account") is None:
-        for key, value in extras.items():
-            extras[key] = f"extra__snowflake__{value}"
-    account = get_snowflake_account(snowflake_dejson.get(extras["account"]), snowflake_dejson.get(extras["region"]))
-    profile_vars = {
-        "SNOWFLAKE_USER": conn.login,
-        "SNOWFLAKE_PASSWORD": conn.password,
-        "SNOWFLAKE_ACCOUNT": account,
-        "SNOWFLAKE_ROLE": snowflake_dejson.get(extras["role"]),
-        "SNOWFLAKE_DATABASE": database_override if database_override else conn.extra_dejson.get(extras["database"]),
-        "SNOWFLAKE_WAREHOUSE": snowflake_dejson.get(extras["warehouse"]),
-        "SNOWFLAKE_SCHEMA": schema_override if schema_override else conn.schema,
-    }
-    return "snowflake_profile", profile_vars
+    @property
+    def database(self) -> str:
+        """
+        In an Airflow Snowflake connection, the database is stored in the extra_dejson.
+        """
+        return str(self.conn_dejson.get("database"))

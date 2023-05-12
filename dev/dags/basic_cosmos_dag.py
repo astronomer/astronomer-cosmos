@@ -11,7 +11,9 @@ basic_cosmos_dag = DbtDag(
     dbt_root_path="/usr/local/airflow/dags/dbt",
     dbt_project_name="jaffle_shop",
     conn_id="airflow_db",
-    dbt_args={"schema": "public"},
+    profile_args={
+        "schema": "public",
+    },
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

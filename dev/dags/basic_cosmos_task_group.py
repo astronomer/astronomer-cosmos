@@ -25,7 +25,7 @@ def basic_cosmos_task_group() -> None:
         dbt_root_path="/usr/local/airflow/dags/dbt",
         dbt_project_name="jaffle_shop",
         conn_id="airflow_db",
-        dbt_args={"schema": "public"},
+        profile_args={"schema": "public"}
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

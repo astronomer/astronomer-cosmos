@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Any
 
 import yaml
 from airflow.utils.context import Context
@@ -60,7 +60,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(
-            context=context, cmd_flags=cmd_flags, handle_profile=False
+            context=context, cmd_flags=cmd_flags
         )
         # set env vars
         self.build_env_args(env_vars)

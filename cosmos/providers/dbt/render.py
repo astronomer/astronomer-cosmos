@@ -38,6 +38,7 @@ def render_project(
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
+    profile_args: Dict[str, str] = {},
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
     execution_mode: Literal["local", "docker", "kubernetes"] = "local",
@@ -54,7 +55,8 @@ def render_project(
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-    :param conn_id: The Airflow connection ID to use in Airflow Datasets
+    :param conn_id: The Airflow connection ID to use
+    :param profile_args: Arguments to pass to the dbt profile
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
     :param execution_mode: The execution mode in which the dbt project should be run.
@@ -128,8 +130,8 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
+        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name, "profile_args": profile_args}
+        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name, "profile_args": profile_args}
         # DbtTestOperator specific arg
         test_args["on_warning_callback"] = on_warning_callback
         if emit_datasets:

@@ -16,9 +16,10 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
+from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
-    FullOutputSubprocessHook,
+    FullOutputSubprocessHook, FullOutputSubprocessResult
 )
 from cosmos.providers.dbt.core.utils.warn_parsing import (
     extract_log_issues,
@@ -27,19 +28,17 @@ from cosmos.providers.dbt.core.utils.warn_parsing import (
 
 logger = logging.getLogger(__name__)
 
-FullOutputSubprocessResult = namedtuple(
-    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
-)
-
 
 class DbtLocalBaseOperator(DbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
+    :param profile_args: Arguments to pass to the profile. See :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param install_deps: If true, install dependencies before running the command
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)
+    template_fields: Sequence[str] = DbtBaseOperator.template_fields + \
+        ("compiled_sql",)
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -47,9 +46,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def __init__(
         self,
         install_deps: bool = False,
+        profile_args: dict[str, str] = {},
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
+        self.profile_args = profile_args
         self.compiled_sql = ""
         super().__init__(**kwargs)
 
@@ -125,6 +126,29 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 tmp_project_dir,
             )
 
+            # get the profile name from the dbt_project.yml file
+            dbt_project_path = os.path.join(tmp_project_dir, "dbt_project.yml")
+            with open(dbt_project_path, "r", encoding="utf-8") as f:
+                dbt_project = yaml.safe_load(f)
+
+            profile_name = dbt_project.get("profile")
+
+            # need to write the profile to a file because dbt requires a profile file
+            # and doesn't accept a profile as a string
+            profile_mapping = get_profile_mapping(
+                conn_id=self.conn_id,
+                profile_args=self.profile_args,
+            )
+            profile_file_contents = profile_mapping.get_profile_file_contents(
+                profile_name=profile_name,
+            )
+            profile_file_path = os.path.join(tmp_project_dir, "profiles.yml")
+            with open(profile_file_path, "w", encoding="utf-8") as f:
+                f.write(profile_file_contents)
+
+            # we also need to get the env from the profile mapping
+            env.update(profile_mapping.get_env_vars())
+
             # if we need to install deps, do so
             if self.install_deps:
                 self.subprocess_hook.run_command(
@@ -158,12 +182,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
+            self.subprocess_hook.log.info(
+                "Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(
                 self.subprocess_hook.sub_process, "pid"
             ):
                 os.killpg(
-                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
+                    os.getpgid(
+                        self.subprocess_hook.sub_process.pid), signal.SIGINT
                 )
         else:
             self.subprocess_hook.send_sigterm()

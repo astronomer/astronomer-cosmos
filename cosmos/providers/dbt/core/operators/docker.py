@@ -50,7 +50,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(
-            context=context, cmd_flags=cmd_flags, handle_profile=False
+            context=context, cmd_flags=cmd_flags
         )
         # set env vars
         self.environment = {**env_vars, **self.environment}

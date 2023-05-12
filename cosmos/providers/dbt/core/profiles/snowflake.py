@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     pass
 
 
-
 class SnowflakeUserPassProfileMapping(BaseProfileMapping):
     """
     Class responsible for mapping Airflow Snowflake connections to dbt profiles.

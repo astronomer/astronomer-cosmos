@@ -68,7 +68,9 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
         """
         Returns the project ID.
         """
-        return str(self.profile_args.get("project") or self.conn.extra_dejson.get("project"))
+        return str(
+            self.profile_args.get("project") or self.conn.extra_dejson.get("project")
+        )
 
     @property
     def dataset(self) -> str:
@@ -82,4 +84,6 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
         """
         Returns the path to the service account file.
         """
-        return str(self.profile_args.get("key_path") or self.conn.extra_dejson.get("key_path"))
+        return str(
+            self.profile_args.get("key_path") or self.conn.extra_dejson.get("key_path")
+        )

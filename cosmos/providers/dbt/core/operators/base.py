@@ -152,8 +152,7 @@ class DbtBaseOperator(BaseOperator):
             env.update(self.env)
 
         # Airflow context as environment variables
-        airflow_context_vars = context_to_airflow_vars(
-            context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
         env.update(airflow_context_vars)
 
         # profile variables from the dbt profile file

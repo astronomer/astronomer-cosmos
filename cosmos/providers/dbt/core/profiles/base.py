@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 class InvalidMappingException(Exception):
     "Raised when a connection is not valid for a profile mapping."
-    pass
 
 
 class BaseProfileMapping:
@@ -25,10 +24,11 @@ class BaseProfileMapping:
     """
 
     connection_type: str = "generic"
+    is_community: bool = False
 
-    def __init__(self, conn: Connection, profile_args: dict[str, Any] = {}):
+    def __init__(self, conn: Connection, profile_args: dict[str, Any] | None = None):
         self.conn = conn
-        self.profile_args = profile_args
+        self.profile_args = profile_args or {}
 
         if not self.validate_connection():
             raise InvalidMappingException
@@ -53,7 +53,7 @@ class BaseProfileMapping:
 
     def get_profile_file_contents(
         self, profile_name: str, target_name: str = "cosmos_target"
-    ):
+    ) -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.
         """
@@ -69,7 +69,7 @@ class BaseProfileMapping:
             }
         }
 
-        return yaml.dump(profile_contents)
+        return str(yaml.dump(profile_contents))
 
     @property
     def database(self) -> str:
@@ -85,9 +85,9 @@ class BaseProfileMapping:
         In most cases, Airflow connections don't have a `schema` field.
         Exceptions to this are handled by the profile mapping subclasses.
         """
-        schema = self.profile_args.get("schema")
+        schema = str(self.profile_args.get("schema"))
         if not schema:
-            raise Exception("You must provide a schema in the profile_args.")
+            raise ValueError("You must provide a schema in the profile_args.")
 
         return schema
 

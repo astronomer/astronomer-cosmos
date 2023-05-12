@@ -5,12 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from typing_extensions import TYPE_CHECKING
-
 from .base import BaseProfileMapping
-
-if TYPE_CHECKING:
-    pass
 
 
 class SnowflakeUserPassProfileMapping(BaseProfileMapping):
@@ -83,7 +78,7 @@ class SnowflakeUserPassProfileMapping(BaseProfileMapping):
         """
         Returns the Snowflake account, formatted how dbt expects it.
         """
-        account = self.conn_dejson.get("account")
+        account = str(self.conn_dejson.get("account"))
 
         if not account:
             return None
@@ -92,7 +87,7 @@ class SnowflakeUserPassProfileMapping(BaseProfileMapping):
         # <account>.<region>
         # https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#account
         # but airflow doesn't necessarily require this, so we need to reconcile
-        region = self.conn_dejson.get("region")
+        region = str(self.conn_dejson.get("region"))
         if region and region not in account:
             account = f"{account}.{region}"
 

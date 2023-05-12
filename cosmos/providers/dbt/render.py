@@ -24,6 +24,7 @@ def calculate_operator_class(
     execution_mode: str,
     dbt_class: str,
 ) -> str:
+    "Given an execution mode and dbt class, return the operator class to use"
     return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 

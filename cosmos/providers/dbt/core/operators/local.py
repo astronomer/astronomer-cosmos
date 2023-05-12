@@ -128,7 +128,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             # ensure there's no profiles.yml file in the project dir
             profiles_path = os.path.join(tmp_project_dir, "profiles.yml")
             if os.path.exists(profiles_path):
-                logger.warning("Cosmos doesn't support user-supplied profiles.yml files. Removing...")
+                logger.warning(
+                    "Cosmos doesn't support user-supplied profiles.yml files. Removing..."
+                )
                 os.remove(profiles_path)
 
             # if we need to install deps, do so

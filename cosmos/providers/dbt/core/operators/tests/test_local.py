@@ -79,9 +79,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
             "SNOWFLAKE_USER": "my_user_id",
             "SNOWFLAKE_PASSWORD": "supersecure123",
             "SNOWFLAKE_ACCOUNT": "my_account",
-            "SNOWFLAKE_ROLE": None,
             "SNOWFLAKE_DATABASE": "my_database",
-            "SNOWFLAKE_WAREHOUSE": None,
             "SNOWFLAKE_SCHEMA": "jaffle_shop",
         },
     )

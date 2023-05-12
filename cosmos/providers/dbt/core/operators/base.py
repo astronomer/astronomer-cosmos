@@ -126,6 +126,8 @@ class DbtBaseOperator(BaseOperator):
         dbt_ol_path = shutil.which("dbt-ol")
         if dbt_executable_path == "dbt" and shutil.which("dbt-ol"):
             self.dbt_executable_path = dbt_ol_path
+        elif dbt_executable_path == "dbt":
+            self.dbt_executable_path = shutil.which("dbt")
         else:
             self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
@@ -135,17 +137,12 @@ class DbtBaseOperator(BaseOperator):
         """
         Builds the set of environment variables to be exposed for the bash command.
         The order of determination is:
-            1. System environment variables (if dbt_args["append_env"] is True and Operator.include_system_env is True)
-            2. The env parameter passed to the Operator
-            3. The Airflow context as environment variables.
-            4. The profile variables from the dbt profile file.
+            1. The env parameter passed to the Operator
+            2. The Airflow context as environment variables.
+            3. The profile variables from the dbt profile file.
         If a user accidentally uses a key that is found earlier in the determination order then it is overwritten.
         """
         env: dict[str, Any] = {}
-
-        # system environment variables
-        if self.include_system_env or self.append_env:
-            env.update(os.environ)
 
         # env parameter passed to the Operator
         if self.env and isinstance(self.env, dict):

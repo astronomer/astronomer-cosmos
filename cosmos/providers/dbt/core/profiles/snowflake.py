@@ -3,13 +3,15 @@ Contains the Airflow Snowflake connection -> dbt profile mapping.
 """
 from __future__ import annotations
 
-from .base import BaseProfileMapping
+from typing import Any
 
-from typing import Any, Callable
 from typing_extensions import TYPE_CHECKING
 
+from .base import BaseProfileMapping
+
 if TYPE_CHECKING:
-    from airflow.models import Connection
+    pass
+
 
 class SnowflakeUserPassProfileMapping(BaseProfileMapping):
     """
@@ -91,7 +93,7 @@ class SnowflakeUserPassProfileMapping(BaseProfileMapping):
         # https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#account
         # but airflow doesn't necessarily require this, so we need to reconcile
         region = self.conn_dejson.get("region")
-        if region and not region in account:
+        if region and region not in account:
             account = f"{account}.{region}"
 
         return account
@@ -109,7 +111,7 @@ class SnowflakeUserPassProfileMapping(BaseProfileMapping):
             "type": "snowflake",
             "account": self.account,
             "user": self.conn.login,
-            "password": self.get_env_var_format('password'),
+            "password": self.get_env_var_format("password"),
             "role": self.conn_dejson.get("role"),
             "database": self.database,
             "warehouse": self.conn_dejson.get("warehouse"),
@@ -122,7 +124,7 @@ class SnowflakeUserPassProfileMapping(BaseProfileMapping):
         Returns a dictionary of environment variables that should be set.
         """
         return {
-            self.get_env_var_name('password'): str(self.conn.password),
+            self.get_env_var_name("password"): str(self.conn.password),
         }
 
     @property

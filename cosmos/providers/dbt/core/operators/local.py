@@ -5,7 +5,6 @@ import os
 import shutil
 import signal
 import tempfile
-from collections import namedtuple
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -16,10 +15,11 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
-from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
+from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
-    FullOutputSubprocessHook, FullOutputSubprocessResult
+    FullOutputSubprocessHook,
+    FullOutputSubprocessResult,
 )
 from cosmos.providers.dbt.core.utils.warn_parsing import (
     extract_log_issues,
@@ -38,8 +38,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + \
-        ("compiled_sql",)
+    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -149,7 +148,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             # get the profile name from the dbt_project.yml file
             dbt_project_path = os.path.join(tmp_project_dir, "dbt_project.yml")
-            with open(dbt_project_path, "r", encoding="utf-8") as f:
+            with open(dbt_project_path, encoding="utf-8") as f:
                 dbt_project = yaml.safe_load(f)
 
             profile_name = dbt_project.get("profile")
@@ -205,14 +204,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info(
-                "Sending SIGINT signal to process group")
+            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(
                 self.subprocess_hook.sub_process, "pid"
             ):
                 os.killpg(
-                    os.getpgid(
-                        self.subprocess_hook.sub_process.pid), signal.SIGINT
+                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
                 )
         else:
             self.subprocess_hook.send_sigterm()

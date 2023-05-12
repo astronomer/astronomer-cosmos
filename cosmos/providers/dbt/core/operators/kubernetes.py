@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Sequence, Any
+from typing import Callable, Optional, Sequence
 
 import yaml
 from airflow.utils.context import Context

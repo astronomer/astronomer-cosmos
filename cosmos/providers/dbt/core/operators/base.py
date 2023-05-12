@@ -141,9 +141,10 @@ class DbtBaseOperator(BaseOperator):
             4. The profile variables from the dbt profile file.
         If a user accidentally uses a key that is found earlier in the determination order then it is overwritten.
         """
-        env = {}
+        env: dict[str, Any] = {}
+
         # system environment variables
-        if self.include_system_env and self.append_env:
+        if self.include_system_env or self.append_env:
             env.update(os.environ)
 
         # env parameter passed to the Operator
@@ -151,7 +152,8 @@ class DbtBaseOperator(BaseOperator):
             env.update(self.env)
 
         # Airflow context as environment variables
-        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
+        airflow_context_vars = context_to_airflow_vars(
+            context, in_env_var_format=True)
         env.update(airflow_context_vars)
 
         # profile variables from the dbt profile file

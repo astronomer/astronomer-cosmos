@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     pass
 
 
+
 class SnowflakeUserPassProfileMapping(BaseProfileMapping):
     """
     Class responsible for mapping Airflow Snowflake connections to dbt profiles.
@@ -46,13 +47,13 @@ class SnowflakeUserPassProfileMapping(BaseProfileMapping):
         if not self.account:
             return False
 
-        if not self.conn_dejson.get("database"):
+        if not self.database:
             return False
 
         if not self.conn_dejson.get("warehouse"):
             return False
 
-        if not self.conn.schema:
+        if not self.schema:
             return False
 
         return True

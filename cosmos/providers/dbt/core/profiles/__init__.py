@@ -32,8 +32,7 @@ def get_profile_mapping(
         profile_args = {}
 
     # get the connection from Airflow
-    hook = BaseHook.get_hook(conn_id)
-    conn = hook.get_connection(conn_id)
+    conn = BaseHook.get_connection(conn_id)
 
     if not conn:
         raise ValueError(f"Could not find connection {conn_id}.")
@@ -46,4 +45,5 @@ def get_profile_mapping(
         except InvalidMappingException:
             continue
 
-    raise ValueError(f"Could not find a profile mapping for connection {conn_id}.")
+    raise ValueError(
+        f"Could not find a profile mapping for connection {conn_id}.")

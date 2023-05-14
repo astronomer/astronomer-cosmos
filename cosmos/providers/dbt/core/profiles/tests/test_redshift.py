@@ -1,8 +1,8 @@
 "Tests for the Redshift profile."
 
 from unittest.mock import patch
-import pytest
 
+import pytest
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
@@ -57,7 +57,7 @@ def test_connection_claiming() -> None:
         del values[key]
         conn = Connection(**values)  # type: ignore
 
-        print('testing with', values)
+        print("testing with", values)
 
         # should raise an InvalidMappingException
         with pytest.raises(InvalidMappingException):
@@ -72,8 +72,7 @@ def test_connection_claiming() -> None:
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = RedshiftPasswordProfileMapping(
-        conn, {"schema": "my_schema"})
+    profile_mapping = RedshiftPasswordProfileMapping(conn, {"schema": "my_schema"})
     assert profile_mapping.validate_connection()
 
 

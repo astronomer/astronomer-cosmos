@@ -3,11 +3,10 @@ Contains the Airflow Snowflake connection -> dbt profile mapping.
 """
 from __future__ import annotations
 
+from logging import getLogger
 from typing import Any
 
 from .base import BaseProfileMapping
-
-from logging import getLogger
 
 logger = getLogger(__name__)
 
@@ -37,43 +36,40 @@ class PostgresProfileMapping(BaseProfileMapping):
 
         if not self.conn.host:
             logger.info(
-                "Not using mapping %s because host is not set",
-                self.__class__.__name__
+                "Not using mapping %s because host is not set", self.__class__.__name__
             )
             return False
 
         if not self.conn.login:
             logger.info(
-                "Not using mapping %s because login is not set",
-                self.__class__.__name__
+                "Not using mapping %s because login is not set", self.__class__.__name__
             )
             return False
 
         if not self.conn.password:
             logger.info(
                 "Not using mapping %s because password is not set",
-                self.__class__.__name__
+                self.__class__.__name__,
             )
             return False
 
         if not self.conn.port:
             logger.info(
-                "Not using mapping %s because port is not set",
-                self.__class__.__name__
+                "Not using mapping %s because port is not set", self.__class__.__name__
             )
             return False
 
         if not self.database:
             logger.info(
                 "Not using mapping %s because database is not set",
-                self.__class__.__name__
+                self.__class__.__name__,
             )
             return False
 
         if not self.schema:
             logger.info(
                 "Not using mapping %s because schema is not set",
-                self.__class__.__name__
+                self.__class__.__name__,
             )
             return False
 

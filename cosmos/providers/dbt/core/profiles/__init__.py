@@ -45,5 +45,4 @@ def get_profile_mapping(
         except InvalidMappingException:
             continue
 
-    raise ValueError(
-        f"Could not find a profile mapping for connection {conn_id}.")
+    raise ValueError(f"Could not find a profile mapping for connection {conn_id}.")

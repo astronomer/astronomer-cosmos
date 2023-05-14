@@ -7,8 +7,7 @@ from airflow.models.connection import Connection
 from cosmos.providers.dbt.core.profiles.base import BaseProfileMapping
 
 
-def test_profile_file_contents(
-) -> None:
+def test_profile_file_contents() -> None:
     """
     Tests that the profile file contents are correct.
     """
@@ -30,7 +29,9 @@ def test_profile_file_contents(
         target_name="my_target",
     )
 
-    assert profile_contents == """my_profile:
+    assert (
+        profile_contents
+        == """my_profile:
     outputs:
         my_target:
             host: my_host
@@ -38,3 +39,4 @@ def test_profile_file_contents(
             user: my_user
     target: my_target
 """
+    )

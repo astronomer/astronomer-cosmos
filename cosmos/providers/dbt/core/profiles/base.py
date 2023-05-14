@@ -69,27 +69,37 @@ class BaseProfileMapping:
             }
         }
 
-        return str(yaml.dump(profile_contents))
+        return str(yaml.dump(profile_contents, indent=4))
+
+    @classmethod
+    def filter_null(cls, args: dict[str, Any]) -> dict[str, Any]:
+        """
+        Filters out null values from a dictionary.
+        """
+        return {k: v for k, v in args.items() if v is not None}
 
     @property
-    def database(self) -> str:
+    def database(self) -> str | None:
         """
         In most cases, Airflow uses the `schema` field for the database name.
         Exceptions to this are handled by the profile mapping subclasses.
         """
+        if not self.conn.schema:
+            return None
+
         return str(self.conn.schema)
 
     @property
-    def schema(self) -> str:
+    def schema(self) -> str | None:
         """
         In most cases, Airflow connections don't have a `schema` field.
         Exceptions to this are handled by the profile mapping subclasses.
         """
-        schema = str(self.profile_args.get("schema"))
+        schema = self.profile_args.get("schema")
         if not schema:
-            raise ValueError("You must provide a schema in the profile_args.")
+            return None
 
-        return schema
+        return str(schema)
 
     @classmethod
     def get_env_var_name(cls, field_name: str) -> str:

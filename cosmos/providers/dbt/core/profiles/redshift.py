@@ -4,8 +4,11 @@ Contains the Airflow Snowflake connection -> dbt profile mapping.
 from __future__ import annotations
 
 from typing import Any
+from logging import getLogger
 
 from .base import BaseProfileMapping
+
+logger = getLogger(__name__)
 
 
 class RedshiftPasswordProfileMapping(BaseProfileMapping):
@@ -32,21 +35,45 @@ class RedshiftPasswordProfileMapping(BaseProfileMapping):
             return False
 
         if not self.conn.host:
+            logger.info(
+                "Not using mapping %s because host is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.conn.login:
+            logger.info(
+                "Not using mapping %s because login is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.conn.password:
+            logger.info(
+                "Not using mapping %s because password is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.conn.port:
+            logger.info(
+                "Not using mapping %s because port is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.database:
+            logger.info(
+                "Not using mapping %s because database is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.schema:
+            logger.info(
+                "Not using mapping %s because schema is not set",
+                self.__class__.__name__
+            )
             return False
 
         return True
@@ -60,7 +87,7 @@ class RedshiftPasswordProfileMapping(BaseProfileMapping):
         https://docs.getdbt.com/reference/warehouse-setups/redshift-setup
         https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/connections/redshift.html
         """
-        return {
+        profile = {
             "type": "redshift",
             "host": self.conn.host,
             "user": self.conn.login,
@@ -73,6 +100,8 @@ class RedshiftPasswordProfileMapping(BaseProfileMapping):
             "region": self.conn.extra_dejson.get("region"),
             **self.profile_args,
         }
+
+        return self.filter_null(profile)
 
     def get_env_vars(self) -> dict[str, str]:
         """

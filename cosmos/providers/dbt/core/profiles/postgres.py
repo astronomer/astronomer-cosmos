@@ -7,6 +7,10 @@ from typing import Any
 
 from .base import BaseProfileMapping
 
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 
 class PostgresProfileMapping(BaseProfileMapping):
     """
@@ -32,21 +36,45 @@ class PostgresProfileMapping(BaseProfileMapping):
             return False
 
         if not self.conn.host:
+            logger.info(
+                "Not using mapping %s because host is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.conn.login:
+            logger.info(
+                "Not using mapping %s because login is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.conn.password:
+            logger.info(
+                "Not using mapping %s because password is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.conn.port:
+            logger.info(
+                "Not using mapping %s because port is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.database:
+            logger.info(
+                "Not using mapping %s because database is not set",
+                self.__class__.__name__
+            )
             return False
 
         if not self.schema:
+            logger.info(
+                "Not using mapping %s because schema is not set",
+                self.__class__.__name__
+            )
             return False
 
         return True
@@ -60,7 +88,7 @@ class PostgresProfileMapping(BaseProfileMapping):
         https://docs.getdbt.com/reference/warehouse-setups/postgres-setup
         https://airflow.apache.org/docs/apache-airflow-providers-postgres/stable/connections/postgres.html
         """
-        return {
+        profile = {
             "type": "postgres",
             "host": self.conn.host,
             "user": self.conn.login,
@@ -72,6 +100,8 @@ class PostgresProfileMapping(BaseProfileMapping):
             "sslmode": self.conn.extra_dejson.get("sslmode"),
             **self.profile_args,
         }
+
+        return self.filter_null(profile)
 
     def get_env_vars(self) -> dict[str, str]:
         """

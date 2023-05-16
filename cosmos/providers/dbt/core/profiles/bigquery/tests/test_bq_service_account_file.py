@@ -1,8 +1,8 @@
 "Tests for the BigQuery profile."
 
+import json
 from unittest.mock import patch
 
-import json
 import pytest
 from airflow.models.connection import Connection
 

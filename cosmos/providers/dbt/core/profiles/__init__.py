@@ -2,28 +2,38 @@
 
 from __future__ import annotations
 
-from typing import Type
+from typing import Any, Type
 
 from airflow.hooks.base import BaseHook
 
-from .base import BaseProfileMapping, InvalidMappingException
-from .bigquery import GoogleCloudServiceAccountFileProfileMapping
-from .databricks import DatabricksTokenProfileMapping
-from .postgres import PostgresProfileMapping
-from .redshift import RedshiftPasswordProfileMapping
-from .snowflake import SnowflakeUserPassProfileMapping
+from .base import BaseProfileMapping
+from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
+from .databricks.token import DatabricksTokenProfileMapping
+from .exasol.user_pass import ExasolUserPasswordProfileMapping
+from .postgres.user_pass import PostgresUserPasswordProfileMapping
+from .redshift.user_pass import RedshiftUserPasswordProfileMapping
+from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
+from .spark.thrift import SparkThriftProfileMapping
+from .trino.ldap import TrinoLDAPProfileMapping
+from .trino.certificate import TrinoCertificateProfileMapping
+from .trino.jwt import TrinoJWTProfileMapping
 
 profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudServiceAccountFileProfileMapping,
     DatabricksTokenProfileMapping,
-    PostgresProfileMapping,
-    RedshiftPasswordProfileMapping,
-    SnowflakeUserPassProfileMapping,
+    PostgresUserPasswordProfileMapping,
+    RedshiftUserPasswordProfileMapping,
+    SnowflakeUserPasswordProfileMapping,
+    SparkThriftProfileMapping,
+    ExasolUserPasswordProfileMapping,
+    TrinoLDAPProfileMapping,
+    TrinoCertificateProfileMapping,
+    TrinoJWTProfileMapping,
 ]
 
 def get_profile_mapping(
     conn_id: str,
-    profile_args: dict[str, str] | None = None,
+    profile_args: dict[str, Any] | None = None,
 ) -> BaseProfileMapping:
     """
     Returns a profile mapping object based on the connection ID.
@@ -38,11 +48,8 @@ def get_profile_mapping(
         raise ValueError(f"Could not find connection {conn_id}.")
 
     for profile_mapping in profile_mappings:
-        try:
-            mapping = profile_mapping(conn, profile_args)
-            if mapping.validate_connection():
-                return mapping
-        except InvalidMappingException:
-            continue
+        mapping = profile_mapping(conn, profile_args)
+        if mapping.can_claim_connection():
+            return mapping
 
     raise ValueError(f"Could not find a profile mapping for connection {conn_id}.")

@@ -1,4 +1,4 @@
-"Re-exports for the BigQuery profile mappings."
+"BigQuery Airflow connection -> dbt profile mappings"
 
 from .service_account_file import GoogleCloudServiceAccountFileProfileMapping
 

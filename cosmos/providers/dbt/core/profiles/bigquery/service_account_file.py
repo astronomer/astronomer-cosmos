@@ -3,9 +3,12 @@ Contains the Airflow Snowflake connection -> dbt profile mapping.
 """
 from __future__ import annotations
 
+from logging import getLogger
 from typing import Any
 
 from cosmos.providers.dbt.core.profiles.base import BaseProfileMapping
+
+logger = getLogger(__name__)
 
 
 class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
@@ -14,37 +17,20 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
     Used when there's a service account file.
     """
 
-    connection_type: str = "google-cloud-platform"
+    airflow_connection_type: str = "google-cloud-platform"
 
-    def validate_connection(self) -> bool:
-        """
-        Return whether the connection is valid for this profile mapping.
-
-        Required by dbt:
-        https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-file
-        - project
-        - dataset
-        - keyfile
-        """
-        if self.conn.conn_type != self.connection_type:
-            return False
-
-        if not self.project:
-            return False
-
-        if not self.dataset:
-            return False
-
-        if not self.key_path:
-            return False
-
-        return True
+    # https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-file
+    required_fields = [
+        "project",
+        "dataset",
+        "keyfile",
+    ]
 
     def get_profile(self) -> dict[str, Any | None]:
         """
         Return a dbt BigQuery profile based on the Airflow GCP connection.
 
-        https://docs.getdbt.com/reference/warehouse-setups/databricks-setup
+        https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-file
         https://airflow.apache.org/docs/apache-airflow-providers-databricks/stable/connections/databricks.html
         """
         return {
@@ -53,37 +39,47 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
             "project": self.project,
             "dataset": self.dataset,
             "threads": self.profile_args.get("threads") or 1,
-            "keyfile": self.key_path,
+            "keyfile": self.keyfile,
             **self.profile_args,
         }
 
-    def get_env_vars(self) -> dict[str, str]:
+    @property
+    def project(self) -> str | None:
         """
-        Returns a dictionary of environment variables that should be set.
+        Project ID can come from:
+        - profile_args.project
+        - Airflow conn.extra.project
         """
-        return {}
+        if self.profile_args.get("project"):
+            return str(self.profile_args.get("project"))
+
+        if self.conn.extra_dejson.get("project"):
+            return str(self.conn.extra_dejson.get("project"))
+
+        return None
 
     @property
-    def project(self) -> str:
+    def dataset(self) -> str | None:
         """
-        Returns the project ID.
+        Dataset can come from:
+        - profile_args.dataset
         """
-        return str(
-            self.profile_args.get("project") or self.conn.extra_dejson.get("project")
-        )
+        if self.profile_args.get("dataset"):
+            return str(self.profile_args.get("dataset"))
+
+        return None
 
     @property
-    def dataset(self) -> str:
+    def keyfile(self) -> str | None:
         """
-        Returns the dataset ID.
+        Keyfile can come from:
+        - profile_args.keyfile
+        - Airflow conn.extra.key_path
         """
-        return str(self.profile_args.get("dataset"))
+        if self.profile_args.get("keyfile"):
+            return str(self.profile_args.get("keyfile"))
 
-    @property
-    def key_path(self) -> str:
-        """
-        Returns the path to the service account file.
-        """
-        return str(
-            self.profile_args.get("key_path") or self.conn.extra_dejson.get("key_path")
-        )
+        if self.conn.extra_dejson.get("key_path"):
+            return str(self.conn.extra_dejson.get("key_path"))
+
+        return None

@@ -154,6 +154,14 @@ test = "pytest ."
 test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml ."
 
 ######################################
+# PYTEST
+######################################
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+######################################
 # DOCS
 ######################################
 

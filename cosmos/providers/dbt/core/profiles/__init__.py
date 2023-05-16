@@ -14,9 +14,9 @@ from .postgres.user_pass import PostgresUserPasswordProfileMapping
 from .redshift.user_pass import RedshiftUserPasswordProfileMapping
 from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
-from .trino.ldap import TrinoLDAPProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
+from .trino.ldap import TrinoLDAPProfileMapping
 
 profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudServiceAccountFileProfileMapping,

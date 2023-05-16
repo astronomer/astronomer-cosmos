@@ -1,16 +1,13 @@
 "Tests for the Trino profile."
 
-from unittest.mock import patch
-
 import json
+from unittest.mock import patch
 
 import pytest
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
-from cosmos.providers.dbt.core.profiles.trino.jwt import (
-    TrinoJWTProfileMapping,
-)
+from cosmos.providers.dbt.core.profiles.trino.jwt import TrinoJWTProfileMapping
 
 
 @pytest.fixture()

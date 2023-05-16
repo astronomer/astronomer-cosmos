@@ -1,8 +1,7 @@
 "Tests for the Snowflake profile."
 
-from unittest.mock import patch
-
 import json
+from unittest.mock import patch
 
 import pytest
 from airflow.models.connection import Connection

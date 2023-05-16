@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import json
+
 import pytest
 from airflow.models.connection import Connection
 
@@ -172,7 +174,13 @@ def test_old_snowflake_format() -> None:
         login="my_user",
         password="my_password",
         schema="my_schema",
-        extra='{"extra__snowflake__account": "my_account", "extra__snowflake__database": "my_database", "extra__snowflake__warehouse": "my_warehouse"}',
+        extra=json.dumps(
+            {
+                "extra__snowflake__account": "my_account",
+                "extra__snowflake__database": "my_database",
+                "extra__snowflake__warehouse": "my_warehouse",
+            }
+        ),
     )
 
     profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
@@ -197,7 +205,14 @@ def test_appends_region() -> None:
         login="my_user",
         password="my_password",
         schema="my_schema",
-        extra='{"account": "my_account", "region": "my_region", "database": "my_database", "warehouse": "my_warehouse"}',
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "region": "my_region",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+            }
+        ),
     )
 
     profile_mapping = SnowflakeUserPasswordProfileMapping(conn)

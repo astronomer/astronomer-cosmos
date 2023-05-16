@@ -33,7 +33,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
-    :param profile_args: Arguments to pass to the profile. See :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
+    :param profile_args: Arguments to pass to the profile. See
+        :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     """

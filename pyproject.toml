@@ -38,6 +38,8 @@ dependencies = [
     "apache-airflow>=2.3.0",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
+    "virtualenv",
+    "importlib-metadata; python_version < '3.8'",
 ]
 
 [project.optional-dependencies]

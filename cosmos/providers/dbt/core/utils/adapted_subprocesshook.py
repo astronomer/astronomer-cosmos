@@ -8,12 +8,16 @@ import contextlib
 import os
 import signal
 from collections import namedtuple
-from subprocess import PIPE, STDOUT, Popen
+from pathlib import Path
+from subprocess import PIPE, STDOUT, Popen, check_output
 from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
+from airflow.utils.python_virtualenv import prepare_virtualenv
 
 FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
+
+PY_INTERPRETER = "python3"
 
 
 class FullOutputSubprocessHook(BaseHook):
@@ -22,6 +26,36 @@ class FullOutputSubprocessHook(BaseHook):
     def __init__(self) -> None:
         self.sub_process: Popen[bytes] | None = None
         super().__init__()
+
+    def setup_virtualenv(
+        self,
+        stack: contextlib.ExitStack,
+        py_system_site_packages: bool = False,
+        py_requirements: list[str] | None = None,
+    ):
+        venv_tmp_dir = stack.enter_context(TemporaryDirectory(prefix="cosmos-venv"))
+
+        py_interpreter = prepare_virtualenv(
+            venv_directory=venv_tmp_dir,
+            python_bin=PY_INTERPRETER,
+            system_site_packages=py_system_site_packages,
+            requirements=py_requirements,
+        )
+        dbt_binary = Path(py_interpreter).parent / "dbt"
+
+        dbt_version = (
+            check_output(
+                [
+                    py_interpreter,
+                    "-c",
+                    "from importlib.metadata import version; print(version('dbt-core'))",
+                ]
+            )
+            .decode()
+            .strip()
+        )
+        self.log.info("DBT version: %s", dbt_version)
+        return dbt_binary
 
     def run_command(
         self,
@@ -56,6 +90,26 @@ class FullOutputSubprocessHook(BaseHook):
             if cwd is None:
                 cwd = stack.enter_context(TemporaryDirectory(prefix="airflowtmp"))
 
+            # TODO: Address the following before having this PR ready for review:
+            # (1) Create a new virtualenv execution mode / dedicated operators
+
+            # (2) Allow users to configure the following values, at DAG and TaskGroup level:
+            # - py_requirements
+            # - py_interpreter
+
+            # (3) Tests
+
+            # venv starts here
+            py_system_site_packages = False  # TODO: allow user to override
+            py_requirements = ["dbt-postgres==1.6.0b1"]  # TODO: allow user to override
+            dbt_binary_path = self.setup_virtualenv(
+                stack=stack,
+                py_system_site_packages=py_system_site_packages,
+                py_requirements=py_requirements,
+            )
+            command[0] = str(dbt_binary_path)
+            # venv stops here
+
             def pre_exec():
                 # Restore default signal disposition and invoke setsid
                 for sig in ("SIGPIPE", "SIGXFZ", "SIGXFSZ"):
@@ -63,7 +117,7 @@ class FullOutputSubprocessHook(BaseHook):
                         signal.signal(getattr(signal, sig), signal.SIG_DFL)
                 os.setsid()
 
-            self.log.info("Running command: %s", command)
+                self.log.info("Running command: %s", command)
 
             self.sub_process = Popen(
                 command,
@@ -79,6 +133,7 @@ class FullOutputSubprocessHook(BaseHook):
 
             if self.sub_process is None:
                 raise RuntimeError("The subprocess should be created here and is None!")
+
             if self.sub_process.stdout is not None:
                 for raw_line in iter(self.sub_process.stdout.readline, b""):
                     line = raw_line.decode(output_encoding, errors="backslashreplace").rstrip()
@@ -86,12 +141,13 @@ class FullOutputSubprocessHook(BaseHook):
                     log_lines.append(line)
                     self.log.info("%s", line)
 
-            self.sub_process.wait()
+                self.sub_process.wait()
 
             self.log.info("Command exited with return code %s", self.sub_process.returncode)
-            return_code: int = self.sub_process.returncode
 
-        return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
+        return FullOutputSubprocessResult(
+            exit_code=self.sub_process.returncode, output=line, full_output=log_lines
+        )
 
     def send_sigterm(self):
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""

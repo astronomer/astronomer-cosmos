@@ -30,6 +30,12 @@ For instance, to run the tests using Python 3.10 and Apache Airflow 2.5, use the
 
     hatch run tests.py3.10-2.5:test-cov
 
+It is also possible to run the tests using all the matrix combinations, by using:
+
+.. code-block:: bash
+
+    hatch run tests:test-cov
+
 
 Using Tilt for local development
 ________________________________

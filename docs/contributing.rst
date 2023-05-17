@@ -18,11 +18,11 @@ To contribute to the cosmos project:
 
 
 Using Hatch for local development
------------------------
+---------------------------------
 
 We currently use  `hatch <https://github.com/pypa/hatch>`_ for building and distributing `astronomer-cosmos`.
 
-The tool can also be used for local development. The `pyproject.toml <../pyproject.toml>`_ file currently defines a matrix of supported versions of Python and Airflow for which a user can run the tests against.
+The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python and Airflow for which a user can run the tests against.
 
 For instance, to run the tests using Python 3.10 and Apache Airflow 2.5, use the following:
 
@@ -38,12 +38,13 @@ It is also possible to use `tilt <https://docs.tilt.dev>`_, a toolkit which help
 
 
 Pre-requisites
-**************
+++++++++++++++
+
 #. `tilt <https://docs.tilt.dev>`_
 #. `git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
 
 Local Sandbox
-************
++++++++++++++
 
 For local development, we use `Tilt <https://docs.tilt.dev>`_. To use Tilt, first clone the ``astronomer-cosmos`` repo:
 
@@ -61,7 +62,7 @@ You can press ``space`` to open the Tilt UI and see the status of the sandbox. O
 
 
 Pre-Commit
-************
+++++++++++
 
 We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
 
@@ -77,7 +78,7 @@ To run the checks manually, run:
 
 
 Writing Docs
-__________________________________
+____________
 
 You can run the docs locally by running the following:
 
@@ -90,9 +91,9 @@ This will run the docs server in a virtual environment with the right dependenci
 
 
 Building
-__________________________________
+________
 
-We use `hatch <https://hatch.pypa.io/latest/>`_ to build the project. To build the project, run:
+We use ```hatch``` to build the project. To build the project, run:
 
 .. code-block:: bash
 
@@ -100,7 +101,7 @@ We use `hatch <https://hatch.pypa.io/latest/>`_ to build the project. To build t
 
 
 Releasing
-__________________________________
+_________
 
 We use GitHub actions to create and deploy new releases. To create a new release, first create a new version using:
 
@@ -109,7 +110,7 @@ We use GitHub actions to create and deploy new releases. To create a new release
     hatch version minor
 
 
-hatch will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
+```hatch``` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
 
 .. note::
     You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.

@@ -30,8 +30,9 @@ extensions = [
 add_module_names = False
 autodoc_mock_imports = ["airflow", "cosmos.providers.dbt"]
 autoapi_dirs = ["../cosmos"]
+autoapi_ignore = ["*/tests/*"]
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/tests/*"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -49,3 +50,14 @@ html_theme_options = {
     },
     "footer_items": ["copyright"],
 }
+
+
+def skip_logger_objects(app, what, name, obj, skip, options):
+    if "logger" in name:
+        skip = True
+
+    return skip
+
+
+def setup(sphinx):
+    sphinx.connect("autoapi-skip-member", skip_logger_objects)

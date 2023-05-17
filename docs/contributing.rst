@@ -16,8 +16,24 @@ To contribute to the cosmos project:
 #. Link your issue to the pull request
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
-Creating a Sandbox to Test Changes
-__________________________________
+
+Using Hatch for local development
+-----------------------
+
+We currently use  `hatch <https://github.com/pypa/hatch>`_ for building and distributing `astronomer-cosmos`.
+
+The tool can also be used for local development. For instance, to run all the tests on Python 3.10 and Apache Airflow 2.5, use:
+
+.. code-block:: bash
+
+    hatch run tests.py3.10-2.5:test-cov
+
+
+Using Tilt for local development
+________________________________
+
+It is also possible to use `tilt <https://docs.tilt.dev>`_, a toolkit which helps on microservices local development.
+
 
 Pre-requisites
 **************

@@ -129,7 +129,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             profiles_path = os.path.join(tmp_project_dir, "profiles.yml")
             if os.path.exists(profiles_path):
                 logger.warning(
-                    "Cosmos doesn't support user-supplied profiles.yml files. Removing..."
+                    "Cosmos doesn't support user-supplied profiles.yml files. \
+                    Please use Airflow connections instead. \
+                    Ignoring profiles.yml…"
                 )
                 os.remove(profiles_path)
 

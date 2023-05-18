@@ -56,9 +56,13 @@ with DAG(
     doc_md=__doc__,
     catchup=False,
 ) as dag:
-    generate_dbt_docs_aws = DbtDocsS3Operator(
-        task_id="generate_dbt_docs_aws",
+
+    generate_dbt_docs = DbtDocsOperator(
+        task_id="generate_dbt_docs",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
+        profile_args={
+            "schema": "public",
+        },
         conn_id="airflow_db",
         schema="public",
         aws_conn_id=S3_CONN_ID,

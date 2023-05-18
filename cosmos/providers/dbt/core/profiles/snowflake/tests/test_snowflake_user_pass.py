@@ -188,9 +188,9 @@ def test_old_snowflake_format() -> None:
         "user": conn.login,
         "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
         "schema": conn.schema,
-        "account": conn.extra_dejson.get("extra__snowflake__account"),
-        "database": conn.extra_dejson.get("extra__snowflake__database"),
-        "warehouse": conn.extra_dejson.get("extra__snowflake__warehouse"),
+        "account": conn.extra_dejson.get("account"),
+        "database": conn.extra_dejson.get("database"),
+        "warehouse": conn.extra_dejson.get("warehouse"),
     }
 
 

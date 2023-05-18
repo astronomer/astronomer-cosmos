@@ -24,6 +24,7 @@ def mock_exasol_connection():  # type: ignore
         password="my_password",
         port=8563,
         schema="my_database",
+        extra='{"protocol_version": "1"}',
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -117,6 +118,7 @@ def test_profile_args(
         "dbname": mock_exasol_connection.schema,
         "schema": "my_schema",
         "threads": 1,
+        "protocol_version": "1",
     }
 
 
@@ -135,6 +137,7 @@ def test_profile_args_overrides(
             "schema": "my_schema",
             "dbname": "my_db_override",
             "threads": 1,
+            "protocol_version": "2",
         },
     )
     assert profile_mapping.profile_args == {
@@ -144,6 +147,7 @@ def test_profile_args_overrides(
         "schema": "my_schema",
         "dbname": "my_db_override",
         "threads": 1,
+        "protocol_version": "2",
     }
 
     assert profile_mapping.get_profile() == {
@@ -154,6 +158,7 @@ def test_profile_args_overrides(
         "dbname": "my_db_override",
         "schema": "my_schema",
         "threads": 1,
+        "protocol_version": "2",
     }
 
 

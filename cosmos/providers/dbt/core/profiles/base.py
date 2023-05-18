@@ -26,6 +26,8 @@ class BaseProfileMapping:
     is_community: bool = False
 
     required_fields: list[str] = []
+    secret_fields: list[str] = []
+    airflow_param_mapping: dict[str, str | list[str]] = {}
 
     def __init__(self, conn: Connection, profile_args: dict[str, Any] | None = None):
         self.conn = conn
@@ -39,7 +41,15 @@ class BaseProfileMapping:
             return False
 
         for field in self.required_fields:
-            if not getattr(self, field):
+            try:
+                if not getattr(self, field):
+                    logger.info(
+                        "Not using mapping %s because %s is not set",
+                        self.__class__.__name__,
+                        field,
+                    )
+                    return False
+            except AttributeError:
                 logger.info(
                     "Not using mapping %s because %s is not set",
                     self.__class__.__name__,
@@ -56,10 +66,16 @@ class BaseProfileMapping:
         raise NotImplementedError
 
     def get_env_vars(self) -> dict[str, str]:
-        """
-        Return a dictionary of environment variables that should be set.
-        """
-        return {}
+        "Returns a dictionary of environment variables that should be set based on self.secret_fields."
+        env_vars = {}
+
+        for field in self.secret_fields:
+            env_var_name = self.get_env_var_name(field)
+            value = self.get_dbt_value(field)
+            if value is not None:
+                env_vars[env_var_name] = str(value)
+
+        return env_vars
 
     def get_profile_file_contents(
         self, profile_name: str, target_name: str = "cosmos_target"
@@ -80,6 +96,52 @@ class BaseProfileMapping:
         }
 
         return str(yaml.dump(profile_contents, indent=4))
+
+    def get_dbt_value(self, name: str) -> Any:
+        """
+        Gets values for the dbt profile based on the required_by_dbt and required_in_profile_args lists.
+        Precedence is:
+        1. profile_args
+        2. conn
+        """
+        # if it's in profile_args, return that
+        if self.profile_args.get(name):
+            return self.profile_args[name]
+
+        # if it's has an entry in airflow_param_mapping, we can get it from conn
+        if name in self.airflow_param_mapping:
+            airflow_fields = self.airflow_param_mapping[name]
+
+            if isinstance(airflow_fields, str):
+                airflow_fields = [airflow_fields]
+
+            for airflow_field in airflow_fields:
+                # make sure there's no "extra." prefix
+                if airflow_field.startswith("extra."):
+                    airflow_field = airflow_field.replace("extra.", "", 1)
+                    value = self.conn.extra_dejson.get(airflow_field)
+                else:
+                    value = getattr(self.conn, airflow_field)
+
+                if not value:
+                    continue
+
+                # if there's a transform method, use it
+                if hasattr(self, f"transform_{name}"):
+                    return getattr(self, f"transform_{name}")(value)
+
+                return value
+
+        # otherwise, we don't have it - return None
+        return None
+
+    def __getattr__(self, name: str) -> Any:
+        "If the attribute doesn't exist, try to get it from profile_args or the Airflow connection."
+        attempted_value = self.get_dbt_value(name)
+        if attempted_value is not None:
+            return attempted_value
+
+        raise AttributeError
 
     @classmethod
     def filter_null(cls, args: dict[str, Any]) -> dict[str, Any]:

@@ -1,19 +1,15 @@
-"""
-Contains the Airflow Exasol connection -> dbt profile mapping.
-"""
+"Maps Airflow Exasol connections with a username and password to dbt profiles."
 from __future__ import annotations
 
-from logging import getLogger
 from typing import Any
 
 from ..base import BaseProfileMapping
 
-logger = getLogger(__name__)
-
 
 class ExasolUserPasswordProfileMapping(BaseProfileMapping):
     """
-    Class responsible for mapping Airflow Exasol connections to dbt profiles.
+    Maps Airflow Exasol connections with a username and password to dbt profiles.
+    https://docs.getdbt.com/reference/warehouse-setups/exasol-setup
     """
 
     airflow_connection_type: str = "exasol"
@@ -21,7 +17,6 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
 
     default_port: int = 8563
 
-    # https://docs.getdbt.com/reference/warehouse-setups/exasol-setup
     required_fields = [
         "threads",
         "dsn",
@@ -31,10 +26,24 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
         "schema",
     ]
 
+    secret_fields = [
+        "password",
+    ]
+
+    airflow_param_mapping = {
+        "dsn": "host",
+        "user": "login",
+        "password": "password",
+        "dbname": "schema",
+        "encryption": "extra.encryption",
+        "compression": "extra.compression",
+        "connection_timeout": "extra.connection_timeout",
+        "socket_timeout": "extra.socket_timeout",
+        "protocol_version": "extra.protocol_version",
+    }
+
     def get_profile(self) -> dict[str, Any | None]:
-        """
-        Return a dbt Spark profile based on the Airflow Spark connection.
-        """
+        "Gets profile. The password is stored in an environment variable."
         profile_vars = {
             "type": "exasol",
             "threads": self.threads,
@@ -55,108 +64,10 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
         # remove any null values
         return self.filter_null(profile_vars)
 
-    def get_env_vars(self) -> dict[str, str]:
-        """
-        Return a dictionary of environment variables that should be set.
-        """
-        env_vars = {}
+    def transform_dsn(self, host: str) -> str:
+        "Adds the port if it's not already there."
+        if not ":" in host:
+            port = self.conn.port or self.default_port
+            return f"{host}:{port}"
 
-        # should always be set because we validate in validate_connection
-        if self.password:
-            env_vars[self.get_env_var_name("password")] = self.password
-
-        return env_vars
-
-    @property
-    def threads(self) -> int | None:
-        """
-        threads can come from:
-        - profile_args.threads
-        """
-        threads = self.profile_args.get("threads")
-        if threads:
-            return int(threads)
-
-        return None
-
-    @property
-    def dsn(self) -> str | None:
-        """
-        dsn can come from:
-        - profile_args.dsn
-        - Airflow's conn.host (and conn.port)
-
-        If the connection's host doesn't have a port, we use the default port.
-        """
-        if self.profile_args.get("dsn"):
-            return self.profile_args.get("dsn")
-
-        if self.conn.host:
-            # if we have a port in the host, use that
-            if ":" in self.conn.host:
-                return self.conn.host
-
-            # otherwise, use the port from the connection
-            if self.conn.port:
-                return f"{self.conn.host}:{self.conn.port}"
-
-            # otherwise, use the default port
-            return f"{self.conn.host}:{self.default_port}"
-
-        return None
-
-    @property
-    def password(self) -> str | None:
-        """
-        Password can come from:
-        - profile_args.password
-        - Airflow's conn.password
-        """
-        if self.profile_args.get("password"):
-            return self.profile_args.get("password")
-
-        if self.conn.password:
-            return str(self.conn.password)
-
-        return None
-
-    @property
-    def user(self) -> str | None:
-        """
-        User can come from:
-        - profile_args.user
-        - Airflow's conn.login
-        """
-        if self.profile_args.get("user"):
-            return self.profile_args.get("user")
-
-        if self.conn.login:
-            return str(self.conn.login)
-
-        return None
-
-    @property
-    def dbname(self) -> str | None:
-        """
-        dbname can come from:
-        - profile_args.dbname
-        - Airflow's conn.schema
-        """
-        if self.profile_args.get("dbname"):
-            return self.profile_args.get("dbname")
-
-        if self.conn.schema:
-            return str(self.conn.schema)
-
-        return None
-
-    @property
-    def schema(self) -> str | None:
-        """
-        Schema can come from:
-        - profile_args.schema
-        """
-        if self.profile_args.get("schema"):
-            return self.profile_args.get("schema")
-
-        return None
+        return host

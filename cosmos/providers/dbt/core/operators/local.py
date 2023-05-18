@@ -111,6 +111,20 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         ).delete()
         session.add(rtif)
 
+    def handle_profiles_yml(self, project_dir: str) -> None:
+        """
+        If there's a profiles.yml file in the project dir, remove it. Cosmos doesn't support
+        user-supplied profiles.yml files.
+        """
+        profiles_path = os.path.join(project_dir, "profiles.yml")
+        if os.path.exists(profiles_path):
+            logger.warning(
+                "Cosmos doesn't support user-supplied profiles.yml files. \
+                    Please use Airflow connections instead. \
+                    Ignoring profiles.yml…"
+            )
+            os.remove(profiles_path)
+
     def run_command(
         self,
         cmd: list[str],
@@ -128,15 +142,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 tmp_project_dir,
             )
 
-            # ensure there's no profiles.yml file in the project dir
-            profiles_path = os.path.join(tmp_project_dir, "profiles.yml")
-            if os.path.exists(profiles_path):
-                logger.warning(
-                    "Cosmos doesn't support user-supplied profiles.yml files. \
-                    Please use Airflow connections instead. \
-                    Ignoring profiles.yml…"
-                )
-                os.remove(profiles_path)
+            self.handle_profiles_yml(tmp_project_dir)
 
             # if we need to install deps, do so
             if self.install_deps:

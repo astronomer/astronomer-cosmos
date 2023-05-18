@@ -103,3 +103,27 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         "SNOWFLAKE_SCHEMA": "jaffle_shop",
     }
     assert env == expected_env
+
+
+@patch("os.path.exists")
+def test_user_supplied_profiles(
+    os_path_exists: MagicMock,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    "Ensures that user supplied profiles log a warning and aren't used"
+    op = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+
+    os_path_exists.return_value = True
+
+    with patch("os.remove") as os_remove:
+        op.handle_profiles_yml(project_dir="my_dir")
+        # ensure that the file is removed
+        assert os_remove.call_count == 1
+
+    # ensure that a warning is logged
+    captured = capfd.readouterr()
+    assert "WARNING" in captured.out and "profiles.yml" in captured.out

@@ -2,7 +2,7 @@
 ## Docs DAG
 
 This DAG illustrates how to run `dbt docs generate` and handle the output. In this example, we're using the
-`DbtDocsLocalOperator` to generate the docs, coupled with a callback. The callback will upload the docs to 
+`DbtDocsLocalOperator` to generate the docs, coupled with a callback. The callback will upload the docs to
 S3 (if you have the S3Hook installed) or to a local directory.
 
 """

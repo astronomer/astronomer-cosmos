@@ -36,6 +36,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param install_deps: If true, install dependencies before running the command
+    :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     """
 
     template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)
@@ -47,11 +48,13 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def __init__(
         self,
         install_deps: bool = False,
+        callback: Optional[Callable[[str], None]] = None,
         profile_args: dict[str, str] = {},
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
         self.profile_args = profile_args
+        self.callback = callback
         self.compiled_sql = ""
         super().__init__(**kwargs)
 
@@ -168,6 +171,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             self.exception_handling(result)
             self.store_compiled_sql(tmp_project_dir, context)
+            if self.callback:
+                self.callback(tmp_project_dir)
 
             return result
 
@@ -362,6 +367,23 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     def execute(self, context: Context):
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        return result.output
+
+
+class DbtDocsLocalOperator(DbtLocalBaseOperator):
+    """
+    Executes `dbt docs generate` command.
+    Use the `callback` parameter to specify a callback function to run after the command completes.
+    """
+
+    ui_color = "#8194E0"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.base_cmd = ["docs", "generate"]
+
+    def execute(self, context: Context):
+        result = self.build_and_run_cmd(context=context)
         return result.output
 
 

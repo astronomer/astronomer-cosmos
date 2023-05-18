@@ -66,7 +66,7 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
 
     def transform_dsn(self, host: str) -> str:
         "Adds the port if it's not already there."
-        if not ":" in host:
+        if ":" not in host:
             port = self.conn.port or self.default_port
             return f"{host}:{port}"
 

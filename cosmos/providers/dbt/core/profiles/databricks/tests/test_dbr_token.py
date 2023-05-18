@@ -19,7 +19,7 @@ def mock_databricks_conn():  # type: ignore
     conn = Connection(
         conn_id="my_databricks_connection",
         conn_type="databricks",
-        host="my_host",
+        host="https://my_host",
         password="my_token",
         extra='{"http_path": "my_http_path"}',
     )
@@ -101,7 +101,7 @@ def test_profile_args(
 
     assert profile_mapping.get_profile() == {
         "type": mock_databricks_conn.conn_type,
-        "host": mock_databricks_conn.host,
+        "host": mock_databricks_conn.host.replace("https://", ""),
         "token": "{{ env_var('COSMOS_CONN_DATABRICKS_TOKEN') }}",
         "http_path": mock_databricks_conn.extra_dejson.get("http_path"),
         "schema": "my_schema",
@@ -117,16 +117,22 @@ def test_profile_args_overrides(
     """
     profile_mapping = get_profile_mapping(
         mock_databricks_conn.conn_id,
-        profile_args={"schema": "my_schema", "http_path": "http_path_override"},
+        profile_args={
+            "schema": "my_schema",
+            "http_path": "http_path_override",
+            "host": "my_host_override",
+        },
     )
     assert profile_mapping.profile_args == {
         "schema": "my_schema",
         "http_path": "http_path_override",
+        "host": "my_host_override",
     }
 
+    print("profile_mapping.get_profile()", profile_mapping.get_profile())
     assert profile_mapping.get_profile() == {
         "type": mock_databricks_conn.conn_type,
-        "host": mock_databricks_conn.host,
+        "host": "my_host_override",
         "token": "{{ env_var('COSMOS_CONN_DATABRICKS_TOKEN') }}",
         "http_path": "http_path_override",
         "schema": "my_schema",

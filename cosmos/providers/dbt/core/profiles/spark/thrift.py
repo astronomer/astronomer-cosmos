@@ -1,29 +1,29 @@
-"""
-Contains the Airflow Spark connection -> dbt profile mapping.
-"""
+"Maps Airflow Spark connections to dbt profiles if they use a thrift connection."
 from __future__ import annotations
 
-from logging import getLogger
 from typing import Any
 
 from ..base import BaseProfileMapping
 
-logger = getLogger(__name__)
-
 
 class SparkThriftProfileMapping(BaseProfileMapping):
     """
-    Class responsible for mapping Airflow Spark connections to dbt profiles.
+    Maps Airflow Spark connections to dbt profiles if they use a thrift connection.
+    https://docs.getdbt.com/reference/warehouse-setups/spark-setup#thrift
+    https://airflow.apache.org/docs/apache-airflow-providers-apache-spark/stable/connections/spark.html
     """
 
     airflow_connection_type: str = "spark"
     is_community: bool = True
 
-    # https://docs.getdbt.com/reference/warehouse-setups/spark-setup#thrift
     required_fields = [
         "schema",
         "host",
     ]
+
+    airflow_param_mapping = {
+        "host": "host",
+    }
 
     def get_profile(self) -> dict[str, Any | None]:
         """
@@ -40,29 +40,3 @@ class SparkThriftProfileMapping(BaseProfileMapping):
 
         # remove any null values
         return self.filter_null(profile_vars)
-
-    @property
-    def schema(self) -> str | None:
-        """
-        Schema can come from:
-        - profile_args.schema
-        """
-        if self.profile_args.get("schema"):
-            return str(self.profile_args.get("schema"))
-
-        return None
-
-    @property
-    def host(self) -> str | None:
-        """
-        Host can come from:
-        - profile_args.host
-        - Airflow conn.host
-        """
-        if self.profile_args.get("host"):
-            return str(self.profile_args.get("host"))
-
-        if self.conn.host:
-            return str(self.conn.host)
-
-        return None

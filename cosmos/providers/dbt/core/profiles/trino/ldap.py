@@ -1,6 +1,4 @@
-"""
-Contains the LDAP Airflow Trino connection -> dbt profile mapping.
-"""
+"Maps Airflow Trino connections to LDAP Trino dbt profiles."
 from __future__ import annotations
 
 from typing import Any
@@ -10,13 +8,24 @@ from .base import TrinoBaseProfileMapping
 
 class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
     """
-    Class responsible for mapping Airflow Trino connections to LDAP Trino dbt profiles.
+    Maps Airflow Trino connections to LDAP Trino dbt profiles.
+
+    https://docs.getdbt.com/reference/warehouse-setups/trino-setup#ldap
+    https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 
     required_fields = TrinoBaseProfileMapping.required_fields + [
         "user",
         "password",
     ]
+    secret_fields = [
+        "password",
+    ]
+    airflow_param_mapping = {
+        "user": "login",
+        "password": "password",
+        **TrinoBaseProfileMapping.airflow_param_mapping,
+    }
 
     def get_profile(self) -> dict[str, Any | None]:
         """
@@ -33,41 +42,3 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
 
         # remove any null values
         return self.filter_null(profile_vars)
-
-    def get_env_vars(self) -> dict[str, str]:
-        """
-        Returns a dictionary of environment variables that should be set.
-        """
-        return {
-            self.get_env_var_name("password"): str(self.password),
-        }
-
-    @property
-    def user(self) -> str | None:
-        """
-        User can come from:
-        - profile_args.user
-        - Airflow conn.login
-        """
-        if self.profile_args.get("user"):
-            return str(self.profile_args.get("user"))
-
-        if self.conn.login:
-            return str(self.conn.login)
-
-        return None
-
-    @property
-    def password(self) -> str | None:
-        """
-        Password can come from:
-        - profile_args.password
-        - Airflow conn.password
-        """
-        if self.profile_args.get("password"):
-            return str(self.profile_args.get("password"))
-
-        if self.conn.password:
-            return str(self.conn.password)
-
-        return None

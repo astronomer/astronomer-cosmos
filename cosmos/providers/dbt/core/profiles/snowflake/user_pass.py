@@ -1,21 +1,25 @@
-"""
-Contains the Airflow Snowflake connection -> dbt profile mapping.
-"""
+"Maps Airflow Snowflake connections to dbt profiles if they use a user/password."
 from __future__ import annotations
 
-from typing import Any
+import json
+
+from typing import Any, TYPE_CHECKING
 
 from ..base import BaseProfileMapping
+
+if TYPE_CHECKING:
+    from airflow.models import Connection
 
 
 class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
     """
-    Class responsible for mapping Airflow Snowflake connections to dbt profiles.
+    Maps Airflow Snowflake connections to dbt profiles if they use a user/password.
+    https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
+    https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
     airflow_connection_type: str = "snowflake"
 
-    # https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#user--password-authentication
     required_fields = [
         "account",
         "user",
@@ -24,156 +28,64 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         "schema",
         "password",
     ]
+    secret_fields = [
+        "password",
+    ]
+    airflow_param_mapping = {
+        "account": "extra.account",
+        "user": "login",
+        "password": "password",
+        "database": "extra.database",
+        "warehouse": "extra.warehouse",
+        "schema": "schema",
+        "role": "extra.role",
+    }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    def __init__(
+        self, conn: Connection, profile_args: dict[str, Any | None] | None = None
+    ) -> None:
         """
-        Return a dbt Snowflake profile based on the Airflow Snowflake connection.
-
-        Password is stored in an environment variable to avoid writing it to disk.
-
-        https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
-        https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
-        """
-        profile_vars = {
-            "type": "snowflake",
-            "account": self.account,
-            "user": self.conn.login,
-            "password": self.get_env_var_format("password"),
-            "role": self.conn_dejson.get("role"),
-            "database": self.database,
-            "warehouse": self.conn_dejson.get("warehouse"),
-            "schema": self.schema,
-            **self.profile_args,
-        }
-
-        # remove any null values
-        return self.filter_null(profile_vars)
-
-    def get_env_vars(self) -> dict[str, str]:
-        """
-        Returns a dictionary of environment variables that should be set.
-        """
-        return {
-            self.get_env_var_name("password"): str(self.conn.password),
-        }
-
-    @property
-    def conn_dejson(self) -> dict[str, Any]:
-        """
-        Return the connection's extra_dejson dict. Snowflake can be odd because
-        the fields used to be stored with keys in the format 'extra__snowflake__account',
-        but now are stored as 'account'.
+        Snowflake can be odd because the fields used to be stored with keys in the format
+        'extra__snowflake__account', but now are stored as 'account'.
 
         This standardizes the keys to be 'account', 'database', etc.
         """
-        conn_dejson = self.conn.extra_dejson
+        conn_dejson = conn.extra_dejson
 
-        # check if the keys are in the old format
         if conn_dejson.get("extra__snowflake__account"):
-            # if so, update the keys to the new format
             conn_dejson = {
                 key.replace("extra__snowflake__", ""): value
                 for key, value in conn_dejson.items()
             }
 
-        return conn_dejson
+        conn.extra = json.dumps(conn_dejson)
 
-    @property
-    def account(self) -> str | None:
-        """
-        Snowflake account can come from:
-        - profile_args.account
-        - Airflow conn.extra.account (and conn.extra.region)
+        self.conn = conn
+        self.profile_args = profile_args or {}
+        super().__init__(conn, profile_args)
 
-        dbt also expects the account to be in the format <account>.<region> but Airflow
-        doesn't necessarily require this, so this also reconciles the account and region.
-        https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#account
-        """
-        if self.profile_args.get("account"):
-            return str(self.profile_args.get("account"))
+    def get_profile(self) -> dict[str, Any | None]:
+        "Gets profile."
+        profile_vars = {
+            "type": "snowflake",
+            "account": self.account,
+            "user": self.user,
+            "schema": self.schema,
+            "database": self.database,
+            "role": self.conn.extra_dejson.get("role"),
+            "warehouse": self.conn.extra_dejson.get("warehouse"),
+            **self.profile_args,
+            # password should always get set as env var
+            "password": self.get_env_var_format("password"),
+        }
 
-        account = self.conn_dejson.get("account")
+        # remove any null values
+        return self.filter_null(profile_vars)
 
-        if not account:
-            return None
-
-        region = self.conn_dejson.get("region")
+    def transform_account(self, account: str) -> str:
+        "Transform the account to the format <account>.<region> if it's not already."
+        region = self.conn.extra_dejson.get("region")
         if region and region not in account:
             account = f"{account}.{region}"
 
         return str(account)
-
-    @property
-    def user(self) -> str | None:
-        """
-        User can come from:
-        - profile_args.user
-        - Airflow conn.login
-        """
-        if self.profile_args.get("user"):
-            return str(self.profile_args.get("user"))
-
-        if self.conn.login:
-            return str(self.conn.login)
-
-        return None
-
-    @property
-    def database(self) -> str | None:
-        """
-        Database can come from:
-        - profile_args.database
-        - Airflow conn.extra.database
-        """
-        if self.profile_args.get("database"):
-            return str(self.profile_args.get("database"))
-
-        if self.conn_dejson.get("database"):
-            return str(self.conn_dejson.get("database"))
-
-        return None
-
-    @property
-    def warehouse(self) -> str | None:
-        """
-        Warehouse can come from:
-        - profile_args.warehouse
-        - Airflow conn.extra.warehouse
-        """
-        if self.profile_args.get("warehouse"):
-            return str(self.profile_args.get("warehouse"))
-
-        if self.conn_dejson.get("warehouse"):
-            return str(self.conn_dejson.get("warehouse"))
-
-        return None
-
-    @property
-    def schema(self) -> str | None:
-        """
-        Schema can come from:
-        - profile_args.schema
-        - Airflow conn.schema
-        """
-        if self.profile_args.get("schema"):
-            return str(self.profile_args.get("schema"))
-
-        if self.conn.schema:
-            return str(self.conn.schema)
-
-        return None
-
-    @property
-    def password(self) -> str | None:
-        """
-        Password can come from:
-        - profile_args.password
-        - Airflow conn.password
-        """
-        if self.profile_args.get("password"):
-            return str(self.profile_args.get("password"))
-
-        if self.conn.password:
-            return str(self.conn.password)
-
-        return None

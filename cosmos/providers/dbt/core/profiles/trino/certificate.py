@@ -1,6 +1,4 @@
-"""
-Contains the Certificate Airflow Trino connection -> dbt profile mapping.
-"""
+"Maps Airflow Trino connections to Certificate Trino dbt profiles."
 from __future__ import annotations
 
 from typing import Any
@@ -10,7 +8,9 @@ from .base import TrinoBaseProfileMapping
 
 class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
     """
-    Class responsible for mapping Airflow Trino connections to certificate Trino dbt profiles.
+    Maps Airflow Trino connections to Certificate Trino dbt profiles.
+    https://docs.getdbt.com/reference/warehouse-setups/trino-setup#certificate
+    https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 
     required_fields = TrinoBaseProfileMapping.required_fields + [
@@ -18,10 +18,14 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
         "client_private_key",
     ]
 
+    airflow_param_mapping = {
+        "client_certificate": "extra.certs__client_cert_path",
+        "client_private_key": "extra.certs__client_key_path",
+        **TrinoBaseProfileMapping.airflow_param_mapping,
+    }
+
     def get_profile(self) -> dict[str, Any | None]:
-        """
-        Returns a dbt Trino profile based on the Airflow Trino connection.
-        """
+        "Gets profile."
         common_profile_vars = super().get_profile()
         profile_vars = {
             **common_profile_vars,
@@ -33,33 +37,3 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
 
         # remove any null values
         return self.filter_null(profile_vars)
-
-    @property
-    def client_certificate(self) -> str | None:
-        """
-        client_certificate can come from:
-        - profile_args.client_certificate
-        - Airflow conn.extra.certs__client_cert_path
-        """
-        if self.profile_args.get("client_certificate"):
-            return str(self.profile_args.get("client_certificate"))
-
-        if self.conn.extra_dejson.get("certs__client_cert_path"):
-            return str(self.conn.extra_dejson.get("certs__client_cert_path"))
-
-        return None
-
-    @property
-    def client_private_key(self) -> str | None:
-        """
-        client_private_key can come from:
-        - profile_args.client_private_key
-        - Airflow conn.extra.certs__client_key_path
-        """
-        if self.profile_args.get("client_private_key"):
-            return str(self.profile_args.get("client_private_key"))
-
-        if self.conn.extra_dejson.get("certs__client_key_path"):
-            return str(self.conn.extra_dejson.get("certs__client_key_path"))
-
-        return None

@@ -65,7 +65,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
         dbt_tg = DbtTaskGroup(
             dbt_project_name="jaffle_shop",
             conn_id="airflow_db",
-            dbt_args={
+            profile_args={
                 "schema": "public",
             },
         )

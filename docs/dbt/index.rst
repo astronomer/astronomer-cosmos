@@ -9,9 +9,9 @@ Cosmos allows you to render your dbt models as Airflow DAGs and Task Groups.
 
     Installation Options <install-options>
     Usage <usage>
+    Connections & Profiles <connections-profiles>
     Scheduling <scheduling>
     Configuration <configuration>
-    Connections <connections>
     Generating Docs <docs>
     Lineage <lineage>
     Other execution options <other-execution-options>
@@ -50,7 +50,7 @@ Create a DAG and import the :class:`cosmos.providers.dbt.DbtTaskGroup` class. Th
             group_id="dbt_tg",
             dbt_project_name="jaffle_shop",
             conn_id="airflow_db",
-            dbt_args={
+            profile_args={
                 "schema": "public",
             },
         )

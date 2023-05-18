@@ -117,8 +117,7 @@ class FullOutputSubprocessHook(BaseHook):
                         signal.signal(getattr(signal, sig), signal.SIG_DFL)
                 os.setsid()
 
-                self.log.info("Running command: %s", command)
-
+            self.log.info("Running command: %s", command)
             self.sub_process = Popen(
                 command,
                 stdout=PIPE,
@@ -141,9 +140,11 @@ class FullOutputSubprocessHook(BaseHook):
                     log_lines.append(line)
                     self.log.info("%s", line)
 
-                self.sub_process.wait()
+            self.sub_process.wait()
 
-            self.log.info("Command exited with return code %s", self.sub_process.returncode)
+            self.log.info(
+                "Command exited with return code %s", self.sub_process.returncode
+            )
 
         return FullOutputSubprocessResult(
             exit_code=self.sub_process.returncode, output=line, full_output=log_lines

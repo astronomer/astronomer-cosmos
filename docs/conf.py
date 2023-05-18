@@ -28,7 +28,7 @@ extensions = [
 ]
 
 add_module_names = False
-autodoc_mock_imports = ["airflow", "cosmos.providers.dbt"]
+autodoc_mock_imports = ["airflow"]
 autoapi_dirs = ["../cosmos"]
 autoapi_ignore = ["*/tests/*"]
 templates_path = ["_templates"]

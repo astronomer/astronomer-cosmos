@@ -3,7 +3,7 @@ Connections and Profiles
 
 Cosmos automatically translates Airflow connections to dbt profiles. This means that you can use the same connection
 objects you use in Airflow to authenticate with your database in dbt. To do so, there's a class in Cosmos for each
-Airflow connection to dbt profile mapping. 
+Airflow connection to dbt profile mapping.
 
 Each profile mapping class typically gets defined with the following attributes:
 

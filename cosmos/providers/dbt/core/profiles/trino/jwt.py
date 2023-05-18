@@ -15,13 +15,13 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
     """
 
     required_fields = TrinoBaseProfileMapping.required_fields + [
-        "jwt",
+        "jwt_token",
     ]
     secret_fields = [
-        "jwt",
+        "jwt_token",
     ]
     airflow_param_mapping = {
-        "jwt": "extra.jwt__token",
+        "jwt_token": "extra.jwt__token",
         **TrinoBaseProfileMapping.airflow_param_mapping,
     }
 
@@ -36,8 +36,9 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
         profile_vars = {
             **common_profile_vars,
             "method": "jwt",
-            "jwt": self.get_env_var_format("jwt"),
             **profile_args,
+            # jwt_token should always get set as env var
+            "jwt_token": self.get_env_var_format("jwt_token"),
         }
 
         # remove any null values

@@ -140,7 +140,7 @@ def test_profile_args(
         "port": 8080,
         "database": "my_database",
         "schema": "my_schema",
-        "jwt": "{{ env_var('COSMOS_CONN_TRINO_JWT') }}",
+        "jwt_token": "{{ env_var('COSMOS_CONN_TRINO_JWT_TOKEN') }}",
     }
 
 
@@ -156,14 +156,14 @@ def test_profile_args_overrides(
             "database": "my_database",
             "schema": "my_schema",
             "host": "my_host_override",
-            "jwt": "my_jwt_token_override",
+            "jwt_token": "my_jwt_token_override",
         },
     )
     assert profile_mapping.profile_args == {
         "database": "my_database",
         "schema": "my_schema",
         "host": "my_host_override",
-        "jwt": "my_jwt_token_override",
+        "jwt_token": "my_jwt_token_override",
     }
 
     assert profile_mapping.get_profile() == {
@@ -173,7 +173,7 @@ def test_profile_args_overrides(
         "port": 8080,
         "database": "my_database",
         "schema": "my_schema",
-        "jwt": "{{ env_var('COSMOS_CONN_TRINO_JWT') }}",
+        "jwt_token": "{{ env_var('COSMOS_CONN_TRINO_JWT_TOKEN') }}",
     }
 
 
@@ -191,5 +191,5 @@ def test_profile_env_vars(
         },
     )
     assert profile_mapping.get_env_vars() == {
-        "COSMOS_CONN_TRINO_JWT": "my_jwt_token",
+        "COSMOS_CONN_TRINO_JWT_TOKEN": "my_jwt_token",
     }

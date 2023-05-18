@@ -5,7 +5,6 @@
 
    Home <self>
    dbt <dbt/index>
-   API Reference <autoapi/index>
    Contributing <contributing>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg

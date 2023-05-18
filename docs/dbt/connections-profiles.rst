@@ -8,7 +8,8 @@ Airflow connection to dbt profile mapping.
 Each profile mapping class typically gets defined with the following attributes:
 
 * ``airflow_connection_type``: the Airflow connection type that this profile mapping is for.
-* ``required_fields``: a list of required fields for the profile. This refers to the field as it is in dbt.
+* ``required_fields``: a list of required fields for the profile. This refers to the field name as it is in the dbt
+  profile.
 * ``secret_fields``: a list of fields that are secret. These fields will be passed to dbt as environment variables.
 * ``airflow_param_mapping``: a dictionary that maps the Airflow connection fields to the dbt profile fields. The keys
   are the Airflow connection fields and the values are the dbt profile fields.

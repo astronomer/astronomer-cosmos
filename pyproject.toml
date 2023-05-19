@@ -152,7 +152,8 @@ matrix.airflow.dependencies = [
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
 test = "pytest ."
-test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml ."
+test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml . -m 'not integration'"
+test-integration = "pytest cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
 
 ######################################
 # DOCS
@@ -181,6 +182,12 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+markers = [
+    "integration"
+]
 
 [tool.ruff]
 line-length = 120

@@ -38,6 +38,7 @@ def get_dag_bag() -> DagBag:
 dag_bag = get_dag_bag()
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("dag_id", dag_bag.dag_ids)
 def test_example_dag(session, dag_id: str):
     dag = dag_bag.get_dag(dag_id)

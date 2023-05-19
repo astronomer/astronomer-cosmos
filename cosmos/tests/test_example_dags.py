@@ -63,4 +63,4 @@ def get_dag_ids() -> list[str]:
 def test_example_dag(session, dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
-    test_utils.run_dag(dag, conn_file_path=str(EXAMPLE_CONN_FILE))
+    test_utils.run_dag(dag, conn_file_path=EXAMPLE_CONN_FILE)

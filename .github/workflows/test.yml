@@ -46,8 +46,8 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         airflow-version: ["2.3", "2.4", "2.5", "2.6"]
-    needs:
-      - Run-Unit-Tests
+    #needs:
+    #  - Run-Unit-Tests
     services:
       postgres:
         # Docker Hub image

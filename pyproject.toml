@@ -87,6 +87,7 @@ docs =[
     "sphinx-autoapi"
 ]
 tests = [
+    "packaging",
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",

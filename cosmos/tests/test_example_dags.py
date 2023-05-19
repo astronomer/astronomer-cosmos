@@ -24,7 +24,7 @@ def session():
     return get_session()
 
 
-def get_dag_bag() -> DagBag:
+def get_dag_bag():
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     dag_bag = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert dag_bag.dags
@@ -32,11 +32,14 @@ def get_dag_bag() -> DagBag:
     return dag_bag
 
 
-dag_bag = get_dag_bag()
+def get_dag_ids():
+    dag_bag = get_dag_bag()
+    return dag_bag.dag_ids
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("dag_id", dag_bag.dag_ids)
+@pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):
+    dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
     test_utils.run_dag(dag, conn_file_path=EXAMPLE_CONN_FILE)

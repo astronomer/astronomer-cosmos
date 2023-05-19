@@ -153,7 +153,7 @@ matrix.airflow.dependencies = [
 freeze = "pip freeze"
 test = 'pytest  -v . -m "not integration"'
 test-cov = 'pytest -v --cov=cosmos --cov-report=term-missing --cov-report=xml . -m "not integration"'
-#test-integration = "pytest cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
+test-integration = "pytest cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
 
 ######################################
 # DOCS

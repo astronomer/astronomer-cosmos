@@ -9,6 +9,7 @@ We're using the dbt seed command here to populate the database for the purpose o
 would be ingesting data from various sources (i.e. sftp, blob like s3 or gcs, http endpoint, database, etc.)
 
 """
+import os
 
 from airflow import DAG
 from airflow.datasets import Dataset
@@ -16,6 +17,8 @@ from airflow.utils.task_group import TaskGroup
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators import DbtRunOperationOperator, DbtSeedOperator
+
+DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", "/usr/local/airflow/dags/dbt")
 
 with DAG(
     dag_id="extract_dag",
@@ -32,16 +35,16 @@ with DAG(
                 task_id=f"drop_{seed}_if_exists",
                 macro_name="drop_table",
                 args={"table_name": seed},
-                project_dir="/usr/local/airflow/dags/dbt/jaffle_shop",
+                project_dir=DBT_ROOT_PATH,
                 schema="public",
                 conn_id="airflow_db",
             )
 
     jaffle_shop_seed = DbtSeedOperator(
         task_id="seed_jaffle_shop",
-        project_dir="/usr/local/airflow/dags/dbt/jaffle_shop",
-        schema="public",
+        project_dir=DBT_ROOT_PATH,
         conn_id="airflow_db",
+        schema="public",
         outlets=[Dataset("SEED://JAFFLE_SHOP")],
     )
 

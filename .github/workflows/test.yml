@@ -15,17 +15,8 @@ jobs:
   Run-Unit-Tests:
     if: >-
       github.event_name == 'push' ||
-      (
-        github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.fork == false
-      ) ||
-      (
-        github.event_name == 'pull_request_target' &&
-        contains(github.event.pull_request.labels.*.name, 'safe to test')
-      )||
-      (
-        github.event_name == 'release'
-      )
+      github.event_name == 'pull_request' ||
+      github.event_name == 'release'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -56,17 +47,8 @@ jobs:
   Run-Integration-Tests:
     if: >-
       github.event_name == 'push' ||
-      (
-        github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.fork == false
-      ) ||
-      (
-        github.event_name == 'pull_request_target' &&
-        contains(github.event.pull_request.labels.*.name, 'safe to test')
-      )||
-      (
-        github.event_name == 'release'
-      )
+      github.event_name == 'pull_request' ||
+      github.event_name == 'release'
     runs-on: ubuntu-latest
     needs:
       - Run-Unit-Tests

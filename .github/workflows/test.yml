@@ -77,7 +77,7 @@ jobs:
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
-          AIRFLOW_HOME=`pwd` hatch run -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} airflow db init
+          AIRFLOW_HOME=`pwd` hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
           DBT_ROOT_PATH=`pwd`/dev/dags/dbt PYTHONPATH=`pwd`:PYTHONPATH AIRFLOW_HOME=`pwd` hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
 
       - name: Upload coverage to Codecov

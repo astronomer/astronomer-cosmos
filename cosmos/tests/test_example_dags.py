@@ -28,9 +28,6 @@ def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     dag_bag = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert dag_bag.dags
-    import pdb
-
-    pdb.set_trace()
     assert not dag_bag.import_errors
     return dag_bag
 

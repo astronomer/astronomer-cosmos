@@ -46,7 +46,7 @@ jobs:
       - Run-Unit-Tests
     services:
       postgres:
-        image: postgres
+        image: dimberman/pagila-test
         env:
           POSTGRES_PASSWORD=postgres
         options: >-

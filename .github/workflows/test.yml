@@ -13,10 +13,6 @@ concurrency:
 jobs:
 
   default:
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request' ||
-      github.event_name == 'release'
     runs-on: ubuntu-latest
     strategy:
       matrix:

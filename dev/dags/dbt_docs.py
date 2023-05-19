@@ -68,7 +68,7 @@ with DAG(
     generate_dbt_docs = DbtDocsOperator(
         task_id="generate_dbt_docs",
         project_dir="/usr/local/airflow/dags/dbt/jaffle_shop",
-        dbt_args={"schema": "public"},
+        # dbt_args={"schema": "public"},
         conn_id="airflow_db",
         callback=docs_callback,
     )

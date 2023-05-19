@@ -151,9 +151,9 @@ matrix.airflow.dependencies = [
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
-test = "pytest ."
-test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml . -m 'not integration'"
-test-integration = "pytest cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
+test = 'pytest  -v . -m "not integration"'
+test-cov = 'pytest -v --cov=cosmos --cov-report=term-missing --cov-report=xml . -m "not integration"'
+#test-integration = "pytest cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
 
 ######################################
 # DOCS

@@ -138,6 +138,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     cwd=tmp_project_dir,
                 )
 
+            logger.info(f"Trying to run the command:\n {cmd}\nFrom {tmp_project_dir}")
+
             result = self.subprocess_hook.run_command(
                 command=cmd,
                 env=env,

@@ -10,6 +10,7 @@ would be ingesting data from various sources (i.e. sftp, blob like s3 or gcs, ht
 
 """
 import os
+from pathlib import Path
 
 from airflow import DAG
 from airflow.datasets import Dataset
@@ -18,7 +19,8 @@ from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators import DbtRunOperationOperator, DbtSeedOperator
 
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", "/usr/local/airflow/dags/dbt")
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
 
 with DAG(
     dag_id="extract_dag",

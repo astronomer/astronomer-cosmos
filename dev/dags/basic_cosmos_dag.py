@@ -3,10 +3,12 @@ An example DAG that uses Cosmos to render a dbt project.
 """
 import os
 from datetime import datetime
+from pathlib import Path
 
 from cosmos.providers.dbt.dag import DbtDag
 
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", "/usr/local/airflow/dags/dbt")
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
 
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters

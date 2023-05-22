@@ -9,14 +9,17 @@ S3 (if you have the S3Hook installed) or to a local directory.
 
 import os
 import shutil
+from pathlib import Path
 
 from airflow import DAG
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators import DbtDocsOperator
 
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", "/usr/local/airflow/dags/dbt")
-DBT_DOCS_PATH = os.getenv("DBT_DOCS_PATH", "/usr/local/airflow/dbt-docs")
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_DOCS_PATH = Path(__file__).parent / "dbt-docs"
+DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
+DBT_DOCS_PATH = os.getenv("DBT_DOCS_PATH", DEFAULT_DBT_DOCS_PATH)
 AWS_CONN = "aws_default"
 
 

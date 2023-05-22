@@ -1,0 +1,12 @@
+airflow_db:
+    conn_type: postgres
+    host: localhost
+    schema: postgres
+    login: postgres
+    password: postgres
+    port: 5432
+    extra:
+
+aws_default:
+    conn_type: aws
+    description: null

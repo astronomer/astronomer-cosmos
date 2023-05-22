@@ -1,2 +1,4 @@
 [run]
-omit = */test_*
+omit =
+        */test_*
+        cosmos/tests/utils.py

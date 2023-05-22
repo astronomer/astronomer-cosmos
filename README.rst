@@ -72,6 +72,9 @@ This will generate an Airflow Task Group that looks like this:
 
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/jaffle_shop_task_group.png
 
+Community
+_________
+- Join us on the Airflow `Slack<https://join.slack.com/t/apache-airflow/shared_invite/zt-1vo1rxgc3-EfsbdDzqrV51fddWOc6GOQ>` at #airflow-dbt
 
 Changelog
 _________

@@ -36,6 +36,10 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param venv_requirements: Creates a virtual environment with the specified arguments
+    :param venv_system_site_packages: Whether or not all the Python packages from the Airflow instance, will be
+           accessible within the virtual environment (if py_requirements argument is specified).
+           Avoid using unless the DBT job requires it.
     """
 
     template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)
@@ -120,6 +124,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
             os.remove(profiles_path)
 
+    def run_subprocess(self, *args, **kwargs):
+        return self.subprocess_hook.run_command(*args, **kwargs)
+
     def run_command(
         self,
         cmd: list[str],
@@ -147,7 +154,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             # if we need to install deps, do so
             if self.install_deps:
-                self.subprocess_hook.run_command(
+                self.run_subprocess(
                     command=[self.dbt_executable_path, "deps"],
                     env=env,
                     output_encoding=self.output_encoding,
@@ -156,7 +163,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             logger.info(f"Trying to run the command:\n {cmd}\nFrom {tmp_project_dir}")
 
-            result = self.subprocess_hook.run_command(
+            result = self.run_subprocess(
                 command=cmd,
                 env=env,
                 output_encoding=self.output_encoding,

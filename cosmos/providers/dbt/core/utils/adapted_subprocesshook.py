@@ -63,6 +63,8 @@ class FullOutputSubprocessHook(BaseHook):
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
+        py_system_site_packages: bool = False,
+        py_requirements: list[str] | None = None,
     ) -> FullOutputSubprocessResult:
         """
         Execute the command.
@@ -90,25 +92,19 @@ class FullOutputSubprocessHook(BaseHook):
             if cwd is None:
                 cwd = stack.enter_context(TemporaryDirectory(prefix="airflowtmp"))
 
-            # TODO: Address the following before having this PR ready for review:
-            # (1) Create a new virtualenv execution mode / dedicated operators
-
             # (2) Allow users to configure the following values, at DAG and TaskGroup level:
             # - py_requirements
             # - py_interpreter
 
             # (3) Tests
 
-            # venv starts here
-            py_system_site_packages = False  # TODO: allow user to override
-            py_requirements = ["dbt-postgres==1.6.0b1"]  # TODO: allow user to override
-            dbt_binary_path = self.setup_virtualenv(
-                stack=stack,
-                py_system_site_packages=py_system_site_packages,
-                py_requirements=py_requirements,
-            )
-            command[0] = str(dbt_binary_path)
-            # venv stops here
+            if py_requirements:
+                dbt_binary_path = self.setup_virtualenv(
+                    stack=stack,
+                    py_system_site_packages=py_system_site_packages,
+                    py_requirements=py_requirements,
+                )
+                command[0] = str(dbt_binary_path)
 
             def pre_exec():
                 # Restore default signal disposition and invoke setsid

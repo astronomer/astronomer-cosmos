@@ -64,8 +64,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def exception_handling(self, result: FullOutputSubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(
-                f"dbt command returned exit code {self.skip_exit_code}. Skipping. Details: "
-                * result.full_output
+                f"dbt command returned exit code {self.skip_exit_code}. Skipping."
             )
             raise AirflowException(
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: "

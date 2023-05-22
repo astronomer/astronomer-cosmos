@@ -66,6 +66,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             raise AirflowSkipException(
                 f"dbt command returned exit code {self.skip_exit_code}. Skipping."
             )
+        elif result.exit_code != 0:
             raise AirflowException(
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: "
                 * result.full_output

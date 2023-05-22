@@ -80,10 +80,13 @@ jobs:
         run: |
           echo `pwd`
           ls -la
-          AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres AIRFLOW_HOME=`pwd` hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
-          AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres DBT_ROOT_PATH=`pwd`/dev/dags/dbt PYTHONPATH=`pwd`:$PYTHONPATH AIRFLOW_HOME=`pwd` hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
+          AIRFLOW_HOME=`pwd` hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
+          DBT_ROOT_PATH=`pwd`/dev/dags/dbt PYTHONPATH=`pwd`:$PYTHONPATH AIRFLOW_HOME=`pwd` hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+    env:
+      AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres

@@ -78,10 +78,8 @@ jobs:
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
-          echo `pwd`
-          ls -la
-          AIRFLOW_HOME=`pwd` hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
-          DBT_ROOT_PATH=`pwd`/dev/dags/dbt PYTHONPATH=`pwd`:$PYTHONPATH AIRFLOW_HOME=`pwd` hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -89,4 +87,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
     env:
+      AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      DBT_ROOT_PATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt
+      DBT_DOCS_PATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt-docs
+      PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH

@@ -17,6 +17,7 @@ AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
+    "2.7": ["dbt_docs.py"],
 }
 
 # Sort descending based on Versions and convert string to an actual version

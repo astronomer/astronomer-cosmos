@@ -68,8 +68,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
         elif result.exit_code != 0:
             raise AirflowException(
-                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: "
-                * result.full_output
+                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
+                *result.full_output,
             )
 
     @provide_session

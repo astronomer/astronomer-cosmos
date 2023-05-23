@@ -412,15 +412,8 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
                     )
         except ImportError:
             logger.error("ERROR: the S3Hook isn't installed")
-        # if there's a botocore.exceptions.NoCredentialsError, print a warning and just copy the docs locally
         except Exception as exc:
-            if "NoCredentialsError" in str(exc):
-                logger.error(
-                    "ERROR: No AWS credentials found.\
-                    To upload docs to S3, install the S3Hook and configure an S3 connection."
-                )
-            else:
-                logger.error("ERROR: " + str(exc))
+            logger.error("ERROR: " + str(exc))
 
         return
 
@@ -474,15 +467,10 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
                         blob_name=key_path,
                         **keywords,
                     )
-        # if there's a botocore.exceptions.NoCredentialsError, print a warning and just copy the docs locally
+        except ImportError:
+            logger.error("ERROR: Azure module import error")
         except Exception as exc:
-            if "NoCredentialsError" in str(exc):
-                logger.error(
-                    "ERROR: No Azure credentials found.\
-                    To upload docs to Azure Blob Storage, install the WasbHook and configure a connection."
-                )
-            else:
-                logger.error("ERROR: " + str(exc))
+            logger.error("ERROR: " + str(exc))
 
         return
 

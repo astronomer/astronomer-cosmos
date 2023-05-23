@@ -8,16 +8,12 @@ import contextlib
 import os
 import signal
 from collections import namedtuple
-from pathlib import Path
-from subprocess import PIPE, STDOUT, CalledProcessError, Popen, check_output
+from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
-from airflow.utils.python_virtualenv import prepare_virtualenv
 
 FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
-
-PY_INTERPRETER = "python3"
 
 
 class FullOutputSubprocessHook(BaseHook):
@@ -27,52 +23,12 @@ class FullOutputSubprocessHook(BaseHook):
         self.sub_process: Popen[bytes] | None = None
         super().__init__()
 
-    def setup_virtualenv(
-        self,
-        stack: contextlib.ExitStack,
-        py_system_site_packages: bool = False,
-        py_requirements: list[str] | None = None,
-    ):
-        venv_tmp_dir = stack.enter_context(TemporaryDirectory(prefix="cosmos-venv"))
-
-        py_interpreter = prepare_virtualenv(
-            venv_directory=venv_tmp_dir,
-            python_bin=PY_INTERPRETER,
-            system_site_packages=py_system_site_packages,
-            requirements=py_requirements,
-        )
-        dbt_binary = Path(py_interpreter).parent / "dbt"
-
-        try:
-            dbt_version = (
-                check_output(
-                    [
-                        py_interpreter,
-                        "-c",
-                        "from importlib.metadata import version; print(version('dbt-core'))",
-                    ]
-                )
-                .decode()
-                .strip()
-            )
-        except CalledProcessError as e:
-            raise RuntimeError(
-                "Command '{}' return with error (code {}): {}".format(
-                    e.cmd, e.returncode, e.output
-                )
-            )
-
-        self.log.info("Using DBT version %s available at %s", dbt_version, dbt_binary)
-        return dbt_binary
-
     def run_command(
         self,
         command: list[str],
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
-        py_system_site_packages: bool = False,
-        py_requirements: list[str] | None = None,
     ) -> FullOutputSubprocessResult:
         """
         Execute the command.
@@ -99,14 +55,6 @@ class FullOutputSubprocessHook(BaseHook):
         with contextlib.ExitStack() as stack:
             if cwd is None:
                 cwd = stack.enter_context(TemporaryDirectory(prefix="airflowtmp"))
-
-            if py_requirements:
-                dbt_binary_path = self.setup_virtualenv(
-                    stack=stack,
-                    py_system_site_packages=py_system_site_packages,
-                    py_requirements=py_requirements,
-                )
-                command[0] = str(dbt_binary_path)
 
             def pre_exec():
                 # Restore default signal disposition and invoke setsid

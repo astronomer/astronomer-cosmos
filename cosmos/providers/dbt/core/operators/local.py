@@ -368,6 +368,10 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
     """
     Executes `dbt docs generate` command and upload to S3 storage.
+
+    :param target_conn_id: S3's Airflow connection ID
+    :param bucket_name: S3's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be uploaded.
     """
 
     ui_color = "#FF9900"
@@ -431,6 +435,10 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
 class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
     """
     Executes `dbt docs generate` command and upload to Azure Blob Storage.
+
+    :param target_conn_id: Azure Blob Storage's Airflow connection ID
+    :param container_name: Azure Blob Storage's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be uploaded.
     """
 
     ui_color = "#007FFF"

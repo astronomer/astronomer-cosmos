@@ -8,17 +8,19 @@ from pathlib import Path
 from cosmos.providers.dbt.dag import DbtDag
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+PROJECT_NAME = "jaffle_shop"
+CONNECTION_ID = "airflow_db"
 
 example_virtualenv = DbtDag(
     # dbt/cosmos-specific parameters
     dbt_root_path=DBT_ROOT_PATH,
-    dbt_project_name="jaffle_shop",
-    conn_id="airflow_db",
+    dbt_project_name=PROJECT_NAME,
+    conn_id=CONNECTION_ID,
     dbt_args={"schema": "public"},
     execution_mode="virtualenv",
     operator_args={
-        "project_dir": DBT_ROOT_PATH,
+        "project_dir": DBT_ROOT_PATH / PROJECT_NAME,
         "py_system_site_packages": False,
         "py_requirements": ["dbt-postgres==1.6.0b1"],
     },

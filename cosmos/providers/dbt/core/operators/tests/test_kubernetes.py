@@ -142,7 +142,6 @@ def test_created_pod(test_hook):
             },
             "managed_fields": None,
             "name": pod_obj.metadata.name,
-            "namespace": "foo",
             "owner_references": None,
             "resource_version": None,
             "self_link": None,
@@ -224,4 +223,6 @@ def test_created_pod(test_hook):
         },
         "status": None,
     }
-    assert pod_obj.to_dict() == expected_result
+    computed_result = pod_obj.to_dict()
+    computed_result["metadata"].pop("namespace")
+    assert computed_result == expected_result

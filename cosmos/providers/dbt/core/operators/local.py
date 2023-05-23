@@ -364,6 +364,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         result = self.build_and_run_cmd(context=context)
         return result.output
 
+
 class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
     """
     Executes `dbt docs generate` command and upload to S3 storage.
@@ -425,6 +426,69 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
                 )
 
         return
+
+
+class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
+    """
+    Executes `dbt docs generate` command and upload to Azure Blob Storage.
+    """
+
+    ui_color = "#007FFF"
+
+    def __init__(
+            self,
+            target_conn_id: str,
+            container_name: str,
+            folder_dir: str = None,
+            **kwargs
+    ) -> None:
+        from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
+        self.target_conn_id = target_conn_id
+        self.container_name = container_name
+        self.folder_dir = folder_dir
+        super().__init__(**kwargs)
+        self.callback = self.upload_to_azure_storage
+        self.azure_hook = WasbHook(wasb_conn_id=self.target_conn_id)
+        if self.azure_hook.test_connection()[0] is not True:
+            logger.error("ERROR: Failed to connect Azure Blob Storage")
+            raise AirflowException(
+                f"Failed to connect Azure Blob Storage"
+            )
+
+    def upload_to_azure_storage(self, tmp_project_dir: str) -> None:
+        try:
+            from azure.storage.blob import ContentSettings
+
+            target_dir = f"{tmp_project_dir}/target"
+            keywords = {'overwrite': True, 'content_settings': ContentSettings(content_type="text/html")}
+
+            # iterate over the files in the target dir and upload them to S3
+            for dirpath, _, filenames in os.walk(target_dir):
+                for filename in filenames:
+                    if self.folder_dir is not None:
+                        key_path = f"{self.folder_dir}/{filename}"
+                    else:
+                        key_path = filename
+                    self.azure_hook.load_file(
+                        file_path=f"{dirpath}/{filename}",
+                        container_name=self.container_name,
+                        blob_name=key_path,
+                        **keywords
+                    )
+        # if there's a botocore.exceptions.NoCredentialsError, print a warning and just copy the docs locally
+        except Exception as exc:
+            if "NoCredentialsError" in str(exc):
+                logger.error(
+                    "ERROR: No Azure credentials found.\
+                    To upload docs to Azure Blob Storage, install the WasbHook and configure a connection."
+                )
+            else:
+                logger.error(
+                    "ERROR: " + str(exc)
+                )
+
+        return
+
 
 class DbtDepsLocalOperator(DbtLocalBaseOperator):
     """

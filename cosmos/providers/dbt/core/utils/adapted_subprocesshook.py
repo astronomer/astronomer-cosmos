@@ -100,12 +100,6 @@ class FullOutputSubprocessHook(BaseHook):
             if cwd is None:
                 cwd = stack.enter_context(TemporaryDirectory(prefix="airflowtmp"))
 
-            # (2) Allow users to configure the following values, at DAG and TaskGroup level:
-            # - py_requirements
-            # - py_interpreter
-
-            # (3) Tests
-
             if py_requirements:
                 dbt_binary_path = self.setup_virtualenv(
                     stack=stack,

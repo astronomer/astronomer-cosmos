@@ -364,6 +364,67 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         result = self.build_and_run_cmd(context=context)
         return result.output
 
+class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
+    """
+    Executes `dbt docs generate` command and upload to S3 storage.
+    """
+
+    ui_color = "#FF9900"
+
+    def __init__(
+            self,
+            target_conn_id: str,
+            bucket_name: str,
+            folder_dir: str = None,
+            **kwargs
+    ) -> None:
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        self.target_conn_id = target_conn_id
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+        super().__init__(**kwargs)
+        self.callback = self.upload_to_s3
+        self.s3_hook = S3Hook(aws_conn_id=self.target_conn_id, extra_args={"ContentType": "text/html"})
+        if self.s3_hook.test_connection()[0] is not True:
+            logger.error("ERROR: Failed to connect S3")
+            raise AirflowException(
+                f"Failed to connect S3"
+            )
+
+    def upload_to_s3(self, tmp_project_dir: str) -> None:
+        try:
+            target_dir = f"{tmp_project_dir}/target"
+
+            # iterate over the files in the target dir and upload them to S3
+            for dirpath, _, filenames in os.walk(target_dir):
+                for filename in filenames:
+                    if self.folder_dir is not None:
+                        key_path = f"{self.folder_dir}/{filename}"
+                    else:
+                        key_path = filename
+                    self.s3_hook.load_file(
+                        filename=f"{dirpath}/{filename}",
+                        bucket_name=self.bucket_name,
+                        key=key_path,
+                        replace=True,
+                    )
+        except ImportError:
+            logger.error(
+                "ERROR: the S3Hook isn't installed"
+            )
+        # if there's a botocore.exceptions.NoCredentialsError, print a warning and just copy the docs locally
+        except Exception as exc:
+            if "NoCredentialsError" in str(exc):
+                logger.error(
+                    "ERROR: No AWS credentials found.\
+                    To upload docs to S3, install the S3Hook and configure an S3 connection."
+                )
+            else:
+                logger.error(
+                    "ERROR: " + str(exc)
+                )
+
+        return
 
 class DbtDepsLocalOperator(DbtLocalBaseOperator):
     """

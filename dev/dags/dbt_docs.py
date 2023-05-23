@@ -8,13 +8,15 @@ S3 (if you have the S3Hook installed) or to a local directory.
 """
 
 import os
-import shutil
 from pathlib import Path
 
 from airflow import DAG
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators import DbtDocsS3Operator, DbtDocsAzureStorageOperator
+from cosmos.providers.dbt.core.operators import (
+    DbtDocsAzureStorageOperator,
+    DbtDocsS3Operator,
+)
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
@@ -30,7 +32,7 @@ with DAG(
         task_id="generate_dbt_docs_aws",
         project_dir=DBT_ROOT_PATH,
         conn_id="airflow_db",
-        schema='public',
+        schema="public",
         target_conn_id="test_aws",
         bucket_name="test_bucket",
     )
@@ -39,7 +41,7 @@ with DAG(
         task_id="generate_dbt_docs_azure",
         project_dir=DBT_ROOT_PATH,
         conn_id="airflow_db",
-        schema='public',
+        schema="public",
         target_conn_id="test_azure",
         container_name="$web",
     )

@@ -64,6 +64,7 @@ class FullOutputSubprocessHook(BaseHook):
                 os.setsid()
 
             self.log.info("Running command: %s", command)
+
             self.sub_process = Popen(
                 command,
                 stdout=PIPE,
@@ -78,7 +79,6 @@ class FullOutputSubprocessHook(BaseHook):
 
             if self.sub_process is None:
                 raise RuntimeError("The subprocess should be created here and is None!")
-
             if self.sub_process.stdout is not None:
                 for raw_line in iter(self.sub_process.stdout.readline, b""):
                     line = raw_line.decode(output_encoding, errors="backslashreplace").rstrip()
@@ -91,9 +91,10 @@ class FullOutputSubprocessHook(BaseHook):
             self.log.info(
                 "Command exited with return code %s", self.sub_process.returncode
             )
+            return_code: int = self.sub_process.returncode
 
         return FullOutputSubprocessResult(
-            exit_code=self.sub_process.returncode, output=line, full_output=log_lines
+            exit_code=return_code, output=line, full_output=log_lines
         )
 
     def send_sigterm(self):

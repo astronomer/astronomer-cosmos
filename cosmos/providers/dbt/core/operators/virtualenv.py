@@ -28,12 +28,11 @@ PY_INTERPRETER = "python3"
 class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core cli command within a Python Virtual Environment, that is created before running the DBT command
-    and deleted just after.
+    and deleted at the end of the operator execution.
 
-    :param install_deps: If true, install dependencies before running the command
-    :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
-    :param py_requirements: Creates a virtual environment with the specified arguments
-    :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance, will be accessible
+    :param py_requirements: If defined, creates a virtual environment with the specified dependencies. Example:
+           ["dbt-postgres==1.5.0"]
+    :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the DBT job requires it.
     """
@@ -57,11 +56,11 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         Path to the DBT binary within a Python virtualenv.
 
         The first time this property is called, it creates a virtualenv and installs the dependencies based on the
-        attributes py_requirements and py_system_site_packages. This value is cached for future calls.
+        self.py_requirements and self.py_system_site_packages. This value is cached for future calls.
         """
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
         # For this reason, we are not using contexts at this point.
-        # The deletion of this virtualenv is being done by the end of the task execution
+        # The deletion of this directory is done explicitly at the end of the `execute` method.
         self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
         py_interpreter = prepare_virtualenv(
             venv_directory=self._venv_tmp_dir.name,

@@ -1,5 +1,6 @@
 from .local import DbtDepsLocalOperator as DbtDepsOperator
 from .local import DbtDocsLocalOperator as DbtDocsOperator
+from .local import DbtDocsS3LocalOperator as DbtDocsS3Operator
 from .local import DbtLSLocalOperator as DbtLSOperator
 from .local import DbtRunLocalOperator as DbtRunOperator
 from .local import DbtRunOperationLocalOperator as DbtRunOperationOperator
@@ -16,4 +17,5 @@ __all__ = [
     "DbtRunOperationOperator",
     "DbtDepsOperator",
     "DbtDocsOperator",
+    "DbtDocsS3Operator"
 ]

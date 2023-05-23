@@ -50,9 +50,15 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self._venv_tmp_dir = ""
 
     @cached_property
-    def dbt_path(
+    def venv_dbt_path(
         self,
     ) -> str:
+        """
+        Path to the DBT binary within a Python virtualenv.
+
+        The first time this property is called, it creates a virtualenv and installs the dependencies based on the
+        attributes py_requirements and py_system_site_packages. This value is cached for future calls.
+        """
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
         # For this reason, we are not using contexts at this point.
         # The deletion of this virtualenv is being done by the end of the task execution
@@ -77,7 +83,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     def run_subprocess(self, command, *args, **kwargs):
         if self.py_requirements:
-            command[0] = self.dbt_path
+            command[0] = self.venv_dbt_path
 
         return self.subprocess_hook.run_command(
             command,
@@ -87,7 +93,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         output = super().execute(context)
-        self._venv_tmp_dir.cleanup()
+        if self._venv_tmp_dir:
+            self._venv_tmp_dir.cleanup()
         return output
 
 

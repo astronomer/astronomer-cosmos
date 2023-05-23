@@ -36,10 +36,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
-    :param venv_requirements: Creates a virtual environment with the specified arguments
-    :param venv_system_site_packages: Whether or not all the Python packages from the Airflow instance, will be
-           accessible within the virtual environment (if py_requirements argument is specified).
-           Avoid using unless the DBT job requires it.
     """
 
     template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)

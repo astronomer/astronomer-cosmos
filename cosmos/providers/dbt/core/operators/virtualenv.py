@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections import namedtuple
 
 from cosmos.providers.dbt.core.operators.local import (
     DbtDocsLocalOperator,
@@ -15,10 +14,6 @@ from cosmos.providers.dbt.core.operators.local import (
 )
 
 logger = logging.getLogger(__name__)
-
-FullOutputSubprocessResult = namedtuple(
-    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
-)
 
 
 class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):

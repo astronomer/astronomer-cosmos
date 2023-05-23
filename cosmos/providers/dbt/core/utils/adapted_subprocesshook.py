@@ -9,7 +9,7 @@ import os
 import signal
 from collections import namedtuple
 from pathlib import Path
-from subprocess import PIPE, STDOUT, Popen, check_output
+from subprocess import PIPE, STDOUT, CalledProcessError, Popen, check_output
 from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
@@ -43,18 +43,26 @@ class FullOutputSubprocessHook(BaseHook):
         )
         dbt_binary = Path(py_interpreter).parent / "dbt"
 
-        dbt_version = (
-            check_output(
-                [
-                    py_interpreter,
-                    "-c",
-                    "from importlib.metadata import version; print(version('dbt-core'))",
-                ]
+        try:
+            dbt_version = (
+                check_output(
+                    [
+                        py_interpreter,
+                        "-c",
+                        "from importlib.metadata import version; print(version('dbt-core'))",
+                    ]
+                )
+                .decode()
+                .strip()
             )
-            .decode()
-            .strip()
-        )
-        self.log.info("DBT version: %s", dbt_version)
+        except CalledProcessError as e:
+            raise RuntimeError(
+                "Command '{}' return with error (code {}): {}".format(
+                    e.cmd, e.returncode, e.output
+                )
+            )
+
+        self.log.info("Using DBT version %s available at %s", dbt_version, dbt_binary)
         return dbt_binary
 
     def run_command(

@@ -4,17 +4,17 @@ Cosmos - dbt Support
 Cosmos allows you to render your dbt models as Airflow DAGs and Task Groups.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
     :caption: Sections
 
     Installation Options <install-options>
+    Execution Modes <execution-modes>
     Usage <usage>
     Connections & Profiles <connections-profiles>
     Scheduling <scheduling>
     Configuration <configuration>
     Generating Docs <docs>
     Lineage <lineage>
-    Other execution options <other-execution-options>
 
 
 Quickstart

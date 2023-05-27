@@ -9,11 +9,18 @@ S3 (if you have the S3Hook installed) or to a local directory.
 
 import os
 import shutil
+from pathlib import Path
 
 from airflow import DAG
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators import DbtDocsOperator
+
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_DOCS_PATH = Path(__file__).parent / "dbt-docs"
+DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
+DBT_DOCS_PATH = os.getenv("DBT_DOCS_PATH", DEFAULT_DBT_DOCS_PATH)
+AWS_CONN = "aws_default"
 
 
 def docs_callback(project_dir: str) -> None:
@@ -25,7 +32,7 @@ def docs_callback(project_dir: str) -> None:
     try:
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
-        hook = S3Hook(aws_conn_id="aws_default")
+        hook = S3Hook(aws_conn_id=AWS_CONN)
 
         # iterate over the files in the target dir and upload them to S3
         for dirpath, _, filenames in os.walk(target_dir):
@@ -52,25 +59,23 @@ def docs_callback(project_dir: str) -> None:
             )
 
     # copy the target dir to /usr/local/airflow/dbt-docs
-    if os.path.exists("/usr/local/airflow/dbt-docs"):
-        shutil.rmtree("/usr/local/airflow/dbt-docs")
+    if os.path.exists(DBT_DOCS_PATH):
+        shutil.rmtree(DBT_DOCS_PATH)
 
-    shutil.copytree(target_dir, "/usr/local/airflow/dbt-docs")
+    shutil.copytree(target_dir, DBT_DOCS_PATH)
 
 
 with DAG(
     dag_id="docs_dag",
     start_date=datetime(2023, 1, 1),
-    schedule="@daily",
+    schedule_interval="@daily",
     doc_md=__doc__,
     catchup=False,
 ) as dag:
     generate_dbt_docs = DbtDocsOperator(
         task_id="generate_dbt_docs",
-        project_dir="/usr/local/airflow/dags/dbt/jaffle_shop",
-        profile_args={
-            "schema": "public",
-        },
+        project_dir=DBT_ROOT_PATH,
+        profile_args={"schema": "public"},
         conn_id="airflow_db",
         callback=docs_callback,
     )

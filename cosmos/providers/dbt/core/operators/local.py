@@ -69,7 +69,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
         elif result.exit_code != 0:
             raise AirflowException(
-                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
+                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
+                *result.full_output,
             )
 
     @provide_session
@@ -168,6 +169,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
+
+            logger.info(f"Trying to run the command:\n {cmd}\nFrom {tmp_project_dir}")
 
             result = self.subprocess_hook.run_command(
                 command=cmd,

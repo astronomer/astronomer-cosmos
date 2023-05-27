@@ -9,8 +9,7 @@ from typing import List
 import pytest
 import yaml
 
-from cosmos.providers.dbt.parser.project import (DbtModel, DbtModelType,
-                                                 DbtProject)
+from cosmos.providers.dbt.parser.project import DbtModel, DbtModelType, DbtProject
 
 DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags/dbt/"
 SAMPLE_CSV_PATH = DBT_PROJECT_PATH / "jaffle_shop/seeds/raw_customers.csv"

@@ -18,9 +18,13 @@ from sqlalchemy.orm import Session
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
-    FullOutputSubprocessHook, FullOutputSubprocessResult)
-from cosmos.providers.dbt.core.utils.warn_parsing import (extract_log_issues,
-                                                          parse_output)
+    FullOutputSubprocessHook,
+    FullOutputSubprocessResult,
+)
+from cosmos.providers.dbt.core.utils.warn_parsing import (
+    extract_log_issues,
+    parse_output,
+)
 
 logger = logging.getLogger(__name__)
 

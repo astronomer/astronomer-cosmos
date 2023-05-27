@@ -4,8 +4,7 @@ import pytest
 from airflow.exceptions import AirflowException
 
 from cosmos.core.graph.entities import Group
-from cosmos.providers.dbt.render import (calculate_operator_class,
-                                         render_project)
+from cosmos.providers.dbt.render import calculate_operator_class, render_project
 
 DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags/dbt/"
 

@@ -4,27 +4,32 @@ dbt support for Airflow. Contains dags, task groups, and operators.
 """
 
 # re-export user facing utilities
-from cosmos.providers.dbt.core.utils.data_aware_scheduling import \
-    get_dbt_dataset
+from cosmos.providers.dbt.core.utils.data_aware_scheduling import get_dbt_dataset
+
 # re-export the dag and task group
 from cosmos.providers.dbt.dag import DbtDag
 from cosmos.providers.dbt.task_group import DbtTaskGroup
 
 # re-export the operators
-from .core.operators.local import (DbtDepsLocalOperator, DbtLSLocalOperator,
-                                   DbtRunLocalOperator,
-                                   DbtRunOperationLocalOperator,
-                                   DbtSeedLocalOperator,
-                                   DbtSnapshotLocalOperator,
-                                   DbtTestLocalOperator)
+from .core.operators.local import (
+    DbtDepsLocalOperator,
+    DbtLSLocalOperator,
+    DbtRunLocalOperator,
+    DbtRunOperationLocalOperator,
+    DbtSeedLocalOperator,
+    DbtSnapshotLocalOperator,
+    DbtTestLocalOperator,
+)
 
 try:
-    from .core.operators.docker import (DbtLSDockerOperator,
-                                        DbtRunDockerOperator,
-                                        DbtRunOperationDockerOperator,
-                                        DbtSeedDockerOperator,
-                                        DbtSnapshotDockerOperator,
-                                        DbtTestDockerOperator)
+    from .core.operators.docker import (
+        DbtLSDockerOperator,
+        DbtRunDockerOperator,
+        DbtRunOperationDockerOperator,
+        DbtSeedDockerOperator,
+        DbtSnapshotDockerOperator,
+        DbtTestDockerOperator,
+    )
 except ImportError:
     from .core.operators.lazy_load import MissingPackage
 
@@ -49,12 +54,14 @@ except ImportError:
     )
 
 try:
-    from .core.operators.kubernetes import (DbtLSKubernetesOperator,
-                                            DbtRunKubernetesOperator,
-                                            DbtRunOperationKubernetesOperator,
-                                            DbtSeedKubernetesOperator,
-                                            DbtSnapshotKubernetesOperator,
-                                            DbtTestKubernetesOperator)
+    from .core.operators.kubernetes import (
+        DbtLSKubernetesOperator,
+        DbtRunKubernetesOperator,
+        DbtRunOperationKubernetesOperator,
+        DbtSeedKubernetesOperator,
+        DbtSnapshotKubernetesOperator,
+        DbtTestKubernetesOperator,
+    )
 except ImportError:
     from .core.operators.lazy_load import MissingPackage
 

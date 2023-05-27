@@ -6,7 +6,8 @@ import pytest
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
-from cosmos.providers.dbt.core.profiles.spark.thrift import SparkThriftProfileMapping
+from cosmos.providers.dbt.core.profiles.spark.thrift import \
+    SparkThriftProfileMapping
 
 
 @pytest.fixture()

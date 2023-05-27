@@ -1,9 +1,7 @@
 from airflow.hooks.subprocess import SubprocessResult
 
-from cosmos.providers.dbt.core.utils.warn_parsing import (
-    extract_log_issues,
-    parse_output,
-)
+from cosmos.providers.dbt.core.utils.warn_parsing import (extract_log_issues,
+                                                          parse_output)
 
 
 def test_parse_output() -> None:

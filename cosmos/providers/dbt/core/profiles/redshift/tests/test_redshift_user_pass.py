@@ -6,9 +6,8 @@ import pytest
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
-from cosmos.providers.dbt.core.profiles.redshift.user_pass import (
-    RedshiftUserPasswordProfileMapping,
-)
+from cosmos.providers.dbt.core.profiles.redshift.user_pass import \
+    RedshiftUserPasswordProfileMapping
 
 
 @pytest.fixture()

@@ -7,7 +7,8 @@ from typing import Any, Type
 from airflow.hooks.base import BaseHook
 
 from .base import BaseProfileMapping
-from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
+from .bigquery.service_account_file import \
+    GoogleCloudServiceAccountFileProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping

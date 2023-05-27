@@ -4,7 +4,8 @@ import json
 
 from airflow.models.connection import Connection
 
-from cosmos.providers.dbt.core.profiles.trino.base import TrinoBaseProfileMapping
+from cosmos.providers.dbt.core.profiles.trino.base import \
+    TrinoBaseProfileMapping
 
 
 def test_profile_args() -> None:

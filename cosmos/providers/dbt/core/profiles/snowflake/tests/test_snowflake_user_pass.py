@@ -7,9 +7,8 @@ import pytest
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
-from cosmos.providers.dbt.core.profiles.snowflake.user_pass import (
-    SnowflakeUserPasswordProfileMapping,
-)
+from cosmos.providers.dbt.core.profiles.snowflake.user_pass import \
+    SnowflakeUserPasswordProfileMapping
 
 
 @pytest.fixture()

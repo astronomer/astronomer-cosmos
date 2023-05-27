@@ -156,12 +156,13 @@ test = 'pytest  -vv . -m "not integration"'
 test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml . -m "not integration"'
 test-integration = "pytest -vv cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
 
-######################################
-# PYTEST
-######################################
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::DeprecationWarning",
+]
+minversion = "6.0"
+markers = [
+    "integration"
 ]
 
 ######################################
@@ -191,12 +192,6 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
-
-[tool.pytest.ini_options]
-minversion = "6.0"
-markers = [
-    "integration"
-]
 
 [tool.ruff]
 line-length = 120

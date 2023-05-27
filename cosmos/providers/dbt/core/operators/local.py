@@ -43,7 +43,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
-    include_system_env = True
 
     def __init__(
         self,

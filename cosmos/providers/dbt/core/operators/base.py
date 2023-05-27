@@ -132,35 +132,48 @@ class DbtBaseOperator(BaseOperator):
         self.dbt_cmd_flags = dbt_cmd_flags
         super().__init__(**kwargs)
 
-    def get_env(self, context: Context, profile_vars: dict[str, str]) -> dict[str, str]:
+    def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike]:
         """
         Builds the set of environment variables to be exposed for the bash command.
+
         The order of determination is:
-            1. The env parameter passed to the Operator
-            2. The Airflow context as environment variables.
-            3. The profile variables from the dbt profile file.
-        If a user accidentally uses a key that is found earlier in the determination order then it is overwritten.
+            1. The Airflow context as environment variables.
+            2. The env parameter passed to the Operator
+
+        Note that this also filters out any invalid types that cannot be cast to strings.
         """
         env: dict[str, Any] = {}
-
-        # env parameter passed to the Operator
-        if self.env and isinstance(self.env, dict):
-            env.update(self.env)
 
         # Airflow context as environment variables
         airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
         env.update(airflow_context_vars)
 
-        # profile variables from the dbt profile file
-        env.update(profile_vars)
+        # env parameter passed to the Operator
+        if self.env and isinstance(self.env, dict):
+            env.update(self.env)
 
-        # filter out invalid types
+        # filter out invalid types and give a warning when a value is removed
         accepted_types = (str, bytes, os.PathLike)
-        filtered_env = {
-            k: v
-            for k, v in env.items()
-            if all((isinstance(k, accepted_types), isinstance(v, accepted_types)))
-        }
+
+        filtered_env: dict[str, str | bytes | os.PathLike] = {}
+
+        for key, val in env.items():
+            if isinstance(key, accepted_types) and isinstance(val, accepted_types):
+                filtered_env[key] = val
+            else:
+                if isinstance(key, accepted_types):
+                    logger.warning(
+                        "Env var %s was ignored because its key is not a valid type. Must be one of %s",
+                        key,
+                        accepted_types,
+                    )
+
+                if isinstance(val, accepted_types):
+                    logger.warning(
+                        "Env var %s was ignored because its value is not a valid type. Must be one of %s",
+                        key,
+                        accepted_types,
+                    )
 
         return filtered_env
 
@@ -199,6 +212,6 @@ class DbtBaseOperator(BaseOperator):
         if cmd_flags:
             dbt_cmd.extend(cmd_flags)
 
-        env = self.get_env(context, profile_vars={})
+        env = self.get_env(context)
 
         return dbt_cmd, env

@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 # kubernetes is an optional dependency, so we need to check if it's installed
 try:
-    from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import \
-        convert_env_vars
-    from airflow.providers.cncf.kubernetes.operators.pod import \
-        KubernetesPodOperator
+    from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
+        convert_env_vars,
+    )
+    from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
     from kubernetes.client import models as k8s
 except ImportError:
     raise ImportError(

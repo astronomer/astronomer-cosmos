@@ -6,8 +6,9 @@ import pytest
 from airflow.models.connection import Connection
 
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
-from cosmos.providers.dbt.core.profiles.databricks.token import \
-    DatabricksTokenProfileMapping
+from cosmos.providers.dbt.core.profiles.databricks.token import (
+    DatabricksTokenProfileMapping,
+)
 
 
 @pytest.fixture()

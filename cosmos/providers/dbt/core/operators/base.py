@@ -72,7 +72,6 @@ class DbtBaseOperator(BaseOperator):
         "warn_error",
     )
 
-    include_system_env = False
     intercept_flag = True
 
     def __init__(

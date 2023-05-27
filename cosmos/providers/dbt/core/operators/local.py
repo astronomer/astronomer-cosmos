@@ -131,6 +131,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             # get the profile name from the dbt_project.yml file
             dbt_project_path = os.path.join(tmp_project_dir, "dbt_project.yml")
+
+            # if there's no dbt_project.yml file, we're not in a dbt project
+            # and need to raise an error
+            if not os.path.exists(dbt_project_path):
+                raise AirflowException(
+                    f"dbt project directory {self.project_dir} does not contain a dbt_project.yml file."
+                )
+
             with open(dbt_project_path, encoding="utf-8") as f:
                 dbt_project = yaml.safe_load(f)
 

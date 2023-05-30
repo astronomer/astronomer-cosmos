@@ -176,10 +176,10 @@ Cosmos supports ldap, certificate, jwt and kerberos authentication which are com
 Kerberos authentication does not support keytabs so a password is required instead.
 
 To provide a default Trino catalog this should come from extras in the Airflow connection or it can be provided/overriden
-using `dbt_args = {"db_name": "my_catalog"}}`
+using ``dbt_args = {"db_name": "my_catalog"}}``
 
 To provide a default Trino schema a.k.a database this will come from the Airflow connection schema or it can be provided/overriden
-using `dbt_args = {"schema": "my_schema"}}`
+using ``dbt_args = {"schema": "my_schema"}}``
 
 Spark Thrift
 ++++++++++++

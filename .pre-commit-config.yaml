@@ -5,11 +5,15 @@ repos:
     rev: v4.4.0
     hooks:
       - id: check-added-large-files
+      - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
         args:
           - --unsafe
       - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: pretty-format-json
+        args: ['--autofix']
       - id: trailing-whitespace
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.4.0

@@ -11,36 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
-  Run-Unit-Tests:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
-        airflow-version: ["2.3", "2.4", "2.5", "2.6"]
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install packages and dependencies
-        run: |
-          python -m pip install hatch
-          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
-
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
-        run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-cov
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  Run-Integration-Tests:
+  run-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -55,9 +26,9 @@ jobs:
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
         ports:
           - 5432:5432
     steps:
@@ -74,7 +45,11 @@ jobs:
           python -m pip install dbt-postgres
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
+      - name: Unit Tests - Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-cov
+
+      - name: Integration Tests - Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration

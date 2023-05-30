@@ -19,7 +19,7 @@ from cosmos.providers.dbt.core.operators import (
 )
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 with DAG(
     dag_id="docs_dag",
@@ -30,19 +30,19 @@ with DAG(
 ) as dag:
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
-        project_dir=DBT_ROOT_PATH,
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
         schema="public",
-        target_conn_id="test_aws",
-        bucket_name="test_bucket",
+        aws_conn_id="aws_default",
+        bucket_name="cosmos-docs",
     )
 
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
         task_id="generate_dbt_docs_azure",
-        project_dir=DBT_ROOT_PATH,
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
         schema="public",
-        target_conn_id="test_azure",
+        azure_conn_id="test_azure",
         container_name="$web",
     )
 

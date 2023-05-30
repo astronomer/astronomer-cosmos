@@ -46,7 +46,6 @@ The :class:`cosmos.providers.dbt.DbtTaskGroup` class can be used to render a tas
         start_date=datetime(2022, 11, 27),
         schedule="@daily",
     ) as dag:
-
         e1 = EmptyOperator(task_id="ingestion_workflow")
 
         dbt_tg = DbtTaskGroup(
@@ -123,9 +122,9 @@ If you need to reference a Unity Catalog then pass the name of the catalog in db
 
     tg = DbtTaskGroup(
         # ...
-        dbt_args = {
+        dbt_args={
             # ...
-            'db_name': 'unity-catalog'
+            "db_name": "unity-catalog"
         }
         # ...
     )

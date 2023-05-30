@@ -68,6 +68,22 @@ If you want to run custom code after the docs are generated, you can use the :cl
 
     from cosmos.providers.dbt.core.operators import DbtDocsOperator
 
+    from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+
+    def upload_to_s3(project_dir: str):
+        # Upload the docs to S3
+        hook = S3Hook(aws_conn_id="aws_conn_id")
+
+        for dir, _, files in os.walk(project_dir):
+            for file in files:
+                hook.load_file(
+                    filename=os.path.join(dir, file),
+                    key=file,
+                    bucket_name="my-bucket",
+                    replace=True,
+                )
+
     def upload_docs(project_dir):
         # upload docs to a storage of your choice
         # you only need to upload the following files:

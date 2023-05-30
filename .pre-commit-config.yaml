@@ -68,6 +68,12 @@ repos:
     hooks:
       - id: black
         args: [ "--config", "./pyproject.toml" ]
+  - repo: https://github.com/asottile/blacken-docs
+    rev: 1.13.0
+    hooks:
+      - id: blacken-docs
+        alias: black
+        additional_dependencies: [black>=22.10.0]
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks

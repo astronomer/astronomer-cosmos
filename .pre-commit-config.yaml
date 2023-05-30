@@ -23,7 +23,6 @@ repos:
         name: Run codespell to check for common misspellings in files
         language: python
         types: [text]
-        #exclude: ^mk/.*\.mk$|^python-sdk/docs/Makefile|^python-sdk/Makefile$|^python-sdk/tests/modified_constraint_file.txt$|^python-sdk/tests/benchmark/Makefile$
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
@@ -74,6 +73,12 @@ repos:
       - id: blacken-docs
         alias: black
         additional_dependencies: [black>=22.10.0]
+  #-   repo: https://github.com/pre-commit/mirrors-mypy
+  #    rev: 'v1.3.0'
+  #    hooks:
+  #    - id: mypy
+  #      name: mypy-python-sdk
+  #      additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil]
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks

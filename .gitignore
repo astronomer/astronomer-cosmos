@@ -71,7 +71,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-reference/_generated/
+docs/reference/_generated/
 
 # PyBuilder
 target/
@@ -142,5 +142,5 @@ dmypy.json
 # dbt
 logs/
 
-# Airflow connections file
-test-connections.yaml
+# integration tests
+dev/dags/.airflowignore

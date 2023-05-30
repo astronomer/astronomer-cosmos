@@ -11,12 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  default:
+
+  Run-Unit-Tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
-        airflow-version: ["2.3", "2.4", "2.5"]
+        airflow-version: ["2.3", "2.4", "2.5", "2.6"]
     steps:
       - uses: actions/checkout@v3
 
@@ -27,15 +28,65 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install .[tests,docker,kubernetes]
-          python -m pip install "apache-airflow==${{ matrix.airflow-version }}"
-          python -m pip list
+          python -m pip install hatch
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
-          pytest --doctest-modules --durations=10 --pyargs --cov=cosmos/ cosmos/
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  Run-Integration-Tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        airflow-version: ["2.3", "2.4", "2.5", "2.6"]
+    services:
+      postgres:
+        # Docker Hub image
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install hatch
+          python -m pip install dbt-postgres
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
+
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
+        run: |
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run airflow db init
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+    env:
+      AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+      AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      DBT_ROOT_PATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt
+      DBT_DOCS_PATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt-docs
+      PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH

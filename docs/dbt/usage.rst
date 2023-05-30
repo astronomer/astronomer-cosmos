@@ -3,13 +3,13 @@ Usage
 
 Cosmos supports two standard way of rendering dbt projects: either as a full DAG or as a Task Group.
 
-By default, Cosmos will look in the ``/usr/local/airflow/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.providers.dbt.DbtDag` or :class:`cosmos.providers.dbt.DbtTaskGroup`. You can also override the default models directory, which is ``"models"`` by default, using the ``dbt_models_dir`` argument.
+By default, Cosmos will look in the ``/usr/local/airflow/dags/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.providers.dbt.DbtDag` or :class:`cosmos.providers.dbt.DbtTaskGroup`. You can also override the default models directory, which is ``"models"`` by default, using the ``dbt_models_dir`` argument.
 
 Rendering
-+++++++++
+---------
 
 Full DAG
---------
+++++++++
 
 The :class:`cosmos.providers.dbt.DbtDag` class can be used to render a full DAG for a dbt project. This is useful if you want to run all of the dbt models in a project as a single DAG.
 
@@ -28,7 +28,7 @@ The :class:`cosmos.providers.dbt.DbtDag` class can be used to render a full DAG 
 
 
 Task Group
-----------
+++++++++++
 
 The :class:`cosmos.providers.dbt.DbtTaskGroup` class can be used to render a task group for a dbt project. This is useful if you want to run your dbt models in a project as a single task group, and include other non-dbt tasks in your DAG (e.g., extracting and loading data).
 
@@ -64,7 +64,7 @@ The :class:`cosmos.providers.dbt.DbtTaskGroup` class can be used to render a tas
 
 
 Connections & profiles
-+++++++++++++++++++++++++++++++
+----------------------
 
 Cosmos currently supports the following connection types.
 
@@ -107,13 +107,13 @@ For more information, see the `dbt documentation <https://docs.getdbt.com/refere
     )
 
 BigQuery
----------
+++++++++
 
 Cosmos supports the keyfile json `method <https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-json>`__
 which is common between Airflow and dbt.
 
 Databricks
------------
+++++++++++
 
 If you need to reference a Unity Catalog then pass the name of the catalog in db_name within dbt_args.
 
@@ -131,7 +131,7 @@ If you need to reference a Unity Catalog then pass the name of the catalog in db
     )
 
 Postgres
----------
+++++++++
 
 The database name is determined in the following order.
 
@@ -146,14 +146,14 @@ to prevent confusion.
 In the connection it remains as schema, even though it refers to a database.
 
 Redshift
----------
+++++++++
 
 Builds upon Postgres so the details on schemas are the same.
 
 Cosmos supports the password based authentication `method <https://docs.getdbt.com/reference/warehouse-setups/redshift-setup#password-based-authentication>`__
 
 Exasol
----------
+++++++
 
 Builds upon Postgres so the details on schemas are the same.
 
@@ -161,7 +161,7 @@ Cosmos supports the password based authentication `method <https://docs.getdbt.c
 
 
 Snowflake
-----------
++++++++++
 
 Cosmos supports the dbt User/Password authentication `method <https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup#user--password-authentication>`__
 
@@ -169,7 +169,7 @@ Supports both pre and post apache-airflow-providers-snowflake v4.0.2 changes for
 by this `pull request <https://github.com/apache/airflow/pull/26764>`__.
 
 Trino
-______
++++++
 
 Cosmos supports ldap, certificate, jwt and kerberos authentication which are common between dbt and Airflow.
 
@@ -182,7 +182,7 @@ To provide a default Trino schema a.k.a database this will come from the Airflow
 using `dbt_args = {"schema": "my_schema"}}`
 
 Spark Thrift
-______
+++++++++++++
 
 Spark Thrift uses Airflow Spark JDBC connection.
 

@@ -25,12 +25,11 @@ def test_render_project_default():
     )
     assert isinstance(computed, Group)
     assert computed.id == "jaffle_shop"
-    assert len(computed.entities) == 9
+    assert len(computed.entities) == 8
     entities_ids = [entity.id for entity in computed.entities]
     expected_ids = [
         "customers",
         "orders",
-        "orders_snapshot_timestamp_snapshot",
         "raw_customers_seed",
         "raw_orders_seed",
         "raw_payments_seed",
@@ -49,12 +48,11 @@ def test_render_project_test_behavior_none():
     )
     assert isinstance(computed, Group)
     assert computed.id == "jaffle_shop"
-    assert len(computed.entities) == 9
+    assert len(computed.entities) == 8
     entities_ids = [entity.id for entity in computed.entities]
     expected_ids = [
         "customers_run",
         "orders_run",
-        "orders_snapshot_timestamp_snapshot",
         "raw_customers_seed",
         "raw_orders_seed",
         "raw_payments_seed",
@@ -73,13 +71,12 @@ def test_render_project_test_behavior_after_all():
     )
     assert isinstance(computed, Group)
     assert computed.id == "jaffle_shop"
-    assert len(computed.entities) == 10
+    assert len(computed.entities) == 9
     entities_ids = [entity.id for entity in computed.entities]
     expected_ids = [
         "customers_run",
         "jaffle_shop_test",
         "orders_run",
-        "orders_snapshot_timestamp_snapshot",
         "raw_customers_seed",
         "raw_orders_seed",
         "raw_payments_seed",
@@ -134,12 +131,11 @@ def test_render_project_select_models_by_excluding_path():
         dbt_root_path=DBT_PROJECT_PATH,
         exclude={"paths": ["models/staging/"]},
     )
-    assert len(computed.entities) == 6
+    assert len(computed.entities) == 5
     entities_ids = [entity.id for entity in computed.entities]
     expected_ids = [
         "customers",
         "orders",
-        "orders_snapshot_timestamp_snapshot",
         "raw_customers_seed",
         "raw_orders_seed",
         "raw_payments_seed",

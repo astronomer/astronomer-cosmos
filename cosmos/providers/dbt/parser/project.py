@@ -185,7 +185,7 @@ class DbtProject:
     # required, user-specified instance variables
     project_name: str
     # optional, user-specified instance variables
-    dbt_root_path: str = "/usr/local/airflow/dbt"
+    dbt_root_path: str = "/usr/local/airflow/dags/dbt"
     dbt_models_dir: str = "models"
     dbt_snapshots_dir: str = "snapshots"
     dbt_seeds_dir: str = "seeds"

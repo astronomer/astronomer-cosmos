@@ -87,6 +87,7 @@ docs =[
     "sphinx-autoapi"
 ]
 tests = [
+    "packaging",
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",
@@ -138,19 +139,21 @@ dependencies = [
 
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.7", "3.8", "3.9", "3.10"]
-airflow = ["2.3", "2.4", "2.5"]
+airflow = ["2.3", "2.4", "2.5", "2.6"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
     { value = "apache-airflow==2.3", if = ["2.3"] },
     { value = "apache-airflow==2.4", if = ["2.4"] },
     { value = "apache-airflow==2.5", if = ["2.5"] },
+    { value = "apache-airflow==2.6", if = ["2.6"] },
 ]
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
-test = "pytest ."
-test-cov = "pytest --cov=cosmos --cov-report=term-missing --cov-report=xml ."
+test = 'pytest  -vv . -m "not integration"'
+test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml . -m "not integration"'
+test-integration = "pytest -vv cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
 
 ######################################
 # DOCS
@@ -179,6 +182,12 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+markers = [
+    "integration"
+]
 
 [tool.ruff]
 line-length = 120

@@ -16,3 +16,5 @@ USER astro
 
 # add a connection to the airflow db for testing
 ENV AIRFLOW_CONN_AIRFLOW_DB=postgres://airflow:pg_password@postgres:5432/airflow
+ENV DBT_ROOT_PATH=/usr/local/airflow/dags/dbt
+ENV DBT_DOCS_PATH=/usr/local/airflow/dbt-docs

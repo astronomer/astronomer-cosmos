@@ -6,7 +6,7 @@ Cosmos offers a few different configuration options for how your dbt project is 
 Testing
 ----------------------
 
-By default, Cosmos will add a test after each model. This can be overriden using the ``test_behavior`` field. The options are:
+By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field. The options are:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully

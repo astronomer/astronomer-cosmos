@@ -16,6 +16,14 @@ repos:
       - id: pretty-format-json
         args: ['--autofix']
       - id: trailing-whitespace
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.4
+    hooks:
+      - id: codespell
+        name: Run codespell to check for common misspellings in files
+        language: python
+        types: [text]
+        #exclude: ^mk/.*\.mk$|^python-sdk/docs/Makefile|^python-sdk/Makefile$|^python-sdk/tests/modified_constraint_file.txt$|^python-sdk/tests/benchmark/Makefile$
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:

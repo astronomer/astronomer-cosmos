@@ -104,7 +104,7 @@ to the desired Cosmos component.
         When creating a connection object in Airflow, the top-level ``database`` is passed through the *Schema*
         parameter (see ``Schema`` section in the `OSS Airflow Docs <https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/connections/redshift.html#configuring-the-connection>`_).
         Due to this, there is no field for a default schema so it needs to be passed when the Cosmos class is
-        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overriden here (but a default
+        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overridden here (but a default
         value must still be included when creating the Airflow connection):
 
         .. code-block:: python
@@ -176,7 +176,7 @@ to the desired Cosmos component.
         `here <https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html#configuring-the-connection>`_).
         The top-level ``project_id`` is extracted from the json service account parameters. However, there is no
         available field to specify a default ``dataset`` so it needs to be passed when the Cosmos class is instantiated
-        via the ``dbt_args`` parameter. If desired, the project_id can can also be overriden here:
+        via the ``dbt_args`` parameter. If desired, the project_id can can also be overridden here:
 
         .. code-block:: python
 
@@ -245,7 +245,7 @@ to the desired Cosmos component.
         parameter. If no value is provided, Cosmos will assume a default catalog value of ``hive_metastore`` based on
         Databricks documentation `here <https://docs.databricks.com/data-governance/unity-catalog/hive-metastore.html#default-catalog>`_.
         Due to this, there is no field for a databricks default database so it needs to be passed when the Cosmos class
-        is instantiated via the ``dbt_args`` parameter. If desired, the catalog can also be overriden here:
+        is instantiated via the ``dbt_args`` parameter. If desired, the catalog can also be overridden here:
 
         .. code-block:: python
 
@@ -313,7 +313,7 @@ to the desired Cosmos component.
         When creating a connection object in Airflow, the top-level ``database`` is passed through the *Schema*
         parameter (see ``Schema`` section in the `OSS Airflow Docs <https://airflow.apache.org/docs/apache-airflow-providers-postgres/stable/connections/postgres.html#configuring-the-connection>`_).
         Due to this, there is no field for a default schema so it needs to be passed when the Cosmos class is
-        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overriden here (but a default
+        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overridden here (but a default
         value must still be included when creating the Airflow connection):
 
         .. code-block:: python
@@ -380,7 +380,7 @@ Cosmos Object, you can choose to override the database/schema values from the Co
     )
 
 Additionally, if you've specified a database/schema in either the connection object or the parameters shown in the code
-block above, those are overriden by dbt project files. For example, if you've setup a ``properties.yml`` file in your dbt
+block above, those are overridden by dbt project files. For example, if you've setup a ``properties.yml`` file in your dbt
 project like this:
 
 .. code-block:: yaml

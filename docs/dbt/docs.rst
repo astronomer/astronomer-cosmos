@@ -1,7 +1,7 @@
 Generating Docs
 ================
 
-dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_.
+dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the `jaffle_shop` project, check out _`this site<http://cosmos-docs.s3-website-us-east-1.amazonaws.com/>`_.
 
 Many users choose to generate and serve these docs on a static website. This is a great way to share your data models with your team and other stakeholders.
 

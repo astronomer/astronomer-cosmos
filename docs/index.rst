@@ -101,3 +101,6 @@ License
 _______
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
+
+Docs
+____

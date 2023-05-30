@@ -10,19 +10,12 @@ DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags
 
 
 def test_calculate_operator_class():
-    class_module_import_path = calculate_operator_class(
-        execution_mode="kubernetes", dbt_class="Seed"
-    )
-    assert (
-        class_module_import_path
-        == "cosmos.providers.dbt.core.operators.kubernetes.SeedKubernetesOperator"
-    )
+    class_module_import_path = calculate_operator_class(execution_mode="kubernetes", dbt_class="Seed")
+    assert class_module_import_path == "cosmos.providers.dbt.core.operators.kubernetes.SeedKubernetesOperator"
 
 
 def test_render_project_default():
-    computed = render_project(
-        dbt_project_name="jaffle_shop", dbt_root_path=DBT_PROJECT_PATH
-    )
+    computed = render_project(dbt_project_name="jaffle_shop", dbt_root_path=DBT_PROJECT_PATH)
     assert isinstance(computed, Group)
     assert computed.id == "jaffle_shop"
     assert len(computed.entities) == 8

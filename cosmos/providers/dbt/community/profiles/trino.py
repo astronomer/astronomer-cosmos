@@ -70,34 +70,22 @@ def create_profile_vars_kerberos(
     principal = str(extra_dejson.get("kerberos__principal"))
     password = str(conn.password)
     if not all((Path(krb5_config).exists(), principal, password)):
-        raise ValueError(
-            "One of kerberos__config, kerberos__principal or password is missing/incorrect"
-        )
+        raise ValueError("One of kerberos__config, kerberos__principal or password is missing/incorrect")
     common_profile_vars["TRINO_PASSWORD"] = password
     common_profile_vars["TRINO_KRB5_CONFIG"] = krb5_config
     common_profile_vars["TRINO_PRINCIPAL"] = principal
     # Optional fields
-    common_profile_vars["TRINO_SERVICE_NAME"] = str(
-        extra_dejson.get("kerberos__service_name")
-    )
-    common_profile_vars["TRINO_MUTUAL_AUTHENTICATION"] = str(
-        extra_dejson.get("kerberos__mutual_authentication")
-    )
-    common_profile_vars["TRINO_FORCE_PREEMPTIVE"] = str(
-        extra_dejson.get("kerberos__force_preemptive")
-    )
-    common_profile_vars["TRINO_HOSTNAME_OVERRIDE"] = str(
-        extra_dejson.get("kerberos__hostname_override")
-    )
+    common_profile_vars["TRINO_SERVICE_NAME"] = str(extra_dejson.get("kerberos__service_name"))
+    common_profile_vars["TRINO_MUTUAL_AUTHENTICATION"] = str(extra_dejson.get("kerberos__mutual_authentication"))
+    common_profile_vars["TRINO_FORCE_PREEMPTIVE"] = str(extra_dejson.get("kerberos__force_preemptive"))
+    common_profile_vars["TRINO_HOSTNAME_OVERRIDE"] = str(extra_dejson.get("kerberos__hostname_override"))
     common_profile_vars["TRINO_SANITIZE_MUTUAL_ERROR_RESPONSE"] = str(
         extra_dejson.get("kerberos__sanitize_mutual_error_response")
     )
     common_profile_vars["TRINO_DELEGATE"] = str(extra_dejson.get("kerberos__delegate"))
     # Not sure if this is supposed to be a file or not.
     # https://github.com/trinodb/trino-python-client/blob/0.321.0/trino/auth.py#L84
-    common_profile_vars["TRINO_CA_BUNDLE"] = str(
-        extra_dejson.get("kerberos__ca_bundle")
-    )
+    common_profile_vars["TRINO_CA_BUNDLE"] = str(extra_dejson.get("kerberos__ca_bundle"))
 
     return common_profile_vars
 
@@ -119,9 +107,7 @@ def create_profile_vars_ldap(
     return common_profile_vars
 
 
-def create_profile_vars_certs(
-    conn: Connection, common_profile_vars: dict[str, str]
-) -> dict[str, str]:
+def create_profile_vars_certs(conn: Connection, common_profile_vars: dict[str, str]) -> dict[str, str]:
     """
     Airflow: certs__client_cert_path = dbt: client_certificate
     Airflow: certs__client_key_path  = dbt: client_private_key
@@ -140,9 +126,7 @@ def create_profile_vars_certs(
     return common_profile_vars
 
 
-def create_profile_vars_jwt(
-    conn: Connection, common_profile_vars: dict[str, str]
-) -> dict[str, str]:
+def create_profile_vars_jwt(conn: Connection, common_profile_vars: dict[str, str]) -> dict[str, str]:
     """
     Airflow: jwt__token = dbt: jwt_token
     """
@@ -175,18 +159,14 @@ def create_profile_vars_trino(
         )
     common_vars = {
         "TRINO_HTTP_SCHEME": str(extra_dejson.get("protocol")),
-        "TRINO_DATABASE": database_override
-        if database_override is not None
-        else str(extra_dejson.get("catalog")),
+        "TRINO_DATABASE": database_override if database_override is not None else str(extra_dejson.get("catalog")),
         "TRINO_SCHEMA": schema_override if schema_override is not None else conn.schema,
         "TRINO_HOST": conn.host,
         "TRINO_PORT": str(conn.port),
     }
 
     if extra_dejson.get("session_properties"):
-        common_vars["TRINO_SESSION_PROPERTIES"] = str(
-            extra_dejson.get("session_properties")
-        )
+        common_vars["TRINO_SESSION_PROPERTIES"] = str(extra_dejson.get("session_properties"))
 
     dispatch = {
         "ldap": create_profile_vars_ldap,

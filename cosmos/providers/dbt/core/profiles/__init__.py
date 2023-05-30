@@ -44,37 +44,21 @@ if TYPE_CHECKING:
 class AdapterConfig:
     profile_name: str
     profile: dict[str, str]
-    create_profile_function: Callable[
-        [Connection, Optional[str], Optional[str]], tuple[str, dict[str, str]]
-    ]
+    create_profile_function: Callable[[Connection, Optional[str], Optional[str]], tuple[str, dict[str, str]]]
 
 
 def get_available_adapters() -> dict[str, AdapterConfig]:
     return {
-        "postgres": AdapterConfig(
-            "postgres_profile", postgres_profile, create_profile_vars_postgres
-        ),
-        "redshift": AdapterConfig(
-            "redshift_profile", redshift_profile, create_profile_vars_redshift
-        ),
-        "snowflake": AdapterConfig(
-            "snowflake_profile", snowflake_profile, create_profile_vars_snowflake
-        ),
+        "postgres": AdapterConfig("postgres_profile", postgres_profile, create_profile_vars_postgres),
+        "redshift": AdapterConfig("redshift_profile", redshift_profile, create_profile_vars_redshift),
+        "snowflake": AdapterConfig("snowflake_profile", snowflake_profile, create_profile_vars_snowflake),
         "google_cloud_platform": AdapterConfig(
             "bigquery_profile",
             bigquery_profile,
             create_profile_vars_google_cloud_platform,
         ),
-        "databricks": AdapterConfig(
-            "databricks_profile", databricks_profile, create_profile_vars_databricks
-        ),
-        "exasol": AdapterConfig(
-            "exasol_profile", exasol_profile, create_profile_vars_exasol
-        ),
-        "trino": AdapterConfig(
-            "trino_profile", trino_profile, create_profile_vars_trino
-        ),
-        "spark": AdapterConfig(
-            "spark_profile", spark_profile, create_profile_vars_spark_thrift
-        ),
+        "databricks": AdapterConfig("databricks_profile", databricks_profile, create_profile_vars_databricks),
+        "exasol": AdapterConfig("exasol_profile", exasol_profile, create_profile_vars_exasol),
+        "trino": AdapterConfig("trino_profile", trino_profile, create_profile_vars_trino),
+        "spark": AdapterConfig("spark_profile", spark_profile, create_profile_vars_spark_thrift),
     }

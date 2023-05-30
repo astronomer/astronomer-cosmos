@@ -33,9 +33,7 @@ def create_profile_vars_redshift(
     """
 
     if not schema_override:
-        raise ValueError(
-            "A redshift schema must be provided via the `schema` parameter"
-        )
+        raise ValueError("A redshift schema must be provided via the `schema` parameter")
 
     profile_vars = {
         "REDSHIFT_HOST": conn.host,

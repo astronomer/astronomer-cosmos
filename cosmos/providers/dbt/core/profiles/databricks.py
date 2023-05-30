@@ -42,9 +42,7 @@ def create_profile_vars_databricks(
         token = conn.extra_dejson.get("token")
 
     if not schema_override:
-        raise ValueError(
-            "A databricks database must be provided via the `schema` parameter"
-        )
+        raise ValueError("A databricks database must be provided via the `schema` parameter")
 
     if database_override:
         catalog = database_override
@@ -53,9 +51,7 @@ def create_profile_vars_databricks(
     else:
         # see https://docs.databricks.com/data-governance/unity-catalog/hive-metastore.html#default-catalog
         catalog = "hive_metastore"
-        logging.info(
-            f"Using catalog: {catalog} as default since none specified in db_name or connection schema"
-        )
+        logging.info(f"Using catalog: {catalog} as default since none specified in db_name or connection schema")
 
     profile_vars = {
         "DATABRICKS_HOST": str(conn.host).replace("https://", ""),

@@ -170,9 +170,7 @@ class DbtBaseOperator(BaseOperator):
         # Eventually the keys & values in the env dict get passed through os.fsencode which enforces this.
         accepted_types = (str, bytes, os.PathLike)
         filtered_env = {
-            k: v
-            for k, v in combined_env.items()
-            if all((isinstance(k, accepted_types), isinstance(v, accepted_types)))
+            k: v for k, v in combined_env.items() if all((isinstance(k, accepted_types), isinstance(v, accepted_types)))
         }
 
         return filtered_env

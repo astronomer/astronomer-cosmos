@@ -10,11 +10,27 @@ repos:
       - id: check-yaml
         args:
           - --unsafe
+      - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: pretty-format-json
         args: ['--autofix']
       - id: trailing-whitespace
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: rst-backticks
+      - id: python-no-log-warn
+      - id: python-check-mock-methods
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.1
+    hooks:
+      - id: forbid-crlf
+      - id: remove-crlf
+      - id: forbid-tabs
+        exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
+      - id: remove-tabs
+        exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.4.0
     hooks:

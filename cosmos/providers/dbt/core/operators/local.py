@@ -473,7 +473,6 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
             self.azure_conn_id,
         )
 
-        from azure.storage.blob import ContentSettings
         from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 
         target_dir = f"{project_dir}/target"

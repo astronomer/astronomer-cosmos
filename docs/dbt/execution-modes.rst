@@ -1,12 +1,5 @@
 .. _execution-modes:
 
-.. toctree::
-    :maxdepth: 2
-    :caption: Sections
-
-    Kubernetes Execution Mode <execution-mode-kubernetes>
-    Docker Execution Mode <execution-mode-docker>
-
 Execution Modes
 ===============
 
@@ -25,9 +18,6 @@ Learn more at :ref:`Installation Options <install-options>`.
 The default ``execution_mode`` is **local**.
 
 If using a cloud provider, the recommendation is to use the **virtualenv** execution mode.
-
-Overview
---------
 
 For more details, check each execution mode description below.
 
@@ -56,12 +46,8 @@ For more details, check each execution mode description below.
      - High
      - No
 
-
-Modes
------
-
 Local
-.....
+-----
 
 Although ``local`` is the fastest way to run Cosmos operators, it also assumes that the DBT Python dependencies do not
 conflict with the Airflow worker dependencies - which is often not true, specially when running in some Cloud managed services.
@@ -81,7 +67,7 @@ The ``local`` execution mode also allows users to declare the path to a custom `
 In this case, the user is responsible for pre-installing DBT (potentially in a user-maintained virtual environment) and manage its extensions.
 
 Virtualenv
-..........
+----------
 
 If you're using managed Airflow solutions on AWS (Amazon MWAA), Azure (Azure Data Factory's Managed Airflow) and GCP (Cloud Composer),
 we recommend you use the ``virtualenv`` execution mode.
@@ -110,7 +96,7 @@ Example of how to use:
        :end-before: [END virtualenv_example]
 
 Docker
-......
+------
 
 The ``docker`` approach assumes users have a previously created Docker image, which should contain the DBT pipelines and
 a ``profiles.yml``, managed by the user.
@@ -136,7 +122,7 @@ Example DAG:
 
 
 Kubernetes
-..........
+----------
 
 Lastly, the ``kubernetes`` approach is the most isolated way of running DBT, since not only the DBT commands are run
 from within a container, but also potentially in a separate host/pod.

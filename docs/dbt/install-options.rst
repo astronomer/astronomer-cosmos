@@ -15,12 +15,8 @@ Read :ref:`Execution Modes <execution-modes>` to decide which is the most suitab
 
 Depending on the ``execution mode``, the package ``astronomer-cosmos`` should be installed in different ways.
 
-
-Packages requirements
----------------------
-
 Local execution mode
-....................
+--------------------
 
 In this case, install the following package at the same level as other Airflow dependencies (preferably pinned):
 
@@ -64,7 +60,7 @@ For example, to install Cosmos with dbt and the Postgres adapter, run the follow
 
 
 Virtualenv execution mode
-.........................
+-------------------------
 
 This is the most lightweight form of installing Cosmos.
 
@@ -74,11 +70,11 @@ Install the following package at the same level as other Airflow dependencies (p
 
     pip install astronomer-cosmos
 
-Learn more about this execution mode at :ref:`Execution Modes <execution-modes:Virtualenv>`.
+Learn more about this execution mode at :ref:`Execution Modes <dbt/execution-modes:Virtualenv>`_.
 
 
 Docker execution mode
-.....................
+---------------------
 
 Install the following package at the same level as other Airflow dependencies (preferably pinned):
 
@@ -86,10 +82,10 @@ Install the following package at the same level as other Airflow dependencies (p
 
     pip install astronomer-cosmos[docker]
 
-Learn more about this execution mode at :ref:`Execution Modes <execution-modes:Docker>`.
+Learn more about this execution mode at :ref:`Execution Modes <dbt/execution-modes:Docker>`_.
 
 Kubernetes execution mode
-.........................
+-------------------------
 
 Install the following package at the same level as other Airflow dependencies (preferably pinned):
 
@@ -97,4 +93,4 @@ Install the following package at the same level as other Airflow dependencies (p
 
     pip install astronomer-cosmos[kubernetes]
 
-Learn more about this execution mode at :ref:`Execution Modes <execution-modes:Kubernetes>`.
+Learn more about this execution mode at :ref:`Execution Modes <dbt/execution-modes:Kubernetes>`_.

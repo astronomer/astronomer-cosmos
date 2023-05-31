@@ -137,12 +137,16 @@ class DbtBaseOperator(BaseOperator):
         Builds the set of environment variables to be exposed for the bash command.
 
         The order of determination is:
-            1. The Airflow context as environment variables.
-            2. The env parameter passed to the Operator
+            1. If append_env is True, the current process environment.
+            2. The Airflow context as environment variables.
+            3. The env parameter passed to the Operator
 
         Note that this also filters out any invalid types that cannot be cast to strings.
         """
         env: dict[str, Any] = {}
+
+        if self.append_env:
+            env.update(os.environ)
 
         # Airflow context as environment variables
         airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)

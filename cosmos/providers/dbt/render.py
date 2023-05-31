@@ -111,7 +111,7 @@ def render_project(
 
         if "configs" in select:
             # TODO: coverme
-            if not set(select["configs"]).intersection(model.config.config_selectors):
+            if not set(select["configs"]).intersection(model.config.config_selectors) == set(select["configs"]):
                 continue
 
         if "configs" in exclude:

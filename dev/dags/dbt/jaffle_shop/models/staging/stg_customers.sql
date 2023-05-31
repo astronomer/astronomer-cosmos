@@ -1,3 +1,10 @@
+{{
+    config(
+        tags=["customers"],
+    )
+}}
+
+
 with source as (
 
     {#-

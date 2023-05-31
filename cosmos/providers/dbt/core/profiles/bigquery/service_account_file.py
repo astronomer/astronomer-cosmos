@@ -11,7 +11,7 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
     Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account file.
 
     https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-file
-    https://airflow.apache.org/docs/apache-airflow-providers-databricks/stable/connections/databricks.html
+    https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
 
     airflow_connection_type: str = "google-cloud-platform"

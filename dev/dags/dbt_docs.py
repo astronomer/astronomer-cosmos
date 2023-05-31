@@ -11,6 +11,9 @@ import os
 from pathlib import Path
 
 from airflow import DAG
+from airflow.hooks.base import BaseHook
+from airflow.exceptions import AirflowNotFoundException
+from airflow.decorators import task
 from pendulum import datetime
 
 from cosmos.providers.dbt.core.operators import (
@@ -20,6 +23,31 @@ from cosmos.providers.dbt.core.operators import (
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+
+S3_CONN_ID = "aws_default"
+AZURE_CONN_ID = "test_azure"
+
+
+@task.branch(task_id="which_upload")
+def which_upload():
+    "Only run the docs tasks if we have the proper connections set up"
+    downstream_tasks_to_run = []
+
+    try:
+        BaseHook.get_connection(S3_CONN_ID)
+        downstream_tasks_to_run += ["generate_dbt_docs_aws"]
+    except AirflowNotFoundException:
+        pass
+
+    # if we have an AZURE_CONN_ID, check if it's valid
+    try:
+        BaseHook.get_connection(AZURE_CONN_ID)
+        downstream_tasks_to_run += ["generate_dbt_docs_azure"]
+    except AirflowNotFoundException:
+        pass
+
+    return downstream_tasks_to_run
+
 
 with DAG(
     dag_id="docs_dag",
@@ -33,7 +61,7 @@ with DAG(
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
         schema="public",
-        aws_conn_id="aws_default",
+        aws_conn_id=S3_CONN_ID,
         bucket_name="cosmos-docs",
     )
 
@@ -42,8 +70,8 @@ with DAG(
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
         schema="public",
-        azure_conn_id="test_azure",
+        azure_conn_id=AZURE_CONN_ID,
         container_name="$web",
     )
 
-    [generate_dbt_docs_aws, generate_dbt_docs_azure]
+    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure]

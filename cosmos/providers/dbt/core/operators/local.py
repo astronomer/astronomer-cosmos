@@ -423,9 +423,7 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info(
-                "Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}"
-            )
+            logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
 
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 

@@ -84,6 +84,7 @@ If you want to run custom code after the docs are generated, you can use the :cl
                     replace=True,
                 )
 
+
     def upload_docs(project_dir):
         # upload docs to a storage of your choice
         # you only need to upload the following files:
@@ -92,6 +93,7 @@ If you want to run custom code after the docs are generated, you can use the :cl
         # - f"{project_dir}/target/graph.gpickle"
         # - f"{project_dir}/target/catalog.json"
         pass
+
 
     # then, in your DAG code:
     generate_dbt_docs = DbtDocsOperator(

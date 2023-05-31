@@ -97,7 +97,7 @@ As contributors and maintainers to this project, you are expected to abide by th
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
 
-License
+License2
 _______
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_

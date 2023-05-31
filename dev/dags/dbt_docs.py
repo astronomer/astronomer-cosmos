@@ -24,8 +24,8 @@ from cosmos.providers.dbt.core.operators import (
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-S3_CONN_ID = "aws_default"
-AZURE_CONN_ID = "test_azure"
+S3_CONN_ID = "aws_docs"
+AZURE_CONN_ID = "azure_docs"
 
 
 @task.branch(task_id="which_upload")

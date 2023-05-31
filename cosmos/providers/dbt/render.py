@@ -116,7 +116,7 @@ def render_project(
 
         if "configs" in exclude:
             # TODO: coverme
-            if set(exclude["configs"]).intersection(model.config.config_selectors):
+            if set(exclude["configs"]).intersection(model.config.config_selectors) == set(exclude["configs"]):
                 continue
 
         run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}

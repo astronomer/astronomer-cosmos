@@ -5,8 +5,8 @@ Installation Options
 
 Cosmos can run DBT commands using four different approaches, called ``execution modes``:
 
-1. **local**: Run DBT commands from the same environment as Airflow (optional: define the path to a dbt binary)
-2. **virtualenv**: Run DBT commands from a Python virtual environment created by Cosmos (**recommended**)
+1. **local**: Run DBT commands using a pre-installed DBT binary (default)
+2. **virtualenv**: Run DBT commands from a Python virtual environment created by Cosmos
 3. **docker**: Run DBT commands using Docker (requires a pre-existing Docker image)
 4. **kubernetes**: Run DBT commands within a Kubernetes Pod (requires a pre-existing Docker image)
 
@@ -18,12 +18,26 @@ Depending on the ``execution mode``, the package ``astronomer-cosmos`` should be
 Local execution mode
 --------------------
 
-In this case, install the following package at the same level as other Airflow dependencies (preferably pinned):
+Pre-installed DBT
+.................
+
+If the Airflow worker node already has DBT installed, install Cosmos using:
+
+.. code-block:: bash
+
+    pip install astronomer-cosmos
+
+In this case, users can specify it by passing the argument XXXX.
+
+
+Install DBT within the same environment as Cosmos
+.................................................
+
+In this case, install the DBT package at the same level as other Airflow dependencies (preferably pinned):
 
 .. code-block:: bash
 
     pip install astronomer-cosmos[dbt-all]
-
 
 Using ``dbt-all`` will install all Cosmos, dbt, and all of the supported database types. If you only need a subset of the supported database types, you can use the following selectors:
 
@@ -62,7 +76,7 @@ For example, to install Cosmos with dbt and the Postgres adapter, run the follow
 Virtualenv execution mode
 -------------------------
 
-This is the most lightweight form of installing Cosmos.
+Cosmos can create a dedicated Python virtual environment and install DBT for the users, for each task run.
 
 Install the following package at the same level as other Airflow dependencies (preferably pinned):
 

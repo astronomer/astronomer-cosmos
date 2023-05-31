@@ -49,6 +49,8 @@ For more details, check each execution mode description below.
 Local
 -----
 
+ from the same environment as Airflow  (optional: define the path to a dbt binary)
+
 Although ``local`` is the fastest way to run Cosmos operators, it also assumes that the DBT Python dependencies do not
 conflict with the Airflow worker dependencies - which is often not true, specially when running in some Cloud managed services.
 

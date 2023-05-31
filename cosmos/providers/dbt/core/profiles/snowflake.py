@@ -52,17 +52,13 @@ def create_profile_vars_snowflake(
     if snowflake_dejson.get("account") is None:
         for key, value in extras.items():
             extras[key] = f"extra__snowflake__{value}"
-    account = get_snowflake_account(
-        snowflake_dejson.get(extras["account"]), snowflake_dejson.get(extras["region"])
-    )
+    account = get_snowflake_account(snowflake_dejson.get(extras["account"]), snowflake_dejson.get(extras["region"]))
     profile_vars = {
         "SNOWFLAKE_USER": conn.login,
         "SNOWFLAKE_PASSWORD": conn.password,
         "SNOWFLAKE_ACCOUNT": account,
         "SNOWFLAKE_ROLE": snowflake_dejson.get(extras["role"]),
-        "SNOWFLAKE_DATABASE": database_override
-        if database_override
-        else conn.extra_dejson.get(extras["database"]),
+        "SNOWFLAKE_DATABASE": database_override if database_override else conn.extra_dejson.get(extras["database"]),
         "SNOWFLAKE_WAREHOUSE": snowflake_dejson.get(extras["warehouse"]),
         "SNOWFLAKE_SCHEMA": schema_override if schema_override else conn.schema,
     }

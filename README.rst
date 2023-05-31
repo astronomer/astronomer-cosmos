@@ -53,7 +53,6 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
         start_date=datetime(2022, 11, 27),
         schedule="@daily",
     ):
-
         e1 = EmptyOperator(task_id="pre_dbt")
 
         dbt_tg = DbtTaskGroup(

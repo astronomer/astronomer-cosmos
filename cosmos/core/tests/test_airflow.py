@@ -191,9 +191,7 @@ def test_cosmos_dag_and_task_group(
                     "upstream_entity_ids": entity.upstream_entity_ids + upstreams,
                 }
             elif isinstance(entity, Group):
-                flatten_entities(
-                    entity.entities, upstreams + entity.upstream_entity_ids
-                )
+                flatten_entities(entity.entities, upstreams + entity.upstream_entity_ids)
 
     flatten_entities(group.entities)
 
@@ -244,9 +242,7 @@ def test_cosmos_dag_and_task_group(
         class_name = str(type(tg_task))
         assert class_name == f"<class '{cosmos_task['operator_class']}'>"
 
-        airflow_upstream_task_ids = [
-            id.split(".")[-1] for id in list(tg_task.upstream_task_ids)
-        ]
+        airflow_upstream_task_ids = [id.split(".")[-1] for id in list(tg_task.upstream_task_ids)]
         assert airflow_upstream_task_ids == cosmos_task["upstream_entity_ids"]
 
 

@@ -176,6 +176,9 @@ serve = "sphinx-autobuild docs docs/_build"
 ######################################
 # THIRD PARTY TOOLS
 ######################################
+[tool.black]
+line-length = 120
+target-version = ['py37', 'py38', 'py39', 'py310']
 
 [tool.isort]
 profile = "black"

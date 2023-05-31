@@ -25,8 +25,7 @@ MIN_VER_DAG_FILE: dict[str, list[str]] = {
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
-    Version(version): MIN_VER_DAG_FILE[version]
-    for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
+    Version(version): MIN_VER_DAG_FILE[version] for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
 }
 
 

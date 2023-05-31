@@ -40,9 +40,7 @@ def create_profile_vars_spark_thrift(
         schema = conn.schema
     else:
         schema = "default"
-        logging.info(
-            f"Using schema: {schema} as default since none specified in db_name or connection schema"
-        )
+        logging.info(f"Using schema: {schema} as default since none specified in db_name or connection schema")
 
     profile_vars = {
         "SPARK_HOST": conn.host,

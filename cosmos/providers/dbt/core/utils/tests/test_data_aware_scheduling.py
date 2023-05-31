@@ -13,12 +13,8 @@ from cosmos.providers.dbt.dataset import Dataset
             "orders",
             Dataset("DBT://MY_CONNECTION/JAFFLE_SHOP/ORDERS"),
         ),
-        pytest.param(
-            "my_connection", "jafflé_shop", "orders", None, marks=pytest.mark.xfail
-        ),
+        pytest.param("my_connection", "jafflé_shop", "orders", None, marks=pytest.mark.xfail),
     ],
 )
-def test_get_dbt_dataset(
-    connection_id: str, project_name: str, model_name: str, expected_dataset: Dataset
-) -> None:
+def test_get_dbt_dataset(connection_id: str, project_name: str, model_name: str, expected_dataset: Dataset) -> None:
     assert get_dbt_dataset(connection_id, project_name, model_name) == expected_dataset

@@ -52,9 +52,7 @@ def test_create_default_profiles_exist(tmp_path: Path) -> None:
 
 
 @patch("cosmos.providers.dbt.core.utils.profiles_generator.cosmos_version")
-def test_create_default_profiles_exist_library_update(
-    cosmos_version: MagicMock, tmp_path: Path
-) -> None:
+def test_create_default_profiles_exist_library_update(cosmos_version: MagicMock, tmp_path: Path) -> None:
     """
     If the version of astronomer-cosmos has been updated then we ensure that the profiles are re-written.
     """
@@ -180,9 +178,7 @@ def test_create_profile_vars_databricks(airflow_connection: Connection) -> None:
         "DATABRICKS_TOKEN": token,
     }
 
-    profile, profile_vars = create_profile_vars_databricks(
-        airflow_connection, catalog, schema
-    )
+    profile, profile_vars = create_profile_vars_databricks(airflow_connection, catalog, schema)
     assert profile == "databricks_profile"
     assert profile_vars == expected_profile_vars
 
@@ -209,9 +205,7 @@ def test_create_profile_vars_postgres(airflow_connection: Connection) -> None:
         "POSTGRES_SCHEMA": schema,
     }
 
-    profile, profile_vars = create_profile_vars_postgres(
-        airflow_connection, database, schema
-    )
+    profile, profile_vars = create_profile_vars_postgres(airflow_connection, database, schema)
     assert profile == "postgres_profile"
     assert profile_vars == expected_profile_vars
 
@@ -244,9 +238,7 @@ def test_create_profile_vars_postgres_no_database(
         "POSTGRES_SCHEMA": schema,
     }
 
-    profile, profile_vars = create_profile_vars_postgres(
-        airflow_connection, None, schema
-    )
+    profile, profile_vars = create_profile_vars_postgres(airflow_connection, None, schema)
     assert profile == "postgres_profile"
     assert profile_vars == expected_profile_vars
 
@@ -310,9 +302,7 @@ def test_create_profile_vars_exasol(airflow_connection: Connection) -> None:
         "region given but different to region in account",
     ],
 )
-def test_get_snowflake_account(
-    account: str, region: Optional[str], expected_account: str
-) -> None:
+def test_get_snowflake_account(account: str, region: Optional[str], expected_account: str) -> None:
     assert get_snowflake_account(account, region) == expected_account
 
 
@@ -321,9 +311,7 @@ def test_get_snowflake_account(
     [True, False],
     ids=["extras have prefix", "extras don't have prefix"],
 )
-def test_create_profile_vars_snowflake(
-    airflow_connection: Connection, extras_are_prefixed: bool
-) -> None:
+def test_create_profile_vars_snowflake(airflow_connection: Connection, extras_are_prefixed: bool) -> None:
     region = "us-east"
     warehouse = "warehouse"
     database = "db"
@@ -359,9 +347,7 @@ def test_create_profile_vars_snowflake(
         "SNOWFLAKE_SCHEMA": schema,
     }
 
-    profile, profile_vars = create_profile_vars_snowflake(
-        airflow_connection, database, schema
-    )
+    profile, profile_vars = create_profile_vars_snowflake(airflow_connection, database, schema)
     assert profile == "snowflake_profile"
     assert profile_vars == expected_profile_vars
 
@@ -387,9 +373,7 @@ def test_create_profile_vars_redshift(airflow_connection: Connection) -> None:
         "REDSHIFT_SCHEMA": schema,
     }
 
-    profile, profile_vars = create_profile_vars_redshift(
-        airflow_connection, database, schema
-    )
+    profile, profile_vars = create_profile_vars_redshift(airflow_connection, database, schema)
     assert profile == "redshift_profile"
     assert profile_vars == expected_profile_vars
 
@@ -450,9 +434,7 @@ def test_create_profile_vars_google_cloud_platform(
         "BIGQUERY_CLIENT_X509_CERT_URL": client_x509_cert_url,
     }
 
-    profile, profile_vars = create_profile_vars_google_cloud_platform(
-        airflow_connection, database, schema
-    )
+    profile, profile_vars = create_profile_vars_google_cloud_platform(airflow_connection, database, schema)
     assert profile == "bigquery_profile"
     assert profile_vars == expected_profile_vars
 
@@ -485,9 +467,7 @@ def test_create_profile_vars_trino(airflow_connection: Connection) -> None:
         "TRINO_AUTH_TYPE": "ldap",
     }
 
-    profile, profile_vars = create_profile_vars_trino(
-        airflow_connection, "delta", schema
-    )
+    profile, profile_vars = create_profile_vars_trino(airflow_connection, "delta", schema)
     assert profile == "trino_profile"
     assert profile_vars == expected_profile_vars
 

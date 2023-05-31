@@ -42,9 +42,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
         "No exception raised",
     ],
 )
-def test_dbt_base_operator_exception_handling(
-    skip_exception, exception_code_returned, expected_exception
-) -> None:
+def test_dbt_base_operator_exception_handling(skip_exception, exception_code_returned, expected_exception) -> None:
     dbt_base_operator = DbtLocalBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
@@ -52,13 +50,9 @@ def test_dbt_base_operator_exception_handling(
     )
     if expected_exception:
         with pytest.raises(expected_exception):
-            dbt_base_operator.exception_handling(
-                SubprocessResult(exception_code_returned, None)
-            )
+            dbt_base_operator.exception_handling(SubprocessResult(exception_code_returned, None))
     else:
-        dbt_base_operator.exception_handling(
-            SubprocessResult(exception_code_returned, None)
-        )
+        dbt_base_operator.exception_handling(SubprocessResult(exception_code_returned, None))
 
 
 @patch("cosmos.providers.dbt.core.operators.base.context_to_airflow_vars")

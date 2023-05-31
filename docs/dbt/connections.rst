@@ -39,9 +39,9 @@ to the desired Cosmos component.
             jaffle_shop = DbtTaskGroup(
                 conn_id="redshift_default",
                 dbt_args={
-                    "db_name": "my_redshift_database", #optional, overrides the database value in the Airflow Connection
-                    "schema": "my_redshift_schema", #optional, overrides the schema value in the Airflow Connection
-                }
+                    "db_name": "my_redshift_database",  # optional, overrides the database value in the Airflow Connection
+                    "schema": "my_redshift_schema",  # optional, overrides the schema value in the Airflow Connection
+                },
             )
 
         **Implementation**
@@ -80,7 +80,7 @@ to the desired Cosmos component.
         .. code-block:: python
 
             jaffle_shop = DbtTaskGroup(
-                ...
+                # ...
                 conn_id="snowflake_default",
             )
 
@@ -104,7 +104,7 @@ to the desired Cosmos component.
         When creating a connection object in Airflow, the top-level ``database`` is passed through the *Schema*
         parameter (see ``Schema`` section in the `OSS Airflow Docs <https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/connections/redshift.html#configuring-the-connection>`_).
         Due to this, there is no field for a default schema so it needs to be passed when the Cosmos class is
-        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overriden here (but a default
+        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overridden here (but a default
         value must still be included when creating the Airflow connection):
 
         .. code-block:: python
@@ -112,9 +112,9 @@ to the desired Cosmos component.
             jaffle_shop = DbtTaskGroup(
                 conn_id="redshift_default",
                 dbt_args={
-                    "db_name": "my_redshift_database", #optional, but overrides the value in the Airflow Connection
-                    "schema": "my_redshift_schema", #not optional, because default schema can't be specified in the Airflow Connection
-                }
+                    "db_name": "my_redshift_database",  # optional, but overrides the value in the Airflow Connection
+                    "schema": "my_redshift_schema",  # not optional, because default schema can't be specified in the Airflow Connection
+                },
             )
 
         **Implementation**
@@ -149,10 +149,7 @@ to the desired Cosmos component.
 
         .. code-block:: python
 
-            jaffle_shop = DbtTaskGroup(
-                conn_id="redshift_default",
-                ...
-            )
+            jaffle_shop = DbtTaskGroup(conn_id="redshift_default", ...)
 
    .. tab:: BigQuery
 
@@ -176,16 +173,16 @@ to the desired Cosmos component.
         `here <https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html#configuring-the-connection>`_).
         The top-level ``project_id`` is extracted from the json service account parameters. However, there is no
         available field to specify a default ``dataset`` so it needs to be passed when the Cosmos class is instantiated
-        via the ``dbt_args`` parameter. If desired, the project_id can can also be overriden here:
+        via the ``dbt_args`` parameter. If desired, the project_id can can also be overridden here:
 
         .. code-block:: python
 
             jaffle_shop = DbtTaskGroup(
                 conn_id="bigquery_default",
                 dbt_args={
-                    "db_name": "my_gcp_project", #optional, but overrides the value in the Airflow Connection
-                    "schema": "my_gcp_dataset", #not optional, because default dataset can't be specified in the Airflow Connection
-                }
+                    "db_name": "my_gcp_project",  # optional, but overrides the value in the Airflow Connection
+                    "schema": "my_gcp_dataset",  # not optional, because default dataset can't be specified in the Airflow Connection
+                },
             )
 
         **Implementation**
@@ -224,10 +221,7 @@ to the desired Cosmos component.
 
         .. code-block:: python
 
-            jaffle_shop = DbtTaskGroup(
-                conn_id="bigquery_default",
-                ...
-            )
+            jaffle_shop = DbtTaskGroup(conn_id="bigquery_default", ...)
 
    .. tab:: Databricks
 
@@ -245,16 +239,16 @@ to the desired Cosmos component.
         parameter. If no value is provided, Cosmos will assume a default catalog value of ``hive_metastore`` based on
         Databricks documentation `here <https://docs.databricks.com/data-governance/unity-catalog/hive-metastore.html#default-catalog>`_.
         Due to this, there is no field for a databricks default database so it needs to be passed when the Cosmos class
-        is instantiated via the ``dbt_args`` parameter. If desired, the catalog can also be overriden here:
+        is instantiated via the ``dbt_args`` parameter. If desired, the catalog can also be overridden here:
 
         .. code-block:: python
 
             jaffle_shop = DbtTaskGroup(
                 conn_id="databricks_default",
                 dbt_args={
-                    "db_name": "my_databricks_catalog", #optional, overrides the value in the Airflow Connection
-                    "schema": "my_databricks_db", #not optional, because default database can't be specified in the Airflow Connection
-                }
+                    "db_name": "my_databricks_catalog",  # optional, overrides the value in the Airflow Connection
+                    "schema": "my_databricks_db",  # not optional, because default database can't be specified in the Airflow Connection
+                },
             )
 
         **Implementation**
@@ -313,7 +307,7 @@ to the desired Cosmos component.
         When creating a connection object in Airflow, the top-level ``database`` is passed through the *Schema*
         parameter (see ``Schema`` section in the `OSS Airflow Docs <https://airflow.apache.org/docs/apache-airflow-providers-postgres/stable/connections/postgres.html#configuring-the-connection>`_).
         Due to this, there is no field for a default schema so it needs to be passed when the Cosmos class is
-        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overriden here (but a default
+        instantiated via the ``dbt_args`` parameter. If desired, the database can also be overridden here (but a default
         value must still be included when creating the Airflow connection):
 
         .. code-block:: python
@@ -321,9 +315,9 @@ to the desired Cosmos component.
             jaffle_shop = DbtTaskGroup(
                 conn_id="postgres_default",
                 dbt_args={
-                    "db_name": "my_postgres_database", #optional, but overrides the value in the Airflow Connection
-                    "schema": "my_postgres_schema", #not optional, because default schema can't be specified in the Airflow Connection
-                }
+                    "db_name": "my_postgres_database",  # optional, but overrides the value in the Airflow Connection
+                    "schema": "my_postgres_schema",  # not optional, because default schema can't be specified in the Airflow Connection
+                },
             )
 
         **Implementation**
@@ -374,13 +368,13 @@ Cosmos Object, you can choose to override the database/schema values from the Co
     jaffle_shop = DbtTaskGroup(
         conn_id="your_conn_id",
         dbt_args={
-            "db_name": "your_db_name", # overrides the db specified in the Airflow connection
-            "schema": "your_schema_name", # sets a default schema (required on all connections except Snowflake)
-        }
+            "db_name": "your_db_name",  # overrides the db specified in the Airflow connection
+            "schema": "your_schema_name",  # sets a default schema (required on all connections except Snowflake)
+        },
     )
 
 Additionally, if you've specified a database/schema in either the connection object or the parameters shown in the code
-block above, those are overriden by dbt project files. For example, if you've setup a ``properties.yml`` file in your dbt
+block above, those are overridden by dbt project files. For example, if you've setup a ``properties.yml`` file in your dbt
 project like this:
 
 .. code-block:: yaml

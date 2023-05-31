@@ -32,9 +32,7 @@ def create_profile_vars_postgres(
     """
 
     if not schema_override:
-        raise ValueError(
-            "A postgres schema must be provided via the `schema` parameter"
-        )
+        raise ValueError("A postgres schema must be provided via the `schema` parameter")
 
     profile_vars = {
         "POSTGRES_HOST": conn.host,

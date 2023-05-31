@@ -65,9 +65,7 @@ def map_profile(
     connection_type = conn.conn_type
     adapters = get_available_adapters()
     if connection_type in adapters:
-        return adapters[connection_type].create_profile_function(
-            conn, db_override, schema_override
-        )
+        return adapters[connection_type].create_profile_function(conn, db_override, schema_override)
 
     logging.getLogger().setLevel(logging.ERROR)
     logging.error(f"This connection type is currently not supported {connection_type}.")

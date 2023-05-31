@@ -75,15 +75,11 @@ class DbtModelConfig:
             # if the config_type matches is even in a list of prefixes then
             if config_type in prefixes:
                 # make sure that it's prefix doesn't already exist in the sql configs
-                if not any(
-                    [element.startswith(config_type) for element in sql_configs]
-                ):
+                if not any([element.startswith(config_type) for element in sql_configs]):
                     # if it does let's double-check against each prefix and add it
                     for prefix in prefixes:
                         # if the actual config doesn't exist in the sql_configs then add it
-                        if not any(
-                            [element.startswith(prefix) for element in sql_configs]
-                        ):
+                        if not any([element.startswith(prefix) for element in sql_configs]):
                             sql_configs.add(config)
             else:
                 sql_configs.add(config)
@@ -148,13 +144,9 @@ class DbtModel:
                     # if it is, check if any kwargs are tags
                     for kwarg in base_node.kwargs:
                         for selector in self.config.config_types:
-                            extracted_config = self._extract_config(
-                                kwarg=kwarg, config_name=selector
-                            )
+                            extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
                             config.config_selectors |= (
-                                set(extracted_config)
-                                if isinstance(extracted_config, (str, List))
-                                else set()
+                                set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
                             )
 
         # set the config and set the parsed file flag to true
@@ -176,9 +168,7 @@ class DbtModel:
 
             except Exception as e:
                 # if we can't convert it to a constant, we can't do anything with it
-                logger.warning(
-                    f"Could not parse {config_name} from config in {self.path}: {e}"
-                )
+                logger.warning(f"Could not parse {config_name} from config in {self.path}: {e}")
                 pass
 
     def __repr__(self) -> str:
@@ -306,24 +296,16 @@ class DbtProject:
                     if isinstance(config_value, str):
                         config_selectors.append(f"{selector}:{config_value}")
                     else:
-                        [
-                            config_selectors.append(f"{selector}:{item}")
-                            for item in config_value
-                            if item
-                        ]
+                        [config_selectors.append(f"{selector}:{item}") for item in config_value if item]
 
             # dbt default ensures "materialized:view" is set for all models if nothing is specified so that it will
             # work in a select/exclude list
             config_types = [
-                selector_name
-                for selector in config_selectors
-                for selector_name in [selector.split(":")[0]]
+                selector_name for selector in config_selectors for selector_name in [selector.split(":")[0]]
             ]
             if "materialized" not in config_types:
                 config_selectors.append("materialized:view")
 
             # then, get the model and merge the configs
             model = self.models[model_name]
-            model.config = model.config + DbtModelConfig(
-                config_selectors=set(config_selectors)
-            )
+            model.config = model.config + DbtModelConfig(config_selectors=set(config_selectors))

@@ -27,9 +27,7 @@ from cosmos.providers.dbt.core.utils.warn_parsing import (
 
 logger = logging.getLogger(__name__)
 
-FullOutputSubprocessResult = namedtuple(
-    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
-)
+FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):
@@ -63,9 +61,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def exception_handling(self, result: FullOutputSubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
-            raise AirflowSkipException(
-                f"dbt command returned exit code {self.skip_exit_code}. Skipping."
-            )
+            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             raise AirflowException(
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
@@ -73,9 +69,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
 
     @provide_session
-    def store_compiled_sql(
-        self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION
-    ) -> None:
+    def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
         """
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
@@ -176,9 +170,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             return result
 
-    def build_and_run_cmd(
-        self, context: Context, cmd_flags: list[str] | None = None
-    ) -> FullOutputSubprocessResult:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         return self.run_command(cmd=dbt_cmd, env=env, context=context)
 
@@ -189,12 +181,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
             self.subprocess_hook.log.info("Sending SIGINT signal to process group")
-            if self.subprocess_hook.sub_process and hasattr(
-                self.subprocess_hook.sub_process, "pid"
-            ):
-                os.killpg(
-                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
-                )
+            if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
+                os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
         else:
             self.subprocess_hook.send_sigterm()
 
@@ -308,9 +296,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         return self.on_warning_callback and no_tests_message not in result.output
 
-    def _handle_warnings(
-        self, result: FullOutputSubprocessResult, context: Context
-    ) -> None:
+    def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
          on_warning_callback with the updated context.
@@ -437,9 +423,7 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info(
-                "Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}"
-            )
+            logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
 
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 
@@ -521,6 +505,5 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         raise DeprecationWarning(
-            "The DbtDepsOperator has been deprecated. "
-            "Please use the `install_deps` flag in dbt_args instead."
+            "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )

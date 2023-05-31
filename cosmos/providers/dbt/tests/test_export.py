@@ -36,9 +36,7 @@ def test_failed_docker_import(operator: str, reset_docker_operators: None) -> No
     Test that the docker operators are not imported when docker is not installed.
     Should raise a RuntimeError.
     """
-    with mock.patch.dict(
-        sys.modules, {"airflow.providers.docker.operators.docker": None}
-    ):
+    with mock.patch.dict(sys.modules, {"airflow.providers.docker.operators.docker": None}):
         with pytest.raises(RuntimeError):
             from cosmos.providers import dbt
 
@@ -70,9 +68,7 @@ def reset_kubernetes_operators() -> None:
     "operator",
     kubernetes_operators,
 )
-def test_failed_kubernetes_import(
-    operator: str, reset_kubernetes_operators: None
-) -> None:
+def test_failed_kubernetes_import(operator: str, reset_kubernetes_operators: None) -> None:
     """
     Test that the kubernetes operators are not imported when kubernetes is not installed.
     Should raise a RuntimeError.

@@ -30,9 +30,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
 
     """
 
-    template_fields: Sequence[str] = (
-        DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
-    )
+    template_fields: Sequence[str] = DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
 
     intercept_flag = False
 
@@ -59,9 +57,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
         # This means that we don't have openlineage support, but we will create a ticket
         # to add that in the future
         self.dbt_executable_path = "dbt"
-        dbt_cmd, env_vars = self.build_cmd(
-            context=context, cmd_flags=cmd_flags, handle_profile=False
-        )
+        dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags, handle_profile=False)
         # set env vars
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd
@@ -147,9 +143,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(
-        self, on_warning_callback: Optional[Callable] = None, **kwargs
-    ) -> None:
+    def __init__(self, on_warning_callback: Optional[Callable] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
         # as of now, on_warning_callback in kubernetes executor does nothing

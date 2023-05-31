@@ -5,10 +5,10 @@ Execution Modes
 
 Cosmos can run DBT commands using four different approaches, called ``execution modes``:
 
-1. **local**: Run DBT commands from the same environment as Airflow (optional: define the path to a dbt binary)
-2. **virtualenv**: Run DBT commands from a Python virtual environment created by Cosmos (**recommended**)
-3. **docker**: Run DBT commands using Docker (requires a pre-existing Docker image)
-4. **kubernetes**: Run DBT commands within a Kubernetes Pod  (requires a pre-existing Docker image and a Kubernetes cluster)
+1. **local**: Run ``dbt`` commands using an user-managed ``dbt`` installation (default)
+2. **virtualenv**: Run ``dbt`` commands using Python virtual environments managed by Cosmos
+3. **docker**: Run ``dbt`` commands using Docker (requires a pre-existing Docker image)
+4. **kubernetes**: Run ``dbt`` commands within a Kubernetes Pod (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary depending on each user's needs and concerns.
 

@@ -15,12 +15,7 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent.parent / "dev/dags"
 EXAMPLE_CONN_FILE = Path(__file__).parent / "test-connections.yaml"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 
-MIN_VER_DAG_FILE: dict[str, list[str]] = {
-    "2.4": ["cosmos_seed_dag.py"],
-    "2.7": [
-        "cosmos_seed_dag.py",
-    ],  # Bug: https://github.com/astronomer/astronomer-cosmos/issues/282
-}
+MIN_VER_DAG_FILE: dict[str, list[str]] = {}
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {

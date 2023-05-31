@@ -89,7 +89,9 @@ When at least one WARN message is present, the function passed to ``on_warning_c
 Selecting and Excluding
 ----------------------
 
-Cosmos allows you to filter by configs (e.g. ``materialized``, ``tags``) using the ``select`` and ``exclude`` parameters. If a model contains any of the configs in the ``select``, it gets included as part of the DAG/Task Group. Similarly, if a model contains any of the configs in the ``exclude``, it gets excluded from the DAG/Task Group.
+Cosmos allows you to filter by configs (e.g. ``materialized``, ``tags``) using the ``select`` and ``exclude`` parameters.
+
+If a model contains ALL of the configs in the ``select``, it gets included as part of the DAG/Task Group. Similarly, if a model contains ALL of the configs in the ``exclude``, it gets excluded from the DAG/Task Group.
 
 The ``select`` and ``exclude`` parameters are dictionaries with the following keys:
 

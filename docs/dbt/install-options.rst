@@ -13,16 +13,17 @@ Cosmos can run ``dbt`` commands using four different approaches, called ``execut
 The choice of the ``execution mode`` can vary based on each user's needs and concerns.
 Read :ref:`Execution Modes <execution-modes>` to decide which is the most suitable for you.
 
-Depending on the ``execution mode``, the package ``astronomer-cosmos`` should be installed in different ways.
+Depending on the ``execution mode``, the package ``astronomer-cosmos`` should be installed differently.
 
 Local execution mode
 --------------------
 
-There are two ways of using the :ref:`Local Execution Mode <dbt/execution-modes:Local>`_:
+There are two ways of using the `Local Execution Mode <execution-modes.html#local>`__:
+
 * Installing ``dbt`` together with Cosmos
 * Referencing a pre-installed ``dbt`` package
 
-More details on how to install Cosmos in each of these scenarios can be found below:
+Find more details on how to install Cosmos for each of these below:
 
 Install ``dbt`` together with Cosmos
 ....................................
@@ -44,7 +45,7 @@ If you only need a subset of the supported database types, you can use the follo
      - Dependencies
 
    * - (default)
-     - apache-airflow, Jinja2
+     - apache-airflow, Jinja2, virtualenv
 
    * - ``dbt-all``
      - astronomer-cosmos, dbt-core, dbt-bigquery, dbt-redshift, dbt-snowflake, dbt-postgres
@@ -68,7 +69,7 @@ For example, to install Cosmos with ``dbt`` and the Postgres adapter, run the fo
 
     pip install 'astronomer-cosmos[dbt-postgres]'
 
-Using a pre-installed ``dbt`` package
+Use a pre-installed ``dbt`` package
 .....................................
 
 If the Airflow worker node already has ``dbt``, install a lightweight version of Cosmos by running:
@@ -79,10 +80,11 @@ If the Airflow worker node already has ``dbt``, install a lightweight version of
 
 In this case, users can specify - if necessary - a custom path to ``dbt`` by using the argument ``dbt_executable_path``.
 
-Detailed examples of how to use this execution mode can be found at:
-* :ref:`Astro Cloud <dbt/execution-mode-local-in-astro>`_
-* :ref:`Docker <dbt/execution-mode-local-in-docker>`_
-* :ref:`MWAA <dbt/execution-mode-local-in-mwaa>`_
+For more examples of how to use this execution mode, check the following:
+
+* `Astro Cloud <execution-mode-local-in-astro>`__
+* `Docker <execution-mode-local-in-docker>`__
+* `MWAA <execution-mode-local-in-mwaa>`__
 
 
 Virtualenv execution mode
@@ -91,13 +93,13 @@ Virtualenv execution mode
 Cosmos can create a dedicated Python virtual environment for each task run, installing ``dbt`` and
 any other user-defined dependencies in an isolated way.
 
-In this scenario, Cosmos can be installed using (preferably pinned):
+In this scenario, install Cosmos using (preferably pinned):
 
 .. code-block:: bash
 
     pip install astronomer-cosmos
 
-Learn more about this execution mode at :ref:`Execution Modes <dbt/execution-modes:Virtualenv>`_.
+Learn more about this execution mode at `Execution Modes <execution-modes.rst:virtualenv>`__.
 
 
 Docker execution mode
@@ -110,7 +112,7 @@ In this case, install the following package at the same level as other Airflow d
 
     pip install 'astronomer-cosmos[docker]'
 
-Learn more about this execution mode at :ref:`Execution Modes <dbt/execution-modes:Docker>`_.
+Learn more about this execution mode at :ref:`Execution Modes <execution-modes.rst:docker>`__.
 
 Kubernetes execution mode
 -------------------------
@@ -122,4 +124,4 @@ Install the following package at the same level as other Airflow dependencies (p
 
     pip install 'astronomer-cosmos[kubernetes]'
 
-Learn more about this execution mode at :ref:`Execution Modes <dbt/execution-modes:Kubernetes>`_.
+Learn more about this execution mode at :ref:`Execution Modes <execution-modes.rst:kubernetes`__.

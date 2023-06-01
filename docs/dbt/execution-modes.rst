@@ -3,21 +3,19 @@
 Execution Modes
 ===============
 
-Cosmos can run DBT commands using four different approaches, called ``execution modes``:
+Cosmos can run ``dbt`` commands using four different approaches, called ``execution modes``:
 
-1. **local**: Run ``dbt`` commands using an user-managed ``dbt`` installation (default)
-2. **virtualenv**: Run ``dbt`` commands using Python virtual environments managed by Cosmos
-3. **docker**: Run ``dbt`` commands using Docker (requires a pre-existing Docker image)
-4. **kubernetes**: Run ``dbt`` commands within a Kubernetes Pod (requires a pre-existing Docker image)
+1. **local**: Run ``dbt`` commands using a local ``dbt`` installation (default)
+2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
+3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
+4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
 
-The choice of the ``execution mode`` can vary depending on each user's needs and concerns.
+The choice of the ``execution mode`` can vary based on each user's needs and concerns.
 
 Based on the ``execution mode``, Cosmos should be installed in different ways.
-Learn more at :ref:`Installation Options <install-options>`.
+Learn more at `Installation Options <install-options>`__.
 
 The default ``execution_mode`` is **local**.
-
-If using a cloud provider, the recommendation is to use the **virtualenv** execution mode.
 
 For more details, check each execution mode description below.
 
@@ -30,32 +28,39 @@ For more details, check each execution mode description below.
      - Environment Isolation
      - Cosmos Profile Management
    * - Local
-     - Fastest
+     - Fast
      - None
      - Yes
    * - Virtualenv
-     - Fast
+     - Medium
      - Lightweight
      - Yes
    * - Docker
-     - Medium
+     - Slow
      - Medium
      - No
    * - Kubernetes
-     - Medium
+     - Slow
      - High
      - No
 
 Local
 -----
 
- from the same environment as Airflow  (optional: define the path to a dbt binary)
+The ``local`` execution mode assumes there is a ``dbt`` binary reachable from within the Airflow worker node.
+It may have been installed as part of the `Cosmos package <install-options.html>`__ or not.
 
-Although ``local`` is the fastest way to run Cosmos operators, it also assumes that the DBT Python dependencies do not
-conflict with the Airflow worker dependencies - which is often not true, specially when running in some Cloud managed services.
+By default Cosmos assumes the ``dbt`` command is available at the user system path.
+If that is not the case, a custom path to ``dbt`` can be set by using the argument ``dbt_executable_path``.
 
 When using the ``local`` execution mode, Cosmos converts Airflow Connections into a way DBT understands them by creating a
 DBT profile file (``profiles.yml``).
+
+The ``local`` execution mode is the fastest way to run Cosmos operators, since there is not overhead of installing ``dbt``
+or building docker containers. However, it may not be an option to users using some managed Airflow services such as
+Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict - and the user does not have control of installing
+``dbt`` in the Composer container.
+
 
 Example of how to use:
 

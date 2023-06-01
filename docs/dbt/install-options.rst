@@ -25,7 +25,7 @@ There are two ways of using the `Local Execution Mode <execution-modes.html#loca
 
 Find more details on how to install Cosmos for each of these below:
 
-Install ``dbt`` together with Cosmos
+Install Cosmos together with ``dbt``
 ....................................
 
 If the Airflow host does not have ``dbt``, it is possible to install it as part of the Cosmos package installation,

@@ -6,9 +6,9 @@ Installation Options
 Cosmos can run ``dbt`` commands using four different approaches, called ``execution modes``:
 
 1. **local**: Run ``dbt`` commands using a local ``dbt`` installation (default)
-2. **virtualenv**: Run ``dbt`` commands using Python virtual environments managed by Cosmos
-3. **docker**: Run ``dbt`` commands using Docker (requires a pre-existing Docker image)
-4. **kubernetes**: Run ``dbt`` commands within a Kubernetes Pod (requires a pre-existing Docker image)
+2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
+3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
+4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns.
 Read :ref:`Execution Modes <execution-modes>` to decide which is the most suitable for you.
@@ -82,9 +82,9 @@ In this case, users can specify - if necessary - a custom path to ``dbt`` by usi
 
 For more examples of how to use this execution mode, check the following:
 
-* `Astro Cloud <execution-mode-local-in-astro>`__
-* `Docker <execution-mode-local-in-docker>`__
-* `MWAA <execution-mode-local-in-mwaa>`__
+* `Astro Cloud <execution-mode-local-in-astro.html>`__
+* `Docker <execution-mode-local-in-docker.html>`__
+* `MWAA <execution-mode-local-in-mwaa.html>`__
 
 
 Virtualenv execution mode
@@ -99,7 +99,7 @@ In this scenario, install Cosmos using (preferably pinned):
 
     pip install astronomer-cosmos
 
-Learn more about this execution mode at `Execution Modes <execution-modes.rst:virtualenv>`__.
+Learn more about this execution mode at `Execution Modes <execution-modes.html#virtualenv>`__.
 
 
 Docker execution mode
@@ -112,7 +112,7 @@ In this case, install the following package at the same level as other Airflow d
 
     pip install 'astronomer-cosmos[docker]'
 
-Learn more about this execution mode at :ref:`Execution Modes <execution-modes.rst:docker>`__.
+Learn more about this execution mode at `Execution Modes <execution-modes.html#docker>`__.
 
 Kubernetes execution mode
 -------------------------
@@ -124,4 +124,4 @@ Install the following package at the same level as other Airflow dependencies (p
 
     pip install 'astronomer-cosmos[kubernetes]'
 
-Learn more about this execution mode at :ref:`Execution Modes <execution-modes.rst:kubernetes`__.
+Learn more about this execution mode at `Execution Modes <execution-modes.html#kubernetes>`__.

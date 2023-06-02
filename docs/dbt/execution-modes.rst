@@ -12,7 +12,7 @@ Cosmos can run ``dbt`` commands using four different approaches, called ``execut
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. The default ``execution_mode`` is **local**. For more details, check each execution mode described below.
 
-You should install Cosmos differently based on the ``execution mode``,  Learn more at `Installation Options <install-options>`__.
+You should install Cosmos differently based on the ``execution mode``,  Learn more at :ref:`Installation Options <install-options>`.
 
 
 .. list-table:: Execution Modes Comparison
@@ -50,7 +50,7 @@ Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict, the 
 
 The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Airflow worker node.
 
-If ``dbt`` was not installed as part of the `Cosmos package <install-options.html#local>`__,
+If ``dbt`` was not `installed as part of the Cosmos package <install-options.html#local>`__,
 users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
 
 When using the ``local`` execution mode, Cosmos converts Airflow Connections into a native ``dbt`` profiles file (``profiles.yml``).
@@ -64,9 +64,9 @@ Example of how to use, for instance, when ``dbt`` was installed together with Co
 
 Detailed examples of how to use the ``local`` execution mode when ``dbt`` is installed separately from Cosmos:
 
-* `Astro <execution-mode-local-in-astro.html>`__
-* `Docker <execution-mode-local-in-docker.html>`__
-* `MWAA <execution-mode-local-in-mwaa.html>`__
+* :ref:`Astro <execution-mode-local-in-astro>`
+* :ref:`Docker <execution-mode-local-in-docker>`
+* :ref:`MWAA <execution-mode-local-in-mwaa>`
 
 Virtualenv
 ----------
@@ -78,7 +78,7 @@ The ``virtualenv`` mode isolates the Airflow worker dependencies from ``dbt`` by
 during task execution and deleted afterwards. In this case, users are responsible for declaring which version of ``dbt`` they
 want to use using the argument ``py_requirements``.
 
-In this case, users are responsible for declaring which version of ``dbt`` they want to use by giving the argument ``py_requirements``. This argument can be set directly in operator instances or when instantiating``DbtDag`` and ``DbtTaskGroup`` as part of ``operator_args``.
+In this case, users are responsible for declaring which version of ``dbt`` they want to use by giving the argument ``py_requirements``. This argument can be set directly in operator instances or when instantiating ``DbtDag`` and ``DbtTaskGroup`` as part of ``operator_args``.
 
 Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating
 a ``dbt`` profile file (``profiles.yml``).
@@ -87,10 +87,10 @@ A drawback with this approach is that it is slower than ``local`` because it cre
 
 Example of how to use:
 
-    .. literalinclude:: ../../dev/dags/example_virtualenv.py
-       :language: python
-       :start-after: [START virtualenv_example]
-       :end-before: [END virtualenv_example]
+.. literalinclude:: ../../dev/dags/example_virtualenv.py
+   :language: python
+   :start-after: [START virtualenv_example]
+   :end-before: [END virtualenv_example]
 
 Docker
 ------
@@ -106,7 +106,7 @@ which sometimes can lead to challenges running `Docker in Docker <https://devops
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container,
 which is slower than creating a Virtualenv with ``dbt-core``.
 
-Check the step-by-step guide on using the ``docker`` execution mode at ::ref:`Execution Mode Docker <execution-mode-docker>`.
+Check the step-by-step guide on using the ``docker`` execution mode at :ref:`Execution Mode Docker <execution-mode-docker>`.
 
 Example DAG:
 
@@ -132,7 +132,7 @@ It assumes the user has a Kubernetes cluster. It also expects the user to ensure
 
 The ``Kubernetes`` deployment may be slower than ``Docker`` and ``Virtualenv`` assuming that the container image is built (which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``) and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 
-Check the step-by-step guide on using the ``docker`` execution mode at ::ref:`Execution Mode Kubernetes <execution-mode-kubernetes>`.
+Check the step-by-step guide on using the ``kubernetes`` execution mode at :ref:`Kubernetes Operators <execution-mode-kubernetes>`.
 
 Example DAG:
 

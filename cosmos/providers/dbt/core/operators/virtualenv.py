@@ -31,14 +31,14 @@ PY_INTERPRETER = "python3"
 
 class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     """
-    Executes a dbt core cli command within a Python Virtual Environment, that is created before running the DBT command
+    Executes a dbt core cli command within a Python Virtual Environment, that is created before running the dbt command
     and deleted at the end of the operator execution.
 
     :param py_requirements: If defined, creates a virtual environment with the specified dependencies. Example:
            ["dbt-postgres==1.5.0"]
     :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).
-           Avoid using unless the DBT job requires it.
+           Avoid using unless the dbt job requires it.
     """
 
     def __init__(
@@ -57,7 +57,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self,
     ) -> str:
         """
-        Path to the DBT binary within a Python virtualenv.
+        Path to the dbt binary within a Python virtualenv.
 
         The first time this property is called, it creates a virtualenv and installs the dependencies based on the
         self.py_requirements and self.py_system_site_packages. This value is cached for future calls.
@@ -81,7 +81,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             ]
         )
         dbt_version = cmd_output.output
-        self.log.info("Using DBT version %s available at %s", dbt_version, dbt_binary)
+        self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
     def run_subprocess(self, command, *args, **kwargs):
@@ -103,35 +103,35 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
     """
-    Executes a dbt core ls command within a Python Virtual Environment, that is created before running the DBT command
+    Executes a dbt core ls command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
     """
 
 
 class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):
     """
-    Executes a dbt core seed command within a Python Virtual Environment, that is created before running the DBT command
+    Executes a dbt core seed command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
     """
 
 
 class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalOperator):
     """
-    Executes a dbt core snapshot command within a Python Virtual Environment, that is created before running the DBT
+    Executes a dbt core snapshot command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
 
 
 class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):
     """
-    Executes a dbt core run command within a Python Virtual Environment, that is created before running the DBT command
+    Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
     """
 
 
 class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator):
     """
-    Executes a dbt core test command within a Python Virtual Environment, that is created before running the DBT command
+    Executes a dbt core test command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
     """
 
@@ -139,12 +139,12 @@ class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator)
 class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):
     """
     Executes a dbt core run-operation command within a Python Virtual Environment, that is created before running the
-    DBT command and deleted just after.
+    dbt command and deleted just after.
     """
 
 
 class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator):
     """
-    Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the DBT
+    Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """

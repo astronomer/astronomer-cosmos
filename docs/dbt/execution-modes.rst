@@ -47,53 +47,51 @@ For more details, check each execution mode description below.
 Local
 -----
 
-The ``local`` execution mode assumes there is a ``dbt`` binary reachable from within the Airflow worker node.
-It may have been installed as part of the `Cosmos package <install-options.html>`__ or not.
-
-By default Cosmos assumes the ``dbt`` command is available at the user system path.
-If that is not the case, a custom path to ``dbt`` can be set by using the argument ``dbt_executable_path``.
-
-When using the ``local`` execution mode, Cosmos converts Airflow Connections into a way DBT understands them by creating a
-DBT profile file (``profiles.yml``).
+This is the default execution mode.
 
 The ``local`` execution mode is the fastest way to run Cosmos operators, since there is not overhead of installing ``dbt``
-or building docker containers. However, it may not be an option to users using some managed Airflow services such as
-Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict - and the user does not have control of installing
-``dbt`` in the Composer container.
+or building docker containers. However, it may not be an option to users using managed Airflow services such as
+Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict - and the user may not be able to install ``dbt``
+in a custom path.
 
+The ``local`` execution mode assumes there is a ``dbt`` binary reachable from within the Airflow worker node.
 
-Example of how to use:
+If ``dbt`` was not installed as part of the `Cosmos package <install-options.html#local>`__,
+users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
+
+When using the ``local`` execution mode, Cosmos converts Airflow Connections into a native ``dbt`` profiles file (``profiles.yml``).
+
+Example of how to use, for instance, when ``dbt`` was installed together with Cosmos:
 
     .. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
        :language: python
        :start-after: [START local_example]
        :end-before: [END local_example]
 
+Detailed examples of how to use the ``local`` execution mode when ``dbt`` is installed separately from Cosmos:
 
-The ``local`` execution mode also allows users to declare the path to a custom ``dbt`` binary path, by setting the argument ``dbt_executable_path``.
-In this case, the user is responsible for pre-installing DBT (potentially in a user-maintained virtual environment) and manage its extensions.
+* `Astro <execution-mode-local-in-astro.html>`__
+* `Docker <execution-mode-local-in-docker.html>`__
+* `MWAA <execution-mode-local-in-mwaa.html>`__
 
 Virtualenv
 ----------
 
-If you're using managed Airflow solutions on AWS (Amazon MWAA), Azure (Azure Data Factory's Managed Airflow) and GCP (Cloud Composer),
+If you're using managed Airflow on GCP (Cloud Composer), for instance,
 we recommend you use the ``virtualenv`` execution mode.
 
-The ``virtualenv`` mode isolates the Airflow worker dependencies from DBT by managing a Python virtual environment created
-during task execution and deleted afterwards. In this case, users are responsible for declaring which version of DBT they
+The ``virtualenv`` mode isolates the Airflow worker dependencies from ``dbt`` by managing a Python virtual environment created
+during task execution and deleted afterwards. In this case, users are responsible for declaring which version of ``dbt`` they
 want to use by utilizing the argument ``py_requirements``.
 
-In this case, users are responsible for declaring which version of DBT they
+In this case, users are responsible for declaring which version of ``dbt`` they
 want to use by utilizing the argument ``py_requirements``. This value can be set when instantiating operators directly
 or creating instances of ``DbtDag`` or ``DbtTaskGroup`` from within the parameter ``operator_args``.
 
-Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way DBT understands them by creating
-a DBT profile file (``profiles.yml``).
+Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating
+a ``dbt`` profile file (``profiles.yml``).
 
-This approach is a bit slower than ``local``, because a new Python virtual environment is created each time a task is run.
-
-A drawback with this approach is that everytime a task is run with Cosmos, a new Python ``virtualenv`` is created, which
-may be slow depending on the user-defined dependencies.
+A drawback with this approach is that it is slower than ``local``, because a new Python virtual environment is created each time a task is run.
 
 Example of how to use:
 
@@ -105,12 +103,17 @@ Example of how to use:
 Docker
 ------
 
-The ``docker`` approach assumes users have a previously created Docker image, which should contain the DBT pipelines and
+The ``docker`` approach assumes users have a previously created Docker image, which should contain all the ``dbt`` pipelines and
 a ``profiles.yml``, managed by the user.
+
 The user has better environment isolation than when using ``local`` or ``virtualenv`` modes, but also more responsibility
 (ensuring the Docker container used has the up-to-date files and managing secrets potentially in multiple places).
+
 The other challenge with the ``docker`` approach is if the Airflow worker is already running in Docker,
-which sometimes can lead to challenges running Docker in Docker.
+which sometimes can lead to challenges running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
+
+This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container,
+which is slower than creating a Virtualenv with ``dbt-core``.
 
 Check the step-by-step guide on how to user the ``docker`` execution mode at ::ref:`Execution Mode Docker <execution-mode-docker>`.
 
@@ -119,25 +122,29 @@ Example DAG:
 .. code-block:: python
 
   docker_cosmos_dag = DbtDag(
-        (...)
-        execution_mode="docker",
-        operator_args={
-            "image": "dbt-jaffle-shop:1.0.0",
-            "network_mode": "bridge",
-        }
+      # ...
+      execution_mode="docker",
+      operator_args={
+          "image": "dbt-jaffle-shop:1.0.0",
+          "network_mode": "bridge",
+      },
   )
 
 
 Kubernetes
 ----------
 
-Lastly, the ``kubernetes`` approach is the most isolated way of running DBT, since not only the DBT commands are run
+Lastly, the ``kubernetes`` approach is the most isolated way of running ``dbt``, since not only the ``dbt`` commands are run
 from within a container, but also potentially in a separate host/pod.
 
 It assumes the user has a Kubernetes cluster.
 
-It also expects the user has to ensure the Docker container has up-to-date pipeline and DBT profiles,
+It also expects the user has to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles,
 potentially leading the user to declare secrets in two different places (Airflow and Docker container).
+
+The ``Kubernetes`` deployment may be slower than ``Docker`` and ``Virtualenv`` assuming that the container image may have to be built
+(which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``)
+and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 
 Check the step-by-step guide on how to user the ``docker`` execution mode at ::ref:`Execution Mode Kubernetes <execution-mode-kubernetes>`.
 
@@ -153,11 +160,12 @@ Example DAG:
     )
 
     docker_cosmos_dag = DbtDag(
-          (...)
-          execution_mode="kubernetes",
-          operator_args={
-              "image": "dbt-jaffle-shop:1.0.0",
-              "get_logs": True,
-              "is_delete_operator_pod": False,
-              "secrets": [postgres_password_secret]
+        # ...
+        execution_mode="kubernetes",
+        operator_args={
+            "image": "dbt-jaffle-shop:1.0.0",
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "secrets": [postgres_password_secret],
+        },
     )

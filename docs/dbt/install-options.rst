@@ -15,8 +15,8 @@ Read :ref:`Execution Modes <execution-modes>` to decide which is the most suitab
 
 Depending on the ``execution mode``, the package ``astronomer-cosmos`` should be installed differently.
 
-Local execution mode
---------------------
+Local
+-----
 
 There are two ways of using the `Local Execution Mode <execution-modes.html#local>`__:
 
@@ -82,13 +82,13 @@ In this case, users can specify - if necessary - a custom path to ``dbt`` by usi
 
 For more examples of how to use this execution mode, check the following:
 
-* `Astro Cloud <execution-mode-local-in-astro.html>`__
+* `Astro <execution-mode-local-in-astro.html>`__
 * `Docker <execution-mode-local-in-docker.html>`__
 * `MWAA <execution-mode-local-in-mwaa.html>`__
 
 
-Virtualenv execution mode
--------------------------
+Virtualenv
+----------
 
 Cosmos can create a dedicated Python virtual environment for each task run, installing ``dbt`` and
 any other user-defined dependencies in an isolated way.
@@ -102,8 +102,8 @@ In this scenario, install Cosmos using (preferably pinned):
 Learn more about this execution mode at `Execution Modes <execution-modes.html#virtualenv>`__.
 
 
-Docker execution mode
----------------------
+Docker
+------
 
 Cosmos can run ``dbt`` tasks by running an isolated Docker container per task.
 In this case, install the following package at the same level as other Airflow dependencies (preferably pinned):
@@ -114,8 +114,8 @@ In this case, install the following package at the same level as other Airflow d
 
 Learn more about this execution mode at `Execution Modes <execution-modes.html#docker>`__.
 
-Kubernetes execution mode
--------------------------
+Kubernetes
+----------
 
 Last but not least, Cosmos can run ``dbt`` tasks by creating a Kubernetes pod per task.
 Install the following package at the same level as other Airflow dependencies (preferably pinned):

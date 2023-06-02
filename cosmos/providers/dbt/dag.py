@@ -51,9 +51,7 @@ class DbtDag(CosmosDag):
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
         select: Dict[str, List[str]] = {},
         exclude: Dict[str, List[str]] = {},
-        execution_mode: Literal[
-            "local", "docker", "kubernetes", "virtualenv"
-        ] = "local",
+        execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,

@@ -88,14 +88,10 @@ class FullOutputSubprocessHook(BaseHook):
 
             self.sub_process.wait()
 
-            self.log.info(
-                "Command exited with return code %s", self.sub_process.returncode
-            )
+            self.log.info("Command exited with return code %s", self.sub_process.returncode)
             return_code: int = self.sub_process.returncode
 
-        return FullOutputSubprocessResult(
-            exit_code=return_code, output=line, full_output=log_lines
-        )
+        return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
 
     def send_sigterm(self):
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""

@@ -82,9 +82,9 @@ In this case, users can specify - if necessary - a custom path to ``dbt`` by usi
 
 For more examples of how to use this execution mode, check the following:
 
-* `Astro <execution-mode-local-in-astro.html>`__
-* `Docker <execution-mode-local-in-docker.html>`__
-* `MWAA <execution-mode-local-in-mwaa.html>`__
+* :ref:`Astro <execution-mode-local-in-astro>`
+* :ref:`Docker <execution-mode-local-in-docker>`
+* :ref:`MWAA <execution-mode-local-in-mwaa>`
 
 
 Virtualenv

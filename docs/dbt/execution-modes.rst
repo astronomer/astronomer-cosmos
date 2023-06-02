@@ -10,14 +10,10 @@ Cosmos can run ``dbt`` commands using four different approaches, called ``execut
 3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
 
-The choice of the ``execution mode`` can vary based on each user's needs and concerns.
+The choice of the ``execution mode`` can vary based on each user's needs and concerns. The default ``execution_mode`` is **local**. For more details, check each execution mode described below.
 
-Based on the ``execution mode``, Cosmos should be installed in different ways.
-Learn more at `Installation Options <install-options>`__.
+You should install Cosmos differently based on the ``execution mode``,  Learn more at `Installation Options <install-options>`__.
 
-The default ``execution_mode`` is **local**.
-
-For more details, check each execution mode description below.
 
 .. list-table:: Execution Modes Comparison
    :widths: 25 25 25 25
@@ -47,14 +43,12 @@ For more details, check each execution mode description below.
 Local
 -----
 
-This is the default execution mode.
+By default, Cosmos uses the ``local`` execution mode.
 
-The ``local`` execution mode is the fastest way to run Cosmos operators, since there is not overhead of installing ``dbt``
-or building docker containers. However, it may not be an option to users using managed Airflow services such as
-Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict - and the user may not be able to install ``dbt``
-in a custom path.
+The ``local`` execution mode is the fastest way to run Cosmos operators since they don't install ``dbt`` nor build docker containers. However, it may not be an option for users using managed Airflow services such as
+Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict, the user may not be able to install ``dbt`` in a custom path.
 
-The ``local`` execution mode assumes there is a ``dbt`` binary reachable from within the Airflow worker node.
+The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Airflow worker node.
 
 If ``dbt`` was not installed as part of the `Cosmos package <install-options.html#local>`__,
 users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
@@ -82,16 +76,14 @@ we recommend you use the ``virtualenv`` execution mode.
 
 The ``virtualenv`` mode isolates the Airflow worker dependencies from ``dbt`` by managing a Python virtual environment created
 during task execution and deleted afterwards. In this case, users are responsible for declaring which version of ``dbt`` they
-want to use by utilizing the argument ``py_requirements``.
+want to use using the argument ``py_requirements``.
 
-In this case, users are responsible for declaring which version of ``dbt`` they
-want to use by utilizing the argument ``py_requirements``. This value can be set when instantiating operators directly
-or creating instances of ``DbtDag`` or ``DbtTaskGroup`` from within the parameter ``operator_args``.
+In this case, users are responsible for declaring which version of ``dbt`` they want to use by giving the argument ``py_requirements``. This argument can be set directly in operator instances or when instantiating``DbtDag`` and ``DbtTaskGroup`` as part of ``operator_args``.
 
 Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating
 a ``dbt`` profile file (``profiles.yml``).
 
-A drawback with this approach is that it is slower than ``local``, because a new Python virtual environment is created each time a task is run.
+A drawback with this approach is that it is slower than ``local`` because it creates a new Python virtual environment for each Cosmos Dbt task run.
 
 Example of how to use:
 
@@ -106,8 +98,7 @@ Docker
 The ``docker`` approach assumes users have a previously created Docker image, which should contain all the ``dbt`` pipelines and
 a ``profiles.yml``, managed by the user.
 
-The user has better environment isolation than when using ``local`` or ``virtualenv`` modes, but also more responsibility
-(ensuring the Docker container used has the up-to-date files and managing secrets potentially in multiple places).
+The user has better environment isolation than when using ``local`` or ``virtualenv`` modes, but also more responsibility (ensuring the Docker container used has up-to-date files and managing secrets potentially in multiple places).
 
 The other challenge with the ``docker`` approach is if the Airflow worker is already running in Docker,
 which sometimes can lead to challenges running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
@@ -115,7 +106,7 @@ which sometimes can lead to challenges running `Docker in Docker <https://devops
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container,
 which is slower than creating a Virtualenv with ``dbt-core``.
 
-Check the step-by-step guide on how to user the ``docker`` execution mode at ::ref:`Execution Mode Docker <execution-mode-docker>`.
+Check the step-by-step guide on using the ``docker`` execution mode at ::ref:`Execution Mode Docker <execution-mode-docker>`.
 
 Example DAG:
 
@@ -134,19 +125,14 @@ Example DAG:
 Kubernetes
 ----------
 
-Lastly, the ``kubernetes`` approach is the most isolated way of running ``dbt``, since not only the ``dbt`` commands are run
-from within a container, but also potentially in a separate host/pod.
+Lastly, the ``kubernetes`` approach is the most isolated way of running ``dbt`` since the ``dbt`` run commands
+from within a Kubernetes Pod, usually in a separate host.
 
-It assumes the user has a Kubernetes cluster.
+It assumes the user has a Kubernetes cluster. It also expects the user to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading the user to declare secrets in two places (Airflow and Docker container).
 
-It also expects the user has to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles,
-potentially leading the user to declare secrets in two different places (Airflow and Docker container).
+The ``Kubernetes`` deployment may be slower than ``Docker`` and ``Virtualenv`` assuming that the container image is built (which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``) and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 
-The ``Kubernetes`` deployment may be slower than ``Docker`` and ``Virtualenv`` assuming that the container image may have to be built
-(which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``)
-and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
-
-Check the step-by-step guide on how to user the ``docker`` execution mode at ::ref:`Execution Mode Kubernetes <execution-mode-kubernetes>`.
+Check the step-by-step guide on using the ``docker`` execution mode at ::ref:`Execution Mode Kubernetes <execution-mode-kubernetes>`.
 
 Example DAG:
 

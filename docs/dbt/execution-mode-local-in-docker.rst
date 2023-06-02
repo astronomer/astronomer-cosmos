@@ -39,9 +39,9 @@ To install dbt into a virtual environment on an Airflow Docker Image, you can us
 
     tg = DbtTaskGroup(
         # ...
-        dbt_args = {
+        dbt_args={
             # ...
-            'dbt_executable_path': f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
+            "dbt_executable_path": f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
         }
         # ...
     )

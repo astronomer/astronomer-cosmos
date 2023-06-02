@@ -32,9 +32,9 @@ The step-by-step is detailed below.
 
     tg = DbtTaskGroup(
         # ...
-        dbt_args = {
+        dbt_args={
             # ...
-            'dbt_executable_path': f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
+            "dbt_executable_path": f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt"
         }
         # ...
     )

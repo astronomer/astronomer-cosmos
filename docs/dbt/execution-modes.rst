@@ -64,9 +64,9 @@ Example of how to use, for instance, when ``dbt`` was installed together with Co
 
 Detailed examples of how to use the ``local`` execution mode when ``dbt`` is installed separately from Cosmos:
 
-* :ref:`Astro <execution-mode-local-in-astro>`
-* :ref:`Docker <execution-mode-local-in-docker>`
-* :ref:`MWAA <execution-mode-local-in-mwaa>`
+* `Astro <execution-mode-local-in-astro.html>`__
+* `Docker <execution-mode-local-in-docker.html>`__
+* `MWAA <execution-mode-local-in-mwaa.html>`__
 
 Virtualenv
 ----------
@@ -106,7 +106,7 @@ which sometimes can lead to challenges running `Docker in Docker <https://devops
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container,
 which is slower than creating a Virtualenv with ``dbt-core``.
 
-Check the step-by-step guide on using the ``docker`` execution mode at :ref:`Execution Mode Docker <execution-mode-docker>`.
+Check the step-by-step guide on using the ``docker`` execution mode at :ref:`Docker operators <execution-mode-docker>`.
 
 Example DAG:
 

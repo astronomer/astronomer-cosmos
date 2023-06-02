@@ -1,9 +1,9 @@
 Local Execution Mode in Astro
 -----------------------------
 
-It is possible to use Cosmos in Astro by using several :ref:`Execution Modes <dbt/execution-modes>`_, including ``Local``, ``Virtualenv`` and ``Kubernetes``.
+It is possible to use Cosmos in Astro by using several :ref:`Execution Modes <execution-modes>`, including ``local``, ``virtualenv``, ``docker`` and ``kubernetes``.
 
-Below is an example of how to use the :ref:`Local Execution Mode <dbt/execution-modes:Local>`_
+Below is an example of how to use the `Local Execution Mode <execution-modes.html#local>`__
 and the ``dbt_executable_path`` argument.
 
 The step-by-step is detailed below.

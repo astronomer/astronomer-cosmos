@@ -4,11 +4,13 @@ inherit from to ensure consistency.
 """
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
 from logging import getLogger
 from typing import Any
 
-import yaml
 from typing import TYPE_CHECKING
+import yaml
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class BaseProfileMapping:
+class BaseProfileMapping(ABC):
     """
     A base class that other profile mappings should inherit from to ensure consistency.
     Responsible for mapping Airflow connections to dbt profiles.
@@ -59,6 +61,7 @@ class BaseProfileMapping:
 
         return True
 
+    @abstractmethod
     def get_profile(self) -> dict[str, Any]:
         """
         Return a dbt profile based on the Airflow connection.

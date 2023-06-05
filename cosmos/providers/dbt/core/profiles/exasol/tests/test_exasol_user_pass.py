@@ -104,7 +104,7 @@ def test_profile_args(
         "threads": 1,
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": mock_exasol_connection.conn_type,
         "dsn": f"{mock_exasol_connection.host}:{mock_exasol_connection.port}",
         "user": mock_exasol_connection.login,
@@ -144,7 +144,7 @@ def test_profile_args_overrides(
         "protocol_version": "2",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": mock_exasol_connection.conn_type,
         "dsn": "my_dsn_override",
         "user": "my_user_override",
@@ -166,7 +166,7 @@ def test_profile_env_vars(
         mock_exasol_connection.conn_id,
         profile_args={"schema": "my_schema", "threads": 1},
     )
-    assert profile_mapping.get_env_vars() == {
+    assert profile_mapping.env_vars == {
         "COSMOS_CONN_EXASOL_PASSWORD": mock_exasol_connection.password,
     }
 

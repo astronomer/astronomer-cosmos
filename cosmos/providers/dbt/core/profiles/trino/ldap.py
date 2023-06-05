@@ -27,11 +27,12 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
         **TrinoBaseProfileMapping.airflow_param_mapping,
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         """
         Returns a dbt Trino profile based on the Airflow Trino connection.
         """
-        common_profile_vars = super().get_profile()
+        common_profile_vars = super().profile
         profile_vars = {
             **common_profile_vars,
             "method": "ldap",

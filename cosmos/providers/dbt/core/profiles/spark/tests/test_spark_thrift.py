@@ -83,7 +83,7 @@ def test_profile_args(
         "schema": "my_schema",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "spark",
         "method": "thrift",
         "schema": "my_schema",
@@ -111,7 +111,7 @@ def test_profile_args_overrides(
         "user": "my_user",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "spark",
         "method": "thrift",
         "schema": "my_schema",
@@ -130,4 +130,4 @@ def test_profile_env_vars(
         mock_spark_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )
-    assert profile_mapping.get_env_vars() == {}
+    assert profile_mapping.env_vars == {}

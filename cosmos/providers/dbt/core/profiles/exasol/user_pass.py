@@ -42,7 +42,8 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
         "protocol_version": "extra.protocol_version",
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
         profile_vars = {
             "type": "exasol",

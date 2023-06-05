@@ -34,7 +34,8 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
         "http_path": "extra.http_path",
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Generates profile. The token is stored in an environment variable."
         return {
             "type": "databricks",

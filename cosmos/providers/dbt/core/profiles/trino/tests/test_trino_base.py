@@ -32,7 +32,7 @@ def test_profile_args() -> None:
         "schema": "my_schema",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "trino",
         "database": "my_database",
         "schema": "my_schema",
@@ -71,7 +71,7 @@ def test_profile_args_overrides() -> None:
         "session_properties": {"my_property": "my_value_override"},
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "trino",
         "database": "my_database",
         "schema": "my_schema",

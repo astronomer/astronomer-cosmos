@@ -25,7 +25,8 @@ class SparkThriftProfileMapping(BaseProfileMapping):
         "host": "host",
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         """
         Return a dbt Spark profile based on the Airflow Spark connection.
         """

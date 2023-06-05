@@ -101,7 +101,7 @@ def test_profile_args(
         "schema": "my_schema",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": mock_postgres_conn.conn_type,
         "host": mock_postgres_conn.host,
         "user": mock_postgres_conn.login,
@@ -127,7 +127,7 @@ def test_profile_args_overrides(
         "dbname": "my_db_override",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": mock_postgres_conn.conn_type,
         "host": mock_postgres_conn.host,
         "user": mock_postgres_conn.login,
@@ -148,6 +148,6 @@ def test_profile_env_vars(
         mock_postgres_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )
-    assert profile_mapping.get_env_vars() == {
+    assert profile_mapping.env_vars == {
         "COSMOS_CONN_POSTGRES_PASSWORD": mock_postgres_conn.password,
     }

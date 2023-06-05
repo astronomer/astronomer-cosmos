@@ -61,14 +61,16 @@ class BaseProfileMapping(ABC):
 
         return True
 
+    @property
     @abstractmethod
-    def get_profile(self) -> dict[str, Any]:
+    def profile(self) -> dict[str, Any]:
         """
         Return a dbt profile based on the Airflow connection.
         """
         raise NotImplementedError
 
-    def get_env_vars(self) -> dict[str, str]:
+    @property
+    def env_vars(self) -> dict[str, str]:
         "Returns a dictionary of environment variables that should be set based on self.secret_fields."
         env_vars = {}
 
@@ -84,7 +86,7 @@ class BaseProfileMapping(ABC):
         """
         Translates the profile into a string that can be written to a profiles.yml file.
         """
-        profile_vars = self.get_profile()
+        profile_vars = self.profile
 
         # filter out any null values
         profile_vars = {k: v for k, v in profile_vars.items() if v is not None}

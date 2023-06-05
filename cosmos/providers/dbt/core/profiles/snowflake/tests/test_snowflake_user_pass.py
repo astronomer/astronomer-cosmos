@@ -113,7 +113,7 @@ def test_profile_args(
         mock_snowflake_conn.conn_id,
     )
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
         "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
@@ -138,7 +138,7 @@ def test_profile_args_overrides(
         "database": "my_db_override",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
         "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
@@ -158,7 +158,7 @@ def test_profile_env_vars(
     profile_mapping = get_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
-    assert profile_mapping.get_env_vars() == {
+    assert profile_mapping.env_vars == {
         "COSMOS_CONN_SNOWFLAKE_PASSWORD": mock_snowflake_conn.password,
     }
 
@@ -183,7 +183,7 @@ def test_old_snowflake_format() -> None:
     )
 
     profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": conn.conn_type,
         "user": conn.login,
         "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
@@ -215,7 +215,7 @@ def test_appends_region() -> None:
     )
 
     profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": conn.conn_type,
         "user": conn.login,
         "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",

@@ -136,7 +136,7 @@ def test_profile_args(
         "schema": "my_schema",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "trino",
         "method": "certificate",
         "host": "my_host",
@@ -170,7 +170,7 @@ def test_profile_args_overrides(
         "client_private_key": "my_client_private_key_override",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "trino",
         "method": "certificate",
         "host": "my_host_override",

@@ -109,7 +109,7 @@ def test_profile_args(
         "dataset": "my_dataset",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "bigquery",
         "method": "service-account",
         "project": mock_bigquery_conn.extra_dejson.get("project"),
@@ -141,7 +141,7 @@ def test_profile_args_overrides(
         "keyfile": "my_keyfile_override",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "bigquery",
         "method": "service-account",
         "project": "my_project_override",
@@ -161,4 +161,4 @@ def test_profile_env_vars(
         mock_bigquery_conn.conn_id,
         profile_args={"dataset": "my_dataset"},
     )
-    assert profile_mapping.get_env_vars() == {}
+    assert profile_mapping.env_vars == {}

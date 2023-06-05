@@ -24,9 +24,10 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
         **TrinoBaseProfileMapping.airflow_param_mapping,
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Gets profile."
-        common_profile_vars = super().get_profile()
+        common_profile_vars = super().profile
         profile_vars = {
             **common_profile_vars,
             "method": "certificate",

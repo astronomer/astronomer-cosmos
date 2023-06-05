@@ -58,7 +58,8 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         self.profile_args = profile_args or {}
         super().__init__(conn, profile_args)
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Gets profile."
         profile_vars = {
             "type": "snowflake",

@@ -164,7 +164,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 f.write(profile_file_contents)
 
             # we also need to get the env from the profile mapping
-            env.update(profile_mapping.get_env_vars())
+            env.update(profile_mapping.env_vars)
 
             # if we need to install deps, do so
             if self.install_deps:

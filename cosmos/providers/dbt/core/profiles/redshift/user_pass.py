@@ -37,7 +37,8 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
         "region": "extra.region",
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Gets profile."
         profile = {
             "type": "redshift",

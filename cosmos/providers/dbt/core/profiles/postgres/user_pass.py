@@ -37,7 +37,8 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         "sslmode": "extra.sslmode",
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
         profile = {
             "type": "postgres",

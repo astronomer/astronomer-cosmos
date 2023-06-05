@@ -131,7 +131,7 @@ def test_profile_args(
         "schema": "my_schema",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "trino",
         "method": "jwt",
         "host": "my_host",
@@ -164,7 +164,7 @@ def test_profile_args_overrides(
         "jwt_token": "my_jwt_token_override",
     }
 
-    assert profile_mapping.get_profile() == {
+    assert profile_mapping.profile == {
         "type": "trino",
         "method": "jwt",
         "host": "my_host_override",
@@ -188,6 +188,6 @@ def test_profile_env_vars(
             "schema": "my_schema",
         },
     )
-    assert profile_mapping.get_env_vars() == {
+    assert profile_mapping.env_vars == {
         "COSMOS_CONN_TRINO_JWT_TOKEN": "my_jwt_token",
     }

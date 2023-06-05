@@ -28,7 +28,8 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
         "keyfile": "extra.key_path",
     }
 
-    def get_profile(self) -> dict[str, Any | None]:
+    @property
+    def profile(self) -> dict[str, Any | None]:
         "Generates profile. Defaults `threads` to 1."
         return {
             "type": "bigquery",

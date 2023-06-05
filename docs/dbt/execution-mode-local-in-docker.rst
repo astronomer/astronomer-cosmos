@@ -1,13 +1,13 @@
 Local Execution Mode in Docker
 ------------------------------
 
-One of the existing :ref:`Execution Modes <dbt/execution-modes>`_ is ``Docker``, when Cosmos runs each ``dbt`` command in an independent Docker container.
+One of the existing `Execution Modes <execution-modes>`_ is ``Docker``, when Cosmos runs each ``dbt`` command in an independent Docker container.
 
 An alternative to the ``Docker`` execution mode is to run Airflow inside ``Docker``,
-use the :ref:`Local Execution Mode <dbt/execution-modes:Local>`_ and
+use the `Local Execution Mode <execution-modes.html#local>`_ and
 manage the ``dbt`` installation in an independent Python virtual environment, within the container.
 
-An advantage of this approach when compared to the :ref:`Virtualenv Execution Mode <dbt/execution-modes:Virtualenv>`_ is
+An advantage of this approach when compared to the `Virtualenv Execution Mode <execution-modes.html#virtualenv>`_ is
 that there is that there is not an overhead on creating a Python virtualenv each time a Cosmos ``dbt`` task is executed.
 
 To install dbt into a virtual environment on an Airflow Docker Image, you can use the following steps:

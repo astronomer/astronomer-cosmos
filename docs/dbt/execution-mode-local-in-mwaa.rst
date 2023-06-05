@@ -1,7 +1,7 @@
 Local Execution Mode in MWAA
 ----------------------------
 
-Users can face Python dependency issues when trying to use the Cosmos :ref:`Local Execution Mode <dbt/execution-modes:Local>`_ in Amazon Managed Workflows for Apache Airflow (MWAA).
+Users can face Python dependency issues when trying to use the Cosmos `Local Execution Mode <execution-modes.html#local>`_ in Amazon Managed Workflows for Apache Airflow (MWAA).
 
 This step-by-step illustrates how to use the Local Execution Mode, together with the
 `MWAA's startup script <https://docs.aws.amazon.com/mwaa/latest/userguide/using-startup-script.html>`_ and

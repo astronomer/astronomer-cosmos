@@ -60,9 +60,7 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = ExasolUserPasswordProfileMapping(
-            conn, {"schema": "my_schema", "threads": 1}
-        )
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
         assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
@@ -77,9 +75,7 @@ def test_connection_claiming() -> None:
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(
-        conn, {"schema": "my_schema", "threads": 1}
-    )
+    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
     assert profile_mapping.can_claim_connection()
 
 
@@ -89,9 +85,7 @@ def test_profile_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
-        mock_exasol_connection.conn_id, {"schema": "my_schema", "threads": 1}
-    )
+    profile_mapping = get_profile_mapping(mock_exasol_connection.conn_id, {"schema": "my_schema", "threads": 1})
     assert isinstance(profile_mapping, ExasolUserPasswordProfileMapping)
 
 
@@ -191,9 +185,7 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(
-        conn, {"schema": "my_schema", "threads": 1}
-    )
+    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
     assert profile_mapping.dsn == "my_host:1000"
 
     # next, test with a host that doesn't include a port
@@ -206,9 +198,7 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(
-        conn, {"schema": "my_schema", "threads": 1}
-    )
+    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
     assert profile_mapping.dsn == "my_host:8563"  # should default to 8563
 
     # lastly, test with a port override
@@ -222,7 +212,5 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(
-        conn, {"schema": "my_schema", "threads": 1}
-    )
+    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
     assert profile_mapping.dsn == "my_host:1000"

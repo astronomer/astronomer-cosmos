@@ -58,9 +58,7 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = GoogleCloudServiceAccountFileProfileMapping(
-            conn, {"dataset": "my_dataset"}
-        )
+        profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
         assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
@@ -78,9 +76,7 @@ def test_connection_claiming() -> None:
         conn_type="google-cloud-platform",
         extra=json.dumps(extra),
     )
-    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(
-        conn, {"dataset": "my_dataset"}
-    )
+    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
     assert profile_mapping.can_claim_connection()
 
 

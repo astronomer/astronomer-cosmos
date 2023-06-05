@@ -59,9 +59,7 @@ def test_connection_claiming() -> None:
         print("testing with", values)
 
         # should raise an InvalidMappingException
-        profile_mapping = RedshiftUserPasswordProfileMapping(
-            conn, {"schema": "my_schema"}
-        )
+        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
         assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema

@@ -101,9 +101,7 @@ def render_project(
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:
         profile_args["schema"] = task_args["schema"]
-        logger.warning(
-            "Specifying a schema in the task_args is deprecated. Please use the profile_args instead."
-        )
+        logger.warning("Specifying a schema in the task_args is deprecated. Please use the profile_args instead.")
 
     # iterate over each model once to create the initial tasks
     for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):

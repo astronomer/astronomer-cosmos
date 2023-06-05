@@ -67,9 +67,7 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = TrinoCertificateProfileMapping(
-            conn, {"database": "my_database", "schema": "my_schema"}
-        )
+        profile_mapping = TrinoCertificateProfileMapping(conn, {"database": "my_database", "schema": "my_schema"})
         assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema

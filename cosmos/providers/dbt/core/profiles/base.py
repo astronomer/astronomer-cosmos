@@ -8,7 +8,7 @@ from logging import getLogger
 from typing import Any
 
 import yaml
-from typing_extensions import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -77,9 +77,7 @@ class BaseProfileMapping:
 
         return env_vars
 
-    def get_profile_file_contents(
-        self, profile_name: str, target_name: str = "cosmos_target"
-    ) -> str:
+    def get_profile_file_contents(self, profile_name: str, target_name: str = "cosmos_target") -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.
         """

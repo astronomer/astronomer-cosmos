@@ -40,9 +40,7 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         "role": "extra.role",
     }
 
-    def __init__(
-        self, conn: Connection, profile_args: dict[str, Any | None] | None = None
-    ) -> None:
+    def __init__(self, conn: Connection, profile_args: dict[str, Any | None] | None = None) -> None:
         """
         Snowflake can be odd because the fields used to be stored with keys in the format
         'extra__snowflake__account', but now are stored as 'account'.
@@ -52,10 +50,7 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         conn_dejson = conn.extra_dejson
 
         if conn_dejson.get("extra__snowflake__account"):
-            conn_dejson = {
-                key.replace("extra__snowflake__", ""): value
-                for key, value in conn_dejson.items()
-            }
+            conn_dejson = {key.replace("extra__snowflake__", ""): value for key, value in conn_dejson.items()}
 
         conn.extra = json.dumps(conn_dejson)
 

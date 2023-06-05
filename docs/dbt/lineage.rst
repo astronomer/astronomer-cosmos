@@ -73,5 +73,5 @@ reference the ``base`` tab instructions
                 ...,
                 dbt_args={
                     "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt-ol",
-                }
+                },
             )

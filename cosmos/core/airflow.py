@@ -68,9 +68,7 @@ class CosmosTaskGroup(TaskGroup):
         # render all the entities in the group
         for ent in cosmos_group.entities:
             if isinstance(ent, Group):
-                entities[ent.id] = CosmosTaskGroup(
-                    cosmos_group=ent, dag=dag, parent_group=self
-                )
+                entities[ent.id] = CosmosTaskGroup(cosmos_group=ent, dag=dag, parent_group=self)
             elif isinstance(ent, Task):
                 entities[ent.id] = get_airflow_task(
                     task=ent,
@@ -82,21 +80,15 @@ class CosmosTaskGroup(TaskGroup):
         for ent in cosmos_group.entities:
             for upstream_id in ent.upstream_entity_ids:
                 if upstream_id not in entities:
-                    raise ValueError(
-                        f"Entity {upstream_id} is not in the group {cosmos_group.id}"
-                    )
+                    raise ValueError(f"Entity {upstream_id} is not in the group {cosmos_group.id}")
 
                 if ent.id not in entities:
-                    raise ValueError(
-                        f"Entity {ent.id} is not in the group {cosmos_group.id}"
-                    )
+                    raise ValueError(f"Entity {ent.id} is not in the group {cosmos_group.id}")
 
                 entities[upstream_id] >> entities[ent.id]
 
 
-def get_airflow_task(
-    task: Task, dag: DAG, task_group: Optional[TaskGroup] = None
-) -> BaseOperator:
+def get_airflow_task(task: Task, dag: DAG, task_group: Optional[TaskGroup] = None) -> BaseOperator:
     """
     Get the Airflow Operator class for a Task.
 
@@ -119,8 +111,6 @@ def get_airflow_task(
     )
 
     if not isinstance(airflow_task, BaseOperator):
-        raise TypeError(
-            f"Operator class {task.operator_class} is not a subclass of BaseOperator"
-        )
+        raise TypeError(f"Operator class {task.operator_class} is not a subclass of BaseOperator")
 
     return airflow_task

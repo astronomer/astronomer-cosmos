@@ -87,6 +87,4 @@ jobs:
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
-      DBT_ROOT_PATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt
-      DBT_DOCS_PATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt-docs
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH

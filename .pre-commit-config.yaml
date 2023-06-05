@@ -5,40 +5,66 @@ repos:
     rev: v4.4.0
     hooks:
       - id: check-added-large-files
+      - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
         args:
           - --unsafe
+      - id: debug-statements
       - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: pretty-format-json
+        args: ['--autofix']
       - id: trailing-whitespace
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.4
+    hooks:
+      - id: codespell
+        name: Run codespell to check for common misspellings in files
+        language: python
+        types: [text]
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: rst-backticks
+      - id: python-check-mock-methods
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.1
+    hooks:
+      - id: remove-crlf
+      - id: remove-tabs
+        exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.4.0
     hooks:
       - id: pyupgrade
         args:
-          - --py3-plus
+          - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.269
+    rev: v0.0.270
     hooks:
       - id: ruff
         args:
           - --fix
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        name: isort (python)
-      - id: isort
-        name: isort (cython)
-        types: [cython]
-      - id: isort
-        name: isort (pyi)
-        types: [pyi]
   - repo: https://github.com/psf/black
     rev: 23.3.0
     hooks:
       - id: black
+        args: [ "--config", "./pyproject.toml" ]
+  - repo: https://github.com/asottile/blacken-docs
+    rev: 1.13.0
+    hooks:
+      - id: blacken-docs
+        alias: black
+        additional_dependencies: [black>=22.10.0]
+  #-   repo: https://github.com/pre-commit/mirrors-mypy
+  #    rev: 'v1.3.0'
+  #    hooks:
+  #    - id: mypy
+  #      name: mypy-python-sdk
+  #      additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil]
+
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
   autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate

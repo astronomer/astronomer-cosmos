@@ -13,9 +13,7 @@ from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
 
-FullOutputSubprocessResult = namedtuple(
-    "FullOutputSubprocessResult", ["exit_code", "output", "full_output"]
-)
+FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
 
 
 class FullOutputSubprocessHook(BaseHook):
@@ -83,23 +81,17 @@ class FullOutputSubprocessHook(BaseHook):
                 raise RuntimeError("The subprocess should be created here and is None!")
             if self.sub_process.stdout is not None:
                 for raw_line in iter(self.sub_process.stdout.readline, b""):
-                    line = raw_line.decode(
-                        output_encoding, errors="backslashreplace"
-                    ).rstrip()
+                    line = raw_line.decode(output_encoding, errors="backslashreplace").rstrip()
                     # storing the warn & error lines to be used later
                     log_lines.append(line)
                     self.log.info("%s", line)
 
             self.sub_process.wait()
 
-            self.log.info(
-                "Command exited with return code %s", self.sub_process.returncode
-            )
+            self.log.info("Command exited with return code %s", self.sub_process.returncode)
             return_code: int = self.sub_process.returncode
 
-        return FullOutputSubprocessResult(
-            exit_code=return_code, output=line, full_output=log_lines
-        )
+        return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
 
     def send_sigterm(self):
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""

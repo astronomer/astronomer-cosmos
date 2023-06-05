@@ -33,25 +33,17 @@ try:
 except ImportError:
     from .core.operators.lazy_load import MissingPackage
 
-    DbtLSDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtLSDockerOperator", "docker"
-    )
-    DbtRunDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtRunDockerOperator", "docker"
-    )
+    DbtLSDockerOperator = MissingPackage("cosmos.providers.dbt.core.operators.docker.DbtLSDockerOperator", "docker")
+    DbtRunDockerOperator = MissingPackage("cosmos.providers.dbt.core.operators.docker.DbtRunDockerOperator", "docker")
     DbtRunOperationDockerOperator = MissingPackage(
         "cosmos.providers.dbt.core.operators.docker.DbtRunOperationDockerOperator",
         "docker",
     )
-    DbtSeedDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtSeedDockerOperator", "docker"
-    )
+    DbtSeedDockerOperator = MissingPackage("cosmos.providers.dbt.core.operators.docker.DbtSeedDockerOperator", "docker")
     DbtSnapshotDockerOperator = MissingPackage(
         "cosmos.providers.dbt.core.operators.docker.DbtSnapshotDockerOperator", "docker"
     )
-    DbtTestDockerOperator = MissingPackage(
-        "cosmos.providers.dbt.core.operators.docker.DbtTestDockerOperator", "docker"
-    )
+    DbtTestDockerOperator = MissingPackage("cosmos.providers.dbt.core.operators.docker.DbtTestDockerOperator", "docker")
 
 try:
     from .core.operators.kubernetes import (

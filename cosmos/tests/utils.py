@@ -53,9 +53,7 @@ def test_dag(
 
     execution_date = execution_date or timezone.utcnow()
 
-    dag.log.debug(
-        "Clearing existing task instances for execution date %s", execution_date
-    )
+    dag.log.debug("Clearing existing task instances for execution date %s", execution_date)
     dag.clear(
         start_date=execution_date,
         end_date=execution_date,
@@ -101,9 +99,7 @@ def add_logger_if_needed(dag: DAG, ti: TaskInstance):
         ti: The taskinstance that will receive a logger
 
     """
-    logging_format = logging.Formatter(
-        "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
-    )
+    logging_format = logging.Formatter("[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s")
     handler = logging.StreamHandler(sys.stdout)
     handler.level = logging.INFO
     handler.setFormatter(logging_format)
@@ -157,9 +153,7 @@ def _get_or_create_dagrun(
     """
     log.info("dagrun id: %s", dag.dag_id)
     dr: DagRun = (
-        session.query(DagRun)
-        .filter(DagRun.dag_id == dag.dag_id, DagRun.execution_date == execution_date)
-        .first()
+        session.query(DagRun).filter(DagRun.dag_id == dag.dag_id, DagRun.execution_date == execution_date).first()
     )
     if dr:
         session.delete(dr)

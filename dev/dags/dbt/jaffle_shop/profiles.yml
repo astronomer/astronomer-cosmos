@@ -1,0 +1,13 @@
+# WARNING: this gets ignored by cosmos
+jaffle_shop:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      user: alice
+      password: <password>
+      port: 5432
+      dbname: jaffle_shop
+      schema: dbt_alice
+      threads: 4

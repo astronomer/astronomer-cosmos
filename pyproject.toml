@@ -36,8 +36,10 @@ classifiers = [
 ]
 dependencies = [
     "apache-airflow>=2.3.0",
+    "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
+    "virtualenv",
 ]
 
 [project.optional-dependencies]
@@ -154,7 +156,7 @@ matrix.airflow.dependencies = [
 freeze = "pip freeze"
 test = 'pytest  -vv . -m "not integration"'
 test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml . -m "not integration"'
-test-integration = "pytest -vv cosmos/tests/ --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
+test-integration = "pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml -m integration"
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -185,6 +187,9 @@ serve = "sphinx-autobuild docs docs/_build"
 ######################################
 # THIRD PARTY TOOLS
 ######################################
+[tool.black]
+line-length = 120
+target-version = ['py37', 'py38', 'py39', 'py310']
 
 [tool.isort]
 profile = "black"

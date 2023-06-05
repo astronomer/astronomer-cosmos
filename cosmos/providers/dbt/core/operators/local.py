@@ -64,9 +64,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def exception_handling(self, result: FullOutputSubprocessResult):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
-            raise AirflowSkipException(
-                f"dbt command returned exit code {self.skip_exit_code}. Skipping."
-            )
+            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             raise AirflowException(
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
@@ -74,9 +72,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
 
     @provide_session
-    def store_compiled_sql(
-        self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION
-    ) -> None:
+    def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
         """
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
@@ -113,6 +109,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         ).delete()
         session.add(rtif)
 
+    def run_subprocess(self, *args, **kwargs):
+        return self.subprocess_hook.run_command(*args, **kwargs)
+
     def run_command(
         self,
         cmd: list[str],
@@ -123,6 +122,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         Copies the dbt project to a temporary directory and runs the command.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
+            logger.info(
+                "Cloning project to writable temp directory %s from %s",
+                tmp_dir,
+                self.project_dir,
+            )
+
             # need a subfolder because shutil.copytree will fail if the destination dir already exists
             tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
             shutil.copytree(
@@ -163,16 +168,16 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             # if we need to install deps, do so
             if self.install_deps:
-                self.subprocess_hook.run_command(
+                self.run_subprocess(
                     command=[self.dbt_executable_path, "deps"],
                     env=env,
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
 
-            logger.info(f"Trying to run the command:\n {cmd}\nFrom {tmp_project_dir}")
+            logger.info("Trying to run the command:\n %s\nFrom %s", cmd, tmp_project_dir)
 
-            result = self.subprocess_hook.run_command(
+            result = self.run_subprocess(
                 command=cmd,
                 env=env,
                 output_encoding=self.output_encoding,
@@ -186,9 +191,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             return result
 
-    def build_and_run_cmd(
-        self, context: Context, cmd_flags: list[str] | None = None
-    ) -> FullOutputSubprocessResult:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         return self.run_command(cmd=dbt_cmd, env=env, context=context)
 
@@ -199,12 +202,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
             self.subprocess_hook.log.info("Sending SIGINT signal to process group")
-            if self.subprocess_hook.sub_process and hasattr(
-                self.subprocess_hook.sub_process, "pid"
-            ):
-                os.killpg(
-                    os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT
-                )
+            if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
+                os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
         else:
             self.subprocess_hook.send_sigterm()
 
@@ -318,9 +317,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         return self.on_warning_callback and no_tests_message not in result.output
 
-    def _handle_warnings(
-        self, result: FullOutputSubprocessResult, context: Context
-    ) -> None:
+    def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
          on_warning_callback with the updated context.
@@ -388,6 +385,8 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#8194E0"
 
+    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["docs", "generate"]
@@ -395,6 +394,127 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     def execute(self, context: Context):
         result = self.build_and_run_cmd(context=context)
         return result.output
+
+
+class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
+    """
+    Executes `dbt docs generate` command and upload to S3 storage. Returns the S3 path to the generated documentation.
+
+    :param aws_conn_id: S3's Airflow connection ID
+    :param bucket_name: S3's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
+        uploaded.
+    """
+
+    ui_color = "#FF9900"
+
+    def __init__(
+        self,
+        aws_conn_id: str,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs,
+    ) -> None:
+        "Initializes the operator."
+        self.aws_conn_id = aws_conn_id
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+
+        super().__init__(**kwargs)
+
+        # override the callback with our own
+        self.callback = self.upload_to_s3
+
+    def upload_to_s3(self, project_dir: str) -> None:
+        "Uploads the generated documentation to S3."
+        logger.info(
+            'Attempting to upload generated docs to S3 using S3Hook("%s")',
+            self.aws_conn_id,
+        )
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+        target_dir = f"{project_dir}/target"
+
+        hook = S3Hook(
+            self.aws_conn_id,
+            extra_args={
+                "ContentType": "text/html",
+            },
+        )
+
+        for filename in self.required_files:
+            logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
+
+            key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
+
+            hook.load_file(
+                filename=f"{target_dir}/{filename}",
+                bucket_name=self.bucket_name,
+                key=key,
+                replace=True,
+            )
+
+
+class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
+    """
+    Executes `dbt docs generate` command and upload to Azure Blob Storage.
+
+    :param azure_conn_id: Azure Blob Storage's Airflow connection ID
+    :param container_name: Azure Blob Storage's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
+        uploaded.
+    """
+
+    ui_color = "#007FFF"
+
+    def __init__(
+        self,
+        azure_conn_id: str,
+        container_name: str,
+        folder_dir: str | None = None,
+        **kwargs,
+    ) -> None:
+        "Initializes the operator."
+        self.azure_conn_id = azure_conn_id
+        self.container_name = container_name
+        self.folder_dir = folder_dir
+
+        super().__init__(**kwargs)
+
+        # override the callback with our own
+        self.callback = self.upload_to_azure
+
+    def upload_to_azure(self, project_dir: str) -> None:
+        "Uploads the generated documentation to Azure Blob Storage."
+        logger.info(
+            'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
+            self.azure_conn_id,
+        )
+
+        from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
+
+        target_dir = f"{project_dir}/target"
+
+        hook = WasbHook(
+            self.azure_conn_id,
+        )
+
+        for filename in self.required_files:
+            logger.info(
+                "Uploading %s to %s",
+                filename,
+                f"wasb://{self.container_name}/{filename}",
+            )
+
+            blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
+
+            hook.load_file(
+                file_path=f"{target_dir}/{filename}",
+                container_name=self.container_name,
+                blob_name=blob_name,
+                overwrite=True,
+            )
 
 
 class DbtDepsLocalOperator(DbtLocalBaseOperator):
@@ -406,6 +526,5 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs) -> None:
         raise DeprecationWarning(
-            "The DbtDepsOperator has been deprecated. "
-            "Please use the `install_deps` flag in dbt_args instead."
+            "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )

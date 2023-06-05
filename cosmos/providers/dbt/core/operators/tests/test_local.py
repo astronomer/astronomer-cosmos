@@ -42,9 +42,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
         "No exception raised",
     ],
 )
-def test_dbt_base_operator_exception_handling(
-    skip_exception, exception_code_returned, expected_exception
-) -> None:
+def test_dbt_base_operator_exception_handling(skip_exception, exception_code_returned, expected_exception) -> None:
     dbt_base_operator = DbtLocalBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
@@ -52,13 +50,9 @@ def test_dbt_base_operator_exception_handling(
     )
     if expected_exception:
         with pytest.raises(expected_exception):
-            dbt_base_operator.exception_handling(
-                SubprocessResult(exception_code_returned, None)
-            )
+            dbt_base_operator.exception_handling(SubprocessResult(exception_code_returned, None))
     else:
-        dbt_base_operator.exception_handling(
-            SubprocessResult(exception_code_returned, None)
-        )
+        dbt_base_operator.exception_handling(SubprocessResult(exception_code_returned, None))
 
 
 @patch("cosmos.providers.dbt.core.operators.base.context_to_airflow_vars")
@@ -89,3 +83,27 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         "START_DATE": "2023-02-15 12:30:00",
     }
     assert env == expected_env
+
+
+@patch("os.path.exists")
+def test_user_supplied_profiles(
+    os_path_exists: MagicMock,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    "Ensures that user supplied profiles log a warning and aren't used"
+    op = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+
+    os_path_exists.return_value = True
+
+    with patch("os.remove") as os_remove:
+        op.handle_profiles_yml(project_dir="my_dir")
+        # ensure that the file is removed
+        assert os_remove.call_count == 1
+
+    # ensure that a warning is logged
+    captured = capfd.readouterr()
+    assert "WARNING" in captured.out and "profiles.yml" in captured.out

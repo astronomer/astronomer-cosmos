@@ -77,9 +77,7 @@ def render_project(
 
     # this is the group that will be returned
     base_group = Group(id=dbt_project_name)
-    entities: Dict[
-        str, CosmosEntity
-    ] = {}  # this is a dict of all the entities we create
+    entities: Dict[str, CosmosEntity] = {}  # this is a dict of all the entities we create
 
     # add project_dir arg to task_args
     if execution_mode == "local":
@@ -108,23 +106,16 @@ def render_project(
         )
 
     # iterate over each model once to create the initial tasks
-    for model_name, model in itertools.chain(
-        project.models.items(), project.snapshots.items(), project.seeds.items()
-    ):
+    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
         # filters down to a path within the project_dir
         if "paths" in select:
-            root_directories = [
-                project.project_dir / path.strip("/")
-                for path in select.get("paths", [])
-            ]
+            root_directories = [project.project_dir / path.strip("/") for path in select.get("paths", [])]
             if not set(root_directories).intersection(model.path.parents):
                 continue
 
         # filters out any specified paths
         if "paths" in exclude:
-            root_directories = [
-                project.project_dir / path.strip("/") for path in exclude.get("paths")
-            ]
+            root_directories = [project.project_dir / path.strip("/") for path in exclude.get("paths")]
             if set(root_directories).intersection(model.path.parents):
                 continue
 
@@ -194,6 +185,7 @@ def render_project(
         else:
             # TODO: coverme
             logger.error("Unknown DBT type.")
+            continue
 
         # if test_behavior isn't "after_each", we can just add the task to the
         # base group and do nothing else for now
@@ -230,18 +222,14 @@ def render_project(
             base_group.add_entity(entity=run_task)
 
     # add dependencies now that we have all the entities
-    for model_name, model in itertools.chain(
-        project.models.items(), project.snapshots.items(), project.seeds.items()
-    ):
+    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
         upstream_deps = model.config.upstream_models
         for upstream_model_name in upstream_deps:
             try:
                 dep_task = entities[upstream_model_name]
                 entities[model_name].add_upstream(dep_task)
             except KeyError:
-                logger.error(
-                    f"Dependency {upstream_model_name} not found for model {model}"
-                )
+                logger.error(f"Dependency {upstream_model_name} not found for model {model}")
     if test_behavior == "after_all":
         # make a test task
         test_task = Task(
@@ -260,9 +248,7 @@ def render_project(
         # add it as an upstream to all the models that don't have downstream tasks
         # since we don't have downstream info readily available, we have to iterate
         # start with all models, and remove them as we find downstream tasks
-        models_with_no_downstream_tasks = [
-            model_name for model_name, model in project.models.items()
-        ]
+        models_with_no_downstream_tasks = [model_name for model_name, model in project.models.items()]
 
         # iterate over all models
         for model_name, model in project.models.items():

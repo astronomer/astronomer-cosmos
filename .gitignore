@@ -144,3 +144,12 @@ logs/
 
 # integration tests
 dev/dags/.airflowignore
+
+# Local Airflow standalone
+airflow.cfg
+airflow.db
+standalone_admin_password.txt
+webserver_config.py
+
+# VI
+*.sw[a-z]

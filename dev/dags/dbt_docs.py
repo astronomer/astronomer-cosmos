@@ -8,61 +8,45 @@ S3 (if you have the S3Hook installed) or to a local directory.
 """
 
 import os
-import shutil
 from pathlib import Path
 
 from airflow import DAG
+from airflow.hooks.base import BaseHook
+from airflow.exceptions import AirflowNotFoundException
+from airflow.decorators import task
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators import DbtDocsOperator
+from cosmos.providers.dbt.core.operators import (
+    DbtDocsAzureStorageOperator,
+    DbtDocsS3Operator,
+)
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
-DEFAULT_DBT_DOCS_PATH = Path(__file__).parent / "dbt-docs"
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
-DBT_DOCS_PATH = os.getenv("DBT_DOCS_PATH", DEFAULT_DBT_DOCS_PATH)
-AWS_CONN = "aws_default"
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+
+S3_CONN_ID = "aws_docs"
+AZURE_CONN_ID = "azure_docs"
 
 
-def docs_callback(project_dir: str) -> None:
-    """
-    Callback function to print the path to the generated docs.
-    """
-    target_dir = f"{project_dir}/target"
+@task.branch(task_id="which_upload")
+def which_upload():
+    "Only run the docs tasks if we have the proper connections set up"
+    downstream_tasks_to_run = []
 
     try:
-        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-
-        hook = S3Hook(aws_conn_id=AWS_CONN)
-
-        # iterate over the files in the target dir and upload them to S3
-        for dirpath, _, filenames in os.walk(target_dir):
-            for filename in filenames:
-                hook.load_file(
-                    filename=f"{dirpath}/{filename}",
-                    bucket_name="my-bucket",
-                    key=f"dbt-docs/{filename}",
-                    replace=True,
-                )
-
-        return
-
-    # if the S3Hook isn't installed, just copy the target dir to a local dir
-    except ImportError:
+        BaseHook.get_connection(S3_CONN_ID)
+        downstream_tasks_to_run += ["generate_dbt_docs_aws"]
+    except AirflowNotFoundException:
         pass
 
-    # if there's a botocore.exceptions.NoCredentialsError, print a warning and just copy the docs locally
-    except Exception as exc:
-        if "NoCredentialsError" in str(exc):
-            print(
-                "WARNING: No AWS credentials found.\
-                To upload docs to S3, install the S3Hook and configure an S3 connection."
-            )
+    # if we have an AZURE_CONN_ID, check if it's valid
+    try:
+        BaseHook.get_connection(AZURE_CONN_ID)
+        downstream_tasks_to_run += ["generate_dbt_docs_azure"]
+    except AirflowNotFoundException:
+        pass
 
-    # copy the target dir to /usr/local/airflow/dbt-docs
-    if os.path.exists(DBT_DOCS_PATH):
-        shutil.rmtree(DBT_DOCS_PATH)
-
-    shutil.copytree(target_dir, DBT_DOCS_PATH)
+    return downstream_tasks_to_run
 
 
 with DAG(
@@ -72,12 +56,22 @@ with DAG(
     doc_md=__doc__,
     catchup=False,
 ) as dag:
-    generate_dbt_docs = DbtDocsOperator(
-        task_id="generate_dbt_docs",
-        project_dir=DBT_ROOT_PATH,
-        profile_args={"schema": "public"},
+    generate_dbt_docs_aws = DbtDocsS3Operator(
+        task_id="generate_dbt_docs_aws",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
-        callback=docs_callback,
+        profile_args={"schema": "public"},
+        aws_conn_id=S3_CONN_ID,
+        bucket_name="cosmos-docs",
     )
 
-    generate_dbt_docs
+    generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
+        task_id="generate_dbt_docs_azure",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+        azure_conn_id=AZURE_CONN_ID,
+        container_name="$web",
+    )
+
+    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure]

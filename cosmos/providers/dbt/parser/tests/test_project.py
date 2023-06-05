@@ -94,9 +94,7 @@ def test_dbtproject__handle_config_file_with_unknown_name():
         (["tag1", "tag2"], {"materialized:view", "tags:tag1", "tags:tag2"}),
     ],
 )
-def test_dbtproject__handle_config_file_with_selector(
-    input_tags, expected_config_selectors
-):
+def test_dbtproject__handle_config_file_with_selector(input_tags, expected_config_selectors):
     dbt_project = DbtProject(
         project_name="jaffle_shop",
         dbt_root_path=DBT_PROJECT_PATH,
@@ -110,16 +108,11 @@ def test_dbtproject__handle_config_file_with_selector(
 
         sample_config_file_path = Path(tmp_fp.name)
         dbt_project._handle_config_file(sample_config_file_path)
-        assert (
-            dbt_project.models["orders"].config.config_selectors
-            == expected_config_selectors
-        )
+        assert dbt_project.models["orders"].config.config_selectors == expected_config_selectors
 
 
 def test_dbtmodelconfig___repr__():
-    dbt_model = DbtModel(
-        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
-    )
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     expected_start = (
         "DbtModel(name='some_name', type='DbtModelType.DBT_MODEL', "
         "path='dev/dags/dbt/jaffle_shop/models/customers.sql', config=DbtModelConfig(config_selectors=set(), "
@@ -148,9 +141,7 @@ class KeywordArg:
 
 
 def test_dbtmodelconfig_extract_config_non_kwarg():
-    dbt_model = DbtModel(
-        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
-    )
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     kwarg = {}
     config_name = "abc"
     computed = dbt_model._extract_config(kwarg, config_name)
@@ -158,9 +149,7 @@ def test_dbtmodelconfig_extract_config_non_kwarg():
 
 
 def test_dbtmodelconfig_extract_config_with_kwarg_list_without_as_const(caplog):
-    dbt_model = DbtModel(
-        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
-    )
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     kwarg = KeywordArg(key="some_conf", value=[1, 2])
     config_name = "some_conf"
     with caplog.at_level(logging.WARN):
@@ -174,9 +163,7 @@ def test_dbtmodelconfig_extract_config_with_kwarg_list_without_as_const(caplog):
 
 
 def test_dbtmodelconfig_extract_config_with_kwarg_list():
-    dbt_model = DbtModel(
-        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
-    )
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     kwarg = KeywordArg(key="some_conf", value=KeywordArgValueList([1, 2]))
     config_name = "some_conf"
     computed = dbt_model._extract_config(kwarg, config_name)
@@ -185,9 +172,7 @@ def test_dbtmodelconfig_extract_config_with_kwarg_list():
 
 
 def test_dbtmodelconfig_extract_config_with_kwarg_str():
-    dbt_model = DbtModel(
-        name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH
-    )
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     kwarg = KeywordArg(key="some_conf", value=KeywordArgValueStr("abc"))
     config_name = "some_conf"
     computed = dbt_model._extract_config(kwarg, config_name)

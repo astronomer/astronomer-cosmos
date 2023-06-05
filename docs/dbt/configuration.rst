@@ -6,7 +6,7 @@ Cosmos offers a few different configuration options for how your dbt project is 
 Testing
 ----------------------
 
-By default, Cosmos will add a test after each model. This can be overriden using the ``test_behavior`` field. The options are:
+By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field. The options are:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully
@@ -16,12 +16,13 @@ Example:
 
 .. code-block:: python
 
-   from cosmos.providers.dbt import DbtDag
+    from cosmos.providers.dbt import DbtTaskGroup
 
-    jaffle_shop = DbtDag(
+    jaffle_shop = DbtTaskGroup(
         # ...
-        test_behavior='after_all',
+        test_behavior="snowflake_default",
     )
+
 
 Warn Notification
 ----------------------
@@ -38,13 +39,14 @@ For example, the following code snippet shows how to send a Slack message when a
 
 .. code-block:: python
 
-   from cosmos.providers.dbt import DbtDag
-   from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
-   from airflow.utils.context import Context
+    from cosmos.providers.dbt import DbtDag
+    from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
+    from airflow.utils.context import Context
+
 
     def warning_callback_func(context: Context):
-        tests = context.get('test_names')
-        results = context.get('test_results')
+        tests = context.get("test_names")
+        results = context.get("test_results")
 
         warning_msgs = ""
         for test, result in zip(tests, results):
@@ -64,8 +66,9 @@ For example, the following code snippet shows how to send a Slack message when a
             {warning_msgs}
             """
 
-            slack_hook = SlackWebhookHook(slack_webhook_conn_id='slack_conn_id')
+            slack_hook = SlackWebhookHook(slack_webhook_conn_id="slack_conn_id")
             slack_hook.send(text=slack_msg)
+
 
     mrr_playbook = DbtDag(
         # ...
@@ -100,27 +103,27 @@ Examples:
 
 .. code-block:: python
 
-   from cosmos.providers.dbt import DbtDag
+    from cosmos.providers.dbt import DbtDag
 
     jaffle_shop = DbtDag(
         # ...
-        select={"configs": ['tags:daily']},
+        select={"configs": ["tags:daily"]},
     )
 
 .. code-block:: python
 
-   from cosmos.providers.dbt import DbtDag
+    from cosmos.providers.dbt import DbtDag
 
     jaffle_shop = DbtDag(
         # ...
-        select={"configs": ['schema:prod']},
+        select={"configs": ["schema:prod"]},
     )
 
 .. code-block:: python
 
-   from cosmos.providers.dbt import DbtDag
+    from cosmos.providers.dbt import DbtDag
 
     jaffle_shop = DbtDag(
         # ...
-        select={"paths": ['analytics/tables']},
+        select={"paths": ["analytics/tables"]},
     )

@@ -30,9 +30,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
 
     """
 
-    template_fields: Sequence[str] = (
-        DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
-    )
+    template_fields: Sequence[str] = DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
 
     intercept_flag = False
 
@@ -145,9 +143,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(
-        self, on_warning_callback: Optional[Callable] = None, **kwargs
-    ) -> None:
+    def __init__(self, on_warning_callback: Optional[Callable] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
         # as of now, on_warning_callback in kubernetes executor does nothing

@@ -201,7 +201,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             logger.info("Trying to run the command:\n %s\nFrom %s", cmd, tmp_project_dir)
 
             result = self.run_subprocess(
-                command=cmd,
+                command=cmd + ["--profile", profile_name],
                 env=env,
                 output_encoding=self.output_encoding,
                 cwd=tmp_project_dir,

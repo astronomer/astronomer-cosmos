@@ -1,6 +1,8 @@
 """
 This module contains a function to render a dbt project as an Airflow DAG.
 """
+from __future__ import annotations
+
 try:
     from typing import Literal
 except ImportError:

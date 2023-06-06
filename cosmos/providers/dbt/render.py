@@ -1,6 +1,8 @@
 """
 This module contains a function to render a dbt project into Cosmos entities.
 """
+from __future__ import annotations
+
 import itertools
 import logging
 

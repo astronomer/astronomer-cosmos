@@ -12,6 +12,7 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 PROJECT_NAME = "jaffle_shop"
 CONNECTION_ID = "airflow_db"
 
+# [START virtualenv_example]
 example_virtualenv = DbtDag(
     # dbt/cosmos-specific parameters
     dbt_root_path=DBT_ROOT_PATH,
@@ -30,3 +31,4 @@ example_virtualenv = DbtDag(
     catchup=False,
     dag_id="example_virtualenv",
 )
+# [END virtualenv_example]

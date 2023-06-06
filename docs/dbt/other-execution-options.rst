@@ -40,6 +40,28 @@ At the moment, the user is expected to add to the Docker image both:
 - The dbt Profile which contains the information for dbt to access the database
 - Handle secrets
 
+Additional KubernetesPodOperator parameters can be added on the operator_args parameter of the DbtKubernetesOperator.
+
+For instance,
+
+.. code-block:: text
+
+    DbtTaskGroup(
+        ...
+        operator_args={
+            "queue": "kubernetes",
+            "image": "dbt-jaffle-shop:1.0.0",
+            "image_pull_policy": "Always",
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "namespace": "default",
+            "env_vars": {
+                ...
+            },
+        },
+        execution_mode="kubernetes",
+    )
+
 Step-by-step instructions
 +++++++++++++++++++++++++
 

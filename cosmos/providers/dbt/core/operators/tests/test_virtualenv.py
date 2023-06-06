@@ -5,6 +5,7 @@ from cosmos.providers.dbt.core.operators.virtualenv import DbtVirtualenvBaseOper
 from airflow.models.connection import Connection
 
 
+@patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.providers.dbt.core.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.providers.dbt.core.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
 @patch("cosmos.providers.dbt.core.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
@@ -45,3 +46,4 @@ def test_run_command(
     assert dbt_deps[0][0][0].endswith("/bin/dbt")
     assert dbt_deps[0][0][0] == dbt_cmd[0][0][0]
     assert dbt_cmd[0][0][1] == "do-something"
+    assert mock_execute.call_count == 2

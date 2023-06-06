@@ -10,12 +10,6 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-from cosmos.providers.dbt.constants import DBT_PROFILE_PATH
-from cosmos.providers.dbt.core.utils.profiles_generator import (
-    create_default_profiles,
-    map_profile,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,8 +28,6 @@ class DbtBaseOperator(BaseOperator):
         defined in your dbt_project.yml file. This argument should be a YAML
         string, eg. '{my_variable: my_value}' (templated)
     :param models: dbt optional argument that specifies which nodes to include.
-    :param profiles_dir: dbt optional argument that specifies which directory to look in for the profiles.yml file.
-    :param profile: dbt optional argument that specifies which profile of the profiles.yml file to use.
     :param cache_selected_only:
     :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
         the dbt_project.yml file ('require-dbt-version')
@@ -71,8 +63,6 @@ class DbtBaseOperator(BaseOperator):
         "selector",
         "vars",
         "models",
-        "profiles_dir",
-        "profile",
     )
     global_boolean_flags = (
         "no_version_check",
@@ -94,8 +84,6 @@ class DbtBaseOperator(BaseOperator):
         selector: str = None,
         vars: dict = None,
         models: str = None,
-        profiles_dir: str = None,
-        profile: str = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
         fail_fast: bool = False,
@@ -120,8 +108,6 @@ class DbtBaseOperator(BaseOperator):
         self.selector = selector
         self.vars = vars
         self.models = models
-        self.profiles_dir = profiles_dir
-        self.profile = profile
         self.cache_selected_only = cache_selected_only
         self.no_version_check = no_version_check
         self.fail_fast = fail_fast
@@ -139,39 +125,59 @@ class DbtBaseOperator(BaseOperator):
         dbt_ol_path = shutil.which("dbt-ol")
         if dbt_executable_path == "dbt" and shutil.which("dbt-ol"):
             self.dbt_executable_path = dbt_ol_path
+        elif dbt_executable_path == "dbt":
+            self.dbt_executable_path = shutil.which("dbt")
         else:
             self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
         super().__init__(**kwargs)
 
-    def get_env(self, context: Context, profile_vars: dict[str, str]) -> dict[str, str]:
+    def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike]:
         """
         Builds the set of environment variables to be exposed for the bash command.
+
         The order of determination is:
-            1. Environment variables created for dbt profiles, `profile_vars`.
+            1. If append_env is True, the current process environment.
             2. The Airflow context as environment variables.
-            3. System environment variables if dbt_args{"append_env": True}
-            4. User specified environment variables, through dbt_args{"vars": {"key": "val"}}
-        If a user accidentally uses a key that is found earlier in the determination order then it is overwritten.
+            3. The env parameter passed to the Operator
+
+        Note that this also filters out any invalid types that cannot be cast to strings.
         """
-        system_env = os.environ.copy()
-        env = self.env
-        if env is None:
-            env = system_env
-        elif self.append_env:
-            system_env.update(env)
-            env = system_env
+        env: dict[str, Any] = {}
+
+        if self.append_env:
+            env.update(os.environ)
+
+        # Airflow context as environment variables
         airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
-        self.log.debug(
-            "Exporting the following env vars:\n%s",
-            "\n".join(f"{k}={v}" for k, v in airflow_context_vars.items()),
-        )
-        combined_env = {**env, **airflow_context_vars, **profile_vars}
-        # Eventually the keys & values in the env dict get passed through os.fsencode which enforces this.
+        env.update(airflow_context_vars)
+
+        # env parameter passed to the Operator
+        if self.env and isinstance(self.env, dict):
+            env.update(self.env)
+
+        # filter out invalid types and give a warning when a value is removed
         accepted_types = (str, bytes, os.PathLike)
-        filtered_env = {
-            k: v for k, v in combined_env.items() if all((isinstance(k, accepted_types), isinstance(v, accepted_types)))
-        }
+
+        filtered_env: dict[str, str | bytes | os.PathLike] = {}
+
+        for key, val in env.items():
+            if isinstance(key, accepted_types) and isinstance(val, accepted_types):
+                filtered_env[key] = val
+            else:
+                if isinstance(key, accepted_types):
+                    logger.warning(
+                        "Env var %s was ignored because its key is not a valid type. Must be one of %s",
+                        key,
+                        accepted_types,
+                    )
+
+                if isinstance(val, accepted_types):
+                    logger.warning(
+                        "Env var %s was ignored because its value is not a valid type. Must be one of %s",
+                        key,
+                        accepted_types,
+                    )
 
         return filtered_env
 
@@ -199,7 +205,6 @@ class DbtBaseOperator(BaseOperator):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-        handle_profile: bool = True,
     ) -> Tuple[list[str], dict]:
         dbt_cmd = [self.dbt_executable_path]
         if isinstance(self.base_cmd, str):
@@ -210,17 +215,7 @@ class DbtBaseOperator(BaseOperator):
         # add command specific flags
         if cmd_flags:
             dbt_cmd.extend(cmd_flags)
-        # add profile
-        if handle_profile:
-            create_default_profiles(DBT_PROFILE_PATH)
-            profile, profile_vars = map_profile(
-                conn_id=self.conn_id,
-                db_override=self.db_name,
-                schema_override=self.schema,
-            )
-            dbt_cmd.extend(["--profile", profile])
-            # set env vars
-            env = self.get_env(context, profile_vars)
-            return dbt_cmd, env
 
-        return dbt_cmd, {}
+        env = self.get_env(context)
+
+        return dbt_cmd, env

@@ -24,6 +24,7 @@ def calculate_operator_class(
     execution_mode: str,
     dbt_class: str,
 ) -> str:
+    "Given an execution mode and dbt class, return the operator class to use"
     return f"cosmos.providers.dbt.core.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 
@@ -38,6 +39,7 @@ def render_project(
     test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
     emit_datasets: bool = True,
     conn_id: str = "default_conn_id",
+    profile_args: Dict[str, str] = {},
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
     execution_mode: Literal["local", "docker", "kubernetes"] = "local",
@@ -54,7 +56,8 @@ def render_project(
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-    :param conn_id: The Airflow connection ID to use in Airflow Datasets
+    :param conn_id: The Airflow connection ID to use
+    :param profile_args: Arguments to pass to the dbt profile
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
     :param execution_mode: The execution mode in which the dbt project should be run.
@@ -95,6 +98,11 @@ def render_project(
                 f"{set(select['paths']).intersection(exclude['paths'])}"
             )
 
+    # if task_args has a schema, add it to the profile args and add a deprecated warning
+    if "schema" in task_args:
+        profile_args["schema"] = task_args["schema"]
+        logger.warning("Specifying a schema in the task_args is deprecated. Please use the profile_args instead.")
+
     # iterate over each model once to create the initial tasks
     for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
         # filters down to a path within the project_dir
@@ -119,8 +127,18 @@ def render_project(
             if set(exclude["configs"]).intersection(model.config.config_selectors):
                 continue
 
-        run_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
-        test_args: Dict[str, Any] = {**task_args, **operator_args, "models": model_name}
+        run_args: Dict[str, Any] = {
+            **task_args,
+            **operator_args,
+            "models": model_name,
+            "profile_args": profile_args,
+        }
+        test_args: Dict[str, Any] = {
+            **task_args,
+            **operator_args,
+            "models": model_name,
+            "profile_args": profile_args,
+        }
         # DbtTestOperator specific arg
         test_args["on_warning_callback"] = on_warning_callback
         if emit_datasets:

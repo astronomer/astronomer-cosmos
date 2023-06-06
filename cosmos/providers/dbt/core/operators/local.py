@@ -5,7 +5,6 @@ import os
 import shutil
 import signal
 import tempfile
-from collections import namedtuple
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -17,8 +16,10 @@ from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
+from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
     FullOutputSubprocessHook,
+    FullOutputSubprocessResult,
 )
 from cosmos.providers.dbt.core.utils.warn_parsing import (
     extract_log_issues,
@@ -27,13 +28,13 @@ from cosmos.providers.dbt.core.utils.warn_parsing import (
 
 logger = logging.getLogger(__name__)
 
-FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
-
 
 class DbtLocalBaseOperator(DbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
+    :param profile_args: Arguments to pass to the profile. See
+        :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     """
@@ -47,9 +48,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self,
         install_deps: bool = False,
         callback: Optional[Callable[[str], None]] = None,
+        profile_args: dict[str, str] = {},
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
+        self.profile_args = profile_args
         self.callback = callback
         self.compiled_sql = ""
         super().__init__(**kwargs)
@@ -106,20 +109,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         ).delete()
         session.add(rtif)
 
-    def handle_profiles_yml(self, project_dir: str) -> None:
-        """
-        If there's a profiles.yml file in the project dir, remove it. Cosmos doesn't support
-        user-supplied profiles.yml files.
-        """
-        profiles_path = os.path.join(project_dir, "profiles.yml")
-        if os.path.exists(profiles_path):
-            logger.warning(
-                "Cosmos doesn't support user-supplied profiles.yml files. \
-                    Please use Airflow connections instead. \
-                    Ignoring profiles.yml…"
-            )
-            os.remove(profiles_path)
-
     def run_subprocess(self, *args, **kwargs):
         return self.subprocess_hook.run_command(*args, **kwargs)
 
@@ -146,7 +135,36 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 tmp_project_dir,
             )
 
-            self.handle_profiles_yml(tmp_project_dir)
+            # get the profile name from the dbt_project.yml file
+            dbt_project_path = os.path.join(tmp_project_dir, "dbt_project.yml")
+
+            # if there's no dbt_project.yml file, we're not in a dbt project
+            # and need to raise an error
+            if not os.path.exists(dbt_project_path):
+                raise AirflowException(
+                    f"dbt project directory {self.project_dir} does not contain a dbt_project.yml file."
+                )
+
+            with open(dbt_project_path, encoding="utf-8") as f:
+                dbt_project = yaml.safe_load(f)
+
+            profile_name = dbt_project.get("profile")
+
+            # need to write the profile to a file because dbt requires a profile file
+            # and doesn't accept a profile as a string
+            profile_mapping = get_profile_mapping(
+                conn_id=self.conn_id,
+                profile_args=self.profile_args,
+            )
+            profile_file_contents = profile_mapping.get_profile_file_contents(
+                profile_name=profile_name,
+            )
+            profile_file_path = os.path.join(tmp_project_dir, "profiles.yml")
+            with open(profile_file_path, "w", encoding="utf-8") as f:
+                f.write(profile_file_contents)
+
+            # we also need to get the env from the profile mapping
+            env.update(profile_mapping.env_vars)
 
             # if we need to install deps, do so
             if self.install_deps:
@@ -157,7 +175,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     cwd=tmp_project_dir,
                 )
 
-            logger.info(f"Trying to run the command:\n {cmd}\nFrom {tmp_project_dir}")
+            logger.info("Trying to run the command:\n %s\nFrom %s", cmd, tmp_project_dir)
 
             result = self.run_subprocess(
                 command=cmd,

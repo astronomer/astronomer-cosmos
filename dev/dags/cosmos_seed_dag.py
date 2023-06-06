@@ -38,15 +38,15 @@ with DAG(
                 macro_name="drop_table",
                 args={"table_name": seed},
                 project_dir=DBT_ROOT_PATH / "jaffle_shop",
-                schema="public",
                 conn_id="airflow_db",
+                profile_args={"schema": "public"},
             )
 
     jaffle_shop_seed = DbtSeedOperator(
         task_id="seed_jaffle_shop",
-        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
-        schema="public",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
+        profile_args={"schema": "public"},
         outlets=[Dataset("SEED://JAFFLE_SHOP")],
     )
 

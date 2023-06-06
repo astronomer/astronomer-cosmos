@@ -5,7 +5,6 @@
 
    Home <self>
    dbt <dbt/index>
-   API Reference <autoapi/index>
    Contributing <contributing>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
@@ -64,7 +63,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
         dbt_tg = DbtTaskGroup(
             dbt_project_name="jaffle_shop",
             conn_id="airflow_db",
-            dbt_args={
+            profile_args={
                 "schema": "public",
             },
         )

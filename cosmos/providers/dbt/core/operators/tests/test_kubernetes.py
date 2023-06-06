@@ -54,26 +54,12 @@ def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -
     p_context_to_airflow_vars.return_value = {"START_DATE": "2023-02-15 12:30:00"}
     env = dbt_kube_operator.get_env(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
-        profile_vars={
-            "SNOWFLAKE_USER": "my_user_id",
-            "SNOWFLAKE_PASSWORD": "supersecure123",
-            "SNOWFLAKE_ACCOUNT": "my_account",
-            "SNOWFLAKE_ROLE": None,
-            "SNOWFLAKE_DATABASE": "my_database",
-            "SNOWFLAKE_WAREHOUSE": None,
-            "SNOWFLAKE_SCHEMA": "jaffle_shop",
-        },
     )
     expected_env = {
         "start_date": "20220101",
         "end_date": "20220102",
         "some_path": Path(__file__),
         "START_DATE": "2023-02-15 12:30:00",
-        "SNOWFLAKE_USER": "my_user_id",
-        "SNOWFLAKE_PASSWORD": "supersecure123",
-        "SNOWFLAKE_ACCOUNT": "my_account",
-        "SNOWFLAKE_DATABASE": "my_database",
-        "SNOWFLAKE_SCHEMA": "jaffle_shop",
     }
     assert env == expected_env
 
@@ -122,7 +108,7 @@ def test_created_pod(test_hook):
     ls_kwargs = {"env_vars": {"FOO": "BAR"}}
     ls_kwargs.update(base_kwargs)
     ls_operator = DbtLSKubernetesOperator(**ls_kwargs)
-    ls_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+    ls_operator.build_kube_args(context={}, cmd_flags=MagicMock())
     pod_obj = ls_operator.build_pod_request_obj()
     expected_result = {
         "api_version": "v1",

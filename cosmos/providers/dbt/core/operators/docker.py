@@ -47,7 +47,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
         # This means that we don't have openlineage support, but we will create a ticket
         # to add that in the future
         self.dbt_executable_path = "dbt"
-        dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags, handle_profile=False)
+        dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         # set env vars
         self.environment = {**env_vars, **self.environment}
         self.command = dbt_cmd

@@ -60,7 +60,7 @@ with DAG(
         task_id="generate_dbt_docs_aws",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
-        schema="public",
+        profile_args={"schema": "public"},
         aws_conn_id=S3_CONN_ID,
         bucket_name="cosmos-docs",
     )
@@ -69,7 +69,7 @@ with DAG(
         task_id="generate_dbt_docs_azure",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         conn_id="airflow_db",
-        schema="public",
+        profile_args={"schema": "public"},
         azure_conn_id=AZURE_CONN_ID,
         container_name="$web",
     )

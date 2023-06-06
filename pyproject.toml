@@ -158,6 +158,15 @@ test = 'pytest -vv --durations=0 . -m "not integration"'
 test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 . -m "not integration"'
 test-integration = "pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+minversion = "6.0"
+markers = [
+    "integration"
+]
+
 ######################################
 # DOCS
 ######################################
@@ -168,7 +177,7 @@ dependencies = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-tabs",
-    "sphinx-autoapi"
+    "sphinx-autoapi",
 ]
 
 [tool.hatch.envs.docs.scripts]
@@ -188,12 +197,6 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
-
-[tool.pytest.ini_options]
-minversion = "6.0"
-markers = [
-    "integration"
-]
 
 [tool.ruff]
 line-length = 120

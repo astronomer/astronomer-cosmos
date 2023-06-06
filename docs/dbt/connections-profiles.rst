@@ -56,10 +56,7 @@ if you have macros or other code that depends on the profile name. For example, 
 
 .. code-block:: python
 
-    dag = DbtDag(
-        profile_name_override="my_profile_name",
-        ...
-    )
+    dag = DbtDag(profile_name_override="my_profile_name", ...)
 
 If no profile name is specified, and there's no profile target in the dbt_project.yml file, Cosmos will use the
 default profile name ``cosmos_profile``.

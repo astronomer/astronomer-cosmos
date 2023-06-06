@@ -15,6 +15,7 @@ def test_run_command(
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_execute,
 ):
     mock_get_connection.return_value = Connection(
         conn_id="fake_conn",

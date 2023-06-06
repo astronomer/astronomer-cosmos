@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -83,3 +83,36 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         "START_DATE": "2023-02-15 12:30:00",
     }
     assert env == expected_env
+
+
+@patch("os.path.exists")
+def test_get_profile_name(mock_os_path_exists) -> None:
+    mock_os_path_exists.return_value = True
+
+    # check that a user-specified profile name is returned when specified
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+        profile_name="default",
+    )
+    assert dbt_base_operator.get_profile_name("path/to/dir") == "default"
+
+    # check that the dbt_project profile name is returned when no user-specified profile name is specified
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    with patch("pathlib.Path.read_text") as mock_read_text:
+        mock_read_text.return_value = "profile: default"
+        assert dbt_base_operator.get_profile_name("path/to/dir") == "default"
+
+    # check that the default profile name is returned when no user-specified profile name is specified and no
+    # dbt_project profile name is specified
+    with patch("pathlib.Path.read_text") as mock_read_text:
+        mock_read_text.return_value = ""
+        assert dbt_base_operator.get_profile_name("path/to/dir") == "cosmos_profile"
+
+        mock_read_text.return_value = "other_config: other_value"
+        assert dbt_base_operator.get_profile_name("path/to/dir") == "cosmos_profile"

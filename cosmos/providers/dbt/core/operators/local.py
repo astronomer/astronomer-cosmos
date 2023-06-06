@@ -35,6 +35,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
+    :param profile_name: A name to use for the dbt profile. If not provided, and no profile target is found
+        in your project's dbt_project.yml, "cosmos_profile" is used.
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     """
@@ -49,11 +51,13 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         install_deps: bool = False,
         callback: Optional[Callable[[str], None]] = None,
         profile_args: dict[str, str] = {},
+        profile_name: str | None = None,
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
         self.profile_args = profile_args
         self.callback = callback
+        self.profile_name = profile_name
         self.compiled_sql = ""
         super().__init__(**kwargs)
 
@@ -112,6 +116,38 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def run_subprocess(self, *args, **kwargs):
         return self.subprocess_hook.run_command(*args, **kwargs)
 
+    def get_profile_name(self, project_dir: str) -> str:
+        """
+        Returns the profile name to use. Precedence is:
+        1. The profile name passed in to the operator
+        2. The profile name in the dbt_project.yml file
+        3. "cosmos_profile"
+        """
+        if self.profile_name:
+            return self.profile_name
+
+        # get the profile name from the dbt_project.yml file
+        dbt_project_path = os.path.join(project_dir, "dbt_project.yml")
+
+        # if there's no dbt_project.yml file, we're not in a dbt project
+        # and need to raise an error
+        if not os.path.exists(dbt_project_path):
+            raise AirflowException(f"dbt project directory {self.project_dir} does not contain a dbt_project.yml file.")
+
+        # get file contents using path
+        dbt_project = yaml.safe_load(Path(dbt_project_path).read_text(encoding="utf-8")) or {}
+
+        profile_name = dbt_project.get("profile", "cosmos_profile")
+
+        if not isinstance(profile_name, str):
+            raise AirflowException(
+                f"dbt project directory {self.project_dir} contains a dbt_project.yml file, but the profile "
+                f"specified in the file is not a string. Please specify a string profile name, or pass a profile "
+                f"name to the operator."
+            )
+
+        return profile_name
+
     def run_command(
         self,
         cmd: list[str],
@@ -135,20 +171,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 tmp_project_dir,
             )
 
-            # get the profile name from the dbt_project.yml file
-            dbt_project_path = os.path.join(tmp_project_dir, "dbt_project.yml")
-
-            # if there's no dbt_project.yml file, we're not in a dbt project
-            # and need to raise an error
-            if not os.path.exists(dbt_project_path):
-                raise AirflowException(
-                    f"dbt project directory {self.project_dir} does not contain a dbt_project.yml file."
-                )
-
-            with open(dbt_project_path, encoding="utf-8") as f:
-                dbt_project = yaml.safe_load(f)
-
-            profile_name = dbt_project.get("profile")
+            profile_name = self.get_profile_name(tmp_project_dir)
 
             # need to write the profile to a file because dbt requires a profile file
             # and doesn't accept a profile as a string

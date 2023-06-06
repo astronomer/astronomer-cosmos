@@ -46,6 +46,24 @@ secret values are passed to dbt as environment variables with the following nami
 For example, a Snowflake password field would be passed to dbt as an environment variable with the name
 ``COSMOS_CONN_SNOWFLAKE_PASSWORD``.
 
+Profile Name
+------------
+
+By default, Cosmos will use the dbt profile name specified in your project's dbt_project.yml file. However, you can
+override this by passing in a ``profile_name_override`` parameter to either ``DbtDag`` or ``DbtTaskGroup``. This is useful
+if you have macros or other code that depends on the profile name. For example, to ensure we always use the profile name
+``my_profile_name`` in the following example, we can pass in a ``profile_name_override`` parameter to ``DbtDag``:
+
+.. code-block:: python
+
+    dag = DbtDag(
+        profile_name_override="my_profile_name",
+        ...
+    )
+
+If no profile name is specified, and there's no profile target in the dbt_project.yml file, Cosmos will use the
+default profile name ``cosmos_profile``.
+
 
 Available Profile Mappings
 ==========================

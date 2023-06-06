@@ -25,6 +25,8 @@ class DbtTaskGroup(CosmosTaskGroup):
     :param dbt_seeds_dir: The path to the dbt seeds directory within the project
     :param conn_id: The Airflow connection ID to use for the dbt profile
     :param profile_args: Arguments to pass to the dbt profile
+    :param profile_name_override: A name to use for the dbt profile. If not provided, and no profile target is found
+        in your project's dbt_project.yml, "cosmos_profile" is used.
     :param dbt_args: Parameters to pass to the underlying dbt operators, can include dbt_executable_path to utilize venv
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
@@ -45,6 +47,7 @@ class DbtTaskGroup(CosmosTaskGroup):
         dbt_project_name: str,
         conn_id: str,
         profile_args: Dict[str, str] = {},
+        profile_name_override: Optional[str] = None,
         dbt_args: Dict[str, Any] = {},
         operator_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
@@ -79,6 +82,7 @@ class DbtTaskGroup(CosmosTaskGroup):
             emit_datasets=emit_datasets,
             conn_id=conn_id,
             profile_args=profile_args,
+            profile_name=profile_name_override,
             select=select,
             exclude=exclude,
             execution_mode=execution_mode,

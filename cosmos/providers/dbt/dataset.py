@@ -14,3 +14,6 @@ except ImportError:
 
         def __eq__(self, other) -> bool:
             return self.id == other.id
+
+
+__all__ = ["Dataset"]

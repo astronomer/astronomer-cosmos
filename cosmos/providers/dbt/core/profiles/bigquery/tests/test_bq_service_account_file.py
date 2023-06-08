@@ -23,7 +23,7 @@ def mock_bigquery_conn():  # type: ignore
     }
     conn = Connection(
         conn_id="my_bigquery_connection",
-        conn_type="google-cloud-platform",
+        conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
 
@@ -52,7 +52,7 @@ def test_connection_claiming() -> None:
         del values[key]
         conn = Connection(
             conn_id="my_bigquery_connection",
-            conn_type="google-cloud-platform",
+            conn_type="google_cloud_platform",
             extra=json.dumps(values),
         )
 
@@ -64,7 +64,7 @@ def test_connection_claiming() -> None:
     # also test when there's no schema
     conn = Connection(
         conn_id="my_bigquery_connection",
-        conn_type="google-cloud-platform",
+        conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
     profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
@@ -73,7 +73,7 @@ def test_connection_claiming() -> None:
     # if we have them all, it should claim
     conn = Connection(
         conn_id="my_bigquery_connection",
-        conn_type="google-cloud-platform",
+        conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
     profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})

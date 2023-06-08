@@ -83,7 +83,7 @@ In this case, users are responsible for declaring which version of ``dbt`` they 
 Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating
 a ``dbt`` profile file (``profiles.yml``).
 
-A drawback with this approach is that it is slower than ``local`` because it creates a new Python virtual environment for each Cosmos Dbt task run.
+A drawback with this approach is that it is slower than ``local`` because it creates a new Python virtual environment for each Cosmos dbt task run.
 
 Example of how to use:
 

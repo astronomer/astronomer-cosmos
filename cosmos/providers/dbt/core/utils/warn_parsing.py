@@ -7,7 +7,7 @@ from airflow.hooks.subprocess import SubprocessResult
 
 def parse_output(result: SubprocessResult, keyword: str) -> int:
     """
-    Parses the DBT test output message and returns the number of errors or warnings.
+    Parses the dbt test output message and returns the number of errors or warnings.
 
     :param result: String containing the output to be parsed.
     :param keyword: String representing the keyword to search for in the output (WARN, ERROR).
@@ -35,10 +35,10 @@ def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
     """
     Extracts warning messages from the log list and returns them as a formatted string.
 
-    This function searches for warning messages in DBT test. It reverses the log list for performance
+    This function searches for warning messages in dbt test. It reverses the log list for performance
     improvement. It extracts and formats the relevant information and appends it to a list of warnings.
 
-    :param log_list: List of strings, where each string is a log line from DBT test.
+    :param log_list: List of strings, where each string is a log line from dbt test.
     :return: two lists of strings, the first one containing the test names and the second one
         containing the test results.
     """

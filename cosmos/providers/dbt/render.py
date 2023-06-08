@@ -189,7 +189,7 @@ def render_project(
             )
         else:
             # TODO: coverme
-            logger.error("Unknown DBT type.")
+            logger.error("Unknown dbt type.")
             continue
 
         # if test_behavior isn't "after_each", we can just add the task to the

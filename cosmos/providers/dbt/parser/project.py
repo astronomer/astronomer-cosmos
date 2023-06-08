@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class DbtModelType(Enum):
     """
-    Represents type of DBT unit (model, snapshot, seed)
+    Represents type of dbt unit (model, snapshot, seed)
     """
 
     DBT_MODEL = 1

@@ -14,7 +14,7 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
     https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
 
-    airflow_connection_type: str = "google-cloud-platform"
+    airflow_connection_type: str = "google_cloud_platform"
 
     required_fields = [
         "project",

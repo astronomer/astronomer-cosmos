@@ -116,3 +116,14 @@ def test_get_profile_name(mock_os_path_exists) -> None:
 
         mock_read_text.return_value = "other_config: other_value"
         assert dbt_base_operator.get_profile_name("path/to/dir") == "cosmos_profile"
+
+    # test that we raise an AirflowException if the profile argument is not a string
+    with patch("pathlib.Path.read_text") as mock_read_text:
+        mock_read_text.return_value = "profile:\n  my_key: my_value"
+        with pytest.raises(AirflowException):
+            dbt_base_operator.get_profile_name("path/to/dir")
+
+    # test that we raise an AirflowException if there's no dbt_project.yml file
+    mock_os_path_exists.return_value = False
+    with pytest.raises(AirflowException):
+        dbt_base_operator.get_profile_name("path/to/dir")

@@ -15,6 +15,7 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
+from cosmos.providers.dbt.constants import DEFAULT_DBT_PROFILE_NAME
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
@@ -137,7 +138,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         # get file contents using path
         dbt_project = yaml.safe_load(Path(dbt_project_path).read_text(encoding="utf-8")) or {}
 
-        profile_name = dbt_project.get("profile", "cosmos_profile")
+        profile_name = dbt_project.get("profile", DEFAULT_DBT_PROFILE_NAME)
 
         if not isinstance(profile_name, str):
             raise AirflowException(

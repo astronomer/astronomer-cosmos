@@ -11,7 +11,7 @@ from packaging.version import Version
 
 from . import utils as test_utils
 
-EXAMPLE_DAGS_DIR = Path(__file__).parent.parent.parent / "dev/dags"
+EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 EXAMPLE_CONN_FILE = Path(__file__).parent / "test-connections.yaml"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 

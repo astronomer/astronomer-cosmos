@@ -1,4 +1,3 @@
 [run]
 omit =
-        */test_*
-        cosmos/tests/utils.py
+        tests/*

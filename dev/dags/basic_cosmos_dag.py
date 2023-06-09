@@ -20,6 +20,7 @@ basic_cosmos_dag = DbtDag(
     profile_args={
         "schema": "public",
     },
+    profile_name_override="airflow",
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

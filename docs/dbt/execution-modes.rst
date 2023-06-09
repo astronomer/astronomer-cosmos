@@ -75,8 +75,7 @@ If you're using managed Airflow on GCP (Cloud Composer), for instance,
 we recommend you use the ``virtualenv`` execution mode.
 
 The ``virtualenv`` mode isolates the Airflow worker dependencies from ``dbt`` by managing a Python virtual environment created
-during task execution and deleted afterwards. In this case, users are responsible for declaring which version of ``dbt`` they
-want to use using the argument ``py_requirements``.
+during task execution and deleted afterwards.
 
 In this case, users are responsible for declaring which version of ``dbt`` they want to use by giving the argument ``py_requirements``. This argument can be set directly in operator instances or when instantiating ``DbtDag`` and ``DbtTaskGroup`` as part of ``operator_args``.
 

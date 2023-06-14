@@ -21,6 +21,7 @@ basic_cosmos_dag = DbtDag(
         "schema": "public",
     },
     profile_name_override="airflow",
+    target_name_override="dev_target",
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

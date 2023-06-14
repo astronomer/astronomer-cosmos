@@ -43,6 +43,7 @@ def render_project(
     conn_id: str = "default_conn_id",
     profile_args: Dict[str, str] = {},
     profile_name: str | None = None,
+    target_name: str | None = None,
     select: Dict[str, List[str]] = {},
     exclude: Dict[str, List[str]] = {},
     execution_mode: Literal["local", "docker", "kubernetes"] = "local",
@@ -63,6 +64,7 @@ def render_project(
     :param profile_args: Arguments to pass to the dbt profile
     :param profile_name: A name to use for the dbt profile. If not provided, and no profile target is found
         in your project's dbt_project.yml, "cosmos_profile" is used.
+    :param target_name: A name to use for the dbt target. If not provided, "cosmos_target" is used.
     :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
     :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2]}})
     :param execution_mode: The execution mode in which the dbt project should be run.
@@ -138,6 +140,7 @@ def render_project(
             "models": model_name,
             "profile_args": profile_args,
             "profile_name": profile_name,
+            "target_name": target_name,
         }
         test_args: Dict[str, Any] = {
             **task_args,
@@ -145,6 +148,7 @@ def render_project(
             "models": model_name,
             "profile_args": profile_args,
             "profile_name": profile_name,
+            "target_name": target_name,
         }
         # DbtTestOperator specific arg
         test_args["on_warning_callback"] = on_warning_callback

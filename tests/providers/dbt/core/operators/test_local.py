@@ -127,3 +127,23 @@ def test_get_profile_name(mock_os_path_exists) -> None:
     mock_os_path_exists.return_value = False
     with pytest.raises(AirflowException):
         dbt_base_operator.get_profile_name("path/to/dir")
+
+
+def test_get_target_name() -> None:
+    # when a user specifies a target name, it should be returned
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+        target_name="default",
+    )
+    assert dbt_base_operator.get_target_name() == "default"
+
+    # when a user does not specify a target name, the default target name should be returned
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+
+    assert dbt_base_operator.get_target_name() == "cosmos_target"

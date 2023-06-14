@@ -61,6 +61,18 @@ if you have macros or other code that depends on the profile name. For example, 
 If no profile name is specified, and there's no profile target in the dbt_project.yml file, Cosmos will use the
 default profile name ``cosmos_profile``.
 
+Target Name
+-----------
+
+By default, Cosmos will use the target name ``cosmos_target``. However, you can override this by passing in a
+``target_name_override`` parameter to either ``DbtDag`` or ``DbtTaskGroup``. This is useful if you have macros or other
+code that depends on the target name. For example, to ensure we always use the target name ``my_target_name`` in the
+following example, we can pass in a ``target_name_override`` parameter to ``DbtDag``:
+
+.. code-block:: python
+
+    dag = DbtDag(target_name_override="my_target_name", ...)
+
 
 Available Profile Mappings
 ==========================

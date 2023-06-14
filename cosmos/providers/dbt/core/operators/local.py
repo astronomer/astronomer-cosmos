@@ -15,7 +15,7 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
-from cosmos.providers.dbt.constants import DEFAULT_DBT_PROFILE_NAME
+from cosmos.providers.dbt.constants import DEFAULT_DBT_PROFILE_NAME, DEFAULT_DBT_TARGET_NAME
 from cosmos.providers.dbt.core.operators.base import DbtBaseOperator
 from cosmos.providers.dbt.core.profiles import get_profile_mapping
 from cosmos.providers.dbt.core.utils.adapted_subprocesshook import (
@@ -53,12 +53,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         callback: Optional[Callable[[str], None]] = None,
         profile_args: dict[str, str] = {},
         profile_name: str | None = None,
+        target_name: str | None = None,
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
         self.profile_args = profile_args
         self.callback = callback
         self.profile_name = profile_name
+        self.target_name = target_name
         self.compiled_sql = ""
         super().__init__(**kwargs)
 
@@ -149,6 +151,17 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
         return profile_name
 
+    def get_target_name(self) -> str:
+        """
+        Returns the target name to use. Precedence is:
+        1. The target name passed in to the operator
+        2. "cosmos_target"
+        """
+        if self.target_name:
+            return self.target_name
+
+        return DEFAULT_DBT_TARGET_NAME
+
     def run_command(
         self,
         cmd: list[str],
@@ -173,6 +186,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
 
             profile_name = self.get_profile_name(tmp_project_dir)
+            target_name = self.get_target_name()
 
             # need to write the profile to a file because dbt requires a profile file
             # and doesn't accept a profile as a string
@@ -182,6 +196,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             )
             profile_file_contents = profile_mapping.get_profile_file_contents(
                 profile_name=profile_name,
+                target_name=target_name,
             )
             profile_file_path = os.path.join(tmp_project_dir, "profiles.yml")
             with open(profile_file_path, "w", encoding="utf-8") as f:
@@ -202,7 +217,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             logger.info("Trying to run the command:\n %s\nFrom %s", cmd, tmp_project_dir)
 
             result = self.run_subprocess(
-                command=cmd + ["--profile", profile_name],
+                command=cmd + ["--profile", profile_name, "--target", target_name],
                 env=env,
                 output_encoding=self.output_encoding,
                 cwd=tmp_project_dir,

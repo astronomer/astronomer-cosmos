@@ -1,0 +1,13 @@
+example_profile:
+  target: cosmos_astronomer
+  outputs:
+    dev:
+      type:
+      account:
+      user:
+      password:
+      role:
+      database:
+      warehouse:
+      schema:
+      threads: 1

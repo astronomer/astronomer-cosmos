@@ -73,3 +73,7 @@ class DbtProject:
 
         manifest: Manifest = res.result
         self.manifest = manifest
+        if manifest is None:
+            raise Exception("Manifest is None", self.project_dir.as_posix(), res)
+        logger.info("Runner", runner)
+        logger.info("manifest", manifest)

@@ -41,7 +41,6 @@ def build_map(manifest: Manifest, select: str | None) -> dict:
     # TODO: deal with snapshots and seed
     """
     runner = dbtRunner()
-    logger.info("Building map of dbt project", runner)
     select = select or ""
     command = (
         "ls --resource-type model snapshot seed test --output json --output-keys unique_id resource_type" + " " + select
@@ -120,9 +119,6 @@ def render_project(
         dbt_root_path=dbt_root_path,
         project_name=dbt_project_name,
     )
-
-    logger.info("dbt project", project)
-    logger.info("manifest", project.manifest)
     # add project_dir arg to task_args
     if execution_mode == "local":
         task_args["project_dir"] = project.project_dir

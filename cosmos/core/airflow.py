@@ -18,31 +18,53 @@ class CosmosDag(DAG):
 
     def __init__(
         self,
-        cosmos_group: Group,
+        models: dict,
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        # TODO: handle this
         # if the user doesn't specify a dag_id, use the entity id
-        if "dag_id" not in kwargs:
-            kwargs["dag_id"] = cosmos_group.id
+        # if "dag_id" not in kwargs:
+        #     kwargs["dag_id"] = cosmos_group.id
 
         super().__init__(*args, **kwargs)
 
-        entities: Dict[str, Any] = {}
+        # loop through the models and create a group for each one
+        # TODO: doesn't need to be a dict
+        for model in models.values():
+            model_task_group = TaskGroup(group_id=model.name, dag=self)
+            # create a task for each model
+            model_run_task = get_airflow_task(
+                task=model.task,
+                dag=self,
+                task_group=model_task_group,
+            )
+            # create a task group if there are tests
+            if model.tests:
+                test_task_group = TaskGroup(
+                    group_id=f"{model.name}_tests",
+                    dag=self,
+                )
+                # create a task for each test
+                for test in model.tests:
+                    test_task = get_airflow_task(
+                        task=test.task,
+                        dag=self,
+                        task_group=test_task_group,
+                    )
+                    # create dependencies between the model and the tests
+                    model_run_task >> test_task
 
-        # render all the entities in the group
-        for ent in cosmos_group.entities:
-            if isinstance(ent, Group):
-                entities[ent.id] = CosmosTaskGroup(cosmos_group=ent, dag=self)
-            elif isinstance(ent, Task):
-                entities[ent.id] = get_airflow_task(task=ent, dag=self)
-
-        # add dependencies
-        for ent in cosmos_group.entities:
-            for upstream_id in ent.upstream_entity_ids:
-                entities[upstream_id] >> entities[ent.id]
+                    # create downstream dependencies
+                    for child in model.child_models:
+                        test_task >> child.task
+            else:
+                # create downstream dependencies
+                for child in model.child_models:
+                    model_run_task >> child.task
 
 
+# TODO: handle this
 class CosmosTaskGroup(TaskGroup):
     """
     Render a Group as an Airflow TaskGroup. Subclass of Airflow TaskGroup.

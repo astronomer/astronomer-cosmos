@@ -8,7 +8,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from cosmos.core.airflow import CosmosTaskGroup
 
@@ -56,12 +56,8 @@ class DbtTaskGroup(CosmosTaskGroup):
         operator_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dags/dbt",
-        dbt_models_dir: str = "models",
-        dbt_snapshots_dir: str = "snapshots",
-        dbt_seeds_dir: str = "seeds",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
-        select: Dict[str, List[str]] = {},
-        exclude: Dict[str, List[str]] = {},
+        select: str = "",
         execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
@@ -77,9 +73,6 @@ class DbtTaskGroup(CosmosTaskGroup):
         group = render_project(
             dbt_project_name=dbt_project_name,
             dbt_root_path=dbt_root_path,
-            dbt_models_dir=dbt_models_dir,
-            dbt_snapshots_dir=dbt_snapshots_dir,
-            dbt_seeds_dir=dbt_seeds_dir,
             task_args=dbt_args,
             operator_args=operator_args,
             test_behavior=test_behavior,
@@ -89,7 +82,6 @@ class DbtTaskGroup(CosmosTaskGroup):
             profile_name=profile_name_override,
             target_name=target_name_override,
             select=select,
-            exclude=exclude,
             execution_mode=execution_mode,
             on_warning_callback=on_warning_callback,
         )

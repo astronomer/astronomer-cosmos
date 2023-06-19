@@ -8,7 +8,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from cosmos.core.airflow import CosmosDag
 
@@ -22,8 +22,6 @@ class DbtDag(CosmosDag):
 
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The path to the dbt root directory
-    :param dbt_models_dir: The path to the dbt models directory within the project
-    :param dbt_seeds_dir: The path to the dbt seeds directory within the project
     :param conn_id: The Airflow connection ID to use for the dbt profile
     :param profile_args: Arguments to pass to the dbt profile
     :param profile_name_override: A name to use for the dbt profile. If not provided, and no profile target is found
@@ -35,8 +33,7 @@ class DbtDag(CosmosDag):
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
-    :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
-    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2"]})
+    :param select: TODO
     :param execution_mode: The execution mode in which the dbt project should be run.
         Options are "local", "virtualenv", "docker", and "kubernetes".
         Defaults to "local"
@@ -54,12 +51,8 @@ class DbtDag(CosmosDag):
         target_name_override: str | None = None,
         operator_args: Dict[str, Any] = {},
         emit_datasets: bool = True,
-        dbt_root_path: str = "/usr/local/airflow/dags/dbt",
-        dbt_models_dir: str = "models",
-        dbt_seeds_dir: str = "seeds",
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
-        select: Dict[str, List[str]] = {},
-        exclude: Dict[str, List[str]] = {},
+        select: str | None = None,
         execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
@@ -72,11 +65,8 @@ class DbtDag(CosmosDag):
         }
 
         # get the group of the dbt project
-        group = render_project(
+        models = render_project(
             dbt_project_name=dbt_project_name,
-            dbt_root_path=dbt_root_path,
-            dbt_models_dir=dbt_models_dir,
-            dbt_seeds_dir=dbt_seeds_dir,
             task_args=dbt_args,
             operator_args=operator_args,
             test_behavior=test_behavior,
@@ -86,10 +76,9 @@ class DbtDag(CosmosDag):
             profile_name=profile_name_override,
             target_name=target_name_override,
             select=select,
-            exclude=exclude,
             execution_mode=execution_mode,
             on_warning_callback=on_warning_callback,
         )
 
         # call the airflow DAG constructor
-        super().__init__(group, *args, **kwargs)
+        super().__init__(models, *args, **kwargs)

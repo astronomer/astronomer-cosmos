@@ -20,7 +20,7 @@ from sqlalchemy.orm.session import Session
 log = logging.getLogger(__name__)
 
 
-def run_dag(dag: DAG, conn_file_path: str) -> DagRun:
+def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
     return test_dag(dag=dag, conn_file_path=conn_file_path)
 
 

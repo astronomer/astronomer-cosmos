@@ -36,6 +36,20 @@ It is also possible to run the tests using all the matrix combinations, by using
 
     hatch run tests:test-cov
 
+The integration tests rely on Postgres. It is possible to host Postgres by using Docker, for example:
+
+.. code-block:: bash
+
+    docker run --name postgres -p 5432:5432 -p 5433:5433 -e POSTGRES_PASSWORD=postgres postgres
+
+To run the integration tests, use:
+
+.. code-block:: bash
+
+    export AIRFLOW_HOME=`pwd`
+    export AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres
+    hatch run tests.py3.8-2.5:test-integration
+
 
 Using Tilt for local development
 ________________________________

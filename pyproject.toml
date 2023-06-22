@@ -91,6 +91,7 @@ docs =[
     "sphinx-autoapi"
 ]
 tests = [
+    "dbt-postgres",
     "packaging",
     "pytest>=6.0",
     "pytest-split",

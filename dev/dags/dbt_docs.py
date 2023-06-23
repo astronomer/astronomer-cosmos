@@ -16,7 +16,7 @@ from airflow.exceptions import AirflowNotFoundException
 from airflow.decorators import task
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators import (
+from cosmos.operators import (
     DbtDocsAzureStorageOperator,
     DbtDocsS3Operator,
 )

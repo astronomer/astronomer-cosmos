@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos.providers.dbt.dag import DbtDag
+from cosmos.dag import DbtDag
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))

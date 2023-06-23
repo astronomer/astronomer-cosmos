@@ -178,3 +178,13 @@ def test_dbtmodelconfig_extract_config_with_kwarg_str():
     computed = dbt_model._extract_config(kwarg, config_name)
     expected = ["some_conf:abc"]
     assert computed == expected
+
+
+def test_dbtmodelconfig_with_sources(tmp_path):
+    model_sql = SAMPLE_MODEL_SQL_PATH.read_text()
+    model_with_sources_sql = model_sql.replace("ref('stg_customers')", "source('sample_source', 'stg_customers')")
+    path_with_sources = tmp_path / "customers_with_sources.sql"
+    path_with_sources.write_text(model_with_sources_sql)
+
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=path_with_sources)
+    assert "sample_source" not in dbt_model.config.upstream_models

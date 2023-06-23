@@ -27,7 +27,7 @@ Install the package using pip:
     pip install astronomer-cosmos[dbt-all]
 
 
-Create a DAG and import the :class:`cosmos.providers.dbt.DbtTaskGroup` class. The ``DbtTaskGroup`` operator requires a the name of your dbt project, an Airflow connection ID, a schema, and any additional arguments you'd like to pass to dbt.
+Create a DAG and import the :class:`cosmos.DbtTaskGroup` class. The ``DbtTaskGroup`` operator requires a the name of your dbt project, an Airflow connection ID, a schema, and any additional arguments you'd like to pass to dbt.
 
 .. code-block:: python
 
@@ -35,7 +35,7 @@ Create a DAG and import the :class:`cosmos.providers.dbt.DbtTaskGroup` class. Th
 
     from airflow import DAG
     from airflow.operators.empty import EmptyOperator
-    from cosmos.providers.dbt.task_group import DbtTaskGroup
+    from cosmos.task_group import DbtTaskGroup
 
 
     with DAG(

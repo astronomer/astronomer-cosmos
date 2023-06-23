@@ -149,9 +149,14 @@ matrix.airflow.dependencies = [
 freeze = "pip freeze"
 test = 'pytest -vv --durations=0 . -m "not integration"'
 test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration"'
-# we need to install using the follow to avoid newer versions of pip checks, e.g.:
+# we install using the following workaround to overcome installation conflicts, such as:
 # apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
-test-integration = "rm airflow.*; pip install dbt-postgres; airflow db init; pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"
+test-integration = """\
+pip uninstall dbt-postgres; \
+rm -rf airflow.*; \
+airflow db init; \
+pip install dbt-postgres; \
+pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
 
 [tool.pytest.ini_options]
 filterwarnings = [

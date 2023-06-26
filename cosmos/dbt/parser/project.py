@@ -132,7 +132,7 @@ class DbtModel:
         for base_node in ast.find_all(jinja2.nodes.Call):
             if hasattr(base_node.node, "name"):
                 # check we have a ref - this indicates a dependency
-                if base_node.node.name == "ref" or base_node.node.name == "source":
+                if base_node.node.name == "ref":
                     # if it is, get the first argument
                     first_arg = base_node.args[0]
                     if isinstance(first_arg, jinja2.nodes.Const):

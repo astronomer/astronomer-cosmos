@@ -84,7 +84,7 @@ Google Cloud Platform
 Service Account File
 ~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.bigquery.GoogleCloudServiceAccountFileProfileMapping
+.. autoclass:: cosmos.profiles.bigquery.GoogleCloudServiceAccountFileProfileMapping
     :undoc-members:
     :members:
 
@@ -95,7 +95,7 @@ Databricks
 Token
 ~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.databricks.DatabricksTokenProfileMapping
+.. autoclass:: cosmos.profiles.databricks.DatabricksTokenProfileMapping
     :undoc-members:
     :members:
 
@@ -106,7 +106,7 @@ Exasol
 Username and Password
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.exasol.ExasolUserPasswordProfileMapping
+.. autoclass:: cosmos.profiles.exasol.ExasolUserPasswordProfileMapping
     :undoc-members:
     :members:
 
@@ -117,7 +117,7 @@ Postgres
 Username and Password
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.postgres.PostgresUserPasswordProfileMapping
+.. autoclass:: cosmos.profiles.postgres.PostgresUserPasswordProfileMapping
     :undoc-members:
     :members:
 
@@ -128,7 +128,7 @@ Redshift
 Username and Password
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.redshift.RedshiftUserPasswordProfileMapping
+.. autoclass:: cosmos.profiles.redshift.RedshiftUserPasswordProfileMapping
     :undoc-members:
     :members:
 
@@ -139,7 +139,7 @@ Snowflake
 Username and Password
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.snowflake.SnowflakeUserPasswordProfileMapping
+.. autoclass:: cosmos.profiles.snowflake.SnowflakeUserPasswordProfileMapping
     :undoc-members:
     :members:
 
@@ -150,7 +150,7 @@ Spark
 Thrift
 ~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.spark.SparkThriftProfileMapping
+.. autoclass:: cosmos.profiles.spark.SparkThriftProfileMapping
     :undoc-members:
     :members:
 
@@ -161,7 +161,7 @@ Trino
 Base
 ~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.trino.TrinoBaseProfileMapping
+.. autoclass:: cosmos.profiles.trino.TrinoBaseProfileMapping
     :undoc-members:
     :members:
 
@@ -169,7 +169,7 @@ Base
 LDAP
 ~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.trino.TrinoLDAPProfileMapping
+.. autoclass:: cosmos.profiles.trino.TrinoLDAPProfileMapping
     :undoc-members:
     :members:
     :show-inheritance:
@@ -178,7 +178,7 @@ LDAP
 JWT
 ~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.trino.TrinoJWTProfileMapping
+.. autoclass:: cosmos.profiles.trino.TrinoJWTProfileMapping
     :undoc-members:
     :members:
     :show-inheritance:
@@ -186,7 +186,7 @@ JWT
 Certificate
 ~~~~~~~~~~~
 
-.. autoclass:: cosmos.providers.dbt.core.profiles.trino.TrinoCertificateProfileMapping
+.. autoclass:: cosmos.profiles.trino.TrinoCertificateProfileMapping
     :undoc-members:
     :members:
     :show-inheritance:

@@ -8,7 +8,7 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos.providers.dbt.task_group import DbtTaskGroup
+from cosmos.task_group import DbtTaskGroup
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)

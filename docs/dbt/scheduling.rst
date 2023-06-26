@@ -10,7 +10,7 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag
+    from cosmos import DbtDag
 
     jaffle_shop = DbtDag(
         # ...
@@ -38,7 +38,7 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag, get_dbt_dataset
+    from cosmos import DbtDag, get_dbt_dataset
 
     project_one = DbtDag(
         # ...

@@ -17,7 +17,7 @@ from airflow.datasets import Dataset
 from airflow.utils.task_group import TaskGroup
 from pendulum import datetime
 
-from cosmos.providers.dbt.core.operators import DbtRunOperationOperator, DbtSeedOperator
+from cosmos.operators import DbtRunOperationOperator, DbtSeedOperator
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))

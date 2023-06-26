@@ -3,7 +3,7 @@ Usage
 
 Cosmos supports two standard way of rendering dbt projects: either as a full DAG or as a Task Group.
 
-By default, Cosmos will look in the ``/usr/local/airflow/dags/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.providers.dbt.DbtDag` or :class:`cosmos.providers.dbt.DbtTaskGroup`. You can also override the default models directory, which is ``"models"`` by default, using the ``dbt_models_dir`` argument.
+By default, Cosmos will look in the ``/usr/local/airflow/dags/dbt`` directory (next to the ``dags`` folder if you're using the `Astro CLI <https://github.com/astronomer/astro-cli>`_). You can override this using the ``dbt_root_path`` argument in either :class:`cosmos.DbtDag` or :class:`cosmos.DbtTaskGroup`. You can also override the default models directory, which is ``"models"`` by default, using the ``dbt_models_dir`` argument.
 
 Rendering
 ---------
@@ -11,11 +11,11 @@ Rendering
 Full DAG
 ++++++++
 
-The :class:`cosmos.providers.dbt.DbtDag` class can be used to render a full DAG for a dbt project. This is useful if you want to run all of the dbt models in a project as a single DAG.
+The :class:`cosmos.DbtDag` class can be used to render a full DAG for a dbt project. This is useful if you want to run all of the dbt models in a project as a single DAG.
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag
+    from cosmos import DbtDag
 
     jaffle_shop = DbtDag(
         dbt_project_name="jaffle_shop",
@@ -30,7 +30,7 @@ The :class:`cosmos.providers.dbt.DbtDag` class can be used to render a full DAG 
 Task Group
 ++++++++++
 
-The :class:`cosmos.providers.dbt.DbtTaskGroup` class can be used to render a task group for a dbt project. This is useful if you want to run your dbt models in a project as a single task group, and include other non-dbt tasks in your DAG (e.g., extracting and loading data).
+The :class:`cosmos.DbtTaskGroup` class can be used to render a task group for a dbt project. This is useful if you want to run your dbt models in a project as a single task group, and include other non-dbt tasks in your DAG (e.g., extracting and loading data).
 
 .. code-block:: python
 
@@ -38,7 +38,7 @@ The :class:`cosmos.providers.dbt.DbtTaskGroup` class can be used to render a tas
 
     from airflow import DAG
     from airflow.operators.empty import EmptyOperator
-    from cosmos.providers.dbt.task_group import DbtTaskGroup
+    from cosmos.task_group import DbtTaskGroup
 
 
     with DAG(

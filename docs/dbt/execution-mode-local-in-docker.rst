@@ -35,7 +35,7 @@ To install dbt into a virtual environment on an Airflow Docker Image, you can us
 .. code-block:: python
 
     import os
-    from cosmos.providers.dbt import DbtTaskGroup
+    from cosmos import DbtTaskGroup
 
     tg = DbtTaskGroup(
         # ...

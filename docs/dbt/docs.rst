@@ -7,9 +7,9 @@ Many users choose to generate and serve these docs on a static website. This is 
 
 Cosmos offers two pre-built ways of generating and uploading dbt docs and a fallback option to run custom code after the docs are generated:
 
-- :class:`~cosmos.providers.dbt.core.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
-- :class:`~cosmos.providers.dbt.core.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
-- :class:`~cosmos.providers.dbt.core.operators.DbtDocsOperator`: generates docs and runs a custom callback.
+- :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
+- :class:`~cosmos.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
+- :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
 
 The first two operators require you to have a connection to the target storage. The third operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
 
@@ -22,11 +22,11 @@ Upload to S3
 
 S3 supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official documentation <https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteHosting.html>`_.
 
-You can use the :class:`~cosmos.providers.dbt.core.operators.DbtDocsS3Operator` to generate and upload docs to a S3 bucket. The following code snippet shows how to do this with the default jaffle_shop project:
+You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upload docs to a S3 bucket. The following code snippet shows how to do this with the default jaffle_shop project:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt.core.operators import DbtDocsS3Operator
+    from cosmos.operators import DbtDocsS3Operator
 
     # then, in your DAG code:
     generate_dbt_docs_aws = DbtDocsS3Operator(
@@ -43,11 +43,11 @@ Upload to Azure Blob Storage
 
 Azure Blob Storage supports serving static files directly from a container. To learn more (and to set it up), check out the `official documentation <https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website>`_.
 
-You can use the :class:`~cosmos.providers.dbt.core.operators.DbtDocsAzureStorageOperator` to generate and upload docs to an Azure Blob Storage. The following code snippet shows how to do this with the default jaffle_shop project:
+You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to generate and upload docs to an Azure Blob Storage. The following code snippet shows how to do this with the default jaffle_shop project:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt.core.operators import DbtDocsAzureStorageOperator
+    from cosmos.operators import DbtDocsAzureStorageOperator
 
     # then, in your DAG code:
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
@@ -62,11 +62,11 @@ You can use the :class:`~cosmos.providers.dbt.core.operators.DbtDocsAzureStorage
 Custom Callback
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-If you want to run custom code after the docs are generated, you can use the :class:`~cosmos.providers.dbt.core.operators.DbtDocsOperator`. The following code snippet shows how to do this with the default jaffle_shop project:
+If you want to run custom code after the docs are generated, you can use the :class:`~cosmos.operators.DbtDocsOperator`. The following code snippet shows how to do this with the default jaffle_shop project:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt.core.operators import DbtDocsOperator
+    from cosmos.operators import DbtDocsOperator
 
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 

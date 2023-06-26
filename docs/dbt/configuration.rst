@@ -16,7 +16,7 @@ Example:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtTaskGroup
+    from cosmos import DbtTaskGroup
 
     jaffle_shop = DbtTaskGroup(
         # ...
@@ -39,7 +39,7 @@ For example, the following code snippet shows how to send a Slack message when a
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag
+    from cosmos import DbtDag
     from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
     from airflow.utils.context import Context
 
@@ -103,7 +103,7 @@ Examples:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag
+    from cosmos import DbtDag
 
     jaffle_shop = DbtDag(
         # ...
@@ -112,7 +112,7 @@ Examples:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag
+    from cosmos import DbtDag
 
     jaffle_shop = DbtDag(
         # ...
@@ -121,7 +121,7 @@ Examples:
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtDag
+    from cosmos import DbtDag
 
     jaffle_shop = DbtDag(
         # ...

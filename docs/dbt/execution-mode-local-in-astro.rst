@@ -28,7 +28,7 @@ The step-by-step is detailed below.
 
 .. code-block:: python
 
-    from cosmos.providers.dbt import DbtTaskGroup
+    from cosmos import DbtTaskGroup
 
     tg = DbtTaskGroup(
         # ...

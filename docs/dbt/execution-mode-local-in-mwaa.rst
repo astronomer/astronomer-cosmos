@@ -35,7 +35,7 @@ the ``dbt_executable_path`` argument.
 .. code-block:: python
 
     import os
-    from cosmos.providers.dbt import DbtTaskGroup
+    from cosmos import DbtTaskGroup
 
     tg = DbtTaskGroup(
         # ...

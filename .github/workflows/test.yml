@@ -75,6 +75,7 @@ jobs:
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-setup
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
 
       - name: Upload coverage to Codecov

@@ -42,12 +42,18 @@ The integration tests rely on Postgres. It is possible to host Postgres by using
 
     docker run --name postgres -p 5432:5432 -p 5433:5433 -e POSTGRES_PASSWORD=postgres postgres
 
-To run the integration tests, use:
+To run the integration tests for the first time, use:
 
 .. code-block:: bash
 
     export AIRFLOW_HOME=`pwd`
     export AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres
+    hatch run tests.py3.8-2.5:test-integration-setup
+    hatch run tests.py3.8-2.5:test-integration
+
+If testing for the same Airflow and Python version, next runs of the integration tests can be:
+
+.. code-block:: bash
     hatch run tests.py3.8-2.5:test-integration
 
 

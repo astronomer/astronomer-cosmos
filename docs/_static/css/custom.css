@@ -215,7 +215,7 @@ pre {
   border-radius: var(--bs-border-radius-sm);
 }
 
-blockquote div[class^="highlight-"] { 
+blockquote div[class^="highlight-"] {
   margin: 0;
 }
 

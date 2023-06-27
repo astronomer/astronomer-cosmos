@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.models.baseoperator import BaseOperator

@@ -52,7 +52,7 @@ class DbtBaseOperator(BaseOperator):
         Otherwise, the query will keep running when the task is killed.
     :param dbt_executable_path: Path to dbt executable can be used with venv
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
-    :param dbt_cmd_flags: Flags passed to dbt command override those that are calculated.
+    :param dbt_cmd_flags: List of flags to pass to dbt command
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -97,7 +97,7 @@ class DbtBaseOperator(BaseOperator):
         skip_exit_code: int = 99,
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
-        dbt_cmd_flags: Dict[str, Any] = {},
+        dbt_cmd_flags: list[str] = None,
         **kwargs,
     ) -> None:
         self.project_dir = project_dir
@@ -207,14 +207,21 @@ class DbtBaseOperator(BaseOperator):
         cmd_flags: list[str] | None = None,
     ) -> Tuple[list[str], dict]:
         dbt_cmd = [self.dbt_executable_path]
+
         if isinstance(self.base_cmd, str):
             dbt_cmd.append(self.base_cmd)
         else:
             dbt_cmd.extend(self.base_cmd)
+
         dbt_cmd.extend(self.add_global_flags())
+
         # add command specific flags
         if cmd_flags:
             dbt_cmd.extend(cmd_flags)
+
+        # add user-supplied args
+        if self.dbt_cmd_flags:
+            dbt_cmd.extend(self.dbt_cmd_flags)
 
         env = self.get_env(context)
 

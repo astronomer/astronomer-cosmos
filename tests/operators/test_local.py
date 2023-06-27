@@ -29,6 +29,21 @@ def test_dbt_base_operator_add_global_flags() -> None:
     ]
 
 
+def test_dbt_base_operator_add_user_supplied_flags() -> None:
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+        base_cmd="run",
+        dbt_cmd_flags=["--full-refresh"],
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    assert "--full-refresh" in cmd
+
+
 @pytest.mark.parametrize(
     ["skip_exception", "exception_code_returned", "expected_exception"],
     [

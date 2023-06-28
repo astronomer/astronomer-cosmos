@@ -96,10 +96,12 @@ tests = [
     "requests-mock",
     "pytest-cov",
     "pytest-describe",
+    "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
     "types-requests",
     "mypy",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
 ]
+
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
@@ -126,18 +128,9 @@ include = [
 
 [tool.hatch.envs.tests]
 dependencies = [
-    "pytest>=6.0",
-    "pytest-split",
-    "pytest-dotenv",
-    "requests-mock",
-    "pytest-cov",
-    "pytest-describe",
-    "types-requests",
-    "mypy",
-    "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
-
+    "astronomer-cosmos[tests]",
     "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 
 [[tool.hatch.envs.tests.matrix]]
@@ -156,7 +149,13 @@ matrix.airflow.dependencies = [
 freeze = "pip freeze"
 test = 'pytest -vv --durations=0 . -m "not integration"'
 test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration"'
-test-integration = "pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"
+# we install using the following workaround to overcome installation conflicts, such as:
+# apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
+test-integration-setup = """pip uninstall dbt-postgres; \
+rm -rf airflow.*; \
+airflow db init; \
+pip install dbt-postgres;"""
+test-integration = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
 
 [tool.pytest.ini_options]
 filterwarnings = [

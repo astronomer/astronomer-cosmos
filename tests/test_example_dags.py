@@ -12,7 +12,6 @@ from packaging.version import Version
 from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
-EXAMPLE_CONN_FILE = Path(__file__).parent / "test-connections.yaml"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
@@ -62,4 +61,4 @@ def get_dag_ids() -> list[str]:
 def test_example_dag(session, dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
-    test_utils.run_dag(dag, conn_file_path=EXAMPLE_CONN_FILE)
+    test_utils.run_dag(dag)

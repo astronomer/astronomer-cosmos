@@ -8,6 +8,7 @@ from airflow.hooks.base import BaseHook
 
 from .base import BaseProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
+from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -20,6 +21,7 @@ from .trino.ldap import TrinoLDAPProfileMapping
 
 profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudServiceAccountFileProfileMapping,
+    GoogleCloudServiceAccountDictProfileMapping,
     DatabricksTokenProfileMapping,
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,

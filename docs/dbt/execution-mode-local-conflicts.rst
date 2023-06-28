@@ -3,7 +3,7 @@
 Airflow and DBT dependencies conflicts
 ======================================
 
-When using the `Local Execution Mode <execution-modes.html#local>`__, users may face dependencies conflicts between
+When using the `Local Execution Mode <execution-modes.html#local>`__, users may face dependency conflicts between
 Apache Airflow and DBT. The amount of conflicts may increase depending on the Airflow providers and DBT plugins being used.
 
 If you find errors, we recommend users look into using `alternative execution modes <execution-modes.html>`__.

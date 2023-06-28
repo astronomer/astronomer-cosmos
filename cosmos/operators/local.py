@@ -40,6 +40,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         in your project's dbt_project.yml, "cosmos_profile" is used.
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param target_name: A name to use for the dbt target. If not provided, and no target is found
+        in your project's dbt_project.yml, "cosmos_target" is used.
+    :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
     """
 
     template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)
@@ -54,6 +57,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         profile_args: dict[str, str] = {},
         profile_name: str | None = None,
         target_name: str | None = None,
+        should_store_compiled_sql: bool = True,
         **kwargs,
     ) -> None:
         self.install_deps = install_deps
@@ -62,6 +66,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.profile_name = profile_name
         self.target_name = target_name
         self.compiled_sql = ""
+        self.should_store_compiled_sql = should_store_compiled_sql
         super().__init__(**kwargs)
 
     @cached_property
@@ -84,6 +89,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
         """
+        if not self.should_store_compiled_sql:
+            return
+
         compiled_queries = {}
         # dbt compiles sql files and stores them in the target directory
         for root, _, files in os.walk(os.path.join(tmp_project_dir, "target")):

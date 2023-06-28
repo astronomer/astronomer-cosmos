@@ -29,6 +29,21 @@ def test_dbt_base_operator_add_global_flags() -> None:
     ]
 
 
+def test_dbt_base_operator_add_user_supplied_flags() -> None:
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+        base_cmd="run",
+        dbt_cmd_flags=["--full-refresh"],
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    assert "--full-refresh" in cmd
+
+
 @pytest.mark.parametrize(
     ["skip_exception", "exception_code_returned", "expected_exception"],
     [
@@ -147,3 +162,33 @@ def test_get_target_name() -> None:
     )
 
     assert dbt_base_operator.get_target_name() == "cosmos_target"
+
+
+def test_store_compiled_sql() -> None:
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # here we just need to call the method to make sure it doesn't raise an exception
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+
+    dbt_base_operator = DbtLocalBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=True,
+    )
+
+    # here we call the method and see if it tries to access the context["ti"]
+    # it should, and it should raise a KeyError because we didn't pass in a ti
+    with pytest.raises(KeyError):
+        dbt_base_operator.store_compiled_sql(
+            tmp_project_dir="my/dir",
+            context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+        )

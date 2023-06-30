@@ -51,7 +51,11 @@ dbt-all = [
     "dbt-redshift",
     "dbt-snowflake",
     "dbt-spark",
+    "dbt-clickhouse",
     "astronomer-cosmos[dbt-openlineage]"
+]
+dbt-clickhouse = [
+    "dbt-clickhouse",
 ]
 dbt-bigquery = [
     "dbt-bigquery",

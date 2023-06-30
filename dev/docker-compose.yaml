@@ -6,7 +6,6 @@ x-airflow-common:
   build:
     context: ..
     dockerfile: dev/Dockerfile
-  env_file: .env
   environment:
     &airflow-common-env
     DB_BACKEND: postgres

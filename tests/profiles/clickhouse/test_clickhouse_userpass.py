@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.providers.dbt.core.profiles import get_profile_mapping
-from cosmos.providers.dbt.core.profiles.clickhouse.user_pass import (
+from cosmos.profiles import get_profile_mapping
+from cosmos.profiles.clickhouse.user_pass import (
     ClickhouseUserPasswordProfileMapping,
 )
 

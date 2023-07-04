@@ -7,7 +7,7 @@ from typing import Any
 
 from airflow.models.dag import DAG
 
-from cosmos.airflow import airflow_kwargs, specific_kwargs, Group
+from cosmos.airflow.group import airflow_kwargs, specific_kwargs, Group
 
 
 class DbtDag(DAG, Group):

@@ -9,8 +9,8 @@ __version__ = "0.7.5"
 from cosmos.dataset import get_dbt_dataset
 
 # re-export the dag and task group
-from cosmos.dag import DbtDag
-from cosmos.task_group import DbtTaskGroup
+from cosmos.airflow.dag import DbtDag
+from cosmos.airflow.task_group import DbtTaskGroup
 
 # re-export the operators
 from cosmos.operators.local import (

@@ -6,7 +6,7 @@ from typing import Any
 
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.airflow import airflow_kwargs, specific_kwargs, Group
+from cosmos.airflow.group import airflow_kwargs, specific_kwargs, Group
 
 
 class DbtTaskGroup(TaskGroup, Group):

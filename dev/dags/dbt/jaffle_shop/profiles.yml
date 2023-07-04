@@ -5,9 +5,9 @@ jaffle_shop:
     dev:
       type: postgres
       host: localhost
-      user: alice
-      password: <password>
+      user: postgres
+      password: postgres
       port: 5432
-      dbname: jaffle_shop
-      schema: dbt_alice
+      dbname: public
+      schema: dbt_example
       threads: 4

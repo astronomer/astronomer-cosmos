@@ -30,6 +30,7 @@ def calculate_operator_class(
     return f"cosmos.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 
+# TODO: delete this function and related tests
 def render_project(
     dbt_project_name: str,
     dbt_root_path: str = "/usr/local/airflow/dags/dbt",

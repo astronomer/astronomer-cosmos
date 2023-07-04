@@ -11,6 +11,7 @@ from cosmos.core.graph.entities import Group, Task
 logger = logging.getLogger(__name__)
 
 
+# TODO: delete this class and tests
 class CosmosDag(DAG):
     """
     Render a Group as an Airflow DAG. Subclass of Airflow DAG.
@@ -43,6 +44,7 @@ class CosmosDag(DAG):
                 entities[upstream_id] >> entities[ent.id]
 
 
+# TODO: delete this class and tests
 class CosmosTaskGroup(TaskGroup):
     """
     Render a Group as an Airflow TaskGroup. Subclass of Airflow TaskGroup.

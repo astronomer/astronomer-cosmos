@@ -34,7 +34,9 @@ def extract_dbt_nodes(
     # - support manifests
 
     # Have an alternative for K8s & Docker executor
-    command = ["dbt", "ls", "--exclude", "*orders*", "--output", "json", "--profiles-dir", project_dir]
+    # command = ["dbt", "ls", "--exclude", "*orders*", "--output", "json", "--profiles-dir", project_dir]
+    command = ["dbt", "ls", "--output", "json", "--profiles-dir", project_dir]
+
     process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=project_dir)
     stdout, stderr = process.communicate()
 

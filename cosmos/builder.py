@@ -1,13 +1,18 @@
 from __future__ import annotations
 import json
+import logging
 from dataclasses import dataclass
 from subprocess import Popen, PIPE
 
 from airflow.models.dag import DAG
+from airflow.utils.task_group import TaskGroup
 
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
-from cosmos.core.graph.entities import Task
+from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.render import calculate_operator_class
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,43 +65,92 @@ def extract_dbt_nodes(
     return nodes
 
 
+def calculate_leaves(nodes):
+    """
+    Tasks which are not parents (dependencies) to other tasks.
+    """
+    parents = []
+    leaves = []
+    [parents.extend(node.depends_on) for node in nodes]
+    parents_ids = set(parents)
+    for node in nodes:
+        if node.unique_id not in parents_ids:
+            leaves.append(node)
+    return leaves
+
+
 def create_task_metadata(node: DbtNode, execution_mode, args):
     dbt_resource_to_class = {"model": "DbtRun", "snapshot": "DbtSnapshot", "seed": "DbtSeed", "test": "DbtTest"}
-    task_metadata = Task(
-        id=node.name,  # TODO: make it consistent with the old way
+    task_id_suffix = "run" if node.resource_type == "model" else node.resource_type
+    if node.resource_type in dbt_resource_to_class:
+        task_metadata = TaskMetadata(
+            id=f"{node.name}_{task_id_suffix}",
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
+            ),
+            arguments=args,
+        )
+        return task_metadata
+    else:
+        # Example of task that is currently skipped: "test"
+        logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
+
+
+def create_test_task_metadata(test_task_name, execution_mode, task_args, model_name=None):
+    if model_name is not None:
+        task_args = {**task_args, **{"models": model_name}}
+    return TaskMetadata(
+        id=test_task_name,
         operator_class=calculate_operator_class(
-            execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
+            execution_mode=execution_mode,
+            dbt_class="DbtTest",
         ),
-        arguments=args,
+        arguments=task_args,
     )
-    return task_metadata
 
 
-def create_task_args(node: DbtNode, execution_mode, project_dir, conn_id, profile_args):
-    # TODO: adjust for non-local execution modes
-    args = {}
-    if execution_mode == "local":
-        args["project_dir"] = project_dir
-        args["conn_id"] = conn_id
-        args["profile_args"] = profile_args
-    return args
-
-
-def add_airflow_entities(nodes: list[DbtNode], dag: DAG, execution_mode: str, project_dir, conn_id, profile_args):
+def add_airflow_entities(
+    nodes: list[DbtNode],
+    dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
+    execution_mode: str,  # Cosmos-specific - decide what which class to use
+    task_args,  # Cosmos/DBT - used to instantiate tasks
+    test_behavior,  # Cosmos-specific: how to inject tests to Airflow DAG
+    dbt_project_name,  # DBT / Cosmos - used to name test task if mode is after_all,
+    task_group: TaskGroup | None = None,
+):
     tasks_map = {}
-    # TODO: support task groups
-    # TODO: add crazy test logic before/after
 
-    # create Airflow tasks
+    # usually, we'll try to map one DBT node to one Airflow task
+    # the exception are the test nodes
+    # if test_behaviour=="after_each", each model will be bundled with a test, using TaskGroup
     for node_id, node in nodes.items():
-        args = create_task_args(node, execution_mode, project_dir, conn_id, profile_args)
-        task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=args)
-        task = create_airflow_task(task_meta, dag)
-        tasks_map[node_id] = task
+        task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=task_args)
+        if task_meta and node.resource_type != "test":
+            if node.resource_type == "model" and test_behavior == "after_each":
+                with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
+                    task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                    test_meta = create_test_task_metadata(
+                        f"{node.name}_test", execution_mode, task_args=task_args, model_name=node.unique_id
+                    )
+                    test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
+                    task >> test_task
+                    task_or_group = model_task_group
+            else:
+                task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+            tasks_map[node_id] = task_or_group
 
-    # define Airflow tasks dependencies
+    # if test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG, after the tasks which
+    # are leaves, in other words, which do not have downstream tasks.
+    if test_behavior == "after_all":
+        test_meta = create_test_task_metadata(f"{dbt_project_name}_test", execution_mode, task_args=task_args)
+        test_task = create_airflow_task(test_meta, dag, task_group=task_group)
+        leaves = calculate_leaves(nodes)
+        for leaf_node in leaves:
+            tasks_map[leaf_node.unique_id] >> test_task
+
+    # create the Airflow task dependencies between non-test nodes
     for node_id, node in nodes.items():
         for parent_node_id in node.depends_on:
-            # depending on selection filters, it may not be
-            if parent_node_id in tasks_map:
+            # depending on the node type, it will not have mapped 1:1 to tasks_map
+            if (node_id in tasks_map) and (parent_node_id in tasks_map):
                 tasks_map[parent_node_id] >> tasks_map[node_id]

@@ -84,15 +84,29 @@ class DbtDag(DAG):
             selector=None,
         )
 
-        # filter out nodes as needed
+        # TODO: filter out nodes as needed
+
+        # TODO: create a function?
+        # TODO: adjust for non-local execution modes
+        # TODO: add dataset outlets
+        task_args = {
+            **dbt_args,
+            **operator_args,
+            "profile_args": profile_args,
+            "profile_name": profile_name_override,
+            "target_name": target_name_override,
+            # may be only needed for local / venv:
+            "project_dir": dbt_root_path / dbt_project_name,
+            "conn_id": conn_id,
+        }
 
         add_airflow_entities(
             nodes=nodes,
             dag=self,
             execution_mode=execution_mode,
-            project_dir=dbt_root_path / dbt_project_name,
-            conn_id=conn_id,
-            profile_args=profile_args,
+            task_args=task_args,
+            test_behavior=test_behavior,
+            dbt_project_name=dbt_project_name,
         )
 
         # get the group of the dbt project

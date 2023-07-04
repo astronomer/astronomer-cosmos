@@ -10,12 +10,10 @@ except ImportError:
 
 from typing import Any, Callable, Dict, List, Optional
 
-from cosmos.core.airflow import CosmosDag
-
-from .render import render_project
+from airflow.models.dag import DAG
 
 
-class DbtDag(CosmosDag):
+class DbtDag(DAG):
     """
     Render a dbt project as an Airflow DAG. Overrides the Airflow DAG model to allow
     for additional configs to be passed.
@@ -44,6 +42,8 @@ class DbtDag(CosmosDag):
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
+    # _task_group = None
+
     def __init__(
         self,
         dbt_project_name: str,
@@ -70,8 +70,33 @@ class DbtDag(CosmosDag):
             **dbt_args,
             "conn_id": conn_id,
         }
+        super().__init__(*args, **kwargs)
+
+        from cosmos.builder import extract_dbt_nodes, add_airflow_entities
+
+        nodes = extract_dbt_nodes(
+            project_dir=dbt_root_path / dbt_project_name,
+            # project_dir="/tmp/dbt_project",
+            resource_type=None,
+            select=None,
+            models=None,
+            exclude=None,
+            selector=None,
+        )
+
+        # filter out nodes as needed
+
+        add_airflow_entities(
+            nodes=nodes,
+            dag=self,
+            execution_mode=execution_mode,
+            project_dir=dbt_root_path / dbt_project_name,
+            conn_id=conn_id,
+            profile_args=profile_args,
+        )
 
         # get the group of the dbt project
+        """
         group = render_project(
             dbt_project_name=dbt_project_name,
             dbt_root_path=dbt_root_path,
@@ -90,6 +115,8 @@ class DbtDag(CosmosDag):
             execution_mode=execution_mode,
             on_warning_callback=on_warning_callback,
         )
+        """
 
         # call the airflow DAG constructor
-        super().__init__(group, *args, **kwargs)
+
+        # super().__init__(group, *args, **kwargs)

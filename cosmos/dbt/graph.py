@@ -7,6 +7,7 @@ from typing import Any
 
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
+from cosmos.dbt.filter import filter_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,8 @@ class DbtGraph:
 
     def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd="dbt"):
         self.project = project
-        self.exclude = exclude or []
-        self.select = select or []
+        self.exclude = exclude or {}
+        self.select = select or {}
 
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
@@ -107,6 +108,10 @@ class DbtGraph:
             nodes[model_name] = node
 
         self.nodes = nodes
+
+        self.filtered_nodes = filter_nodes(
+            project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
+        )
 
     def load_via_manifest(self):
         # TODO

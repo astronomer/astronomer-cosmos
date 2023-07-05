@@ -13,7 +13,7 @@ from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.builder import add_airflow_entities
+from cosmos.airflow.graph import build_airflow_graph
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import DbtProject
 
@@ -153,7 +153,7 @@ class AirflowGroup:
 
         validate_arguments(select, exclude, profile_args, task_args)
 
-        add_airflow_entities(
+        build_airflow_graph(
             nodes=dbt_graph.nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,

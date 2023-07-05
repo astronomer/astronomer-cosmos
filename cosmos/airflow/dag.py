@@ -7,10 +7,10 @@ from typing import Any
 
 from airflow.models.dag import DAG
 
-from cosmos.airflow.group import airflow_kwargs, specific_kwargs, Group
+from cosmos.airflow.group import airflow_kwargs, specific_kwargs, AirflowGroup
 
 
-class DbtDag(DAG, Group):
+class DbtDag(DAG, AirflowGroup):
     """
     Render a dbt project as an Airflow DAG.
     """
@@ -20,5 +20,5 @@ class DbtDag(DAG, Group):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        dag = DAG.__init__(self, *args, **airflow_kwargs(**kwargs))
-        Group.__init__(self, *args, dag=dag, **specific_kwargs(**kwargs))
+        DAG.__init__(self, *args, **airflow_kwargs(**kwargs))
+        AirflowGroup.__init__(self, *args, dag=self, **specific_kwargs(**kwargs))

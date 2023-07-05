@@ -6,10 +6,10 @@ from typing import Any
 
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.airflow.group import airflow_kwargs, specific_kwargs, Group
+from cosmos.airflow.group import airflow_kwargs, specific_kwargs, AirflowGroup
 
 
-class DbtTaskGroup(TaskGroup, Group):
+class DbtTaskGroup(TaskGroup, AirflowGroup):
     """
     Render a dbt project as an Airflow Task Group.
     """
@@ -20,5 +20,5 @@ class DbtTaskGroup(TaskGroup, Group):
         **kwargs: Any,
     ) -> None:
         group_id = kwargs.get("group_id", kwargs.get("dbt_project_name", "dbt_task_group"))
-        task_group = TaskGroup.__init__(self, group_id, *args, **airflow_kwargs(**kwargs))
-        Group.__init__(self, *args, task_group=task_group, **specific_kwargs(**kwargs))
+        TaskGroup.__init__(self, group_id, *args, **airflow_kwargs(**kwargs))
+        AirflowGroup.__init__(self, *args, task_group=self, **specific_kwargs(**kwargs))

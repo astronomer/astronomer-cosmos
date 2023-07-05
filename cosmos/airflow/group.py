@@ -1,24 +1,32 @@
 from __future__ import annotations
+
 import inspect
+import logging
+from typing import Any, Callable, Optional
 
 try:
     from typing import Literal
 except ImportError:
     from typing_extensions import Literal
-from typing import Any, Callable, Optional
 
+from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.builder import extract_dbt_nodes, add_airflow_entities, convert_legacy_project_to_nodes
+from cosmos.builder import add_airflow_entities
+from cosmos.dbt.graph import DbtGraph
+from cosmos.dbt.project import DbtProject
+
+
+logger = logging.getLogger(__name__)
 
 
 def specific_kwargs(**kwargs):
     """
-    Extract kwargs specific to the cosmos.airflow.Group class initialization method.
+    Extract kwargs specific to the cosmos.airflow.AirflowGroup class initialization method.
     """
     new_kwargs = {}
-    specific_args_keys = inspect.getfullargspec(Group.__init__).args
+    specific_args_keys = inspect.getfullargspec(AirflowGroup.__init__).args
     for arg_key, arg_value in kwargs.items():
         if arg_key in specific_args_keys:
             new_kwargs[arg_key] = arg_value
@@ -37,7 +45,33 @@ def airflow_kwargs(**kwargs):
     return new_kwargs
 
 
-class Group:
+def validate_arguments(select, exclude, profile_args, task_args) -> None:
+    """
+    Validate that selectors mutually exclusive filters have not been given.
+    Validate deprecated arguments.
+    """
+
+    if "tags" in select and "tags" in exclude:
+        if set(select["tags"]).intersection(exclude["tags"]):
+            raise AirflowException(
+                f"Can't specify the same tag in `select` and `include`: "
+                f"{set(select['tags']).intersection(exclude['tags'])}"
+            )
+
+    if "paths" in select and "paths" in exclude:
+        if set(select["paths"]).intersection(exclude["paths"]):
+            raise AirflowException(
+                f"Can't specify the same path in `select` and `include`: "
+                f"{set(select['paths']).intersection(exclude['paths'])}"
+            )
+
+    # if task_args has a schema, add it to the profile args and add a deprecated warning
+    if "schema" in task_args:
+        profile_args["schema"] = task_args["schema"]
+        logger.warning("Specifying a schema in the task_args is deprecated. Please use the profile_args instead.")
+
+
+class AirflowGroup:
     """
     Logic common to build an Airflow DbtDag and DbtTaskGroup from a DBT project.
 
@@ -91,21 +125,20 @@ class Group:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        # old nodes
-        convert_legacy_project_to_nodes(
-            dbt_root_path, dbt_models_dir, dbt_snapshots_dir, dbt_seeds_dir, dbt_project_name
+        dbt_project = DbtProject(
+            name=dbt_project_name,
+            root_dir=dbt_root_path,
+            models_dir=dbt_models_dir,
+            seeds_dir=dbt_seeds_dir,
+            snapshots_dir=dbt_snapshots_dir,
         )
 
-        nodes = extract_dbt_nodes(
-            project_dir=dbt_root_path / dbt_project_name,
+        dbt_graph = DbtGraph(
+            project=dbt_project,
             exclude=exclude,
             select=select,
         )
-
-        dbt_args = {
-            **dbt_args,
-            "conn_id": conn_id,
-        }
+        dbt_graph.load()
 
         task_args = {
             **dbt_args,
@@ -113,19 +146,21 @@ class Group:
             "profile_args": profile_args,
             "profile_name": profile_name_override,
             "target_name": target_name_override,
-            # may be only needed for local / venv:
-            "project_dir": dbt_root_path / dbt_project_name,
+            # the following args may be only needed for local / venv:
+            "project_dir": dbt_project.dir,
             "conn_id": conn_id,
         }
 
+        validate_arguments(select, exclude, profile_args, task_args)
+
         add_airflow_entities(
-            nodes=nodes,
+            nodes=dbt_graph.nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,
             execution_mode=execution_mode,
             task_args=task_args,
             test_behavior=test_behavior,
-            dbt_project_name=dbt_project_name,
+            dbt_project_name=dbt_project.name,
             conn_id=conn_id,
             on_warning_callback=on_warning_callback,
             emit_datasets=emit_datasets,

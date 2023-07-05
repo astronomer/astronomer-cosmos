@@ -1,133 +1,21 @@
 from __future__ import annotations
-import itertools
-import json
-import logging
-from dataclasses import dataclass
-from subprocess import Popen, PIPE
-from typing import Any, Callable
 
-from airflow.exceptions import AirflowException
+import logging
+from typing import Callable
+
+
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
-from cosmos.dbt.parser.project import DbtProject
+from cosmos.dbt.graph import DbtNode
+
 from cosmos.render import calculate_operator_class
 
 
 logger = logging.getLogger(__name__)
-
-# TODO replace inline constants
-
-
-@dataclass
-class DbtNode:
-    name: str
-    unique_id: str
-    resource_type: str
-    depends_on: list[str]
-    file_path: str
-    tags: list[str]
-    config: dict[str, Any]
-
-
-# TODO: implement this:
-def extract_dbt_nodes_from_manifest():
-    pass
-
-
-def extract_dbt_nodes(
-    project_dir,
-    exclude=None,
-    select=None,
-    # models=None,
-    # selector=None,
-    # resource_type=None,
-    # profile_name="dbt_project.yml",
-):
-    # TODO: have a reliable way of checking if dbt is available
-
-    # TODO: May need to create the profile in advance
-    # Have an alternative for K8s & Docker executor
-    command = ["dbt", "ls", "--output", "json", "--profiles-dir", project_dir]
-    if exclude is not None:
-        command.extend(["--exclude", ",".join(exclude)])
-    if select is not None:
-        command.extend(["--select", ",".join(select)])
-
-    process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=project_dir)
-    stdout, stderr = process.communicate()
-
-    nodes = {}
-    for line in stdout.decode().split("\n"):
-        try:
-            node_dict = json.loads(line.strip())
-        except json.decoder.JSONDecodeError:
-            logger.info("Skipping line: %s", line)
-        else:
-            node = DbtNode(
-                name=node_dict["name"],
-                unique_id=node_dict["unique_id"],
-                resource_type=node_dict["resource_type"],
-                depends_on=node_dict["depends_on"].get("nodes", []),
-                file_path=project_dir / node_dict["original_file_path"],
-                tags=node_dict["tags"],
-                config=node_dict["config"],
-            )
-            nodes[node.unique_id] = node
-
-    return nodes
-
-
-def convert_legacy_project_to_nodes(dbt_root_path, dbt_models_dir, dbt_snapshots_dir, dbt_seeds_dir, dbt_project_name):
-    """
-    Convert from the original project to the new list of nodes representation
-    """
-    project = DbtProject(
-        dbt_root_path=dbt_root_path,
-        dbt_models_dir=dbt_models_dir,
-        dbt_snapshots_dir=dbt_snapshots_dir,
-        dbt_seeds_dir=dbt_seeds_dir,
-        project_name=dbt_project_name,
-    )
-    nodes = {}
-    for model_name, model in itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items()):
-        config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
-        node = DbtNode(
-            name=model_name,
-            unique_id=model_name,
-            resource_type=model.type,
-            depends_on=model.config.upstream_models,
-            file_path=model.path,
-            tags=[],
-            config=config,  # already contains tags
-        )
-        nodes[model_name] = node
-    return nodes
-
-
-def validate_arguments(select, exclude, profile_args, task_args):
-    # ensures the same tag isn't in select & exclude
-    if "tags" in select and "tags" in exclude:
-        if set(select["tags"]).intersection(exclude["tags"]):
-            raise AirflowException(
-                f"Can't specify the same tag in `select` and `include`: "
-                f"{set(select['tags']).intersection(exclude['tags'])}"
-            )
-
-    if "paths" in select and "paths" in exclude:
-        if set(select["paths"]).intersection(exclude["paths"]):
-            raise AirflowException(
-                f"Can't specify the same path in `select` and `include`: "
-                f"{set(select['paths']).intersection(exclude['paths'])}"
-            )
-
-    # if task_args has a schema, add it to the profile args and add a deprecated warning
-    if "schema" in task_args:
-        profile_args["schema"] = task_args["schema"]
-        logger.warning("Specifying a schema in the task_args is deprecated. Please use the profile_args instead.")
 
 
 def filter_nodes(project_dir, nodes, select, exclude):

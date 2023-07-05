@@ -19,6 +19,7 @@ def normalize_config(config):
 
 def filter_nodes(project_dir, nodes, select, exclude):
     # TODO: test!
+    # TODO: confirm if there is a missing part of logic that is on the legacy project
     chosen_nodes = nodes
     if select or exclude:
         chosen_nodes = nodes.copy()

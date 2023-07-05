@@ -57,34 +57,28 @@ If testing for the same Airflow and Python version, next runs of the integration
     hatch run tests.py3.8-2.5:test-integration
 
 
-Using Tilt for local development
-________________________________
+Using Docker Compose for local development
+---------------------------------
 
-It is also possible to use `tilt <https://docs.tilt.dev>`_, a toolkit which helps on microservices local development.
+It is also possible to just build the development environment using docker compose
 
-
-Pre-requisites
-++++++++++++++
-
-#. `tilt <https://docs.tilt.dev>`_
-#. `git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
 
 Local Sandbox
 +++++++++++++
 
-For local development, we use `Tilt <https://docs.tilt.dev>`_. To use Tilt, first clone the ``astronomer-cosmos`` repo:
+To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo:
 
 .. code-block:: bash
 
     git clone https://github.com/astronomer/astronomer-cosmos.git
 
-Then, run the following from the ``astronomer-cosmos`` directory:
+Then, run the following command from the ``astronomer-cosmos`` directory:
 
 .. code-block:: bash
 
-    tilt up
+    docker compose -f dev/docker-compose.yaml up -d --build
 
-You can press ``space`` to open the Tilt UI and see the status of the sandbox. Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
+Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
 
 
 Pre-Commit

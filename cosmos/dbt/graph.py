@@ -46,6 +46,7 @@ class DbtGraph:
         self.dbt_cmd = dbt_cmd
 
     def load(self):
+        # TODO: defined order of precedence and criteria to use one or another method
         self.load_via_custom_parser()
         self.load_via_dbt_ls()
         # self.load_from_dbt_manifest()

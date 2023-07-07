@@ -157,7 +157,7 @@ test-integration-setup = """pip uninstall dbt-postgres; \
 rm -rf airflow.*; \
 airflow db init; \
 pip install dbt-postgres;"""
-test-integration = """pytest -vv  tests/test_example_dags.py::test_example_dag[basic_cosmos_dag] --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
+test-integration = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
 
 [tool.pytest.ini_options]
 filterwarnings = [

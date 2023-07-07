@@ -2,6 +2,7 @@ import itertools
 import json
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from subprocess import Popen, PIPE
 from typing import Any
 
@@ -12,6 +13,12 @@ from cosmos.dbt.filter import filter_nodes
 logger = logging.getLogger(__name__)
 
 # TODO replace inline constants
+
+
+class LoadMode(Enum):
+    CUSTOM = 0
+    DBT_LS = 1
+    DBT_MANIFEST = 2
 
 
 @dataclass
@@ -45,11 +52,14 @@ class DbtGraph:
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
 
-    def load(self):
-        # TODO: defined order of precedence and criteria to use one or another method
-        self.load_via_custom_parser()
-        self.load_via_dbt_ls()
-        # self.load_from_dbt_manifest()
+    # TODO: implement smart load, which tries other load modes if the desired fails
+    def load(self, method=LoadMode.CUSTOM):
+        load_method = {
+            LoadMode.CUSTOM: self.load_via_custom_parser,
+            LoadMode.DBT_LS: self.load_via_dbt_ls,
+            LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
+        }
+        load_method[LoadMode.CUSTOM]()
 
     def load_via_dbt_ls(self):
         command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]

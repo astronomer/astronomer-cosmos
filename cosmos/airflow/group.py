@@ -14,7 +14,7 @@ from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.dbt.graph import DbtGraph
+from cosmos.dbt.graph import DbtGraph, LoadMode
 from cosmos.dbt.project import DbtProject
 
 
@@ -138,7 +138,7 @@ class AirflowGroup:
             exclude=exclude,
             select=select,
         )
-        dbt_graph.load()
+        dbt_graph.load(LoadMode.CUSTOM)
 
         task_args = {
             **dbt_args,

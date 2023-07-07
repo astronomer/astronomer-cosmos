@@ -124,6 +124,6 @@ class DbtGraph:
             project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
         )
 
-    def load_via_manifest(self):
+    def load_from_dbt_manifest(self):
         # TODO
         pass

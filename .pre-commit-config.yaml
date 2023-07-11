@@ -35,14 +35,14 @@ repos:
       - id: remove-tabs
         exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.8.0
+    rev: v3.9.0
     hooks:
       - id: pyupgrade
         args:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.276
+    rev: v0.0.277
     hooks:
       - id: ruff
         args:
@@ -53,7 +53,7 @@ repos:
       - id: black
         args: [ "--config", "./pyproject.toml" ]
   - repo: https://github.com/asottile/blacken-docs
-    rev: 1.14.0
+    rev: 1.15.0
     hooks:
       - id: blacken-docs
         alias: black

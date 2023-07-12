@@ -1,8 +1,9 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from cosmos.dbt.graph import DbtGraph
+from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
 from cosmos.dbt.project import DbtProject
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -28,6 +29,63 @@ def test_load_via_manifest_with_exclude():
         "model.jaffle_shop.stg_payments",
     ]
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / "jaffle_shop/models/customers.sql"
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
+def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest=SAMPLE_MANIFEST)
+    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph.load(execution_mode="local")
+    assert mock_load_from_dbt_manifest.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
+def test_load_automatic_without_manifest(mock_load_via_dbt_ls):
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest="/tmp/manifest.json")
+    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph.load(execution_mode="local")
+    assert mock_load_via_dbt_ls.called
+
+
+def test_load_manifest_without_manifest():
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(project=dbt_project)
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load(execution_mode="local", method=LoadMode.DBT_MANIFEST)
+    assert err_info.value.args[0] == "Unable to load manifest using None"
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
+def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest=SAMPLE_MANIFEST)
+    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph.load(execution_mode="local", method=LoadMode.DBT_MANIFEST)
+    assert mock_load_from_dbt_manifest.called
+
+
+@pytest.mark.parametrize(
+    "exec_mode,method,expected_function",
+    [
+        ("local", LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
+        ("virtualenv", LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
+        ("kubernetes", LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
+        ("docker", LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
+        ("local", LoadMode.DBT_LS, "mock_load_via_dbt_ls"),
+        ("local", LoadMode.CUSTOM, "mock_load_via_custom_parser"),
+    ],
+)
+@patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", return_value=None)
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
+@patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
+def test_load(
+    mock_load_from_dbt_manifest, mock_load_via_dbt_ls, mock_load_via_custom_parser, exec_mode, method, expected_function
+):
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(project=dbt_project)
+
+    dbt_graph.load(method=method, execution_mode=exec_mode)
+    load_function = locals()[expected_function]
+    assert load_function.called
 
 
 @pytest.mark.integration

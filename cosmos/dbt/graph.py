@@ -4,6 +4,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
@@ -16,7 +17,12 @@ logger = logging.getLogger(__name__)
 # TODO replace inline constants
 
 
+class CosmosLoadDbtException(Exception):
+    pass
+
+
 class LoadMode(Enum):
+    AUTOMATIC = "automatic"
     CUSTOM = "custom"
     DBT_LS = "dbt_ls"
     DBT_MANIFEST = "dbt_manifest"
@@ -53,13 +59,32 @@ class DbtGraph:
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
 
+    def is_manifest_available(self):
+        return self.project.manifest and Path(self.project.manifest).exists()
+
     # TODO: implement smart load, which tries other load modes if the desired fails
-    def load(self, method=LoadMode.CUSTOM):
+    def load(self, method=LoadMode.AUTOMATIC, execution_mode="local"):
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
+        if method == LoadMode.AUTOMATIC:
+            if self.is_manifest_available():
+                self.load_from_dbt_manifest()
+                return
+            elif execution_mode in ("local", "virtualenv"):
+                self.load_via_dbt_ls()
+                return
+                # TODO: if it errors, we should use LoadMode.CUSTOM
+                # self.load_via_custom_parser()
+            else:
+                self.load_via_custom_parser()
+                return
+
+        if method == LoadMode.DBT_MANIFEST and not self.is_manifest_available():
+            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest}")
+
         load_method[method]()
 
     def load_via_dbt_ls(self):

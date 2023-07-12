@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import pathlib
 from typing import Any, Callable, Optional
 
 try:
@@ -121,8 +122,8 @@ class DbtToAirflowConverter:
         select: list[str] | None = None,
         exclude: list[str] | None = None,
         execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
-        load_mode: Literal["automatic", "custom", "dbt_ls", "dbt_manifest"] = "automatic",
-        manifest: str | None = None,
+        load_mode: LoadMode = LoadMode.AUTOMATIC,
+        manifest_path: str | pathlib.Path | None = None,
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
@@ -136,6 +137,7 @@ class DbtToAirflowConverter:
             models_dir=dbt_models_dir,
             seeds_dir=dbt_seeds_dir,
             snapshots_dir=dbt_snapshots_dir,
+            manifest=manifest_path,
         )
 
         dbt_graph = DbtGraph(
@@ -143,7 +145,7 @@ class DbtToAirflowConverter:
             exclude=exclude,
             select=select,
         )
-        dbt_graph.load(LoadMode.CUSTOM)
+        dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 
         task_args = {
             **dbt_args,

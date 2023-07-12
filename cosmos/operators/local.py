@@ -94,14 +94,16 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
         compiled_queries = {}
         # dbt compiles sql files and stores them in the target directory
-        for root, _, files in os.walk(os.path.join(tmp_project_dir, "target")):
-            for file in files:
-                if not file.endswith(".sql"):
+        for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
+            for file_path in file_paths:
+                if not file_path.endswith(".sql"):
                     continue
 
-                compiled_sql_path = Path(os.path.join(root, file))
+                compiled_sql_path = Path(os.path.join(folder_path, file_path))
                 compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
-                compiled_queries[file] = compiled_sql.strip()
+
+                relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
+                compiled_queries[relative_path] = compiled_sql.strip()
 
         for name, query in compiled_queries.items():
             self.compiled_sql += f"-- {name}\n{query}\n\n"

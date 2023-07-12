@@ -59,7 +59,7 @@ sample_nodes = {node.unique_id: node for node in sample_nodes_list}
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) <= version.parse("2.3.0"),
+    version.parse(airflow_version) < version.parse("2.4"),
     reason="Airflow DAG did not have task_group_dict until the 2.4 release",
 )
 @pytest.mark.integration
@@ -100,6 +100,10 @@ def test_build_airflow_graph_with_after_each():
     assert dag.leaves[0].task_id == "child.child_test"
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4"),
+    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
+)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_all():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:

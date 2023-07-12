@@ -42,8 +42,8 @@ class DbtGraph:
     Support loading a dbt project graph (represented by nodes) using different strategies.
     """
 
-    nodes: list[DbtNode] = []
-    filtered_nodes: list[DbtNode] = []
+    nodes: dict[str, DbtNode] = dict()
+    filtered_nodes: dict[str, DbtNode] = dict()
 
     def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd="dbt"):
         self.project = project

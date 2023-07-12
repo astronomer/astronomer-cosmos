@@ -164,10 +164,11 @@ def test_calculate_leaves():
         config={},
     )
 
-    nodes = [grandparent_node, parent1_node, parent2_node, child_node]
+    nodes_list = [grandparent_node, parent1_node, parent2_node, child_node]
+    nodes = {node.unique_id: node for node in nodes_list}
 
-    leaves = calculate_leaves(nodes)
-    assert leaves == [child_node]
+    leaves = calculate_leaves(nodes.keys(), nodes)
+    assert leaves == ["child"]
 
 
 def test_create_task_metadata_unsupported(caplog):

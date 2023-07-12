@@ -121,6 +121,8 @@ class DbtToAirflowConverter:
         select: list[str] | None = None,
         exclude: list[str] | None = None,
         execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
+        load_mode: Literal["automatic", "custom", "dbt_ls", "dbt_manifest"] = "automatic",
+        manifest: str | None = None,
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,

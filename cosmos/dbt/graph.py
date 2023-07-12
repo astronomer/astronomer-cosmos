@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 class LoadMode(Enum):
-    CUSTOM = 0
-    DBT_LS = 1
-    DBT_MANIFEST = 2
+    CUSTOM = "custom"
+    DBT_LS = "dbt_ls"
+    DBT_MANIFEST = "dbt_manifest"
 
 
 @dataclass
@@ -60,7 +60,7 @@ class DbtGraph:
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
-        load_method[LoadMode.CUSTOM]()
+        load_method[method]()
 
     def load_via_dbt_ls(self):
         command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]

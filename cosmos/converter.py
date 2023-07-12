@@ -26,7 +26,7 @@ def specific_kwargs(**kwargs):
     Extract kwargs specific to the cosmos.airflow.AirflowGroup class initialization method.
     """
     new_kwargs = {}
-    specific_args_keys = inspect.getfullargspec(AirflowGroup.__init__).args
+    specific_args_keys = inspect.getfullargspec(DbtToAirflowConverter.__init__).args
     for arg_key, arg_value in kwargs.items():
         if arg_key in specific_args_keys:
             new_kwargs[arg_key] = arg_value
@@ -71,7 +71,7 @@ def validate_arguments(select, exclude, profile_args, task_args) -> None:
         logger.warning("Specifying a schema in the task_args is deprecated. Please use the profile_args instead.")
 
 
-class AirflowGroup:
+class DbtToAirflowConverter:
     """
     Logic common to build an Airflow DbtDag and DbtTaskGroup from a DBT project.
 
@@ -92,8 +92,8 @@ class AirflowGroup:
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
     :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
         Defaults to "after_each"
-    :param select: A dict of dbt selector arguments (i.e., {"tags": ["tag_1", "tag_2"]})
-    :param exclude: A dict of dbt exclude arguments (i.e., {"tags": ["tag_1", "tag_2"]})
+    :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
+    :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param execution_mode: The execution mode in which the dbt project should be run.
         Options are "local", "virtualenv", "docker", and "kubernetes".
         Defaults to "local"
@@ -114,17 +114,20 @@ class AirflowGroup:
         operator_args: dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dags/dbt",
-        dbt_models_dir: str = "models",
-        dbt_seeds_dir: str = "seeds",
-        dbt_snapshots_dir: str = "snapshots",
+        dbt_models_dir: str | None = None,
+        dbt_seeds_dir: str | None = None,
+        dbt_snapshots_dir: str | None = None,
         test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
-        select: dict[str, list[str]] = {},
-        exclude: dict[str, list[str]] = {},
+        select: list[str] | None = None,
+        exclude: list[str] | None = None,
         execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        select = select or []
+        exclude = exclude or []
+
         dbt_project = DbtProject(
             name=dbt_project_name,
             root_dir=dbt_root_path,

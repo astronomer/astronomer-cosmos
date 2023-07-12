@@ -9,7 +9,7 @@ from typing import Any
 
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
-from cosmos.dbt.filter import filter_nodes
+from cosmos.dbt.selector import select_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,8 @@ class DbtGraph:
 
     def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd="dbt"):
         self.project = project
-        self.exclude = exclude or {}
-        self.select = select or {}
+        self.exclude = exclude or []
+        self.select = select or []
 
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
@@ -65,9 +65,9 @@ class DbtGraph:
     def load_via_dbt_ls(self):
         command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]
         if self.exclude:
-            command.extend(["--exclude", ",".join(self.exclude)])
+            command.extend(["--exclude", *self.exclude])
         if self.select:
-            command.extend(["--select", ",".join(self.select)])
+            command.extend(["--select", *self.select])
 
         process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir)
         stdout, stderr = process.communicate()
@@ -99,9 +99,9 @@ class DbtGraph:
         """
         project = LegacyDbtProject(
             dbt_root_path=self.project.root_dir,
-            dbt_models_dir=self.project.models_dir,
-            dbt_snapshots_dir=self.project.snapshots_dir,
-            dbt_seeds_dir=self.project.seeds_dir,
+            dbt_models_dir=self.project.models_dir.stem,
+            dbt_snapshots_dir=self.project.snapshots_dir.stem,
+            dbt_seeds_dir=self.project.seeds_dir.stem,
             project_name=self.project.name,
         )
         nodes = {}
@@ -115,16 +115,33 @@ class DbtGraph:
                 depends_on=model.config.upstream_models,
                 file_path=model.path,
                 tags=[],
-                config=config,  # already contains tags
+                config=config,
             )
             nodes[model_name] = node
 
         self.nodes = nodes
-
-        self.filtered_nodes = filter_nodes(
+        self.filtered_nodes = select_nodes(
             project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
         )
 
     def load_from_dbt_manifest(self):
-        # TODO
-        pass
+        nodes = {}
+        with open(self.project.manifest) as fp:
+            manifest = json.load(fp)
+
+            for unique_id, node_dict in manifest.get("nodes", {}).items():
+                node = DbtNode(
+                    name=node_dict["name"],
+                    unique_id=unique_id,
+                    resource_type=node_dict["resource_type"],
+                    depends_on=node_dict["depends_on"].get("nodes", []),
+                    file_path=self.project.dir / node_dict["original_file_path"],
+                    tags=node_dict["tags"],
+                    config=node_dict["config"],
+                )
+                nodes[node.unique_id] = node
+
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
+            )

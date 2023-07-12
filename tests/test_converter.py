@@ -1,7 +1,7 @@
 import pytest
 from airflow.exceptions import AirflowException
 
-from cosmos.airflow.group import validate_arguments
+from cosmos.converter import validate_arguments
 
 
 @pytest.mark.parametrize("argument_key", ["tags", "paths"])

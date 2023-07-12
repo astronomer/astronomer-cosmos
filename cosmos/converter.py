@@ -3,7 +3,6 @@ from __future__ import annotations
 import inspect
 import logging
 import pathlib
-import shutil
 from typing import Any, Callable, Optional
 
 try:
@@ -16,6 +15,7 @@ from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
+from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.graph import DbtGraph, LoadMode
 from cosmos.dbt.project import DbtProject
 
@@ -145,7 +145,7 @@ class DbtToAirflowConverter:
             project=dbt_project,
             exclude=exclude,
             select=select,
-            dbt_cmd=dbt_args.get("dbt_executable_path", shutil.which("dbt-ol")),
+            dbt_cmd=dbt_args.get("dbt_executable_path", get_system_dbt()),
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 

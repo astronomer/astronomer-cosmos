@@ -2,13 +2,13 @@ from __future__ import annotations
 import itertools
 import json
 import logging
-import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
+from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import select_nodes
@@ -52,7 +52,7 @@ class DbtGraph:
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
 
-    def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd=shutil.which("dbt-ol")):
+    def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd=get_system_dbt()):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
@@ -97,7 +97,11 @@ class DbtGraph:
         if self.select:
             command.extend(["--select", *self.select])
 
-        process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir)
+        try:
+            process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir)
+        except FileNotFoundError as exception:
+            raise CosmosLoadDbtException(f"Unable to run the command {command} due to the error:\n{exception}")
+
         stdout, stderr = process.communicate()
         # TODO: cover this with test:
         if stderr:

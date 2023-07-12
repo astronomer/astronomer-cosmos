@@ -45,7 +45,6 @@ def create_task_metadata(node: DbtNode, execution_mode, args):
         )
         return task_metadata
     else:
-        # Example of task that is currently skipped: "test"
         logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
 
 

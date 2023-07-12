@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from pathlib import Path
 
 
@@ -8,8 +9,7 @@ TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
 
 
-def build_paths(project_dir, selected_paths):
-    return [(project_dir / path.strip("/")) for path in selected_paths]
+logger = logging.getLogger(__name__)
 
 
 class SelectorConfig:
@@ -41,7 +41,7 @@ class SelectorConfig:
                     self.config[key] = value
             else:
                 self.other.append(item)
-                # TODO: raise an exception or log
+                logger.warning("Unsupported select statement: %s", item)
 
 
 def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig):

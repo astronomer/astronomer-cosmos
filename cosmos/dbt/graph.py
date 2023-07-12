@@ -2,7 +2,7 @@ from __future__ import annotations
 import itertools
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from subprocess import Popen, PIPE
 from typing import Any
@@ -33,8 +33,8 @@ class DbtNode:
     resource_type: str
     depends_on: list[str]
     file_path: str
-    tags: list[str]
-    config: dict[str, Any]
+    tags: list[str] = field(default_factory=lambda: [])
+    config: dict[str, Any] = field(default_factory=lambda: {})
 
 
 class DbtGraph:

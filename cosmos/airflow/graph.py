@@ -24,17 +24,18 @@ def calculate_operator_class(
     return f"cosmos.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 
-def calculate_leaves(nodes):
+def calculate_leaves(tasks_ids, nodes):
     """
     Tasks which are not parents (dependencies) to other tasks.
     """
     parents = []
     leaves = []
-    [parents.extend(node.depends_on) for node in nodes]
+    materialized_nodes = [node for node in nodes.values() if node.unique_id in tasks_ids]
+    [parents.extend(node.depends_on) for node in materialized_nodes]
     parents_ids = set(parents)
-    for node in nodes:
+    for node in materialized_nodes:
         if node.unique_id not in parents_ids:
-            leaves.append(node)
+            leaves.append(node.unique_id)
     return leaves
 
 
@@ -116,9 +117,9 @@ def build_airflow_graph(
             f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
-        leaves = calculate_leaves(nodes)
-        for leaf_node in leaves:
-            tasks_map[leaf_node.unique_id] >> test_task
+        leaves_ids = calculate_leaves(tasks_ids=tasks_map.keys(), nodes=nodes)
+        for leaf_node_id in leaves_ids:
+            tasks_map[leaf_node_id] >> test_task
 
     # Create the Airflow task dependencies between non-test nodes
     for node_id, node in nodes.items():

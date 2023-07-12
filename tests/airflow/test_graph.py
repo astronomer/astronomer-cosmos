@@ -1,10 +1,124 @@
+from pathlib import Path
+from datetime import datetime
+
+import pytest
+from airflow.models import DAG
+
 from cosmos.airflow.graph import (
+    build_airflow_graph,
     calculate_leaves,
     create_task_metadata,
     create_test_task_metadata,
     calculate_operator_class,
 )
 from cosmos.dbt.graph import DbtNode
+
+
+SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
+
+parent_seed = DbtNode(
+    name="seed_parent",
+    unique_id="seed_parent",
+    resource_type="seed",
+    depends_on=[],
+    file_path="",
+)
+parent_node = DbtNode(
+    name="parent",
+    unique_id="parent",
+    resource_type="model",
+    depends_on=["seed_parent"],
+    file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+    tags=["has_child"],
+    config={"materialized": "view"},
+)
+test_parent_node = DbtNode(
+    name="test_parent", unique_id="test_parent", resource_type="test", depends_on=["parent"], file_path=""
+)
+child_node = DbtNode(
+    name="child",
+    unique_id="child",
+    resource_type="model",
+    depends_on=["parent"],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
+    tags=["nightly"],
+    config={"materialized": "table"},
+)
+test_child_node = DbtNode(
+    name="test_child",
+    unique_id="test_child",
+    resource_type="test",
+    depends_on=["child"],
+    file_path="",
+)
+
+sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, test_child_node]
+sample_nodes = {node.unique_id: node for node in sample_nodes_list}
+
+
+@pytest.mark.integration
+def test_build_airflow_graph_with_after_each():
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode="local",
+            task_args=task_args,
+            test_behavior="after_each",
+            dbt_project_name="astro_shop",
+            conn_id="fake_conn",
+        )
+    topological_sort = [task.task_id for task in dag.topological_sort()]
+    expected_sort = [
+        "seed_parent_seed",
+        "parent.parent_run",
+        "parent.parent_test",
+        "child.child_run",
+        "child.child_test",
+    ]
+    assert topological_sort == expected_sort
+    task_groups = dag.task_group_dict
+    assert len(task_groups) == 2
+
+    assert task_groups["parent"].upstream_task_ids == {"seed_parent_seed"}
+    assert list(task_groups["parent"].children.keys()) == ["parent.parent_run", "parent.parent_test"]
+
+    assert task_groups["child"].upstream_task_ids == {"parent.parent_test"}
+    assert list(task_groups["child"].children.keys()) == ["child.child_run", "child.child_test"]
+
+    assert len(dag.leaves) == 1
+    assert dag.leaves[0].task_id == "child.child_test"
+
+
+@pytest.mark.integration
+def test_build_airflow_graph_with_after_all():
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode="local",
+            task_args=task_args,
+            test_behavior="after_all",
+            dbt_project_name="astro_shop",
+            conn_id="fake_conn",
+        )
+    topological_sort = [task.task_id for task in dag.topological_sort()]
+    expected_sort = ["seed_parent_seed", "parent_run", "child_run", "astro_shop_test"]
+    assert topological_sort == expected_sort
+
+    task_groups = dag.task_group_dict
+    assert len(task_groups) == 0
+
+    assert len(dag.leaves) == 1
+    assert dag.leaves[0].task_id == "astro_shop_test"
 
 
 def test_calculate_operator_class():

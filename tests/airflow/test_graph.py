@@ -2,7 +2,9 @@ from pathlib import Path
 from datetime import datetime
 
 import pytest
+from airflow import __version__ as airflow_version
 from airflow.models import DAG
+from packaging import version
 
 from cosmos.airflow.graph import (
     build_airflow_graph,
@@ -56,6 +58,10 @@ sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, tes
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version) <= version.parse("2.3.0"),
+    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
+)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_each():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -203,7 +209,7 @@ def test_create_task_metadata_model(caplog):
 
 
 def test_create_task_metadata_seed(caplog):
-    child_node = DbtNode(
+    sample_node = DbtNode(
         name="my_seed",
         unique_id="my_folder.my_seed",
         resource_type="seed",
@@ -212,7 +218,7 @@ def test_create_task_metadata_seed(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(child_node, execution_mode="docker", args=[])
+    metadata = create_task_metadata(sample_node, execution_mode="docker", args=[])
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
 

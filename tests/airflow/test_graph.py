@@ -1,5 +1,15 @@
-from cosmos.airflow.graph import calculate_leaves, create_task_metadata, create_test_task_metadata
+from cosmos.airflow.graph import (
+    calculate_leaves,
+    create_task_metadata,
+    create_test_task_metadata,
+    calculate_operator_class,
+)
 from cosmos.dbt.graph import DbtNode
+
+
+def test_calculate_operator_class():
+    class_module_import_path = calculate_operator_class(execution_mode="kubernetes", dbt_class="Seed")
+    assert class_module_import_path == "cosmos.operators.kubernetes.SeedKubernetesOperator"
 
 
 def test_calculate_leaves():

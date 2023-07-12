@@ -12,10 +12,16 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
 from cosmos.dbt.graph import DbtNode
 
-from cosmos.render import calculate_operator_class
-
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_operator_class(
+    execution_mode: str,
+    dbt_class: str,
+) -> str:
+    "Given an execution mode and dbt class, return the operator class to use"
+    return f"cosmos.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
 
 
 def calculate_leaves(nodes):

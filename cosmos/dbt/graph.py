@@ -2,6 +2,7 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -51,7 +52,7 @@ class DbtGraph:
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
 
-    def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd="dbt"):
+    def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd=shutil.which("dbt-ol")):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
@@ -62,7 +63,6 @@ class DbtGraph:
     def is_manifest_available(self):
         return self.project.manifest and Path(self.project.manifest).exists()
 
-    # TODO: implement smart load, which tries other load modes if the desired fails
     def load(self, method=LoadMode.AUTOMATIC, execution_mode="local"):
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
@@ -74,10 +74,12 @@ class DbtGraph:
                 self.load_from_dbt_manifest()
                 return
             elif execution_mode in ("local", "virtualenv"):
-                self.load_via_dbt_ls()
-                return
-                # TODO: if it errors, we should use LoadMode.CUSTOM
-                # self.load_via_custom_parser()
+                try:
+                    self.load_via_dbt_ls()
+                except FileNotFoundError:
+                    self.load_via_custom_parser()
+                finally:
+                    return
             else:
                 self.load_via_custom_parser()
                 return
@@ -88,6 +90,7 @@ class DbtGraph:
         load_method[method]()
 
     def load_via_dbt_ls(self):
+        logger.info("Trying to parse the dbt project using dbt ls...")
         command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]
         if self.exclude:
             command.extend(["--exclude", *self.exclude])
@@ -96,6 +99,9 @@ class DbtGraph:
 
         process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir)
         stdout, stderr = process.communicate()
+        # TODO: cover this with test:
+        if stderr:
+            raise CosmosLoadDbtException(f"Unable to run the command {command} due to the error:\n{stderr}")
 
         nodes = {}
         for line in stdout.decode().split("\n"):
@@ -122,6 +128,7 @@ class DbtGraph:
         """
         Convert from the legacy Cosmos DbtProject to the new list of nodes representation.
         """
+        logger.info("Trying to parse the dbt project using a custom Cosmos method...")
         project = LegacyDbtProject(
             dbt_root_path=self.project.root_dir,
             dbt_models_dir=self.project.models_dir.stem,
@@ -150,6 +157,7 @@ class DbtGraph:
         )
 
     def load_from_dbt_manifest(self):
+        logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}
         with open(self.project.manifest) as fp:
             manifest = json.load(fp)

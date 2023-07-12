@@ -39,12 +39,24 @@ def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
     assert mock_load_from_dbt_manifest.called
 
 
+@patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=FileNotFoundError())
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
-def test_load_automatic_without_manifest(mock_load_via_dbt_ls):
+def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_custom_parser):
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest="/tmp/manifest.json")
     dbt_graph = DbtGraph(project=dbt_project)
     dbt_graph.load(execution_mode="local")
     assert mock_load_via_dbt_ls.called
+    assert not mock_load_via_custom_parser.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", return_value=None)
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", side_effect=FileNotFoundError())
+def test_load_automatic_without_manifest_and_without_dbt_cmd(mock_load_via_dbt_ls, mock_load_via_custom_parser):
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph.load(execution_mode="local", method=LoadMode.AUTOMATIC)
+    assert mock_load_via_dbt_ls.called
+    assert mock_load_via_custom_parser.called
 
 
 def test_load_manifest_without_manifest():

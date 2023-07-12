@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import logging
 import pathlib
+import shutil
 from typing import Any, Callable, Optional
 
 try:
@@ -144,6 +145,7 @@ class DbtToAirflowConverter:
             project=dbt_project,
             exclude=exclude,
             select=select,
+            dbt_cmd=dbt_args.get("dbt_executable_path", shutil.which("dbt-ol")),
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 

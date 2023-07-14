@@ -76,9 +76,9 @@ class DbtGraph:
             elif execution_mode in ("local", "virtualenv"):
                 try:
                     self.load_via_dbt_ls()
+                    return
                 except FileNotFoundError:
                     self.load_via_custom_parser()
-                finally:
                     return
             else:
                 self.load_via_custom_parser()
@@ -96,19 +96,22 @@ class DbtGraph:
             command.extend(["--exclude", *self.exclude])
         if self.select:
             command.extend(["--select", *self.select])
-
+        logger.info(f"Running command: {command}")
         try:
-            process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir)
+            process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir, universal_newlines=True)
         except FileNotFoundError as exception:
-            raise CosmosLoadDbtException(f"Unable to run the command {command} due to the error:\n{exception}")
+            raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{exception}")
 
         stdout, stderr = process.communicate()
-        # TODO: cover this with test:
-        if stderr:
-            raise CosmosLoadDbtException(f"Unable to run the command {command} due to the error:\n{stderr}")
+
+        logger.debug(f"Output: {stdout}")
+
+        if stderr or "Runtime Error" in stdout:
+            details = stderr or stdout
+            raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
 
         nodes = {}
-        for line in stdout.decode().split("\n"):
+        for line in stdout.split("\n"):
             try:
                 node_dict = json.loads(line.strip())
             except json.decoder.JSONDecodeError:

@@ -40,5 +40,7 @@ class DbtProject:
             self.profile_path = self.pipeline_dir / "profiles.yml"
         if not self.profile_path.exists():
             with open(self.profile_path, "w") as fp:
-                profile_content = {self.name: {"target": "dev"}, "output": {"dev": {}}}
+                profile_content = {
+                    self.name: {"target": "dev", "outputs": {"dev": {"type": "sqlite", "database": "/tmp/dummy.db"}}}
+                }
                 yaml.dump(profile_content, fp)

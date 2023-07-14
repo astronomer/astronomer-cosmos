@@ -61,7 +61,7 @@ class DbtGraph:
         self.dbt_cmd = dbt_cmd
 
     def is_manifest_available(self):
-        return self.project.manifest and Path(self.project.manifest).exists()
+        return self.project.manifest_path and Path(self.project.manifest_path).exists()
 
     def load(self, method=LoadMode.AUTOMATIC, execution_mode="local"):
         load_method = {
@@ -85,7 +85,7 @@ class DbtGraph:
                 return
 
         if method == LoadMode.DBT_MANIFEST and not self.is_manifest_available():
-            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest}")
+            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
 
         load_method[method]()
 
@@ -163,7 +163,7 @@ class DbtGraph:
     def load_from_dbt_manifest(self):
         logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}
-        with open(self.project.manifest) as fp:
+        with open(self.project.manifest_path) as fp:
             manifest = json.load(fp)
 
             for unique_id, node_dict in manifest.get("nodes", {}).items():

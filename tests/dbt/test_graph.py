@@ -11,7 +11,7 @@ SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 
 
 def test_load_via_manifest_with_exclude():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest=SAMPLE_MANIFEST)
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
     dbt_graph = DbtGraph(project=dbt_project, exclude=["config.materialized:table"])
     dbt_graph.load_from_dbt_manifest()
 
@@ -33,7 +33,7 @@ def test_load_via_manifest_with_exclude():
 
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
 def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest=SAMPLE_MANIFEST)
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
     dbt_graph = DbtGraph(project=dbt_project)
     dbt_graph.load(execution_mode="local")
     assert mock_load_from_dbt_manifest.called
@@ -42,7 +42,7 @@ def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=FileNotFoundError())
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_custom_parser):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest="/tmp/manifest.json")
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path="/tmp/manifest.json")
     dbt_graph = DbtGraph(project=dbt_project)
     dbt_graph.load(execution_mode="local")
     assert mock_load_via_dbt_ls.called
@@ -69,7 +69,7 @@ def test_load_manifest_without_manifest():
 
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
 def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest=SAMPLE_MANIFEST)
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
     dbt_graph = DbtGraph(project=dbt_project)
     dbt_graph.load(execution_mode="local", method=LoadMode.DBT_MANIFEST)
     assert mock_load_from_dbt_manifest.called

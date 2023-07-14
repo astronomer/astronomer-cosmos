@@ -138,7 +138,7 @@ class DbtToAirflowConverter:
             models_dir=dbt_models_dir,
             seeds_dir=dbt_seeds_dir,
             snapshots_dir=dbt_snapshots_dir,
-            manifest=manifest_path,
+            manifest_path=manifest_path,
         )
 
         dbt_graph = DbtGraph(

@@ -191,7 +191,7 @@ def test_create_task_metadata_unsupported(caplog):
         tags=[],
         config={},
     )
-    response = create_task_metadata(child_node, execution_mode="", args=[])
+    response = create_task_metadata(child_node, execution_mode="", args={})
     assert response is None
     expected_msg = "Unsupported resource type unsupported (node unsupported)."
     assert caplog.messages[0] == expected_msg
@@ -207,9 +207,10 @@ def test_create_task_metadata_model(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(child_node, execution_mode="local", args=[])
+    metadata = create_task_metadata(child_node, execution_mode="local", args={})
     assert metadata.id == "my_model_run"
     assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
+    assert metadata.arguments == {"models": "my_model"}
 
 
 def test_create_task_metadata_seed(caplog):
@@ -222,7 +223,7 @@ def test_create_task_metadata_seed(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(sample_node, execution_mode="docker", args=[])
+    metadata = create_task_metadata(sample_node, execution_mode="docker", args={})
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
 

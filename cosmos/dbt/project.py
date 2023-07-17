@@ -1,5 +1,4 @@
 from __future__ import annotations
-import yaml
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,18 +28,20 @@ class DbtProject:
         if self.snapshots_dir is None:
             self.snapshots_dir = self.pipeline_dir / "snapshots"
         if self.profile_path is None:
-            self.update_profile_path()
+            self.profile_path = self.pipeline_dir / "profiles.yml"
 
     @property
     def dir(self) -> Path:
         return self.root_dir / self.name
 
-    def update_profile_path(self):
-        if not self.profile_path:
-            self.profile_path = self.pipeline_dir / "profiles.yml"
-        if not self.profile_path.exists():
-            with open(self.profile_path, "w") as fp:
-                profile_content = {
-                    self.name: {"target": "dev", "outputs": {"dev": {"type": "sqlite", "database": "/tmp/dummy.db"}}}
-                }
-                yaml.dump(profile_content, fp)
+    def is_manifest_available(self) -> bool:
+        """
+        Checks if the `dbt` project manifest is set and if the file exists.
+        """
+        return self.project.manifest_path and Path(self.project.manifest_path).exists()
+
+    def is_profile_yml_available(self) -> bool:
+        """
+        Checks if the `dbt` profiles.yml file exists.
+        """
+        return Path(self.project.profile_path).exists()

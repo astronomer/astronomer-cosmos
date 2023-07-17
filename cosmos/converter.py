@@ -107,7 +107,7 @@ class DbtToAirflowConverter:
         Defaults to "after_each"
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param execution_mode: The execution mode in which the dbt project should be run.
+    :param execution_mode: How Cosmos should run each dbt node (local, virtualenv, docker, k8s)
         Options are "local", "virtualenv", "docker", and "kubernetes".
         Defaults to "local"
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"

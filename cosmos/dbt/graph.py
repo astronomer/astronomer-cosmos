@@ -4,7 +4,6 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
@@ -19,10 +18,18 @@ logger = logging.getLogger(__name__)
 
 
 class CosmosLoadDbtException(Exception):
+    """
+    Exception raised while trying to load a `dbt` project as a `DbtGraph` instance.
+    """
+
     pass
 
 
 class LoadMode(Enum):
+    """
+    Supported ways to load a `dbt` project into a `DbtGraph` instance.
+    """
+
     AUTOMATIC = "automatic"
     CUSTOM = "custom"
     DBT_LS = "dbt_ls"
@@ -46,13 +53,32 @@ class DbtNode:
 
 class DbtGraph:
     """
-    Support loading a dbt project graph (represented by nodes) using different strategies.
+    A dbt project graph (represented by `nodes` and `filtered_nodes`).
+    Supports different ways of loading the `dbt` project into this representation.
+
+    Different loading methods can result in different `nodes` and `filtered_nodes`.
+
+    Example of how to use:
+
+        dbt_graph = DbtGraph(
+            project=DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR),
+            exclude=["*orders*"],
+            select=[],
+            dbt_cmd="/usr/local/bin/dbt",
+        )
+        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode="local")
     """
 
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
 
-    def __init__(self, project: DbtProject, exclude=None, select=None, dbt_cmd=get_system_dbt()):
+    def __init__(
+        self,
+        project: DbtProject,
+        exclude: list[str] | None = None,
+        select: list[str] = None,
+        dbt_cmd: str = get_system_dbt(),
+    ):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
@@ -60,20 +86,24 @@ class DbtGraph:
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
 
-    def is_manifest_available(self):
-        return self.project.manifest_path and Path(self.project.manifest_path).exists()
+    def load(self, method: LoadMode = LoadMode.AUTOMATIC, execution_mode: str = "local") -> None:
+        """
+        Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
 
-    def load(self, method=LoadMode.AUTOMATIC, execution_mode="local"):
+        :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
+            or dbt ls)
+        :param execution_mode: How Cosmos should run each dbt node (local, virtualenv, docker, k8s)
+        """
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
         if method == LoadMode.AUTOMATIC:
-            if self.is_manifest_available():
+            if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
                 return
-            elif execution_mode in ("local", "virtualenv"):
+            elif execution_mode in ("local", "virtualenv") and self.is_profile_yml_available():
                 try:
                     self.load_via_dbt_ls()
                     return
@@ -84,12 +114,20 @@ class DbtGraph:
                 self.load_via_custom_parser()
                 return
 
-        if method == LoadMode.DBT_MANIFEST and not self.is_manifest_available():
+        if method == LoadMode.DBT_MANIFEST and not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
 
         load_method[method]()
 
     def load_via_dbt_ls(self):
+        """
+        This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
+        line for both parsing and filtering the nodes.
+
+        Updates in-place:
+        * self.nodes
+        * self.filtered_nodes
+        """
         logger.info("Trying to parse the dbt project using dbt ls...")
         command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]
         if self.exclude:
@@ -133,7 +171,15 @@ class DbtGraph:
 
     def load_via_custom_parser(self):
         """
-        Convert from the legacy Cosmos DbtProject to the new list of nodes representation.
+        This is the least accurate way of loading `dbt` projects and filtering them out, since it uses custom Cosmos
+        logic, which is usually a subset of what is available in `dbt`.
+
+        Internally, it uses the legacy Cosmos DbtProject representation and converts it to the current
+        nodes list representation.
+
+        Updates in-place:
+        * self.nodes
+        * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project using a custom Cosmos method...")
         project = LegacyDbtProject(
@@ -164,6 +210,16 @@ class DbtGraph:
         )
 
     def load_from_dbt_manifest(self):
+        """
+        This approach accurately loads `dbt` projects using the `manifest.yml` file.
+
+        However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
+        to filter out the nodes relevant to the user (based on self.exclude and self.select).
+
+        Updates in-place:
+        * self.nodes
+        * self.filtered_nodes
+        """
         logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}
         with open(self.project.manifest_path) as fp:

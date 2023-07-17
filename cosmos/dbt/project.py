@@ -38,10 +38,10 @@ class DbtProject:
         """
         Checks if the `dbt` project manifest is set and if the file exists.
         """
-        return self.project.manifest_path and Path(self.project.manifest_path).exists()
+        return self.manifest_path and Path(self.manifest_path).exists()
 
     def is_profile_yml_available(self) -> bool:
         """
         Checks if the `dbt` profiles.yml file exists.
         """
-        return Path(self.project.profile_path).exists()
+        return Path(self.profile_path).exists()

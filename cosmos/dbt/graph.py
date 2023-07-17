@@ -103,7 +103,7 @@ class DbtGraph:
             if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
                 return
-            elif execution_mode in ("local", "virtualenv") and self.is_profile_yml_available():
+            elif execution_mode in ("local", "virtualenv") and self.project.is_profile_yml_available():
                 try:
                     self.load_via_dbt_ls()
                     return

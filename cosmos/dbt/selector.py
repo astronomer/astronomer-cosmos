@@ -14,10 +14,21 @@ logger = logging.getLogger(__name__)
 
 class SelectorConfig:
     """
-    Parse a select statement
+    Represents a select/exclude statement.
+    Supports to load it from a string.
     """
 
     def __init__(self, project_dir: Path, statement: str):
+        """
+        Create a selector config file.
+
+        :param project_dir: Directory to a dbt project
+        :param statement: dbt statement as passed within select and exclude arguments
+
+        References:
+        https://docs.getdbt.com/reference/node-selection/syntax
+        https://docs.getdbt.com/reference/node-selection/yaml-selectors
+        """
         self.project_dir = project_dir
         self.paths: list[str] = []
         self.tags: list[str] = []
@@ -26,6 +37,16 @@ class SelectorConfig:
         self.load_from_statement(statement)
 
     def load_from_statement(self, statement: str):
+        """
+        Load in-place select parameters.
+        Raises an exception if they are not yet implemented in Cosmos.
+
+        :param statement: dbt statement as passed within select and exclude arguments
+
+        References:
+        https://docs.getdbt.com/reference/node-selection/syntax
+        https://docs.getdbt.com/reference/node-selection/yaml-selectors
+        """
         items = statement.split(",")
         for item in items:
             if item.startswith(PATH_SELECTOR):
@@ -44,8 +65,17 @@ class SelectorConfig:
                 logger.warning("Unsupported select statement: %s", item)
 
 
-def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig):
-    """ """
+def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig) -> list[str]:
+    """
+    Return a list of node ids which matches the configuration defined in config.
+
+    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
+    :param config: User-defined select statements
+
+    References:
+    https://docs.getdbt.com/reference/node-selection/syntax
+    https://docs.getdbt.com/reference/node-selection/yaml-selectors
+    """
     selected_nodes = set()
     for node_id, node in nodes.items():
         if config.tags and not (sorted(node.tags) == sorted(config.tags)):
@@ -63,7 +93,9 @@ def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig):
     return selected_nodes
 
 
-def select_nodes(project_dir: Path, nodes: dict, select: list[str] | None = None, exclude: list[str] | None = None):
+def select_nodes(
+    project_dir: Path, nodes: dict[str, str], select: list[str] | None = None, exclude: list[str] | None = None
+) -> dict[str, str]:
     """
     Given a group of nodes within a project, apply select and exclude filters using
     dbt node selection.

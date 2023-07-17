@@ -23,9 +23,11 @@ from cosmos.dbt.project import DbtProject
 logger = logging.getLogger(__name__)
 
 
-def specific_kwargs(**kwargs):
+def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
     """
-    Extract kwargs specific to the cosmos.airflow.AirflowGroup class initialization method.
+    Extract kwargs specific to the cosmos.converter.DbtToAirflowConverter class initialization method.
+
+    :param kwargs: kwargs which can contain DbtToAirflowConverter and non DbtToAirflowConverter kwargs.
     """
     new_kwargs = {}
     specific_args_keys = inspect.getfullargspec(DbtToAirflowConverter.__init__).args
@@ -35,9 +37,11 @@ def specific_kwargs(**kwargs):
     return new_kwargs
 
 
-def airflow_kwargs(**kwargs):
+def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
     """
     Extract kwargs specific to the Airflow DAG or TaskGroup class initialization method.
+
+    :param kwargs: kwargs which can contain Airflow DAG or TaskGroup and cosmos.converter.DbtToAirflowConverter kwargs.
     """
     new_kwargs = {}
     non_airflow_kwargs = specific_kwargs(**kwargs)
@@ -47,10 +51,17 @@ def airflow_kwargs(**kwargs):
     return new_kwargs
 
 
-def validate_arguments(select, exclude, profile_args, task_args) -> None:
+def validate_arguments(
+    select: list[str], exclude: list[str], profile_args: dict[str, Any], task_args: dict[str, Any]
+) -> None:
     """
-    Validate that selectors mutually exclusive filters have not been given.
+    Validate that mutually exclusive selectors filters have not been given.
     Validate deprecated arguments.
+
+    :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
+    :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
+    :param profile_args: Arguments to pass to the dbt profile
+    :param task_args: Arguments to be used to instantiate an Airflow Task
     """
 
     if "tags" in select and "tags" in exclude:
@@ -70,7 +81,7 @@ def validate_arguments(select, exclude, profile_args, task_args) -> None:
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:
         profile_args["schema"] = task_args["schema"]
-        logger.warning("Specifying a schema in the task_args is deprecated. Please use the profile_args instead.")
+        logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
 
 
 class DbtToAirflowConverter:

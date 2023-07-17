@@ -210,7 +210,7 @@ def test_create_task_metadata_model(caplog):
     metadata = create_task_metadata(child_node, execution_mode="local", args={})
     assert metadata.id == "my_model_run"
     assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
-    assert metadata.arguments == {"select": "my_model"}
+    assert metadata.arguments == {"models": "my_model"}
 
 
 def test_create_task_metadata_seed(caplog):
@@ -226,7 +226,7 @@ def test_create_task_metadata_seed(caplog):
     metadata = create_task_metadata(sample_node, execution_mode="docker", args={})
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
-    assert metadata.arguments == {"select": "my_seed"}
+    assert metadata.arguments == {"models": "my_seed"}
 
 
 def test_create_task_metadata_snapshot(caplog):
@@ -242,7 +242,7 @@ def test_create_task_metadata_snapshot(caplog):
     metadata = create_task_metadata(sample_node, execution_mode="kubernetes", args={})
     assert metadata.id == "my_snapshot_snapshot"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator"
-    assert metadata.arguments == {"select": "my_snapshot"}
+    assert metadata.arguments == {"models": "my_snapshot"}
 
 
 def test_create_test_task_metadata():

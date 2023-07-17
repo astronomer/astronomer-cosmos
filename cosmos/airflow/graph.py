@@ -60,7 +60,7 @@ def create_task_metadata(node: DbtNode, execution_mode: str, args: dict) -> Task
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = {"model": "DbtRun", "snapshot": "DbtSnapshot", "seed": "DbtSeed", "test": "DbtTest"}
-    args = {**args, **{"select": node.name}}
+    args = {**args, **{"models": node.name}}
     task_id_suffix = "run" if node.resource_type == "model" else node.resource_type
 
     if node.resource_type in dbt_resource_to_class:

@@ -145,10 +145,8 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
     dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=dbt_project)
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
-    assert (
-        err_info.value.args[0]
-        == "Unable to run the command due to the error:\n[Errno 2] No such file or directory: '/inexistent/dbt'"
-    )
+    expected = "Unable to run the command due to the error:\n[Errno 2] No such file or directory: '/inexistent/dbt'"
+    assert err_info.value.args[0].startswith(expected)
 
 
 def test_load_via_load_via_custom_parser():

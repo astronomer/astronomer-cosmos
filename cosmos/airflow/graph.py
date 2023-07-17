@@ -36,7 +36,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     Return a list of unique_ids for nodes that are not parents (don't have dependencies on other tasks).
 
     :param tasks_ids: Node/task IDs which are materialized in the Airflow DAG
-    :param nodes: Dictionary mapping node.unique_id to node
+    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
     :returns: List of unique_ids for the nodes that are graph leaves
     """
     parents = []
@@ -52,7 +52,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
 
 def create_task_metadata(node: DbtNode, execution_mode: str, args: dict) -> TaskMetadata:
     """
-    Create the metadata that will be used to instantiate the Airflow Task that will run the given dbt node.
+    Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
 
     :param node: The dbt node which we desired to convert into an Airflow Task
     :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
@@ -82,7 +82,7 @@ def create_test_task_metadata(
     model_name: str | None = None,
 ) -> TaskMetadata:
     """
-    Create the metadata that will be used to instantiate the Airflow Task that will run the given dbt test node.
+    Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
 
     :param test_task_name: Name of the Airflow task to be created
     :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
@@ -107,17 +107,46 @@ def create_test_task_metadata(
 
 
 def build_airflow_graph(
-    nodes: list[DbtNode],
+    nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: str,  # Cosmos-specific - decide what which class to use
-    task_args,  # Cosmos/DBT - used to instantiate tasks
-    test_behavior,  # Cosmos-specific: how to inject tests to Airflow DAG
-    dbt_project_name,  # DBT / Cosmos - used to name test task if mode is after_all,
-    conn_id,  # Cosmos, dataset URI
+    task_args: dict[str, str],  # Cosmos/DBT - used to instantiate tasks
+    test_behavior: str | None,  # Cosmos-specific: how to inject tests to Airflow DAG
+    dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
+    conn_id: str,  # Cosmos, dataset URI
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable | None = None,  # argument specific to the DBT test command
     emit_datasets: bool = True,  # Cosmos
-):
+) -> None:
+    """
+    Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
+
+    The following arguments affect how each airflow task is instantiated:
+    * `execution_mode`
+    * `task_args`
+
+    The parameter `test_behavior` influences how many and where test nodes will be added, while the argument
+    `on_warning_callback` allows users to set a callback function to be called depending on the test result.
+    If the `test_behavior` is None, no test nodes are added. Otherwise, if the `test_behaviour` is `after_all`,
+    a single test task will be added after the Cosmos leave tasks, and it is named using `dbt_project_name`.
+    Finally, if the `test_behaviour` is `after_each`, a test will be added after each model.
+
+    If `emit_datasets` is True, tasks will create outlets using:
+    * `dbt_project_name`
+    * `conn_id`
+
+    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
+    :param dag: Airflow DAG instance
+    :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
+    :param task_args: Arguments to be used to instantiate an Airflow Task
+    :param test_behavior: Defines how many test dbt nodes and where they will be added
+    :param dbt_project_name: Name of the dbt pipeline of interest
+    :param conn_id: Airflow connection ID
+    :param task_group: Airflow Task Group instance
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+    and “test_results” of type List.
+    :param emit_datasets: Decides if Cosmos should add outlets to model classes or not.
+    """
     tasks_map = {}
 
     # In most cases, we'll  map one DBT node to one Airflow task

@@ -70,6 +70,16 @@ def test_connection_claiming() -> None:
     profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
     assert not profile_mapping.can_claim_connection()
 
+    # if we have dataset specified in extra, it should claim
+    dataset_dict = {"dataset": "my_dataset"}
+    conn = Connection(
+        conn_id="my_bigquery_connection",
+        conn_type="google_cloud_platform",
+        extra=json.dumps({**extra, **dataset_dict}),
+    )
+    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
+    assert profile_mapping.can_claim_connection()
+
     # if we have them all, it should claim
     conn = Connection(
         conn_id="my_bigquery_connection",

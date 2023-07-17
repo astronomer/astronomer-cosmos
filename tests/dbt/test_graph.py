@@ -140,6 +140,17 @@ def test_load_via_dbt_ls_without_exclude():
     assert len(dbt_graph.nodes) == 28
 
 
+def test_load_via_dbt_ls_with_invalid_dbt_path():
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=dbt_project)
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_via_dbt_ls()
+    assert (
+        err_info.value.args[0]
+        == "Unable to run the command due to the error:\n[Errno 2] No such file or directory: '/inexistent/dbt'"
+    )
+
+
 def test_load_via_load_via_custom_parser():
     dbt_project = DbtProject(
         name="jaffle_shop",

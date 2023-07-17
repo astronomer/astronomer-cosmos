@@ -149,6 +149,18 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
     assert err_info.value.args[0].startswith(expected)
 
 
+@patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
+def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
+    # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(project=dbt_project)
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_via_dbt_ls()
+    expected = "Unable to run the command due to the error:\nSome Runtime Error"
+    assert err_info.value.args[0] == expected
+    mock_popen_communicate.assert_called_once()
+
+
 def test_load_via_load_via_custom_parser():
     dbt_project = DbtProject(
         name="jaffle_shop",

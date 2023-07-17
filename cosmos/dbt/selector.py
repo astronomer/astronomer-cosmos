@@ -93,6 +93,23 @@ def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig) -> lis
     return selected_nodes
 
 
+def retrieve_by_label(statement_list: list[str], label: str) -> set:
+    """
+    Return a set of values associated with a label.
+
+    Example:
+        >>> values = retrieve_by_label(["path:/tmp,tag:a", "tag:b,path:/home"])
+        >>> values
+        {"a", "b"}
+    """
+    label_values = set()
+    for statement in statement_list:
+        config = SelectorConfig(Path(), statement)
+        item_values = getattr(config, label)
+        label_values = label_values.union(item_values)
+    return label_values
+
+
 def select_nodes(
     project_dir: Path, nodes: dict[str, str], select: list[str] | None = None, exclude: list[str] | None = None
 ) -> dict[str, str]:

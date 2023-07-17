@@ -18,6 +18,7 @@ from cosmos.airflow.graph import build_airflow_graph
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.graph import DbtGraph, LoadMode
 from cosmos.dbt.project import DbtProject
+from cosmos.dbt.selector import retrieve_by_label
 
 
 logger = logging.getLogger(__name__)
@@ -63,20 +64,12 @@ def validate_arguments(
     :param profile_args: Arguments to pass to the dbt profile
     :param task_args: Arguments to be used to instantiate an Airflow Task
     """
-
-    if "tags" in select and "tags" in exclude:
-        if set(select["tags"]).intersection(exclude["tags"]):
-            raise AirflowException(
-                f"Can't specify the same tag in `select` and `include`: "
-                f"{set(select['tags']).intersection(exclude['tags'])}"
-            )
-
-    if "paths" in select and "paths" in exclude:
-        if set(select["paths"]).intersection(exclude["paths"]):
-            raise AirflowException(
-                f"Can't specify the same path in `select` and `include`: "
-                f"{set(select['paths']).intersection(exclude['paths'])}"
-            )
+    for field in ("tags", "paths"):
+        select_items = retrieve_by_label(select, field)
+        exclude_items = retrieve_by_label(exclude, field)
+        intersection = {str(item) for item in set(select_items).intersection(exclude_items)}
+        if intersection:
+            raise AirflowException(f"Can't specify the same {field[:-1]} in `select` and `exclude`: " f"{intersection}")
 
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:

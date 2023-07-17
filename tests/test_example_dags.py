@@ -57,7 +57,7 @@ def get_dag_ids() -> list[str]:
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("dag_id", return_value=get_dag_ids())
+@pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)

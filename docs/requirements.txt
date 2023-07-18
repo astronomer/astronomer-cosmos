@@ -1,4 +1,0 @@
-apache-airflow
-pydata-sphinx-theme
-sphinx-tabs
-sphinx-autoapi

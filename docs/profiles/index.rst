@@ -1,4 +1,4 @@
-Connections and Profiles
+Profiles
 ==========================
 
 Cosmos automatically translates Airflow connections to dbt profiles. This means that you can use the same connection

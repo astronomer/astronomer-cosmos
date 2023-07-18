@@ -1,0 +1,37 @@
+.. _getting-started:
+
+.. toctree::
+   :hidden:
+   :caption: Contents:
+
+   Astro <astro>
+   MWAA <mwaa>
+   GCC <gcc>
+   Open-Source <open-source>
+   Execution Modes <execution-modes>
+   Docker Execution Mode <docker>
+   Kubernetes Execution Mode <kubernetes>
+
+
+Getting Started
+===============
+
+Recommended Methods
+-------------------
+
+The recommended way to install and run Cosmos depends on how you run Airflow. For specific guides, see the following:
+
+- `Getting Started on Astro <astro.html>`__
+- `Getting Started on MWAA <mwaa.html>`__
+- `Getting Started on GCC <gcc.html>`__
+- `Getting Started on Open-Source <open_source.html>`__
+
+Other Methods
+-------------
+
+While the above methods are recommended, you may require a different setup. For more customization, check out the different execution modes that Cosmos supports on the `Execution Modes <execution-modes.html>`__ page.
+
+For specific guides, see the following:
+
+- `Executing dbt DAGs with Docker Operators <docker.html>`__
+- `Executing dbt DAGs with KubernetesPodOperators <kubernetes.html>`__

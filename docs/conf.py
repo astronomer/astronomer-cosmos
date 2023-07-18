@@ -20,10 +20,9 @@ author = "Astronomer"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "autoapi.extension",
+    # "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx.ext.autosectionlabel",
     "sphinx_tabs.tabs",
 ]
 
@@ -48,16 +47,17 @@ html_theme_options = {
         "image_light": "cosmos-icon.svg",
         "image_dark": "cosmos-icon.svg",
     },
-    "footer_items": ["copyright"],
+    "footer_start": ["copyright"],
+    "show_nav_level": 2,
 }
 
 
-def skip_logger_objects(app, what, name, obj, skip, options):
-    if "logger" in name:
-        skip = True
+# def skip_logger_objects(app, what, name, obj, skip, options):
+#     if "logger" in name:
+#         skip = True
 
-    return skip
+#     return skip
 
 
-def setup(sphinx):
-    sphinx.connect("autoapi-skip-member", skip_logger_objects)
+# def setup(sphinx):
+#     sphinx.connect("autoapi-skip-member", skip_logger_objects)

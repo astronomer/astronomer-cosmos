@@ -12,7 +12,7 @@
 
   # Default build command.
   command = "make dirhtml"
-  environment = { PYTHON_VERSION = "3.10" }
+  environment = { PYTHON_VERSION = "3.8" }
 
 # Production context: all deploys from the Production branch
 # set in your site’s Branches settings in the UI will inherit

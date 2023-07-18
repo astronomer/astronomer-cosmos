@@ -79,4 +79,3 @@ installed
             "dbt_executable_path": "/usr/local/bin/dbt-ol",
         },
     )
-

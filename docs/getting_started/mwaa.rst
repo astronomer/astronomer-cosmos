@@ -94,7 +94,6 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
         profile_args={
             "schema": "public",
         },
-
         # normal dag parameters
         schedule_interval="@daily",
         start_date=datetime(2023, 1, 1),

@@ -52,14 +52,12 @@ Make sure to rename the ``<your-adapter>`` value below to your adapter's Python 
         profile_args={
             "schema": "public",
         },
-
         # cosmos virtualenv parameters
         execution_mode="virtualenv",
         operator_args={
             "py_system_site_packages": False,
             "py_requirements": ["<your-adapter>"],
         },
-
         # normal dag parameters
         schedule_interval="@daily",
         start_date=datetime(2023, 1, 1),

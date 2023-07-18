@@ -194,7 +194,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 self.project_dir,
                 tmp_project_dir,
             )
-
             profile_name = self.get_profile_name(tmp_project_dir)
             target_name = self.get_target_name()
 

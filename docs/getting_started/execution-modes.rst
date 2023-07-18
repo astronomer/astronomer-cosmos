@@ -92,7 +92,7 @@ The other challenge with the ``docker`` approach is if the Airflow worker is alr
 
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container, which is slower than creating a Virtualenv with ``dbt-core``.
 
-Check the step-by-step guide on using the ``docker`` execution mode at `Docker Operators <docker>`.
+Check the step-by-step guide on using the ``docker`` execution mode at `Docker Operators <docker.html>`_.
 
 Example DAG:
 
@@ -117,7 +117,7 @@ It assumes the user has a Kubernetes cluster. It also expects the user to ensure
 
 The ``Kubernetes`` deployment may be slower than ``Docker`` and ``Virtualenv`` assuming that the container image is built (which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``) and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 
-Check the step-by-step guide on using the ``kubernetes`` execution mode at `Kubernetes Operators <kubernetes>`.
+Check the step-by-step guide on using the ``kubernetes`` execution mode at `Kubernetes Operators <kubernetes.html>`_.
 
 Example DAG:
 

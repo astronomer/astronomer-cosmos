@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
+class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/private key.
     https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication

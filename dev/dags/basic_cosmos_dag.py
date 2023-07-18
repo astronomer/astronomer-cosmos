@@ -9,7 +9,7 @@ from pathlib import Path
 from cosmos import DbtDag
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
-DBT_ROOT_PATH = os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 # [START local_example]
 basic_cosmos_dag = DbtDag(

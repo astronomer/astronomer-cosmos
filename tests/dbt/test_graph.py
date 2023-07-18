@@ -149,6 +149,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
     assert err_info.value.args[0].startswith(expected)
 
 
+@pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
 def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout

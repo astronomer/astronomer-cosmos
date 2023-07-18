@@ -23,7 +23,6 @@ extensions = [
     # "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx_tabs.tabs",
 ]
 
 add_module_names = False
@@ -48,16 +47,4 @@ html_theme_options = {
         "image_dark": "cosmos-icon.svg",
     },
     "footer_start": ["copyright"],
-    "show_nav_level": 2,
 }
-
-
-# def skip_logger_objects(app, what, name, obj, skip, options):
-#     if "logger" in name:
-#         skip = True
-
-#     return skip
-
-
-# def setup(sphinx):
-#     sphinx.connect("autoapi-skip-member", skip_logger_objects)

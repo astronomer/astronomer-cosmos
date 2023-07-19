@@ -25,19 +25,19 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
         "database",
         "warehouse",
         "schema",
-        "private_key",
+        "private_key_content",
     ]
     secret_fields = [
-        "private_key",
+        "private_key_content",
     ]
     airflow_param_mapping = {
         "account": "extra.account",
         "user": "login",
-        "private_key": "extra.private_key_content",
         "database": "extra.database",
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
+        "private_key_content": "extra.private_key_content",
     }
 
     def __init__(self, conn: Connection, profile_args: dict[str, Any | None] | None = None) -> None:
@@ -71,7 +71,7 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
             "warehouse": self.conn.extra_dejson.get("warehouse"),
             **self.profile_args,
             # private_key should always get set as env var
-            "private_key": self.get_env_var_format("private_key"),
+            "private_key_content": self.get_env_var_format("private_key_content"),
         }
 
         # remove any null values

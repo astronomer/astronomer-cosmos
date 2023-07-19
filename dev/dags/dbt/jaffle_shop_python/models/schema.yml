@@ -29,6 +29,11 @@ models:
       - name: total_order_amount
         description: Total value (AUD) of a customer's orders
 
+    config:
+      cluster_id: "{{ env_var('DATABRICKS_CLUSTER_ID') }}"
+      submission_method: all_purpose_cluster
+      create_notebook: False
+
   - name: orders
     description: This table has basic information about orders, as well as some derived facts based on payments
 
@@ -80,3 +85,8 @@ models:
         description: Amount of the order (AUD) paid for by gift card
         tests:
           - not_null
+
+    config:
+      cluster_id: "{{ env_var('DATABRICKS_CLUSTER_ID') }}"
+      submission_method: all_purpose_cluster
+      create_notebook: False

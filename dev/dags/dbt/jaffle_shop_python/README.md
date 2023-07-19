@@ -9,3 +9,7 @@ See [dbt's documentation](https://github.com/dbt-labs/jaffle_shop) for more info
 This project has been modified from the original to highlight some of the features of Cosmos. Namely:
 
 - tags have been added to the models
+- the following models were replaced:
+  - `models/orders.sql` by `models/orders.py`
+  - `models/customers.sql` by `models/customers.py`
+- the `profiles.yml` to interface with Databricks

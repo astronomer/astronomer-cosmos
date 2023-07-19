@@ -1,13 +1,11 @@
-# WARNING: this gets ignored by cosmos
 jaffle_shop:
-  target: dev
-  outputs:
-    dev:
-      type: postgres
-      host: localhost
-      user: postgres
-      password: postgres
-      port: 5432
-      dbname: public
-      schema: dbt_example
-      threads: 4
+ outputs:
+   dev:
+     catalog: null
+     host: "{{ env_var('DATABRICKS_HOST') }}"
+     http_path: /sql/1.0/warehouses/{{ env_var('DATABRICKS_WAREHOUSE_ID') }}
+     schema: cosmos
+     threads: 1
+     token: "{{ env_var('DATABRICKS_TOKEN') }}"
+     type: databricks
+ target: dev

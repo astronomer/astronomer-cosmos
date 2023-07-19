@@ -2,6 +2,7 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from subprocess import Popen, PIPE
 from typing import Any
@@ -128,7 +129,9 @@ class DbtGraph:
             command.extend(["--select", *self.select])
         logger.info(f"Running command: {command}")
         try:
-            process = Popen(command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir, universal_newlines=True)
+            process = Popen(
+                command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir, universal_newlines=True, env=os.environ
+            )
         except FileNotFoundError as exception:
             raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{exception}")
 

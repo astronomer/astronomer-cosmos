@@ -8,6 +8,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :caption: Contents:
 
+   Parsing Methods <parsing-methods>
    Configuring Lineage <lineage>
    Generating Docs <generating-docs>
    Scheduling <scheduling>

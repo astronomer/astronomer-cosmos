@@ -45,7 +45,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
 
     from airflow import DAG
     from airflow.operators.empty import EmptyOperator
-    from cosmos.providers.dbt.task_group import DbtTaskGroup
+    from cosmos import DbtTaskGroup
 
 
     with DAG(

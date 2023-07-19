@@ -24,12 +24,15 @@ The recommended way to install and run Cosmos depends on how you run Airflow. Fo
 - `Getting Started on Astro <astro.html>`__
 - `Getting Started on MWAA <mwaa.html>`__
 - `Getting Started on GCC <gcc.html>`__
-- `Getting Started on Open-Source <open_source.html>`__
+- `Getting Started on Open-Source <open-source.html>`__
 
-Other Methods
--------------
+While the above methods are recommended, you may require a different setup. Check out the sections below for more information.
 
-While the above methods are recommended, you may require a different setup. For more customization, check out the different execution modes that Cosmos supports on the `Execution Modes <execution-modes.html>`__ page.
+
+Execution Methods
+-----------------
+
+For more customization, check out the different execution modes that Cosmos supports on the `Execution Modes <execution-modes.html>`__ page.
 
 For specific guides, see the following:
 

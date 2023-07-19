@@ -216,6 +216,10 @@ class DbtProject:
         for file_name in self.models_dir.rglob("*.sql"):
             self._handle_sql_file(file_name)
 
+        # crawl the models in the project
+        for file_name in self.models_dir.rglob("*.py"):
+            self._handle_sql_file(file_name)
+
         # crawl the snapshots in the project
         for file_name in self.snapshots_dir.rglob("*.sql"):
             self._handle_sql_file(file_name)

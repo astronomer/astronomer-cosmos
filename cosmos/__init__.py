@@ -1,9 +1,10 @@
+# type: ignore # ignores "Cannot assign to a type" MyPy error
+
 """
 Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
 Contains dags, task groups, and operators.
 """
-
 __version__ = "0.7.5"
 
 from cosmos.airflow.dag import DbtDag
@@ -11,6 +12,7 @@ from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
 from cosmos.dataset import get_dbt_dataset
 
+from cosmos.operators.lazy_load import MissingPackage
 
 from cosmos.operators.local import (
     DbtDepsLocalOperator,
@@ -32,8 +34,6 @@ try:
         DbtTestDockerOperator,
     )
 except ImportError:
-    from cosmos.operators.lazy_load import MissingPackage
-
     DbtLSDockerOperator = MissingPackage("cosmos.operators.docker.DbtLSDockerOperator", "docker")
     DbtRunDockerOperator = MissingPackage("cosmos.operators.docker.DbtRunDockerOperator", "docker")
     DbtRunOperationDockerOperator = MissingPackage(
@@ -54,8 +54,6 @@ try:
         DbtTestKubernetesOperator,
     )
 except ImportError:
-    from cosmos.operators.lazy_load import MissingPackage
-
     DbtLSKubernetesOperator = MissingPackage(
         "cosmos.operators.kubernetes.DbtLSKubernetesOperator",
         "kubernetes",

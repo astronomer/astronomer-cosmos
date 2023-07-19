@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 
 from airflow.compat.functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
+from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 from cosmos.operators.local import (
     DbtDocsLocalOperator,
@@ -45,14 +46,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self,
         py_requirements: list[str] | None = None,
         py_system_site_packages: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
-        self._venv_tmp_dir = ""
+        self._venv_tmp_dir = TemporaryDirectory()
 
-    @cached_property
+    @cached_property  # type: ignore[misc] # ignores internal untyped decorator
     def venv_dbt_path(
         self,
     ) -> str:
@@ -84,11 +85,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
-    def run_subprocess(self, command, *args, **kwargs):
+    def run_subprocess(self, *args: tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
+        command = kwargs["command"]
+
         if self.py_requirements:
             command[0] = self.venv_dbt_path
 
-        return self.subprocess_hook.run_command(
+        return self.subprocess_hook.run_command(  # type: ignore[no-any-return]
             command,
             *args,
             **kwargs,

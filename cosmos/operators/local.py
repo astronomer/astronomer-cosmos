@@ -6,7 +6,7 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -45,7 +45,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)
+    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -58,7 +58,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         profile_name: str | None = None,
         target_name: str | None = None,
         should_store_compiled_sql: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.install_deps = install_deps
         self.profile_args = profile_args
@@ -69,12 +69,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.should_store_compiled_sql = should_store_compiled_sql
         super().__init__(**kwargs)
 
-    @cached_property
-    def subprocess_hook(self):
+    @cached_property  # type: ignore[misc] # ignores internal untyped decorator
+    def subprocess_hook(self) -> FullOutputSubprocessHook:
         """Returns hook for running the bash command."""
         return FullOutputSubprocessHook()
 
-    def exception_handling(self, result: FullOutputSubprocessResult):
+    def exception_handling(self, result: FullOutputSubprocessResult) -> None:
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
@@ -83,7 +83,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 *result.full_output,
             )
 
-    @provide_session
+    @provide_session  # type: ignore[misc] # ignores internal untyped decorator
     def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
         """
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
@@ -126,8 +126,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         ).delete()
         session.add(rtif)
 
-    def run_subprocess(self, *args, **kwargs):
-        return self.subprocess_hook.run_command(*args, **kwargs)
+    def run_subprocess(self, *args: tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
+        return self.subprocess_hook.run_command(*args, **kwargs)  # type: ignore[no-any-return]
 
     def get_profile_name(self, project_dir: str) -> str:
         """
@@ -174,8 +174,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def run_command(
         self,
-        cmd: list[str],
-        env: dict[str, str],
+        cmd: list[Optional[str]],
+        env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
     ) -> FullOutputSubprocessResult:
         """
@@ -244,7 +244,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def execute(self, context: Context) -> str:
         # TODO is this going to put loads of unnecessary stuff in to xcom?
-        return self.build_and_run_cmd(context=context).output
+        return self.build_and_run_cmd(context=context).output  # type: ignore[no-any-return]
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -262,13 +262,13 @@ class DbtLSLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#DBCDF6"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "ls"
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtSeedLocalOperator(DbtLocalBaseOperator):
@@ -280,22 +280,22 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#F58D7E"
 
-    def __init__(self, full_refresh: bool = False, **kwargs) -> None:
+    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
         self.base_cmd = "seed"
 
-    def add_cmd_flags(self):
+    def add_cmd_flags(self) -> list[str]:
         flags = []
         if self.full_refresh is True:
             flags.append("--full-refresh")
 
         return flags
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
@@ -306,13 +306,13 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#964B00"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "snapshot"
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtRunLocalOperator(DbtLocalBaseOperator):
@@ -323,13 +323,13 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "run"
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
@@ -343,8 +343,8 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
     def __init__(
         self,
-        on_warning_callback: Optional[Callable] = None,
-        **kwargs,
+        on_warning_callback: Optional[Callable[..., Any]] = None,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = "test"
@@ -362,7 +362,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         :param result: The output from the build and run command.
         """
 
-        return self.on_warning_callback and no_tests_message not in result.output
+        return self.on_warning_callback is not None and no_tests_message not in result.output
 
     def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
@@ -378,19 +378,20 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         warning_context["test_names"] = test_names
         warning_context["test_results"] = test_results
 
-        self.on_warning_callback(warning_context)
+        if self.on_warning_callback:
+            self.on_warning_callback(warning_context)
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
 
         if not self._should_run_tests(result):
-            return result.output
+            return result.output  # type: ignore[no-any-return]
 
         warnings = parse_output(result, "WARN")
         if warnings > 0:
             self._handle_warnings(result, context)
 
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
@@ -405,23 +406,23 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     ui_color = "#8194E0"
     template_fields: Sequence[str] = "args"
 
-    def __init__(self, macro_name: str, args: dict = None, **kwargs) -> None:
+    def __init__(self, macro_name: str, args: Optional[dict[str, Any]] = None, **kwargs: Any) -> None:
         self.macro_name = macro_name
         self.args = args
         super().__init__(**kwargs)
         self.base_cmd = ["run-operation", macro_name]
 
-    def add_cmd_flags(self):
+    def add_cmd_flags(self) -> list[str]:
         flags = []
         if self.args is not None:
             flags.append("--args")
             flags.append(yaml.dump(self.args))
         return flags
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
@@ -434,13 +435,13 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 
     required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["docs", "generate"]
 
-    def execute(self, context: Context):
+    def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output
+        return result.output  # type: ignore[no-any-return]
 
 
 class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
@@ -460,7 +461,7 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         aws_conn_id: str,
         bucket_name: str,
         folder_dir: str | None = None,
-        **kwargs,
+        **kwargs: str,
     ) -> None:
         "Initializes the operator."
         self.aws_conn_id = aws_conn_id
@@ -520,7 +521,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
         azure_conn_id: str,
         container_name: str,
         folder_dir: str | None = None,
-        **kwargs,
+        **kwargs: str,
     ) -> None:
         "Initializes the operator."
         self.azure_conn_id = azure_conn_id
@@ -571,7 +572,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: str) -> None:
         raise DeprecationWarning(
             "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )

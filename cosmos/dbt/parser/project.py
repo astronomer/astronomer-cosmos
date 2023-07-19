@@ -10,10 +10,10 @@ import ast
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Dict, List, Set
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 import jinja2
-import yaml  # type: ignore
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class DbtModelConfig:
         self,
         sql_configs: Set[str],
         properties_configs: Set[str],
-        prefixes: List[str] = None,
+        prefixes: Optional[List[str]] = None,
     ) -> Set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
@@ -186,7 +186,7 @@ class DbtModel:
         self.config = config
 
     # TODO following needs coverage:
-    def _extract_config(self, kwarg, config_name: str):
+    def _extract_config(self, kwarg: Any, config_name: str) -> Any:
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:
                 # try to convert it to a constant and get the value
@@ -221,10 +221,10 @@ class DbtProject:
     project_name: str
 
     # optional, user-specified instance variables
-    dbt_root_path: str = "/usr/local/airflow/dags/dbt"
-    dbt_models_dir: str = "models"
-    dbt_snapshots_dir: str = "snapshots"
-    dbt_seeds_dir: str = "seeds"
+    dbt_root_path: Optional[str] = None
+    dbt_models_dir: Optional[str] = None
+    dbt_snapshots_dir: Optional[str] = None
+    dbt_seeds_dir: Optional[str] = None
 
     # private instance variables for managing state
     models: Dict[str, DbtModel] = field(default_factory=dict)
@@ -239,6 +239,15 @@ class DbtProject:
         """
         Initializes the parser.
         """
+        if self.dbt_root_path is None:
+            self.dbt_root_path = "/usr/local/airflow/dags/dbt"
+        if self.dbt_models_dir is None:
+            self.dbt_models_dir = "models"
+        if self.dbt_snapshots_dir is None:
+            self.dbt_snapshots_dir = "snapshots"
+        if self.dbt_seeds_dir is None:
+            self.dbt_seeds_dir = "seeds"
+
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
         self.models_dir = self.project_dir / self.dbt_models_dir
@@ -333,7 +342,9 @@ class DbtProject:
                     if isinstance(config_value, str):
                         config_selectors.append(f"{selector}:{config_value}")
                     else:
-                        [config_selectors.append(f"{selector}:{item}") for item in config_value if item]
+                        for item in config_value:
+                            if item:
+                                config_selectors.append(f"{selector}:{item}")
 
             # dbt default ensures "materialized:view" is set for all models if nothing is specified so that it will
             # work in a select/exclude list

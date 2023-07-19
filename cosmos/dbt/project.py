@@ -17,7 +17,7 @@ class DbtProject:
     profile_path: Path | None = None
     _cosmos_created_profile_file: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.models_dir is None:
             self.models_dir = self.dir / "models"
         if self.seeds_dir is None:
@@ -38,10 +38,10 @@ class DbtProject:
         """
         Check if the `dbt` project manifest is set and if the file exists.
         """
-        return self.manifest_path and Path(self.manifest_path).exists()
+        return self.manifest_path is not None and Path(self.manifest_path).exists()
 
     def is_profile_yml_available(self) -> bool:
         """
         Check if the `dbt` profiles.yml file exists.
         """
-        return Path(self.profile_path).exists()
+        return Path(self.profile_path).exists() if self.profile_path else False

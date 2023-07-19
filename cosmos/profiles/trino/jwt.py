@@ -28,7 +28,7 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
     @property
     def profile(self) -> dict[str, Any | None]:
         "Gets profile."
-        common_profile_vars = super().profile
+        common_profile_vars: dict[str, Any] = super().profile
 
         # need to remove jwt from profile_args because it will be set as an environment variable
         profile_args = self.profile_args.copy()

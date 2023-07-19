@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from typing import Any, Callable
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
@@ -42,7 +42,8 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     parents = []
     leaves = []
     materialized_nodes = [node for node in nodes.values() if node.unique_id in tasks_ids]
-    [parents.extend(node.depends_on) for node in materialized_nodes]
+    for node in materialized_nodes:
+        parents.extend(node.depends_on)
     parents_ids = set(parents)
     for node in materialized_nodes:
         if node.unique_id not in parents_ids:
@@ -80,12 +81,13 @@ def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dic
         return task_metadata
     else:
         logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
+        return None
 
 
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
-    task_args: dict,
+    task_args: dict[str, Any],
     on_warning_callback: callable,
     model_name: str | None = None,
 ) -> TaskMetadata:
@@ -118,12 +120,12 @@ def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
-    task_args: dict[str, str],  # Cosmos/DBT - used to instantiate tasks
+    task_args: dict[str, Any],  # Cosmos/DBT - used to instantiate tasks
     test_behavior: TestBehavior,  # Cosmos-specific: how to inject tests to Airflow DAG
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
     conn_id: str,  # Cosmos, dataset URI
     task_group: TaskGroup | None = None,
-    on_warning_callback: Callable | None = None,  # argument specific to the DBT test command
+    on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     emit_datasets: bool = True,  # Cosmos
 ) -> None:
     """
@@ -191,7 +193,7 @@ def build_airflow_graph(
             f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
-        leaves_ids = calculate_leaves(tasks_ids=tasks_map.keys(), nodes=nodes)
+        leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
 

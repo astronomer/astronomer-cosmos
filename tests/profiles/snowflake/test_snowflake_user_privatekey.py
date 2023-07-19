@@ -1,4 +1,4 @@
-"Tests for the Snowflake user/password profile."
+"Tests for the Snowflake user/private key profile."
 
 import json
 from unittest.mock import patch
@@ -8,7 +8,7 @@ from airflow.models.connection import Connection
 
 from cosmos.profiles import get_profile_mapping
 from cosmos.profiles.snowflake import (
-    SnowflakeUserPasswordProfileMapping,
+    SnowflakePrivateKeyPemProfileMapping,
 )
 
 
@@ -18,12 +18,11 @@ def mock_snowflake_conn():  # type: ignore
     Sets the connection as an environment variable.
     """
     conn = Connection(
-        conn_id="my_snowflake_password_connection",
+        conn_id="my_snowflake_pk_connection",
         conn_type="snowflake",
         login="my_user",
-        password="my_password",
         schema="my_schema",
-        extra='{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse"}',
+        extra='{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}',
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -38,7 +37,7 @@ def test_connection_claiming() -> None:
     # - conn_type == snowflake
     # and the following exist:
     # - user
-    # - password
+    # - private key
     # - account
     # - database
     # - warehouse
@@ -46,9 +45,8 @@ def test_connection_claiming() -> None:
     potential_values = {
         "conn_type": "snowflake",
         "login": "my_user",
-        "password": "my_password",
         "schema": "my_database",
-        "extra": '{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse"}',
+        "extra": '{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}',
     }
 
     # if we're missing any of the values, it shouldn't claim
@@ -59,35 +57,35 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = SnowflakeUserPasswordProfileMapping(
+        profile_mapping = SnowflakePrivateKeyPemProfileMapping(
             conn,
         )
         assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the account
     conn = Connection(**potential_values)  # type: ignore
-    conn.extra = '{"database": "my_database", "warehouse": "my_warehouse"}'
+    conn.extra = '{"database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+    profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
     assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the database
     conn = Connection(**potential_values)  # type: ignore
-    conn.extra = '{"account": "my_account", "warehouse": "my_warehouse"}'
+    conn.extra = '{"account": "my_account", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+    profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
     assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the warehouse
     conn = Connection(**potential_values)  # type: ignore
-    conn.extra = '{"account": "my_account", "database": "my_database"}'
+    conn.extra = '{"account": "my_account", "database": "my_database", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+    profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
     assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+    profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
     assert profile_mapping.can_claim_connection()
 
 
@@ -100,7 +98,7 @@ def test_profile_mapping_selected(
     profile_mapping = get_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
-    assert isinstance(profile_mapping, SnowflakeUserPasswordProfileMapping)
+    assert isinstance(profile_mapping, SnowflakePrivateKeyPemProfileMapping)
 
 
 def test_profile_args(
@@ -116,7 +114,7 @@ def test_profile_args(
     assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
-        "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
+        "private_key_content": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
         "schema": mock_snowflake_conn.schema,
         "account": mock_snowflake_conn.extra_dejson.get("account"),
         "database": mock_snowflake_conn.extra_dejson.get("database"),
@@ -141,7 +139,7 @@ def test_profile_args_overrides(
     assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
-        "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
+        "private_key_content": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
         "schema": mock_snowflake_conn.schema,
         "account": mock_snowflake_conn.extra_dejson.get("account"),
         "database": "my_db_override",
@@ -159,7 +157,7 @@ def test_profile_env_vars(
         mock_snowflake_conn.conn_id,
     )
     assert profile_mapping.env_vars == {
-        "COSMOS_CONN_SNOWFLAKE_PASSWORD": mock_snowflake_conn.password,
+        "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT": mock_snowflake_conn.password,
     }
 
 
@@ -182,11 +180,11 @@ def test_old_snowflake_format() -> None:
         ),
     )
 
-    profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+    profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
     assert profile_mapping.profile == {
         "type": conn.conn_type,
         "user": conn.login,
-        "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
+        "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
         "schema": conn.schema,
         "account": conn.extra_dejson.get("account"),
         "database": conn.extra_dejson.get("database"),
@@ -214,7 +212,7 @@ def test_appends_region() -> None:
         ),
     )
 
-    profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+    profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
     assert profile_mapping.profile == {
         "type": conn.conn_type,
         "user": conn.login,

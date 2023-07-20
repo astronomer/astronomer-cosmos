@@ -21,6 +21,7 @@ from cosmos import DbtDag
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+SCHEMA = "cosmos_" + os.getenv("DATABRICKS_UNIQUE_ID", "")
 
 # [START example_cosmos_python_models]
 example_cosmos_python_models = DbtDag(

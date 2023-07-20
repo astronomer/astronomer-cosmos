@@ -22,7 +22,14 @@ def mock_snowflake_conn():  # type: ignore
         conn_type="snowflake",
         login="my_user",
         schema="my_schema",
-        extra='{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}',
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+            }
+        ),
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -46,7 +53,14 @@ def test_connection_claiming() -> None:
         "conn_type": "snowflake",
         "login": "my_user",
         "schema": "my_database",
-        "extra": '{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}',
+        "extra": json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+            }
+        ),
     }
 
     # if we're missing any of the values, it shouldn't claim

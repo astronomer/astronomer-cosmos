@@ -2,7 +2,10 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from cosmos.dbt.graph import DbtNode
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cosmos.dbt.graph import DbtNode
 
 
 SUPPORTED_CONFIG = ["materialized", "schema", "tags"]

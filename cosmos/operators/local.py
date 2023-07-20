@@ -6,7 +6,7 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -126,7 +126,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         ).delete()
         session.add(rtif)
 
-    def run_subprocess(self, *args: tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
+    def run_subprocess(self, *args: Tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
         return self.subprocess_hook.run_command(*args, **kwargs)  # type: ignore[no-any-return]
 
     def get_profile_name(self, project_dir: str) -> str:
@@ -404,7 +404,7 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = "args"
+    template_fields: Sequence[str] = ("args",)
 
     def __init__(self, macro_name: str, args: Optional[dict[str, Any]] = None, **kwargs: Any) -> None:
         self.macro_name = macro_name

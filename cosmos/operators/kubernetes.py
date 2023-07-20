@@ -161,7 +161,7 @@ class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = "args"
+    template_fields: Sequence[str] = ("args",)
 
     def __init__(self, macro_name: str, args: Optional[dict[str, Any]] = None, **kwargs: str) -> None:
         self.macro_name = macro_name

@@ -30,7 +30,7 @@ example_cosmos_python_models = DbtDag(
     dbt_project_name="jaffle_shop_python",
     conn_id="databricks_default",
     profile_args={
-        "schema": "cosmos",
+        "schema": SCHEMA,
     },
     operator_args={"append_env": True},
     profile_name_override="airflow",

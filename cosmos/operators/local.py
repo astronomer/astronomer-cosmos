@@ -6,7 +6,7 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence, Tuple
+from typing import Any, Callable, Sequence, Tuple
 
 import yaml
 from airflow.compat.functools import cached_property
@@ -53,7 +53,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     def __init__(
         self,
         install_deps: bool = False,
-        callback: Optional[Callable[[str], None]] = None,
+        callback: Callable[[str], None] | None = None,
         profile_args: dict[str, str] = {},
         profile_name: str | None = None,
         target_name: str | None = None,
@@ -174,7 +174,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def run_command(
         self,
-        cmd: list[Optional[str]],
+        cmd: list[str | None],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
     ) -> FullOutputSubprocessResult:
@@ -264,7 +264,7 @@ class DbtLSLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "ls"
+        self.base_cmd = ["ls"]
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
@@ -283,7 +283,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
-        self.base_cmd = "seed"
+        self.base_cmd = ["seed"]
 
     def add_cmd_flags(self) -> list[str]:
         flags = []
@@ -308,7 +308,7 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "snapshot"
+        self.base_cmd = ["snapshot"]
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
@@ -325,7 +325,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "run"
+        self.base_cmd = ["run"]
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
@@ -343,11 +343,11 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
     def __init__(
         self,
-        on_warning_callback: Optional[Callable[..., Any]] = None,
+        on_warning_callback: Callable[..., Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "test"
+        self.base_cmd = ["test"]
         self.on_warning_callback = on_warning_callback
 
     def _should_run_tests(
@@ -406,7 +406,7 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     ui_color = "#8194E0"
     template_fields: Sequence[str] = ("args",)
 
-    def __init__(self, macro_name: str, args: Optional[dict[str, Any]] = None, **kwargs: Any) -> None:
+    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
         self.macro_name = macro_name
         self.args = args
         super().__init__(**kwargs)

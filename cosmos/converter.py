@@ -3,8 +3,7 @@ from __future__ import annotations
 import inspect
 import logging
 import sys
-from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
@@ -144,7 +143,7 @@ class DbtToAirflowConverter:
         execution_mode: str | ExecutionMode = ExecutionMode.LOCAL,
         load_mode: str | LoadMode = LoadMode.AUTOMATIC,
         manifest_path: str | Path | None = None,
-        on_warning_callback: Optional[Callable[..., Any]] = None,
+        on_warning_callback: Callable[..., Any] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:

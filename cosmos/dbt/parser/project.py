@@ -10,7 +10,7 @@ import ast
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set
+from typing import Any, ClassVar, Dict, List, Set
 
 import jinja2
 import yaml
@@ -63,7 +63,7 @@ class DbtModelConfig:
         self,
         sql_configs: Set[str],
         properties_configs: Set[str],
-        prefixes: Optional[List[str]] = None,
+        prefixes: List[str] | None = None,
     ) -> Set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
@@ -221,10 +221,10 @@ class DbtProject:
     project_name: str
 
     # optional, user-specified instance variables
-    dbt_root_path: Optional[str] = None
-    dbt_models_dir: Optional[str] = None
-    dbt_snapshots_dir: Optional[str] = None
-    dbt_seeds_dir: Optional[str] = None
+    dbt_root_path: str | None = None
+    dbt_models_dir: str | None = None
+    dbt_snapshots_dir: str | None = None
+    dbt_seeds_dir: str | None = None
 
     # private instance variables for managing state
     models: Dict[str, DbtModel] = field(default_factory=dict)

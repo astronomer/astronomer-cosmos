@@ -5,7 +5,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from subprocess import Popen, PIPE
-from typing import Any, Optional
+from typing import Any
 
 from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.dbt.executable import get_system_dbt
@@ -65,8 +65,8 @@ class DbtGraph:
     def __init__(
         self,
         project: DbtProject,
-        exclude: Optional[list[str]] = None,
-        select: Optional[list[str]] = None,
+        exclude: list[str] | None = None,
+        select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
     ):
         self.project = project

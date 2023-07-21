@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Sequence
 
 import yaml
 from airflow.utils.context import Context
@@ -62,7 +62,7 @@ class DbtLSDockerOperator(DbtDockerBaseOperator):
 
     def __init__(self, **kwargs: str) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "ls"
+        self.base_cmd = ["ls"]
 
     def execute(self, context: Context) -> Any:
         return self.build_and_run_cmd(context=context)
@@ -80,7 +80,7 @@ class DbtSeedDockerOperator(DbtDockerBaseOperator):
     def __init__(self, full_refresh: bool = False, **kwargs: str) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
-        self.base_cmd = "seed"
+        self.base_cmd = ["seed"]
 
     def add_cmd_flags(self) -> list[str]:
         flags = []
@@ -104,7 +104,7 @@ class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
 
     def __init__(self, **kwargs: str) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "snapshot"
+        self.base_cmd = ["snapshot"]
 
     def execute(self, context: Context) -> Any:
         return self.build_and_run_cmd(context=context)
@@ -120,7 +120,7 @@ class DbtRunDockerOperator(DbtDockerBaseOperator):
 
     def __init__(self, **kwargs: str) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "run"
+        self.base_cmd = ["run"]
 
     def execute(self, context: Context) -> Any:
         return self.build_and_run_cmd(context=context)
@@ -133,9 +133,9 @@ class DbtTestDockerOperator(DbtDockerBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(self, on_warning_callback: Optional[Callable[..., Any]] = None, **kwargs: str) -> None:
+    def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: str) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = "test"
+        self.base_cmd = ["test"]
         # as of now, on_warning_callback in docker executor does nothing
         self.on_warning_callback = on_warning_callback
 
@@ -155,7 +155,7 @@ class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
     ui_color = "#8194E0"
     template_fields: Sequence[str] = ("args",)
 
-    def __init__(self, macro_name: str, args: Optional[dict[str, Any]] = None, **kwargs: str) -> None:
+    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: str) -> None:
         self.macro_name = macro_name
         self.args = args
         super().__init__(**kwargs)

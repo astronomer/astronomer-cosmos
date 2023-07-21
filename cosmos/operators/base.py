@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
@@ -78,26 +78,26 @@ class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass My
         self,
         project_dir: str,
         conn_id: str,
-        base_cmd: Optional[str | list[str]] = None,
-        select: Optional[str] = None,
-        exclude: Optional[str] = None,
-        selector: Optional[str] = None,
-        vars: Optional[dict[str, str]] = None,
-        models: Optional[str] = None,
+        base_cmd: list[str] | None = None,
+        select: str | None = None,
+        exclude: str | None = None,
+        selector: str | None = None,
+        vars: dict[str, str] | None = None,
+        models: str | None = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
         fail_fast: bool = False,
         quiet: bool = False,
         warn_error: bool = False,
-        db_name: Optional[str] = None,
-        schema: Optional[str] = None,
-        env: Optional[dict[str, Any]] = None,
+        db_name: str | None = None,
+        schema: str | None = None,
+        env: dict[str, Any] | None = None,
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
-        dbt_cmd_flags: Optional[list[str]] = None,
+        dbt_cmd_flags: list[str] | None = None,
         **kwargs: str,
     ) -> None:
         self.project_dir = project_dir
@@ -205,12 +205,10 @@ class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass My
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-    ) -> Tuple[list[Optional[str]], dict[str, str | bytes | os.PathLike[Any]]]:
+    ) -> Tuple[list[str | None], dict[str, str | bytes | os.PathLike[Any]]]:
         dbt_cmd = [self.dbt_executable_path]
 
-        if isinstance(self.base_cmd, str):
-            dbt_cmd.append(self.base_cmd)
-        elif isinstance(self.base_cmd, list):
+        if self.base_cmd:
             dbt_cmd.extend(self.base_cmd)
 
         dbt_cmd.extend(self.add_global_flags())

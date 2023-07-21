@@ -144,6 +144,14 @@ Username and Password
     :members:
 
 
+Username and Private Key
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: cosmos.profiles.snowflake.SnowflakePrivateKeyPemProfileMapping
+    :undoc-members:
+    :members:
+
+
 Spark
 -----
 

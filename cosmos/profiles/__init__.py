@@ -13,6 +13,7 @@ from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
 from .redshift.user_pass import RedshiftUserPasswordProfileMapping
 from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
+from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
@@ -24,6 +25,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
     SnowflakeUserPasswordProfileMapping,
+    SnowflakePrivateKeyPemProfileMapping,
     SparkThriftProfileMapping,
     ExasolUserPasswordProfileMapping,
     TrinoLDAPProfileMapping,

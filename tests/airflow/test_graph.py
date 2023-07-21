@@ -22,26 +22,26 @@ SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 parent_seed = DbtNode(
     name="seed_parent",
     unique_id="seed_parent",
-    resource_type="seed",
+    resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
 )
 parent_node = DbtNode(
     name="parent",
     unique_id="parent",
-    resource_type="model",
+    resource_type=DbtResourceType.MODEL,
     depends_on=["seed_parent"],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view"},
 )
 test_parent_node = DbtNode(
-    name="test_parent", unique_id="test_parent", resource_type="test", depends_on=["parent"], file_path=""
+    name="test_parent", unique_id="test_parent", resource_type=DbtResourceType.TEST, depends_on=["parent"], file_path=""
 )
 child_node = DbtNode(
     name="child",
     unique_id="child",
-    resource_type="model",
+    resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
     tags=["nightly"],
@@ -50,7 +50,7 @@ child_node = DbtNode(
 test_child_node = DbtNode(
     name="test_child",
     unique_id="test_child",
-    resource_type="test",
+    resource_type=DbtResourceType.TEST,
     depends_on=["child"],
     file_path="",
 )
@@ -73,7 +73,7 @@ def test_build_airflow_graph_with_after_each():
         build_airflow_graph(
             nodes=sample_nodes,
             dag=dag,
-            execution_mode="local",
+            execution_mode=ExecutionMode.LOCAL,
             task_args=task_args,
             test_behavior="after_each",
             dbt_project_name="astro_shop",
@@ -115,7 +115,7 @@ def test_build_airflow_graph_with_after_all():
         build_airflow_graph(
             nodes=sample_nodes,
             dag=dag,
-            execution_mode="local",
+            execution_mode=ExecutionMode.LOCAL,
             task_args=task_args,
             test_behavior="after_all",
             dbt_project_name="astro_shop",

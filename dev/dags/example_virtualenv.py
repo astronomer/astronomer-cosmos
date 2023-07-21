@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag
+from cosmos import DbtDag, ExecutionMode
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -19,7 +19,7 @@ example_virtualenv = DbtDag(
     dbt_project_name=PROJECT_NAME,
     conn_id=CONNECTION_ID,
     dbt_args={"schema": "public"},
-    execution_mode="virtualenv",
+    execution_mode=ExecutionMode.VIRTUALENV,
     operator_args={
         "project_dir": DBT_ROOT_PATH / PROJECT_NAME,
         "py_system_site_packages": False,

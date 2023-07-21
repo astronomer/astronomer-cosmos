@@ -6,13 +6,12 @@ Contains dags, task groups, and operators.
 
 __version__ = "0.7.5"
 
-from cosmos.dataset import get_dbt_dataset
-
-# re-export the dag and task group
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.dataset import get_dbt_dataset
 
-# re-export the operators
+
 from cosmos.operators.local import (
     DbtDepsLocalOperator,
     DbtLSLocalOperator,
@@ -105,4 +104,7 @@ __all__ = [
     "DbtSeedKubernetesOperator",
     "DbtTestKubernetesOperator",
     "DbtSnapshotKubernetesOperator",
+    "ExecutionMode",
+    "LoadMode",
+    "TestBehavior",
 ]

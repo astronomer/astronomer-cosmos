@@ -18,6 +18,7 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "snowflake"
+    is_community: bool = True
 
     required_fields = [
         "account",

@@ -13,7 +13,7 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     calculate_operator_class,
 )
-from cosmos.constants import ExecutionMode, DbtResourceType
+from cosmos.constants import ExecutionMode, DbtResourceType, TestBehavior
 from cosmos.dbt.graph import DbtNode
 
 
@@ -75,7 +75,7 @@ def test_build_airflow_graph_with_after_each():
             dag=dag,
             execution_mode=ExecutionMode.LOCAL,
             task_args=task_args,
-            test_behavior="after_each",
+            test_behavior=TestBehavior.AFTER_EACH,
             dbt_project_name="astro_shop",
             conn_id="fake_conn",
         )
@@ -117,7 +117,7 @@ def test_build_airflow_graph_with_after_all():
             dag=dag,
             execution_mode=ExecutionMode.LOCAL,
             task_args=task_args,
-            test_behavior="after_all",
+            test_behavior=TestBehavior.AFTER_ALL,
             dbt_project_name="astro_shop",
             conn_id="fake_conn",
         )

@@ -164,7 +164,7 @@ test-integration = """pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
---ignore-glob='*example_cosmos_python_models.py*'
+-k 'not test_example_dag[example_cosmos_python_models]'
 """
 test-integration-expensive = """pytest -vv \
 --cov=cosmos \

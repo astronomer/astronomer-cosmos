@@ -5,18 +5,14 @@ import logging
 import pathlib
 from typing import Any, Callable, Optional
 
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
-
 from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
+from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.dbt.graph import DbtGraph, LoadMode
+from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
 
@@ -96,13 +92,11 @@ class DbtToAirflowConverter:
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-    :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
-        Defaults to "after_each"
+    :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param execution_mode: How Cosmos should run each dbt node (local, virtualenv, docker, k8s)
-        Options are "local", "virtualenv", "docker", and "kubernetes".
-        Defaults to "local"
+    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
+        Default is ExecutionMode.LOCAL.
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
@@ -123,10 +117,10 @@ class DbtToAirflowConverter:
         dbt_models_dir: str | None = None,
         dbt_seeds_dir: str | None = None,
         dbt_snapshots_dir: str | None = None,
-        test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
+        test_behavior: TestBehavior = TestBehavior.AFTER_EACH,
         select: list[str] | None = None,
         exclude: list[str] | None = None,
-        execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
+        execution_mode: ExecutionMode = ExecutionMode.LOCAL,
         load_mode: LoadMode = LoadMode.AUTOMATIC,
         manifest_path: str | pathlib.Path | None = None,
         on_warning_callback: Optional[Callable] = None,

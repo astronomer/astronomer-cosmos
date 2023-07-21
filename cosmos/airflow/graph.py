@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from typing import Callable
 
-
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos.constants import DbtNodeType, TestBehavior, ExecutionMode
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_operator_class(
-    execution_mode: str,
+    execution_mode: ExecutionMode,
     dbt_class: str,
 ) -> str:
     """
@@ -28,7 +28,7 @@ def calculate_operator_class(
     :returns: path string to the correspondent Cosmos Airflow operator
     (e.g. cosmos.operators.localDbtSnapshotLocalOperator)
     """
-    return f"cosmos.operators.{execution_mode}.{dbt_class}{execution_mode.capitalize()}Operator"
+    return f"cosmos.operators.{execution_mode.value}.{dbt_class}{execution_mode.value.capitalize()}Operator"
 
 
 def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:
@@ -50,20 +50,26 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     return leaves
 
 
-def create_task_metadata(node: DbtNode, execution_mode: str, args: dict) -> TaskMetadata:
+def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dict) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
 
     :param node: The dbt node which we desired to convert into an Airflow Task
-    :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
+    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
+         Default is ExecutionMode.LOCAL.
     :param args: Arguments to be used to instantiate an Airflow Task
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
-    dbt_resource_to_class = {"model": "DbtRun", "snapshot": "DbtSnapshot", "seed": "DbtSeed", "test": "DbtTest"}
+    dbt_resource_to_class = {
+        DbtNodeType.MODEL: "DbtRun",
+        DbtNodeType.SNAPSHOT: "DbtSnapshot",
+        DbtNodeType.SEED: "DbtSeed",
+        DbtNodeType.TEST: "DbtTest",
+    }
     args = {**args, **{"models": node.name}}
-    task_id_suffix = "run" if node.resource_type == "model" else node.resource_type
 
-    if node.resource_type in dbt_resource_to_class:
+    if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
+        task_id_suffix = "run" if node.resource_type == DbtNodeType.MODEL else node.resource_type.value
         task_metadata = TaskMetadata(
             id=f"{node.name}_{task_id_suffix}",
             operator_class=calculate_operator_class(
@@ -78,7 +84,7 @@ def create_task_metadata(node: DbtNode, execution_mode: str, args: dict) -> Task
 
 def create_test_task_metadata(
     test_task_name: str,
-    execution_mode: str,
+    execution_mode: ExecutionMode,
     task_args: dict,
     on_warning_callback: callable,
     model_name: str | None = None,
@@ -111,9 +117,9 @@ def create_test_task_metadata(
 def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
-    execution_mode: str,  # Cosmos-specific - decide what which class to use
+    execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
     task_args: dict[str, str],  # Cosmos/DBT - used to instantiate tasks
-    test_behavior: str | None,  # Cosmos-specific: how to inject tests to Airflow DAG
+    test_behavior: TestBehavior,  # Cosmos-specific: how to inject tests to Airflow DAG
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
     conn_id: str,  # Cosmos, dataset URI
     task_group: TaskGroup | None = None,
@@ -139,9 +145,10 @@ def build_airflow_graph(
 
     :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
     :param dag: Airflow DAG instance
-    :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
+    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
+        Default is ExecutionMode.LOCAL.
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param test_behavior: Defines how many test dbt nodes and where they will be added
+    :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
     :param dbt_project_name: Name of the dbt pipeline of interest
     :param conn_id: Airflow connection ID
     :param task_group: Airflow Task Group instance
@@ -158,8 +165,8 @@ def build_airflow_graph(
         task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=task_args)
         if emit_datasets:
             task_args["outlets"] = [get_dbt_dataset(conn_id, dbt_project_name, node.name)]
-        if task_meta and node.resource_type != "test":
-            if node.resource_type == "model" and test_behavior == "after_each":
+        if task_meta and node.resource_type != DbtNodeType.TEST:
+            if node.resource_type == DbtNodeType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
                     task = create_airflow_task(task_meta, dag, task_group=model_task_group)
                     test_meta = create_test_task_metadata(
@@ -178,7 +185,7 @@ def build_airflow_graph(
 
     # If test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
-    if test_behavior == "after_all":
+    if test_behavior == TestBehavior.AFTER_ALL:
         task_args.pop("outlets", None)
         test_meta = create_test_task_metadata(
             f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback

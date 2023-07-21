@@ -3,10 +3,10 @@ import itertools
 import json
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from subprocess import Popen, PIPE
 from typing import Any
 
+from cosmos.constants import DbtNodeType, ExecutionMode, LoadMode
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
@@ -23,17 +23,6 @@ class CosmosLoadDbtException(Exception):
     """
 
     pass
-
-
-class LoadMode(Enum):
-    """
-    Supported ways to load a `dbt` project into a `DbtGraph` instance.
-    """
-
-    AUTOMATIC = "automatic"
-    CUSTOM = "custom"
-    DBT_LS = "dbt_ls"
-    DBT_MANIFEST = "dbt_manifest"
 
 
 @dataclass
@@ -66,7 +55,7 @@ class DbtGraph:
             select=[],
             dbt_cmd="/usr/local/bin/dbt",
         )
-        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode="local")
+        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """
 
     nodes: dict[str, DbtNode] = dict()
@@ -86,13 +75,13 @@ class DbtGraph:
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
 
-    def load(self, method: LoadMode = LoadMode.AUTOMATIC, execution_mode: str = "local") -> None:
+    def load(self, method: LoadMode = LoadMode.AUTOMATIC, execution_mode: ExecutionMode = ExecutionMode.LOCAL) -> None:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
 
         :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
             or dbt ls)
-        :param execution_mode: How Cosmos should run each dbt node (local, virtualenv, docker, k8s)
+        :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.KUBERNETES)
         """
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
@@ -103,7 +92,10 @@ class DbtGraph:
             if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
                 return
-            elif execution_mode in ("local", "virtualenv") and self.project.is_profile_yml_available():
+            elif (
+                execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV)
+                and self.project.is_profile_yml_available()
+            ):
                 try:
                     self.load_via_dbt_ls()
                     return
@@ -158,7 +150,7 @@ class DbtGraph:
                 node = DbtNode(
                     name=node_dict["name"],
                     unique_id=node_dict["unique_id"],
-                    resource_type=node_dict["resource_type"],
+                    resource_type=DbtNodeType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],
@@ -196,7 +188,7 @@ class DbtGraph:
             node = DbtNode(
                 name=model_name,
                 unique_id=model_name,
-                resource_type=model.type,
+                resource_type=DbtNodeType(model.type.value),
                 depends_on=model.config.upstream_models,
                 file_path=model.path,
                 tags=[],
@@ -229,7 +221,7 @@ class DbtGraph:
                 node = DbtNode(
                     name=node_dict["name"],
                     unique_id=unique_id,
-                    resource_type=node_dict["resource_type"],
+                    resource_type=DbtNodeType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],

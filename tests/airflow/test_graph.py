@@ -13,6 +13,7 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     calculate_operator_class,
 )
+from cosmos.constants import ExecutionMode, DbtNodeType
 from cosmos.dbt.graph import DbtNode
 
 
@@ -132,8 +133,8 @@ def test_build_airflow_graph_with_after_all():
 
 
 def test_calculate_operator_class():
-    class_module_import_path = calculate_operator_class(execution_mode="kubernetes", dbt_class="Seed")
-    assert class_module_import_path == "cosmos.operators.kubernetes.SeedKubernetesOperator"
+    class_module_import_path = calculate_operator_class(execution_mode=ExecutionMode.KUBERNETES, dbt_class="DbtSeed")
+    assert class_module_import_path == "cosmos.operators.kubernetes.DbtSeedKubernetesOperator"
 
 
 def test_calculate_leaves():
@@ -201,13 +202,13 @@ def test_create_task_metadata_model(caplog):
     child_node = DbtNode(
         name="my_model",
         unique_id="my_folder.my_model",
-        resource_type="model",
+        resource_type=DbtNodeType.MODEL,
         depends_on=[],
         file_path="",
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(child_node, execution_mode="local", args={})
+    metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})
     assert metadata.id == "my_model_run"
     assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
     assert metadata.arguments == {"models": "my_model"}
@@ -217,13 +218,13 @@ def test_create_task_metadata_seed(caplog):
     sample_node = DbtNode(
         name="my_seed",
         unique_id="my_folder.my_seed",
-        resource_type="seed",
+        resource_type=DbtNodeType.SEED,
         depends_on=[],
         file_path="",
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(sample_node, execution_mode="docker", args={})
+    metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
     assert metadata.arguments == {"models": "my_seed"}
@@ -233,13 +234,13 @@ def test_create_task_metadata_snapshot(caplog):
     sample_node = DbtNode(
         name="my_snapshot",
         unique_id="my_folder.my_snapshot",
-        resource_type="snapshot",
+        resource_type=DbtNodeType.SNAPSHOT,
         depends_on=[],
         file_path="",
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(sample_node, execution_mode="kubernetes", args={})
+    metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.KUBERNETES, args={})
     assert metadata.id == "my_snapshot_snapshot"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator"
     assert metadata.arguments == {"models": "my_snapshot"}
@@ -248,7 +249,7 @@ def test_create_task_metadata_snapshot(caplog):
 def test_create_test_task_metadata():
     metadata = create_test_task_metadata(
         test_task_name="test_no_nulls",
-        execution_mode="local",
+        execution_mode=ExecutionMode.LOCAL,
         task_args={"task_arg": "value"},
         on_warning_callback=True,
         model_name="my_model",

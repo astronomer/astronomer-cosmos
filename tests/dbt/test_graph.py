@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.constants import ExecutionMode, DbtNodeType
+from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
 from cosmos.dbt.project import DbtProject
 
@@ -23,7 +23,7 @@ def test_load_via_manifest_with_exclude():
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
     assert sample_node.unique_id == "model.jaffle_shop.customers"
-    assert sample_node.resource_type == DbtNodeType.MODEL
+    assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
         "model.jaffle_shop.stg_customers",
         "model.jaffle_shop.stg_orders",
@@ -122,7 +122,7 @@ def test_load_via_dbt_ls_with_exclude():
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
     assert sample_node.unique_id == "model.jaffle_shop.customers"
-    assert sample_node.resource_type == "model"
+    assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
         "model.jaffle_shop.stg_customers",
         "model.jaffle_shop.stg_orders",

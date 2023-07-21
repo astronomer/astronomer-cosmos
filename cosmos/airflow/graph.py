@@ -6,7 +6,7 @@ from typing import Callable
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.constants import DbtNodeType, TestBehavior, ExecutionMode
+from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
@@ -61,15 +61,15 @@ def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dic
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = {
-        DbtNodeType.MODEL: "DbtRun",
-        DbtNodeType.SNAPSHOT: "DbtSnapshot",
-        DbtNodeType.SEED: "DbtSeed",
-        DbtNodeType.TEST: "DbtTest",
+        DbtResourceType.MODEL: "DbtRun",
+        DbtResourceType.SNAPSHOT: "DbtSnapshot",
+        DbtResourceType.SEED: "DbtSeed",
+        DbtResourceType.TEST: "DbtTest",
     }
     args = {**args, **{"models": node.name}}
 
     if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
-        task_id_suffix = "run" if node.resource_type == DbtNodeType.MODEL else node.resource_type.value
+        task_id_suffix = "run" if node.resource_type == DbtResourceType.MODEL else node.resource_type.value
         task_metadata = TaskMetadata(
             id=f"{node.name}_{task_id_suffix}",
             operator_class=calculate_operator_class(
@@ -165,8 +165,8 @@ def build_airflow_graph(
         task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=task_args)
         if emit_datasets:
             task_args["outlets"] = [get_dbt_dataset(conn_id, dbt_project_name, node.name)]
-        if task_meta and node.resource_type != DbtNodeType.TEST:
-            if node.resource_type == DbtNodeType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
+        if task_meta and node.resource_type != DbtResourceType.TEST:
+            if node.resource_type == DbtResourceType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
                     task = create_airflow_task(task_meta, dag, task_group=model_task_group)
                     test_meta = create_test_task_metadata(

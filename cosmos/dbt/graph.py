@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from subprocess import Popen, PIPE
 from typing import Any
 
-from cosmos.constants import DbtNodeType, ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
@@ -150,7 +150,7 @@ class DbtGraph:
                 node = DbtNode(
                     name=node_dict["name"],
                     unique_id=node_dict["unique_id"],
-                    resource_type=DbtNodeType(node_dict["resource_type"]),
+                    resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],
@@ -188,7 +188,7 @@ class DbtGraph:
             node = DbtNode(
                 name=model_name,
                 unique_id=model_name,
-                resource_type=DbtNodeType(model.type.value),
+                resource_type=DbtResourceType(model.type.value),
                 depends_on=model.config.upstream_models,
                 file_path=model.path,
                 tags=[],
@@ -221,7 +221,7 @@ class DbtGraph:
                 node = DbtNode(
                     name=node_dict["name"],
                     unique_id=unique_id,
-                    resource_type=DbtNodeType(node_dict["resource_type"]),
+                    resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],

@@ -13,7 +13,7 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     calculate_operator_class,
 )
-from cosmos.constants import ExecutionMode, DbtNodeType
+from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtNode
 
 
@@ -141,7 +141,7 @@ def test_calculate_leaves():
     grandparent_node = DbtNode(
         name="grandparent",
         unique_id="grandparent",
-        resource_type="model",
+        resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
         tags=[],
@@ -150,7 +150,7 @@ def test_calculate_leaves():
     parent1_node = DbtNode(
         name="parent1",
         unique_id="parent1",
-        resource_type="model",
+        resource_type=DbtResourceType.MODEL,
         depends_on=["grandparent"],
         file_path="",
         tags=[],
@@ -159,7 +159,7 @@ def test_calculate_leaves():
     parent2_node = DbtNode(
         name="parent2",
         unique_id="parent2",
-        resource_type="model",
+        resource_type=DbtResourceType.MODEL,
         depends_on=["grandparent"],
         file_path="",
         tags=[],
@@ -168,7 +168,7 @@ def test_calculate_leaves():
     child_node = DbtNode(
         name="child",
         unique_id="child",
-        resource_type="model",
+        resource_type=DbtResourceType.MODEL,
         depends_on=["parent1", "parent2"],
         file_path="",
         tags=[],
@@ -202,7 +202,7 @@ def test_create_task_metadata_model(caplog):
     child_node = DbtNode(
         name="my_model",
         unique_id="my_folder.my_model",
-        resource_type=DbtNodeType.MODEL,
+        resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
         tags=[],
@@ -218,7 +218,7 @@ def test_create_task_metadata_seed(caplog):
     sample_node = DbtNode(
         name="my_seed",
         unique_id="my_folder.my_seed",
-        resource_type=DbtNodeType.SEED,
+        resource_type=DbtResourceType.SEED,
         depends_on=[],
         file_path="",
         tags=[],
@@ -234,7 +234,7 @@ def test_create_task_metadata_snapshot(caplog):
     sample_node = DbtNode(
         name="my_snapshot",
         unique_id="my_folder.my_snapshot",
-        resource_type=DbtNodeType.SNAPSHOT,
+        resource_type=DbtResourceType.SNAPSHOT,
         depends_on=[],
         file_path="",
         tags=[],

@@ -41,7 +41,7 @@ class ExecutionMode(Enum):
 
 
 # Rename to DbtResourceType
-class DbtNodeType(Enum):
+class DbtResourceType(Enum):
     """
     Type of dbt node.
     """

@@ -158,7 +158,21 @@ rm -rf airflow.*; \
 airflow db init; \
 pip install dbt-postgres; \
 pip install dbt-databricks"""
-test-integration = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
+test-integration = """pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+--ignore-glob='*example_cosmos_python_models.py*'
+"""
+test-integration-expensive = """pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+-k 'test_example_dag[example_cosmos_python_models]'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -166,7 +180,7 @@ filterwarnings = [
 ]
 minversion = "6.0"
 markers = [
-    "integration"
+    "integration",
 ]
 
 ######################################

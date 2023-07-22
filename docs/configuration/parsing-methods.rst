@@ -10,6 +10,10 @@ Cosmos offers several options to parse your dbt project:
 - ``dbt_ls``. Parses a dbt project directory using the ``dbt ls`` command.
 - ``custom``. Uses Cosmos' custom dbt parser, which extracts dependencies from your dbt's model code.
 
+The ``dbt_manifest`` and ``dbt_ls`` methods use dbt directly to parse your project. This means that they will respect your ``dbt_project.yml`` file and any other dbt configuration you have set up.
+
+On the other hand, the ``custom`` method uses Cosmos' own dbt parser. This parser is not as robust as dbt's, so it's recommended that you use one of the other methods if possible.
+
 
 ``automatic``
 -------------

@@ -1,9 +1,9 @@
 .. _gcc:
 
-Getting Started on GCC
-=======================
+Getting Started on Google Cloud Composer (GCC)
+================================================
 
-Because there's no straightforward way of creating a Python virtual environment in GCC, we recommend using Cosmos' built-in virtual environment functionality to run dbt.
+Because there's no straightforward way of creating a Python virtual environment in Google Cloud Composer (GCC) , we recommend using Cosmos' built-in virtual environment functionality to run dbt.
 
 Install Cosmos
 --------------

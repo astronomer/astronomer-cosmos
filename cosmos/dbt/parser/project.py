@@ -21,9 +21,9 @@ class DbtModelType(Enum):
     Represents type of dbt unit (model, snapshot, seed)
     """
 
-    DBT_MODEL = 1
-    DBT_SNAPSHOT = 2
-    DBT_SEED = 3
+    DBT_MODEL = "model"
+    DBT_SNAPSHOT = "snapshot"
+    DBT_SEED = "seed"
 
 
 @dataclass

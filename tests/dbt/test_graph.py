@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
+from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
 from cosmos.dbt.project import DbtProject
 
@@ -22,7 +23,7 @@ def test_load_via_manifest_with_exclude():
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
     assert sample_node.unique_id == "model.jaffle_shop.customers"
-    assert sample_node.resource_type == "model"
+    assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
         "model.jaffle_shop.stg_customers",
         "model.jaffle_shop.stg_orders",
@@ -35,7 +36,7 @@ def test_load_via_manifest_with_exclude():
 def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
     dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode="local")
+    dbt_graph.load(execution_mode=ExecutionMode.LOCAL)
     assert mock_load_from_dbt_manifest.called
 
 
@@ -44,7 +45,7 @@ def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
 def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_custom_parser):
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path="/tmp/manifest.json")
     dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode="local")
+    dbt_graph.load(execution_mode=ExecutionMode.LOCAL)
     assert mock_load_via_dbt_ls.called
     assert not mock_load_via_custom_parser.called
 
@@ -54,7 +55,7 @@ def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_cus
 def test_load_automatic_without_manifest_and_without_dbt_cmd(mock_load_via_dbt_ls, mock_load_via_custom_parser):
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode="local", method=LoadMode.AUTOMATIC)
+    dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.AUTOMATIC)
     assert mock_load_via_dbt_ls.called
     assert mock_load_via_custom_parser.called
 
@@ -63,7 +64,7 @@ def test_load_manifest_without_manifest():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(project=dbt_project)
     with pytest.raises(CosmosLoadDbtException) as err_info:
-        dbt_graph.load(execution_mode="local", method=LoadMode.DBT_MANIFEST)
+        dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_MANIFEST)
     assert err_info.value.args[0] == "Unable to load manifest using None"
 
 
@@ -71,19 +72,19 @@ def test_load_manifest_without_manifest():
 def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
     dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode="local", method=LoadMode.DBT_MANIFEST)
+    dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_MANIFEST)
     assert mock_load_from_dbt_manifest.called
 
 
 @pytest.mark.parametrize(
     "exec_mode,method,expected_function",
     [
-        ("local", LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
-        ("virtualenv", LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
-        ("kubernetes", LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
-        ("docker", LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
-        ("local", LoadMode.DBT_LS, "mock_load_via_dbt_ls"),
-        ("local", LoadMode.CUSTOM, "mock_load_via_custom_parser"),
+        (ExecutionMode.LOCAL, LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
+        (ExecutionMode.VIRTUALENV, LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
+        (ExecutionMode.KUBERNETES, LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
+        (ExecutionMode.DOCKER, LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
+        (ExecutionMode.LOCAL, LoadMode.DBT_LS, "mock_load_via_dbt_ls"),
+        (ExecutionMode.LOCAL, LoadMode.CUSTOM, "mock_load_via_custom_parser"),
     ],
 )
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", return_value=None)
@@ -121,7 +122,7 @@ def test_load_via_dbt_ls_with_exclude():
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
     assert sample_node.unique_id == "model.jaffle_shop.customers"
-    assert sample_node.resource_type == "model"
+    assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
         "model.jaffle_shop.stg_customers",
         "model.jaffle_shop.stg_orders",

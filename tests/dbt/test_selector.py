@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
 from cosmos.dbt.selector import select_nodes
 
@@ -8,7 +9,7 @@ SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 grandparent_node = DbtNode(
     name="grandparent",
     unique_id="grandparent",
-    resource_type="model",
+    resource_type=DbtResourceType.MODEL,
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/grandparent.sql",
     tags=["has_child"],
@@ -17,7 +18,7 @@ grandparent_node = DbtNode(
 parent_node = DbtNode(
     name="parent",
     unique_id="parent",
-    resource_type="model",
+    resource_type=DbtResourceType.MODEL,
     depends_on=["grandparent"],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
@@ -26,7 +27,7 @@ parent_node = DbtNode(
 child_node = DbtNode(
     name="child",
     unique_id="child",
-    resource_type="model",
+    resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
     tags=["nightly"],

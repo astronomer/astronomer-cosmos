@@ -3,26 +3,27 @@ from __future__ import annotations
 import inspect
 import logging
 import pathlib
+from enum import Enum
 from typing import Any, Callable, Optional
-
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
 
 from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
+from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.dbt.graph import DbtGraph, LoadMode
+from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.profiles import ProfileConfig
 
 
 logger = logging.getLogger(__name__)
+
+
+class UserInputError(Exception):
+    pass
 
 
 def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -75,6 +76,21 @@ def validate_arguments(select: list[str], exclude: list[str], task_args: dict[st
         raise AirflowException("The `schema` argument is no longer supported. Please use the `profile_args` instead.")
 
 
+def convert_value_to_enum(value: str | Enum, enum_class: Enum) -> Enum:
+    """
+    If value is an enum, return enum item.
+    Else, if value is a string, attempt to return the correspondent enum value.
+    Raise an exception otherwise
+    """
+    if isinstance(value, str):
+        try:
+            return enum_class(value)
+        except ValueError:
+            raise UserInputError(f"The given value {value} is not compatible with the type {enum_class.__name__}")
+    else:
+        return value
+
+
 class DbtToAirflowConverter:
     """
     Logic common to build an Airflow DbtDag and DbtTaskGroup from a DBT project.
@@ -91,13 +107,11 @@ class DbtToAirflowConverter:
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-    :param test_behavior: The behavior for running tests. Options are "none", "after_each", and "after_all".
-        Defaults to "after_each"
+    :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param execution_mode: How Cosmos should run each dbt node (local, virtualenv, docker, k8s)
-        Options are "local", "virtualenv", "docker", and "kubernetes".
-        Defaults to "local"
+    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
+        Default is ExecutionMode.LOCAL.
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
@@ -115,11 +129,11 @@ class DbtToAirflowConverter:
         dbt_models_dir: str | None = None,
         dbt_seeds_dir: str | None = None,
         dbt_snapshots_dir: str | None = None,
-        test_behavior: Literal["none", "after_each", "after_all"] = "after_each",
+        test_behavior: str | TestBehavior = TestBehavior.AFTER_EACH,
         select: list[str] | None = None,
         exclude: list[str] | None = None,
-        execution_mode: Literal["local", "docker", "kubernetes", "virtualenv"] = "local",
-        load_mode: LoadMode = LoadMode.AUTOMATIC,
+        execution_mode: str | ExecutionMode = ExecutionMode.LOCAL,
+        load_mode: str | LoadMode = LoadMode.AUTOMATIC,
         manifest_path: str | pathlib.Path | None = None,
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
@@ -132,6 +146,10 @@ class DbtToAirflowConverter:
             raise ValueError(
                 "When using local or virtualenv execution mode, a ProfileConfig must be provided to render the profile."
             )
+
+        test_behavior = convert_value_to_enum(test_behavior, TestBehavior)
+        execution_mode = convert_value_to_enum(execution_mode, ExecutionMode)
+        load_mode = convert_value_to_enum(load_mode, LoadMode)
 
         dbt_project = DbtProject(
             name=dbt_project_name,

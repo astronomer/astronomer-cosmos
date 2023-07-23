@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import logging
 import pathlib
+from enum import Enum
 from typing import Any, Callable, Optional
 
 from airflow.exceptions import AirflowException
@@ -18,6 +19,10 @@ from cosmos.dbt.selector import retrieve_by_label
 
 
 logger = logging.getLogger(__name__)
+
+
+class UserInputError(Exception):
+    pass
 
 
 def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -73,6 +78,21 @@ def validate_arguments(
         logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
 
 
+def convert_value_to_enum(value: str | Enum, enum_class: Enum) -> Enum:
+    """
+    If value is an enum, return enum item.
+    Else, if value is a string, attempt to return the correspondent enum value.
+    Raise an exception otherwise
+    """
+    if isinstance(value, str):
+        try:
+            return enum_class(value)
+        except ValueError:
+            raise UserInputError(f"The given value {value} is not compatible with the type {enum_class.__name__}")
+    else:
+        return value
+
+
 class DbtToAirflowConverter:
     """
     Logic common to build an Airflow DbtDag and DbtTaskGroup from a DBT project.
@@ -117,11 +137,11 @@ class DbtToAirflowConverter:
         dbt_models_dir: str | None = None,
         dbt_seeds_dir: str | None = None,
         dbt_snapshots_dir: str | None = None,
-        test_behavior: TestBehavior = TestBehavior.AFTER_EACH,
+        test_behavior: str | TestBehavior = TestBehavior.AFTER_EACH,
         select: list[str] | None = None,
         exclude: list[str] | None = None,
-        execution_mode: ExecutionMode = ExecutionMode.LOCAL,
-        load_mode: LoadMode = LoadMode.AUTOMATIC,
+        execution_mode: str | ExecutionMode = ExecutionMode.LOCAL,
+        load_mode: str | LoadMode = LoadMode.AUTOMATIC,
         manifest_path: str | pathlib.Path | None = None,
         on_warning_callback: Optional[Callable] = None,
         *args: Any,
@@ -129,6 +149,10 @@ class DbtToAirflowConverter:
     ) -> None:
         select = select or []
         exclude = exclude or []
+
+        test_behavior = convert_value_to_enum(test_behavior, TestBehavior)
+        execution_mode = convert_value_to_enum(execution_mode, ExecutionMode)
+        load_mode = convert_value_to_enum(load_mode, LoadMode)
 
         dbt_project = DbtProject(
             name=dbt_project_name,

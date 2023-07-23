@@ -19,6 +19,7 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.graph import DbtGraph, LoadMode
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
+from cosmos.profiles import ProfileConfig
 
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,7 @@ def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
     return new_kwargs
 
 
-def validate_arguments(
-    select: list[str], exclude: list[str], profile_args: dict[str, Any], task_args: dict[str, Any]
-) -> None:
+def validate_arguments(select: list[str], exclude: list[str], task_args: dict[str, Any]) -> None:
     """
     Validate that mutually exclusive selectors filters have not been given.
     Validate deprecated arguments.
@@ -73,8 +72,7 @@ def validate_arguments(
 
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:
-        profile_args["schema"] = task_args["schema"]
-        logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
+        raise AirflowException("The `schema` argument is no longer supported. Please use the `profile_args` instead.")
 
 
 class DbtToAirflowConverter:
@@ -83,15 +81,12 @@ class DbtToAirflowConverter:
 
     :param dag: Airflow DAG to be populated
     :param task_group (optional): Airflow Task Group to be populated
+    :param profile_config: A ProfileConfig object to use to render and execute dbt. Required if using
+        local or virtualenv execution mode.
     :param dbt_project_name: The name of the dbt project
     :param dbt_root_path: The path to the dbt root directory
     :param dbt_models_dir: The path to the dbt models directory within the project
     :param dbt_seeds_dir: The path to the dbt seeds directory within the project
-    :param conn_id: The Airflow connection ID to use for the dbt profile
-    :param profile_args: Arguments to pass to the dbt profile
-    :param profile_name_override: A name to use for the dbt profile. If not provided, and no profile target is found
-        in your project's dbt_project.yml, "cosmos_profile" is used.
-    :param target_name_override: A name to use for the dbt target. If not provided, "cosmos_target" is used.
     :param dbt_args: Parameters to pass to the underlying dbt operators, can include dbt_executable_path to utilize venv
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
@@ -110,13 +105,10 @@ class DbtToAirflowConverter:
     def __init__(
         self,
         dbt_project_name: str,
-        conn_id: str,
+        profile_config: ProfileConfig | None = None,
         dag: DAG | None = None,
         task_group: TaskGroup | None = None,
-        profile_args: dict[str, str] = {},
         dbt_args: dict[str, Any] = {},
-        profile_name_override: str | None = None,
-        target_name_override: str | None = None,
         operator_args: dict[str, Any] = {},
         emit_datasets: bool = True,
         dbt_root_path: str = "/usr/local/airflow/dags/dbt",
@@ -135,6 +127,11 @@ class DbtToAirflowConverter:
     ) -> None:
         select = select or []
         exclude = exclude or []
+
+        if execution_mode in ["local", "virtualenv"] and not profile_config:
+            raise ValueError(
+                "When using local or virtualenv execution mode, a ProfileConfig must be provided to render the profile."
+            )
 
         dbt_project = DbtProject(
             name=dbt_project_name,
@@ -156,15 +153,12 @@ class DbtToAirflowConverter:
         task_args = {
             **dbt_args,
             **operator_args,
-            "profile_args": profile_args,
-            "profile_name": profile_name_override,
-            "target_name": target_name_override,
             # the following args may be only needed for local / venv:
             "project_dir": dbt_project.dir,
-            "conn_id": conn_id,
+            "profile_config": profile_config,
         }
 
-        validate_arguments(select, exclude, profile_args, task_args)
+        validate_arguments(select, exclude, task_args)
 
         build_airflow_graph(
             nodes=dbt_graph.nodes,
@@ -174,7 +168,6 @@ class DbtToAirflowConverter:
             task_args=task_args,
             test_behavior=test_behavior,
             dbt_project_name=dbt_project.name,
-            conn_id=conn_id,
             on_warning_callback=on_warning_callback,
             emit_datasets=emit_datasets,
         )

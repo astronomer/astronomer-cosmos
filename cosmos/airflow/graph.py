@@ -11,6 +11,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
 from cosmos.dbt.graph import DbtNode
+from cosmos.profiles import ProfileConfig
 
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ def build_airflow_graph(
     task_args: dict[str, str],  # Cosmos/DBT - used to instantiate tasks
     test_behavior: str | None,  # Cosmos-specific: how to inject tests to Airflow DAG
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
-    conn_id: str,  # Cosmos, dataset URI
+    profile_config: ProfileConfig,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable | None = None,  # argument specific to the DBT test command
     emit_datasets: bool = True,  # Cosmos

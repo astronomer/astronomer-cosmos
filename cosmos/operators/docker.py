@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 # docker is an optional dependency, so we need to check if it's installed
 try:
     from airflow.providers.docker.operators.docker import DockerOperator
-except ImportError:
+except ImportError as exception:
     raise ImportError(
-        "Could not import DockerOperator. Ensure you've installed the docker provider separately or "
-        "with with `pip install astronomer-cosmos[...,docker]`."
-    )
+        "Could not import DockerOperator. Ensure you've installed the docker provider separately or"
+        " with with `pip install astronomer-cosmos[...,docker]`."
+    ) from exception
 
 
 class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
@@ -26,14 +26,14 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
 
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + DockerOperator.template_fields
+    template_fields: list[str] = DbtBaseOperator.template_fields + DockerOperator.template_fields
 
     intercept_flag = False
 
     def __init__(
         self,
         image: str,  # Make image a required argument since it's required by DockerOperator
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(image=image, **kwargs)
 

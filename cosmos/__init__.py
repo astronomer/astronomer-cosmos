@@ -9,11 +9,11 @@ __version__ = "0.7.5"
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig, ExecutionConfig
 from cosmos.dataset import get_dbt_dataset
 
 
 from cosmos.operators.local import (
-    DbtDepsLocalOperator,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
@@ -21,6 +21,7 @@ from cosmos.operators.local import (
     DbtSnapshotLocalOperator,
     DbtTestLocalOperator,
 )
+
 
 try:
     from cosmos.operators.docker import (
@@ -82,12 +83,15 @@ except ImportError:
     )
 
 __all__ = [
+    "ProjectConfig",
+    "ProfileConfig",
+    "RenderConfig",
+    "ExecutionConfig",
     "DbtLSLocalOperator",
     "DbtRunOperationLocalOperator",
     "DbtRunLocalOperator",
     "DbtSeedLocalOperator",
     "DbtTestLocalOperator",
-    "DbtDepsLocalOperator",
     "DbtSnapshotLocalOperator",
     "get_dbt_dataset",
     "DbtDag",

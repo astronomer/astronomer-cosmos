@@ -93,7 +93,7 @@ class FullOutputSubprocessHook(BaseHook):
 
         return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
 
-    def send_sigterm(self):
+    def send_sigterm(self) -> None:
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""
         self.log.info("Sending SIGTERM signal to process group")
         if self.sub_process and hasattr(self.sub_process, "pid"):

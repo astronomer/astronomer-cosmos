@@ -1,4 +1,3 @@
-from .local import DbtDepsLocalOperator as DbtDepsOperator
 from .local import DbtDocsAzureStorageLocalOperator as DbtDocsAzureStorageOperator
 from .local import DbtDocsLocalOperator as DbtDocsOperator
 from .local import DbtDocsS3LocalOperator as DbtDocsS3Operator
@@ -16,7 +15,6 @@ __all__ = [
     "DbtRunOperator",
     "DbtTestOperator",
     "DbtRunOperationOperator",
-    "DbtDepsOperator",
     "DbtDocsOperator",
     "DbtDocsS3Operator",
     "DbtDocsAzureStorageOperator",

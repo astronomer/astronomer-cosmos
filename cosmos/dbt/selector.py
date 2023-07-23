@@ -2,6 +2,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from cosmos.dbt.node import DbtNode
+
 
 SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
@@ -36,7 +38,7 @@ class SelectorConfig:
         self.other: list[str] = []
         self.load_from_statement(statement)
 
-    def load_from_statement(self, statement: str):
+    def load_from_statement(self, statement: str) -> None:
         """
         Load in-place select parameters.
         Raises an exception if they are not yet implemented in Cosmos.
@@ -51,7 +53,7 @@ class SelectorConfig:
         for item in items:
             if item.startswith(PATH_SELECTOR):
                 index = len(PATH_SELECTOR)
-                self.paths.append(self.project_dir / item[index:])
+                self.paths.append(str(self.project_dir / item[index:]))
             elif item.startswith(TAG_SELECTOR):
                 index = len(TAG_SELECTOR)
                 self.tags.append(item[index:])
@@ -65,7 +67,7 @@ class SelectorConfig:
                 logger.warning("Unsupported select statement: %s", item)
 
 
-def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig) -> list[str]:
+def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: SelectorConfig) -> set[str]:
     """
     Return a list of node ids which matches the configuration defined in config.
 
@@ -85,7 +87,8 @@ def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig) -> lis
         if config.config and not (config.config.items() <= supported_node_config.items()):
             continue
 
-        if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):
+        node_path = Path(node.file_path)
+        if config.paths and not (set(config.paths).issubset(set(node_path.parents))):
             continue
 
         selected_nodes.add(node_id)
@@ -93,7 +96,7 @@ def select_nodes_ids_by_intersection(nodes: dict, config: SelectorConfig) -> lis
     return selected_nodes
 
 
-def retrieve_by_label(statement_list: list[str], label: str) -> set:
+def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     """
     Return a set of values associated with a label.
 
@@ -102,7 +105,7 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set:
         >>> values
         {"a", "b"}
     """
-    label_values = set()
+    label_values: set[str] = set()
     for statement in statement_list:
         config = SelectorConfig(Path(), statement)
         item_values = getattr(config, label)
@@ -111,8 +114,8 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set:
 
 
 def select_nodes(
-    project_dir: Path, nodes: dict[str, str], select: list[str] | None = None, exclude: list[str] | None = None
-) -> dict[str, str]:
+    project_dir: Path, nodes: dict[str, DbtNode], select: list[str] | None = None, exclude: list[str] | None = None
+) -> dict[str, DbtNode]:
     """
     Given a group of nodes within a project, apply select and exclude filters using
     dbt node selection.
@@ -126,7 +129,7 @@ def select_nodes(
     if not select and not exclude:
         return nodes
 
-    subset_ids = set()
+    subset_ids: set[str] = set()
 
     for statement in select:
         config = SelectorConfig(project_dir, statement)

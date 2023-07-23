@@ -6,6 +6,7 @@ from typing import Any
 
 from airflow.utils.task_group import TaskGroup
 
+from cosmos.config import ProjectConfig
 from cosmos.converter import airflow_kwargs, specific_kwargs, DbtToAirflowConverter
 
 
@@ -16,10 +17,17 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):  # type: ignore[misc] # ig
 
     def __init__(
         self,
+        project_config: ProjectConfig,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        group_id = kwargs.get("group_id", kwargs.get("dbt_project_name", "dbt_task_group"))
-        TaskGroup.__init__(self, group_id, *args, **airflow_kwargs(**kwargs))
-        kwargs["task_group"] = self
-        DbtToAirflowConverter.__init__(self, *args, **specific_kwargs(**kwargs))
+        group_id = kwargs.pop("group_id", project_config.project_name)
+
+        kwargs = {
+            **kwargs,
+            "group_id": group_id,
+            "project_config": project_config,
+        }
+
+        TaskGroup.__init__(self, *args, **airflow_kwargs(**kwargs))
+        DbtToAirflowConverter.__init__(self, *args, task_group=self, **specific_kwargs(**kwargs))

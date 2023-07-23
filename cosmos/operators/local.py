@@ -1,31 +1,25 @@
+"Contains the local operators to run dbt commands locally."
 from __future__ import annotations
 
 import logging
 import os
 import shutil
 import signal
-import tempfile
 from pathlib import Path
-from typing import Any, Callable, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 import yaml
+from airflow.models.renderedtifields import RenderedTaskInstanceFields
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.utils.context import Context
-from airflow.utils.session import NEW_SESSION, provide_session
-from sqlalchemy.orm import Session
 
-from cosmos.constants import DEFAULT_DBT_PROFILE_NAME, DEFAULT_DBT_TARGET_NAME
 from cosmos.operators.base import DbtBaseOperator
-from cosmos.profiles import get_profile_mapping
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
-from cosmos.dbt.parser.output import (
-    extract_log_issues,
-    parse_output,
-)
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +28,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
-    :param profile_args: Arguments to pass to the profile. See
-        :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
-    :param profile_name: A name to use for the dbt profile. If not provided, and no profile target is found
-        in your project's dbt_project.yml, "cosmos_profile" is used.
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
-    :param target_name: A name to use for the dbt target. If not provided, and no target is found
-        in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
     """
 
@@ -52,19 +40,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def __init__(
         self,
-        install_deps: bool = False,
-        callback: Callable[[str], None] | None = None,
-        profile_args: dict[str, str] = {},
-        profile_name: str | None = None,
-        target_name: str | None = None,
+        callback: Optional[Callable[[str], None]] = None,
         should_store_compiled_sql: bool = True,
         **kwargs: Any,
     ) -> None:
-        self.install_deps = install_deps
-        self.profile_args = profile_args
         self.callback = callback
-        self.profile_name = profile_name
-        self.target_name = target_name
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         super().__init__(**kwargs)
@@ -74,12 +54,17 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         """Returns hook for running the bash command."""
         return FullOutputSubprocessHook()
 
-    def exception_handling(self, result: FullOutputSubprocessResult) -> None:
-        if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
-            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
-        elif result.exit_code != 0:
+    def exception_handling(self, _: Context, result: FullOutputSubprocessResult) -> None:
+        "If the exit code is the skip exit code, raise an AirflowSkipException. Otherwise, raise an AirflowException."
+        skip_exit_code = self.cosmos_config.execution_config.skip_exit_code
+        exit_code = result.exit_code
+
+        if skip_exit_code is not None and exit_code == skip_exit_code:
+            raise AirflowSkipException(f"dbt command returned exit code {skip_exit_code}. Skipping.")
+
+        if exit_code != 0:
             raise AirflowException(
-                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
+                f"dbt command failed. The command returned a non-zero exit code {exit_code}. Details: ",
                 *result.full_output,
             )
 
@@ -112,143 +97,86 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
         # need to refresh the rendered task field record in the db because Airflow only does this
         # before executing the task, not after
-        from airflow.models.renderedtifields import RenderedTaskInstanceFields
 
-        ti = context["ti"]
-        ti.task.template_fields = self.template_fields
-        rtif = RenderedTaskInstanceFields(ti, render_templates=False)
+        task_instance = context["ti"]
+        task_instance.task.template_fields = self.template_fields
+        rtif = RenderedTaskInstanceFields(task_instance, render_templates=False)
 
         # delete the old records
         session.query(RenderedTaskInstanceFields).filter(
             RenderedTaskInstanceFields.dag_id == self.dag_id,
             RenderedTaskInstanceFields.task_id == self.task_id,
-            RenderedTaskInstanceFields.run_id == ti.run_id,
+            RenderedTaskInstanceFields.run_id == task_instance.run_id,
         ).delete()
         session.add(rtif)
 
-    def run_subprocess(self, *args: Tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
-        return subprocess_result
-
-    def get_profile_name(self, project_dir: str) -> str:
-        """
-        Returns the profile name to use. Precedence is:
-        1. The profile name passed in to the operator
-        2. The profile name in the dbt_project.yml file
-        3. "cosmos_profile"
-        """
-        if self.profile_name:
-            return self.profile_name
-
-        # get the profile name from the dbt_project.yml file
-        dbt_project_path = os.path.join(project_dir, "dbt_project.yml")
-
-        # if there's no dbt_project.yml file, we're not in a dbt project
-        # and need to raise an error
-        if not os.path.exists(dbt_project_path):
-            raise AirflowException(f"dbt project directory {self.project_dir} does not contain a dbt_project.yml file.")
-
-        # get file contents using path
-        dbt_project = yaml.safe_load(Path(dbt_project_path).read_text(encoding="utf-8")) or {}
-
-        profile_name = dbt_project.get("profile", DEFAULT_DBT_PROFILE_NAME)
-
-        if not isinstance(profile_name, str):
-            raise AirflowException(
-                f"dbt project directory {self.project_dir} contains a dbt_project.yml file, but the profile "
-                f"specified in the file is not a string. Please specify a string profile name, or pass a profile "
-                f"name to the operator."
-            )
-
-        return profile_name
-
-    def get_target_name(self) -> str:
-        """
-        Returns the target name to use. Precedence is:
-        1. The target name passed in to the operator
-        2. "cosmos_target"
-        """
-        if self.target_name:
-            return self.target_name
-
-        return DEFAULT_DBT_TARGET_NAME
-
-    def run_command(
-        self,
-        cmd: list[str | None],
-        env: dict[str, str | bytes | os.PathLike[Any]],
-        context: Context,
-    ) -> FullOutputSubprocessResult:
+    def execute(self, context: Context) -> None:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
+        env = self.get_env(context=context)
+        project_dir = self.cosmos_config.project_config.dbt_project_path
+        dbt_executable_path = str(self.cosmos_config.execution_config.dbt_executable_path)
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             logger.info(
                 "Cloning project to writable temp directory %s from %s",
                 tmp_dir,
-                self.project_dir,
+                project_dir,
             )
 
             # need a subfolder because shutil.copytree will fail if the destination dir already exists
             tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
             shutil.copytree(
-                self.project_dir,
+                project_dir,
                 tmp_project_dir,
             )
-            profile_name = self.get_profile_name(tmp_project_dir)
-            target_name = self.get_target_name()
 
-            # need to write the profile to a file because dbt requires a profile file
-            # and doesn't accept a profile as a string
-            profile_mapping = get_profile_mapping(
-                conn_id=self.conn_id,
-                profile_args=self.profile_args,
-            )
-            profile_file_contents = profile_mapping.get_profile_file_contents(
-                profile_name=profile_name,
-                target_name=target_name,
-            )
-            profile_file_path = os.path.join(tmp_project_dir, "profiles.yml")
-            with open(profile_file_path, "w", encoding="utf-8") as f:
-                f.write(profile_file_contents)
+            desired_profile_path = Path(tmp_dir) / "profiles.yml"
+            with self.cosmos_config.profile_config.ensure_profile(desired_profile_path=desired_profile_path) as (
+                profiles_yml_path,
+                profile_env_vars,
+            ):
+                env.update(profile_env_vars)
 
-            # we also need to get the env from the profile mapping
-            env.update(profile_mapping.env_vars)
+                if self.cosmos_config.execution_config.install_deps:
+                    logger.info(
+                        "Trying to run the command:\n %s\nFrom %s", [dbt_executable_path, "deps"], tmp_project_dir
+                    )
+                    self.subprocess_hook.run_command(
+                        command=[dbt_executable_path, "deps"],
+                        env=env,
+                        cwd=tmp_project_dir,
+                    )
 
-            # if we need to install deps, do so
-            if self.install_deps:
-                self.run_subprocess(
-                    command=[self.dbt_executable_path, "deps"],
+                generated_cmd = self.build_cmd(
+                    [
+                        "--profiles-dir",
+                        os.path.dirname(profiles_yml_path),
+                        "--profile",
+                        self.cosmos_config.profile_config.profile_name,
+                        "--target",
+                        self.cosmos_config.profile_config.target_name,
+                    ]
+                )
+
+                logger.info("Trying to run the command:\n %s\nFrom %s", generated_cmd, tmp_project_dir)
+
+                result = self.subprocess_hook.run_command(
+                    command=generated_cmd,
                     env=env,
-                    output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
 
-            logger.info("Trying to run the command:\n %s\nFrom %s", cmd, tmp_project_dir)
+                self.store_compiled_sql(tmp_project_dir, context)
+                self.exception_handling(context, result)
 
-            result = self.run_subprocess(
-                command=cmd + ["--profile", profile_name, "--target", target_name],
-                env=env,
-                output_encoding=self.output_encoding,
-                cwd=tmp_project_dir,
-            )
-            self.exception_handling(result)
-            self.store_compiled_sql(tmp_project_dir, context)
-            if self.callback:
-                self.callback(tmp_project_dir)
-
-            return result
-
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
-        dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
-        return self.run_command(cmd=dbt_cmd, env=env, context=context)
-
-    def execute(self, context: Context) -> str:
-        # TODO is this going to put loads of unnecessary stuff in to xcom?
-        return self.build_and_run_cmd(context=context).output
+                if self.callback:
+                    self.callback(tmp_project_dir)
 
     def on_kill(self) -> None:
-        if self.cancel_query_on_kill:
+        "Overrides the default on_kill behavior to send a SIGINT signal to the process group."
+        if self.cosmos_config.execution_config.cancel_query_on_kill:
             self.subprocess_hook.log.info("Sending SIGINT signal to process group")
             if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
                 os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
@@ -257,19 +185,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
 
 class DbtLSLocalOperator(DbtLocalBaseOperator):
-    """
-    Executes a dbt core ls command.
-    """
+    "Executes a dbt core ls command."
 
     ui_color = "#DBCDF6"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["ls"]
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
+    base_cmd = ["ls"]
 
 
 class DbtSeedLocalOperator(DbtLocalBaseOperator):
@@ -280,119 +200,72 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#F58D7E"
+    base_cmd = ["seed"]
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
-        self.base_cmd = ["seed"]
 
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
+    def build_cmd(self, flags: list[str] | None = None) -> list[str]:
+        "Overrides the base class build_cmd to add the full-refresh flag."
+        cmd = super().build_cmd(flags=flags)
+
         if self.full_refresh is True:
-            flags.append("--full-refresh")
+            cmd.append("--full-refresh")
 
-        return flags
-
-    def execute(self, context: Context) -> str:
-        cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output
+        return cmd
 
 
 class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
-    """
-    Executes a dbt core snapshot command.
-
-    """
+    "Executes a dbt core snapshot command."
 
     ui_color = "#964B00"
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["snapshot"]
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
+    base_cmd = ["snapshot"]
 
 
 class DbtRunLocalOperator(DbtLocalBaseOperator):
-    """
-    Executes a dbt core run command.
-    """
+    "Executes a dbt core run command."
 
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["run"]
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
+    base_cmd = ["run"]
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core test command.
+
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
     ui_color = "#8194E0"
+    base_cmd = ["test"]
 
     def __init__(
         self,
-        on_warning_callback: Callable[..., Any] | None = None,
+        on_warning_callback: Callable[[dict[str, object]], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = ["test"]
         self.on_warning_callback = on_warning_callback
 
-    def _should_run_tests(
-        self,
-        result: FullOutputSubprocessResult,
-        no_tests_message: str = "Nothing to do",
-    ) -> bool:
-        """
-        Check if any tests are defined to run in the DAG. If tests are defined
-        and on_warning_callback is set, then function returns True.
+    def exception_handling(self, context: Context, result: FullOutputSubprocessResult) -> None:
+        "Checks for warnings and calls the on_warning_callback if there are any."
+        super().exception_handling(context, result)
 
-        :param result: The output from the build and run command.
-        """
-
-        return self.on_warning_callback is not None and no_tests_message not in result.output
-
-    def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
-        """
-         Handles warnings by extracting log issues, creating additional context, and calling the
-         on_warning_callback with the updated context.
-
-        :param result: The result object from the build and run command.
-        :param context: The original airflow context in which the build and run command was executed.
-        """
-        test_names, test_results = extract_log_issues(result.full_output)
-
-        warning_context = dict(context)
-        warning_context["test_names"] = test_names
-        warning_context["test_results"] = test_results
-
-        if self.on_warning_callback:
-            self.on_warning_callback(warning_context)
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-
-        if not self._should_run_tests(result):
-            return result.output
+        if not self.on_warning_callback or "Nothing to do" in result.output:
+            return
 
         warnings = parse_output(result, "WARN")
         if warnings > 0:
-            self._handle_warnings(result, context)
+            test_names, test_results = extract_log_issues(result.full_output)
 
-        return result.output
+            warning_context = dict(context)
+            warning_context["test_names"] = test_names
+            warning_context["test_results"] = test_results
+
+            self.on_warning_callback(warning_context)
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
@@ -405,7 +278,7 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = ("args",)
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ["args"]
 
     def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
         self.macro_name = macro_name
@@ -413,17 +286,15 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = ["run-operation", macro_name]
 
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.args is not None:
-            flags.append("--args")
-            flags.append(yaml.dump(self.args))
-        return flags
+    def build_cmd(self, flags: list[str] | None = None) -> list[str]:
+        "Overrides the base class build_cmd to add the args flag."
+        cmd = super().build_cmd(flags=flags)
 
-    def execute(self, context: Context) -> str:
-        cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output
+        if self.args is not None:
+            cmd.append("--args")
+            cmd.append(yaml.dump(self.args))
+
+        return cmd
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
@@ -433,16 +304,8 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-
+    base_cmd = ["docs", "generate"]
     required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["docs", "generate"]
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
 
 
 class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
@@ -462,7 +325,8 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         aws_conn_id: str,
         bucket_name: str,
         folder_dir: str | None = None,
-        **kwargs: str,
+        **kwargs: Any,
+
     ) -> None:
         "Initializes the operator."
         self.aws_conn_id = aws_conn_id
@@ -522,7 +386,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
         azure_conn_id: str,
         container_name: str,
         folder_dir: str | None = None,
-        **kwargs: str,
+        **kwargs: Any,
     ) -> None:
         "Initializes the operator."
         self.azure_conn_id = azure_conn_id
@@ -564,16 +428,3 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
                 blob_name=blob_name,
                 overwrite=True,
             )
-
-
-class DbtDepsLocalOperator(DbtLocalBaseOperator):
-    """
-    Executes a dbt core deps command.
-    """
-
-    ui_color = "#8194E0"
-
-    def __init__(self, **kwargs: str) -> None:
-        raise DeprecationWarning(
-            "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
-        )

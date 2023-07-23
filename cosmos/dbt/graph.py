@@ -1,45 +1,24 @@
+"Contains the DbtGraph class which is used to represent a dbt project graph."
 from __future__ import annotations
+
 import itertools
 import json
 import logging
-import os
-from dataclasses import dataclass, field
-from pathlib import Path
 from subprocess import Popen, PIPE
-from typing import Any
 
 from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
-from cosmos.dbt.executable import get_system_dbt
+from cosmos.config import CosmosConfig
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
-from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import select_nodes
+from cosmos.dbt.node import DbtNode
 
 logger = logging.getLogger(__name__)
-
-# TODO replace inline constants
 
 
 class CosmosLoadDbtException(Exception):
     """
     Exception raised while trying to load a `dbt` project as a `DbtGraph` instance.
     """
-
-    pass
-
-
-@dataclass
-class DbtNode:
-    """
-    Metadata related to a dbt node (e.g. model, seed, snapshot).
-    """
-
-    name: str
-    unique_id: str
-    resource_type: DbtResourceType
-    depends_on: list[str]
-    file_path: Path
-    tags: list[str] = field(default_factory=lambda: [])
-    config: dict[str, Any] = field(default_factory=lambda: {})
 
 
 class DbtGraph:
@@ -52,12 +31,12 @@ class DbtGraph:
     Example of how to use:
 
         dbt_graph = DbtGraph(
-            project=DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR),
-            exclude=["*orders*"],
-            select=[],
+            project_config=ProjectConfig(...),
+            render_config=RenderConfig(...),
+            profile_config=ProfileConfig(...),
             dbt_cmd="/usr/local/bin/dbt",
         )
-        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
+        dbt_graph.load()
     """
 
     nodes: dict[str, DbtNode] = dict()
@@ -65,48 +44,34 @@ class DbtGraph:
 
     def __init__(
         self,
-        project: DbtProject,
-        exclude: list[str] | None = None,
-        select: list[str] | None = None,
-        dbt_cmd: str = get_system_dbt(),
+        cosmos_config: CosmosConfig,
     ):
-        self.project = project
-        self.exclude = exclude or []
-        self.select = select or []
+        self.project_config = cosmos_config.project_config
+        self.render_config = cosmos_config.render_config
+        self.profile_config = cosmos_config.profile_config
+        self.execution_config = cosmos_config.execution_config
 
-        # specific to loading using ls
-        self.dbt_cmd = dbt_cmd
-
-    def load(self, method: LoadMode = LoadMode.AUTOMATIC, execution_mode: ExecutionMode = ExecutionMode.LOCAL) -> None:
+    def load(self) -> None:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
-
-        :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
-            or dbt ls)
-        :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.KUBERNETES)
         """
-        load_method = {
+        if self.render_config.load_method_enum == LoadMode.AUTOMATIC:
+            if self.project_config.is_manifest_available():
+                return self.load_from_dbt_manifest()
+
+            if self.execution_config.execution_mode_enum in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
+                try:
+                    return self.load_via_dbt_ls()
+                except FileNotFoundError:
+                    return self.load_via_custom_parser()
+
+            return self.load_via_custom_parser()
+
+        {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
-        }
-        if method == LoadMode.AUTOMATIC:
-            if self.project.is_manifest_available():
-                self.load_from_dbt_manifest()
-                return
-            elif (
-                execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV)
-                and self.project.is_profile_yml_available()
-            ):
-                try:
-                    self.load_via_dbt_ls()
-                    return
-                except FileNotFoundError:
-                    self.load_via_custom_parser()
-                    return
-            else:
-                self.load_via_custom_parser()
-                return
+        }[self.render_config.load_method_enum]()
 
         if method == LoadMode.DBT_MANIFEST and not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
@@ -123,27 +88,34 @@ class DbtGraph:
         * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project using dbt ls...")
-        command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]
-        if self.exclude:
-            command.extend(["--exclude", *self.exclude])
-        if self.select:
-            command.extend(["--select", *self.select])
-        logger.info(f"Running command: {command}")
-        try:
-            process = Popen(
-                command,  # type: ignore[arg-type]
-                stdout=PIPE,
-                stderr=PIPE,
-                cwd=self.project.dir,
-                universal_newlines=True,
-                env=os.environ,
-            )
-        except FileNotFoundError as exception:
-            raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{exception}")
+
+        command = [
+            str(self.execution_config.dbt_executable_path),
+            "ls",
+            "--output",
+            "json",
+            "--profiles-dir",
+            str(self.project_config.dbt_project_path),
+        ]
+
+        if self.render_config.exclude:
+            command.extend(["--exclude", *self.render_config.exclude])
+
+        if self.render_config.select:
+            command.extend(["--select", *self.render_config.select])
+
+        logger.info("Running command `%s`", command)
+        process = Popen(
+            command,
+            stdout=PIPE,
+            stderr=PIPE,
+            cwd=self.project_config.dbt_project_path,
+            universal_newlines=True,
+        )
 
         stdout, stderr = process.communicate()
 
-        logger.debug(f"Output: {stdout}")
+        logger.debug("Command output: %s", stdout)
 
         if stderr or "Runtime Error" in stdout:
             details = stderr or stdout
@@ -156,16 +128,16 @@ class DbtGraph:
             except json.decoder.JSONDecodeError:
                 logger.info("Skipping line: %s", line)
             else:
-                node = DbtNode(
+                node_id = node_dict["unique_id"]
+                nodes[node_id] = DbtNode(
                     name=node_dict["name"],
-                    unique_id=node_dict["unique_id"],
+                    unique_id=node_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),
-                    file_path=self.project.dir / node_dict["original_file_path"],
+                    file_path=self.project_config.dbt_project_path / node_dict["original_file_path"],
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                 )
-                nodes[node.unique_id] = node
 
         self.nodes = nodes
         self.filtered_nodes = nodes
@@ -185,29 +157,35 @@ class DbtGraph:
         logger.info("Trying to parse the dbt project using a custom Cosmos method...")
 
         project = LegacyDbtProject(
-            dbt_root_path=str(self.project.root_dir),
-            dbt_models_dir=self.project.models_dir.stem if self.project.models_dir else None,
-            dbt_seeds_dir=self.project.seeds_dir.stem if self.project.seeds_dir else None,
-            project_name=self.project.name,
+            dbt_root_path=str(self.project_config.dbt_project_path.parent),
+            project_name=self.project_config.dbt_project_path.stem,
+            dbt_models_dir=self.project_config.models_path.stem,
+            dbt_snapshots_dir=self.project_config.snapshots_path.stem,
+            dbt_seeds_dir=self.project_config.seeds_path.stem,
         )
+
         nodes = {}
-        models = itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items())
-        for model_name, model in models:
-            config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
-            node = DbtNode(
-                name=model_name,
-                unique_id=model_name,
-                resource_type=DbtResourceType(model.type.value),
-                depends_on=list(model.config.upstream_models),
-                file_path=model.path,
+
+        all_nodes = itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items())
+
+        for node_name, node in all_nodes:
+            config = {item.split(":")[0]: item.split(":")[-1] for item in node.config.config_selectors}
+            nodes[node_name] = DbtNode(
+                name=node_name,
+                unique_id=node_name,
+                resource_type=DbtResourceType(node.type.value),
+                depends_on=list(node.config.upstream_models),
+                file_path=str(node.path),
                 tags=[],
                 config=config,
             )
-            nodes[model_name] = node
 
         self.nodes = nodes
         self.filtered_nodes = select_nodes(
-            project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
+            project_dir=self.project_config.dbt_project_path,
+            nodes=nodes,
+            select=self.render_config.select,
+            exclude=self.render_config.exclude,
         )
 
     def load_from_dbt_manifest(self) -> None:
@@ -221,10 +199,14 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
+        if not self.project_config.is_manifest_available():
+            raise ValueError(f"Unable to load manifest using {self.project_config.manifest_path}")
+
         logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}
-        with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
-            manifest = json.load(fp)
+
+        with self.project_config.dbt_project_path.open() as manifest_file:
+            manifest = json.load(manifest_file)
 
             for unique_id, node_dict in manifest.get("nodes", {}).items():
                 node = DbtNode(
@@ -232,7 +214,7 @@ class DbtGraph:
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),
-                    file_path=self.project.dir / node_dict["original_file_path"],
+                    file_path=self.project_config.dbt_project_path / node_dict["original_file_path"],
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                 )
@@ -240,5 +222,8 @@ class DbtGraph:
 
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
-                project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
+                project_dir=self.project_config.dbt_project_path,
+                nodes=nodes,
+                select=self.render_config.select,
+                exclude=self.render_config.exclude,
             )

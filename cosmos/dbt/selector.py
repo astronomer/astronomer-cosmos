@@ -2,10 +2,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.node import DbtNode
 
 
 SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
@@ -56,7 +53,7 @@ class SelectorConfig:
         for item in items:
             if item.startswith(PATH_SELECTOR):
                 index = len(PATH_SELECTOR)
-                self.paths.append(self.project_dir / item[index:])
+                self.paths.append(str(self.project_dir / item[index:]))
             elif item.startswith(TAG_SELECTOR):
                 index = len(TAG_SELECTOR)
                 self.tags.append(item[index:])
@@ -90,7 +87,8 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
         if config.config and not (config.config.items() <= supported_node_config.items()):
             continue
 
-        if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):
+        node_path = Path(node.file_path)
+        if config.paths and not (set(config.paths).issubset(set(node_path.parents))):
             continue
 
         selected_nodes.add(node_id)

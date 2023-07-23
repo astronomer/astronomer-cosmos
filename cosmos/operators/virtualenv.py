@@ -1,14 +1,13 @@
+"Module contains all Cosmos operators that run dbt commands within a Python Virtual Environment."
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Tuple
-
+from typing import TYPE_CHECKING, Any
 
 from airflow.compat.functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
-from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 from cosmos.operators.local import (
     DbtDocsLocalOperator,
@@ -50,8 +49,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     ) -> None:
         self.py_requirements = py_requirements or []
         self.py_system_site_packages = py_system_site_packages
+        self._venv_tmp_dir: TemporaryDirectory[str] | None = None
         super().__init__(**kwargs)
-        self._venv_tmp_dir = TemporaryDirectory()
 
     @cached_property  # type: ignore[misc] # ignores internal untyped decorator
     def venv_dbt_path(
@@ -67,38 +66,25 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         # For this reason, we are not using contexts at this point.
         # The deletion of this directory is done explicitly at the end of the `execute` method.
         self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
+
         py_interpreter = prepare_virtualenv(
             venv_directory=self._venv_tmp_dir.name,
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,
             requirements=self.py_requirements,
         )
+
         dbt_binary = Path(py_interpreter).parent / "dbt"
-        cmd_output = self.subprocess_hook.run_command(
-            [
-                py_interpreter,
-                "-c",
-                "from importlib.metadata import version; print(version('dbt-core'))",
-            ]
-        )
-        dbt_version = cmd_output.output
-        self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
-    def run_subprocess(  # type: ignore[override]
-        self, *args: Tuple[Any], command: list[str], **kwargs: Any
-    ) -> FullOutputSubprocessResult:
-        if self.py_requirements:
-            command[0] = self.venv_dbt_path
+    def execute(self, context: Context) -> None:
+        "Overrides the base class method to set the dbt executable path to the one within the virtualenv."
+        self.cosmos_config.execution_config.dbt_executable_path = self.venv_dbt_path
 
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(command, *args, **kwargs)
-        return subprocess_result
+        super().execute(context)
 
-    def execute(self, context: Context) -> str:
-        output = super().execute(context)
         if self._venv_tmp_dir:
             self._venv_tmp_dir.cleanup()
-        return output
 
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):

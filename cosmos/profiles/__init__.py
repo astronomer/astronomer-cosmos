@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from .profile_config import ProfileConfig
 from .base import BaseProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
@@ -18,18 +17,17 @@ from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
 
 
-__all__ : list[Type[BaseProfileMapping]] = [
-    ProfileConfig,
-    GoogleCloudServiceAccountFileProfileMapping,
-    GoogleCloudServiceAccountDictProfileMapping,
-    DatabricksTokenProfileMapping,
-    PostgresUserPasswordProfileMapping,
-    RedshiftUserPasswordProfileMapping,
-    SnowflakeUserPasswordProfileMapping,
-    SnowflakePrivateKeyPemProfileMapping,
-    SparkThriftProfileMapping,
-    ExasolUserPasswordProfileMapping,
-    TrinoLDAPProfileMapping,
-    TrinoCertificateProfileMapping,
-    TrinoJWTProfileMapping,
+__all__ : list[str] = [
+    "GoogleCloudServiceAccountDictProfileMapping",
+    "GoogleCloudServiceAccountFileProfileMapping",
+    "DatabricksTokenProfileMapping",
+    "ExasolUserPasswordProfileMapping",
+    "PostgresUserPasswordProfileMapping",
+    "RedshiftUserPasswordProfileMapping",
+    "SnowflakeUserPasswordProfileMapping",
+    "SnowflakePrivateKeyPemProfileMapping",
+    "SparkThriftProfileMapping",
+    "TrinoCertificateProfileMapping",
+    "TrinoJWTProfileMapping",
+    "TrinoLDAPProfileMapping",
 ]

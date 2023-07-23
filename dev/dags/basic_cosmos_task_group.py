@@ -8,7 +8,8 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup
+from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -26,10 +27,14 @@ def basic_cosmos_task_group() -> None:
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
     jaffle_shop = DbtTaskGroup(
-        dbt_root_path=DBT_ROOT_PATH,
-        dbt_project_name="jaffle_shop",
-        conn_id="airflow_db",
-        profile_args={"schema": "public"},
+        project_config=ProjectConfig(
+            DBT_ROOT_PATH / "jaffle_shop",
+        ),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="airflow_db", profile_args={"schema": "public"}),
+        ),
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

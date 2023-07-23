@@ -9,10 +9,15 @@ from cosmos.dbt.project import DbtProject
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
+SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 
 
-def test_load_via_manifest_with_exclude():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
+@pytest.mark.parametrize(
+    "pipeline_name,manifest_filepath,model_filepath",
+    [("jaffle_shop", SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
+)
+def test_load_via_manifest_with_exclude(pipeline_name, manifest_filepath, model_filepath):
+    dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=manifest_filepath)
     dbt_graph = DbtGraph(project=dbt_project, exclude=["config.materialized:table"])
     dbt_graph.load_from_dbt_manifest()
 
@@ -29,7 +34,7 @@ def test_load_via_manifest_with_exclude():
         "model.jaffle_shop.stg_orders",
         "model.jaffle_shop.stg_payments",
     ]
-    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / "jaffle_shop/models/customers.sql"
+    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{pipeline_name}/models/{model_filepath}"
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
@@ -132,8 +137,9 @@ def test_load_via_dbt_ls_with_exclude():
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_exclude():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+@pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
+def test_load_via_dbt_ls_without_exclude(pipeline_name):
+    dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(project=dbt_project)
     dbt_graph.load_via_dbt_ls()
 
@@ -163,9 +169,10 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     mock_popen_communicate.assert_called_once()
 
 
-def test_load_via_load_via_custom_parser():
+@pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
+def test_load_via_load_via_custom_parser(pipeline_name):
     dbt_project = DbtProject(
-        name="jaffle_shop",
+        name=pipeline_name,
         root_dir=DBT_PROJECTS_ROOT_DIR,
     )
     dbt_graph = DbtGraph(project=dbt_project)

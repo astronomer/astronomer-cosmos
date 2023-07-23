@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
+import ast
+
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -14,6 +16,11 @@ import jinja2
 import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+
+DBT_PY_MODEL_METHOD_NAME = "model"
+DBT_PY_DEP_METHOD_NAME = "ref"
+PYTHON_FILE_SUFFIX = ".py"
 
 
 class DbtModelType(Enum):
@@ -87,6 +94,30 @@ class DbtModelConfig:
         return sql_configs
 
 
+def extract_python_file_upstream_requirements(code: str) -> list[str]:
+    """
+    Given a dbt Python model source code, identify other dbt entities which are upstream requirements.
+
+    This method tries to find a `model` function and `dbt.ref` calls within it. Return a list of upstream entities IDs.
+    """
+    source_code = ast.parse(code)
+
+    upstream_entities = []
+    model_function = ""
+    for node in source_code.body:
+        if isinstance(node, ast.FunctionDef) and node.name == DBT_PY_MODEL_METHOD_NAME:
+            model_function = node
+            break
+
+    for item in ast.walk(model_function):
+        if isinstance(item, ast.Call) and item.func.attr == DBT_PY_DEP_METHOD_NAME:
+            upstream_entity_id = hasattr(item.args[-1], "value") and item.args[-1].value
+            if upstream_entity_id:
+                upstream_entities.append(upstream_entity_id)
+
+    return upstream_entities
+
+
 @dataclass
 class DbtModel:
     """
@@ -124,30 +155,32 @@ class DbtModel:
         elif self.type == DbtModelType.DBT_SEED:
             code = None
 
-        # get the dependencies
-        env = jinja2.Environment()
-        ast = env.parse(code)
+        if self.path.suffix == PYTHON_FILE_SUFFIX:
+            config.upstream_models = config.upstream_models.union(set(extract_python_file_upstream_requirements(code)))
+        else:
+            # get the dependencies
+            env = jinja2.Environment()
+            jinja2_ast = env.parse(code)
+            # iterate over the jinja nodes to extract info
+            for base_node in jinja2_ast.find_all(jinja2.nodes.Call):
+                if hasattr(base_node.node, "name"):
+                    # check we have a ref - this indicates a dependency
+                    if base_node.node.name == "ref":
+                        # if it is, get the first argument
+                        first_arg = base_node.args[0]
+                        if isinstance(first_arg, jinja2.nodes.Const):
+                            # and add it to the config
+                            config.upstream_models.add(first_arg.value)
 
-        # iterate over the jinja nodes to extract info
-        for base_node in ast.find_all(jinja2.nodes.Call):
-            if hasattr(base_node.node, "name"):
-                # check we have a ref - this indicates a dependency
-                if base_node.node.name == "ref":
-                    # if it is, get the first argument
-                    first_arg = base_node.args[0]
-                    if isinstance(first_arg, jinja2.nodes.Const):
-                        # and add it to the config
-                        config.upstream_models.add(first_arg.value)
-
-                # check if we have a config - this could contain tags
-                if base_node.node.name == "config":
-                    # if it is, check if any kwargs are tags
-                    for kwarg in base_node.kwargs:
-                        for selector in self.config.config_types:
-                            extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
-                            config.config_selectors |= (
-                                set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
-                            )
+                    # check if we have a config - this could contain tags
+                    if base_node.node.name == "config":
+                        # if it is, check if any kwargs are tags
+                        for kwarg in base_node.kwargs:
+                            for selector in self.config.config_types:
+                                extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
+                                config.config_selectors |= (
+                                    set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
+                                )
 
         # set the config and set the parsed file flag to true
         self.config = config
@@ -214,6 +247,10 @@ class DbtProject:
 
         # crawl the models in the project
         for file_name in self.models_dir.rglob("*.sql"):
+            self._handle_sql_file(file_name)
+
+        # crawl the models in the project
+        for file_name in self.models_dir.rglob("*.py"):
             self._handle_sql_file(file_name)
 
         # crawl the snapshots in the project

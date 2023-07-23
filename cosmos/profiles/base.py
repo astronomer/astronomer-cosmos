@@ -11,6 +11,8 @@ from typing import Any
 from typing import TYPE_CHECKING
 import yaml
 
+from airflow.hooks.base import BaseHook
+
 if TYPE_CHECKING:
     from airflow.models import Connection
 
@@ -30,16 +32,19 @@ class BaseProfileMapping(ABC):
     secret_fields: list[str] = []
     airflow_param_mapping: dict[str, str | list[str]] = {}
 
-    def __init__(self, conn: Connection, profile_args: dict[str, Any] | None = None):
-        self.conn = conn
+    _conn: Connection | None = None
+
+    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None):
+        self.conn_id = conn_id
         self.profile_args = profile_args or {}
 
-    def can_claim_connection(self) -> bool:
-        """
-        Return whether the connection is valid for this profile mapping.
-        """
-        if self.conn.conn_type != self.airflow_connection_type:
-            return False
+    @property
+    def conn(self) -> Connection:
+        "Returns the Airflow connection."
+        if not self._conn:
+            conn = BaseHook.get_connection(self.conn_id)
+            if not conn:
+                raise ValueError(f"Could not find connection with conn_id {self.conn_id}")
 
         logger.info(dir(self.conn))
         logger.info(self.conn.__dict__)
@@ -60,8 +65,9 @@ class BaseProfileMapping(ABC):
                     field,
                 )
                 return False
+            self._conn = conn
 
-        return True
+        return self._conn
 
     @property
     @abstractmethod
@@ -84,7 +90,7 @@ class BaseProfileMapping(ABC):
 
         return env_vars
 
-    def get_profile_file_contents(self, profile_name: str, target_name: str = "cosmos_target") -> str:
+    def get_profile_file_contents(self, profile_name: str, target_name: str) -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.
         """

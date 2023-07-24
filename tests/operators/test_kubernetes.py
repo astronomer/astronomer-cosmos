@@ -9,95 +9,8 @@ from cosmos.operators.kubernetes import (
 )
 
 
-# def test_dbt_kubernetes_operator_add_global_flags() -> None:
-#     dbt_kube_operator = DbtKubernetesBaseOperator(
-#         conn_id="my_airflow_connection",
-#         task_id="my-task",
-#         image="my_image",
-#         project_dir="my/dir",
-#         vars={
-#             "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
-#             "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
-#         },
-#         no_version_check=True,
-#     )
-#     assert dbt_kube_operator.add_global_flags() == [
-#         "--vars",
-#         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-#         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
-#         "--no-version-check",
-#     ]
-
-
-# @patch("cosmos.operators.base.context_to_airflow_vars")
-# def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
-#     """
-#     If an end user passes in a
-#     """
-#     dbt_kube_operator = DbtKubernetesBaseOperator(
-#         conn_id="my_airflow_connection",
-#         task_id="my-task",
-#         image="my_image",
-#         project_dir="my/dir",
-#     )
-#     dbt_kube_operator.env = {
-#         "start_date": "20220101",
-#         "end_date": "20220102",
-#         "some_path": Path(__file__),
-#         "retries": 3,
-#         ("tuple", "key"): "some_value",
-#     }
-#     p_context_to_airflow_vars.return_value = {"START_DATE": "2023-02-15 12:30:00"}
-#     env = dbt_kube_operator.get_env(
-#         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
-#     )
-#     expected_env = {
-#         "start_date": "20220101",
-#         "end_date": "20220102",
-#         "some_path": Path(__file__),
-#         "START_DATE": "2023-02-15 12:30:00",
-#     }
-#     assert env == expected_env
-
-
-# base_kwargs = {
-#     "conn_id": "my_airflow_connection",
-#     "task_id": "my-task",
-#     "image": "my_image",
-#     "project_dir": "my/dir",
-#     "vars": {
-#         "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
-#         "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
-#     },
-#     "no_version_check": True,
-# }
-
-# result_map = {
-#     "ls": DbtLSKubernetesOperator(**base_kwargs),
-#     "run": DbtRunKubernetesOperator(**base_kwargs),
-#     "test": DbtTestKubernetesOperator(**base_kwargs),
-#     "seed": DbtSeedKubernetesOperator(**base_kwargs),
-# }
-
-
-# def test_dbt_kubernetes_build_command():
-#     """
-#     Since we know that the KubernetesOperator is tested, we can just test that the
-#     command is built correctly and added to the "arguments" parameter.
-#     """
-#     for command_name, command_operator in result_map.items():
-#         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
-#         assert command_operator.arguments == [
-#             "dbt",
-#             command_name,
-#             "--vars",
-#             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-#             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
-#             "--no-version-check",
-#         ]
-
-
-def test_created_pod():
+@patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
+def test_created_pod(test_hook) -> None:
     with patch("pathlib.Path.exists", return_value=True):
         cosmos_config = CosmosConfig(
             project_config=ProjectConfig(
@@ -114,6 +27,9 @@ def test_created_pod():
                 dbt_cli_flags=["--no-version-check"],
             ),
         )
+
+    test_hook.is_in_cluster = False
+    test_hook._get_namespace.return_value.to_dict.return_value = "foo"
 
     ls_operator = DbtLSKubernetesOperator(
         task_id="my-task",
@@ -226,10 +142,5 @@ def test_created_pod():
     }
     computed_result = pod_obj.to_dict()
     computed_result["metadata"].pop("namespace")
-
-    print("== computed_result ==")
-    print(computed_result)
-    print("== expected_result ==")
-    print(expected_result)
 
     assert computed_result == expected_result

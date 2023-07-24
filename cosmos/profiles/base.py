@@ -42,18 +42,21 @@ class BaseProfileMapping(ABC):
         if self.conn.conn_type != self.airflow_connection_type:
             return False
 
+        logger.info(dir(self.conn))
+        logger.info(self.conn.__dict__)
+
         for field in self.required_fields:
             try:
                 if not getattr(self, field):
                     logger.info(
-                        "Not using mapping %s because %s is not set",
+                        "1 Not using mapping %s because %s is not set",
                         self.__class__.__name__,
                         field,
                     )
                     return False
             except AttributeError:
                 logger.info(
-                    "Not using mapping %s because %s is not set",
+                    "2 Not using mapping %s because %s is not set",
                     self.__class__.__name__,
                     field,
                 )

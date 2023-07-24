@@ -4,6 +4,7 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, ExecutionConfig
+from cosmos.constants import ExecutionMode
 from cosmos.operators.kubernetes import (
     DbtLSKubernetesOperator,
 )
@@ -22,7 +23,7 @@ def test_created_pod(test_hook) -> None:
                 path_to_profiles_yml="my/profiles.yml",
             ),
             execution_config=ExecutionConfig(
-                execution_mode="kubernetes",
+                execution_mode=ExecutionMode.KUBERNETES,
                 dbt_executable_path="dbt",
                 dbt_cli_flags=["--no-version-check"],
             ),

@@ -31,7 +31,7 @@ def cosmos_byo_profile() -> None:
             DBT_ROOT_PATH / "jaffle_shop",
         ),
         profile_config=ProfileConfig(
-            profile_name="jaffle_shop",
+            profile_name="default",
             target_name="dev",
             path_to_profiles_yml=PROFILES_FILE_PATH,
         ),

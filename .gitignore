@@ -141,6 +141,7 @@ dmypy.json
 
 # dbt
 logs/
+.user.yml
 
 # integration tests
 dev/dags/.airflowignore

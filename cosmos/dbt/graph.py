@@ -58,11 +58,11 @@ class DbtGraph:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
         """
-        if self.render_config.load_method_enum == LoadMode.AUTOMATIC:
+        if self.render_config.load_method == LoadMode.AUTOMATIC:
             if self.project_config.is_manifest_available():
                 return self.load_from_dbt_manifest()
 
-            if self.execution_config.execution_mode_enum in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
+            if self.execution_config.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
                 try:
                     return self.load_via_dbt_ls()
                 except FileNotFoundError:
@@ -74,7 +74,7 @@ class DbtGraph:
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
-        }[self.render_config.load_method_enum]()
+        }[self.render_config.load_method]()
 
     def load_via_dbt_ls(self) -> None:
         """
@@ -92,8 +92,6 @@ class DbtGraph:
             "ls",
             "--output",
             "json",
-            "--profiles-dir",
-            str(self.project_config.dbt_project_path),
         ]
 
         if self.render_config.exclude:
@@ -102,21 +100,33 @@ class DbtGraph:
         if self.render_config.select:
             command.extend(["--select", *self.render_config.select])
 
-        logger.info("Running command `%s`", command)
-        process = Popen(
-            command,
-            stdout=PIPE,
-            stderr=PIPE,
-            cwd=self.project_config.dbt_project_path,
-            env=os.environ,
-            universal_newlines=True,
-        )
+        with self.profile_config.ensure_profile() as (
+            profile_path,
+            env_vars,
+        ):
+            command.extend(["--profiles-dir", str(profile_path.parent)])
+            command.extend(["--profile", self.profile_config.profile_name])
+            command.extend(["--target", self.profile_config.target_name])
+            env = {
+                **os.environ,
+                **env_vars,
+            }
 
-        stdout, stderr = process.communicate()
+            logger.info("Running command `%s`", command)
+            process = Popen(
+                command,
+                stdout=PIPE,
+                stderr=PIPE,
+                cwd=self.project_config.dbt_project_path,
+                env=env,
+                universal_newlines=True,
+            )
+            stdout, stderr = process.communicate()
 
-        logger.debug("Command output: %s", stdout)
+        logger.info("Command output: %s", stdout)
 
         if stderr or "Runtime Error" in stdout:
+            logger.error("Command error: %s", stderr)
             details = stderr or stdout
             raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
 

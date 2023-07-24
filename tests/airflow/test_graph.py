@@ -15,7 +15,7 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     calculate_operator_class,
 )
-from cosmos.constants import ExecutionMode, DbtResourceType
+from cosmos.constants import ExecutionMode, DbtResourceType, TestBehavior
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, RenderConfig
 from cosmos.dbt.node import DbtNode
 
@@ -136,7 +136,7 @@ def test_build_airflow_graph_with_after_all(path_patch):
                 path_to_profiles_yml=SAMPLE_PROJ_PATH / "profiles.yml",
             ),
             render_config=RenderConfig(
-                test_behavior="after_all",
+                test_behavior=TestBehavior.AFTER_ALL,
             ),
         )
         build_airflow_graph(

@@ -40,7 +40,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):
         generated_cmd = self.build_cmd()
         env = self.get_env(context=context)
 
-        # set the instance params that the DockerOperator wil pick up
+        # set the instance params that the DockerOperator will pick up
         self.command = generated_cmd
         self.environment = env
 

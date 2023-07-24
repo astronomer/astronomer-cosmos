@@ -8,7 +8,7 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, RenderConfig
+from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -34,9 +34,6 @@ def basic_cosmos_task_group() -> None:
             profile_name="default",
             target_name="dev",
             profile_mapping=PostgresUserPasswordProfileMapping(conn_id="airflow_db", profile_args={"schema": "public"}),
-        ),
-        render_config=RenderConfig(
-            test_behavior="after_all",
         ),
         operator_args={
             "on_warning_callback": print,

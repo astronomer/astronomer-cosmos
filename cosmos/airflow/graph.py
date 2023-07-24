@@ -164,7 +164,7 @@ def build_airflow_graph(
     for node_id, node in nodes.items():
         run_metadata = create_task_metadata(
             node=node,
-            execution_mode=execution_config.execution_mode_enum,
+            execution_mode=execution_config.execution_mode,
             args=task_args,
         )
 
@@ -176,7 +176,7 @@ def build_airflow_graph(
             # TODO: support custom test nodes
             continue
 
-        if node.resource_type == DbtResourceType.MODEL and render_config.test_behavior_enum == TestBehavior.AFTER_EACH:
+        if node.resource_type == DbtResourceType.MODEL and render_config.test_behavior == TestBehavior.AFTER_EACH:
             # if test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
             test_task_args = dict(task_args)
             if render_config.emit_datasets:
@@ -184,7 +184,7 @@ def build_airflow_graph(
 
             test_metadata = create_test_task_metadata(
                 f"{node.name}_test",
-                execution_mode=execution_config.execution_mode_enum,
+                execution_mode=execution_config.execution_mode,
                 task_args=test_task_args,
                 model_name=node.name,
             )
@@ -200,11 +200,11 @@ def build_airflow_graph(
 
     # If test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
-    if render_config.test_behavior_enum == TestBehavior.AFTER_ALL:
+    if render_config.test_behavior == TestBehavior.AFTER_ALL:
         task_args.pop("outlets", None)
         test_metadata = create_test_task_metadata(
             f"{project_config.project_name}_test",
-            execution_mode=execution_config.execution_mode_enum,
+            execution_mode=execution_config.execution_mode,
             task_args=task_args,
         )
         test_task = create_airflow_task(test_metadata, dag, task_group=task_group)

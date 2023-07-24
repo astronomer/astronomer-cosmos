@@ -1,12 +1,11 @@
-jaffle_shop:
-  target: dev
-  outputs:
-    dev:
-      type: postgres
-      host: postgres
-      user: airflow
-      password: pg_password
-      port: 5432
-      dbname: airflow
-      schema: public
-      threads: 4
+default:
+    outputs:
+        dev:
+            dbname: airflow
+            host: postgres
+            password: '{{ env_var(''COSMOS_CONN_POSTGRES_PASSWORD'') }}'
+            port: 5432
+            schema: public
+            type: postgres
+            user: airflow
+    target: dev

@@ -30,15 +30,10 @@ class RenderConfig:
     """
 
     emit_datasets: bool = True
-    test_behavior: str | TestBehavior = TestBehavior.AFTER_EACH
-    load_method: str | LoadMode = LoadMode.AUTOMATIC
+    test_behavior: TestBehavior = TestBehavior.AFTER_EACH
+    load_method: LoadMode = LoadMode.AUTOMATIC
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        "Converts strings to enums."
-        self.test_behavior_enum = TestBehavior(self.test_behavior)
-        self.load_method_enum = LoadMode(self.load_method)
 
 
 @dataclass
@@ -136,10 +131,11 @@ class ProfileConfig:
             raise ValueError("Either path_to_profiles_yml or profile_mapping must be set to render a profile")
 
     @contextlib.contextmanager
-    def ensure_profile(self, desired_profile_path: Path | None = None) -> Iterator[tuple[str, dict[str, str]]]:
+    def ensure_profile(self, desired_profile_path: Path | None = None) -> Iterator[tuple[Path, dict[str, str]]]:
         "Context manager to ensure that there is a profile. If not, create one."
         if self.path_to_profiles_yml:
-            yield self.path_to_profiles_yml, {}
+            logger.info("Using user-supplied profiles.yml at %s", self.path_to_profiles_yml)
+            yield Path(self.path_to_profiles_yml), {}
 
         elif self.profile_mapping:
             profile_contents = self.profile_mapping.get_profile_file_contents(
@@ -147,24 +143,24 @@ class ProfileConfig:
             )
 
             if desired_profile_path:
-                logger.debug(
+                logger.info(
                     "Writing profile to %s with the following contents:\n%s",
                     desired_profile_path,
                     profile_contents,
                 )
+                # write profile_contents to desired_profile_path using yaml library
                 desired_profile_path.write_text(profile_contents)
-                yield str(desired_profile_path), self.profile_mapping.env_vars
-
+                yield desired_profile_path, self.profile_mapping.env_vars
             else:
                 with tempfile.TemporaryDirectory() as temp_dir:
                     temp_file = Path(temp_dir) / "profiles.yml"
-                    logger.debug(
+                    logger.info(
                         "Creating temporary profiles.yml at %s with the following contents:\n%s",
                         temp_file,
                         profile_contents,
                     )
                     temp_file.write_text(profile_contents)
-                    yield str(temp_file), self.profile_mapping.env_vars
+                    yield temp_file, self.profile_mapping.env_vars
 
 
 @dataclass
@@ -185,17 +181,13 @@ class ExecutionConfig:
     Defaults to None
     """
 
-    execution_mode: str | ExecutionMode = ExecutionMode.LOCAL
+    execution_mode: ExecutionMode = ExecutionMode.LOCAL
     dbt_executable_path: str | Path = shutil.which("dbt-ol") or shutil.which("dbt") or "dbt"
     dbt_cli_flags: list[str] = field(default_factory=list)
     append_env: bool = False
     cancel_query_on_kill: bool = True
     install_deps: bool = False
     skip_exit_code: int | None = None
-
-    def __post_init__(self) -> None:
-        "Converts strings to enums"
-        self.execution_mode_enum = ExecutionMode(self.execution_mode)
 
 
 @dataclass

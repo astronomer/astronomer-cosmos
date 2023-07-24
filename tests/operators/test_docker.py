@@ -3,6 +3,7 @@ from unittest.mock import patch
 from airflow.utils.context import Context
 
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, ExecutionConfig
+from cosmos.constants import ExecutionMode
 from cosmos.operators.docker import DbtDockerBaseOperator
 
 
@@ -18,7 +19,7 @@ def test_docker_command_env() -> None:
                 path_to_profiles_yml="my/profiles.yml",
             ),
             execution_config=ExecutionConfig(
-                execution_mode="docker",
+                execution_mode=ExecutionMode.DOCKER,
                 dbt_executable_path="dbt",
                 append_env=True,
             ),

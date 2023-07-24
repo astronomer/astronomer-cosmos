@@ -10,6 +10,7 @@ from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 from pathlib import Path
 
+from cosmos.constants import ExecutionMode
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.dbt.graph import DbtGraph
 from cosmos.config import ProjectConfig, RenderConfig, ProfileConfig, ExecutionConfig, CosmosConfig
@@ -58,7 +59,7 @@ def validate_configs(
     project_config.validate_project()
 
     # if we're in local or venv mode, make sure we have a profile
-    if execution_config.execution_mode == "local" or execution_config.execution_mode == "venv":
+    if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV] and not profile_config:
         if not profile_config:
             raise ValueError("You must provide a profile_config when using local or venv execution mode")
 

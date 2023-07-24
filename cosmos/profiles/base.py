@@ -79,7 +79,7 @@ class BaseProfileMapping(ABC):
             value = self.get_dbt_value(field)
             if isinstance(value, dict):
                 env_vars[env_var_name] = json.dumps(value)
-            if value is not None:
+            elif value is not None:
                 env_vars[env_var_name] = str(value)
 
         return env_vars
@@ -99,7 +99,6 @@ class BaseProfileMapping(ABC):
                 "outputs": {target_name: profile_vars},
             }
         }
-
         return str(yaml.dump(profile_contents, indent=4))
 
     def get_dbt_value(self, name: str) -> Any:

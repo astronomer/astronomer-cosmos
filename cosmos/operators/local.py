@@ -231,7 +231,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 output_encoding=self.output_encoding,
                 cwd=tmp_project_dir,
             )
-
             self.exception_handling(result)
             self.store_compiled_sql(tmp_project_dir, context)
             if self.callback:

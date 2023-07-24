@@ -38,6 +38,9 @@ def basic_cosmos_task_group() -> None:
         render_config=RenderConfig(
             test_behavior="after_all",
         ),
+        operator_args={
+            "on_warning_callback": print,
+        },
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

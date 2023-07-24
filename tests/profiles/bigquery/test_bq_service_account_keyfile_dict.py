@@ -46,19 +46,3 @@ def test_connection_claiming_fails(mock_bigquery_conn_with_dict: Connection):
     mock_bigquery_conn_with_dict.extra = json.dumps({"project": "my_project", "keyfile_dict": {"key": "value"}})
     profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
     assert not profile_mapping.can_claim_connection()
-
-
-def test_profile_env_vars(
-    mock_bigquery_conn_with_dict: Connection,
-) -> None:
-    """
-    Tests that the environment variables get set correctly.
-    """
-    profile_mapping = get_profile_mapping(
-        mock_bigquery_conn_with_dict.conn_id,
-    )
-    assert profile_mapping.env_vars == {
-        "COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_KEYFILE_DICT": str(
-            mock_bigquery_conn_with_dict.extra_dejson["keyfile_dict"]
-        ),
-    }

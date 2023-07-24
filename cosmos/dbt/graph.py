@@ -4,6 +4,7 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import os
 from subprocess import Popen, PIPE
 
 from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
@@ -107,6 +108,7 @@ class DbtGraph:
             stdout=PIPE,
             stderr=PIPE,
             cwd=self.project_config.dbt_project_path,
+            env=os.environ,
             universal_newlines=True,
         )
 

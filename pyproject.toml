@@ -156,8 +156,23 @@ test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml -
 test-integration-setup = """pip uninstall dbt-postgres; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install dbt-postgres;"""
-test-integration = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
+pip install dbt-postgres; \
+pip install dbt-databricks"""
+test-integration = """pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+-k 'not test_example_dag[example_cosmos_python_models]'
+"""
+test-integration-expensive = """pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+-k 'test_example_dag[example_cosmos_python_models]'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -165,7 +180,7 @@ filterwarnings = [
 ]
 minversion = "6.0"
 markers = [
-    "integration"
+    "integration",
 ]
 
 ######################################

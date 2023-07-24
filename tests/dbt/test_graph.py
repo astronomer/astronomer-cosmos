@@ -5,7 +5,6 @@ import pytest
 
 from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
-from cosmos.dbt.project import DbtProject
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, RenderConfig, ExecutionConfig
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -294,7 +293,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
             ),
         ),
     )
-    with pytest.raises(FileNotFoundError) as err_info:
+    with pytest.raises(FileNotFoundError):
         dbt_graph.load_via_dbt_ls()
 
 

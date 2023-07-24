@@ -7,7 +7,7 @@ COPY ./README.rst  ${AIRFLOW_HOME}/astronomer_cosmos/
 COPY ./cosmos/  ${AIRFLOW_HOME}/astronomer_cosmos/cosmos/
 
 # install the package in editable mode
-RUN pip install -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres]
+RUN pip install -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres,dbt-databricks]
 
 # make sure astro user owns the package
 RUN chown -R astro:astro ${AIRFLOW_HOME}/astronomer_cosmos

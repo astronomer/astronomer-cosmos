@@ -6,6 +6,7 @@ import pytest
 from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, RenderConfig, ExecutionConfig
+from cosmos.exceptions import CosmosValueError
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
@@ -137,7 +138,7 @@ def test_load_manifest_without_manifest():
             ),
         ),
     )
-    with pytest.raises(ValueError) as err_info:
+    with pytest.raises(CosmosValueError) as err_info:
         dbt_graph.load()
 
     assert err_info.value.args[0] == "Unable to load manifest using /random/path/to/manifest.json"

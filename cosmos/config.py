@@ -12,6 +12,7 @@ from logging import getLogger
 
 from cosmos.profiles.base import BaseProfileMapping
 from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
+from cosmos.exceptions import CosmosValueError
 
 logger = getLogger(__name__)
 
@@ -69,13 +70,13 @@ class ProjectConfig:
         "Validates that the project, models, and seeds directories exist."
         project_yml_path = self.dbt_project_path / "dbt_project.yml"
         if not project_yml_path.exists():
-            raise ValueError(f"Could not find dbt_project.yml at {project_yml_path}")
+            raise CosmosValueError(f"Could not find dbt_project.yml at {project_yml_path}")
 
         if not self.models_path.exists():
-            raise ValueError(f"Could not find models directory at {self.models_path}")
+            raise CosmosValueError(f"Could not find models directory at {self.models_path}")
 
         if self.manifest and not self.manifest_path.exists():
-            raise ValueError(f"Could not find manifest at {self.manifest_path}")
+            raise CosmosValueError(f"Could not find manifest at {self.manifest_path}")
 
     def is_manifest_available(self) -> bool:
         """
@@ -123,12 +124,12 @@ class ProfileConfig:
         if self.path_to_profiles_yml:
             profiles_path = Path(self.path_to_profiles_yml)
             if not profiles_path.exists():
-                raise ValueError(f"Could not find profiles.yml at {self.path_to_profiles_yml}")
+                raise CosmosValueError(f"Could not find profiles.yml at {self.path_to_profiles_yml}")
 
     def validate_profile(self) -> None:
         "Validates that we have enough information to render a profile."
         if not self.path_to_profiles_yml and not self.profile_mapping:
-            raise ValueError("Either path_to_profiles_yml or profile_mapping must be set to render a profile")
+            raise CosmosValueError("Either path_to_profiles_yml or profile_mapping must be set to render a profile")
 
     @contextlib.contextmanager
     def ensure_profile(self, desired_profile_path: Path | None = None) -> Iterator[tuple[Path, dict[str, str]]]:

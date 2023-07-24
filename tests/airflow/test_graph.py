@@ -18,6 +18,7 @@ from cosmos.airflow.graph import (
 from cosmos.constants import ExecutionMode, DbtResourceType, TestBehavior
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, RenderConfig
 from cosmos.dbt.node import DbtNode
+from cosmos.exceptions import CosmosValueError
 
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -216,7 +217,7 @@ def test_create_task_metadata_unsupported(caplog):
         tags=[],
         config={},
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(CosmosValueError):
         create_task_metadata(child_node, execution_mode="", args={})
 
 

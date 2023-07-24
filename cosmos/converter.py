@@ -14,6 +14,7 @@ from cosmos.constants import ExecutionMode
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.dbt.graph import DbtGraph
 from cosmos.config import ProjectConfig, RenderConfig, ProfileConfig, ExecutionConfig, CosmosConfig
+from cosmos.exceptions import CosmosValueError
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def validate_configs(
     # if we're in local or venv mode, make sure we have a profile
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV] and not profile_config:
         if not profile_config:
-            raise ValueError("You must provide a profile_config when using local or venv execution mode")
+            raise CosmosValueError("You must provide a profile_config when using local or venv execution mode")
 
         profile_config.validate_profile()
 
@@ -119,12 +120,14 @@ class DbtToAirflowConverter:
 
         if task_group and not dag:
             if not task_group.dag:
-                raise ValueError("task_group must be associated with a DAG or you must pass a DAG to the constructor")
+                raise CosmosValueError(
+                    "task_group must be associated with a DAG or you must pass a DAG to the constructor"
+                )
 
             dag = task_group.dag
 
         if not dag:
-            raise ValueError("You must pass a DAG to the constructor")
+            raise CosmosValueError("You must pass a DAG to the constructor")
 
         build_airflow_graph(
             nodes=dbt_graph.nodes,

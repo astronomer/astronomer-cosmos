@@ -8,7 +8,7 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
+from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, ExecutionConfig
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -35,6 +35,7 @@ def cosmos_byo_profile() -> None:
             target_name="dev",
             path_to_profiles_yml=PROFILES_FILE_PATH,
         ),
+        execution_config=ExecutionConfig(append_env=True),
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

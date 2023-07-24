@@ -11,6 +11,7 @@ from cosmos.config import CosmosConfig
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.selector import select_nodes
 from cosmos.dbt.node import DbtNode
+from cosmos.exceptions import CosmosValueError
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,7 @@ class DbtGraph:
         * self.filtered_nodes
         """
         if not self.project_config.is_manifest_available():
-            raise ValueError(f"Unable to load manifest using {self.project_config.manifest_path}")
+            raise CosmosValueError(f"Unable to load manifest using {self.project_config.manifest_path}")
 
         logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}

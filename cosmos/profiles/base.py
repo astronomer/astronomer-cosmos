@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import yaml
 
 from airflow.hooks.base import BaseHook
+from cosmos.exceptions import CosmosValueError
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -44,7 +45,7 @@ class BaseProfileMapping(ABC):
         if not self._conn:
             conn = BaseHook.get_connection(self.conn_id)
             if not conn:
-                raise ValueError(f"Could not find connection with conn_id {self.conn_id}")
+                raise CosmosValueError(f"Could not find connection with conn_id {self.conn_id}")
 
         logger.info(dir(self.conn))
         logger.info(self.conn.__dict__)

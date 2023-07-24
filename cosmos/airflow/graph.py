@@ -15,6 +15,7 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
 from cosmos.dbt.node import DbtNode
 from cosmos.config import CosmosConfig
+from cosmos.exceptions import CosmosValueError
 
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dic
         )
         return task_metadata
 
-    raise ValueError(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
+    raise CosmosValueError(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
 
 
 def create_test_task_metadata(

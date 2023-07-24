@@ -1,8 +1,6 @@
 "Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account keyfile dict/json."
 from __future__ import annotations
 
-import json
-import tempfile
 from typing import Any
 
 from cosmos.profiles.base import BaseProfileMapping
@@ -32,15 +30,6 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         "keyfile_dict": ["extra.keyfile_dict", "keyfile_dict", "extra__google_cloud_platform__keyfile_dict"],
     }
 
-    def dump_credentials_to_disk(self) -> str:
-        """
-        Store the GCP credentials into a file.
-        """
-        tmp_file = tempfile.NamedTemporaryFile("w")
-        json.dump(self.keyfile_dict, tmp_file)
-        tmp_file.flush()
-        return tmp_file.name
-
     @property
     def profile(self) -> dict[str, Any | None]:
         """
@@ -56,6 +45,5 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
             "dataset": self.dataset,
             "threads": self.profile_args.get("threads") or 1,
             "keyfile_json": self.keyfile_dict,
-            # "keyfile": keyfile_path,
             **self.profile_args,
         }

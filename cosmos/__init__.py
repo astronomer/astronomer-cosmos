@@ -11,10 +11,6 @@ from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
 from cosmos.dataset import get_dbt_dataset
-
-# re-export the dag and task group
-from cosmos.airflow.dag import DbtDag
-from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.operators.lazy_load import MissingPackage
 
 from cosmos.operators.local import (

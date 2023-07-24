@@ -7,13 +7,17 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
-from collections import namedtuple
+from typing import NamedTuple
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
 
-FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
+
+class FullOutputSubprocessResult(NamedTuple):
+    exit_code: int
+    output: str
+    full_output: list[str]
 
 
 class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc] # ignores subclass MyPy error

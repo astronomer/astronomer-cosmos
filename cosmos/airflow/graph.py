@@ -51,7 +51,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     return leaves
 
 
-def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dict) -> TaskMetadata:
+def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any]) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
 
@@ -88,7 +88,7 @@ def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
-    on_warning_callback: callable,
+    on_warning_callback: Callable[..., Any] | None = None,
     model_name: str | None = None,
 ) -> TaskMetadata:
     """

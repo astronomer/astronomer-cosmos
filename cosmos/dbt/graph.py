@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
@@ -34,7 +35,7 @@ class DbtNode:
 
     name: str
     unique_id: str
-    resource_type: str
+    resource_type: DbtResourceType
     depends_on: list[str]
     file_path: Path
     tags: list[str] = field(default_factory=lambda: [])
@@ -130,7 +131,12 @@ class DbtGraph:
         logger.info(f"Running command: {command}")
         try:
             process = Popen(
-                command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir, universal_newlines=True, env=os.environ # type: ignore[arg-type]
+                command,  # type: ignore[arg-type]
+                stdout=PIPE,
+                stderr=PIPE,
+                cwd=self.project.dir,
+                universal_newlines=True,
+                env=os.environ,
             )
         except FileNotFoundError as exception:
             raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{exception}")

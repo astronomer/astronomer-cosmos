@@ -1,8 +1,11 @@
+# mypy: ignore-errors
+# ignoring enum Mypy errors
+
 from __future__ import annotations
+from enum import Enum
 
 import inspect
 import logging
-import sys
 from typing import Any, Callable
 
 from airflow.exceptions import AirflowException
@@ -167,7 +170,7 @@ class DbtToAirflowConverter:
             models_dir=Path(dbt_models_dir) if dbt_models_dir else None,
             seeds_dir=Path(dbt_seeds_dir) if dbt_seeds_dir else None,
             snapshots_dir=Path(dbt_snapshots_dir) if dbt_snapshots_dir else None,
-            manifest_path=manifest_path,  # type: ignore[arg-type]
+            manifest_path=manifest_path,
         )
 
         dbt_graph = DbtGraph(

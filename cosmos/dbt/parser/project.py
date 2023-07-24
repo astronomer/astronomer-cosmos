@@ -103,17 +103,18 @@ def extract_python_file_upstream_requirements(code: str) -> list[str]:
     source_code = ast.parse(code)
 
     upstream_entities = []
-    model_function = ""
+    model_function = None
     for node in source_code.body:
         if isinstance(node, ast.FunctionDef) and node.name == DBT_PY_MODEL_METHOD_NAME:
             model_function = node
             break
 
-    for item in ast.walk(model_function):
-        if isinstance(item, ast.Call) and item.func.attr == DBT_PY_DEP_METHOD_NAME:
-            upstream_entity_id = hasattr(item.args[-1], "value") and item.args[-1].value
-            if upstream_entity_id:
-                upstream_entities.append(upstream_entity_id)
+    if model_function:
+        for item in ast.walk(model_function):
+            if isinstance(item, ast.Call) and item.func.attr == DBT_PY_DEP_METHOD_NAME:  # type: ignore[attr-defined]
+                upstream_entity_id = hasattr(item.args[-1], "value") and item.args[-1].value
+                if upstream_entity_id:
+                    upstream_entities.append(upstream_entity_id)
 
     return upstream_entities
 
@@ -153,7 +154,7 @@ class DbtModel:
             code = code.split("{%")[0]
 
         elif self.type == DbtModelType.DBT_SEED:
-            code = None
+            code = ""
 
         if self.path.suffix == PYTHON_FILE_SUFFIX:
             config.upstream_models = config.upstream_models.union(set(extract_python_file_upstream_requirements(code)))

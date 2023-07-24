@@ -127,7 +127,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         session.add(rtif)
 
     def run_subprocess(self, *args: Tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
-        return self.subprocess_hook.run_command(*args, **kwargs)  # type: ignore[no-any-return]
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
+        return subprocess_result
 
     def get_profile_name(self, project_dir: str) -> str:
         """
@@ -244,7 +245,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def execute(self, context: Context) -> str:
         # TODO is this going to put loads of unnecessary stuff in to xcom?
-        return self.build_and_run_cmd(context=context).output  # type: ignore[no-any-return]
+        return self.build_and_run_cmd(context=context).output
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -268,7 +269,7 @@ class DbtLSLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtSeedLocalOperator(DbtLocalBaseOperator):
@@ -295,7 +296,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
     def execute(self, context: Context) -> str:
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
@@ -312,7 +313,7 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtRunLocalOperator(DbtLocalBaseOperator):
@@ -329,7 +330,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
@@ -385,13 +386,13 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         result = self.build_and_run_cmd(context=context)
 
         if not self._should_run_tests(result):
-            return result.output  # type: ignore[no-any-return]
+            return result.output
 
         warnings = parse_output(result, "WARN")
         if warnings > 0:
             self._handle_warnings(result, context)
 
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
@@ -422,7 +423,7 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     def execute(self, context: Context) -> str:
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
@@ -441,7 +442,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)
-        return result.output  # type: ignore[no-any-return]
+        return result.output
 
 
 class DbtDocsS3LocalOperator(DbtDocsLocalOperator):

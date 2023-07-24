@@ -91,11 +91,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if self.py_requirements:
             command[0] = self.venv_dbt_path
 
-        return self.subprocess_hook.run_command(  # type: ignore[no-any-return]
-            command,
-            *args,
-            **kwargs,
-        )
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(command, *args, **kwargs)
+        return subprocess_result
 
     def execute(self, context: Context) -> str:
         output = super().execute(context)

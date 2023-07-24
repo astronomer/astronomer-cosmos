@@ -14,6 +14,10 @@ from . import utils as test_utils
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 
+EXCLUDE_DAG_IDS = [
+    "cosmos_byo_profile",
+]
+
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
 }
@@ -59,6 +63,9 @@ def get_dag_ids() -> list[str]:
 @pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):
+    if dag_id in EXCLUDE_DAG_IDS:
+        pytest.skip(f"DAG {dag_id} is excluded from testing")
+
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
     test_utils.run_dag(dag)

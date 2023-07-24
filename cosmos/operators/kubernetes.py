@@ -47,7 +47,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
         generated_cmd = self.build_cmd()
         env = self.get_env(context=context)
 
-        # set the instance params that the KPO wil pick up
+        # set the instance params that the KPO will pick up
         self.arguments = generated_cmd
         self.env_vars = convert_env_vars(env)
 

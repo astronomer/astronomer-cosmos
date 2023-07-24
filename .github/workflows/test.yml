@@ -99,8 +99,25 @@ jobs:
       matrix:
         python-version: ["3.10"]
         airflow-version: ["2.6"]
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.fork == false
+      ) ||
+      (
+        github.event_name == 'pull_request_target' &&
+        contains(github.event.pull_request.labels.*.name, 'safe')
+      )
     steps:
       - uses: actions/checkout@v3
+        if: github.event_name != 'pull_request_target'
+
+      - name: Checkout pull/${{ github.event.number }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+        if: github.event_name == 'pull_request_target'
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4

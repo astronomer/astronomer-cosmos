@@ -1,16 +1,11 @@
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, ExecutionConfig
 from cosmos.operators.kubernetes import (
-    DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
-    DbtRunKubernetesOperator,
-    DbtSeedKubernetesOperator,
-    DbtTestKubernetesOperator,
 )
 
 

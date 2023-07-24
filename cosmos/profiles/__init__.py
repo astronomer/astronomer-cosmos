@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from .base import BaseProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping

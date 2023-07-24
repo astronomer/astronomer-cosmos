@@ -1,8 +1,6 @@
 from unittest.mock import patch, MagicMock
 
 import pytest
-from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessResult
 from airflow.utils.context import Context
 from pendulum import datetime
 

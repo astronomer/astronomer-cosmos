@@ -296,7 +296,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
             ),
         ),
     )
-    with pytest.raises(FileNotFoundError) as err_info:
+    with pytest.raises(FileNotFoundError):
         dbt_graph.load_via_dbt_ls()
 
 

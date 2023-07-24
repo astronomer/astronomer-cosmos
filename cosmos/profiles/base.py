@@ -4,7 +4,6 @@ inherit from to ensure consistency.
 """
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Any
@@ -80,9 +79,7 @@ class BaseProfileMapping(ABC):
         for field in self.secret_fields:
             env_var_name = self.get_env_var_name(field)
             value = self.get_dbt_value(field)
-            if isinstance(value, dict):
-                env_vars[env_var_name] = json.dumps(value)
-            elif value is not None:
+            if value is not None:
                 env_vars[env_var_name] = str(value)
 
         return env_vars

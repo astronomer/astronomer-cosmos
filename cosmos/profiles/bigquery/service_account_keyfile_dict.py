@@ -37,7 +37,6 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         Even though the Airflow connection contains hard-coded Service account credentials,
         we generate a temporary file and the DBT profile uses it.
         """
-        # keyfile_path = self.dump_credentials_to_disk()
         return {
             "type": "bigquery",
             "method": "service-account-json",

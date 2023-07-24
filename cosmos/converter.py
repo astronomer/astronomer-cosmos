@@ -49,10 +49,18 @@ def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
 def validate_configs(
     project_config: ProjectConfig,
     render_config: RenderConfig,
-    profile_config: ProfileConfig | None = None,
+    execution_config: ExecutionConfig,
+    profile_config: ProfileConfig,
 ) -> None:
     "Validates all configuration to ensure that they are compatible with each other."
     project_config.validate_project()
+
+    # if we're in local or venv mode, make sure we have a profile
+    if execution_config.execution_mode == "local" or execution_config.execution_mode == "venv":
+        if not profile_config:
+            raise ValueError("You must provide a profile_config when using local or venv execution mode")
+
+        profile_config.validate_profile()
 
 
 class DbtToAirflowConverter:
@@ -91,7 +99,12 @@ class DbtToAirflowConverter:
         if not operator_args:
             operator_args = {}
 
-        validate_configs(project_config, render_config, profile_config)
+        validate_configs(
+            project_config=project_config,
+            render_config=render_config,
+            execution_config=execution_config,
+            profile_config=profile_config,
+        )
 
         dbt_graph = DbtGraph(cosmos_config)
         dbt_graph.load()

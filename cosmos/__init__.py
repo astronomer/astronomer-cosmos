@@ -9,7 +9,7 @@ __version__ = "0.7.5"
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
-from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig, ExecutionConfig
+from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig, ExecutionConfig, CosmosConfig
 from cosmos.dataset import get_dbt_dataset
 
 
@@ -83,6 +83,7 @@ except ImportError:
     )
 
 __all__ = [
+    "CosmosConfig",
     "ProjectConfig",
     "ProfileConfig",
     "RenderConfig",

@@ -53,7 +53,7 @@ class SelectorConfig:
         for item in items:
             if item.startswith(PATH_SELECTOR):
                 index = len(PATH_SELECTOR)
-                self.paths.append(str(self.project_dir / item[index:]))
+                self.paths.append(self.project_dir / item[index:])
             elif item.startswith(TAG_SELECTOR):
                 index = len(TAG_SELECTOR)
                 self.tags.append(item[index:])

@@ -1,7 +1,8 @@
+"Kubernetes operators for dbt."
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Sequence
+from typing import Any
 
 import yaml
 from airflow.utils.context import Context
@@ -16,51 +17,41 @@ try:
         convert_env_vars,
     )
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-    from kubernetes.client import models as k8s
-except ImportError:
+except ImportError as exception:
     raise ImportError(
         "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
         "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
-    )
+    ) from exception
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):
     """
     Executes a dbt core cli command in a Kubernetes Pod.
-
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
-
-    intercept_flag = False
+    template_fields: list[str] = DbtBaseOperator.template_fields + list(KubernetesPodOperator.template_fields)
 
     def __init__(
         self,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
 
-    def build_env_args(self, env: dict) -> list[k8s.V1EnvVar]:
-        env_vars_dict = {}
-        for env_var in self.env_vars:
-            env_vars_dict[env_var.name] = env_var.value
+    def prepare(self, context: Context) -> None:
+        "Sets the command and environment variables for the KPO"
+        generated_cmd = self.build_cmd()
+        env = self.get_env(context=context)
 
-        self.env_vars = convert_env_vars({**env, **env_vars_dict})
+        # set the instance params that the KPO wil pick up
+        self.arguments = generated_cmd
+        self.env_vars = convert_env_vars(env)
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None):
-        self.build_kube_args(cmd_flags, context)
-        self.log.info(f"Running command: {self.arguments}")
-        return super().execute(context)
+        logger.info("Passing the following command to KPO: `%s`", generated_cmd)
 
-    def build_kube_args(self, cmd_flags, context):
-        # For the first round, we're going to assume that the command is dbt
-        # This means that we don't have openlineage support, but we will create a ticket
-        # to add that in the future
-        self.dbt_executable_path = "dbt"
-        dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
-        # set env vars
-        self.build_env_args(env_vars)
-        self.arguments = dbt_cmd
+    def execute(self, context: Context) -> None:
+        "Generates the dbt command and runs the KPO"
+        self.prepare(context=context)
+        super().execute(context)
 
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
@@ -69,13 +60,7 @@ class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
     """
 
     ui_color = "#DBCDF6"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "ls"
-
-    def execute(self, context: Context):
-        return self.build_and_run_cmd(context=context)
+    base_cmd = ["ls"]
 
 
 class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
@@ -86,38 +71,29 @@ class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
     """
 
     ui_color = "#F58D7E"
+    base_cmd = ["seed"]
 
-    def __init__(self, full_refresh: bool = False, **kwargs) -> None:
+    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
-        self.base_cmd = "seed"
 
-    def add_cmd_flags(self):
-        flags = []
+    def build_cmd(self, flags: list[str] | None = None) -> list[str]:
+        "Overrides the base class build_cmd to add the full-refresh flag."
+        cmd = super().build_cmd(flags=flags)
+
         if self.full_refresh is True:
-            flags.append("--full-refresh")
+            cmd.append("--full-refresh")
 
-        return flags
-
-    def execute(self, context: Context):
-        cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        return cmd
 
 
 class DbtSnapshotKubernetesOperator(DbtKubernetesBaseOperator):
     """
     Executes a dbt core snapshot command.
-
     """
 
     ui_color = "#964B00"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "snapshot"
-
-    def execute(self, context: Context):
-        return self.build_and_run_cmd(context=context)
+    base_cmd = ["snapshot"]
 
 
 class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
@@ -127,13 +103,7 @@ class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
 
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "run"
-
-    def execute(self, context: Context):
-        return self.build_and_run_cmd(context=context)
+    base_cmd = ["run"]
 
 
 class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
@@ -142,15 +112,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
     """
 
     ui_color = "#8194E0"
-
-    def __init__(self, on_warning_callback: Optional[Callable] = None, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = "test"
-        # as of now, on_warning_callback in kubernetes executor does nothing
-        self.on_warning_callback = on_warning_callback
-
-    def execute(self, context: Context):
-        return self.build_and_run_cmd(context=context)
+    base_cmd = ["test"]
 
 
 class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
@@ -159,25 +121,24 @@ class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
 
     :param macro_name: name of macro to execute
     :param args: Supply arguments to the macro. This dictionary will be mapped to the keyword arguments defined in the
-        selected macro.
+        selected macro. (templated)
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = "args"
+    template_fields = DbtKubernetesBaseOperator.template_fields + ["args"]
 
-    def __init__(self, macro_name: str, args: dict = None, **kwargs) -> None:
+    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
         self.macro_name = macro_name
         self.args = args
         super().__init__(**kwargs)
         self.base_cmd = ["run-operation", macro_name]
 
-    def add_cmd_flags(self):
-        flags = []
-        if self.args is not None:
-            flags.append("--args")
-            flags.append(yaml.dump(self.args))
-        return flags
+    def build_cmd(self, flags: list[str] | None = None) -> list[str]:
+        "Overrides the base class build_cmd to add the args flag."
+        cmd = super().build_cmd(flags=flags)
 
-    def execute(self, context: Context):
-        cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        if self.args is not None:
+            cmd.append("--args")
+            cmd.append(yaml.dump(self.args))
+
+        return cmd

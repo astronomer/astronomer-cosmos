@@ -7,16 +7,20 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
-from collections import namedtuple
+from typing import NamedTuple
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
 
-FullOutputSubprocessResult = namedtuple("FullOutputSubprocessResult", ["exit_code", "output", "full_output"])
+
+class FullOutputSubprocessResult(NamedTuple):
+    exit_code: int
+    output: str
+    full_output: list[str]
 
 
-class FullOutputSubprocessHook(BaseHook):
+class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc] # ignores subclass MyPy error
     """Hook for running processes with the ``subprocess`` module."""
 
     def __init__(self) -> None:
@@ -56,7 +60,7 @@ class FullOutputSubprocessHook(BaseHook):
             if cwd is None:
                 cwd = stack.enter_context(TemporaryDirectory(prefix="airflowtmp"))
 
-            def pre_exec():
+            def pre_exec() -> None:
                 # Restore default signal disposition and invoke setsid
                 for sig in ("SIGPIPE", "SIGXFZ", "SIGXFSZ"):
                     if hasattr(signal, sig):
@@ -93,7 +97,7 @@ class FullOutputSubprocessHook(BaseHook):
 
         return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
 
-    def send_sigterm(self):
+    def send_sigterm(self) -> None:
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""
         self.log.info("Sending SIGTERM signal to process group")
         if self.sub_process and hasattr(self.sub_process, "pid"):

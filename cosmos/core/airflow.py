@@ -1,6 +1,5 @@
 import importlib
 import logging
-from typing import Optional
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
@@ -11,7 +10,7 @@ from cosmos.core.graph.entities import Task
 logger = logging.getLogger(__name__)
 
 
-def get_airflow_task(task: Task, dag: DAG, task_group: Optional[TaskGroup] = None) -> BaseOperator:
+def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None) -> BaseOperator:
     """
     Get the Airflow Operator class for a Task.
 

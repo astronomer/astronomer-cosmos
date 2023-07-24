@@ -1,14 +1,17 @@
+# mypy: ignore-errors
+# ignoring enum Mypy errors
+
 from __future__ import annotations
+from enum import Enum
 
 import inspect
 import logging
-import pathlib
-from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
+from pathlib import Path
 
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
@@ -142,8 +145,8 @@ class DbtToAirflowConverter:
         exclude: list[str] | None = None,
         execution_mode: str | ExecutionMode = ExecutionMode.LOCAL,
         load_mode: str | LoadMode = LoadMode.AUTOMATIC,
-        manifest_path: str | pathlib.Path | None = None,
-        on_warning_callback: Optional[Callable] = None,
+        manifest_path: str | Path | None = None,
+        on_warning_callback: Callable[..., Any] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -154,12 +157,19 @@ class DbtToAirflowConverter:
         execution_mode = convert_value_to_enum(execution_mode, ExecutionMode)
         load_mode = convert_value_to_enum(load_mode, LoadMode)
 
+        test_behavior = convert_value_to_enum(test_behavior, TestBehavior)
+        execution_mode = convert_value_to_enum(execution_mode, ExecutionMode)
+        load_mode = convert_value_to_enum(load_mode, LoadMode)
+
+        if type(manifest_path) == str:
+            manifest_path = Path(manifest_path)
+
         dbt_project = DbtProject(
             name=dbt_project_name,
-            root_dir=dbt_root_path,
-            models_dir=dbt_models_dir,
-            seeds_dir=dbt_seeds_dir,
-            snapshots_dir=dbt_snapshots_dir,
+            root_dir=Path(dbt_root_path),
+            models_dir=Path(dbt_models_dir) if dbt_models_dir else None,
+            seeds_dir=Path(dbt_seeds_dir) if dbt_seeds_dir else None,
+            snapshots_dir=Path(dbt_snapshots_dir) if dbt_snapshots_dir else None,
             manifest_path=manifest_path,
         )
 

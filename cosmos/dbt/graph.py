@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
@@ -34,9 +35,9 @@ class DbtNode:
 
     name: str
     unique_id: str
-    resource_type: str
+    resource_type: DbtResourceType
     depends_on: list[str]
-    file_path: str
+    file_path: Path
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
 
@@ -66,7 +67,7 @@ class DbtGraph:
         self,
         project: DbtProject,
         exclude: list[str] | None = None,
-        select: list[str] = None,
+        select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
     ):
         self.project = project
@@ -112,7 +113,7 @@ class DbtGraph:
 
         load_method[method]()
 
-    def load_via_dbt_ls(self):
+    def load_via_dbt_ls(self) -> None:
         """
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
@@ -130,7 +131,12 @@ class DbtGraph:
         logger.info(f"Running command: {command}")
         try:
             process = Popen(
-                command, stdout=PIPE, stderr=PIPE, cwd=self.project.dir, universal_newlines=True, env=os.environ
+                command,  # type: ignore[arg-type]
+                stdout=PIPE,
+                stderr=PIPE,
+                cwd=self.project.dir,
+                universal_newlines=True,
+                env=os.environ,
             )
         except FileNotFoundError as exception:
             raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{exception}")
@@ -164,7 +170,7 @@ class DbtGraph:
         self.nodes = nodes
         self.filtered_nodes = nodes
 
-    def load_via_custom_parser(self):
+    def load_via_custom_parser(self) -> None:
         """
         This is the least accurate way of loading `dbt` projects and filtering them out, since it uses custom Cosmos
         logic, which is usually a subset of what is available in `dbt`.
@@ -177,11 +183,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project using a custom Cosmos method...")
+
         project = LegacyDbtProject(
-            dbt_root_path=self.project.root_dir,
-            dbt_models_dir=self.project.models_dir.stem,
-            dbt_snapshots_dir=self.project.snapshots_dir.stem,
-            dbt_seeds_dir=self.project.seeds_dir.stem,
+            dbt_root_path=str(self.project.root_dir),
+            dbt_models_dir=self.project.models_dir.stem if self.project.models_dir else None,
+            dbt_seeds_dir=self.project.seeds_dir.stem if self.project.seeds_dir else None,
             project_name=self.project.name,
         )
         nodes = {}
@@ -192,7 +198,7 @@ class DbtGraph:
                 name=model_name,
                 unique_id=model_name,
                 resource_type=DbtResourceType(model.type.value),
-                depends_on=model.config.upstream_models,
+                depends_on=list(model.config.upstream_models),
                 file_path=model.path,
                 tags=[],
                 config=config,
@@ -204,7 +210,7 @@ class DbtGraph:
             project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
         )
 
-    def load_from_dbt_manifest(self):
+    def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.yml` file.
 
@@ -217,7 +223,7 @@ class DbtGraph:
         """
         logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}
-        with open(self.project.manifest_path) as fp:
+        with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)
 
             for unique_id, node_dict in manifest.get("nodes", {}).items():

@@ -58,12 +58,13 @@ repos:
       - id: blacken-docs
         alias: black
         additional_dependencies: [black>=22.10.0]
-  #-   repo: https://github.com/pre-commit/mirrors-mypy
-  #    rev: 'v1.3.0'
-  #    hooks:
-  #    - id: mypy
-  #      name: mypy-python-sdk
-  #      additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v1.3.0'
+    hooks:
+      - id: mypy
+        name: mypy-python-sdk
+        additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil]
+        files: ^cosmos
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks

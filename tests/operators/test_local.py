@@ -34,7 +34,7 @@ def test_dbt_base_operator_add_user_supplied_flags() -> None:
         conn_id="my_airflow_connection",
         task_id="my-task",
         project_dir="my/dir",
-        base_cmd="run",
+        base_cmd=["run"],
         dbt_cmd_flags=["--full-refresh"],
     )
 

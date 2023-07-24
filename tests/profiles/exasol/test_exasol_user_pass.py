@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
 from cosmos.profiles.exasol.user_pass import (
     ExasolUserPasswordProfileMapping,
 )
@@ -31,78 +30,16 @@ def mock_exasol_connection():  # type: ignore
         yield conn
 
 
-def test_connection_claiming() -> None:
-    """
-    Tests that the Exasol profile mapping claims the correct connection type.
-    """
-    # should only claim when:
-    # - conn_type == exasol
-    # and the following exist:
-    # - threads
-    # - dsn
-    # - user
-    # - password
-    # - dbname
-    # - schema
-    potential_values = {
-        "conn_type": "exasol",
-        "host": "my_host:8563",
-        "login": "my_user",
-        "password": "my_password",
-        "schema": "my_database",
-    }
-
-    # if we're missing any of the values, it shouldn't claim
-    for key in potential_values:
-        values = potential_values.copy()
-        del values[key]
-        conn = Connection(**values)  # type: ignore
-
-        print("testing with", values)
-
-        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-        assert not profile_mapping.can_claim_connection()
-
-    # also test when there's no schema
-    conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"threads": 1})
-    assert not profile_mapping.can_claim_connection()
-
-    # also test when there's no threads
-    conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-    assert not profile_mapping.can_claim_connection()
-
-    # if we have them all, it should claim
-    conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.can_claim_connection()
-
-
-def test_profile_mapping_selected(
-    mock_exasol_connection: Connection,
-) -> None:
-    """
-    Tests that the correct profile mapping is selected.
-    """
-    profile_mapping = get_profile_mapping(mock_exasol_connection.conn_id, {"schema": "my_schema", "threads": 1})
-    assert isinstance(profile_mapping, ExasolUserPasswordProfileMapping)
-
-
 def test_profile_args(
     mock_exasol_connection: Connection,
 ) -> None:
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = ExasolUserPasswordProfileMapping(
         mock_exasol_connection.conn_id,
         profile_args={"schema": "my_schema", "threads": 1},
     )
-    assert profile_mapping.profile_args == {
-        "schema": "my_schema",
-        "threads": 1,
-    }
 
     assert profile_mapping.profile == {
         "type": mock_exasol_connection.conn_type,
@@ -122,7 +59,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = ExasolUserPasswordProfileMapping(
         mock_exasol_connection.conn_id,
         profile_args={
             "dsn": "my_dsn_override",
@@ -134,15 +71,6 @@ def test_profile_args_overrides(
             "protocol_version": "2",
         },
     )
-    assert profile_mapping.profile_args == {
-        "dsn": "my_dsn_override",
-        "user": "my_user_override",
-        "password": "my_password_override",
-        "schema": "my_schema",
-        "dbname": "my_db_override",
-        "threads": 1,
-        "protocol_version": "2",
-    }
 
     assert profile_mapping.profile == {
         "type": mock_exasol_connection.conn_type,
@@ -162,7 +90,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = ExasolUserPasswordProfileMapping(
         mock_exasol_connection.conn_id,
         profile_args={"schema": "my_schema", "threads": 1},
     )
@@ -185,8 +113,9 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.dsn == "my_host:1000"
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.dsn == "my_host:1000"
 
     # next, test with a host that doesn't include a port
     conn = Connection(
@@ -198,8 +127,9 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.dsn == "my_host:8563"  # should default to 8563
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.dsn == "my_host:8563"  # should default to 8563
 
     # lastly, test with a port override
     conn = Connection(
@@ -212,5 +142,6 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.dsn == "my_host:1000"
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.dsn == "my_host:1000"

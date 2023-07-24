@@ -147,17 +147,13 @@ def build_airflow_graph(
 
     :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
     :param dag: Airflow DAG instance
-    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
-        Default is ExecutionMode.LOCAL.
+    :param cosmos_config: Cosmos configuration
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
-    :param dbt_project_name: Name of the dbt pipeline of interest
-    :param conn_id: Airflow connection ID
     :param task_group: Airflow Task Group instance
-    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
-    and “test_results” of type List.
-    :param emit_datasets: Decides if Cosmos should add outlets to model classes or not.
     """
+    task_args = dict(task_args)
+    task_args["cosmos_config"] = cosmos_config
+
     render_config = cosmos_config.render_config
     profile_config = cosmos_config.profile_config
     project_config = cosmos_config.project_config

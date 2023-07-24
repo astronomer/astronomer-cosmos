@@ -117,24 +117,23 @@ class ProfileConfig:
     target_name: str
 
     # should be set if using a user-supplied profiles.yml
-    path_to_profiles_yml: str | None = None
+    path_to_profiles_yml: str | Path | None = None
 
     # should be set if using cosmos to map Airflow connections to dbt profiles
     profile_mapping: BaseProfileMapping | None = None
 
     def __post_init__(self) -> None:
         "Validates that we have enough information to render a profile."
-        if not self.profile_mapping and not self.path_to_profiles_yml:
-            raise ValueError("Either a profile_mapping or path_to_profiles_yml must be set")
-
-        if self.profile_mapping and self.path_to_profiles_yml:
-            raise ValueError("Only one of profile_mapping or path_to_profiles_yml can be set")
-
         # if using a user-supplied profiles.yml, validate that it exists
         if self.path_to_profiles_yml:
             profiles_path = Path(self.path_to_profiles_yml)
             if not profiles_path.exists():
                 raise ValueError(f"Could not find profiles.yml at {self.path_to_profiles_yml}")
+
+    def validate_profile(self) -> None:
+        "Validates that we have enough information to render a profile."
+        if not self.path_to_profiles_yml and not self.profile_mapping:
+            raise ValueError("Either path_to_profiles_yml or profile_mapping must be set to render a profile")
 
     @contextlib.contextmanager
     def ensure_profile(self, desired_profile_path: Path | None = None) -> Iterator[tuple[str, dict[str, str]]]:
@@ -205,7 +204,7 @@ class CosmosConfig:
     Contains all Cosmos config.
     """
 
-    render_config: RenderConfig
     project_config: ProjectConfig
     profile_config: ProfileConfig
-    execution_config: ExecutionConfig
+    render_config: RenderConfig = field(default_factory=RenderConfig)
+    execution_config: ExecutionConfig = field(default_factory=ExecutionConfig)

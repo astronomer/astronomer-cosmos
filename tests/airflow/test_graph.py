@@ -1,10 +1,12 @@
 from pathlib import Path
 from datetime import datetime
 
+from unittest.mock import patch
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 from packaging import version
+
 
 from cosmos.airflow.graph import (
     build_airflow_graph,
@@ -13,8 +15,9 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     calculate_operator_class,
 )
-from cosmos.constants import ExecutionMode, DbtResourceType, TestBehavior
-from cosmos.dbt.graph import DbtNode
+from cosmos.constants import ExecutionMode, DbtResourceType
+from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, RenderConfig
+from cosmos.dbt.node import DbtNode
 
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -24,19 +27,23 @@ parent_seed = DbtNode(
     unique_id="seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
-    file_path="",
+    file_path=Path("seed_parent.csv"),
 )
 parent_node = DbtNode(
     name="parent",
     unique_id="parent",
     resource_type=DbtResourceType.MODEL,
     depends_on=["seed_parent"],
-    file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+    file_path=SAMPLE_PROJ_PATH / "models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view"},
 )
 test_parent_node = DbtNode(
-    name="test_parent", unique_id="test_parent", resource_type=DbtResourceType.TEST, depends_on=["parent"], file_path=""
+    name="test_parent",
+    unique_id="test_parent",
+    resource_type=DbtResourceType.TEST,
+    depends_on=["parent"],
+    file_path=SAMPLE_PROJ_PATH / "models/parent.sql",
 )
 child_node = DbtNode(
     name="child",
@@ -52,11 +59,18 @@ test_child_node = DbtNode(
     unique_id="test_child",
     resource_type=DbtResourceType.TEST,
     depends_on=["child"],
-    file_path="",
+    file_path=Path(""),
 )
 
 sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, test_child_node]
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
+
+
+@pytest.fixture()
+def path_patch():  # type: ignore
+    "Ensures that pathlib.Path.exists returns True"
+    with patch("pathlib.Path.exists", return_value=True):
+        yield
 
 
 @pytest.mark.skipif(
@@ -64,21 +78,25 @@ sample_nodes = {node.unique_id: node for node in sample_nodes_list}
     reason="Airflow DAG did not have task_group_dict until the 2.4 release",
 )
 @pytest.mark.integration
-def test_build_airflow_graph_with_after_each():
+def test_build_airflow_graph_with_after_each(path_patch):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
-        task_args = {
-            "project_dir": SAMPLE_PROJ_PATH,
-            "conn_id": "fake_conn",
-        }
+        cosmos_config = CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=SAMPLE_PROJ_PATH / "astro_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=SAMPLE_PROJ_PATH / "profiles.yml",
+            ),
+        )
         build_airflow_graph(
             nodes=sample_nodes,
             dag=dag,
-            execution_mode=ExecutionMode.LOCAL,
-            task_args=task_args,
-            test_behavior=TestBehavior.AFTER_EACH,
-            dbt_project_name="astro_shop",
-            conn_id="fake_conn",
+            cosmos_config=cosmos_config,
+            task_args={},
         )
+
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = [
         "seed_parent_seed",
@@ -106,20 +124,26 @@ def test_build_airflow_graph_with_after_each():
     reason="Airflow DAG did not have task_group_dict until the 2.4 release",
 )
 @pytest.mark.integration
-def test_build_airflow_graph_with_after_all():
+def test_build_airflow_graph_with_after_all(path_patch):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
-        task_args = {
-            "project_dir": SAMPLE_PROJ_PATH,
-            "conn_id": "fake_conn",
-        }
+        cosmos_config = CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=SAMPLE_PROJ_PATH / "astro_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=SAMPLE_PROJ_PATH / "profiles.yml",
+            ),
+            render_config=RenderConfig(
+                test_behavior="after_all",
+            ),
+        )
         build_airflow_graph(
             nodes=sample_nodes,
             dag=dag,
-            execution_mode=ExecutionMode.LOCAL,
-            task_args=task_args,
-            test_behavior=TestBehavior.AFTER_ALL,
-            dbt_project_name="astro_shop",
-            conn_id="fake_conn",
+            task_args={},
+            cosmos_config=cosmos_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = ["seed_parent_seed", "parent_run", "child_run", "astro_shop_test"]
@@ -192,10 +216,8 @@ def test_create_task_metadata_unsupported(caplog):
         tags=[],
         config={},
     )
-    response = create_task_metadata(child_node, execution_mode="", args={})
-    assert response is None
-    expected_msg = "Unsupported resource type unsupported (node unsupported)."
-    assert caplog.messages[0] == expected_msg
+    with pytest.raises(ValueError):
+        create_task_metadata(child_node, execution_mode="", args={})
 
 
 def test_create_task_metadata_model(caplog):
@@ -211,7 +233,7 @@ def test_create_task_metadata_model(caplog):
     metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})
     assert metadata.id == "my_model_run"
     assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
-    assert metadata.arguments == {"models": "my_model"}
+    assert metadata.arguments == {"models": ["my_model"]}
 
 
 def test_create_task_metadata_seed(caplog):
@@ -227,7 +249,7 @@ def test_create_task_metadata_seed(caplog):
     metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
-    assert metadata.arguments == {"models": "my_seed"}
+    assert metadata.arguments == {"models": ["my_seed"]}
 
 
 def test_create_task_metadata_snapshot(caplog):
@@ -243,7 +265,7 @@ def test_create_task_metadata_snapshot(caplog):
     metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.KUBERNETES, args={})
     assert metadata.id == "my_snapshot_snapshot"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator"
-    assert metadata.arguments == {"models": "my_snapshot"}
+    assert metadata.arguments == {"models": ["my_snapshot"]}
 
 
 def test_create_test_task_metadata():
@@ -251,9 +273,8 @@ def test_create_test_task_metadata():
         test_task_name="test_no_nulls",
         execution_mode=ExecutionMode.LOCAL,
         task_args={"task_arg": "value"},
-        on_warning_callback=True,
         model_name="my_model",
     )
     assert metadata.id == "test_no_nulls"
     assert metadata.operator_class == "cosmos.operators.local.DbtTestLocalOperator"
-    assert metadata.arguments == {"task_arg": "value", "on_warning_callback": True, "models": "my_model"}
+    assert metadata.arguments == {"task_arg": "value", "models": ["my_model"]}

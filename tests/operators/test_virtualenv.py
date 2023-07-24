@@ -1,50 +1,48 @@
 from unittest.mock import patch
 
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
+from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, ExecutionConfig
 
-from airflow.models.connection import Connection
+from airflow.utils.context import Context
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.execute")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
 def test_run_command(
-    mock_get_connection,
     mock_subprocess_hook,
-    mock_exception_handling,
-    mock_store_compiled_sql,
-    mock_execute,
+    mock_super_execute,
+    mock_execute_in_subprocess,
 ):
-    mock_get_connection.return_value = Connection(
-        conn_id="fake_conn",
-        conn_type="postgres",
-        host="fake_host",
-        port=5432,
-        login="fake_login",
-        password="fake_password",
-        schema="fake_schema",
-    )
+    with patch("pathlib.Path.exists", return_value=True):
+        cosmos_config = CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project="my/dir",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml="my/profiles.yml",
+            ),
+            execution_config=ExecutionConfig(
+                dbt_executable_path="my/dbt",
+                dbt_cli_flags=["--full-refresh"],
+            ),
+        )
+
     venv_operator = DbtVirtualenvBaseOperator(
-        conn_id="fake_conn",
+        cosmos_config=cosmos_config,
         task_id="fake_task",
-        install_deps=True,
-        project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         py_requirements=["dbt-postgres==1.6.0b1"],
-        profile_args={"schema": "public"},
     )
-    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={})
-    run_command_args = mock_subprocess_hook.run_command.call_args_list
-    assert len(run_command_args) == 3
-    python_cmd = run_command_args[0]
-    dbt_deps = run_command_args[1]
-    dbt_cmd = run_command_args[2]
-    assert python_cmd[0][0][0].endswith("/bin/python")
-    assert python_cmd[0][-1][-1] == "from importlib.metadata import version; print(version('dbt-core'))"
-    assert dbt_deps[0][0][-1] == "deps"
-    assert dbt_deps[0][0][0].endswith("/bin/dbt")
-    assert dbt_deps[0][0][0] == dbt_cmd[0][0][0]
-    assert dbt_cmd[0][0][1] == "do-something"
-    assert mock_execute.call_count == 2
+
+    venv_operator.execute(Context())
+    assert mock_super_execute.call_count == 1
+    assert mock_execute_in_subprocess.call_count == 2
+
+    create_venv_args = mock_execute_in_subprocess.call_args_list[0]
+    install_deps_args = mock_execute_in_subprocess.call_args_list[1]
+
+    assert "virtualenv" in create_venv_args[0][0]
+    assert "dbt-postgres==1.6.0b1" in install_deps_args[0][0]

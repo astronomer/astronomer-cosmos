@@ -31,7 +31,7 @@ class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass My
     def __init__(
         self,
         cosmos_config: CosmosConfig,
-        models: list[str],
+        models: list[str] | None = None,
         env: dict[str, Any] | None = None,
         dbt_vars: dict[str, Any] | None = None,
         **kwargs: Any,
@@ -89,7 +89,8 @@ class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass My
         dbt_cmd.extend(self.base_cmd)
 
         # add models argument
-        dbt_cmd.extend(["--select", ",".join(self.models)])
+        if self.models:
+            dbt_cmd.extend(["--select", ",".join(self.models)])
 
         # add vars argument
         if self.dbt_vars:

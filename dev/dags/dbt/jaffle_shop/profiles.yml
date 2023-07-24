@@ -1,13 +1,12 @@
-# WARNING: this gets ignored by cosmos
 jaffle_shop:
   target: dev
   outputs:
     dev:
       type: postgres
-      host: localhost
-      user: postgres
-      password: postgres
+      host: postgres
+      user: airflow
+      password: pg_password
       port: 5432
-      dbname: public
-      schema: dbt_example
+      dbname: airflow
+      schema: public
       threads: 4

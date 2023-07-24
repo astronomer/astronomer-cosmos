@@ -5,20 +5,37 @@ import pytest
 
 from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
-from cosmos.dbt.project import DbtProject
+from cosmos.config import CosmosConfig, ProjectConfig, ProfileConfig, RenderConfig, ExecutionConfig
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 
 
-@pytest.mark.parametrize(
-    "pipeline_name,manifest_filepath,model_filepath",
-    [("jaffle_shop", SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
-)
-def test_load_via_manifest_with_exclude(pipeline_name, manifest_filepath, model_filepath):
-    dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=manifest_filepath)
-    dbt_graph = DbtGraph(project=dbt_project, exclude=["config.materialized:table"])
+@pytest.fixture()
+def path_patch():  # type: ignore
+    "Ensures that pathlib.Path.exists returns True"
+    with patch("pathlib.Path.exists", return_value=True):
+        yield
+
+
+def test_load_via_manifest_with_exclude(path_patch):
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+                manifest=SAMPLE_MANIFEST,
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+            ),
+        ),
+    )
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.nodes) == 28
@@ -39,18 +56,45 @@ def test_load_via_manifest_with_exclude(pipeline_name, manifest_filepath, model_
 
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
 def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
-    dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode=ExecutionMode.LOCAL)
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+                manifest=SAMPLE_MANIFEST,
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+            ),
+        ),
+    )
+    dbt_graph.load()
     assert mock_load_from_dbt_manifest.called
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=FileNotFoundError())
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_custom_parser):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path="/tmp/manifest.json")
-    dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode=ExecutionMode.LOCAL)
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+            ),
+        ),
+    )
+    dbt_graph.load()
     assert mock_load_via_dbt_ls.called
     assert not mock_load_via_custom_parser.called
 
@@ -58,26 +102,70 @@ def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_cus
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", return_value=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", side_effect=FileNotFoundError())
 def test_load_automatic_without_manifest_and_without_dbt_cmd(mock_load_via_dbt_ls, mock_load_via_custom_parser):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.AUTOMATIC)
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+            ),
+        ),
+    )
+    dbt_graph.load()
     assert mock_load_via_dbt_ls.called
     assert mock_load_via_custom_parser.called
 
 
 def test_load_manifest_without_manifest():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
-    with pytest.raises(CosmosLoadDbtException) as err_info:
-        dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_MANIFEST)
-    assert err_info.value.args[0] == "Unable to load manifest using None"
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+                manifest="/random/path/to/manifest.json",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+                load_method=LoadMode.DBT_MANIFEST,
+            ),
+        ),
+    )
+    with pytest.raises(ValueError) as err_info:
+        dbt_graph.load()
+
+    assert err_info.value.args[0] == "Unable to load manifest using /random/path/to/manifest.json"
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
 def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
-    dbt_graph = DbtGraph(project=dbt_project)
-    dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_MANIFEST)
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+                manifest=SAMPLE_MANIFEST,
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+                load_method=LoadMode.DBT_MANIFEST,
+            ),
+        ),
+    )
+    dbt_graph.load()
     assert mock_load_from_dbt_manifest.called
 
 
@@ -98,31 +186,63 @@ def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
 def test_load(
     mock_load_from_dbt_manifest, mock_load_via_dbt_ls, mock_load_via_custom_parser, exec_mode, method, expected_function
 ):
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+                manifest="/random/path/to/manifest.json",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                exclude=["config.materialized:table"],
+                load_method=method,
+            ),
+            execution_config=ExecutionConfig(
+                execution_mode=exec_mode,
+            ),
+        ),
+    )
 
-    dbt_graph.load(method=method, execution_mode=exec_mode)
+    dbt_graph.load()
     load_function = locals()[expected_function]
     assert load_function.called
 
 
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_exclude():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project, select=["*customers*"], exclude=["*orders*"])
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                select=["customers", "stg_customers", "raw_customers"],
+            ),
+        ),
+    )
     dbt_graph.load_via_dbt_ls()
-    assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 7
     expected_keys = [
         "model.jaffle_shop.customers",
         "model.jaffle_shop.stg_customers",
         "seed.jaffle_shop.raw_customers",
         "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
         "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2",
         "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
         "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
     ]
     assert list(dbt_graph.nodes.keys()) == expected_keys
+    assert dbt_graph.nodes == dbt_graph.filtered_nodes
+    assert len(dbt_graph.nodes) == 8
 
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
@@ -139,8 +259,18 @@ def test_load_via_dbt_ls_with_exclude():
 @pytest.mark.integration
 @pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
 def test_load_via_dbt_ls_without_exclude(pipeline_name):
-    dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / pipeline_name,
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / pipeline_name / "profiles.yml",
+            ),
+        ),
+    )
     dbt_graph.load_via_dbt_ls()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
@@ -148,20 +278,47 @@ def test_load_via_dbt_ls_without_exclude(pipeline_name):
 
 
 def test_load_via_dbt_ls_with_invalid_dbt_path():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=dbt_project)
-    with pytest.raises(CosmosLoadDbtException) as err_info:
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                load_method=LoadMode.DBT_LS,
+            ),
+            execution_config=ExecutionConfig(
+                dbt_executable_path="/inexistent/dbt",
+            ),
+        ),
+    )
+    with pytest.raises(FileNotFoundError) as err_info:
         dbt_graph.load_via_dbt_ls()
-    expected = "Unable to run the command due to the error:\n[Errno 2] No such file or directory: '/inexistent/dbt'"
-    assert err_info.value.args[0].startswith(expected)
 
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
 def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / "jaffle_shop/profiles.yml",
+            ),
+            render_config=RenderConfig(
+                load_method=LoadMode.DBT_LS,
+            ),
+        ),
+    )
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
     expected = "Unable to run the command due to the error:\nSome Runtime Error"
@@ -171,12 +328,21 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
 
 @pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
 def test_load_via_load_via_custom_parser(pipeline_name):
-    dbt_project = DbtProject(
-        name=pipeline_name,
-        root_dir=DBT_PROJECTS_ROOT_DIR,
+    dbt_graph = DbtGraph(
+        cosmos_config=CosmosConfig(
+            project_config=ProjectConfig(
+                dbt_project=DBT_PROJECTS_ROOT_DIR / pipeline_name,
+            ),
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                path_to_profiles_yml=DBT_PROJECTS_ROOT_DIR / pipeline_name / "profiles.yml",
+            ),
+            render_config=RenderConfig(
+                load_method=LoadMode.CUSTOM,
+            ),
+        ),
     )
-    dbt_graph = DbtGraph(project=dbt_project)
-
     dbt_graph.load_via_custom_parser()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes

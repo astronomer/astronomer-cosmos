@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
 from cosmos.profiles.databricks import (
     DatabricksTokenProfileMapping,
 )
@@ -28,76 +27,19 @@ def mock_databricks_conn():  # type: ignore
         yield conn
 
 
-def test_connection_claiming() -> None:
-    """
-    Tests that the Databricks profile mapping claims the correct connection type.
-    """
-    # should only claim when:
-    # - conn_type == databricks
-    # and the following exist:
-    # - schema
-    # - host
-    # - http_path
-    # - token
-    potential_values = {
-        "conn_type": "databricks",
-        "host": "my_host",
-        "password": "my_token",
-        "extra": '{"http_path": "my_http_path"}',
-    }
-
-    # if we're missing any of the values, it shouldn't claim
-    for key in potential_values:
-        values = potential_values.copy()
-        del values[key]
-        conn = Connection(**values)  # type: ignore
-
-        print("testing with", values)
-
-        profile_mapping = DatabricksTokenProfileMapping(conn, {"schema": "my_schema"})
-        assert not profile_mapping.can_claim_connection()
-
-    # also test when there's no schema
-    conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = DatabricksTokenProfileMapping(conn, {})
-    assert not profile_mapping.can_claim_connection()
-
-    # if we have them all, it should claim
-    conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = DatabricksTokenProfileMapping(conn, {"schema": "my_schema"})
-    assert profile_mapping.can_claim_connection()
-
-
-def test_databricks_mapping_selected(
-    mock_databricks_conn: Connection,
-) -> None:
-    """
-    Tests that the correct profile mapping is selected.
-    """
-    profile_mapping = get_profile_mapping(
-        mock_databricks_conn.conn_id,
-        {"schema": "my_schema"},
-    )
-    assert isinstance(profile_mapping, DatabricksTokenProfileMapping)
-
-
 def test_profile_args(
     mock_databricks_conn: Connection,
 ) -> None:
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = DatabricksTokenProfileMapping(
         mock_databricks_conn.conn_id,
         profile_args={
             "schema": "my_schema",
             "catalog": "my_catalog",
         },
     )
-    assert profile_mapping.profile_args == {
-        "schema": "my_schema",
-        "catalog": "my_catalog",
-    }
 
     assert profile_mapping.profile == {
         "type": mock_databricks_conn.conn_type,
@@ -115,7 +57,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = DatabricksTokenProfileMapping(
         mock_databricks_conn.conn_id,
         profile_args={
             "schema": "my_schema",
@@ -123,11 +65,6 @@ def test_profile_args_overrides(
             "host": "my_host_override",
         },
     )
-    assert profile_mapping.profile_args == {
-        "schema": "my_schema",
-        "http_path": "http_path_override",
-        "host": "my_host_override",
-    }
 
     assert profile_mapping.profile == {
         "type": mock_databricks_conn.conn_type,
@@ -144,7 +81,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = DatabricksTokenProfileMapping(
         mock_databricks_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )

@@ -204,8 +204,7 @@ class DbtGraph:
 
         logger.info("Trying to parse the dbt project using a dbt manifest...")
         nodes = {}
-
-        with self.project_config.dbt_project_path.open() as manifest_file:
+        with self.project_config.manifest_path.open() as manifest_file:
             manifest = json.load(manifest_file)
 
             for unique_id, node_dict in manifest.get("nodes", {}).items():

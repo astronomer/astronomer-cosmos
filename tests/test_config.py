@@ -2,6 +2,7 @@ from pathlib import Path
 
 from cosmos.config import ProjectConfig
 
+
 # Tests that a ProjectConfig object can be created with valid parameters
 def test_valid_parameters():
     project_config = ProjectConfig(dbt_project="path/to/dbt/project")

@@ -21,12 +21,12 @@ def test_valid_parameters():
 
 
 def test_init_with_manifest():
-    project_config = ProjectConfig(dbt_project="/tmp/some-path", manifest="target/manifest.yml")
-    assert project_config.manifest_path == Path("target/manifest.yml")
+    project_config = ProjectConfig(dbt_project="/tmp/some-path", manifest="target/manifest.json")
+    assert project_config.manifest_path == Path("target/manifest.json")
 
 
 def test_validate_project_succeeds():
-    project_config = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR)
+    project_config = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR, manifest=DBT_PROJECTS_ROOT_DIR / "manifest.json")
     assert project_config.validate_project() is None
 
 

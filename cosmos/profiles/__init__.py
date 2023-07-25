@@ -58,3 +58,20 @@ def get_profile_mapping(
             return mapping
 
     raise ValueError(f"Could not find a profile mapping for connection {conn_id}.")
+
+
+__all__ = [
+    "BaseProfileMapping",
+    "GoogleCloudServiceAccountFileProfileMapping",
+    "GoogleCloudServiceAccountDictProfileMapping",
+    "DatabricksTokenProfileMapping",
+    "PostgresUserPasswordProfileMapping",
+    "RedshiftUserPasswordProfileMapping",
+    "SnowflakeUserPasswordProfileMapping",
+    "SnowflakePrivateKeyPemProfileMapping",
+    "SparkThriftProfileMapping",
+    "ExasolUserPasswordProfileMapping",
+    "TrinoLDAPProfileMapping",
+    "TrinoCertificateProfileMapping",
+    "TrinoJWTProfileMapping",
+]

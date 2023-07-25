@@ -1,8 +1,20 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 
 from airflow.models.connection import Connection
+
+from cosmos.config import ProfileConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="fake_conn",
+        profile_args={"schema": "public"},
+    ),
+)
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
@@ -27,13 +39,12 @@ def test_run_command(
         schema="fake_schema",
     )
     venv_operator = DbtVirtualenvBaseOperator(
-        conn_id="fake_conn",
+        profile_config=profile_config,
         task_id="fake_task",
         install_deps=True,
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         py_requirements=["dbt-postgres==1.6.0b1"],
-        profile_args={"schema": "public"},
     )
     venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={})
     run_command_args = mock_subprocess_hook.run_command.call_args_list

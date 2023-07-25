@@ -3,11 +3,13 @@ import itertools
 import json
 import logging
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
+from cosmos.config import ProfileConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
@@ -69,15 +71,21 @@ class DbtGraph:
         exclude: list[str] | None = None,
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
+        profile_config: ProfileConfig | None = None,
     ):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
+        self.profile_config = profile_config
 
         # specific to loading using ls
         self.dbt_cmd = dbt_cmd
 
-    def load(self, method: LoadMode = LoadMode.AUTOMATIC, execution_mode: ExecutionMode = ExecutionMode.LOCAL) -> None:
+    def load(
+        self,
+        method: LoadMode = LoadMode.AUTOMATIC,
+        execution_mode: ExecutionMode = ExecutionMode.LOCAL,
+    ) -> None:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
 
@@ -123,27 +131,49 @@ class DbtGraph:
         * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project using dbt ls...")
-        command = [self.dbt_cmd, "ls", "--output", "json", "--profiles-dir", self.project.dir]
+
+        if not self.profile_config:
+            raise CosmosLoadDbtException("Unable to load dbt project without a profile config")
+
+        if not shutil.which(self.dbt_cmd):
+            raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
+
+        command = [self.dbt_cmd, "ls", "--output", "json"]
+
         if self.exclude:
             command.extend(["--exclude", *self.exclude])
+
         if self.select:
             command.extend(["--select", *self.select])
-        logger.info(f"Running command: {command}")
-        try:
+
+        with self.profile_config.ensure_profile() as (profile_path, env_vars):
+            command.extend(
+                [
+                    "--profiles-dir",
+                    str(profile_path.parent),
+                    "--profile",
+                    self.profile_config.profile_name,
+                    "--target",
+                    self.profile_config.target_name,
+                ]
+            )
+
+            logger.info("Running command: `%s`", " ".join(command))
             process = Popen(
-                command,  # type: ignore[arg-type]
+                command,
                 stdout=PIPE,
                 stderr=PIPE,
                 cwd=self.project.dir,
                 universal_newlines=True,
-                env=os.environ,
+                env={
+                    **os.environ,
+                    **env_vars,
+                },
             )
-        except FileNotFoundError as exception:
-            raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{exception}")
 
-        stdout, stderr = process.communicate()
+            stdout, stderr = process.communicate()
 
-        logger.debug(f"Output: {stdout}")
+        logger.debug("Output: %s", stdout)
 
         if stderr or "Runtime Error" in stdout:
             details = stderr or stdout

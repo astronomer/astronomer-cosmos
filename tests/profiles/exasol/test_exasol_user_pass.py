@@ -60,23 +60,27 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-        assert not profile_mapping.can_claim_connection()
+        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+            profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+            assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"threads": 1})
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"threads": 1})
+        assert not profile_mapping.can_claim_connection()
 
     # also test when there's no threads
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema"})
+        assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.can_claim_connection()
 
 
 def test_profile_mapping_selected(
@@ -185,8 +189,9 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.dsn == "my_host:1000"
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.dsn == "my_host:1000"
 
     # next, test with a host that doesn't include a port
     conn = Connection(
@@ -198,8 +203,9 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.dsn == "my_host:8563"  # should default to 8563
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.dsn == "my_host:8563"  # should default to 8563
 
     # lastly, test with a port override
     conn = Connection(
@@ -212,5 +218,6 @@ def test_dsn_formatting() -> None:
         schema="my_database",
     )
 
-    profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-    assert profile_mapping.dsn == "my_host:1000"
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
+        assert profile_mapping.dsn == "my_host:1000"

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import shutil
+import contextlib
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from logging import getLogger
+from typing import Iterator
 
 from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
 from cosmos.exceptions import CosmosValueError
+from cosmos.profiles import BaseProfileMapping
 
 logger = getLogger(__name__)
 
@@ -94,18 +98,72 @@ class ProjectConfig:
 @dataclass
 class ProfileConfig:
     """
-    Class for setting profile config.
+    Class for setting profile config. Supports two modes of operation:
+    1. Using a user-supplied profiles.yml file. If using this mode, set path_to_profiles_yml to the
+    path to the file.
+    2. Using cosmos to map Airflow connections to dbt profiles. If using this mode, set
+    profile_mapping to a subclass of BaseProfileMapping.
 
     :param profile_name: The name of the dbt profile to use.
     :param target_name: The name of the dbt target to use.
-    :param conn_id: The Airflow connection ID to use.
+    :param path_to_profiles_yml: The path to a profiles.yml file to use.
+    :param profile_mapping: A mapping of Airflow connections to dbt profiles.
     """
 
     # should always be set to be explicit
     profile_name: str
     target_name: str
-    conn_id: str
-    profile_args: dict[str, str] = field(default_factory=dict)
+
+    # should be set if using a user-supplied profiles.yml
+    path_to_profiles_yml: str | Path | None = None
+
+    # should be set if using cosmos to map Airflow connections to dbt profiles
+    profile_mapping: BaseProfileMapping | None = None
+
+    def __post_init__(self) -> None:
+        "Validates that we have enough information to render a profile."
+        # if using a user-supplied profiles.yml, validate that it exists
+        if self.path_to_profiles_yml:
+            profiles_path = Path(self.path_to_profiles_yml)
+            if not profiles_path.exists():
+                raise CosmosValueError(f"Could not find profiles.yml at {self.path_to_profiles_yml}")
+
+    def validate_profile(self) -> None:
+        "Validates that we have enough information to render a profile."
+        if not self.path_to_profiles_yml and not self.profile_mapping:
+            raise CosmosValueError("Either path_to_profiles_yml or profile_mapping must be set to render a profile")
+
+    @contextlib.contextmanager
+    def ensure_profile(self, desired_profile_path: Path | None = None) -> Iterator[tuple[Path, dict[str, str]]]:
+        "Context manager to ensure that there is a profile. If not, create one."
+        if self.path_to_profiles_yml:
+            logger.info("Using user-supplied profiles.yml at %s", self.path_to_profiles_yml)
+            yield Path(self.path_to_profiles_yml), {}
+
+        elif self.profile_mapping:
+            profile_contents = self.profile_mapping.get_profile_file_contents(
+                profile_name=self.profile_name, target_name=self.target_name
+            )
+
+            if desired_profile_path:
+                logger.info(
+                    "Writing profile to %s with the following contents:\n%s",
+                    desired_profile_path,
+                    profile_contents,
+                )
+                # write profile_contents to desired_profile_path using yaml library
+                desired_profile_path.write_text(profile_contents)
+                yield desired_profile_path, self.profile_mapping.env_vars
+            else:
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp_file = Path(temp_dir) / "profiles.yml"
+                    logger.info(
+                        "Creating temporary profiles.yml at %s with the following contents:\n%s",
+                        temp_file,
+                        profile_contents,
+                    )
+                    temp_file.write_text(profile_contents)
+                    yield temp_file, self.profile_mapping.env_vars
 
 
 @dataclass

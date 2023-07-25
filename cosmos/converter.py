@@ -104,11 +104,8 @@ class DbtToAirflowConverter:
         **kwargs: Any,
     ) -> None:
         project_config.validate_project()
+        profile_config.validate_profile()
 
-        conn_id = profile_config.conn_id
-        profile_args = profile_config.profile_args
-        profile_name_override = profile_config.profile_name
-        target_name_override = profile_config.target_name
         emit_datasets = render_config.emit_datasets
         dbt_root_path = project_config.dbt_project_path.parent
         dbt_project_name = project_config.dbt_project_path.name
@@ -122,6 +119,14 @@ class DbtToAirflowConverter:
         load_mode = render_config.load_method
         manifest_path = project_config.manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
+
+        conn_id = "unknown"
+        if profile_config and profile_config.profile_mapping:
+            conn_id = profile_config.profile_mapping.conn_id
+
+        profile_args = {}
+        if profile_config.profile_mapping:
+            profile_args = profile_config.profile_mapping.profile_args
 
         if not operator_args:
             operator_args = {}
@@ -140,17 +145,15 @@ class DbtToAirflowConverter:
             exclude=exclude,
             select=select,
             dbt_cmd=dbt_executable_path,
+            profile_config=profile_config,
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 
         task_args = {
             **operator_args,
-            "profile_args": profile_args,
-            "profile_name": profile_name_override,
-            "target_name": target_name_override,
             # the following args may be only needed for local / venv:
             "project_dir": dbt_project.dir,
-            "conn_id": conn_id,
+            "profile_config": profile_config,
         }
 
         validate_arguments(select, exclude, profile_args, task_args)

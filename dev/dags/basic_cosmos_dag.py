@@ -11,18 +11,24 @@ from cosmos import DbtDag, ProjectConfig, ProfileConfig
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
+)
+
 # [START local_example]
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "jaffle_shop",
     ),
-    profile_config=ProfileConfig(
-        profile_name="default",
-        target_name="dev",
-        conn_id="airflow_db",
-        profile_args={"schema": "public"},
-    ),
+    profile_config=profile_config,
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

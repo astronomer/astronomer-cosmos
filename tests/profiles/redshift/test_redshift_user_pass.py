@@ -58,19 +58,22 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        # should raise an InvalidMappingException
-        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-        assert not profile_mapping.can_claim_connection()
+        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+            # should raise an InvalidMappingException
+            profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
+            assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = RedshiftUserPasswordProfileMapping(conn, {})
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {})
+        assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-    assert profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
+        assert profile_mapping.can_claim_connection()
 
 
 def test_profile_mapping_selected(

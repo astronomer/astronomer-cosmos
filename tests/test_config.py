@@ -26,7 +26,9 @@ def test_init_with_manifest():
 
 
 def test_validate_project_succeeds():
-    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR, manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json")
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR, manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json"
+    )
     assert project_config.validate_project() is None
 
 
@@ -38,7 +40,9 @@ def test_validate_project_fails():
 
 
 def test_is_manifest_available_is_true():
-    dbt_project = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR, manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json")
+    dbt_project = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR, manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json"
+    )
     assert dbt_project.is_manifest_available()
 
 

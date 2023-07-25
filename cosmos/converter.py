@@ -2,30 +2,24 @@
 # ignoring enum Mypy errors
 
 from __future__ import annotations
-from enum import Enum
 
 import inspect
 import logging
 from typing import Any, Callable
-
-from airflow.exceptions import AirflowException
-from airflow.models.dag import DAG
-from airflow.utils.task_group import TaskGroup
 from pathlib import Path
 
+from airflow.models.dag import DAG
+from airflow.utils.task_group import TaskGroup
+
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
-from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
+from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
+from cosmos.exceptions import CosmosValueError
 
 
 logger = logging.getLogger(__name__)
-
-
-class UserInputError(Exception):
-    pass
 
 
 def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -73,27 +67,12 @@ def validate_arguments(
         exclude_items = retrieve_by_label(exclude, field)
         intersection = {str(item) for item in set(select_items).intersection(exclude_items)}
         if intersection:
-            raise AirflowException(f"Can't specify the same {field[:-1]} in `select` and `exclude`: " f"{intersection}")
+            raise CosmosValueError(f"Can't specify the same {field[:-1]} in `select` and `exclude`: " f"{intersection}")
 
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:
         profile_args["schema"] = task_args["schema"]
         logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
-
-
-def convert_value_to_enum(value: str | Enum, enum_class: Enum) -> Enum:
-    """
-    If value is an enum, return enum item.
-    Else, if value is a string, attempt to return the correspondent enum value.
-    Raise an exception otherwise
-    """
-    if isinstance(value, str):
-        try:
-            return enum_class(value)
-        except ValueError:
-            raise UserInputError(f"The given value {value} is not compatible with the type {enum_class.__name__}")
-    else:
-        return value
 
 
 class DbtToAirflowConverter:
@@ -102,67 +81,50 @@ class DbtToAirflowConverter:
 
     :param dag: Airflow DAG to be populated
     :param task_group (optional): Airflow Task Group to be populated
-    :param dbt_project_name: The name of the dbt project
-    :param dbt_root_path: The path to the dbt root directory
-    :param dbt_models_dir: The path to the dbt models directory within the project
-    :param dbt_seeds_dir: The path to the dbt seeds directory within the project
-    :param conn_id: The Airflow connection ID to use for the dbt profile
-    :param profile_args: Arguments to pass to the dbt profile
-    :param profile_name_override: A name to use for the dbt profile. If not provided, and no profile target is found
-        in your project's dbt_project.yml, "cosmos_profile" is used.
-    :param target_name_override: A name to use for the dbt target. If not provided, "cosmos_target" is used.
-    :param dbt_args: Parameters to pass to the underlying dbt operators, can include dbt_executable_path to utilize venv
+    :param project_config: The dbt project configuration
+    :param execution_config: The dbt execution configuration
+    :param render_config: The dbt render configuration
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
-    :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG dependencies
-    :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
-    :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
-    :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
-        Default is ExecutionMode.LOCAL.
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
     def __init__(
         self,
-        dbt_project_name: str,
-        conn_id: str,
+        project_config: ProjectConfig,
+        profile_config: ProfileConfig,
+        execution_config: ExecutionConfig = ExecutionConfig(),
+        render_config: RenderConfig = RenderConfig(),
         dag: DAG | None = None,
         task_group: TaskGroup | None = None,
-        profile_args: dict[str, str] = {},
-        dbt_args: dict[str, Any] = {},
-        profile_name_override: str | None = None,
-        target_name_override: str | None = None,
-        operator_args: dict[str, Any] = {},
-        emit_datasets: bool = True,
-        dbt_root_path: str = "/usr/local/airflow/dags/dbt",
-        dbt_models_dir: str | None = None,
-        dbt_seeds_dir: str | None = None,
-        dbt_snapshots_dir: str | None = None,
-        test_behavior: str | TestBehavior = TestBehavior.AFTER_EACH,
-        select: list[str] | None = None,
-        exclude: list[str] | None = None,
-        execution_mode: str | ExecutionMode = ExecutionMode.LOCAL,
-        load_mode: str | LoadMode = LoadMode.AUTOMATIC,
-        manifest_path: str | Path | None = None,
+        operator_args: dict[str, Any] | None = None,
         on_warning_callback: Callable[..., Any] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        select = select or []
-        exclude = exclude or []
+        project_config.validate_project()
 
-        test_behavior = convert_value_to_enum(test_behavior, TestBehavior)
-        execution_mode = convert_value_to_enum(execution_mode, ExecutionMode)
-        load_mode = convert_value_to_enum(load_mode, LoadMode)
+        conn_id = profile_config.conn_id
+        profile_args = profile_config.profile_args
+        profile_name_override = profile_config.profile_name
+        target_name_override = profile_config.target_name
+        emit_datasets = render_config.emit_datasets
+        dbt_root_path = project_config.dbt_project_path.parent
+        dbt_project_name = project_config.dbt_project_path.name
+        dbt_models_dir = project_config.models_relative_path
+        dbt_seeds_dir = project_config.seeds_relative_path
+        dbt_snapshots_dir = project_config.snapshots_relative_path
+        test_behavior = render_config.test_behavior
+        select = render_config.select
+        exclude = render_config.exclude
+        execution_mode = execution_config.execution_mode
+        load_mode = render_config.load_method
+        manifest_path = project_config.parsed_manifest_path
+        dbt_executable_path = execution_config.dbt_executable_path
 
-        test_behavior = convert_value_to_enum(test_behavior, TestBehavior)
-        execution_mode = convert_value_to_enum(execution_mode, ExecutionMode)
-        load_mode = convert_value_to_enum(load_mode, LoadMode)
-
-        if type(manifest_path) == str:
-            manifest_path = Path(manifest_path)
+        if not operator_args:
+            operator_args = {}
 
         dbt_project = DbtProject(
             name=dbt_project_name,
@@ -177,12 +139,11 @@ class DbtToAirflowConverter:
             project=dbt_project,
             exclude=exclude,
             select=select,
-            dbt_cmd=dbt_args.get("dbt_executable_path", get_system_dbt()),
+            dbt_cmd=dbt_executable_path,
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 
         task_args = {
-            **dbt_args,
             **operator_args,
             "profile_args": profile_args,
             "profile_name": profile_name_override,

@@ -12,6 +12,12 @@ from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
 from cosmos.dataset import get_dbt_dataset
 from cosmos.operators.lazy_load import MissingPackage
+from cosmos.config import (
+    ProjectConfig,
+    ProfileConfig,
+    ExecutionConfig,
+    RenderConfig,
+)
 
 from cosmos.operators.local import (
     DbtDepsLocalOperator,
@@ -79,6 +85,10 @@ except ImportError:
     )
 
 __all__ = [
+    "ProjectConfig",
+    "ProfileConfig",
+    "ExecutionConfig",
+    "RenderConfig",
     "DbtLSLocalOperator",
     "DbtRunOperationLocalOperator",
     "DbtRunLocalOperator",

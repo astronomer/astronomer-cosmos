@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag
+from cosmos import DbtDag, ProjectConfig, ProfileConfig
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -14,14 +14,15 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 # [START local_example]
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters
-    dbt_root_path=DBT_ROOT_PATH,
-    dbt_project_name="jaffle_shop",
-    conn_id="airflow_db",
-    profile_args={
-        "schema": "public",
-    },
-    profile_name_override="airflow",
-    target_name_override="dev_target",
+    project_config=ProjectConfig(
+        DBT_ROOT_PATH / "jaffle_shop",
+    ),
+    profile_config=ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

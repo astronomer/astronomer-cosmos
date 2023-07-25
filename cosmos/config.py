@@ -19,9 +19,9 @@ class RenderConfig:
     Class for setting general Cosmos config.
 
     :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG
-    dependencies
+    dependencies. Defaults to True
     :param test_behavior: The behavior for running tests. Defaults to after each
-    :param execution_mode: The execution mode for dbt. Defaults to local
+    :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     """
@@ -43,7 +43,7 @@ class ProjectConfig:
     :param seeds_dir: The path to the dbt seeds directory within the project. Defaults to seeds
     :param snapshots_dir: The path to the dbt snapshots directory within the project. Defaults to
     snapshots
-    :param manifest_path: The path to the dbt manifest file. Defaults to None
+    :param manifest: The path to the dbt manifest file. Defaults to None
     """
 
     dbt_project: str | Path

@@ -22,7 +22,7 @@ def test_valid_parameters():
 
 def test_init_with_manifest():
     project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
-    assert project_config.manifest_path == Path("target/manifest.json")
+    assert project_config.parsed_manifest_path == Path("target/manifest.json")
 
 
 def test_validate_project_succeeds():

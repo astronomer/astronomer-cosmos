@@ -67,7 +67,7 @@ class ProjectConfig:
         project_yml_path = self.dbt_project_path / "dbt_project.yml"
         mandatory_paths = {
             "dbt_project.yml": project_yml_path,
-            "models directory ": self.models_path,
+            "models directory ": self.models_relative_path,
             "manifest": self.manifest_path,
         }
         for name, path in mandatory_paths.items():

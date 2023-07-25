@@ -1,6 +1,13 @@
 from pathlib import Path
 
+import pytest
+
 from cosmos.config import ProjectConfig
+from cosmos.exceptions import CosmosValueError
+
+
+DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
+PIPELINE_FOLDER = "jaffle_shop"
 
 
 # Tests that a ProjectConfig object can be created with valid parameters
@@ -11,3 +18,20 @@ def test_valid_parameters():
     assert project_config.seeds_path == Path("path/to/dbt/project/seeds")
     assert project_config.snapshots_path == Path("path/to/dbt/project/snapshots")
     assert project_config.manifest_path is None
+
+
+def test_init_with_manifest():
+    project_config = ProjectConfig(dbt_project="/tmp/some-path", manifest="target/manifest.yml")
+    assert project_config.manifest_path == Path("target/manifest.yml")
+
+
+def test_validate_project_succeeds():
+    project_config = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR)
+    assert project_config.validate_project() is None
+
+
+def test_validate_project_fails():
+    project_config = ProjectConfig(dbt_project=Path("/tmp"))
+    with pytest.raises(CosmosValueError) as err_info:
+        assert project_config.validate_project() is None
+    assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"

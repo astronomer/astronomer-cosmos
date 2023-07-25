@@ -112,9 +112,9 @@ class DbtToAirflowConverter:
         emit_datasets = render_config.emit_datasets
         dbt_root_path = project_config.dbt_project_path.parent
         dbt_project_name = project_config.dbt_project_path.name
-        dbt_models_dir = project_config.models_path
-        dbt_seeds_dir = project_config.seeds_path
-        dbt_snapshots_dir = project_config.snapshots_path
+        dbt_models_dir = project_config.models_relative_path
+        dbt_seeds_dir = project_config.seeds_relative_path
+        dbt_snapshots_dir = project_config.snapshots_relative_path
         test_behavior = render_config.test_behavior
         select = render_config.select
         exclude = render_config.exclude

@@ -39,30 +39,30 @@ class ProjectConfig:
     Class for setting project config.
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project
-    :param models_dir: The path to the dbt models directory within the project. Defaults to models
-    :param seeds_dir: The path to the dbt seeds directory within the project. Defaults to seeds
-    :param snapshots_dir: The path to the dbt snapshots directory within the project. Defaults to
+    :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
+    :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
+    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
     snapshots
-    :param manifest: The path to the dbt manifest file. Defaults to None
+    :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     """
 
-    dbt_project: str | Path
-    models: str | Path = "models"
-    seeds: str | Path = "seeds"
-    snapshots: str | Path = "snapshots"
-    manifest: str | Path | None = None
+    dbt_project_path: str | Path
+    models_relative_path: str | Path = "models"
+    seeds_relative_path: str | Path = "seeds"
+    snapshots_relative_path: str | Path = "snapshots"
+    manifest_path: str | Path | None = None
 
     manifest_path: Path | None = None
 
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
-        self.dbt_project_path = Path(self.dbt_project)
-        self.models_path = self.dbt_project_path / Path(self.models)
-        self.seeds_path = self.dbt_project_path / Path(self.seeds)
-        self.snapshots_path = self.dbt_project_path / Path(self.snapshots)
+        self.dbt_project_path = Path(self.dbt_project_path)
+        self.models_relative_path = self.dbt_project_path / Path(self.models_relative_path)
+        self.seeds_relative_path = self.dbt_project_path / Path(self.seeds_relative_path)
+        self.snapshots_relative_path = self.dbt_project_path / Path(self.snapshots_relative_path)
 
-        if self.manifest:
-            self.manifest_path = Path(self.manifest)
+        if self.manifest_path:
+            self.manifest_path = Path(self.manifest_path)
 
     def validate_project(self) -> None:
         "Validates that the project, models, and seeds directories exist."

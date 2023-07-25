@@ -8,7 +8,6 @@ import logging
 from typing import Any, Callable
 from pathlib import Path
 
-from airflow.exceptions import AirflowException
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
@@ -17,13 +16,10 @@ from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
+from cosmos.exceptions import CosmosValueError
 
 
 logger = logging.getLogger(__name__)
-
-
-class UserInputError(Exception):
-    pass
 
 
 def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -71,7 +67,7 @@ def validate_arguments(
         exclude_items = retrieve_by_label(exclude, field)
         intersection = {str(item) for item in set(select_items).intersection(exclude_items)}
         if intersection:
-            raise AirflowException(f"Can't specify the same {field[:-1]} in `select` and `exclude`: " f"{intersection}")
+            raise CosmosValueError(f"Can't specify the same {field[:-1]} in `select` and `exclude`: " f"{intersection}")
 
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:

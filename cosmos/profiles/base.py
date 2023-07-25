@@ -47,25 +47,6 @@ class BaseProfileMapping(ABC):
             if not conn:
                 raise CosmosValueError(f"Could not find connection with conn_id {self.conn_id}")
 
-        logger.info(dir(self.conn))
-        logger.info(self.conn.__dict__)
-
-        for field in self.required_fields:
-            try:
-                if not getattr(self, field):
-                    logger.info(
-                        "1 Not using mapping %s because %s is not set",
-                        self.__class__.__name__,
-                        field,
-                    )
-                    return False
-            except AttributeError:
-                logger.info(
-                    "2 Not using mapping %s because %s is not set",
-                    self.__class__.__name__,
-                    field,
-                )
-                return False
             self._conn = conn
 
         return self._conn

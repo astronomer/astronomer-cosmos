@@ -2,12 +2,7 @@
 from __future__ import annotations
 
 import logging
-<<<<<<< HEAD
-from os import PathLike
-from typing import Any, Callable, Sequence
-=======
 from typing import Any
->>>>>>> 208013a (finish initial implementation)
 
 import yaml
 from airflow.utils.context import Context

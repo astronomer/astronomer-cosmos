@@ -5,21 +5,28 @@ import logging
 import os
 import shutil
 import signal
+import tempfile
+
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Callable, Optional, Any
 
 import yaml
 from airflow.models.renderedtifields import RenderedTaskInstanceFields
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.utils.context import Context
+from airflow.utils.session import NEW_SESSION, provide_session
+from sqlalchemy.orm import Session
 
 from cosmos.operators.base import DbtBaseOperator
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
-
+from cosmos.dbt.parser.output import (
+    extract_log_issues,
+    parse_output,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +40,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
+    template_fields: list[str] = DbtBaseOperator.template_fields + ["compiled_sql"]
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -278,7 +285,7 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ["args"]
+    template_fields: list[str] = DbtLocalBaseOperator.template_fields + ["args"]
 
     def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
         self.macro_name = macro_name
@@ -326,7 +333,6 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         bucket_name: str,
         folder_dir: str | None = None,
         **kwargs: Any,
-
     ) -> None:
         "Initializes the operator."
         self.aws_conn_id = aws_conn_id

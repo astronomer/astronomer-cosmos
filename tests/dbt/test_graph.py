@@ -20,12 +20,16 @@ def path_patch():  # type: ignore
         yield
 
 
-def test_load_via_manifest_with_exclude(path_patch):
+@pytest.mark.parametrize(
+    "pipeline_name,manifest_filepath,model_filepath",
+    [("jaffle_shop", SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
+)
+def test_load_via_manifest_with_exclude(pipeline_name, manifest_filepath, model_filepath):
     dbt_graph = DbtGraph(
         cosmos_config=CosmosConfig(
             project_config=ProjectConfig(
-                dbt_project=DBT_PROJECTS_ROOT_DIR / "jaffle_shop",
-                manifest=SAMPLE_MANIFEST,
+                dbt_project=DBT_PROJECTS_ROOT_DIR / pipeline_name,
+                manifest=manifest_filepath,
             ),
             profile_config=ProfileConfig(
                 profile_name="default",

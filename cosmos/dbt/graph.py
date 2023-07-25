@@ -4,6 +4,7 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import os
 from subprocess import Popen, PIPE
 
 from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
@@ -73,11 +74,6 @@ class DbtGraph:
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }[self.render_config.load_method]()
-
-        if method == LoadMode.DBT_MANIFEST and not self.project.is_manifest_available():
-            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
-
-        load_method[method]()
 
     def load_via_dbt_ls(self) -> None:
         """
@@ -187,7 +183,7 @@ class DbtGraph:
                 unique_id=node_name,
                 resource_type=DbtResourceType(node.type.value),
                 depends_on=list(node.config.upstream_models),
-                file_path=str(node.path),
+                file_path=node.path,
                 tags=[],
                 config=config,
             )

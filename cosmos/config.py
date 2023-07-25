@@ -52,6 +52,8 @@ class ProjectConfig:
     snapshots_relative_path: str | Path = "snapshots"
     manifest_path: str | Path | None = None
 
+    parsed_manifest_path: Path | None = None
+
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
         self.dbt_project_path = Path(self.dbt_project_path)
@@ -60,7 +62,7 @@ class ProjectConfig:
         self.snapshots_relative_path = self.dbt_project_path / Path(self.snapshots_relative_path)
 
         if self.manifest_path:
-            self.manifest_path = Path(self.manifest_path)
+            self.parsed_manifest_path = Path(self.manifest_path)
 
     def validate_project(self) -> None:
         "Validates that the project, models, and seeds directories exist."
@@ -68,7 +70,7 @@ class ProjectConfig:
         mandatory_paths = {
             "dbt_project.yml": project_yml_path,
             "models directory ": self.models_relative_path,
-            "manifest": self.manifest_path,
+            "manifest": self.parsed_manifest_path,
         }
         for name, path in mandatory_paths.items():
             if path is None or not path.exists():
@@ -78,10 +80,10 @@ class ProjectConfig:
         """
         Check if the `dbt` project manifest is set and if the file exists.
         """
-        if not self.manifest_path:
+        if not self.parsed_manifest_path:
             return False
 
-        return self.manifest_path.exists()
+        return self.parsed_manifest_path.exists()
 
     @property
     def project_name(self) -> str:

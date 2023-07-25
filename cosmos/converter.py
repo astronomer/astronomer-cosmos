@@ -120,7 +120,7 @@ class DbtToAirflowConverter:
         exclude = render_config.exclude
         execution_mode = execution_config.execution_mode
         load_mode = render_config.load_method
-        manifest_path = project_config.manifest_path
+        manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
 
         if not operator_args:

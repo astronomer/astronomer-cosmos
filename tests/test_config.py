@@ -21,32 +21,32 @@ def test_valid_parameters():
 
 
 def test_init_with_manifest():
-    project_config = ProjectConfig(dbt_project="/tmp/some-path", manifest="target/manifest.json")
+    project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
     assert project_config.manifest_path == Path("target/manifest.json")
 
 
 def test_validate_project_succeeds():
-    project_config = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR, manifest=DBT_PROJECTS_ROOT_DIR / "manifest.json")
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR, manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json")
     assert project_config.validate_project() is None
 
 
 def test_validate_project_fails():
-    project_config = ProjectConfig(dbt_project=Path("/tmp"))
+    project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
     with pytest.raises(CosmosValueError) as err_info:
         assert project_config.validate_project() is None
     assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"
 
 
 def test_is_manifest_available_is_true():
-    dbt_project = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR, manifest=DBT_PROJECTS_ROOT_DIR / "manifest.json")
+    dbt_project = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR, manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json")
     assert dbt_project.is_manifest_available()
 
 
 def test_is_manifest_available_is_false():
-    dbt_project = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR)
+    dbt_project = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR)
     assert not dbt_project.is_manifest_available()
 
 
 def test_project_name():
-    dbt_project = ProjectConfig(dbt_project=DBT_PROJECTS_ROOT_DIR)
+    dbt_project = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR)
     assert dbt_project.project_name == "sample"

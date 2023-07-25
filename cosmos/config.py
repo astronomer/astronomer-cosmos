@@ -52,8 +52,6 @@ class ProjectConfig:
     snapshots_relative_path: str | Path = "snapshots"
     manifest_path: str | Path | None = None
 
-    manifest_path: Path | None = None
-
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
         self.dbt_project_path = Path(self.dbt_project_path)

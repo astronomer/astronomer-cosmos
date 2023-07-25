@@ -53,7 +53,7 @@ def get_profile_mapping(
         raise ValueError(f"Could not find connection {conn_id}.")
 
     for profile_mapping in profile_mappings:
-        mapping = profile_mapping(conn, profile_args)
+        mapping = profile_mapping(conn.conn_id, profile_args)
         if mapping.can_claim_connection():
             return mapping
 

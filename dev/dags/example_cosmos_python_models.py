@@ -17,7 +17,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig, ExecutionConfig
+from cosmos import DbtDag, ProjectConfig, ProfileConfig
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -34,9 +34,6 @@ example_cosmos_python_models = DbtDag(
         target_name="dev",
         conn_id="databricks_default",
         profile_args={"schema": SCHEMA},
-    ),
-    execution_config=ExecutionConfig(
-        append_env=True,
     ),
     # normal dag parameters
     schedule_interval="@daily",

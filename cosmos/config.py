@@ -116,20 +116,7 @@ class ExecutionConfig:
     :param execution_mode: The execution mode for dbt. Defaults to local
     :param dbt_executable_path: The path to the dbt executable. Defaults to dbt-ol or dbt if
     available on the path.
-    :param dbt_cli_flags: A list of extra dbt cli flags to pass to dbt. Defaults to []
-    :param append_env: If True, append the env dictionary to the existing environment. If False,
-    replace the existing environment with the env dictionary. Defaults to False
-    :param cancel_query_on_kill: If True, cancel the query when the dbt process is killed. If False,
-    do not cancel the query when the dbt process is killed. Defaults to True
-    :param install_deps: If True, install dbt dependencies before running dbt. Defaults to False
-    :param skip_exit_code: If the dbt process exits with this exit code, do not raise an exception.
-    Defaults to None
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     dbt_executable_path: str | Path = shutil.which("dbt-ol") or shutil.which("dbt") or "dbt"
-    dbt_cli_flags: list[str] = field(default_factory=list)
-    append_env: bool = False
-    cancel_query_on_kill: bool = True
-    install_deps: bool = False
-    skip_exit_code: int | None = None

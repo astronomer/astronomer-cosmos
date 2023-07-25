@@ -2,7 +2,6 @@
 # ignoring enum Mypy errors
 
 from __future__ import annotations
-from enum import Enum
 
 import inspect
 import logging
@@ -14,7 +13,6 @@ from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
@@ -81,21 +79,6 @@ def validate_arguments(
         logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
 
 
-def convert_value_to_enum(value: str | Enum, enum_class: Enum) -> Enum:
-    """
-    If value is an enum, return enum item.
-    Else, if value is a string, attempt to return the correspondent enum value.
-    Raise an exception otherwise
-    """
-    if isinstance(value, str):
-        try:
-            return enum_class(value)
-        except ValueError:
-            raise UserInputError(f"The given value {value} is not compatible with the type {enum_class.__name__}")
-    else:
-        return value
-
-
 class DbtToAirflowConverter:
     """
     Logic common to build an Airflow DbtDag and DbtTaskGroup from a DBT project.
@@ -124,6 +107,8 @@ class DbtToAirflowConverter:
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        project_config.validate_project()
+
         conn_id = profile_config.conn_id
         profile_args = profile_config.profile_args
         profile_name_override = profile_config.profile_name
@@ -140,7 +125,7 @@ class DbtToAirflowConverter:
         execution_mode = execution_config.execution_mode
         load_mode = render_config.load_method
         manifest_path = project_config.manifest_path
-        dbt_executable_path = execution_config.dbt_executable_path or get_system_dbt()
+        dbt_executable_path = execution_config.dbt_executable_path
 
         if not operator_args:
             operator_args = {}

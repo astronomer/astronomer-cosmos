@@ -70,7 +70,6 @@ class ProjectConfig:
         mandatory_paths = {
             "dbt_project.yml": project_yml_path,
             "models directory ": self.models_relative_path,
-            "manifest": self.parsed_manifest_path,
         }
         for name, path in mandatory_paths.items():
             if path is None or not path.exists():

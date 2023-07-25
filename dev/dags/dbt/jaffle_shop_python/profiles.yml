@@ -1,4 +1,4 @@
-jaffle_shop:
+default:
  outputs:
    dev:
      catalog: null

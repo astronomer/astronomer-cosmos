@@ -35,6 +35,9 @@ example_cosmos_python_models = DbtDag(
         conn_id="databricks_default",
         profile_args={"schema": SCHEMA},
     ),
+    operator_args={
+        "append_env": True,
+    },
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

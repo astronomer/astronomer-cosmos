@@ -104,20 +104,23 @@ class DbtToAirflowConverter:
         **kwargs: Any,
     ) -> None:
         project_config.validate_project()
-        profile_config.validate_profile()
 
+        conn_id = profile_config.conn_id
+        profile_args = profile_config.profile_args
+        profile_name_override = profile_config.profile_name
+        target_name_override = profile_config.target_name
         emit_datasets = render_config.emit_datasets
         dbt_root_path = project_config.dbt_project_path.parent
         dbt_project_name = project_config.dbt_project_path.name
-        dbt_models_dir = project_config.models_path
-        dbt_seeds_dir = project_config.seeds_path
-        dbt_snapshots_dir = project_config.snapshots_path
+        dbt_models_dir = project_config.models_relative_path
+        dbt_seeds_dir = project_config.seeds_relative_path
+        dbt_snapshots_dir = project_config.snapshots_relative_path
         test_behavior = render_config.test_behavior
         select = render_config.select
         exclude = render_config.exclude
         execution_mode = execution_config.execution_mode
         load_mode = render_config.load_method
-        manifest_path = project_config.manifest_path
+        manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
 
         conn_id = "unknown"

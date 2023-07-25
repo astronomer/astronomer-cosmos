@@ -8,7 +8,6 @@ from pathlib import Path
 from cosmos import DbtDag, ExecutionMode, ExecutionConfig, ProjectConfig, ProfileConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 PROJECT_NAME = "jaffle_shop"

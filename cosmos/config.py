@@ -14,6 +14,9 @@ from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles import BaseProfileMapping
 
+from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
+from cosmos.exceptions import CosmosValueError
+
 logger = getLogger(__name__)
 
 
@@ -22,9 +25,9 @@ class RenderConfig:
     """
     Class for setting general Cosmos config.
 
-    :param emit_datasets: If enabled test nodes emit Airflow Datasets for downstream cross-DAG
+    :param emit_datasets: If enabled model nodes emit Airflow Datasets for downstream cross-DAG
     dependencies. Defaults to True
-    :param test_behavior: The behavior for running tests. Defaults to after each
+    :param test_behavior: The behavior for running tests. Defaults to after each (model)
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
@@ -43,51 +46,50 @@ class ProjectConfig:
     Class for setting project config.
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project
-    :param models_dir: The path to the dbt models directory within the project. Defaults to models
-    :param seeds_dir: The path to the dbt seeds directory within the project. Defaults to seeds
-    :param snapshots_dir: The path to the dbt snapshots directory within the project. Defaults to
+    :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
+    :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
+    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
     snapshots
-    :param manifest: The path to the dbt manifest file. Defaults to None
+    :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     """
 
-    dbt_project: str | Path
-    models: str | Path = "models"
-    seeds: str | Path = "seeds"
-    snapshots: str | Path = "snapshots"
-    manifest: str | Path | None = None
+    dbt_project_path: str | Path
+    models_relative_path: str | Path = "models"
+    seeds_relative_path: str | Path = "seeds"
+    snapshots_relative_path: str | Path = "snapshots"
+    manifest_path: str | Path | None = None
 
-    manifest_path: Path | None = None
+    parsed_manifest_path: Path | None = None
 
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
-        self.dbt_project_path = Path(self.dbt_project)
-        self.models_path = self.dbt_project_path / Path(self.models)
-        self.seeds_path = self.dbt_project_path / Path(self.seeds)
-        self.snapshots_path = self.dbt_project_path / Path(self.snapshots)
+        self.dbt_project_path = Path(self.dbt_project_path)
+        self.models_relative_path = self.dbt_project_path / Path(self.models_relative_path)
+        self.seeds_relative_path = self.dbt_project_path / Path(self.seeds_relative_path)
+        self.snapshots_relative_path = self.dbt_project_path / Path(self.snapshots_relative_path)
 
-        if self.manifest:
-            self.manifest_path = Path(self.manifest)
+        if self.manifest_path:
+            self.parsed_manifest_path = Path(self.manifest_path)
 
     def validate_project(self) -> None:
         "Validates that the project, models, and seeds directories exist."
         project_yml_path = self.dbt_project_path / "dbt_project.yml"
-        if not project_yml_path.exists():
-            raise CosmosValueError(f"Could not find dbt_project.yml at {project_yml_path}")
-
-        if not self.models_path.exists():
-            raise CosmosValueError(f"Could not find models directory at {self.models_path}")
-
-        if self.manifest_path and not self.manifest_path.exists():
-            raise CosmosValueError(f"Could not find manifest at {self.manifest_path}")
+        mandatory_paths = {
+            "dbt_project.yml": project_yml_path,
+            "models directory ": self.models_relative_path,
+        }
+        for name, path in mandatory_paths.items():
+            if path is None or not path.exists():
+                raise CosmosValueError(f"Could not find {name} at {project_yml_path}")
 
     def is_manifest_available(self) -> bool:
         """
         Check if the `dbt` project manifest is set and if the file exists.
         """
-        if not self.manifest_path:
+        if not self.parsed_manifest_path:
             return False
 
-        return self.manifest_path.exists()
+        return self.parsed_manifest_path.exists()
 
     @property
     def project_name(self) -> str:

@@ -107,8 +107,6 @@ class DbtToAirflowConverter:
 
         conn_id = profile_config.conn_id
         profile_args = profile_config.profile_args
-        profile_name_override = profile_config.profile_name
-        target_name_override = profile_config.target_name
         emit_datasets = render_config.emit_datasets
         dbt_root_path = project_config.dbt_project_path.parent
         dbt_project_name = project_config.dbt_project_path.name

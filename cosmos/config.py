@@ -20,7 +20,7 @@ class RenderConfig:
 
     :param emit_datasets: If enabled model nodes emit Airflow Datasets for downstream cross-DAG
     dependencies. Defaults to True
-    :param test_behavior: The behavior for running tests. Defaults to after each
+    :param test_behavior: The behavior for running tests. Defaults to after each (model)
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')

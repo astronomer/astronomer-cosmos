@@ -26,11 +26,13 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
 
 .. code-block:: python
 
-    from cosmos import DbtDag
+    from cosmos import DbtDag, ProjectConfig
 
     my_cosmos_dag = DbtDag(
-        dbt_project_dir="/usr/local/airflow/dags/my_dbt_project",
-        ...,
+        project_config=ProjectConfig(
+            dbt_project_path="/usr/local/airflow/dags/my_dbt_project",
+        ),
+        # ...,
     )
 
 
@@ -43,17 +45,27 @@ Make sure to rename the ``<your-adapter>`` value below to your adapter's Python 
 
 .. code-block:: python
 
-    from cosmos import DbtDag
+    from cosmos import DbtDag, ProjectConfig, ProfileConfig, ExecutionConfig
+    from cosmos.constants import ExecutionMode
+    from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="airflow_db",
+            profile_args={"schema": "public"},
+        ),
+    )
 
     my_cosmos_dag = DbtDag(
-        # dbt/cosmos-specific parameters
-        dbt_project_name="<my_dbt_project>",
-        conn_id="airflow_db",
-        profile_args={
-            "schema": "public",
-        },
-        # cosmos virtualenv parameters
-        execution_mode="virtualenv",
+        project_config=ProjectConfig(
+            "<my_dbt_project>",
+        ),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.VIRTUALENV,
+        ),
         operator_args={
             "py_system_site_packages": False,
             "py_requirements": ["<your-adapter>"],

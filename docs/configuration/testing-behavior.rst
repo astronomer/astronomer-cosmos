@@ -6,7 +6,13 @@ Testing Behavior
 Testing Configuration
 ---------------------
 
-By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field. The options are:
+By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field in the ``RenderConfig`` object.
+Note that this behavior is different from dbt's default behavior, which runs all tests after all models have been run.
+Cosmos defaults to running tests after each model to take a "fail-fast" approach to testing. This means that if a model
+runs with failing tests, the rest of the project is stopped and the failure is reported. This is in contrast to dbt's
+default behavior, which runs all models and tests, and then reports all failures at the end.
+
+Cosmos supports the following test behaviors:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully
@@ -16,11 +22,13 @@ Example:
 
 .. code-block:: python
 
-    from cosmos import DbtTaskGroup
+    from cosmos import DbtTaskGroup, RenderConfig
+    from cosmos.constants import TestBehavior
 
     jaffle_shop = DbtTaskGroup(
-        # ...
-        test_behavior="snowflake_default",
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
     )
 
 

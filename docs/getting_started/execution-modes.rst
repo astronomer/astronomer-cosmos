@@ -55,10 +55,10 @@ When using the ``local`` execution mode, Cosmos converts Airflow Connections int
 
 Example of how to use, for instance, when ``dbt`` was installed together with Cosmos:
 
-    .. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
-       :language: python
-       :start-after: [START local_example]
-       :end-before: [END local_example]
+.. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
+    :language: python
+    :start-after: [START local_example]
+    :end-before: [END local_example]
 
 
 Virtualenv
@@ -100,7 +100,9 @@ Example DAG:
 
   docker_cosmos_dag = DbtDag(
       # ...
-      execution_mode="docker",
+      execution_config=ExecutionConfig(
+        execution_mode=ExecutionMode.DOCKER,
+      ),
       operator_args={
           "image": "dbt-jaffle-shop:1.0.0",
           "network_mode": "bridge",
@@ -132,7 +134,9 @@ Example DAG:
 
     docker_cosmos_dag = DbtDag(
         # ...
-        execution_mode="kubernetes",
+        execution_config=ExecutionConfig(
+          execution_mode=ExecutionMode.KUBERNETES,
+        ),
         operator_args={
             "image": "dbt-jaffle-shop:1.0.0",
             "get_logs": True,

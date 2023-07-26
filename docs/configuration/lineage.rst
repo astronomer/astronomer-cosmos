@@ -49,9 +49,9 @@ installed
 
     jaffle_shop = DbtTaskGroup(
         ...,
-        dbt_args={
-            "dbt_executable_path": "/usr/local/airflow/dbt_venv/bin/dbt-ol",
-        },
+        ExecutionConfig(
+            dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt-ol",
+        ),
     )
 
 
@@ -75,7 +75,7 @@ installed
 
     jaffle_shop = DbtTaskGroup(
         ...,
-        dbt_args={
-            "dbt_executable_path": "/usr/local/bin/dbt-ol",
-        },
+        ExecutionConfig(
+            dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt-ol",
+        ),
     )

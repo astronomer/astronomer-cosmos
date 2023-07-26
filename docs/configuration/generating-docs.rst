@@ -34,8 +34,8 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
         project_dir="path/to/jaffle_shop",
-        conn_id="airflow_db",
-        schema="public",
+        profile_config=profile_config,
+        # docs-specific arguments
         aws_conn_id="test_aws",
         bucket_name="test_bucket",
     )
@@ -55,8 +55,8 @@ You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to genera
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
         task_id="generate_dbt_docs_azure",
         project_dir="path/to/jaffle_shop",
-        conn_id="airflow_db",
-        schema="public",
+        profile_config=profile_config,
+        # docs-specific arguments
         azure_conn_id="test_azure",
         container_name="$web",
     )
@@ -101,7 +101,7 @@ If you want to run custom code after the docs are generated, you can use the :cl
     generate_dbt_docs = DbtDocsOperator(
         task_id="generate_dbt_docs",
         project_dir="path/to/jaffle_shop",
-        conn_id="airflow_db",
-        schema="public",
+        profile_config=profile_config,
+        # docs-specific arguments
         callback=upload_docs,
     )

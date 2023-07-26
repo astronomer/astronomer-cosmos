@@ -8,6 +8,11 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :caption: Contents:
 
+   Project Config <project-config>
+   Profile Config <profile-config>
+   Execution Config <execution-config>
+   Render Config <render-config>
+
    Parsing Methods <parsing-methods>
    Configuring Lineage <lineage>
    Generating Docs <generating-docs>

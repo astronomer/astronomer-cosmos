@@ -65,13 +65,13 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
 
 .. code-block:: python
 
-    from cosmos import DbtDag
+    from cosmos import DbtDag, ProjectConfig
 
     my_cosmos_dag = DbtDag(
-        roject_config=ProjectConfig(
+        project_config=ProjectConfig(
             dbt_project_path="/usr/local/airflow/dags/my_dbt_project",
         ),
-        ...,
+        # ...,
     )
 
 Create a dagfile
@@ -81,7 +81,8 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 
 .. code-block:: python
 
-    from cosmos import DbtDag
+    from cosmos import DbtDag, ProjectConfig, ProfileConfig, ExecutionConfig
+    from cosmos.profiles import PostgresUserPasswordProfileMapping
 
     profile_config = ProfileConfig(
         profile_name="default",
@@ -97,6 +98,9 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
             "/usr/local/airflow/dags/my_dbt_project",
         ),
         profile_config=profile_config,
+        execution_config=ExecutionConfig(
+            dbt_executable_path=f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt",
+        ),
         # normal dag parameters
         schedule_interval="@daily",
         start_date=datetime(2023, 1, 1),

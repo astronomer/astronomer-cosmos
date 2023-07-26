@@ -44,15 +44,12 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
     project_one = DbtDag(
         # ...
-        conn_id="my_conn",
         start_date=datetime(2023, 1, 1),
         schedule_interval="@daily",
-        dbt_project_name="project_one",
     )
 
     project_two = DbtDag(
         # ...
-        start_date=datetime(2023, 1, 1),
         schedule=[get_dbt_dataset("my_conn", "project_one", "my_model")],
         dbt_project_name="project_two",
     )

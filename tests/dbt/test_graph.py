@@ -163,17 +163,18 @@ def test_load_via_dbt_ls_without_profile():
 
 def test_load_via_dbt_ls_with_invalid_dbt_path():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
-        project=dbt_project,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            path_to_profiles_yml=Path(__file__).parent.parent / "sample/profiles.yml",
-        ),
-    )
-    with pytest.raises(CosmosLoadDbtException) as err_info:
-        dbt_graph.load_via_dbt_ls()
+    with patch("pathlib.Path.exists", return_value=True):
+        dbt_graph = DbtGraph(
+            dbt_cmd="/inexistent/dbt",
+            project=dbt_project,
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                path_to_profiles_yml=Path(__file__).parent.parent / "sample/profiles.yml",
+            ),
+        )
+        with pytest.raises(CosmosLoadDbtException) as err_info:
+            dbt_graph.load_via_dbt_ls()
 
     expected = "Unable to find the dbt executable: /inexistent/dbt"
     assert err_info.value.args[0] == expected

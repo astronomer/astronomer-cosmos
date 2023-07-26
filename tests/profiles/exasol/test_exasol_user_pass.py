@@ -89,7 +89,9 @@ def test_profile_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_automatic_profile_mapping(mock_exasol_connection.conn_id, {"schema": "my_schema", "threads": 1})
+    profile_mapping = get_automatic_profile_mapping(
+        mock_exasol_connection.conn_id, {"schema": "my_schema", "threads": 1}
+    )
     assert isinstance(profile_mapping, ExasolUserPasswordProfileMapping)
 
 

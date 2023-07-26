@@ -11,6 +11,9 @@ from typing import Any
 from typing import TYPE_CHECKING
 import yaml
 
+from airflow.hooks.base import BaseHook
+from cosmos.exceptions import CosmosValueError
+
 if TYPE_CHECKING:
     from airflow.models import Connection
 
@@ -30,9 +33,23 @@ class BaseProfileMapping(ABC):
     secret_fields: list[str] = []
     airflow_param_mapping: dict[str, str | list[str]] = {}
 
-    def __init__(self, conn: Connection, profile_args: dict[str, Any] | None = None):
-        self.conn = conn
+    _conn: Connection | None = None
+
+    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None):
+        self.conn_id = conn_id
         self.profile_args = profile_args or {}
+
+    @property
+    def conn(self) -> Connection:
+        "Returns the Airflow connection."
+        if not self._conn:
+            conn = BaseHook.get_connection(self.conn_id)
+            if not conn:
+                raise CosmosValueError(f"Could not find connection {self.conn_id}.")
+
+            self._conn = conn
+
+        return self._conn
 
     def can_claim_connection(self) -> bool:
         """

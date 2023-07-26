@@ -3,9 +3,11 @@ from unittest.mock import patch
 
 import pytest
 
+from cosmos.config import ProfileConfig
 from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
 from cosmos.dbt.project import DbtProject
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
@@ -109,7 +111,19 @@ def test_load(
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_exclude():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project, select=["*customers*"], exclude=["*orders*"])
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        select=["*customers*"],
+        exclude=["*orders*"],
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     assert len(dbt_graph.nodes) == 7
@@ -140,20 +154,53 @@ def test_load_via_dbt_ls_with_exclude():
 @pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
 def test_load_via_dbt_ls_without_exclude(pipeline_name):
     dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
     dbt_graph.load_via_dbt_ls()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     assert len(dbt_graph.nodes) == 28
 
 
-def test_load_via_dbt_ls_with_invalid_dbt_path():
+def test_load_via_dbt_ls_without_profile():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=dbt_project)
+    dbt_graph = DbtGraph(
+        dbt_cmd="/inexistent/dbt",
+        project=dbt_project,
+    )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
-    expected = "Unable to run the command due to the error:\n[Errno 2] No such file or directory: '/inexistent/dbt'"
-    assert err_info.value.args[0].startswith(expected)
+
+    expected = "Unable to load dbt project without a profile config"
+    assert err_info.value.args[0] == expected
+
+
+def test_load_via_dbt_ls_with_invalid_dbt_path():
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    with patch("pathlib.Path.exists", return_value=True):
+        dbt_graph = DbtGraph(
+            dbt_cmd="/inexistent/dbt",
+            project=dbt_project,
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profiles_yml_filepath=Path(__file__).parent.parent / "sample/profiles.yml",
+            ),
+        )
+        with pytest.raises(CosmosLoadDbtException) as err_info:
+            dbt_graph.load_via_dbt_ls()
+
+    expected = "Unable to find the dbt executable: /inexistent/dbt"
+    assert err_info.value.args[0] == expected
 
 
 @pytest.mark.integration
@@ -161,7 +208,17 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
 def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
     expected = "Unable to run the command due to the error:\nSome Runtime Error"

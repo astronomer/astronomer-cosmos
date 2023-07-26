@@ -15,9 +15,8 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
-from cosmos.constants import DEFAULT_DBT_PROFILE_NAME, DEFAULT_DBT_TARGET_NAME
+from cosmos.config import ProfileConfig
 from cosmos.operators.base import DbtBaseOperator
-from cosmos.profiles import get_profile_mapping
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
@@ -52,19 +51,15 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def __init__(
         self,
+        profile_config: ProfileConfig,
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
-        profile_args: dict[str, str] = {},
-        profile_name: str | None = None,
-        target_name: str | None = None,
         should_store_compiled_sql: bool = True,
         **kwargs: Any,
     ) -> None:
+        self.profile_config = profile_config
         self.install_deps = install_deps
-        self.profile_args = profile_args
         self.callback = callback
-        self.profile_name = profile_name
-        self.target_name = target_name
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         super().__init__(**kwargs)
@@ -130,49 +125,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
         return subprocess_result
 
-    def get_profile_name(self, project_dir: str) -> str:
-        """
-        Returns the profile name to use. Precedence is:
-        1. The profile name passed in to the operator
-        2. The profile name in the dbt_project.yml file
-        3. "cosmos_profile"
-        """
-        if self.profile_name:
-            return self.profile_name
-
-        # get the profile name from the dbt_project.yml file
-        dbt_project_path = os.path.join(project_dir, "dbt_project.yml")
-
-        # if there's no dbt_project.yml file, we're not in a dbt project
-        # and need to raise an error
-        if not os.path.exists(dbt_project_path):
-            raise AirflowException(f"dbt project directory {self.project_dir} does not contain a dbt_project.yml file.")
-
-        # get file contents using path
-        dbt_project = yaml.safe_load(Path(dbt_project_path).read_text(encoding="utf-8")) or {}
-
-        profile_name = dbt_project.get("profile", DEFAULT_DBT_PROFILE_NAME)
-
-        if not isinstance(profile_name, str):
-            raise AirflowException(
-                f"dbt project directory {self.project_dir} contains a dbt_project.yml file, but the profile "
-                f"specified in the file is not a string. Please specify a string profile name, or pass a profile "
-                f"name to the operator."
-            )
-
-        return profile_name
-
-    def get_target_name(self) -> str:
-        """
-        Returns the target name to use. Precedence is:
-        1. The target name passed in to the operator
-        2. "cosmos_target"
-        """
-        if self.target_name:
-            return self.target_name
-
-        return DEFAULT_DBT_TARGET_NAME
-
     def run_command(
         self,
         cmd: list[str | None],
@@ -195,25 +147,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 self.project_dir,
                 tmp_project_dir,
             )
-            profile_name = self.get_profile_name(tmp_project_dir)
-            target_name = self.get_target_name()
-
-            # need to write the profile to a file because dbt requires a profile file
-            # and doesn't accept a profile as a string
-            profile_mapping = get_profile_mapping(
-                conn_id=self.conn_id,
-                profile_args=self.profile_args,
-            )
-            profile_file_contents = profile_mapping.get_profile_file_contents(
-                profile_name=profile_name,
-                target_name=target_name,
-            )
-            profile_file_path = os.path.join(tmp_project_dir, "profiles.yml")
-            with open(profile_file_path, "w", encoding="utf-8") as f:
-                f.write(profile_file_contents)
-
-            # we also need to get the env from the profile mapping
-            env.update(profile_mapping.env_vars)
 
             # if we need to install deps, do so
             if self.install_deps:
@@ -224,20 +157,31 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     cwd=tmp_project_dir,
                 )
 
-            logger.info("Trying to run the command:\n %s\nFrom %s", cmd, tmp_project_dir)
+            with self.profile_config.ensure_profile() as (profile_path, env_vars):
+                env.update(env_vars)
+                full_cmd = cmd + [
+                    "--profiles-dir",
+                    str(profile_path.parent),
+                    "--profile",
+                    self.profile_config.profile_name,
+                    "--target",
+                    self.profile_config.target_name,
+                ]
 
-            result = self.run_subprocess(
-                command=cmd + ["--profile", profile_name, "--target", target_name],
-                env=env,
-                output_encoding=self.output_encoding,
-                cwd=tmp_project_dir,
-            )
-            self.exception_handling(result)
-            self.store_compiled_sql(tmp_project_dir, context)
-            if self.callback:
-                self.callback(tmp_project_dir)
+                logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
+                result = self.run_subprocess(
+                    command=full_cmd,
+                    env=env,
+                    output_encoding=self.output_encoding,
+                    cwd=tmp_project_dir,
+                )
 
-            return result
+                self.exception_handling(result)
+                self.store_compiled_sql(tmp_project_dir, context)
+                if self.callback:
+                    self.callback(tmp_project_dir)
+
+                return result
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)

@@ -77,7 +77,7 @@ class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass My
     def __init__(
         self,
         project_dir: str,
-        conn_id: str,
+        conn_id: str | None = None,
         base_cmd: list[str] | None = None,
         select: str | None = None,
         exclude: str | None = None,

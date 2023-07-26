@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 
 
@@ -29,7 +29,7 @@ def mock_bigquery_conn_with_dict():  # type: ignore
 
 
 def test_bigquery_mapping_selected(mock_bigquery_conn_with_dict: Connection):
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn_with_dict.conn_id,
         {"dataset": "my_dataset"},
     )

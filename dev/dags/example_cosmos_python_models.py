@@ -18,10 +18,20 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ProjectConfig, ProfileConfig
+from cosmos.profiles import DatabricksTokenProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 SCHEMA = "cosmos_" + os.getenv("DATABRICKS_UNIQUE_ID", "").replace(".", "_")
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=DatabricksTokenProfileMapping(
+        conn_id="databricks_default",
+        profile_args={"schema": SCHEMA},
+    ),
+)
 
 # [START example_cosmos_python_models]
 example_cosmos_python_models = DbtDag(
@@ -29,12 +39,7 @@ example_cosmos_python_models = DbtDag(
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "jaffle_shop_python",
     ),
-    profile_config=ProfileConfig(
-        profile_name="default",
-        target_name="dev",
-        conn_id="databricks_default",
-        profile_args={"schema": SCHEMA},
-    ),
+    profile_config=profile_config,
     operator_args={
         "append_env": True,
     },

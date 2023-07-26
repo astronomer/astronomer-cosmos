@@ -20,6 +20,12 @@ x-airflow-common:
     ASTRONOMER_ENVIRONMENT: local
     AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES: airflow\.* astro\.*
     OPENLINEAGE_DISABLED: "True"
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    POSTGRES_USER: airflow
+    POSTGRES_PASSWORD: pg_password
+    POSTGRES_DB: airflow
+    POSTGRES_SCHEMA: public
   volumes:
     - ./dags:/usr/local/airflow/dags
     - ./logs:/usr/local/airflow/logs

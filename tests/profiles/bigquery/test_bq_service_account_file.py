@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.bigquery.service_account_file import (
     GoogleCloudServiceAccountFileProfileMapping,
 )
@@ -58,8 +58,9 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
-        assert not profile_mapping.can_claim_connection()
+        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+            profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
+            assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(
@@ -67,8 +68,9 @@ def test_connection_claiming() -> None:
         conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
-    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
+        assert not profile_mapping.can_claim_connection()
 
     # if we have dataset specified in extra, it should claim
     dataset_dict = {"dataset": "my_dataset"}
@@ -77,8 +79,9 @@ def test_connection_claiming() -> None:
         conn_type="google_cloud_platform",
         extra=json.dumps({**extra, **dataset_dict}),
     )
-    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
-    assert profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
+        assert profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(
@@ -86,8 +89,9 @@ def test_connection_claiming() -> None:
         conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
-    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
-    assert profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
+        assert profile_mapping.can_claim_connection()
 
 
 def test_bigquery_mapping_selected(
@@ -96,7 +100,7 @@ def test_bigquery_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         {"dataset": "my_dataset"},
     )
@@ -109,7 +113,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         profile_args={
             "dataset": "my_dataset",
@@ -135,7 +139,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         profile_args={
             "dataset": "my_dataset",
@@ -167,7 +171,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         profile_args={"dataset": "my_dataset"},
     )

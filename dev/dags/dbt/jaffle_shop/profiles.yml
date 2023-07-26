@@ -1,13 +1,12 @@
-# WARNING: this gets ignored by cosmos
-jaffle_shop:
+default:
   target: dev
   outputs:
     dev:
       type: postgres
-      host: localhost
-      user: postgres
-      password: postgres
-      port: 5432
-      dbname: public
-      schema: dbt_example
+      host: "{{ env_var('POSTGRES_HOST') }}"
+      user: "{{ env_var('POSTGRES_USER') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      port: "{{ env_var('POSTGRES_PORT') | int }}"
+      dbname: "{{ env_var('POSTGRES_DB') }}"
+      schema: "{{ env_var('POSTGRES_SCHEMA') }}"
       threads: 4

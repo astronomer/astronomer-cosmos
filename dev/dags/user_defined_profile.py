@@ -1,5 +1,5 @@
 """
-An example DAG that uses Cosmos to render a dbt project as a TaskGroup.
+A DAG that uses Cosmos with a custom profile.
 """
 import os
 from datetime import datetime
@@ -9,19 +9,10 @@ from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
-from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-
-profile_config = ProfileConfig(
-    profile_name="default",
-    target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="airflow_db",
-        profile_args={"schema": "public"},
-    ),
-)
+PROFILES_FILE_PATH = Path(DBT_ROOT_PATH, "jaffle_shop", "profiles.yml")
 
 
 @dag(
@@ -29,9 +20,9 @@ profile_config = ProfileConfig(
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )
-def basic_cosmos_task_group() -> None:
+def user_defined_profile() -> None:
     """
-    The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+    A DAG that uses Cosmos with a custom profile.
     """
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
@@ -39,7 +30,14 @@ def basic_cosmos_task_group() -> None:
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
         ),
-        profile_config=profile_config,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=PROFILES_FILE_PATH,
+        ),
+        operator_args={
+            "append_env": True,
+        },
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")
@@ -47,4 +45,4 @@ def basic_cosmos_task_group() -> None:
     pre_dbt >> jaffle_shop >> post_dbt
 
 
-basic_cosmos_task_group()
+user_defined_profile()

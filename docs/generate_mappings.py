@@ -40,8 +40,8 @@ def get_fields_from_mapping(mapping: Type[BaseProfileMapping]) -> list[Field]:
 
 
 def generate_mapping_docs(
-    templates_dir: str = "templates",
-    output_dir: str = "profiles",
+    templates_dir: str = "./templates",
+    output_dir: str = "./profiles",
 ) -> None:
     """
     Generate a dedicated docs page per profile mapping.

@@ -169,6 +169,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
+            path_to_profiles_yml=Path(__file__).parent.parent / "sample/profiles.yml",
         ),
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:

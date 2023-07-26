@@ -13,6 +13,8 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     calculate_operator_class,
 )
+from cosmos.config import ProfileConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 from cosmos.constants import ExecutionMode, DbtResourceType, TestBehavior
 from cosmos.dbt.graph import DbtNode
 
@@ -69,6 +71,14 @@ def test_build_airflow_graph_with_after_each():
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
             "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
         }
         build_airflow_graph(
             nodes=sample_nodes,
@@ -111,6 +121,14 @@ def test_build_airflow_graph_with_after_all():
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
             "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
         }
         build_airflow_graph(
             nodes=sample_nodes,

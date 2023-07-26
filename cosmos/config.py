@@ -91,7 +91,7 @@ class ProjectConfig:
     @property
     def project_name(self) -> str:
         "The name of the dbt project."
-        return self.dbt_project_path.stem
+        return Path(self.dbt_project_path).stem
 
 
 @dataclass

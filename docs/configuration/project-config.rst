@@ -23,9 +23,9 @@ Project Config Example
     from cosmos.config import ProjectConfig
 
     config = ProjectConfig(
-        dbt_project_path='/path/to/dbt/project',
-        models_relative_path='models',
-        seeds_relative_path='data',
-        snapshots_relative_path='snapshots',
-        manifest_path='/path/to/manifests'
+        dbt_project_path="/path/to/dbt/project",
+        models_relative_path="models",
+        seeds_relative_path="data",
+        snapshots_relative_path="snapshots",
+        manifest_path="/path/to/manifests",
     )

@@ -12,8 +12,6 @@ If you'd like to disable this feature, you can set ``should_store_compiled_sql=F
     from cosmos import DbtDag
 
     DbtDag(
-        operator_args={
-            "should_store_compiled_sql": False
-        },
+        operator_args={"should_store_compiled_sql": False},
         # ...,
     )

@@ -101,7 +101,7 @@ Example DAG:
   docker_cosmos_dag = DbtDag(
       # ...
       execution_config=ExecutionConfig(
-        execution_mode=ExecutionMode.DOCKER,
+          execution_mode=ExecutionMode.DOCKER,
       ),
       operator_args={
           "image": "dbt-jaffle-shop:1.0.0",
@@ -135,7 +135,7 @@ Example DAG:
     docker_cosmos_dag = DbtDag(
         # ...
         execution_config=ExecutionConfig(
-          execution_mode=ExecutionMode.KUBERNETES,
+            execution_mode=ExecutionMode.KUBERNETES,
         ),
         operator_args={
             "image": "dbt-jaffle-shop:1.0.0",

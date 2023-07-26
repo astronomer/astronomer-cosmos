@@ -1,6 +1,14 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
+  - repo: local
+    hooks:
+      - id: check-env-file
+        name: Check if .env file is empty
+        entry: bash -c 'FILE=dev/.env; if [ -s "$FILE" ]; then echo "$FILE is not empty. Please remove its content."; exit 1; fi'
+        language: system
+        types: [file]
+        pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:

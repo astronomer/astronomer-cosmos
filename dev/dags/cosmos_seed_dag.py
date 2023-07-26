@@ -17,10 +17,21 @@ from airflow.datasets import Dataset
 from airflow.utils.task_group import TaskGroup
 from pendulum import datetime
 
+from cosmos import ProfileConfig
 from cosmos.operators import DbtRunOperationOperator, DbtSeedOperator
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
+)
 
 with DAG(
     dag_id="extract_dag",
@@ -38,16 +49,14 @@ with DAG(
                 macro_name="drop_table",
                 args={"table_name": seed},
                 project_dir=DBT_ROOT_PATH / "jaffle_shop",
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
+                profile_config=profile_config,
             )
 
     jaffle_shop_seed = DbtSeedOperator(
         task_id="seed_jaffle_shop",
-        conn_id="airflow_db",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
-        profile_args={"schema": "public"},
         outlets=[Dataset("SEED://JAFFLE_SHOP")],
+        profile_config=profile_config,
     )
 
     drop_seeds >> jaffle_shop_seed

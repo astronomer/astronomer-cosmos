@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.trino.certificate import (
     TrinoCertificateProfileMapping,
 )
@@ -67,39 +67,43 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        profile_mapping = TrinoCertificateProfileMapping(conn, {"database": "my_database", "schema": "my_schema"})
-        assert not profile_mapping.can_claim_connection()
+        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+            profile_mapping = TrinoCertificateProfileMapping(conn, {"database": "my_database", "schema": "my_schema"})
+            assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = TrinoCertificateProfileMapping(
-        conn,
-        {
-            "database": "my_database",
-        },
-    )
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = TrinoCertificateProfileMapping(
+            conn,
+            {
+                "database": "my_database",
+            },
+        )
+        assert not profile_mapping.can_claim_connection()
 
     # also test when there's no database
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = TrinoCertificateProfileMapping(
-        conn,
-        {
-            "schema": "my_schema",
-        },
-    )
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = TrinoCertificateProfileMapping(
+            conn,
+            {
+                "schema": "my_schema",
+            },
+        )
+        assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = TrinoCertificateProfileMapping(
-        conn,
-        {
-            "database": "my_database",
-            "schema": "my_schema",
-        },
-    )
-    assert profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = TrinoCertificateProfileMapping(
+            conn,
+            {
+                "database": "my_database",
+                "schema": "my_schema",
+            },
+        )
+        assert profile_mapping.can_claim_connection()
 
 
 def test_trino_mapping_selected(
@@ -108,7 +112,7 @@ def test_trino_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_trino_conn.conn_id,
         {
             "database": "my_database",
@@ -124,7 +128,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_trino_conn.conn_id,
         profile_args={
             "database": "my_database",
@@ -154,7 +158,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_trino_conn.conn_id,
         profile_args={
             "database": "my_database",

@@ -56,35 +56,47 @@ If testing for the same Airflow and Python version, next runs of the integration
 .. code-block:: bash
     hatch run tests.py3.8-2.5:test-integration
 
+.. code-block:: bash
 
-Using Tilt for local development
-________________________________
+    docker run --name postgres -p 5432:5432 -p 5433:5433 -e POSTGRES_PASSWORD=postgres postgres
 
-It is also possible to use `tilt <https://docs.tilt.dev>`_, a toolkit which helps on microservices local development.
+To run the integration tests for the first time, use:
+
+.. code-block:: bash
+
+    export AIRFLOW_HOME=`pwd`
+    export AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres
+    hatch run tests.py3.8-2.5:test-integration-setup
+    hatch run tests.py3.8-2.5:test-integration
+
+If testing for the same Airflow and Python version, next runs of the integration tests can be:
+
+.. code-block:: bash
+    hatch run tests.py3.8-2.5:test-integration
 
 
-Pre-requisites
-++++++++++++++
+Using Docker Compose for local development
+---------------------------------
 
-#. `tilt <https://docs.tilt.dev>`_
-#. `git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
+It is also possible to just build the development environment using docker compose
+
 
 Local Sandbox
 +++++++++++++
 
-For local development, we use `Tilt <https://docs.tilt.dev>`_. To use Tilt, first clone the ``astronomer-cosmos`` repo:
+To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo:
 
 .. code-block:: bash
 
     git clone https://github.com/astronomer/astronomer-cosmos.git
 
-Then, run the following from the ``astronomer-cosmos`` directory:
+Then, run the following command from the ``astronomer-cosmos`` directory:
 
 .. code-block:: bash
 
-    tilt up
+    docker compose -f dev/docker-compose.yaml up -d --build
 
-You can press ``space`` to open the Tilt UI and see the status of the sandbox. Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
+Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
 
 
 Pre-Commit

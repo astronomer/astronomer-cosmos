@@ -24,7 +24,7 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
 
     airflow_param_mapping = {
         "project": "extra.project",
-        "dataset": "dataset",
+        "dataset": "extra.dataset",
         "keyfile": "extra.key_path",
     }
 

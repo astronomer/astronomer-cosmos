@@ -5,23 +5,33 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos.dag import DbtDag
+from cosmos import DbtDag, ExecutionMode, ExecutionConfig, ProjectConfig, ProfileConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 PROJECT_NAME = "jaffle_shop"
-CONNECTION_ID = "airflow_db"
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
+)
 
 # [START virtualenv_example]
 example_virtualenv = DbtDag(
     # dbt/cosmos-specific parameters
-    dbt_root_path=DBT_ROOT_PATH,
-    dbt_project_name=PROJECT_NAME,
-    conn_id=CONNECTION_ID,
-    dbt_args={"schema": "public"},
-    execution_mode="virtualenv",
+    project_config=ProjectConfig(
+        DBT_ROOT_PATH / "jaffle_shop",
+    ),
+    profile_config=profile_config,
+    execution_config=ExecutionConfig(
+        execution_mode=ExecutionMode.VIRTUALENV,
+    ),
     operator_args={
-        "project_dir": DBT_ROOT_PATH / PROJECT_NAME,
         "py_system_site_packages": False,
         "py_requirements": ["dbt-postgres==1.6.0b1"],
     },

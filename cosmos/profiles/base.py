@@ -5,12 +5,14 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-
 from logging import getLogger
 from typing import Any
 
 from typing import TYPE_CHECKING
 import yaml
+
+from airflow.hooks.base import BaseHook
+from cosmos.exceptions import CosmosValueError
 
 if TYPE_CHECKING:
     from airflow.models import Connection
@@ -31,9 +33,23 @@ class BaseProfileMapping(ABC):
     secret_fields: list[str] = []
     airflow_param_mapping: dict[str, str | list[str]] = {}
 
-    def __init__(self, conn: Connection, profile_args: dict[str, Any] | None = None):
-        self.conn = conn
+    _conn: Connection | None = None
+
+    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None):
+        self.conn_id = conn_id
         self.profile_args = profile_args or {}
+
+    @property
+    def conn(self) -> Connection:
+        "Returns the Airflow connection."
+        if not self._conn:
+            conn = BaseHook.get_connection(self.conn_id)
+            if not conn:
+                raise CosmosValueError(f"Could not find connection {self.conn_id}.")
+
+            self._conn = conn
+
+        return self._conn
 
     def can_claim_connection(self) -> bool:
         """
@@ -42,18 +58,21 @@ class BaseProfileMapping(ABC):
         if self.conn.conn_type != self.airflow_connection_type:
             return False
 
+        logger.info(dir(self.conn))
+        logger.info(self.conn.__dict__)
+
         for field in self.required_fields:
             try:
                 if not getattr(self, field):
                     logger.info(
-                        "Not using mapping %s because %s is not set",
+                        "1 Not using mapping %s because %s is not set",
                         self.__class__.__name__,
                         field,
                     )
                     return False
             except AttributeError:
                 logger.info(
-                    "Not using mapping %s because %s is not set",
+                    "2 Not using mapping %s because %s is not set",
                     self.__class__.__name__,
                     field,
                 )
@@ -97,7 +116,6 @@ class BaseProfileMapping(ABC):
                 "outputs": {target_name: profile_vars},
             }
         }
-
         return str(yaml.dump(profile_contents, indent=4))
 
     def get_dbt_value(self, name: str) -> Any:

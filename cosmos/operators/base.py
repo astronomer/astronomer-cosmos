@@ -13,7 +13,7 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 logger = logging.getLogger(__name__)
 
 
-class DbtBaseOperator(BaseOperator):
+class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass MyPy error
     """
     Executes a dbt core cli command.
 
@@ -77,28 +77,28 @@ class DbtBaseOperator(BaseOperator):
     def __init__(
         self,
         project_dir: str,
-        conn_id: str,
-        base_cmd: str | list[str] = None,
-        select: str = None,
-        exclude: str = None,
-        selector: str = None,
-        vars: dict = None,
-        models: str = None,
+        conn_id: str | None = None,
+        base_cmd: list[str] | None = None,
+        select: str | None = None,
+        exclude: str | None = None,
+        selector: str | None = None,
+        vars: dict[str, str] | None = None,
+        models: str | None = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
         fail_fast: bool = False,
         quiet: bool = False,
         warn_error: bool = False,
-        db_name: str = None,
-        schema: str = None,
-        env: dict = None,
+        db_name: str | None = None,
+        schema: str | None = None,
+        env: dict[str, Any] | None = None,
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
-        dbt_cmd_flags: list[str] = None,
-        **kwargs,
+        dbt_cmd_flags: list[str] | None = None,
+        **kwargs: str,
     ) -> None:
         self.project_dir = project_dir
         self.conn_id = conn_id
@@ -132,7 +132,7 @@ class DbtBaseOperator(BaseOperator):
         self.dbt_cmd_flags = dbt_cmd_flags
         super().__init__(**kwargs)
 
-    def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike]:
+    def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """
         Builds the set of environment variables to be exposed for the bash command.
 
@@ -159,7 +159,7 @@ class DbtBaseOperator(BaseOperator):
         # filter out invalid types and give a warning when a value is removed
         accepted_types = (str, bytes, os.PathLike)
 
-        filtered_env: dict[str, str | bytes | os.PathLike] = {}
+        filtered_env: dict[str, str | bytes | os.PathLike[Any]] = {}
 
         for key, val in env.items():
             if isinstance(key, accepted_types) and isinstance(val, accepted_types):
@@ -205,12 +205,10 @@ class DbtBaseOperator(BaseOperator):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-    ) -> Tuple[list[str], dict]:
+    ) -> Tuple[list[str | None], dict[str, str | bytes | os.PathLike[Any]]]:
         dbt_cmd = [self.dbt_executable_path]
 
-        if isinstance(self.base_cmd, str):
-            dbt_cmd.append(self.base_cmd)
-        else:
+        if self.base_cmd:
             dbt_cmd.extend(self.base_cmd)
 
         dbt_cmd.extend(self.add_global_flags())

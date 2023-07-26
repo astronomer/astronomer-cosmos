@@ -35,6 +35,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
+    # Airflow & Pydantic issue: https://github.com/apache/airflow/issues/32311
+    "pydantic>=1.10.0,<2.0.0",
     "apache-airflow>=2.3.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
@@ -147,15 +149,30 @@ matrix.airflow.dependencies = [
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
-test = 'pytest -vv --durations=0 . -m "not integration"'
-test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration"'
+test = 'pytest -vv --durations=0 . -m "not integration" --ignore=tests/test_example_dags.py'
+test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py'
 # we install using the following workaround to overcome installation conflicts, such as:
 # apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
 test-integration-setup = """pip uninstall dbt-postgres; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install dbt-postgres;"""
-test-integration = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m integration"""
+pip install dbt-postgres; \
+pip install dbt-databricks"""
+test-integration = """pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+-k 'not test_example_dag[example_cosmos_python_models]'
+"""
+test-integration-expensive = """pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+-k 'test_example_dag[example_cosmos_python_models]'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -163,7 +180,7 @@ filterwarnings = [
 ]
 minversion = "6.0"
 markers = [
-    "integration"
+    "integration",
 ]
 
 ######################################

@@ -11,7 +11,7 @@ from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -35,7 +35,7 @@ def cosmos_profile_mapping() -> None:
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="dev",
-            profile_mapping=get_profile_mapping(
+            profile_mapping=get_automatic_profile_mapping(
                 conn_id="airflow_db",
                 profile_args={"schema": "public"},
             ),

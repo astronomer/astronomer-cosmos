@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.spark import SparkThriftProfileMapping
 
 
@@ -65,7 +65,7 @@ def test_spark_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_spark_conn.conn_id,
         {"schema": "my_schema"},
     )
@@ -78,7 +78,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_spark_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )
@@ -100,7 +100,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_spark_conn.conn_id,
         profile_args={
             "schema": "my_schema",
@@ -129,7 +129,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_spark_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )

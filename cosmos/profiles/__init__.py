@@ -36,7 +36,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
 ]
 
 
-def get_profile_mapping(
+def get_automatic_profile_mapping(
     conn_id: str,
     profile_args: dict[str, Any] | None = None,
 ) -> BaseProfileMapping:

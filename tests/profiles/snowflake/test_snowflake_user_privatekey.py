@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.snowflake import (
     SnowflakePrivateKeyPemProfileMapping,
 )
@@ -114,7 +114,7 @@ def test_profile_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
     assert isinstance(profile_mapping, SnowflakePrivateKeyPemProfileMapping)
@@ -126,7 +126,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
 
@@ -147,7 +147,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_snowflake_conn.conn_id,
         profile_args={"database": "my_db_override"},
     )
@@ -172,7 +172,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
     assert profile_mapping.env_vars == {

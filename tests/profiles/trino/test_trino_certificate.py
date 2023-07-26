@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.trino.certificate import (
     TrinoCertificateProfileMapping,
 )
@@ -112,7 +112,7 @@ def test_trino_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_trino_conn.conn_id,
         {
             "database": "my_database",
@@ -128,7 +128,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_trino_conn.conn_id,
         profile_args={
             "database": "my_database",
@@ -158,7 +158,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_trino_conn.conn_id,
         profile_args={
             "database": "my_database",

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.bigquery.service_account_file import (
     GoogleCloudServiceAccountFileProfileMapping,
 )
@@ -100,7 +100,7 @@ def test_bigquery_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         {"dataset": "my_dataset"},
     )
@@ -113,7 +113,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         profile_args={
             "dataset": "my_dataset",
@@ -139,7 +139,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         profile_args={
             "dataset": "my_dataset",
@@ -171,7 +171,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,
         profile_args={"dataset": "my_dataset"},
     )

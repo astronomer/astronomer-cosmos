@@ -70,13 +70,13 @@ class ProjectConfig:
 
     def validate_project(self) -> None:
         "Validates that the project, models, and seeds directories exist."
-        project_yml_path = self.dbt_project_path / "dbt_project.yml"
+        project_yml_path = Path(self.dbt_project_path) / "dbt_project.yml"
         mandatory_paths = {
             "dbt_project.yml": project_yml_path,
             "models directory ": self.models_relative_path,
         }
         for name, path in mandatory_paths.items():
-            if path is None or not path.exists():
+            if path is None or not Path(path).exists():
                 raise CosmosValueError(f"Could not find {name} at {project_yml_path}")
 
     def is_manifest_available(self) -> bool:

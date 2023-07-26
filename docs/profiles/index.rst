@@ -17,7 +17,7 @@
    TrinoLDAP
    TrinoCertificate
    TrinoJWT
-   
+
 
 Profiles Overview
 ==========================
@@ -45,7 +45,6 @@ is set in the ``cosmos.config.ProfileConfig`` object, like so:
     profile_config = ProfileConfig(
         profile_name="my_profile_name",
         target_name="my_target_name",
-
         # choose one of the following
         profile_mapping=...,
         profiles_yml_path=...,
@@ -62,7 +61,7 @@ Profile mappings are utilities provided by Cosmos that translate Airflow connect
 you can use the same connection objects you use in Airflow to authenticate with your database in dbt. To do so, there's
 a class in Cosmos for each Airflow connection to dbt profile mapping.
 
-You can find the available profile mappings on the left-hand side of this page. Each profile mapping is imported from 
+You can find the available profile mappings on the left-hand side of this page. Each profile mapping is imported from
 ``cosmos.profiles`` and takes two arguments:
 
 * ``conn_id``: the Airflow connection ID to use.

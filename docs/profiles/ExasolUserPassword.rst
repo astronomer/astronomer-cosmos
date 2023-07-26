@@ -11,7 +11,7 @@ ExasolUserPassword
 
     https://docs.getdbt.com/reference/warehouse-setups/exasol-setup
 
-    
+
 
 This profile mapping translates Airflow connections with the type ``exasol``
 into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
@@ -21,8 +21,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import ExasolUserPasswordProfileMapping
 
     profile = ExasolUserPasswordProfileMapping(
-        conn_id = 'my_exasol_connection',
-        profile_args = { ... },
+        conn_id="my_exasol_connection",
+        profile_args={...},
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -37,73 +37,73 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-   
+
    * - ``dsn``
      - True
-    
+
      - ``host``
-    
-    
+
+
    * - ``user``
      - True
-    
+
      - ``login``
-    
-    
+
+
    * - ``password``
      - True
-    
+
      - ``password``
-    
-    
+
+
    * - ``dbname``
      - True
-    
+
      - ``schema``
-    
-    
+
+
    * - ``encryption``
      - False
-    
+
      - ``extra.encryption``
-    
-    
+
+
    * - ``compression``
      - False
-    
+
      - ``extra.compression``
-    
-    
+
+
    * - ``connection_timeout``
      - False
-    
+
      - ``extra.connection_timeout``
-    
-    
+
+
    * - ``socket_timeout``
      - False
-    
+
      - ``extra.socket_timeout``
-    
-    
+
+
    * - ``protocol_version``
      - False
-    
+
      - ``extra.protocol_version``
-    
-    
+
+
    * - ``threads``
      - True
-    
+
      -
-    
-    
+
+
    * - ``schema``
      - True
-    
+
      -
-    
-    
+
+
 
 
 Some notes about the table above:

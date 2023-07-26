@@ -13,7 +13,7 @@ SnowflakePrivateKeyPem
 
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
 
-    
+
 
 This profile mapping translates Airflow connections with the type ``snowflake``
 into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
@@ -23,8 +23,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import SnowflakePrivateKeyPemProfileMapping
 
     profile = SnowflakePrivateKeyPemProfileMapping(
-        conn_id = 'my_snowflake_connection',
-        profile_args = { ... },
+        conn_id="my_snowflake_connection",
+        profile_args={...},
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -39,49 +39,49 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-   
+
    * - ``account``
      - True
-    
+
      - ``extra.account``
-    
-    
+
+
    * - ``user``
      - True
-    
+
      - ``login``
-    
-    
+
+
    * - ``database``
      - True
-    
+
      - ``extra.database``
-    
-    
+
+
    * - ``warehouse``
      - True
-    
+
      - ``extra.warehouse``
-    
-    
+
+
    * - ``schema``
      - True
-    
+
      - ``schema``
-    
-    
+
+
    * - ``role``
      - False
-    
+
      - ``extra.role``
-    
-    
+
+
    * - ``private_key_content``
      - True
-    
+
      - ``extra.private_key_content``
-    
-    
+
+
 
 
 Some notes about the table above:

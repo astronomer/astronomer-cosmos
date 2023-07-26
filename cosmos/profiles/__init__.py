@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Type
 
-from airflow.hooks.base import BaseHook
 
 from .base import BaseProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping

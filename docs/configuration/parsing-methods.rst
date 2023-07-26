@@ -50,7 +50,7 @@ To use this:
         render_config=RenderConfig(
             load_mode=LoadMode.DBT_MANIFEST,
         )
-        ...,
+        # ...,
     )
 
 ``dbt_ls``
@@ -72,7 +72,7 @@ To use this:
         render_config=RenderConfig(
             load_mode=LoadMode.DBT_LS,
         )
-        ...,
+        # ...,
     )
 
 
@@ -94,5 +94,5 @@ To use this:
         render_config=RenderConfig(
             load_mode=LoadMode.CUSTOM,
         )
-        ...,
+        # ...,
     )

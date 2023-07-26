@@ -2,3 +2,4 @@ sphinx
 pydata-sphinx-theme
 sphinx-autobuild
 sphinx-autoapi
+apache-airflow

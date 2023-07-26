@@ -7,6 +7,7 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import ExecutionMode, DbtResourceType
 from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
 from cosmos.dbt.project import DbtProject
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
@@ -110,7 +111,19 @@ def test_load(
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_exclude():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project, select=["*customers*"], exclude=["*orders*"])
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        select=["*customers*"],
+        exclude=["*orders*"],
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     assert len(dbt_graph.nodes) == 7
@@ -141,7 +154,17 @@ def test_load_via_dbt_ls_with_exclude():
 @pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
 def test_load_via_dbt_ls_without_exclude(pipeline_name):
     dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
-    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
     dbt_graph.load_via_dbt_ls()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes

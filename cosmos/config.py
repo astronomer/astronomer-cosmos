@@ -18,6 +18,7 @@ logger = getLogger(__name__)
 
 DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 
+
 @dataclass
 class RenderConfig:
     """

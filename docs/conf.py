@@ -1,6 +1,8 @@
 import os
 import sys
 
+from docs.scripts.generate_mappings import generate_mapping_docs
+
 # Add the project root to the path so we can import the package
 sys.path.insert(0, os.path.abspath("../"))
 
@@ -48,3 +50,5 @@ html_theme_options = {
     },
     "footer_start": ["copyright"],
 }
+
+generate_mapping_docs()

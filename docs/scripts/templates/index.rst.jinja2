@@ -5,19 +5,8 @@
    :caption: Profiles
 
    self
-   GoogleCloudServiceAccountFile
-   GoogleCloudServiceAccountDict
-   DatabricksToken
-   PostgresUserPassword
-   RedshiftUserPassword
-   SnowflakeUserPassword
-   SnowflakePrivateKeyPem
-   SparkThrift
-   ExasolUserPassword
-   TrinoLDAP
-   TrinoCertificate
-   TrinoJWT
-   
+   {% for profile in profile_mapping_names %}{{ profile }}
+   {% endfor %}
 
 Profiles Overview
 ==========================
@@ -116,3 +105,4 @@ For example, the code snippet below points Cosmos at a ``profiles.yml`` file and
     )
 
     dag = DbtDag(profile_config=profile_config, ...)
+

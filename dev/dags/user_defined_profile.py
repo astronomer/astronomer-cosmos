@@ -12,7 +12,7 @@ from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-PROFILES_FILE_PATH = DBT_ROOT_PATH / "jaffle_shop" / "profiles.yml"
+PROFILES_FILE_PATH = Path( DBT_ROOT_PATH , "jaffle_shop" , "profiles.yml" )
 
 
 @dag(
@@ -20,7 +20,7 @@ PROFILES_FILE_PATH = DBT_ROOT_PATH / "jaffle_shop" / "profiles.yml"
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )
-def cosmos_byo_profile() -> None:
+def user_defined_profile() -> None:
     """
     A DAG that uses Cosmos with a custom profile.
     """
@@ -33,7 +33,7 @@ def cosmos_byo_profile() -> None:
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="dev",
-            path_to_profiles_yml=PROFILES_FILE_PATH,
+            profiles_yml_filepath=PROFILES_FILE_PATH,
         ),
         operator_args={
             "append_env": True,
@@ -45,4 +45,4 @@ def cosmos_byo_profile() -> None:
     pre_dbt >> jaffle_shop >> post_dbt
 
 
-cosmos_byo_profile()
+user_defined_profile()

@@ -155,6 +155,9 @@ class DbtToAirflowConverter:
             "profile_config": profile_config,
         }
 
+        if dbt_executable_path:
+            task_args["dbt_executable_path"] = dbt_executable_path
+
         validate_arguments(select, exclude, profile_args, task_args)
 
         build_airflow_graph(

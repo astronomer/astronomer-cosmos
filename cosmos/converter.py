@@ -105,8 +105,6 @@ class DbtToAirflowConverter:
     ) -> None:
         project_config.validate_project()
 
-        conn_id = profile_config.profile_mapping.conn_id
-        profile_args = profile_config.profile_mapping.profile_args
         emit_datasets = render_config.emit_datasets
         dbt_root_path = project_config.dbt_project_path.parent
         dbt_project_name = project_config.dbt_project_path.name

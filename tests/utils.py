@@ -57,7 +57,7 @@ def test_dag(
     dag.clear(
         start_date=execution_date,
         end_date=execution_date,
-        dag_run_state=False,  # type: ignore
+        dag_run_state=False,
         session=session,
     )
     dag.log.debug("Getting dagrun for dag %s", dag.dag_id)
@@ -164,7 +164,7 @@ def _get_or_create_dagrun(
         run_id=run_id,
         start_date=start_date or execution_date,
         session=session,
-        conf=conf,  # type: ignore
+        conf=conf,
     )
     log.info("created dagrun %s", str(dr))
     return dr

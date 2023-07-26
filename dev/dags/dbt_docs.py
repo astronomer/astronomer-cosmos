@@ -16,16 +16,27 @@ from airflow.exceptions import AirflowNotFoundException
 from airflow.decorators import task
 from pendulum import datetime
 
+from cosmos import ProfileConfig
 from cosmos.operators import (
     DbtDocsAzureStorageOperator,
     DbtDocsS3Operator,
 )
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 S3_CONN_ID = "aws_docs"
 AZURE_CONN_ID = "azure_docs"
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
+)
 
 
 @task.branch(task_id="which_upload")
@@ -59,8 +70,7 @@ with DAG(
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
-        conn_id="airflow_db",
-        profile_args={"schema": "public"},
+        profile_config=profile_config,
         aws_conn_id=S3_CONN_ID,
         bucket_name="cosmos-docs",
     )
@@ -68,8 +78,7 @@ with DAG(
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
         task_id="generate_dbt_docs_azure",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
-        conn_id="airflow_db",
-        profile_args={"schema": "public"},
+        profile_config=profile_config,
         azure_conn_id=AZURE_CONN_ID,
         container_name="$web",
     )

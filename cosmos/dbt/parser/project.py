@@ -5,15 +5,22 @@ from __future__ import annotations
 
 import logging
 import os
+import ast
+
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Dict, List, Set
+from typing import Any, ClassVar, Dict, List, Set
 
 import jinja2
-import yaml  # type: ignore
+import yaml
 
 logger = logging.getLogger(__name__)
+
+
+DBT_PY_MODEL_METHOD_NAME = "model"
+DBT_PY_DEP_METHOD_NAME = "ref"
+PYTHON_FILE_SUFFIX = ".py"
 
 
 class DbtModelType(Enum):
@@ -21,9 +28,9 @@ class DbtModelType(Enum):
     Represents type of dbt unit (model, snapshot, seed)
     """
 
-    DBT_MODEL = 1
-    DBT_SNAPSHOT = 2
-    DBT_SEED = 3
+    DBT_MODEL = "model"
+    DBT_SNAPSHOT = "snapshot"
+    DBT_SEED = "seed"
 
 
 @dataclass
@@ -56,7 +63,7 @@ class DbtModelConfig:
         self,
         sql_configs: Set[str],
         properties_configs: Set[str],
-        prefixes: List[str] = None,
+        prefixes: List[str] | None = None,
     ) -> Set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
@@ -85,6 +92,31 @@ class DbtModelConfig:
                 sql_configs.add(config)
 
         return sql_configs
+
+
+def extract_python_file_upstream_requirements(code: str) -> list[str]:
+    """
+    Given a dbt Python model source code, identify other dbt entities which are upstream requirements.
+
+    This method tries to find a `model` function and `dbt.ref` calls within it. Return a list of upstream entities IDs.
+    """
+    source_code = ast.parse(code)
+
+    upstream_entities = []
+    model_function = None
+    for node in source_code.body:
+        if isinstance(node, ast.FunctionDef) and node.name == DBT_PY_MODEL_METHOD_NAME:
+            model_function = node
+            break
+
+    if model_function:
+        for item in ast.walk(model_function):
+            if isinstance(item, ast.Call) and item.func.attr == DBT_PY_DEP_METHOD_NAME:  # type: ignore[attr-defined]
+                upstream_entity_id = hasattr(item.args[-1], "value") and item.args[-1].value
+                if upstream_entity_id:
+                    upstream_entities.append(upstream_entity_id)
+
+    return upstream_entities
 
 
 @dataclass
@@ -122,38 +154,40 @@ class DbtModel:
             code = code.split("{%")[0]
 
         elif self.type == DbtModelType.DBT_SEED:
-            code = None
+            code = ""
 
-        # get the dependencies
-        env = jinja2.Environment()
-        ast = env.parse(code)
+        if self.path.suffix == PYTHON_FILE_SUFFIX:
+            config.upstream_models = config.upstream_models.union(set(extract_python_file_upstream_requirements(code)))
+        else:
+            # get the dependencies
+            env = jinja2.Environment()
+            jinja2_ast = env.parse(code)
+            # iterate over the jinja nodes to extract info
+            for base_node in jinja2_ast.find_all(jinja2.nodes.Call):
+                if hasattr(base_node.node, "name"):
+                    # check we have a ref - this indicates a dependency
+                    if base_node.node.name == "ref":
+                        # if it is, get the first argument
+                        first_arg = base_node.args[0]
+                        if isinstance(first_arg, jinja2.nodes.Const):
+                            # and add it to the config
+                            config.upstream_models.add(first_arg.value)
 
-        # iterate over the jinja nodes to extract info
-        for base_node in ast.find_all(jinja2.nodes.Call):
-            if hasattr(base_node.node, "name"):
-                # check we have a ref - this indicates a dependency
-                if base_node.node.name == "ref":
-                    # if it is, get the first argument
-                    first_arg = base_node.args[0]
-                    if isinstance(first_arg, jinja2.nodes.Const):
-                        # and add it to the config
-                        config.upstream_models.add(first_arg.value)
-
-                # check if we have a config - this could contain tags
-                if base_node.node.name == "config":
-                    # if it is, check if any kwargs are tags
-                    for kwarg in base_node.kwargs:
-                        for selector in self.config.config_types:
-                            extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
-                            config.config_selectors |= (
-                                set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
-                            )
+                    # check if we have a config - this could contain tags
+                    if base_node.node.name == "config":
+                        # if it is, check if any kwargs are tags
+                        for kwarg in base_node.kwargs:
+                            for selector in self.config.config_types:
+                                extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
+                                config.config_selectors |= (
+                                    set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
+                                )
 
         # set the config and set the parsed file flag to true
         self.config = config
 
     # TODO following needs coverage:
-    def _extract_config(self, kwarg, config_name: str):
+    def _extract_config(self, kwarg: Any, config_name: str) -> Any:
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:
                 # try to convert it to a constant and get the value
@@ -188,10 +222,10 @@ class DbtProject:
     project_name: str
 
     # optional, user-specified instance variables
-    dbt_root_path: str = "/usr/local/airflow/dags/dbt"
-    dbt_models_dir: str = "models"
-    dbt_snapshots_dir: str = "snapshots"
-    dbt_seeds_dir: str = "seeds"
+    dbt_root_path: str | None = None
+    dbt_models_dir: str | None = None
+    dbt_snapshots_dir: str | None = None
+    dbt_seeds_dir: str | None = None
 
     # private instance variables for managing state
     models: Dict[str, DbtModel] = field(default_factory=dict)
@@ -206,6 +240,15 @@ class DbtProject:
         """
         Initializes the parser.
         """
+        if self.dbt_root_path is None:
+            self.dbt_root_path = "/usr/local/airflow/dags/dbt"
+        if self.dbt_models_dir is None:
+            self.dbt_models_dir = "models"
+        if self.dbt_snapshots_dir is None:
+            self.dbt_snapshots_dir = "snapshots"
+        if self.dbt_seeds_dir is None:
+            self.dbt_seeds_dir = "seeds"
+
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
         self.models_dir = self.project_dir / self.dbt_models_dir
@@ -214,6 +257,10 @@ class DbtProject:
 
         # crawl the models in the project
         for file_name in self.models_dir.rglob("*.sql"):
+            self._handle_sql_file(file_name)
+
+        # crawl the models in the project
+        for file_name in self.models_dir.rglob("*.py"):
             self._handle_sql_file(file_name)
 
         # crawl the snapshots in the project
@@ -296,7 +343,9 @@ class DbtProject:
                     if isinstance(config_value, str):
                         config_selectors.append(f"{selector}:{config_value}")
                     else:
-                        [config_selectors.append(f"{selector}:{item}") for item in config_value if item]
+                        for item in config_value:
+                            if item:
+                                config_selectors.append(f"{selector}:{item}")
 
             # dbt default ensures "materialized:view" is set for all models if nothing is specified so that it will
             # work in a select/exclude list

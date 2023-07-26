@@ -8,11 +8,18 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.operators.local import DbtLocalBaseOperator
+from cosmos.config import ProfileConfig
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=MagicMock(),
+)
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
+        profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
         vars={
@@ -31,10 +38,10 @@ def test_dbt_base_operator_add_global_flags() -> None:
 
 def test_dbt_base_operator_add_user_supplied_flags() -> None:
     dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
+        profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
-        base_cmd="run",
+        base_cmd=["run"],
         dbt_cmd_flags=["--full-refresh"],
     )
 
@@ -59,7 +66,7 @@ def test_dbt_base_operator_add_user_supplied_flags() -> None:
 )
 def test_dbt_base_operator_exception_handling(skip_exception, exception_code_returned, expected_exception) -> None:
     dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
+        profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
     )
@@ -76,7 +83,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
     If an end user passes in a
     """
     dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
+        profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
     )
@@ -100,73 +107,9 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
     assert env == expected_env
 
 
-@patch("os.path.exists")
-def test_get_profile_name(mock_os_path_exists) -> None:
-    mock_os_path_exists.return_value = True
-
-    # check that a user-specified profile name is returned when specified
-    dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
-        task_id="my-task",
-        project_dir="my/dir",
-        profile_name="default",
-    )
-    assert dbt_base_operator.get_profile_name("path/to/dir") == "default"
-
-    # check that the dbt_project profile name is returned when no user-specified profile name is specified
-    dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
-        task_id="my-task",
-        project_dir="my/dir",
-    )
-    with patch("pathlib.Path.read_text") as mock_read_text:
-        mock_read_text.return_value = "profile: default"
-        assert dbt_base_operator.get_profile_name("path/to/dir") == "default"
-
-    # check that the default profile name is returned when no user-specified profile name is specified and no
-    # dbt_project profile name is specified
-    with patch("pathlib.Path.read_text") as mock_read_text:
-        mock_read_text.return_value = ""
-        assert dbt_base_operator.get_profile_name("path/to/dir") == "cosmos_profile"
-
-        mock_read_text.return_value = "other_config: other_value"
-        assert dbt_base_operator.get_profile_name("path/to/dir") == "cosmos_profile"
-
-    # test that we raise an AirflowException if the profile argument is not a string
-    with patch("pathlib.Path.read_text") as mock_read_text:
-        mock_read_text.return_value = "profile:\n  my_key: my_value"
-        with pytest.raises(AirflowException):
-            dbt_base_operator.get_profile_name("path/to/dir")
-
-    # test that we raise an AirflowException if there's no dbt_project.yml file
-    mock_os_path_exists.return_value = False
-    with pytest.raises(AirflowException):
-        dbt_base_operator.get_profile_name("path/to/dir")
-
-
-def test_get_target_name() -> None:
-    # when a user specifies a target name, it should be returned
-    dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
-        task_id="my-task",
-        project_dir="my/dir",
-        target_name="default",
-    )
-    assert dbt_base_operator.get_target_name() == "default"
-
-    # when a user does not specify a target name, the default target name should be returned
-    dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
-        task_id="my-task",
-        project_dir="my/dir",
-    )
-
-    assert dbt_base_operator.get_target_name() == "cosmos_target"
-
-
 def test_store_compiled_sql() -> None:
     dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
+        profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
         should_store_compiled_sql=False,
@@ -179,7 +122,7 @@ def test_store_compiled_sql() -> None:
     )
 
     dbt_base_operator = DbtLocalBaseOperator(
-        conn_id="my_airflow_connection",
+        profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
         should_store_compiled_sql=True,

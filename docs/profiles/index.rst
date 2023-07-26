@@ -89,6 +89,14 @@ Service Account File
     :members:
 
 
+Service Account Dict
+~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: cosmos.profiles.bigquery.GoogleCloudServiceAccountDictProfileMapping
+    :undoc-members:
+    :members:
+
+
 Databricks
 ----------
 
@@ -140,6 +148,14 @@ Username and Password
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: cosmos.profiles.snowflake.SnowflakeUserPasswordProfileMapping
+    :undoc-members:
+    :members:
+
+
+Username and Private Key
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: cosmos.profiles.snowflake.SnowflakePrivateKeyPemProfileMapping
     :undoc-members:
     :members:
 

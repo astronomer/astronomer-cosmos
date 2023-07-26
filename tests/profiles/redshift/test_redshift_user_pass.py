@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_profile_mapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.redshift.user_pass import (
     RedshiftUserPasswordProfileMapping,
 )
@@ -58,19 +58,22 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        # should raise an InvalidMappingException
-        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-        assert not profile_mapping.can_claim_connection()
+        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+            # should raise an InvalidMappingException
+            profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
+            assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = RedshiftUserPasswordProfileMapping(conn, {})
-    assert not profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {})
+        assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-    assert profile_mapping.can_claim_connection()
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = RedshiftUserPasswordProfileMapping(conn, {"schema": "my_schema"})
+        assert profile_mapping.can_claim_connection()
 
 
 def test_profile_mapping_selected(
@@ -79,7 +82,7 @@ def test_profile_mapping_selected(
     """
     Tests that the correct profile mapping is selected.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_redshift_conn.conn_id,
         {"schema": "my_schema"},
     )
@@ -92,7 +95,7 @@ def test_profile_args(
     """
     Tests that the profile values get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_redshift_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )
@@ -117,7 +120,7 @@ def test_profile_args_overrides(
     """
     Tests that you can override the profile values.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_redshift_conn.conn_id,
         profile_args={"schema": "my_schema", "dbname": "my_db_override"},
     )
@@ -143,7 +146,7 @@ def test_profile_env_vars(
     """
     Tests that the environment variables get set correctly.
     """
-    profile_mapping = get_profile_mapping(
+    profile_mapping = get_automatic_profile_mapping(
         mock_redshift_conn.conn_id,
         profile_args={"schema": "my_schema"},
     )

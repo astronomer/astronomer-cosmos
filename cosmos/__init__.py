@@ -1,18 +1,24 @@
+# type: ignore # ignores "Cannot assign to a type" MyPy error
+
 """
 Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
 Contains dags, task groups, and operators.
 """
-
 __version__ = "0.7.5"
 
-from cosmos.dataset import get_dbt_dataset
-
-# re-export the dag and task group
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.dataset import get_dbt_dataset
+from cosmos.operators.lazy_load import MissingPackage
+from cosmos.config import (
+    ProjectConfig,
+    ProfileConfig,
+    ExecutionConfig,
+    RenderConfig,
+)
 
-# re-export the operators
 from cosmos.operators.local import (
     DbtDepsLocalOperator,
     DbtLSLocalOperator,
@@ -33,8 +39,6 @@ try:
         DbtTestDockerOperator,
     )
 except ImportError:
-    from cosmos.operators.lazy_load import MissingPackage
-
     DbtLSDockerOperator = MissingPackage("cosmos.operators.docker.DbtLSDockerOperator", "docker")
     DbtRunDockerOperator = MissingPackage("cosmos.operators.docker.DbtRunDockerOperator", "docker")
     DbtRunOperationDockerOperator = MissingPackage(
@@ -55,8 +59,6 @@ try:
         DbtTestKubernetesOperator,
     )
 except ImportError:
-    from cosmos.operators.lazy_load import MissingPackage
-
     DbtLSKubernetesOperator = MissingPackage(
         "cosmos.operators.kubernetes.DbtLSKubernetesOperator",
         "kubernetes",
@@ -83,6 +85,10 @@ except ImportError:
     )
 
 __all__ = [
+    "ProjectConfig",
+    "ProfileConfig",
+    "ExecutionConfig",
+    "RenderConfig",
     "DbtLSLocalOperator",
     "DbtRunOperationLocalOperator",
     "DbtRunLocalOperator",
@@ -105,4 +111,7 @@ __all__ = [
     "DbtSeedKubernetesOperator",
     "DbtTestKubernetesOperator",
     "DbtSnapshotKubernetesOperator",
+    "ExecutionMode",
+    "LoadMode",
+    "TestBehavior",
 ]

@@ -20,7 +20,7 @@ Create a virtual environment in your ``Dockerfile`` using the sample below. Be s
 
 .. code-block:: docker
 
-    FROM quay.io/astronomer/astro-runtime:8.0.0
+    FROM quay.io/astronomer/astro-runtime:8.8.0
 
     # install dbt into a virtual environment
     RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \
@@ -68,7 +68,9 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
     from cosmos import DbtDag
 
     my_cosmos_dag = DbtDag(
-        dbt_project_dir="/usr/local/airflow/dags/my_dbt_project",
+        roject_config=ProjectConfig(
+            dbt_project_path="/usr/local/airflow/dags/my_dbt_project",
+        ),
         ...,
     )
 
@@ -81,13 +83,20 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 
     from cosmos import DbtDag
 
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="airflow_db",
+            profile_args={"schema": "public"},
+        ),
+    )
+
     my_cosmos_dag = DbtDag(
-        # dbt/cosmos-specific parameters
-        dbt_project_name="<my_dbt_project>",
-        conn_id="airflow_db",
-        profile_args={
-            "schema": "public",
-        },
+        project_config=ProjectConfig(
+            "/usr/local/airflow/dags/my_dbt_project",
+        ),
+        profile_config=profile_config,
         # normal dag parameters
         schedule_interval="@daily",
         start_date=datetime(2023, 1, 1),

@@ -14,9 +14,6 @@ from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles import BaseProfileMapping
 
-from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
-from cosmos.exceptions import CosmosValueError
-
 logger = getLogger(__name__)
 
 

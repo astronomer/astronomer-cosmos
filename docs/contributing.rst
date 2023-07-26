@@ -20,9 +20,9 @@ To contribute to the cosmos project:
 Using Hatch for local development
 ---------------------------------
 
-We currently use :ref:`hatch <https://github.com/pypa/hatch>` for building and distributing ``astronomer-cosmos``.
+We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distributing ``astronomer-cosmos``.
 
-The tool can also be used for local development. The :ref:`pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>` file currently defines a matrix of supported versions of Python and Airflow for which a user can run the tests against.
+The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python and Airflow for which a user can run the tests against.
 
 For instance, to run the tests using Python 3.10 and Apache Airflow 2.5, use the following:
 
@@ -54,6 +54,7 @@ To run the integration tests for the first time, use:
 If testing for the same Airflow and Python version, next runs of the integration tests can be:
 
 .. code-block:: bash
+
     hatch run tests.py3.8-2.5:test-integration
 
 .. code-block:: bash
@@ -72,11 +73,12 @@ To run the integration tests for the first time, use:
 If testing for the same Airflow and Python version, next runs of the integration tests can be:
 
 .. code-block:: bash
+
     hatch run tests.py3.8-2.5:test-integration
 
 
 Using Docker Compose for local development
----------------------------------
+------------------------------------------
 
 It is also possible to just build the development environment using docker compose
 

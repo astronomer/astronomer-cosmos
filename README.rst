@@ -39,14 +39,23 @@ ___________________
 
 You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
 
+
 .. code-block:: python
 
     from pendulum import datetime
 
     from airflow import DAG
     from airflow.operators.empty import EmptyOperator
-    from cosmos.providers.dbt.task_group import DbtTaskGroup
+    from cosmos.task_group import DbtTaskGroup
 
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="airflow_db",
+            profile_args={"schema": "public"},
+        ),
+    )
 
     with DAG(
         dag_id="extract_dag",
@@ -56,11 +65,8 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
         e1 = EmptyOperator(task_id="pre_dbt")
 
         dbt_tg = DbtTaskGroup(
-            dbt_project_name="jaffle_shop",
-            conn_id="airflow_db",
-            profile_args={
-                "schema": "public",
-            },
+            project_config=ProjectConfig("jaffle_shop"),
+            profile_config=profile_config,
         )
 
         e2 = EmptyOperator(task_id="post_dbt")

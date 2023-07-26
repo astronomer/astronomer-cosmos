@@ -4,6 +4,8 @@ import sys
 # Add the project root to the path so we can import the package
 sys.path.insert(0, os.path.abspath("../"))
 
+from docs.generate_mappings import generate_mapping_docs  # noqa: E402
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -20,11 +22,9 @@ author = "Astronomer"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "autoapi.extension",
+    # "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx.ext.autosectionlabel",
-    "sphinx_tabs.tabs",
 ]
 
 add_module_names = False
@@ -48,16 +48,7 @@ html_theme_options = {
         "image_light": "cosmos-icon.svg",
         "image_dark": "cosmos-icon.svg",
     },
-    "footer_items": ["copyright"],
+    "footer_start": ["copyright"],
 }
 
-
-def skip_logger_objects(app, what, name, obj, skip, options):
-    if "logger" in name:
-        skip = True
-
-    return skip
-
-
-def setup(sphinx):
-    sphinx.connect("autoapi-skip-member", skip_logger_objects)
+generate_mapping_docs()

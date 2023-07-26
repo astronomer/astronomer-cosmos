@@ -87,7 +87,6 @@ docs =[
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-tabs",
     "sphinx-autoapi"
 ]
 tests = [
@@ -192,7 +191,6 @@ dependencies = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-tabs",
     "sphinx-autoapi",
 ]
 

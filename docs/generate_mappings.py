@@ -51,6 +51,9 @@ def generate_mapping_docs(
         for file in os.listdir(output_dir):
             os.remove(f"{output_dir}/{file}")
 
+    # then, create the directory
+    os.makedirs(output_dir, exist_ok=True)
+
     # get the index template
     env = Environment(loader=FileSystemLoader(templates_dir))
     index_template = env.get_template("index.rst.jinja2")

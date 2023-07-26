@@ -46,14 +46,8 @@ def get_automatic_profile_mapping(
     if not profile_args:
         profile_args = {}
 
-    # get the connection from Airflow
-    conn = BaseHook.get_connection(conn_id)
-
-    if not conn:
-        raise ValueError(f"Could not find connection {conn_id}.")
-
     for profile_mapping in profile_mappings:
-        mapping = profile_mapping(conn.conn_id, profile_args)
+        mapping = profile_mapping(conn_id, profile_args)
         if mapping.can_claim_connection():
             return mapping
 

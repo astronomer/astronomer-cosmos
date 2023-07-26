@@ -40,7 +40,7 @@ def get_fields_from_mapping(mapping: Type[BaseProfileMapping]) -> list[Field]:
 
 
 def generate_mapping_docs(
-    templates_dir: str = "scripts/templates",
+    templates_dir: str = "templates",
     output_dir: str = "profiles",
 ) -> None:
     """

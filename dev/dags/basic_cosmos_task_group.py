@@ -36,6 +36,7 @@ def basic_cosmos_task_group() -> None:
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
     jaffle_shop = DbtTaskGroup(
+        group_id="test_123",
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
         ),

@@ -14,13 +14,11 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "postgres"
-    default_port = 5432
 
     required_fields = [
         "host",
         "user",
         "password",
-        "port",
         "dbname",
         "schema",
     ]
@@ -41,14 +39,9 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
         profile = {
+            **self.mapped_params,
             "type": "postgres",
-            "host": self.conn.host,
-            "user": self.conn.login,
-            "port": self.conn.port or self.default_port,
-            "dbname": self.dbname,
-            "schema": self.schema,
-            "keepalives_idle": self.conn.extra_dejson.get("keepalives_idle"),
-            "sslmode": self.conn.extra_dejson.get("sslmode"),
+            "port": 5432,
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),

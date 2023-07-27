@@ -26,15 +26,11 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
     }
 
     @property
-    def profile(self) -> dict[str, Any | None]:
+    def profile(self) -> dict[str, Any]:
         "Gets profile."
         profile_vars = {
+            **self.mapped_params,
             "type": "trino",
-            "host": self.host,
-            "port": self.port,
-            "database": self.database,
-            "schema": self.schema,
-            "session_properties": self.conn.extra_dejson.get("session_properties"),
             **self.profile_args,
         }
 

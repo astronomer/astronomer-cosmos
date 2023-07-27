@@ -32,11 +32,9 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Generates profile. Defaults `threads` to 1."
         return {
+            **self.mapped_params,
             "type": "bigquery",
             "method": "service-account",
-            "project": self.project,
-            "dataset": self.dataset,
-            "threads": self.profile_args.get("threads") or 1,
-            "keyfile": self.keyfile,
+            "threads": 1,
             **self.profile_args,
         }

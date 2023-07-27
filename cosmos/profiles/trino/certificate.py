@@ -29,10 +29,9 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
         "Gets profile."
         common_profile_vars = super().profile
         profile_vars = {
+            **self.mapped_params,
             **common_profile_vars,
             "method": "certificate",
-            "client_certificate": self.client_certificate,
-            "client_private_key": self.client_private_key,
             **self.profile_args,
         }
 

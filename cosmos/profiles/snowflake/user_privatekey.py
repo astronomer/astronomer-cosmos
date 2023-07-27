@@ -64,13 +64,8 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile."
         profile_vars = {
+            **self.mapped_params,
             "type": "snowflake",
-            "account": self.account,
-            "user": self.user,
-            "schema": self.schema,
-            "database": self.database,
-            "role": self.conn.extra_dejson.get("role"),
-            "warehouse": self.conn.extra_dejson.get("warehouse"),
             **self.profile_args,
             # private_key should always get set as env var
             "private_key_content": self.get_env_var_format("private_key_content"),

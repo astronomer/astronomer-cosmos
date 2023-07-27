@@ -23,6 +23,7 @@ class SparkThriftProfileMapping(BaseProfileMapping):
 
     airflow_param_mapping = {
         "host": "host",
+        "port": "port",
     }
 
     @property
@@ -31,11 +32,9 @@ class SparkThriftProfileMapping(BaseProfileMapping):
         Return a dbt Spark profile based on the Airflow Spark connection.
         """
         profile_vars = {
+            **self.mapped_params,
             "type": "spark",
             "method": "thrift",
-            "schema": self.schema,
-            "host": self.host,
-            "port": self.conn.port,
             **self.profile_args,
         }
 

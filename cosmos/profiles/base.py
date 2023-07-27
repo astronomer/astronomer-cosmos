@@ -96,8 +96,11 @@ class BaseProfileMapping(ABC):
         for field in self.secret_fields:
             env_var_name = self.get_env_var_name(field)
             value = self.get_dbt_value(field)
-            if value is not None:
-                env_vars[env_var_name] = str(value)
+
+            if value is None:
+                raise CosmosValueError(f"Could not find a value for secret field {field}.")
+
+            env_vars[env_var_name] = str(value)
 
         return env_vars
 

@@ -161,6 +161,13 @@ class BaseProfileMapping(ABC):
 
     def __getattr__(self, name: str) -> Any:
         "If the attribute doesn't exist, try to get it from profile_args or the Airflow connection."
+        # first, try to get the attribute like normal
+        try:
+            return super().__getattribute__(name)
+        except AttributeError:
+            pass
+
+        # if it doesn't exist, try to get it from profile_args or the Airflow connection
         attempted_value = self.get_dbt_value(name)
         if attempted_value is not None:
             return attempted_value

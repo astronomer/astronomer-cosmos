@@ -130,7 +130,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project using dbt ls...")
+        logger.info("Trying to parse the dbt project `%s` using dbt ls...", self.project.name)
 
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load dbt project without a profile config")
@@ -158,17 +158,18 @@ class DbtGraph:
                 ]
             )
 
+            env = os.environ.copy()
+            env.update(env_vars)
+
             logger.info("Running command: `%s`", " ".join(command))
+            logger.info("Environment variables: %s", env_vars)
             process = Popen(
                 command,
                 stdout=PIPE,
                 stderr=PIPE,
                 cwd=self.project.dir,
                 universal_newlines=True,
-                env={
-                    **os.environ,
-                    **env_vars,
-                },
+                env=env,
             )
 
             stdout, stderr = process.communicate()
@@ -212,7 +213,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project using a custom Cosmos method...")
+        logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.name)
 
         project = LegacyDbtProject(
             dbt_root_path=str(self.project.root_dir),
@@ -251,7 +252,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project using a dbt manifest...")
+        logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.name)
         nodes = {}
         with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)

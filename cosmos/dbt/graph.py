@@ -159,7 +159,7 @@ class DbtGraph:
             env.update(env_vars)
 
             logger.info("Running command: `%s`", " ".join(command))
-            logger.info("Environment variables: %s", env_vars)
+            logger.info("Environment variable keys: %s", env.keys())
             process = Popen(
                 command,
                 stdout=PIPE,

@@ -158,11 +158,18 @@ class BaseProfileMapping(ABC):
 
     def __getattr__(self, name: str) -> Any:
         "If the attribute doesn't exist, try to get it from profile_args or the Airflow connection."
+        # first, see if the attribute exists in the instance
+        if hasattr(self, name):
+            return getattr(self, name)
+
         attempted_value = self.get_dbt_value(name)
         if attempted_value is not None:
             return attempted_value
 
-        raise AttributeError
+        raise AttributeError(
+            f"{self.__class__.__name__} has no attribute {name}. If this is a dbt profile field, "
+            f"ensure it's set either in the profile_args or the Airflow connection."
+        )
 
     @classmethod
     def filter_null(cls, args: dict[str, Any]) -> dict[str, Any]:

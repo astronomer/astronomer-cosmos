@@ -169,7 +169,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 ]
 
                 logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
-                logger.info("Using environment variables:\n %s", env)
+                logger.info("Using environment variables keys: %s", env.keys())
                 result = self.run_subprocess(
                     command=full_cmd,
                     env=env,

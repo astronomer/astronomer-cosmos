@@ -16,10 +16,11 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):  # type: ignore[misc] # ig
 
     def __init__(
         self,
+        group_id: str = "dbt_task_group",
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        group_id = kwargs.get("group_id", kwargs.get("dbt_project_name", "dbt_task_group"))
-        TaskGroup.__init__(self, group_id, *args, **airflow_kwargs(**kwargs))
+        group_id = group_id
+        TaskGroup.__init__(self, group_id=group_id, *args, **airflow_kwargs(**kwargs))
         kwargs["task_group"] = self
         DbtToAirflowConverter.__init__(self, *args, **specific_kwargs(**kwargs))

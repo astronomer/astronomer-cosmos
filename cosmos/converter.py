@@ -161,7 +161,7 @@ class DbtToAirflowConverter:
         validate_arguments(select, exclude, profile_args, task_args)
 
         build_airflow_graph(
-            nodes=dbt_graph.nodes,
+            nodes=dbt_graph.filtered_nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,
             execution_mode=execution_mode,

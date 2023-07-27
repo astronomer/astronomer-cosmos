@@ -162,7 +162,10 @@ class BaseProfileMapping(ABC):
         if attempted_value is not None:
             return attempted_value
 
-        raise AttributeError
+        raise AttributeError(
+            f"{self.__class__.__name__} has no attribute {name}. If this is a dbt profile field, "
+            f"ensure it's set either in the profile_args or the Airflow connection."
+        )
 
     @classmethod
     def filter_null(cls, args: dict[str, Any]) -> dict[str, Any]:

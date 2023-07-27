@@ -1,12 +1,18 @@
-Configuration
+.. _testing-behavior:
+
+Testing Behavior
 ================
 
-Cosmos offers a few different configuration options for how your dbt project is run and structured. This page describes the available options and how to configure them.
+Testing Configuration
+---------------------
 
-Testing
-----------------------
+By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field in the ``RenderConfig`` object.
+Note that this behavior is different from dbt's default behavior, which runs all tests after all models have been run.
+Cosmos defaults to running tests after each model to take a "fail-fast" approach to testing. This means that if a model
+runs with failing tests, the rest of the project is stopped and the failure is reported. This is in contrast to dbt's
+default behavior, which runs all models and tests, and then reports all failures at the end.
 
-By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field. The options are:
+Cosmos supports the following test behaviors:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully
@@ -16,16 +22,19 @@ Example:
 
 .. code-block:: python
 
-    from cosmos import DbtTaskGroup
+    from cosmos import DbtTaskGroup, RenderConfig
+    from cosmos.constants import TestBehavior
 
     jaffle_shop = DbtTaskGroup(
-        # ...
-        test_behavior="snowflake_default",
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
     )
 
 
-Warn Notification
-----------------------
+Warning Behavior
+----------------
+
 .. note::
 
     As of now, this feature is only available for the default execution mode ``local``
@@ -85,53 +94,3 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     If warnings that are not associated with tests occur (e.g. freshness warnings), they will still trigger the
     ``on_warning_callback`` method above. However, these warnings will not be included in the ``test_names`` and
     ``test_results`` context variables, which are specific to test-related warnings.
-
-Selecting and Excluding
-----------------------
-
-Cosmos allows you to filter by configs (e.g. ``materialized``, ``tags``) using the ``select`` and ``exclude`` parameters. If a model contains any of the configs in the ``select``, it gets included as part of the DAG/Task Group. Similarly, if a model contains any of the configs in the ``exclude``, it gets excluded from the DAG/Task Group.
-
-The ``select`` and ``exclude`` parameters are dictionaries with the following keys:
-
-- ``configs``: a list of configs to filter by. The configs are in the format ``key:value``. For example, ``tags:daily`` or ``materialized:table``.
-- ``paths``: a list of paths to filter by. The paths are in the format ``path/to/dir``. For example, ``analytics`` or ``analytics/tables``.
-
-.. note::
-    Cosmos currently reads from (1) config calls in the model code and (2) .yml files in the models directory for tags. It does not read from the dbt_project.yml file.
-
-Examples:
-
-.. code-block:: python
-
-    from cosmos import DbtDag
-
-    jaffle_shop = DbtDag(
-        # ...
-        select={"configs": ["tags:daily"]},
-    )
-
-.. code-block:: python
-
-    from cosmos import DbtDag
-
-    jaffle_shop = DbtDag(
-        # ...
-        select={"configs": ["schema:prod"]},
-    )
-
-.. code-block:: python
-
-    from cosmos import DbtDag
-
-    jaffle_shop = DbtDag(
-        # ...
-        select={"paths": ["analytics/tables"]},
-    )
-
-
-Viewing Compiled SQL
-----------------------
-
-When using the local execution mode, Cosmos will store the compiled SQL for each model in the ``compiled_sql`` field of the task's ``template_fields``. This allows you to view the compiled SQL in the Airflow UI.
-
-If you'd like to disable this feature, you can set ``should_store_compiled_sql=False`` on the local operator (or via the ``operator_args`` parameter on the DAG/Task Group).

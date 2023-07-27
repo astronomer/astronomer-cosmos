@@ -76,7 +76,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
 
 This will generate an Airflow Task Group that looks like this:
 
-.. figure:: /docs/_static/dbt_task_group.png
+.. figure:: /docs/_static/jaffle_shop_task_group.png
 
 Community
 _________

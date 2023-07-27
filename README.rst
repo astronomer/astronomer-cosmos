@@ -46,7 +46,8 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
 
     from airflow import DAG
     from airflow.operators.empty import EmptyOperator
-    from cosmos.task_group import DbtTaskGroup
+    from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
+    from cosmos.profiles import PostgresUserPasswordProfileMapping
 
     profile_config = ProfileConfig(
         profile_name="default",
@@ -75,7 +76,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
 
 This will generate an Airflow Task Group that looks like this:
 
-.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/jaffle_shop_task_group.png
+.. figure:: /docs/_static/jaffle_shop_task_group.png
 
 Community
 _________

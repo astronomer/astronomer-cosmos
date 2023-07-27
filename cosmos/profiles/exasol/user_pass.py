@@ -46,17 +46,8 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
         profile_vars = {
+            **self.mapped_params,
             "type": "exasol",
-            "threads": self.threads,
-            "dsn": self.dsn,
-            "user": self.user,
-            "dbname": self.dbname,
-            "schema": self.schema,
-            "encryption": self.conn.extra_dejson.get("encryption"),
-            "compression": self.conn.extra_dejson.get("compression"),
-            "connect_timeout": self.conn.extra_dejson.get("connection_timeout"),
-            "socket_timeout": self.conn.extra_dejson.get("socket_timeout"),
-            "protocol_version": self.conn.extra_dejson.get("protocol_version"),
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),

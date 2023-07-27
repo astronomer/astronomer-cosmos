@@ -34,11 +34,12 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
         """
         common_profile_vars = super().profile
         profile_vars = {
+            **self.mapped_params,
             **common_profile_vars,
             "method": "ldap",
-            "user": self.user,
-            "password": self.get_env_var_format("password"),
             **self.profile_args,
+            # password should always get set as env var
+            "password": self.get_env_var_format("password"),
         }
 
         # remove any null values

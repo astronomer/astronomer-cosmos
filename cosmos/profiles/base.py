@@ -161,6 +161,13 @@ class BaseProfileMapping(ABC):
 
     def __getattr__(self, name: str) -> Any:
         "If the attribute doesn't exist, try to get it from profile_args or the Airflow connection."
+        logger.info(
+            "Couldn't find attribute %s on %s. Trying to get it from `profile_args` or the Airflow connection.",
+            name,
+            self.__class__.__name__,
+        )
+
+        # if it doesn't exist, try to get it from profile_args or the Airflow connection
         attempted_value = self.get_dbt_value(name)
         if attempted_value is not None:
             return attempted_value

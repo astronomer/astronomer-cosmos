@@ -103,7 +103,7 @@ class DbtGraph:
                 self.load_from_dbt_manifest()
                 return
             elif (
-                execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV)
+                execution_mode == ExecutionMode.LOCAL 
                 and self.project.is_profile_yml_available()
             ):
                 try:

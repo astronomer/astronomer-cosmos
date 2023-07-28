@@ -108,6 +108,7 @@ def test_load(
     assert load_function.called
 
 
+@pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_uses_temp_dir(mock_popen):
     mock_popen().communicate.return_value = ("", "")

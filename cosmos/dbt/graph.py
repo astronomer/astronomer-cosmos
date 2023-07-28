@@ -3,6 +3,7 @@ import itertools
 import json
 import os
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import Popen, PIPE
@@ -143,33 +144,36 @@ class DbtGraph:
         if self.select:
             command.extend(["--select", *self.select])
 
-        with self.profile_config.ensure_profile() as (profile_path, env_vars):
-            command.extend(
-                [
-                    "--profiles-dir",
-                    str(profile_path.parent),
-                    "--profile",
-                    self.profile_config.profile_name,
-                    "--target",
-                    self.profile_config.target_name,
-                ]
-            )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shutil.copytree(self.project.dir, tmpdir, dirs_exist_ok=True)
 
-            env = os.environ.copy()
-            env.update(env_vars)
+            with self.profile_config.ensure_profile() as (profile_path, env_vars):
+                command.extend(
+                    [
+                        "--profiles-dir",
+                        str(profile_path.parent),
+                        "--profile",
+                        self.profile_config.profile_name,
+                        "--target",
+                        self.profile_config.target_name,
+                    ]
+                )
 
-            logger.info("Running command: `%s`", " ".join(command))
-            logger.info("Environment variable keys: %s", env.keys())
-            process = Popen(
-                command,
-                stdout=PIPE,
-                stderr=PIPE,
-                cwd=self.project.dir,
-                universal_newlines=True,
-                env=env,
-            )
+                env = os.environ.copy()
+                env.update(env_vars)
 
-            stdout, stderr = process.communicate()
+                logger.info("Running command: `%s`", " ".join(command))
+                logger.info("Environment variable keys: %s", env.keys())
+                process = Popen(
+                    command,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    cwd=tmpdir,
+                    universal_newlines=True,
+                    env=env,
+                )
+
+                stdout, stderr = process.communicate()
 
         logger.debug("dbt output:\n %s", stdout)
 

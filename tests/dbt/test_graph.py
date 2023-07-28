@@ -108,6 +108,28 @@ def test_load(
     assert load_function.called
 
 
+@patch("cosmos.dbt.graph.Popen")
+def test_load_via_dbt_ls_uses_temp_dir(mock_popen):
+    mock_popen().communicate.return_value = ("", "")
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+
+    dbt_graph.load_via_dbt_ls()
+    used_cwd = Path(mock_popen.call_args[0][0][-5])
+    assert used_cwd != dbt_project.dir
+    assert not used_cwd.exists()
+
+
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_exclude():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)

@@ -145,7 +145,10 @@ class DbtGraph:
             command.extend(["--select", *self.select])
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            shutil.copytree(self.project.dir, tmpdir, dirs_exist_ok=True)
+            # when we drop support to Python 3.7, we can use:
+            # shutil.copytree(self.project.dir, tmpdir, dirs_exist_ok=True)
+            cwd = Path(tmpdir) / self.project.name
+            shutil.copytree(self.project.dir, cwd)
 
             with self.profile_config.ensure_profile() as (profile_path, env_vars):
                 command.extend(
@@ -168,7 +171,7 @@ class DbtGraph:
                     command,
                     stdout=PIPE,
                     stderr=PIPE,
-                    cwd=tmpdir,
+                    cwd=cwd,
                     universal_newlines=True,
                     env=env,
                 )

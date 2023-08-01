@@ -47,11 +47,20 @@ grandparent_node = DbtNode(
     tags=["has_child"],
     config={"materialized": "view"},
 )
+grandparent_sibling_node = DbtNode(
+    name="grandparent_sibling",
+    unique_id="grandparent_sibling",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    file_path=SAMPLE_PROJ_PATH / "gen1/models/grandparent_sibling.sql",
+    tags=[],
+    config={},
+)
 parent_node = DbtNode(
     name="parent",
     unique_id="parent",
     resource_type=DbtResourceType.MODEL,
-    depends_on=["grandparent"],
+    depends_on=["grandparent", "grandparent_sibling"],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view"},
@@ -85,13 +94,24 @@ grandchild_2_test_node = DbtNode(
     tags=["nightly"],
     config={"materialized": "table", "tags": ["deprecated", "test2"]},
 )
+orphaned_node = DbtNode(
+    name="orphaned",
+    unique_id="orphaned",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/orphaned.sql",
+    tags=[],
+    config={},
+)
 
 sample_nodes = {
     grandparent_node.unique_id: grandparent_node,
+    grandparent_sibling_node.unique_id: grandparent_sibling_node,
     parent_node.unique_id: parent_node,
     child_node.unique_id: child_node,
     grandchild_1_test_node.unique_id: grandchild_1_test_node,
     grandchild_2_test_node.unique_id: grandchild_2_test_node,
+    orphaned_node.unique_id: orphaned_node,
 }
 
 
@@ -184,6 +204,8 @@ def test_select_nodes_by_exclude_tag():
         child_node.unique_id: child_node,
         grandchild_1_test_node.unique_id: grandchild_1_test_node,
         grandchild_2_test_node.unique_id: grandchild_2_test_node,
+        grandparent_sibling_node.unique_id: grandparent_sibling_node,
+        orphaned_node.unique_id: orphaned_node,
     }
     assert selected == expected
 
@@ -208,6 +230,11 @@ def test_select_nodes_by_exclude_union_config_test_tags():
     )
     expected = {
         grandparent_node.unique_id: grandparent_node,
+def test_select_nodes_by_dfs():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"])
+    expected = {
+        grandparent_node.unique_id: grandparent_node,
+        grandparent_sibling_node.unique_id: grandparent_sibling_node,
         parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
     }
@@ -220,6 +247,13 @@ def test_select_nodes_by_path_dir():
         child_node.unique_id: child_node,
         grandchild_1_test_node.unique_id: grandchild_1_test_node,
         grandchild_2_test_node.unique_id: grandchild_2_test_node,
+def test_select_nodes_by_dfs_exclude_tags():
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"], exclude=["tag:has_child"]
+    )
+    expected = {
+        grandparent_sibling_node.unique_id: grandparent_sibling_node,
+        child_node.unique_id: child_node,
     }
     assert selected == expected
 
@@ -229,4 +263,18 @@ def test_select_nodes_by_path_file():
     expected = {
         parent_node.unique_id: parent_node,
     }
+    assert selected == expected
+def test_select_node_by_dfs_partial_tree():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+parent"])
+    expected = {
+        grandparent_node.unique_id: grandparent_node,
+        grandparent_sibling_node.unique_id: grandparent_sibling_node,
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+
+def test_select_node_by_dfs_leaf():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+orphaned"])
+    expected = {orphaned_node.unique_id: orphaned_node}
     assert selected == expected

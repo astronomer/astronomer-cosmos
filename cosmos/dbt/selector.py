@@ -16,7 +16,7 @@ SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
-
+MODEL_UPSTREAM_SELECTOR = "+"
 
 logger = get_logger(__name__)
 
@@ -42,6 +42,7 @@ class SelectorConfig:
         self.paths: list[Path] = []
         self.tags: list[str] = []
         self.config: dict[str, str] = {}
+        self.model_upstream: str = ""
         self.other: list[str] = []
         self.load_from_statement(statement)
 
@@ -73,6 +74,9 @@ class SelectorConfig:
                 key, value = item[index:].split(":")
                 if key in SUPPORTED_CONFIG:
                     self.config[key] = value
+            elif item.startswith(MODEL_UPSTREAM_SELECTOR):
+                index = len(MODEL_UPSTREAM_SELECTOR)
+                self.model_upstream = item[index:]
             else:
                 self.other.append(item)
                 logger.warning("Unsupported select statement: %s", item)
@@ -146,6 +150,51 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     return selected_nodes
 
 
+def select_nodes_ids_by_dfs(nodes: dict[str, DbtNode], config: SelectorConfig) -> set[str]:
+    """
+    Return a list of node ids which match the configuration defined in the config.
+
+    Specifically, this method depth-first searches from the model referenced in the config,
+    and returns all nodes that are parents of the root.
+
+    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
+    :param config: User-defined select statements
+
+    References:
+    https://docs.getdbt.com/reference/node-selection/syntax
+    https://docs.getdbt.com/reference/node-selection/yaml-selectors
+    """
+
+    # Model selection is done via node name, not unique id, so we have to linearly search for it
+    root_id, root = None, None
+    for node_id, node in nodes.items():
+        if node.name == config.model_upstream:
+            root_id, root = node_id, node
+            break
+
+    if not root:
+        logging.warn("Model in selector not found in DBT graph")
+        return set()
+
+    selected_nodes = set()
+
+    def dfs(node_id: str | None, node: DbtNode, nodes: dict[str, DbtNode]) -> None:
+        if node_id is None:
+            return
+
+        nonlocal selected_nodes
+
+        selected_nodes.add(node_id)
+        for child in node.depends_on:
+            if child in nodes:
+                dfs(child, nodes[child], nodes)
+            else:
+                continue
+
+    dfs(root_id, root, nodes)
+    return selected_nodes
+
+
 def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     """
     Return a set of values associated with a label.
@@ -195,8 +244,12 @@ def select_nodes(
 
     for statement in select:
         config = SelectorConfig(project_dir, statement)
-        select_ids = select_nodes_ids_by_intersection(nodes, config)
-        subset_ids = subset_ids.union(set(select_ids))
+        if config.model_upstream:
+            select_ids = select_nodes_ids_by_dfs(nodes, config)
+            subset_ids = subset_ids.union(set(select_ids))
+        else:
+            select_ids = select_nodes_ids_by_intersection(nodes, config)
+            subset_ids = subset_ids.union(set(select_ids))
 
     if select:
         nodes = {id_: nodes[id_] for id_ in subset_ids}

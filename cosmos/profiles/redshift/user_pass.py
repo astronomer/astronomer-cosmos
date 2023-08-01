@@ -14,7 +14,6 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "redshift"
-    default_port = 5432
 
     required_fields = [
         "host",
@@ -41,17 +40,12 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile."
         profile = {
+            **self.mapped_params,
             "type": "redshift",
-            "host": self.host,
-            "user": self.user,
-            "password": self.get_env_var_format("password"),
-            "port": self.port or self.default_port,
-            "dbname": self.dbname,
-            "schema": self.schema,
-            "connection_timeout": self.conn.extra_dejson.get("timeout"),
-            "sslmode": self.conn.extra_dejson.get("sslmode"),
-            "region": self.conn.extra_dejson.get("region"),
+            "port": 5439,
             **self.profile_args,
+            # password should always get set as env var
+            "password": self.get_env_var_format("password"),
         }
 
         return self.filter_null(profile)

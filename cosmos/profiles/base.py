@@ -58,21 +58,23 @@ class BaseProfileMapping(ABC):
         if self.conn.conn_type != self.airflow_connection_type:
             return False
 
-        logger.info(dir(self.conn))
-        logger.info(self.conn.__dict__)
+        generated_profile = self.profile
 
         for field in self.required_fields:
-            try:
-                if not getattr(self, field):
+            # if it's a secret field, check if we can get it
+            if field in self.secret_fields:
+                if not self.get_dbt_value(field):
                     logger.info(
-                        "1 Not using mapping %s because %s is not set",
+                        "Not using mapping %s because %s is not set",
                         self.__class__.__name__,
                         field,
                     )
                     return False
-            except AttributeError:
+
+            # otherwise, check if it's in the generated profile
+            if not generated_profile.get(field):
                 logger.info(
-                    "2 Not using mapping %s because %s is not set",
+                    "Not using mapping %s because %s is not set",
                     self.__class__.__name__,
                     field,
                 )
@@ -159,16 +161,15 @@ class BaseProfileMapping(ABC):
         # otherwise, we don't have it - return None
         return None
 
-    def __getattr__(self, name: str) -> Any:
-        "If the attribute doesn't exist, try to get it from profile_args or the Airflow connection."
-        attempted_value = self.get_dbt_value(name)
-        if attempted_value is not None:
-            return attempted_value
+    @property
+    def mapped_params(self) -> dict[str, Any]:
+        "Turns the self.airflow_param_mapping into a dictionary of dbt fields and their values."
+        mapped_params = {}
 
-        raise AttributeError(
-            f"{self.__class__.__name__} has no attribute {name}. If this is a dbt profile field, "
-            f"ensure it's set either in the profile_args or the Airflow connection."
-        )
+        for dbt_field in self.airflow_param_mapping:
+            mapped_params[dbt_field] = self.get_dbt_value(dbt_field)
+
+        return mapped_params
 
     @classmethod
     def filter_null(cls, args: dict[str, Any]) -> dict[str, Any]:

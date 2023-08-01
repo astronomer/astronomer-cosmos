@@ -193,7 +193,7 @@ def test_dsn_formatting() -> None:
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-        assert profile_mapping.dsn == "my_host:1000"
+        assert profile_mapping.get_dbt_value("dsn") == "my_host:1000"
 
     # next, test with a host that doesn't include a port
     conn = Connection(
@@ -207,7 +207,7 @@ def test_dsn_formatting() -> None:
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-        assert profile_mapping.dsn == "my_host:8563"  # should default to 8563
+        assert profile_mapping.get_dbt_value("dsn") == "my_host:8563"  # should default to 8563
 
     # lastly, test with a port override
     conn = Connection(
@@ -222,4 +222,4 @@ def test_dsn_formatting() -> None:
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = ExasolUserPasswordProfileMapping(conn, {"schema": "my_schema", "threads": 1})
-        assert profile_mapping.dsn == "my_host:1000"
+        assert profile_mapping.get_dbt_value("dsn") == "my_host:1000"

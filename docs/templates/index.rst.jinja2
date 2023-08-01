@@ -37,7 +37,7 @@ is set in the ``cosmos.config.ProfileConfig`` object, like so:
 
         # choose one of the following
         profile_mapping=...,
-        profiles_yml_path=...,
+        profiles_yml_filepath=...,
     )
 
     dag = DbtDag(profile_config=profile_config, ...)
@@ -89,7 +89,7 @@ Using your own profiles.yml file
 
 If you don't want to use Airflow connections, or if there's no readily-available profile mapping for your database,
 you can use your own dbt profiles.yml file. To do so, you'll need to pass the path to your profiles.yml file to the
-``profiles_yml_path`` argument in ``ProfileConfig``.
+``profiles_yml_filepath`` argument in ``ProfileConfig``.
 
 For example, the code snippet below points Cosmos at a ``profiles.yml`` file and instructs Cosmos to use the
 ``my_snowflake_profile`` profile and ``dev`` target:
@@ -101,7 +101,7 @@ For example, the code snippet below points Cosmos at a ``profiles.yml`` file and
     profile_config = ProfileConfig(
         profile_name="my_snowflake_profile",
         target_name="dev",
-        profiles_yml_path="/path/to/profiles.yml",
+        profiles_yml_filepath="/path/to/profiles.yml",
     )
 
     dag = DbtDag(profile_config=profile_config, ...)

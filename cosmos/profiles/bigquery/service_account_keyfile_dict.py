@@ -19,15 +19,15 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     required_fields = [
         "project",
         "dataset",
-        "keyfile_dict",
+        "keyfile_json",
     ]
 
     airflow_param_mapping = {
         "project": "extra.project",
         # multiple options for dataset because of older Airflow versions
-        "dataset": ["extra.dataset", "dataset"],
+        "dataset": "extra.dataset",
         # multiple options for keyfile_dict param name because of older Airflow versions
-        "keyfile_dict": ["extra.keyfile_dict", "keyfile_dict", "extra__google_cloud_platform__keyfile_dict"],
+        "keyfile_json": ["extra.keyfile_dict", "keyfile_dict", "extra__google_cloud_platform__keyfile_dict"],
     }
 
     @property
@@ -38,11 +38,9 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         we generate a temporary file and the DBT profile uses it.
         """
         return {
+            **self.mapped_params,
             "type": "bigquery",
             "method": "service-account-json",
-            "project": self.project,
-            "dataset": self.dataset,
-            "threads": self.profile_args.get("threads") or 1,
-            "keyfile_json": self.keyfile_dict,
+            "threads": 1,
             **self.profile_args,
         }

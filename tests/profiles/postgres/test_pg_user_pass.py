@@ -48,7 +48,6 @@ def test_connection_claiming() -> None:
         "host": "my_host",
         "login": "my_user",
         "password": "my_password",
-        "port": 5432,
         "schema": "my_database",
     }
 

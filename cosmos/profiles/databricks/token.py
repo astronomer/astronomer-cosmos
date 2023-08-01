@@ -38,10 +38,8 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Generates profile. The token is stored in an environment variable."
         return {
+            **self.mapped_params,
             "type": "databricks",
-            "schema": self.schema,
-            "host": self.host,
-            "http_path": self.http_path,
             **self.profile_args,
             # token should always get set as env var
             "token": self.get_env_var_format("token"),

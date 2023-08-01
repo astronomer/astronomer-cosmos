@@ -50,3 +50,4 @@ class DbtResourceType(Enum):
     SNAPSHOT = "snapshot"
     SEED = "seed"
     TEST = "test"
+    SOURCE = "source"

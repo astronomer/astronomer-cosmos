@@ -147,7 +147,7 @@ class BaseProfileMapping(ABC):
                     airflow_field = airflow_field.replace("extra.", "", 1)
                     value = self.conn.extra_dejson.get(airflow_field)
                 else:
-                    value = getattr(self.conn, airflow_field)
+                    value = getattr(self.conn, airflow_field, None)
 
                 if not value:
                     continue

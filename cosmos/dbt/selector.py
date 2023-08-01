@@ -1,7 +1,7 @@
 from __future__ import annotations
-from pathlib import Path
 import copy
-
+from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cosmos.constants import DbtResourceType
@@ -16,7 +16,7 @@ SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
-
+MODEL_UPSTREAM_SELECTOR = "+"
 
 logger = get_logger(__name__)
 
@@ -42,6 +42,7 @@ class SelectorConfig:
         self.paths: list[Path] = []
         self.tags: list[str] = []
         self.config: dict[str, str] = {}
+        self.model_upstream: str = ""
         self.other: list[str] = []
         self.load_from_statement(statement)
 
@@ -76,6 +77,9 @@ class SelectorConfig:
                 key, value = item[index:].split(":")
                 if key in SUPPORTED_CONFIG:
                     self.config[key] = value
+            elif item.startswith(MODEL_UPSTREAM_SELECTOR):
+                index = len(MODEL_UPSTREAM_SELECTOR)
+                self.model_upstream = item[index:]
             else:
                 self.other.append(item)
                 logger.warning("Unsupported select statement: %s", item)
@@ -175,6 +179,34 @@ class NodeSelector:
                     return self._should_include_node(node.depends_on[0], model_node)
         return False
 
+    def select_nodes_by_precursor(self) -> set[str]:
+        """
+        Return a list of node ids which match the configuration defined in the config.
+
+        Return all nodes that are parents (or parents from parents) of the root defined in the configuration.
+
+        References:
+        https://docs.getdbt.com/reference/node-selection/syntax
+        https://docs.getdbt.com/reference/node-selection/yaml-selectors
+        """
+        root_id, root = None, None
+        for node_id, node in self.nodes.items():
+            if node.name == self.config.model_upstream:
+                root_id, root = node_id, node
+
+        if not root:
+            logger.warn("Model in selector not found in DBT graph")
+            return set()
+
+        selected_nodes = set()
+        precursors = set([root_id])
+        while precursors:
+            precursor_id = precursors.pop()
+            selected_nodes.add(precursor_id)
+            precursors = precursors.union(set(self.nodes[precursor_id].depends_on))
+
+        return selected_nodes
+
 
 def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     """
@@ -217,7 +249,10 @@ def select_nodes(
     filters = [["select", select], ["exclude", exclude]]
     for filter_type, filter in filters:
         for filter_parameter in filter:
-            if filter_parameter.startswith(PATH_SELECTOR) or filter_parameter.startswith(TAG_SELECTOR):
+            if (filter_parameter.startswith(PATH_SELECTOR) or
+                filter_parameter.startswith(TAG_SELECTOR) or
+                filter_parameter.startswith(MODEL_UPSTREAM_SELECTOR)
+            ):
                 continue
             elif any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG]):
                 continue
@@ -229,8 +264,12 @@ def select_nodes(
     for statement in select:
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
-        select_ids = node_selector.select_nodes_ids_by_intersection()
-        subset_ids = subset_ids.union(set(select_ids))
+        if config.model_upstream:
+            select_ids = node_selector.select_nodes_by_precursor()
+            subset_ids = subset_ids.union(set(select_ids))
+        else:
+            select_ids = node_selector.select_nodes_ids_by_intersection()
+            subset_ids = subset_ids.union(set(select_ids))
 
     if select:
         nodes = {id_: nodes[id_] for id_ in subset_ids}

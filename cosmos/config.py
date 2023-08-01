@@ -116,7 +116,7 @@ class ProfileConfig:
     target_name: str
 
     # should be set if using a user-supplied profiles.yml
-    profiles_yml_filepath: Path | None = None
+    profiles_yml_filepath: str | Path | None = None
 
     # should be set if using cosmos to map Airflow connections to dbt profiles
     profile_mapping: BaseProfileMapping | None = None
@@ -124,7 +124,7 @@ class ProfileConfig:
     def __post_init__(self) -> None:
         "Validates that we have enough information to render a profile."
         # if using a user-supplied profiles.yml, validate that it exists
-        if self.profiles_yml_filepath and not self.profiles_yml_filepath.exists():
+        if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
     def validate_profile(self) -> None:

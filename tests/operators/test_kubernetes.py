@@ -167,7 +167,7 @@ def test_created_pod(test_hook):
                     "stdin": None,
                     "stdin_once": None,
                     "termination_message_path": None,
-                    "termination_message_policy": 'File',
+                    "termination_message_policy": None,
                     "tty": None,
                     "volume_devices": None,
                     "volume_mounts": [],

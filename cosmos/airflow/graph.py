@@ -66,6 +66,7 @@ def create_task_metadata(node: DbtNode, execution_mode: ExecutionMode, args: dic
         DbtResourceType.SNAPSHOT: "DbtSnapshot",
         DbtResourceType.SEED: "DbtSeed",
         DbtResourceType.TEST: "DbtTest",
+        DbtResourceType.SOURCE: "DbtSource",
     }
     args = {**args, **{"models": node.name}}
 

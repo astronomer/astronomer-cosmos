@@ -10,7 +10,6 @@ from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.bigquery.oauth import (
     GoogleCloudOauthProfileMapping,
 )
-from typing import Dict
 
 
 @pytest.fixture()
@@ -30,17 +29,13 @@ def mock_bigquery_conn(request):
 
 
 def test_bigquery_mapping_selected(mock_bigquery_conn: Connection):
-    profile_mapping = get_automatic_profile_mapping(
-        mock_bigquery_conn.conn_id, {}
-    )
+    profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})
     assert isinstance(profile_mapping, GoogleCloudOauthProfileMapping)
 
 
-@pytest.mark.parametrize("mock_bigquery_conn", [
-    {"project": "my_project"},
-    {"dataset": "my_dataset"},
-    {}
-], indirect=True)
+@pytest.mark.parametrize(
+    "mock_bigquery_conn", [{"project": "my_project"}, {"dataset": "my_dataset"}, {}], indirect=True
+)
 def test_connection_claiming_fails(mock_bigquery_conn: Connection) -> None:
     """
     Tests that the BigQuery profile mapping claims the correct connection type.

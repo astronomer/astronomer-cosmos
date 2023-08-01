@@ -46,38 +46,38 @@ dependencies = [
 
 [project.optional-dependencies]
 dbt-all = [
-    "dbt-bigquery<1.6.0",
-    "dbt-databricks<1.6.0",
-    "dbt-exasol<1.6.0",
-    "dbt-postgres<1.6.0",
-    "dbt-redshift<1.6.0",
-    "dbt-snowflake<1.6.0",
-    "dbt-spark<1.6.0",
+    "dbt-bigquery",
+    "dbt-databricks",
+    "dbt-exasol",
+    "dbt-postgres",
+    "dbt-redshift",
+    "dbt-snowflake",
+    "dbt-spark",
     "astronomer-cosmos[dbt-openlineage]"
 ]
 dbt-bigquery = [
-    "dbt-bigquery<1.6.0",
+    "dbt-bigquery",
 ]
 dbt-databricks = [
-    "dbt-databricks<1.6.0",
+    "dbt-databricks",
 ]
 dbt-exasol = [
-    "dbt-exasol<1.6.0",
+    "dbt-exasol",
 ]
 dbt-postgres = [
-    "dbt-postgres<1.6.0",
+    "dbt-postgres",
 ]
 dbt-redshift = [
-    "dbt-redshift<1.6.0",
+    "dbt-redshift",
 ]
 dbt-snowflake = [
-    "dbt-snowflake<1.6.0",
+    "dbt-snowflake",
 ]
 dbt-spark = [
-    "dbt-spark<1.6.0",
+    "dbt-spark",
 ]
 dbt-openlineage = [
-    "dbt-core<1.6.0",
+    "dbt-core",
     "openlineage-dbt>=0.21.1"
 ]
 all = [
@@ -155,8 +155,7 @@ test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml -
 test-integration-setup = """pip uninstall dbt-postgres; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install dbt-postgres; \
-pip install dbt-databricks"""
+pip install dbt-postgres dbt-databricks"""
 test-integration = """pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \

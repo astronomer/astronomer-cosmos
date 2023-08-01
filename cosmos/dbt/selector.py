@@ -132,6 +132,15 @@ def select_nodes(
     if not select and not exclude:
         return nodes
 
+    # validates select and exclude filters
+    filters = [["select", select], ["exclude", exclude]]
+    for filter_type, filter in filters:
+        for filter_parameter in filter:
+            if not filter_parameter.startswith(PATH_SELECTOR) or not filter_parameter.startswith(TAG_SELECTOR):
+                raise ValueError(f"Invalid {filter_type} filter: {filter_parameter}")
+            elif not any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG]):
+                raise ValueError(f"Invalid {filter_type} filter: {filter_parameter}")
+
     subset_ids: set[str] = set()
 
     for statement in select:

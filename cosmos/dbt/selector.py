@@ -4,6 +4,8 @@ from pathlib import Path
 
 from typing import TYPE_CHECKING
 
+from cosmos.exceptions import CosmosValueError
+
 if TYPE_CHECKING:
     from cosmos.dbt.graph import DbtNode
 
@@ -136,10 +138,12 @@ def select_nodes(
     filters = [["select", select], ["exclude", exclude]]
     for filter_type, filter in filters:
         for filter_parameter in filter:
-            if not filter_parameter.startswith(PATH_SELECTOR) or not filter_parameter.startswith(TAG_SELECTOR):
-                raise ValueError(f"Invalid {filter_type} filter: {filter_parameter}")
-            elif not any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG]):
-                raise ValueError(f"Invalid {filter_type} filter: {filter_parameter}")
+            if filter_parameter.startswith(PATH_SELECTOR) or filter_parameter.startswith(TAG_SELECTOR):
+                continue
+            elif any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG]):
+                continue
+            else:
+                raise CosmosValueError(f"Invalid {filter_type} filter: {filter_parameter}")
 
     subset_ids: set[str] = set()
 

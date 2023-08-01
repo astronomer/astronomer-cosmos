@@ -46,38 +46,38 @@ dependencies = [
 
 [project.optional-dependencies]
 dbt-all = [
-    "dbt-bigquery",
-    "dbt-databricks",
-    "dbt-exasol",
-    "dbt-postgres",
-    "dbt-redshift",
-    "dbt-snowflake",
-    "dbt-spark",
+    "dbt-bigquery<1.6.0",
+    "dbt-databricks<1.6.0",
+    "dbt-exasol<1.6.0",
+    "dbt-postgres<1.6.0",
+    "dbt-redshift<1.6.0",
+    "dbt-snowflake<1.6.0",
+    "dbt-spark<1.6.0",
     "astronomer-cosmos[dbt-openlineage]"
 ]
 dbt-bigquery = [
-    "dbt-bigquery",
+    "dbt-bigquery<1.6.0",
 ]
 dbt-databricks = [
-    "dbt-databricks",
+    "dbt-databricks<1.6.0",
 ]
 dbt-exasol = [
-    "dbt-exasol",
+    "dbt-exasol<1.6.0",
 ]
 dbt-postgres = [
-    "dbt-postgres",
+    "dbt-postgres<1.6.0",
 ]
 dbt-redshift = [
-    "dbt-redshift",
+    "dbt-redshift<1.6.0",
 ]
 dbt-snowflake = [
-    "dbt-snowflake",
+    "dbt-snowflake<1.6.0",
 ]
 dbt-spark = [
-    "dbt-spark",
+    "dbt-spark<1.6.0",
 ]
 dbt-openlineage = [
-    "dbt-core",
+    "dbt-core<1.6.0",
     "openlineage-dbt>=0.21.1"
 ]
 all = [
@@ -107,7 +107,7 @@ docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
 kubernetes = [
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
 ]
 
 
@@ -131,7 +131,7 @@ include = [
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0"
 ]
 
 [[tool.hatch.envs.tests.matrix]]

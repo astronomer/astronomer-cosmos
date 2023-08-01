@@ -188,7 +188,7 @@ class DbtGraph:
                     name=node_dict["name"],
                     unique_id=node_dict["unique_id"],
                     resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict["depends_on"].get("nodes", []),
+                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],
                     config=node_dict["config"],

@@ -1,8 +1,11 @@
 from pathlib import Path
 
+import pytest
+
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
 from cosmos.dbt.selector import select_nodes
+from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 
@@ -82,9 +85,10 @@ def test_select_nodes_by_exclude_tag():
     assert selected == expected
 
 
-def test_select_nodes_by_exclude_unsupported_selector(caplog):
-    select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["unsupported:filter"])
-    assert "Unsupported select statement: unsupported:filter" in caplog.messages
+def test_select_nodes_by_exclude_unsupported_selector():
+    with pytest.raises(CosmosValueError) as err_info:
+        assert select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["unsupported:filter"])
+    assert err_info.value.args[0] == "Invalid exclude filter: unsupported:filter"
 
 
 def test_select_nodes_by_select_union_exclude_tags():

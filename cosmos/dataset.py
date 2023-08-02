@@ -15,8 +15,10 @@ except (ImportError, ModuleNotFoundError):
             self.id = id
             logger.warning("Datasets are not supported in Airflow < 2.5.0")
 
-        def __eq__(self, other: "Dataset") -> bool:
-            return bool(self.id == other.id)
+        def __eq__(self, other: object) -> bool:
+            if not isinstance(other, Dataset):
+                return NotImplemented
+            return bool(self.id == other.id)  # type: ignore[attr-defined]
 
 
 def get_dbt_dataset(connection_id: str, project_name: str, model_name: str) -> Dataset:

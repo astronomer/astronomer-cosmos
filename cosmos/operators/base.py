@@ -13,7 +13,7 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 logger = logging.getLogger(__name__)
 
 
-class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass MyPy error
+class DbtBaseOperator(BaseOperator):
     """
     Executes a dbt core cli command.
 
@@ -98,7 +98,7 @@ class DbtBaseOperator(BaseOperator):  # type: ignore[misc] # ignores subclass My
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
         dbt_cmd_flags: list[str] | None = None,
-        **kwargs: str,
+        **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
         self.conn_id = conn_id

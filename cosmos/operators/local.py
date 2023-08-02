@@ -112,7 +112,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
         ti = context["ti"]
 
-        if isinstance(ti, TaskInstance): # verifies ti is a TaskInstance in order to access and use the "task" field
+        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
             ti.task.template_fields = self.template_fields
             rtif = RenderedTaskInstanceFields(ti, render_templates=False)
 

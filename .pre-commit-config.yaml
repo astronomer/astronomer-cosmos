@@ -71,7 +71,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy-python-sdk
-        additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil]
+        additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil, apache-airflow]
         files: ^cosmos
 
 ci:

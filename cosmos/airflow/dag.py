@@ -10,7 +10,7 @@ from airflow.models.dag import DAG
 from cosmos.converter import airflow_kwargs, specific_kwargs, DbtToAirflowConverter
 
 
-class DbtDag(DAG, DbtToAirflowConverter):  # type: ignore[misc] # ignores subclass MyPy error
+class DbtDag(DAG, DbtToAirflowConverter):
     """
     Render a dbt project as an Airflow DAG.
     """

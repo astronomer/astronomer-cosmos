@@ -11,6 +11,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
 from cosmos.dbt.graph import DbtNode
+from airflow.models import BaseOperator
 
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,7 @@ def build_airflow_graph(
     :param emit_datasets: Decides if Cosmos should add outlets to model classes or not.
     """
     tasks_map = {}
+    task_or_group: TaskGroup | BaseOperator
 
     # In most cases, we'll  map one DBT node to one Airflow task
     # The exception are the test nodes, since it would be too slow to run test tasks individually.

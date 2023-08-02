@@ -9,7 +9,7 @@ from airflow.utils.task_group import TaskGroup
 from cosmos.converter import airflow_kwargs, specific_kwargs, DbtToAirflowConverter
 
 
-class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):  # type: ignore[misc] # ignores subclass MyPy error
+class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):
     """
     Render a dbt project as an Airflow Task Group.
     """
@@ -20,7 +20,7 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):  # type: ignore[misc] # ig
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        group_id = group_id
-        TaskGroup.__init__(self, group_id=group_id, *args, **airflow_kwargs(**kwargs))
+        kwargs["group_id"] = group_id
+        TaskGroup.__init__(self, *args, **airflow_kwargs(**kwargs))
         kwargs["task_group"] = self
         DbtToAirflowConverter.__init__(self, *args, **specific_kwargs(**kwargs))

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any
 
 
 from airflow.compat.functools import cached_property
@@ -53,7 +53,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         super().__init__(**kwargs)
         self._venv_tmp_dir = TemporaryDirectory()
 
-    @cached_property  # type: ignore[misc] # ignores internal untyped decorator
+    @cached_property
     def venv_dbt_path(
         self,
     ) -> str:
@@ -85,9 +85,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
-    def run_subprocess(  # type: ignore[override]
-        self, *args: Tuple[Any], command: list[str], **kwargs: Any
-    ) -> FullOutputSubprocessResult:
+    def run_subprocess(self, *args: Any, command: list[str], **kwargs: Any) -> FullOutputSubprocessResult:
         if self.py_requirements:
             command[0] = self.venv_dbt_path
 

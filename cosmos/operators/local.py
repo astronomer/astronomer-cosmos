@@ -6,11 +6,12 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 import yaml
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
@@ -64,7 +65,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.should_store_compiled_sql = should_store_compiled_sql
         super().__init__(**kwargs)
 
-    @cached_property  # type: ignore[misc] # ignores internal untyped decorator
+    @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
         """Returns hook for running the bash command."""
         return FullOutputSubprocessHook()
@@ -78,7 +79,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 *result.full_output,
             )
 
-    @provide_session  # type: ignore[misc] # ignores internal untyped decorator
+    @provide_session
     def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
         """
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
@@ -110,18 +111,22 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         from airflow.models.renderedtifields import RenderedTaskInstanceFields
 
         ti = context["ti"]
-        ti.task.template_fields = self.template_fields
-        rtif = RenderedTaskInstanceFields(ti, render_templates=False)
 
-        # delete the old records
-        session.query(RenderedTaskInstanceFields).filter(
-            RenderedTaskInstanceFields.dag_id == self.dag_id,
-            RenderedTaskInstanceFields.task_id == self.task_id,
-            RenderedTaskInstanceFields.run_id == ti.run_id,
-        ).delete()
-        session.add(rtif)
+        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
+            ti.task.template_fields = self.template_fields
+            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
 
-    def run_subprocess(self, *args: Tuple[Any], **kwargs: Any) -> FullOutputSubprocessResult:
+            # delete the old records
+            session.query(RenderedTaskInstanceFields).filter(
+                RenderedTaskInstanceFields.dag_id == self.dag_id,
+                RenderedTaskInstanceFields.task_id == self.task_id,
+                RenderedTaskInstanceFields.run_id == ti.run_id,
+            ).delete()
+            session.add(rtif)
+        else:
+            logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+
+    def run_subprocess(self, *args: Any, **kwargs: Any) -> FullOutputSubprocessResult:
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
         return subprocess_result
 

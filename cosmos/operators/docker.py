@@ -38,7 +38,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
         super().__init__(image=image, **kwargs)
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
-        self.build_command(cmd_flags, context)
+        self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")  # type: ignore[has-type]
         return super().execute(context)
 

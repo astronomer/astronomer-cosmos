@@ -20,12 +20,12 @@ class FullOutputSubprocessResult(NamedTuple):
     full_output: list[str]
 
 
-class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc] # ignores subclass MyPy error
+class FullOutputSubprocessHook(BaseHook):
     """Hook for running processes with the ``subprocess`` module."""
 
     def __init__(self) -> None:
         self.sub_process: Popen[bytes] | None = None
-        super().__init__()
+        super().__init__()  # type: ignore[no-untyped-call]
 
     def run_command(
         self,

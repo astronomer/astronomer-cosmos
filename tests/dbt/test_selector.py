@@ -278,3 +278,9 @@ def test_select_node_by_dfs_leaf():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+orphaned"])
     expected = {orphaned_node.unique_id: orphaned_node}
     assert selected == expected
+
+
+def test_select_node_by_dfs_no_node():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+modelDoesntExist"])
+    expected = {}
+    assert selected == expected

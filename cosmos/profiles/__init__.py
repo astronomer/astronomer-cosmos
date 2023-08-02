@@ -8,6 +8,7 @@ from typing import Any, Type
 from .base import BaseProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
+from .bigquery.oauth import GoogleCloudOauthProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -22,6 +23,7 @@ from .trino.ldap import TrinoLDAPProfileMapping
 profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudServiceAccountFileProfileMapping,
     GoogleCloudServiceAccountDictProfileMapping,
+    GoogleCloudOauthProfileMapping,
     DatabricksTokenProfileMapping,
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
@@ -57,6 +59,7 @@ __all__ = [
     "BaseProfileMapping",
     "GoogleCloudServiceAccountFileProfileMapping",
     "GoogleCloudServiceAccountDictProfileMapping",
+    "GoogleCloudOauthProfileMapping",
     "DatabricksTokenProfileMapping",
     "PostgresUserPasswordProfileMapping",
     "RedshiftUserPasswordProfileMapping",

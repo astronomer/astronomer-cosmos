@@ -1,4 +1,6 @@
 "Maps Airflow GCP connections to dbt BigQuery profiles that uses oauth via gcloud, if they don't use key file or JSON."
+from __future__ import annotations
+
 from typing import Any
 
 from cosmos.profiles.base import BaseProfileMapping

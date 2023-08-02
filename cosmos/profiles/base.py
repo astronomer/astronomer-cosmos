@@ -134,7 +134,7 @@ class BaseProfileMapping(ABC):
         if self.profile_args.get(name):
             return self.profile_args[name]
 
-        # if it's has an entry in airflow_param_mapping, we can get it from conn
+        # if it has an entry in airflow_param_mapping, we can get it from conn
         if name in self.airflow_param_mapping:
             airflow_fields = self.airflow_param_mapping[name]
 
@@ -147,7 +147,7 @@ class BaseProfileMapping(ABC):
                     airflow_field = airflow_field.replace("extra.", "", 1)
                     value = self.conn.extra_dejson.get(airflow_field)
                 else:
-                    value = getattr(self.conn, airflow_field)
+                    value = getattr(self.conn, airflow_field, None)
 
                 if not value:
                     continue

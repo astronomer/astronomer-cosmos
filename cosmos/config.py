@@ -10,7 +10,7 @@ from pathlib import Path
 from logging import getLogger
 from typing import Iterator
 
-from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
+from cosmos.constants import TestBehavior, ExecutionMode, LoadMode, EmitDatasetsType
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles import BaseProfileMapping
 
@@ -24,15 +24,15 @@ class RenderConfig:
     """
     Class for setting general Cosmos config.
 
-    :param emit_datasets: If enabled model nodes emit Airflow Datasets for downstream cross-DAG
-    dependencies. Defaults to True
+    :param emit_datasets_from: Model nodes emit Airflow Datasets for downstream cross-DAG
+    dependencies depending on whether they are run with tests or not. Defaults to None
     :param test_behavior: The behavior for running tests. Defaults to after each (model)
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     """
 
-    emit_datasets: bool = True
+    emit_datasets_from: EmitDatasetsType | None = None
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
     select: list[str] = field(default_factory=list)

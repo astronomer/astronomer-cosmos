@@ -51,3 +51,12 @@ class DbtResourceType(Enum):
     SEED = "seed"
     TEST = "test"
     SOURCE = "source"
+
+
+class EmitDatasetsType(Enum):
+    """
+    Type of dataset to emit.
+    """
+
+    MODELS = "models"
+    TESTS = "tests"

@@ -98,8 +98,8 @@ def create_test_task_metadata(
     :param test_task_name: Name of the Airflow task to be created
     :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
-    and “test_results” of type List.
+    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+    and "test_results" of type List.
     :param model_name: If the test relates to a specific model, the name of the model it relates to
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
@@ -127,7 +127,7 @@ def build_airflow_graph(
     conn_id: str,  # Cosmos, dataset URI
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-    emit_datasets_from: EmitDatasetsType | None = None,  # Cosmos
+    emit_datasets_from: EmitDatasetsType | None = EmitDatasetsType.TESTS,  # Cosmos
 ) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -155,8 +155,8 @@ def build_airflow_graph(
     :param dbt_project_name: Name of the dbt pipeline of interest
     :param conn_id: Airflow connection ID
     :param task_group: Airflow Task Group instance
-    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
-    and “test_results” of type List.
+    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+    and "test_results" of type List.
     :param emit_datasets_from: Model nodes emit Airflow Datasets for downstream cross-DAG dependencies
     depending on whether they are run with tests or not.
     """
@@ -169,37 +169,58 @@ def build_airflow_graph(
     for node_id, node in nodes.items():
         task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=task_args)
 
-        if emit_datasets_from == EmitDatasetsType.MODELS:
-            task_args["outlets"] = [get_dbt_dataset(conn_id, dbt_project_name, node.name)]
-
         if task_meta and node.resource_type != DbtResourceType.TEST:
-            if (
-                node.resource_type == DbtResourceType.MODEL
-                and test_behavior == TestBehavior.AFTER_EACH
-                and EmitDatasetsType.TESTS
-            ):
+            task_outlet = [get_dbt_dataset(connection_id=conn_id, project_name=dbt_project_name, model_name=node.name)]
+            if node.resource_type == DbtResourceType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                    task = create_airflow_task(task_meta, dag, task_group=model_task_group)
-                    test_meta = create_test_task_metadata(
-                        f"{node.name}_test",
-                        execution_mode,
-                        task_args=task_args,
-                        model_name=node.name,
-                        on_warning_callback=on_warning_callback,
-                    )
-                    test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
-                    task >> test_task
-                    task_or_group = model_task_group
+                    model_task_args = task_args.copy()
+                    if emit_datasets_from == EmitDatasetsType.MODELS:
+                        model_task_args["outlets"] = task_outlet
+
+                    model_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=model_task_args)
+                    if model_meta:
+                        run_model_task = create_airflow_task(model_meta, dag, task_group=model_task_group)
+
+                        test_task_args = task_args.copy()
+                        if emit_datasets_from == EmitDatasetsType.TESTS:
+                            test_task_args["outlets"] = task_outlet
+
+                        test_meta = create_test_task_metadata(
+                            f"{node.name}_test",
+                            execution_mode,
+                            task_args=test_task_args,
+                            model_name=node.name,
+                            on_warning_callback=on_warning_callback,
+                        )
+                        test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
+                        run_model_task >> test_task
+                        task_or_group = model_task_group
             else:
-                task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+                model_task_args = task_args.copy()
+                if emit_datasets_from == EmitDatasetsType.MODELS:
+                    model_task_args["outlets"] = task_outlet
+
+                model_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=model_task_args)
+                if model_meta:
+                    task_or_group = create_airflow_task(model_meta, dag, task_group=task_group)
+
             tasks_map[node_id] = task_or_group
 
     # If test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
-    if emit_datasets_from == EmitDatasetsType.TESTS and test_behavior == TestBehavior.AFTER_ALL:
-        task_args.pop("outlets", None)
+    if test_behavior == TestBehavior.AFTER_ALL:
+        test_task_args = task_args.copy()
+        if emit_datasets_from == EmitDatasetsType.TESTS:
+            test_task_args["outlets"] = [
+                get_dbt_dataset(connection_id=conn_id, project_name=dbt_project_name, model_name=node.name)
+                for node in nodes.values()
+            ]
+
         test_meta = create_test_task_metadata(
-            f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback
+            f"{dbt_project_name}_test",
+            execution_mode,
+            task_args=test_task_args,
+            on_warning_callback=on_warning_callback,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

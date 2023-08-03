@@ -32,7 +32,7 @@ class RenderConfig:
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     """
 
-    emit_datasets_from: EmitDatasetsType | None = None
+    emit_datasets_from: EmitDatasetsType | None = EmitDatasetsType.TESTS
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
     select: list[str] = field(default_factory=list)

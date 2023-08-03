@@ -192,7 +192,10 @@ def build_airflow_graph(
     if test_behavior == TestBehavior.AFTER_ALL:
         task_args.pop("outlets", None)
         test_meta = create_test_task_metadata(
-            f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_test_warning_callback=on_test_warning_callback
+            f"{dbt_project_name}_test",
+            execution_mode,
+            task_args=task_args,
+            on_test_warning_callback=on_test_warning_callback,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

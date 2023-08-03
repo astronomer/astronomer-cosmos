@@ -286,7 +286,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 class DbtTestLocalOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core test command.
-    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+    :param on_test_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
@@ -294,12 +294,12 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
     def __init__(
         self,
-        on_warning_callback: Callable[..., Any] | None = None,
+        on_test_warning_callback: Callable[..., Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["test"]
-        self.on_warning_callback = on_warning_callback
+        self.on_test_warning_callback = on_test_warning_callback
 
     def _should_run_tests(
         self,
@@ -308,17 +308,17 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
     ) -> bool:
         """
         Check if any tests are defined to run in the DAG. If tests are defined
-        and on_warning_callback is set, then function returns True.
+        and on_test_warning_callback is set, then function returns True.
 
         :param result: The output from the build and run command.
         """
 
-        return self.on_warning_callback is not None and no_tests_message not in result.output
+        return self.on_test_warning_callback is not None and no_tests_message not in result.output
 
     def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
-         on_warning_callback with the updated context.
+         on_test_warning_callback with the updated context.
 
         :param result: The result object from the build and run command.
         :param context: The original airflow context in which the build and run command was executed.
@@ -329,8 +329,8 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         warning_context["test_names"] = test_names
         warning_context["test_results"] = test_results
 
-        if self.on_warning_callback:
-            self.on_warning_callback(warning_context)
+        if self.on_test_warning_callback:
+            self.on_test_warning_callback(warning_context)
 
     def execute(self, context: Context) -> str:
         result = self.build_and_run_cmd(context=context)

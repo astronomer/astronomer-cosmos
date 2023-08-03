@@ -269,9 +269,9 @@ def test_create_test_task_metadata():
         test_task_name="test_no_nulls",
         execution_mode=ExecutionMode.LOCAL,
         task_args={"task_arg": "value"},
-        on_warning_callback=True,
+        on_test_warning_callback=True,
         model_name="my_model",
     )
     assert metadata.id == "test_no_nulls"
     assert metadata.operator_class == "cosmos.operators.local.DbtTestLocalOperator"
-    assert metadata.arguments == {"task_arg": "value", "on_warning_callback": True, "models": "my_model"}
+    assert metadata.arguments == {"task_arg": "value", "on_test_warning_callback": True, "models": "my_model"}

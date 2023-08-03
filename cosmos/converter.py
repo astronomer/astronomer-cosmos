@@ -86,7 +86,7 @@ class DbtToAirflowConverter:
     :param render_config: The dbt render configuration
     :param operator_args: Parameters to pass to the underlying operators, can include KubernetesPodOperator
         or DockerOperator parameters
-    :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+    :param on_test_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
@@ -99,7 +99,7 @@ class DbtToAirflowConverter:
         dag: DAG | None = None,
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
-        on_warning_callback: Callable[..., Any] | None = None,
+        on_test_warning_callback: Callable[..., Any] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -169,6 +169,6 @@ class DbtToAirflowConverter:
             test_behavior=test_behavior,
             dbt_project_name=dbt_project.name,
             conn_id=conn_id,
-            on_warning_callback=on_warning_callback,
+            on_test_warning_callback=on_test_warning_callback,
             emit_datasets=emit_datasets,
         )

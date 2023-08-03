@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
-        airflow-version: ["2.3", "2.4", "2.5", "2.6"]
+        airflow-version: ["2.2", "2.3", "2.4", "2.5", "2.6"]
     steps:
       - uses: actions/checkout@v3
 

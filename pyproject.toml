@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     # Airflow & Pydantic issue: https://github.com/apache/airflow/issues/32311
     "pydantic>=1.10.0,<2.0.0",
-    "apache-airflow>=2.3.0",
+    "apache-airflow>=2.2.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",

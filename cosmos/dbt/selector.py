@@ -94,7 +94,7 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
             if config_tag and config_tag not in supported_node_config.get("tags", []):
                 continue
 
-            # Remove 'tags' as we've already filtered for them
+            # Remove 'tags' as they've already been filtered for
             config.config.pop("tags", None)
             supported_node_config.pop("tags", None)
 

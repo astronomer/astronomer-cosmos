@@ -91,7 +91,7 @@ docs =[
 ]
 tests = [
     "packaging",
-    "pytest>=6.0",
+    "pytest",
     "pytest-split",
     "pytest-dotenv",
     "requests-mock",

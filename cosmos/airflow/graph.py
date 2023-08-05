@@ -17,7 +17,10 @@ from airflow.models import BaseOperator
 logger = logging.getLogger(__name__)
 
 
-def calculate_operator_class(execution_mode: ExecutionMode, dbt_class: str,) -> str:
+def calculate_operator_class(
+    execution_mode: ExecutionMode,
+    dbt_class: str,
+) -> str:
     """
     Given an execution mode and dbt class, return the operator class path to use.
 
@@ -106,7 +109,10 @@ def create_test_task_metadata(
         task_args["models"] = model_name
     return TaskMetadata(
         id=test_task_name,
-        operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest",),
+        operator_class=calculate_operator_class(
+            execution_mode=execution_mode,
+            dbt_class="DbtTest",
+        ),
         arguments=task_args,
     )
 

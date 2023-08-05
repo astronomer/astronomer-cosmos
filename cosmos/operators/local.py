@@ -286,7 +286,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 class DbtTestLocalOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core test command.
-    :param on_test_warning_callback: A callback function called on warnings with additional Context variables "test_names"
+    :param on_test_warning_callback: callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 

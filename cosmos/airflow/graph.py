@@ -17,10 +17,7 @@ from airflow.models import BaseOperator
 logger = logging.getLogger(__name__)
 
 
-def calculate_operator_class(
-    execution_mode: ExecutionMode,
-    dbt_class: str,
-) -> str:
+def calculate_operator_class(execution_mode: ExecutionMode, dbt_class: str,) -> str:
     """
     Given an execution mode and dbt class, return the operator class path to use.
 
@@ -98,7 +95,7 @@ def create_test_task_metadata(
     :param test_task_name: Name of the Airflow task to be created
     :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param on_test_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+    :param on_test_warning_callback: callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     :param model_name: If the test relates to a specific model, the name of the model it relates to
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
@@ -109,10 +106,7 @@ def create_test_task_metadata(
         task_args["models"] = model_name
     return TaskMetadata(
         id=test_task_name,
-        operator_class=calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        ),
+        operator_class=calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest",),
         arguments=task_args,
     )
 
@@ -155,7 +149,7 @@ def build_airflow_graph(
     :param dbt_project_name: Name of the dbt pipeline of interest
     :param conn_id: Airflow connection ID
     :param task_group: Airflow Task Group instance
-    :param on_test_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+    :param on_test_warning_callback: callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     :param emit_datasets: Decides if Cosmos should add outlets to model classes or not.
     """
@@ -192,7 +186,10 @@ def build_airflow_graph(
     if test_behavior == TestBehavior.AFTER_ALL:
         task_args.pop("outlets", None)
         test_meta = create_test_task_metadata(
-            f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_test_warning_callback=on_test_warning_callback
+            f"{dbt_project_name}_test",
+            execution_mode,
+            task_args=task_args,
+            on_test_warning_callback=on_test_warning_callback,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

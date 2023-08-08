@@ -10,7 +10,14 @@ from subprocess import Popen, PIPE
 from typing import Any
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
+from cosmos.constants import (
+    DbtResourceType,
+    ExecutionMode,
+    LoadMode,
+    DBT_LOG_PATH_ENVVAR,
+    DBT_TARGET_PATH_ENVVAR,
+    DBT_LOG_FILENAME,
+)
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
@@ -18,8 +25,6 @@ from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-
-# TODO replace inline constants
 
 
 class CosmosLoadDbtException(Exception):
@@ -144,26 +149,28 @@ class DbtGraph:
         if self.select:
             command.extend(["--select", *self.select])
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # when we drop support to Python 3.7, we can use:
-            # shutil.copytree(self.project.dir, tmpdir, dirs_exist_ok=True)
-            cwd = Path(tmpdir) / self.project.name
-            shutil.copytree(self.project.dir, cwd)
+        with self.profile_config.ensure_profile() as profile_values:
+            (profile_path, env_vars) = profile_values
+            # TODO: check, it seems this is being called 5 times!!! :scream:
+            command.extend(
+                [
+                    "--profiles-dir",
+                    str(profile_path.parent),
+                    "--profile",
+                    self.profile_config.profile_name,
+                    "--target",
+                    self.profile_config.target_name,
+                ]
+            )
 
-            with self.profile_config.ensure_profile() as (profile_path, env_vars):
-                command.extend(
-                    [
-                        "--profiles-dir",
-                        str(profile_path.parent),
-                        "--profile",
-                        self.profile_config.profile_name,
-                        "--target",
-                        self.profile_config.target_name,
-                    ]
-                )
+            env = os.environ.copy()
+            env.update(env_vars)
 
-                env = os.environ.copy()
-                env.update(env_vars)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir)
+                target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir)
+                env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
+                env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
 
                 logger.info("Running command: `%s`", " ".join(command))
                 logger.info("Environment variable keys: %s", env.keys())
@@ -171,40 +178,51 @@ class DbtGraph:
                     command,
                     stdout=PIPE,
                     stderr=PIPE,
-                    cwd=cwd,
+                    cwd=self.project.dir,
                     universal_newlines=True,
                     env=env,
                 )
 
                 stdout, stderr = process.communicate()
 
-        logger.debug("dbt output:\n %s", stdout)
+                logger.debug("dbt output: %s", stdout)
 
-        if stderr or "Runtime Error" in stdout:
-            details = stderr or stdout
-            raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
+                log_filepath = log_dir / DBT_LOG_FILENAME
+                if not log_filepath.exists():
+                    log_filepath = self.project.dir / DBT_LOG_FILENAME
 
-        nodes = {}
-        for line in stdout.split("\n"):
-            try:
-                node_dict = json.loads(line.strip())
-            except json.decoder.JSONDecodeError:
-                logger.debug("Skipped dbt ls line: %s", line)
-            else:
-                node = DbtNode(
-                    name=node_dict["name"],
-                    unique_id=node_dict["unique_id"],
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.project.dir / node_dict["original_file_path"],
-                    tags=node_dict["tags"],
-                    config=node_dict["config"],
-                )
-                nodes[node.unique_id] = node
-                logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+                if log_filepath.exists():
+                    # import pdb; pdb.set_trace()
+                    logger.debug(f"Logs from {log_filepath}:")
+                    with open(log_filepath) as logfile:
+                        for line in logfile:
+                            logging.debug(line.strip())
 
-        self.nodes = nodes
-        self.filtered_nodes = nodes
+                if stderr or "Runtime Error" in stdout:
+                    details = stderr or stdout
+                    raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
+
+                nodes = {}
+                for line in stdout.split("\n"):
+                    try:
+                        node_dict = json.loads(line.strip())
+                    except json.decoder.JSONDecodeError:
+                        logger.debug("Skipped dbt ls line: %s", line)
+                    else:
+                        node = DbtNode(
+                            name=node_dict["name"],
+                            unique_id=node_dict["unique_id"],
+                            resource_type=DbtResourceType(node_dict["resource_type"]),
+                            depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+                            file_path=self.project.dir / node_dict["original_file_path"],
+                            tags=node_dict["tags"],
+                            config=node_dict["config"],
+                        )
+                        nodes[node.unique_id] = node
+                        logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+
+                self.nodes = nodes
+                self.filtered_nodes = nodes
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))

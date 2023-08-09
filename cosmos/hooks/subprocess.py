@@ -81,7 +81,7 @@ class FullOutputSubprocessHook(BaseHook):
                 preexec_fn=pre_exec,
             )
 
-            logger.info("Output:")
+            logger.info("Command output:")
             line = ""
 
             if self.sub_process is None:

@@ -14,7 +14,7 @@ Bug fixes
 
 Others
 * [pre-commit.ci] pre-commit autoupdate by @pre-commit-ci in #446
-* Resolve MyPy errors when adding Airflow pre-commit dependency by @abhi12mohan in #434 
+* Resolve MyPy errors when adding Airflow pre-commit dependency by @abhi12mohan in #434
 
 
 1.0.0 (2022-12-14)

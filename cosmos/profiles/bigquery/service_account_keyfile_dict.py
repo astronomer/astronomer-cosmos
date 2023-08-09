@@ -46,7 +46,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
             **self.profile_args,
         }
 
-    def transformer_keyfile_json(self, keyfile_json: str | dict[str, str]) -> dict[str, str]:
+    def transform_keyfile_json(self, keyfile_json: str | dict[str, str]) -> dict[str, str]:
         """
         Transforms the keyfile_json param to a dict if it is a string.
         """

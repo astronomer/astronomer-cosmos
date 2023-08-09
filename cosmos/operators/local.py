@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import shutil
 import signal
@@ -17,6 +16,7 @@ from airflow.utils.session import NEW_SESSION, provide_session
 from sqlalchemy.orm import Session
 
 from cosmos.config import ProfileConfig
+from cosmos.log import get_logger
 from cosmos.operators.base import DbtBaseOperator
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
@@ -27,7 +27,7 @@ from cosmos.dbt.parser.output import (
     parse_output,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):

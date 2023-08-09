@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import List
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -148,6 +149,7 @@ def test_dbtmodelconfig_extract_config_non_kwarg():
     assert computed is None
 
 
+@patch("cosmos.dbt.parser.project.logger.propagate", True)
 def test_dbtmodelconfig_extract_config_with_kwarg_list_without_as_const(caplog):
     dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     kwarg = KeywordArg(key="some_conf", value=[1, 2])

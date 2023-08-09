@@ -1,7 +1,6 @@
 from __future__ import annotations
 import itertools
 import json
-import logging
 import os
 import shutil
 from dataclasses import dataclass, field
@@ -15,8 +14,9 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import select_nodes
+from cosmos.log import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # TODO replace inline constants
 
@@ -127,7 +127,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project `%s` using dbt ls...", self.project.name)
+        logger.info("Trying to parse the dbt project `%s` in `%s` using dbt ls...", self.project.name, self.project.dir)
 
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load dbt project without a profile config")
@@ -171,7 +171,7 @@ class DbtGraph:
 
             stdout, stderr = process.communicate()
 
-        logger.debug("Output: %s", stdout)
+        logger.debug("dbt output:\n %s", stdout)
 
         if stderr or "Runtime Error" in stdout:
             details = stderr or stdout
@@ -182,7 +182,7 @@ class DbtGraph:
             try:
                 node_dict = json.loads(line.strip())
             except json.decoder.JSONDecodeError:
-                logger.info("Skipping line: %s", line)
+                logger.debug("Skipped dbt ls line: %s", line)
             else:
                 node = DbtNode(
                     name=node_dict["name"],
@@ -194,9 +194,13 @@ class DbtGraph:
                     config=node_dict["config"],
                 )
                 nodes[node.unique_id] = node
+                logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
 
         self.nodes = nodes
         self.filtered_nodes = nodes
+
+        logger.info("Total nodes: %i", len(self.nodes))
+        logger.info("Total filtered nodes: %i", len(self.nodes))
 
     def load_via_custom_parser(self) -> None:
         """
@@ -238,6 +242,9 @@ class DbtGraph:
             project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
         )
 
+        logger.info("Total nodes: %i", len(self.nodes))
+        logger.info("Total filtered nodes: %i", len(self.nodes))
+
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.yml` file.
@@ -270,3 +277,5 @@ class DbtGraph:
             self.filtered_nodes = select_nodes(
                 project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
             )
+        logger.info("Total nodes: %i", len(self.nodes))
+        logger.info("Total filtered nodes: %i", len(self.nodes))

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import shutil
 from typing import Any, Sequence, Tuple
@@ -10,7 +9,10 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
-logger = logging.getLogger(__name__)
+from cosmos.log import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class DbtBaseOperator(BaseOperator):

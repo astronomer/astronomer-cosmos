@@ -7,14 +7,14 @@ import contextlib
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from logging import getLogger
 from typing import Iterator
 
 from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
 from cosmos.exceptions import CosmosValueError
+from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 

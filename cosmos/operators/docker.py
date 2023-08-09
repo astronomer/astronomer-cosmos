@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, Callable, Sequence
 
 import yaml
 from airflow.utils.context import Context
 
+from cosmos.log import get_logger
 from cosmos.operators.base import DbtBaseOperator
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # docker is an optional dependency, so we need to check if it's installed
 try:

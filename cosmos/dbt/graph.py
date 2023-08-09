@@ -182,7 +182,7 @@ class DbtGraph:
             try:
                 node_dict = json.loads(line.strip())
             except json.decoder.JSONDecodeError:
-                logger.info("Skipping line: %s", line)
+                logger.debug("Skipped dbt ls line: %s", line)
             else:
                 node = DbtNode(
                     name=node_dict["name"],
@@ -194,7 +194,7 @@ class DbtGraph:
                     config=node_dict["config"],
                 )
                 nodes[node.unique_id] = node
-                logger.info("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+                logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
 
         self.nodes = nodes
         self.filtered_nodes = nodes

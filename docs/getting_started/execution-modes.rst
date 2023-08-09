@@ -46,11 +46,9 @@ By default, Cosmos uses the ``local`` execution mode.
 The ``local`` execution mode is the fastest way to run Cosmos operators since they don't install ``dbt`` nor build docker containers. However, it may not be an option for users using managed Airflow services such as
 Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict (:ref:`execution-modes-local-conflicts`), the user may not be able to install ``dbt`` in a custom path.
 
- `Local Execution Mode <execution-modes.html#local>`_
-
 The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Airflow worker node.
 
-If ``dbt`` was not `installed as part of the Cosmos package <install-options.html#local>`__,
+If ``dbt`` was not installed as part of the Cosmos packages,
 users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
 
 When using the ``local`` execution mode, Cosmos converts Airflow Connections into a native ``dbt`` profiles file (``profiles.yml``).
@@ -94,7 +92,7 @@ The other challenge with the ``docker`` approach is if the Airflow worker is alr
 
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container, which is slower than creating a Virtualenv with ``dbt-core``.
 
-Check the step-by-step guide on using the ``docker`` execution mode at `Docker Operators <docker.html>`_.
+Check the step-by-step guide on using the ``docker`` execution mode at :ref:`docker`.
 
 Example DAG:
 
@@ -121,7 +119,7 @@ It assumes the user has a Kubernetes cluster. It also expects the user to ensure
 
 The ``Kubernetes`` deployment may be slower than ``Docker`` and ``Virtualenv`` assuming that the container image is built (which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``) and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 
-Check the step-by-step guide on using the ``kubernetes`` execution mode at `Kubernetes Operators <kubernetes.html>`_.
+Check the step-by-step guide on using the ``kubernetes`` execution mode at :ref:`kubernetes`.
 
 Example DAG:
 

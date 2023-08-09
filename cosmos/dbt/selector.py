@@ -1,10 +1,10 @@
 from __future__ import annotations
-import logging
 from pathlib import Path
 
 from typing import TYPE_CHECKING
 
 from cosmos.exceptions import CosmosValueError
+from cosmos.log import get_logger
 
 if TYPE_CHECKING:
     from cosmos.dbt.graph import DbtNode
@@ -16,7 +16,7 @@ TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SelectorConfig:

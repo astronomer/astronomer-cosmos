@@ -1,13 +1,14 @@
 import importlib
-import logging
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.core.graph.entities import Task
+from cosmos.log import get_logger
 
-logger = logging.getLogger(__name__)
+
+logger = get_logger(__name__)
 
 
 def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None) -> BaseOperator:

@@ -13,6 +13,10 @@ from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.hooks.base import BaseHook
 
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
+
 
 class FullOutputSubprocessResult(NamedTuple):
     exit_code: int
@@ -53,7 +57,7 @@ class FullOutputSubprocessHook(BaseHook):
                                     ``output``: the last line from stderr or stdout
                                     ``full_output``: all lines from stderr or stdout.
         """
-        self.log.info("Tmp dir root location: \n %s", gettempdir())
+        logger.info("Tmp dir root location: \n %s", gettempdir())
         log_lines = []
         with contextlib.ExitStack() as stack:
             if cwd is None:
@@ -66,7 +70,7 @@ class FullOutputSubprocessHook(BaseHook):
                         signal.signal(getattr(signal, sig), signal.SIG_DFL)
                 os.setsid()
 
-            self.log.info("Running command: %s", command)
+            logger.info("Running command: %s", command)
 
             self.sub_process = Popen(
                 command,
@@ -77,7 +81,7 @@ class FullOutputSubprocessHook(BaseHook):
                 preexec_fn=pre_exec,
             )
 
-            self.log.info("Output:")
+            logger.info("Output:")
             line = ""
 
             if self.sub_process is None:
@@ -87,17 +91,17 @@ class FullOutputSubprocessHook(BaseHook):
                     line = raw_line.decode(output_encoding, errors="backslashreplace").rstrip()
                     # storing the warn & error lines to be used later
                     log_lines.append(line)
-                    self.log.info("%s", line)
+                    logger.info("%s", line)
 
             self.sub_process.wait()
 
-            self.log.info("Command exited with return code %s", self.sub_process.returncode)
+            logger.info("Command exited with return code %s", self.sub_process.returncode)
             return_code: int = self.sub_process.returncode
 
         return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
 
     def send_sigterm(self) -> None:
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""
-        self.log.info("Sending SIGTERM signal to process group")
+        logger.info("Sending SIGTERM signal to process group")
         if self.sub_process and hasattr(self.sub_process, "pid"):
             os.killpg(os.getpgid(self.sub_process.pid), signal.SIGTERM)

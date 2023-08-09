@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
 from cosmos.profiles.base import BaseProfileMapping
 
@@ -44,3 +45,15 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
             "threads": 1,
             **self.profile_args,
         }
+
+    def transform_keyfile_json(self, keyfile_json: str | dict[str, str]) -> dict[str, str]:
+        """
+        Transforms the keyfile_json param to a dict if it is a string.
+        """
+        if isinstance(keyfile_json, dict):
+            return keyfile_json
+        keyfile_json = json.loads(keyfile_json)
+        if isinstance(keyfile_json, dict):
+            return keyfile_json
+        else:
+            raise ValueError("keyfile_json cannot be loaded as a dict.")

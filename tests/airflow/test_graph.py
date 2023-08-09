@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from airflow import __version__ as airflow_version
@@ -200,6 +201,7 @@ def test_calculate_leaves():
     assert leaves == ["child"]
 
 
+@patch("cosmos.airflow.graph.logger.propagate", True)
 def test_create_task_metadata_unsupported(caplog):
     child_node = DbtNode(
         name="unsupported",

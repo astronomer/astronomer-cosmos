@@ -3,10 +3,8 @@ Used to parse and extract information from dbt projects.
 """
 from __future__ import annotations
 
-import logging
 import os
 import ast
-
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -15,7 +13,9 @@ from typing import Any, ClassVar, Dict, List, Set
 import jinja2
 import yaml
 
-logger = logging.getLogger(__name__)
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 
 DBT_PY_MODEL_METHOD_NAME = "model"

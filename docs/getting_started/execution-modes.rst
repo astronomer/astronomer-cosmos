@@ -44,7 +44,9 @@ Local
 By default, Cosmos uses the ``local`` execution mode.
 
 The ``local`` execution mode is the fastest way to run Cosmos operators since they don't install ``dbt`` nor build docker containers. However, it may not be an option for users using managed Airflow services such as
-Google Cloud Composer, since Airflow and ``dbt`` dependencies can `conflict <execution-mode-local-conflicts.html>`__, the user may not be able to install ``dbt`` in a custom path.
+Google Cloud Composer, since Airflow and ``dbt`` dependencies can conflict (:ref:`execution-modes-local-conflicts`), the user may not be able to install ``dbt`` in a custom path.
+
+ `Local Execution Mode <execution-modes.html#local>`_
 
 The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Airflow worker node.
 

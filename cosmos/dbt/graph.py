@@ -15,6 +15,8 @@ from cosmos.constants import (
     ExecutionMode,
     LoadMode,
     DBT_LOG_FILENAME,
+    DBT_LOG_PATH_ENVVAR,
+    DBT_TARGET_PATH_ENVVAR,
 )
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
@@ -169,6 +171,11 @@ class DbtGraph:
             with tempfile.TemporaryDirectory() as tmpdir:
                 logger.info("Running command: `%s`", " ".join(command))
                 logger.info("Environment variable keys: %s", env.keys())
+                log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir)
+                target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir)
+                env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
+                env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
+
                 process = Popen(
                     command,
                     stdout=PIPE,
@@ -181,9 +188,9 @@ class DbtGraph:
                 stdout, stderr = process.communicate()
 
                 logger.debug("dbt output: %s", stdout)
-                log_filepath = Path(tmpdir) / "logs" / DBT_LOG_FILENAME
+                log_filepath = log_dir / DBT_LOG_FILENAME
+                logger.debug("dbt logs available in: %s", log_filepath)
                 if log_filepath.exists():
-                    logger.debug(f"Logs from {log_filepath}:")
                     with open(log_filepath) as logfile:
                         for line in logfile:
                             logger.debug(line.strip())

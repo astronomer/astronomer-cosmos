@@ -151,7 +151,6 @@ class DbtGraph:
 
         with self.profile_config.ensure_profile() as profile_values:
             (profile_path, env_vars) = profile_values
-            # TODO: check, it seems this is being called 5 times!!! :scream:
             command.extend(
                 [
                     "--project-dir",

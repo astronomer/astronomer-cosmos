@@ -1,3 +1,5 @@
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,8 +12,26 @@ from cosmos.dbt.project import DbtProject
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+DBT_PIPELINE_NAME = "jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
+
+
+@pytest.fixture
+def tmp_dbt_project_dir():
+    """
+    Creates a plain dbt project structure, which does not contain logs or target folders.
+    """
+    source_proj_dir = DBT_PROJECTS_ROOT_DIR / DBT_PIPELINE_NAME
+
+    tmp_dir = Path(tempfile.mkdtemp())
+    target_proj_dir = tmp_dir / DBT_PIPELINE_NAME
+    shutil.copytree(source_proj_dir, target_proj_dir)
+    shutil.rmtree(target_proj_dir / "logs", ignore_errors=True)
+    shutil.rmtree(target_proj_dir / "target", ignore_errors=True)
+    yield tmp_dir
+
+    shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
 
 
 @pytest.mark.parametrize(
@@ -110,9 +130,12 @@ def test_load(
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
-def test_load_via_dbt_ls_uses_temp_dir(mock_popen):
+def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_popen, tmp_dbt_project_dir):
     mock_popen().communicate.return_value = ("", "")
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    assert not (tmp_dbt_project_dir / "target").exists()
+    assert not (tmp_dbt_project_dir / "logs").exists()
+
+    dbt_project = DbtProject(name=DBT_PIPELINE_NAME, root_dir=tmp_dbt_project_dir)
     dbt_graph = DbtGraph(
         project=dbt_project,
         profile_config=ProfileConfig(
@@ -124,8 +147,10 @@ def test_load_via_dbt_ls_uses_temp_dir(mock_popen):
             ),
         ),
     )
-
     dbt_graph.load_via_dbt_ls()
+    assert not (tmp_dbt_project_dir / "target").exists()
+    assert not (tmp_dbt_project_dir / "logs").exists()
+
     used_cwd = Path(mock_popen.call_args[0][0][-5])
     assert used_cwd != dbt_project.dir
     assert not used_cwd.exists()

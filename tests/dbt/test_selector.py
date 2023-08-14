@@ -86,8 +86,6 @@ def test_select_nodes_by_select_config_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child"])
     expected = {
         child_node.unique_id: child_node,
-        grandchild_1_test_node.unique_id: grandchild_1_test_node,
-        grandchild_2_test_node.unique_id: grandchild_2_test_node,
     }
     assert selected == expected
 
@@ -140,6 +138,8 @@ def test_select_nodes_by_select_union():
         grandparent_node.unique_id: grandparent_node,
         parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
+        grandchild_1_test_node.unique_id: grandchild_1_test_node,
+        grandchild_2_test_node.unique_id: grandchild_2_test_node,
     }
     assert selected == expected
 
@@ -152,6 +152,7 @@ def test_select_nodes_by_select_intersection():
 def test_select_nodes_by_exclude_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["tag:has_child"])
     expected = {
+        child_node.unique_id: child_node,
         grandchild_1_test_node.unique_id: grandchild_1_test_node,
         grandchild_2_test_node.unique_id: grandchild_2_test_node,
     }

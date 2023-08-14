@@ -48,7 +48,7 @@ To use this:
             manifest_path="/path/to/manifest.json",
         ),
         render_config=RenderConfig(
-            load_mode=LoadMode.DBT_MANIFEST,
+            load_method=LoadMode.DBT_MANIFEST,
         )
         # ...,
     )
@@ -70,7 +70,7 @@ To use this:
 
     DbtDag(
         render_config=RenderConfig(
-            load_mode=LoadMode.DBT_LS,
+            load_method=LoadMode.DBT_LS,
         )
         # ...,
     )
@@ -92,7 +92,7 @@ To use this:
 
     DbtDag(
         render_config=RenderConfig(
-            load_mode=LoadMode.CUSTOM,
+            load_method=LoadMode.CUSTOM,
         )
         # ...,
     )

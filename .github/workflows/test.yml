@@ -54,11 +54,9 @@ jobs:
         airflow-version: ["2.3", "2.4", "2.5", "2.6"]
     services:
       postgres:
-        # Docker Hub image
         image: postgres
         env:
           POSTGRES_PASSWORD: postgres
-        # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -110,6 +108,18 @@ jobs:
       matrix:
         python-version: ["3.10"]
         airflow-version: ["2.6"]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     if: >-
       github.event_name == 'push' ||
       (
@@ -164,3 +174,32 @@ jobs:
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
       DATABRICKS_WAREHOUSE_ID: ${{ secrets.DATABRICKS_WAREHOUSE_ID }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
+
+  Code-Coverage:
+    if: github.event.action != 'labeled'
+    needs:
+      - Run-Unit-Tests
+      - Run-Integration-Tests
+      - Run-Integration-Tests-Expensive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+      - name: Install coverage
+        run: |
+          pip3 install coverage
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+      - name: Run coverage
+        run: |
+          coverage combine ./coverage/coverage*/.coverage
+          coverage report
+          coverage xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}

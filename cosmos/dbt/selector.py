@@ -85,6 +85,9 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     """
     selected_nodes = set()
     for node_id, node in nodes.items():
+        if not config.paths and not config.tags and not config.config:
+            continue
+
         if config.tags and not (sorted(node.tags) == sorted(config.tags)):
             continue
 
@@ -166,9 +169,10 @@ def select_nodes(
 
     nodes_ids = set(nodes.keys())
 
+    exclude_ids: set[str] = set()
     for statement in exclude:
         config = SelectorConfig(project_dir, statement)
-        exclude_ids = select_nodes_ids_by_intersection(nodes, config)
+        exclude_ids = exclude_ids.union(set(select_nodes_ids_by_intersection(nodes, config)))
         subset_ids = set(nodes_ids) - set(exclude_ids)
 
     return {id_: nodes[id_] for id_ in subset_ids}

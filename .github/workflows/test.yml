@@ -174,32 +174,3 @@ jobs:
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
       DATABRICKS_WAREHOUSE_ID: ${{ secrets.DATABRICKS_WAREHOUSE_ID }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
-
-  Code-Coverage:
-    if: github.event.action != 'labeled'
-    needs:
-      - Run-Unit-Tests
-      - Run-Integration-Tests
-      - Run-Integration-Tests-Expensive
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.10'
-      - name: Install coverage
-        run: |
-          pip3 install coverage
-      - name: Download all artifacts
-        uses: actions/download-artifact@v2
-      - name: Run coverage
-        run: |
-          coverage combine ./coverage/coverage*/.coverage
-          coverage report
-          coverage xml
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}

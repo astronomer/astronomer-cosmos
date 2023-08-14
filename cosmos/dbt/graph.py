@@ -3,13 +3,21 @@ import itertools
 import json
 import os
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import Popen, PIPE
 from typing import Any
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
+from cosmos.constants import (
+    DbtResourceType,
+    ExecutionMode,
+    LoadMode,
+    DBT_LOG_FILENAME,
+    DBT_LOG_PATH_ENVVAR,
+    DBT_TARGET_PATH_ENVVAR,
+)
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
 from cosmos.dbt.project import DbtProject
@@ -17,8 +25,6 @@ from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-
-# TODO replace inline constants
 
 
 class CosmosLoadDbtException(Exception):
@@ -143,9 +149,12 @@ class DbtGraph:
         if self.select:
             command.extend(["--select", *self.select])
 
-        with self.profile_config.ensure_profile() as (profile_path, env_vars):
+        with self.profile_config.ensure_profile() as profile_values:
+            (profile_path, env_vars) = profile_values
             command.extend(
                 [
+                    "--project-dir",
+                    str(self.project.dir),
                     "--profiles-dir",
                     str(profile_path.parent),
                     "--profile",
@@ -158,46 +167,58 @@ class DbtGraph:
             env = os.environ.copy()
             env.update(env_vars)
 
-            logger.info("Running command: `%s`", " ".join(command))
-            logger.info("Environment variable keys: %s", env.keys())
-            process = Popen(
-                command,
-                stdout=PIPE,
-                stderr=PIPE,
-                cwd=self.project.dir,
-                universal_newlines=True,
-                env=env,
-            )
+            with tempfile.TemporaryDirectory() as tmpdir:
+                logger.info("Running command: `%s`", " ".join(command))
+                logger.info("Environment variable keys: %s", env.keys())
+                log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir)
+                target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir)
+                env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
+                env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
 
-            stdout, stderr = process.communicate()
-
-        logger.debug("dbt output:\n %s", stdout)
-
-        if stderr or "Runtime Error" in stdout:
-            details = stderr or stdout
-            raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
-
-        nodes = {}
-        for line in stdout.split("\n"):
-            try:
-                node_dict = json.loads(line.strip())
-            except json.decoder.JSONDecodeError:
-                logger.debug("Skipped dbt ls line: %s", line)
-            else:
-                node = DbtNode(
-                    name=node_dict["name"],
-                    unique_id=node_dict["unique_id"],
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.project.dir / node_dict["original_file_path"],
-                    tags=node_dict["tags"],
-                    config=node_dict["config"],
+                process = Popen(
+                    command,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    cwd=tmpdir,
+                    universal_newlines=True,
+                    env=env,
                 )
-                nodes[node.unique_id] = node
-                logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
 
-        self.nodes = nodes
-        self.filtered_nodes = nodes
+                stdout, stderr = process.communicate()
+
+                logger.debug("dbt output: %s", stdout)
+                log_filepath = log_dir / DBT_LOG_FILENAME
+                logger.debug("dbt logs available in: %s", log_filepath)
+                if log_filepath.exists():
+                    with open(log_filepath) as logfile:
+                        for line in logfile:
+                            logger.debug(line.strip())
+
+                if stderr or "Runtime Error" in stdout:
+                    details = stderr or stdout
+                    raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
+
+                nodes = {}
+                for line in stdout.split("\n"):
+                    try:
+                        node_dict = json.loads(line.strip())
+                    except json.decoder.JSONDecodeError:
+                        logger.debug("Skipped dbt ls line: %s", line)
+                    else:
+                        node = DbtNode(
+                            name=node_dict["name"],
+                            unique_id=node_dict["unique_id"],
+                            resource_type=DbtResourceType(node_dict["resource_type"]),
+                            depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+                            file_path=self.project.dir / node_dict["original_file_path"],
+                            tags=node_dict["tags"],
+                            config=node_dict["config"],
+                        )
+                        nodes[node.unique_id] = node
+                        logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+
+                self.nodes = nodes
+                self.filtered_nodes = nodes
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))

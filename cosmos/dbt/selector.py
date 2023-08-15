@@ -43,6 +43,10 @@ class SelectorConfig:
         self.other: list[str] = []
         self.load_from_statement(statement)
 
+    @property
+    def is_empty_config(self) -> bool:
+        return not self.paths and not self.tags and not self.config and not self.other
+
     def load_from_statement(self, statement: str) -> None:
         """
         Load in-place select parameters.
@@ -85,6 +89,9 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     """
     selected_nodes = set()
     for node_id, node in nodes.items():
+        if config.is_empty_config:
+            continue
+
         if config.tags and not (sorted(node.tags) == sorted(config.tags)):
             continue
 

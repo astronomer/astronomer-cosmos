@@ -37,7 +37,7 @@ repos:
       - id: rst-backticks
       - id: python-check-mock-methods
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.1
+    rev: v1.5.4
     hooks:
       - id: remove-crlf
       - id: remove-tabs
@@ -50,7 +50,7 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.282
+    rev: v0.0.284
     hooks:
       - id: ruff
         args:
@@ -67,7 +67,7 @@ repos:
         alias: black
         additional_dependencies: [black>=22.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.4.1'
+    rev: 'v1.5.0'
     hooks:
       - id: mypy
         name: mypy-python-sdk

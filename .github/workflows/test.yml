@@ -217,7 +217,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           path: ./coverage
-      - name: Run coverage
+      - name: Combine coverage
         run: |
           coverage combine ./coverage/coverage*/.coverage
           coverage report
@@ -227,4 +227,4 @@ jobs:
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/coverage.xml
+          files: coverage.xml

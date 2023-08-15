@@ -148,6 +148,15 @@ class DbtToAirflowConverter:
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 
+        if not dbt_graph.nodes:
+            raise CosmosValueError(f"No nodes found for {dbt_project.name} project.")
+        if not dbt_graph.filtered_nodes:
+            raise CosmosValueError(
+                f"No dbt nodes found with the given filters. "
+                f"Please check your `select` and `exclude` filters: "
+                f"select={select} exclude={exclude}"
+            )
+
         task_args = {
             **operator_args,
             # the following args may be only needed for local / venv:

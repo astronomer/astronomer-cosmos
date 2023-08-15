@@ -48,7 +48,24 @@ def test_dbt_base_operator_add_user_supplied_flags() -> None:
     cmd, _ = dbt_base_operator.build_cmd(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    assert "--full-refresh" in cmd
+    assert cmd[-2] == "run"
+    assert cmd[-1] == "--full-refresh"
+
+
+def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
+    dbt_base_operator = DbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        base_cmd=["run"],
+        dbt_cmd_global_flags=["--cache-selected-only"],
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    assert cmd[-2] == "--cache-selected-only"
+    assert cmd[-1] == "run"
 
 
 @pytest.mark.parametrize(

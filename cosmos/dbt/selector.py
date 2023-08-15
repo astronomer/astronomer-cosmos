@@ -42,6 +42,10 @@ class SelectorConfig:
         self.config: dict[str, str] = {}
         self.other: list[str] = []
         self.load_from_statement(statement)
+        self.is_config_empty: bool = False
+
+        if not self.paths and not self.tags and not self.config and not self.other:
+            self.is_config_empty = True
 
     def load_from_statement(self, statement: str) -> None:
         """
@@ -85,7 +89,7 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     """
     selected_nodes = set()
     for node_id, node in nodes.items():
-        if not config.paths and not config.tags and not config.config:
+        if config.is_config_empty:
             continue
 
         if config.tags and not (sorted(node.tags) == sorted(config.tags)):

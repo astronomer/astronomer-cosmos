@@ -54,3 +54,4 @@ class DbtResourceType(Enum):
     SEED = "seed"
     TEST = "test"
     SOURCE = "source"
+    EXPOSURE = "exposure"

@@ -53,8 +53,8 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
 
     def transform_keyfile_json(self, keyfile_json: str | dict[str, str]) -> dict[str, str]:
         """
-        Transforms the keyfile_json param to a dict if it is a string, and
-        sets environment variables for the service account credentials.
+        Transforms the keyfile_json param to a dict if it is a string, and sets environment
+        variables for the service account json secret fields.
         """
         if isinstance(keyfile_json, dict):
             keyfile_json_dict = keyfile_json

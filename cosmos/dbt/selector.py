@@ -1,6 +1,7 @@
 from __future__ import annotations
-from pathlib import Path
 
+import copy
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cosmos.exceptions import CosmosValueError
@@ -88,22 +89,24 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     https://docs.getdbt.com/reference/node-selection/yaml-selectors
     """
     selected_nodes = set()
+
     if not config.is_empty:
         for node_id, node in nodes.items():
             if config.tags and not (sorted(node.tags) == sorted(config.tags)):
                 continue
 
             supported_node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
+            config_tag = config.config.get("tags")
             if config.config:
-                config_tag = config.config.get("tags")
                 if config_tag and config_tag not in supported_node_config.get("tags", []):
                     continue
 
                 # Remove 'tags' as they've already been filtered for
-                config.config.pop("tags", None)
+                config_copy = copy.deepcopy(config.config)
+                config_copy.pop("tags", None)
                 supported_node_config.pop("tags", None)
 
-                if not (config.config.items() <= supported_node_config.items()):
+                if not (config_copy.items() <= supported_node_config.items()):
                     continue
 
             if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):

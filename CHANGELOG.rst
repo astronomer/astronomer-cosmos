@@ -1,6 +1,27 @@
 Changelog
 =========
 
+1.1.0a1 (2023-08-16)
+--------------------
+
+Feature (pending documentation!)
+* Support dbt global flags (via dbt_cmd_global_flags in operator_args) by @tatiana in #469
+
+Enhancements
+* Hide sensitive field when using BigQuery keyfile_dict profile mapping by @jbandoro in #471
+
+Bug fixes
+* Fix bug on select node add exclude selector subset ids logic by @jensenity in #463
+* Refactor dbt ls to run from a temporary directory, to avoid Read-only file system errors during DAG parsing, by @tatiana in #414
+
+Others
+* Docs: Fix RenderConfig load argument by @jbandoro in #466
+* Enable CI integration tests from external forks by @tatiana in #458
+* Improve CI tests runtime by @tatiana in #457
+* Change CI to run coverage after tests pass by @tatiana in #461
+* Fix forks code revision in code coverage by @tatiana in #472
+* [pre-commit.ci] pre-commit autoupdate by @pre-commit-ci in #467
+
 1.0.5 (2023-08-09)
 ------------------
 

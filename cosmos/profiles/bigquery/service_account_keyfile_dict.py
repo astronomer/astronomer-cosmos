@@ -61,7 +61,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         else:
             keyfile_json_dict = json.loads(keyfile_json)
             if not isinstance(keyfile_json_dict, dict):
-                raise ValueError("keyfile_json cannot be loaded as a dict.")
+                raise CosmosValueError("keyfile_json cannot be loaded as a dict.")
 
         for field in self.secret_fields:
             value = keyfile_json_dict.get(field)

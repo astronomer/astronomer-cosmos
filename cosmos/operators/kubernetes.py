@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 # kubernetes is an optional dependency, so we need to check if it's installed
 try:
-    from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
-        convert_env_vars,
-    )
+    from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 except ImportError:
     raise ImportError(
@@ -141,10 +139,16 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(self, on_test_warning_callback: Callable[..., Any] | None = None, **kwargs: str) -> None:
+    def __init__(
+        self,
+        on_warning_callback: Callable[..., Any] | None = None,
+        on_test_warning_callback: Callable[..., Any] | None = None,
+        **kwargs: str,
+    ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["test"]
-        # as of now, on_test_warning_callback in kubernetes executor does nothing
+        # as of now, on_warning_callback in kubernetes executor does nothing
+        self.on_warning_callback = on_warning_callback
         self.on_test_warning_callback = on_test_warning_callback
 
     def execute(self, context: Context) -> Any:

@@ -31,9 +31,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
     intercept_flag = False
 
     def __init__(
-        self,
-        image: str,  # Make image a required argument since it's required by DockerOperator
-        **kwargs: Any,
+        self, image: str, **kwargs: Any,  # Make image a required argument since it's required by DockerOperator
     ) -> None:
         super().__init__(image=image, **kwargs)
 
@@ -133,10 +131,16 @@ class DbtTestDockerOperator(DbtDockerBaseOperator):
 
     ui_color = "#8194E0"
 
-    def __init__(self, on_test_warning_callback: Callable[..., Any] | None = None, **kwargs: str) -> None:
+    def __init__(
+        self,
+        on_warning_callback: Callable[..., Any] | None = None,
+        on_test_warning_callback: Callable[..., Any] | None = None,
+        **kwargs: str,
+    ) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["test"]
-        # as of now, on_test_warning_callback in docker executor does nothing
+        # as of now, on_warning_callback in docker executor does nothing
+        self.on_warning_callback = on_warning_callback
         self.on_test_warning_callback = on_test_warning_callback
 
     def execute(self, context: Context) -> Any:

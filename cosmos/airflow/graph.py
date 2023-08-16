@@ -86,6 +86,7 @@ def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
+    on_warning_callback: Callable[..., Any] | None = None,
     on_test_warning_callback: Callable[..., Any] | None = None,
     model_name: str | None = None,
 ) -> TaskMetadata:
@@ -95,13 +96,14 @@ def create_test_task_metadata(
     :param test_task_name: Name of the Airflow task to be created
     :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param on_test_warning_callback: callback function called on warnings with additional Context variables “test_names”
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     :param model_name: If the test relates to a specific model, the name of the model it relates to
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
-    task_args["on_test_warning_callback"] = on_test_warning_callback
+    task_args["on_warning_callback"] = on_warning_callback
+    task_args["on_test_warning_callback"] = on_warning_callback
     if model_name is not None:
         task_args["models"] = model_name
     return TaskMetadata(
@@ -120,6 +122,7 @@ def build_airflow_graph(
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
     conn_id: str,  # Cosmos, dataset URI
     task_group: TaskGroup | None = None,
+    on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     on_test_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     emit_datasets: bool = True,  # Cosmos
 ) -> None:
@@ -131,7 +134,7 @@ def build_airflow_graph(
     * `task_args`
 
     The parameter `test_behavior` influences how many and where test nodes will be added, while the argument
-    `on_test_warning_callback` allows users to set a callback function to be called depending on the test result.
+    `on_warning_callback` allows users to set a callback function to be called depending on the test result.
     If the `test_behavior` is None, no test nodes are added. Otherwise, if the `test_behaviour` is `after_all`,
     a single test task will be added after the Cosmos leave tasks, and it is named using `dbt_project_name`.
     Finally, if the `test_behaviour` is `after_each`, a test will be added after each model.
@@ -149,7 +152,7 @@ def build_airflow_graph(
     :param dbt_project_name: Name of the dbt pipeline of interest
     :param conn_id: Airflow connection ID
     :param task_group: Airflow Task Group instance
-    :param on_test_warning_callback: callback function called on warnings with additional Context variables “test_names”
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     :param emit_datasets: Decides if Cosmos should add outlets to model classes or not.
     """
@@ -172,6 +175,7 @@ def build_airflow_graph(
                         execution_mode,
                         task_args=task_args,
                         model_name=node.name,
+                        on_warning_callback=on_warning_callback,
                         on_test_warning_callback=on_test_warning_callback,
                     )
                     test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
@@ -189,6 +193,7 @@ def build_airflow_graph(
             f"{dbt_project_name}_test",
             execution_mode,
             task_args=task_args,
+            on_warning_callback=on_warning_callback,
             on_test_warning_callback=on_test_warning_callback,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)

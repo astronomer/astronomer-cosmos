@@ -31,7 +31,9 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
     intercept_flag = False
 
     def __init__(
-        self, image: str, **kwargs: Any,  # Make image a required argument since it's required by DockerOperator
+        self,
+        image: str,
+        **kwargs: Any,  # Make image a required argument since it's required by DockerOperator
     ) -> None:
         super().__init__(image=image, **kwargs)
 

@@ -131,20 +131,26 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         return subprocess_result
 
     def run_command(
-        self, cmd: list[str | None], env: dict[str, str | bytes | os.PathLike[Any]], context: Context,
+        self,
+        cmd: list[str | None],
+        env: dict[str, str | bytes | os.PathLike[Any]],
+        context: Context,
     ) -> FullOutputSubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             logger.info(
-                "Cloning project to writable temp directory %s from %s", tmp_dir, self.project_dir,
+                "Cloning project to writable temp directory %s from %s",
+                tmp_dir,
+                self.project_dir,
             )
 
             # need a subfolder because shutil.copytree will fail if the destination dir already exists
             tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
             shutil.copytree(
-                self.project_dir, tmp_project_dir,
+                self.project_dir,
+                tmp_project_dir,
             )
 
             # if we need to install deps, do so
@@ -170,7 +176,10 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
                 logger.info("Using environment variables keys: %s", env.keys())
                 result = self.run_subprocess(
-                    command=full_cmd, env=env, output_encoding=self.output_encoding, cwd=tmp_project_dir,
+                    command=full_cmd,
+                    env=env,
+                    output_encoding=self.output_encoding,
+                    cwd=tmp_project_dir,
                 )
 
                 self.exception_handling(result)
@@ -294,7 +303,11 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         self.on_warning_callback = on_warning_callback
         self.on_test_warning_callback = on_test_warning_callback
 
-    def _should_run_tests(self, result: FullOutputSubprocessResult, no_tests_message: str = "Nothing to do",) -> bool:
+    def _should_run_tests(
+        self,
+        result: FullOutputSubprocessResult,
+        no_tests_message: str = "Nothing to do",
+    ) -> bool:
         """
         Check if any tests are defined to run in the DAG. If tests are defined
         and on_warning_callback is set, then function returns True.
@@ -401,7 +414,13 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
 
     ui_color = "#FF9900"
 
-    def __init__(self, aws_conn_id: str, bucket_name: str, folder_dir: str | None = None, **kwargs: str,) -> None:
+    def __init__(
+        self,
+        aws_conn_id: str,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs: str,
+    ) -> None:
         "Initializes the operator."
         self.aws_conn_id = aws_conn_id
         self.bucket_name = bucket_name
@@ -415,14 +434,20 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
     def upload_to_s3(self, project_dir: str) -> None:
         "Uploads the generated documentation to S3."
         logger.info(
-            'Attempting to upload generated docs to S3 using S3Hook("%s")', self.aws_conn_id,
+            'Attempting to upload generated docs to S3 using S3Hook("%s")',
+            self.aws_conn_id,
         )
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
         target_dir = f"{project_dir}/target"
 
-        hook = S3Hook(self.aws_conn_id, extra_args={"ContentType": "text/html",},)
+        hook = S3Hook(
+            self.aws_conn_id,
+            extra_args={
+                "ContentType": "text/html",
+            },
+        )
 
         for filename in self.required_files:
             logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
@@ -430,7 +455,10 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 
             hook.load_file(
-                filename=f"{target_dir}/{filename}", bucket_name=self.bucket_name, key=key, replace=True,
+                filename=f"{target_dir}/{filename}",
+                bucket_name=self.bucket_name,
+                key=key,
+                replace=True,
             )
 
 
@@ -446,7 +474,13 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
 
     ui_color = "#007FFF"
 
-    def __init__(self, azure_conn_id: str, container_name: str, folder_dir: str | None = None, **kwargs: str,) -> None:
+    def __init__(
+        self,
+        azure_conn_id: str,
+        container_name: str,
+        folder_dir: str | None = None,
+        **kwargs: str,
+    ) -> None:
         "Initializes the operator."
         self.azure_conn_id = azure_conn_id
         self.container_name = container_name
@@ -468,11 +502,15 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
 
         target_dir = f"{project_dir}/target"
 
-        hook = WasbHook(self.azure_conn_id,)
+        hook = WasbHook(
+            self.azure_conn_id,
+        )
 
         for filename in self.required_files:
             logger.info(
-                "Uploading %s to %s", filename, f"wasb://{self.container_name}/{filename}",
+                "Uploading %s to %s",
+                filename,
+                f"wasb://{self.container_name}/{filename}",
             )
 
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename

@@ -2,12 +2,41 @@ from pathlib import Path
 
 import pytest
 
+from cosmos.dbt.selector import SelectorConfig
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
 from cosmos.dbt.selector import select_nodes
 from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
+
+
+@pytest.fixture
+def selector_config():
+    project_dir = Path("/path/to/project")
+    statement = ""
+    return SelectorConfig(project_dir, statement)
+
+
+@pytest.mark.parametrize(
+    "paths, tags, config, other, expected",
+    [
+        ([], [], {}, [], True),
+        ([Path("path1")], [], {}, [], False),
+        ([], ["tag:has_child"], {}, [], False),
+        ([], [], {"config.tags:test"}, [], False),
+        ([], [], {}, ["other"], False),
+        ([Path("path1")], ["tag:has_child"], {"config.tags:test"}, ["other"], False),
+    ],
+)
+def test_is_empty_config(selector_config, paths, tags, config, other, expected):
+    selector_config.paths = paths
+    selector_config.tags = tags
+    selector_config.config = config
+    selector_config.other = other
+
+    assert selector_config.is_empty == expected
+
 
 grandparent_node = DbtNode(
     name="grandparent",
@@ -37,10 +66,32 @@ child_node = DbtNode(
     config={"materialized": "table", "tags": ["is_child"]},
 )
 
+grandchild_1_test_node = DbtNode(
+    name="grandchild_1",
+    unique_id="grandchild_1",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=["parent"],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/grandchild_1.sql",
+    tags=["nightly"],
+    config={"materialized": "table", "tags": ["deprecated", "test"]},
+)
+
+grandchild_2_test_node = DbtNode(
+    name="grandchild_2",
+    unique_id="grandchild_2",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=["parent"],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/grandchild_2.sql",
+    tags=["nightly"],
+    config={"materialized": "table", "tags": ["deprecated", "test2"]},
+)
+
 sample_nodes = {
     grandparent_node.unique_id: grandparent_node,
     parent_node.unique_id: parent_node,
     child_node.unique_id: child_node,
+    grandchild_1_test_node.unique_id: grandchild_1_test_node,
+    grandchild_2_test_node.unique_id: grandchild_2_test_node,
 }
 
 
@@ -52,13 +103,19 @@ def test_select_nodes_by_select_tag():
 
 def test_select_nodes_by_select_config():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.materialized:table"])
-    expected = {child_node.unique_id: child_node}
+    expected = {
+        child_node.unique_id: child_node,
+        grandchild_1_test_node.unique_id: grandchild_1_test_node,
+        grandchild_2_test_node.unique_id: grandchild_2_test_node,
+    }
     assert selected == expected
 
 
 def test_select_nodes_by_select_config_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child"])
-    expected = {child_node.unique_id: child_node}
+    expected = {
+        child_node.unique_id: child_node,
+    }
     assert selected == expected
 
 
@@ -70,6 +127,21 @@ def test_select_nodes_by_select_union_config_tag():
         grandparent_node.unique_id: grandparent_node,
         parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_select_union_config_test_tags():
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        select=["config.tags:test", "config.tags:test2", "config.materialized:view"],
+    )
+    expected = {
+        grandparent_node.unique_id: grandparent_node,
+        parent_node.unique_id: parent_node,
+        grandchild_1_test_node.unique_id: grandchild_1_test_node,
+        grandchild_2_test_node.unique_id: grandchild_2_test_node,
     }
     assert selected == expected
 
@@ -95,6 +167,8 @@ def test_select_nodes_by_select_union():
         grandparent_node.unique_id: grandparent_node,
         parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
+        grandchild_1_test_node.unique_id: grandchild_1_test_node,
+        grandchild_2_test_node.unique_id: grandchild_2_test_node,
     }
     assert selected == expected
 
@@ -106,7 +180,11 @@ def test_select_nodes_by_select_intersection():
 
 def test_select_nodes_by_exclude_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["tag:has_child"])
-    expected = {child_node.unique_id: child_node}
+    expected = {
+        child_node.unique_id: child_node,
+        grandchild_1_test_node.unique_id: grandchild_1_test_node,
+        grandchild_2_test_node.unique_id: grandchild_2_test_node,
+    }
     assert selected == expected
 
 
@@ -121,4 +199,16 @@ def test_select_nodes_by_select_union_exclude_tags():
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.materialized:view"], exclude=["tag:has_child"]
     )
     expected = {}
+    assert selected == expected
+
+
+def test_select_nodes_by_exclude_union_config_test_tags():
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["config.tags:test", "config.tags:test2"]
+    )
+    expected = {
+        grandparent_node.unique_id: grandparent_node,
+        parent_node.unique_id: parent_node,
+        child_node.unique_id: child_node,
+    }
     assert selected == expected

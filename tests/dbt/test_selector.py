@@ -35,7 +35,7 @@ def test_is_empty_config(selector_config, paths, tags, config, other, expected):
     selector_config.config = config
     selector_config.other = other
 
-    assert selector_config.is_empty_config == expected
+    assert selector_config.is_empty == expected
 
 
 grandparent_node = DbtNode(

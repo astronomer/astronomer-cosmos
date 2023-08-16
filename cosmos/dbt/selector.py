@@ -44,8 +44,8 @@ class SelectorConfig:
         self.load_from_statement(statement)
 
     @property
-    def is_empty_config(self) -> bool:
-        return not self.paths and not self.tags and not self.config and not self.other
+    def is_empty(self) -> bool:
+        return not (self.paths or self.tags or self.config or self.other)
 
     def load_from_statement(self, statement: str) -> None:
         """
@@ -88,28 +88,28 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     https://docs.getdbt.com/reference/node-selection/yaml-selectors
     """
     selected_nodes = set()
-    if not config.is_empty_config:
+    if not config.is_empty:
         for node_id, node in nodes.items():
-        if config.tags and not (sorted(node.tags) == sorted(config.tags)):
-            continue
-
-        supported_node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
-        if config.config:
-            config_tag = config.config.get("tags")
-            if config_tag and config_tag not in supported_node_config.get("tags", []):
+            if config.tags and not (sorted(node.tags) == sorted(config.tags)):
                 continue
 
-            # Remove 'tags' as they've already been filtered for
-            config.config.pop("tags", None)
-            supported_node_config.pop("tags", None)
+            supported_node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
+            if config.config:
+                config_tag = config.config.get("tags")
+                if config_tag and config_tag not in supported_node_config.get("tags", []):
+                    continue
 
-            if not (config.config.items() <= supported_node_config.items()):
+                # Remove 'tags' as they've already been filtered for
+                config.config.pop("tags", None)
+                supported_node_config.pop("tags", None)
+
+                if not (config.config.items() <= supported_node_config.items()):
+                    continue
+
+            if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):
                 continue
 
-        if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):
-            continue
-
-        selected_nodes.add(node_id)
+            selected_nodes.add(node_id)
 
     return selected_nodes
 

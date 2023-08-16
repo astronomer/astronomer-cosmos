@@ -2,12 +2,41 @@ from pathlib import Path
 
 import pytest
 
+from cosmos.dbt.selector import SelectorConfig
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
 from cosmos.dbt.selector import select_nodes
 from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
+
+
+@pytest.fixture
+def selector_config():
+    project_dir = Path("/path/to/project")
+    statement = ""
+    return SelectorConfig(project_dir, statement)
+
+
+@pytest.mark.parametrize(
+    "paths, tags, config, other, expected",
+    [
+        ([], [], {}, [], True),
+        ([Path("path1")], [], {}, [], False),
+        ([], ["tag:has_child"], {}, [], False),
+        ([], [], {"config.tags:test"}, [], False),
+        ([], [], {}, ["other"], False),
+        ([Path("path1")], ["tag:has_child"], {"config.tags:test"}, ["other"], False),
+    ],
+)
+def test_is_empty_config(selector_config, paths, tags, config, other, expected):
+    selector_config.paths = paths
+    selector_config.tags = tags
+    selector_config.config = config
+    selector_config.other = other
+
+    assert selector_config.is_empty_config == expected
+
 
 grandparent_node = DbtNode(
     name="grandparent",

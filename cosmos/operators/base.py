@@ -55,6 +55,7 @@ class DbtBaseOperator(BaseOperator):
     :param dbt_executable_path: Path to dbt executable can be used with venv
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
     :param dbt_cmd_flags: List of flags to pass to dbt command
+    :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -100,6 +101,7 @@ class DbtBaseOperator(BaseOperator):
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = "dbt",
         dbt_cmd_flags: list[str] | None = None,
+        dbt_cmd_global_flags: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -132,6 +134,7 @@ class DbtBaseOperator(BaseOperator):
         else:
             self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
+        self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
@@ -209,6 +212,8 @@ class DbtBaseOperator(BaseOperator):
         cmd_flags: list[str] | None = None,
     ) -> Tuple[list[str | None], dict[str, str | bytes | os.PathLike[Any]]]:
         dbt_cmd = [self.dbt_executable_path]
+
+        dbt_cmd.extend(self.dbt_cmd_global_flags)
 
         if self.base_cmd:
             dbt_cmd.extend(self.base_cmd)

@@ -5,19 +5,20 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from logging import getLogger
 from typing import Any
 
 from typing import TYPE_CHECKING
 import yaml
 
 from airflow.hooks.base import BaseHook
+
 from cosmos.exceptions import CosmosValueError
+from cosmos.log import get_logger
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BaseProfileMapping(ABC):

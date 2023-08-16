@@ -4,9 +4,9 @@ from typing import Any, Tuple
 try:
     from airflow.datasets import Dataset
 except (ImportError, ModuleNotFoundError):
-    from logging import getLogger
+    from cosmos.log import get_logger
 
-    logger = getLogger(__name__)
+    logger = get_logger(__name__)
 
     class Dataset:  # type: ignore[no-redef]
         cosmos_override = True

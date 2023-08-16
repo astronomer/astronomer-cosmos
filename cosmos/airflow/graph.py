@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, Callable
 
 from airflow.models.dag import DAG
@@ -11,10 +10,11 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dataset import get_dbt_dataset
 from cosmos.dbt.graph import DbtNode
+from cosmos.log import get_logger
 from airflow.models import BaseOperator
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def calculate_operator_class(

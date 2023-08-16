@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
-
 
 from airflow.compat.functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
+from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtDocsLocalOperator,
     DbtLocalBaseOperator,
@@ -24,7 +23,7 @@ from cosmos.operators.local import (
 if TYPE_CHECKING:
     from airflow.utils.context import Context
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 PY_INTERPRETER = "python3"

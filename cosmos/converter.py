@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import inspect
-import logging
 from typing import Any, Callable
 from pathlib import Path
 
@@ -17,9 +16,10 @@ from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
 from cosmos.exceptions import CosmosValueError
+from cosmos.log import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:

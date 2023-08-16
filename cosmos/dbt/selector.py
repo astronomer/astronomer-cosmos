@@ -1,10 +1,10 @@
 from __future__ import annotations
-import logging
 from pathlib import Path
 
 from typing import TYPE_CHECKING
 
 from cosmos.exceptions import CosmosValueError
+from cosmos.log import get_logger
 
 if TYPE_CHECKING:
     from cosmos.dbt.graph import DbtNode
@@ -16,7 +16,7 @@ TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SelectorConfig:
@@ -89,8 +89,17 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
             continue
 
         supported_node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
-        if config.config and not (config.config.items() <= supported_node_config.items()):
-            continue
+        if config.config:
+            config_tag = config.config.get("tags")
+            if config_tag and config_tag not in supported_node_config.get("tags", []):
+                continue
+
+            # Remove 'tags' as they've already been filtered for
+            config.config.pop("tags", None)
+            supported_node_config.pop("tags", None)
+
+            if not (config.config.items() <= supported_node_config.items()):
+                continue
 
         if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):
             continue

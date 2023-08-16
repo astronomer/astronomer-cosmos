@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
-logger = logging.getLogger(__name__)
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass

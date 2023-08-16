@@ -162,7 +162,7 @@ test-integration = """pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not test_example_dag[example_cosmos_python_models]'
+-k 'not (test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv])'
 """
 test-integration-expensive = """pytest -vv \
 --cov=cosmos \
@@ -170,7 +170,7 @@ test-integration-expensive = """pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'test_example_dag[example_cosmos_python_models]'"""
+-k 'test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv]'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [

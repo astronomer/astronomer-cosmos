@@ -88,8 +88,8 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     https://docs.getdbt.com/reference/node-selection/yaml-selectors
     """
     selected_nodes = set()
-    if not config.is_empty:
-        for node_id, node in nodes.items():
+    for node_id, node in nodes.items():
+        if not config.is_empty:
             if config.tags and not (sorted(node.tags) == sorted(config.tags)):
                 continue
 

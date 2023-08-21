@@ -161,7 +161,7 @@ class DbtGraph:
                     if child_name not in ignore_paths:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
 
-                local_flags=[
+                local_flags = [
                         "--project-dir",
                         str(tmpdir),
                         "--profiles-dir",

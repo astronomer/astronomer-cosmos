@@ -80,12 +80,12 @@ class DbtGraph:
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
         profile_config: ProfileConfig | None = None,
-        dbt_deps: bool | None = True,
     ):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
         self.profile_config = profile_config
+
         # specific to loading using ls
         self.dbt_deps = dbt_deps
         self.dbt_cmd = dbt_cmd
@@ -146,7 +146,6 @@ class DbtGraph:
 
         with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
             (profile_path, env_vars) = profile_values
-
             env = os.environ.copy()
             env.update(env_vars)
 
@@ -229,10 +228,10 @@ class DbtGraph:
                             logger.debug(line.strip())
 
                 if stderr or "Error" in stdout:
-                    details = stderr or stdout
                     if 'Run "dbt deps" to install package dependencies' in stdout:
-                        raise CosmosLoadDbtException("Unable to run dbt ls command due to dbt_packages not installed.")
+                        raise CosmosLoadDbtException("Unable to run dbt ls command due to dbt_packages not installed. Set dbpt")
                     else:
+                        details = stderr or stdout
                         raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")
 
                 nodes = {}

@@ -147,10 +147,12 @@ class DbtGraph:
 
         with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
             (profile_path, env_vars) = profile_values
+
             env = os.environ.copy()
             env.update(env_vars)
 
             with tempfile.TemporaryDirectory() as tmpdir:
+<<<<<<< HEAD
                 logger.info("Creating symlinks from %s to `%s`", self.project.dir, tmpdir)
                 # We create symbolic links to the original directory files and directories.
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary

@@ -143,14 +143,6 @@ class DbtGraph:
         if not shutil.which(self.dbt_cmd):
             raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
 
-        command = [self.dbt_cmd, "ls", "--output", "json"]
-
-        if self.exclude:
-            command.extend(["--exclude", *self.exclude])
-
-        if self.select:
-            command.extend(["--select", *self.select])
-
         with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
             (profile_path, env_vars) = profile_values
             env = os.environ.copy()
@@ -167,8 +159,7 @@ class DbtGraph:
                     if child_name not in ignore_paths:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
 
-                command.extend(
-                    [
+                local_flags=[
                         "--project-dir",
                         str(tmpdir),
                         "--profiles-dir",
@@ -178,16 +169,48 @@ class DbtGraph:
                         "--target",
                         self.profile_config.target_name,
                     ]
-                )
-                logger.info("Running command: `%s`", " ".join(command))
-                logger.info("Environment variable keys: %s", env.keys())
                 log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
 
+                if self.dbt_deps:
+                    deps_command=[self.dbt_cmd, "deps"]
+                    deps_command.extend(local_flags)
+                    logger.info("Running command: `%s`", " ".join(deps_command))
+                    logger.info("Environment variable keys: %s", env.keys())
+
+                    process = Popen(
+                        deps_command,
+                        stdout=PIPE,
+                        stderr=PIPE,
+                        cwd=tmpdir,
+                        universal_newlines=True,
+                        env=env,
+                    )
+                    stdout, stderr = process.communicate()
+
+                    logger.debug("dbt deps output: %s", stdout)
+
+                    if stderr or "Error" in stdout:
+                        details = stderr or stdout
+                        raise CosmosLoadDbtException(f"Unable to run dbt deps command due to the error:\n{details}")
+
+                ls_command = [self.dbt_cmd, "ls", "--output", "json"]
+
+                if self.exclude:
+                    ls_command.extend(["--exclude", *self.exclude])
+
+                if self.select:
+                    ls_command.extend(["--select", *self.select])
+
+                ls_command.extend(local_flags)
+
+                logger.info("Running command: `%s`", " ".join(ls_command))
+                logger.info("Environment variable keys: %s", env.keys())
+
                 process = Popen(
-                    command,
+                    ls_command,
                     stdout=PIPE,
                     stderr=PIPE,
                     cwd=tmpdir,
@@ -206,8 +229,11 @@ class DbtGraph:
                             logger.debug(line.strip())
 
                 if stderr or "Error" in stdout:
-                    details = stderr or stdout
-                    raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
+                    if 'Run "dbt deps" to install package dependencies' in stdout:
+                        raise CosmosLoadDbtException("Unable to run dbt ls command due to dbt_packages not installed. Set dbpt")
+                    else:
+                        details = stderr or stdout
+                        raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")
 
                 nodes = {}
                 for line in stdout.split("\n"):

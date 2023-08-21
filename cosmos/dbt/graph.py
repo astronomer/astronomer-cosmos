@@ -191,7 +191,6 @@ class DbtGraph:
                         env=env,
                     )
                     stdout, stderr = process.communicate()
-
                     logger.debug("dbt deps output: %s", stdout)
 
                     if stderr or "Error" in stdout:

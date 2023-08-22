@@ -30,6 +30,7 @@ class RenderConfig:
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
+    :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
     """
 
     emit_datasets: bool = True
@@ -37,6 +38,7 @@ class RenderConfig:
     load_method: LoadMode = LoadMode.AUTOMATIC
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
+    dbt_deps: bool = True
 
 
 @dataclass

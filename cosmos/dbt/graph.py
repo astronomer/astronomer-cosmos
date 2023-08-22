@@ -76,6 +76,7 @@ class DbtGraph:
     def __init__(
         self,
         project: DbtProject,
+        dbt_deps: bool,
         exclude: list[str] | None = None,
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
@@ -183,7 +184,6 @@ class DbtGraph:
                     deps_command.extend(local_flags)
                     logger.info("Running command: `%s`", " ".join(deps_command))
                     logger.info("Environment variable keys: %s", env.keys())
-
                     process = Popen(
                         deps_command,
                         stdout=PIPE,

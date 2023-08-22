@@ -76,7 +76,6 @@ class DbtGraph:
     def __init__(
         self,
         project: DbtProject,
-        dbt_deps: bool,
         exclude: list[str] | None = None,
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),

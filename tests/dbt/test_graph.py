@@ -251,9 +251,10 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
     expected = "Unable to find the dbt executable: /inexistent/dbt"
     assert err_info.value.args[0] == expected
 
-
-def test_load_via_dbt_ls_without_dbt_deps():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+@pytest.mark.integration
+@pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
+def test_load_via_dbt_ls_without_dbt_deps(pipeline_name):
+    dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(
         dbt_deps=False,
         project=dbt_project,

@@ -231,10 +231,10 @@ class DbtGraph:
                             logger.debug(line.strip())
 
                 if stderr or "Error" in stdout:
+                    details = stderr or stdout
                     if 'Run "dbt deps" to install package dependencies' in stdout:
                         raise CosmosLoadDbtException("Unable to run dbt ls command due to dbt_packages not installed. Set dbpt")
                     else:
-                        details = stderr or stdout
                         raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")
 
                 nodes = {}

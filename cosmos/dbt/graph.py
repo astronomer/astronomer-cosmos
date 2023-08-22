@@ -81,23 +81,14 @@ class DbtGraph:
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
         profile_config: ProfileConfig | None = None,
-<<<<<<< HEAD
         dbt_deps: bool | None = True,
-=======
-        
->>>>>>> 9130816 (Adding dbt_deps option in render config)
     ):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
         self.profile_config = profile_config
-<<<<<<< HEAD
-        self.dbt_deps = dbt_deps
-=======
-        self.dbt_deps=dbt_deps
->>>>>>> 9130816 (Adding dbt_deps option in render config)
-
         # specific to loading using ls
+        self.dbt_deps = dbt_deps
         self.dbt_cmd = dbt_cmd
 
     def load(

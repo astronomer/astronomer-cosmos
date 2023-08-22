@@ -8,7 +8,6 @@ from airflow.utils.task_group import TaskGroup
 from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
-from cosmos.dataset import get_dbt_dataset
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from airflow.models import BaseOperator
@@ -167,8 +166,8 @@ def build_airflow_graph(
     # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
     for node_id, node in nodes.items():
         task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=task_args)
-        if emit_datasets:
-            task_args["outlets"] = [get_dbt_dataset(conn_id, dbt_project_name, node.name)]
+        # if emit_datasets:
+        #    task_args["outlets"] = [get_dbt_dataset(conn_id, dbt_project_name, node.name)]
         if task_meta and node.resource_type != DbtResourceType.TEST:
             if node.resource_type == DbtResourceType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
@@ -190,7 +189,7 @@ def build_airflow_graph(
     # If test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
-        task_args.pop("outlets", None)
+        # task_args.pop("outlets", None)
         test_meta = create_test_task_metadata(
             f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback
         )

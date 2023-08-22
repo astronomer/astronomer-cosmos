@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 from typing import Any, Sequence, Tuple
 
 import yaml
@@ -9,6 +8,7 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
+from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
 
@@ -99,7 +99,7 @@ class DbtBaseOperator(BaseOperator):
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
         cancel_query_on_kill: bool = True,
-        dbt_executable_path: str = "dbt",
+        dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
         dbt_cmd_global_flags: list[str] | None = None,
         **kwargs: Any,
@@ -124,15 +124,7 @@ class DbtBaseOperator(BaseOperator):
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
         self.cancel_query_on_kill = cancel_query_on_kill
-        # dbt-ol is the OpenLineage wrapper for dbt, which automatically
-        # generates and emits lineage data to a specified backend.
-        dbt_ol_path = shutil.which("dbt-ol")
-        if dbt_executable_path == "dbt" and shutil.which("dbt-ol"):
-            self.dbt_executable_path = dbt_ol_path
-        elif dbt_executable_path == "dbt":
-            self.dbt_executable_path = shutil.which("dbt")
-        else:
-            self.dbt_executable_path = dbt_executable_path
+        self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         super().__init__(**kwargs)

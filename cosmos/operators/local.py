@@ -8,11 +8,19 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import yaml
+from airflow import Dataset, DAG
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
-from airflow.utils.session import NEW_SESSION, provide_session
+from airflow.utils.session import NEW_SESSION, create_session, provide_session
+
+try:
+    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+except ModuleNotFoundError:
+    is_open_lineage_available = False
+else:
+    is_open_lineage_available = True
 from sqlalchemy.orm import Session
 
 from cosmos.config import ProfileConfig
@@ -135,6 +143,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         cmd: list[str | None],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
+        emit_openlineage: bool = False,
     ) -> FullOutputSubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -181,6 +190,15 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
+                if emit_openlineage and is_open_lineage_available:
+                    dataset_uris = self.get_openlineage_dataset_uris(env, tmp_project_dir)
+                    outlets = [Dataset(uri) for uri in dataset_uris]
+                    self.register_outlets(outlets)
+                    # TODO:
+                    # - register inlets
+                    # - expose the lineage through the get_openlineage_facets methods - references:
+                    # https://github.com/OpenLineage/OpenLineage/blob/main/integration/airflow/openlineage/airflow/extractors/dbt_cloud_extractor.py#L181
+                    # https://github.com/OpenLineage/OpenLineage/blob/main/integration/airflow/openlineage/airflow/extractors/manager.py#L40
 
                 self.exception_handling(result)
                 self.store_compiled_sql(tmp_project_dir, context)
@@ -189,13 +207,60 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
                 return result
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
+    def get_openlineage_dataset_uris(self, env: dict, project_dir: Path) -> list[str]:
+        """
+        Use openlineage-dbt to extract lineage events from the artifacts generated after running the dbt command.
+        Relies on the following files:
+        * profiles
+        * {project_dir}/target/manifest.json
+        * {project_dir}/target/run_results.json
+
+        Return a list of Dataset URIs (strings).
+        """
+        # Since openlineage-dbt relies on the profiles definition, we need to make these newly introduced environment
+        # variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment variables
+        # as an argument, so we need to inject them to the system environment variables.
+        for key, value in env.items():
+            os.environ[key] = value
+
+        openlineage_processor = DbtLocalArtifactProcessor(
+            producer="https://github.com/astronomer/astronomer-cosmos/",
+            job_namespace=os.getenv("OPENLINEAGE_NAMESPACE"),
+            project_dir=project_dir,
+            profile_name=self.profile_config.profile_name,
+            target=self.profile_config.target_name,
+        )
+        events = openlineage_processor.parse()
+        dataset_uris = []
+        # TODO: handle the scenario when it is not successful
+        # also extract inlets
+        for completed in events.completes:
+            for output in completed.outputs:
+                dataset_uri = output.namespace + "/" + output.name
+                dataset_uris.append(dataset_uri)
+        return dataset_uris
+
+    def register_outlets(self, new_outlets: list[Dataset]) -> None:
+        """
+        Register a list of datasets as outlets of the current task.
+        Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
+        """
+        with create_session() as session:
+            self.outlets.extend(new_outlets)
+            for task in self.dag.tasks:
+                if task.task_id == self.task_id:
+                    task.outlets.extend(new_outlets)
+            DAG.bulk_write_to_db([self.dag], session=session)
+            session.commit()
+
+    def build_and_run_cmd(
+        self, context: Context, cmd_flags: list[str] | None = None, emit_openlineage: bool = False
+    ) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
-        return self.run_command(cmd=dbt_cmd, env=env, context=context)
+        return self.run_command(cmd=dbt_cmd, env=env, context=context, emit_openlineage=emit_openlineage)
 
     def execute(self, context: Context) -> str:
-        # TODO is this going to put loads of unnecessary stuff in to xcom?
-        return self.build_and_run_cmd(context=context).output
+        self.build_and_run_cmd(context=context).output
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -245,7 +310,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags, emit_openlineage=True)
         return result.output
 
 
@@ -262,7 +327,7 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["snapshot"]
 
     def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
+        result = self.build_and_run_cmd(context=context, emit_openlineage=True)
         return result.output
 
 
@@ -279,8 +344,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["run"]
 
     def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
+        self.build_and_run_cmd(context=context, emit_openlineage=True).output
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
@@ -333,7 +397,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
             self.on_warning_callback(warning_context)
 
     def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
+        result = self.build_and_run_cmd(context=context, emit_openlineage=True)
 
         if not self._should_run_tests(result):
             return result.output

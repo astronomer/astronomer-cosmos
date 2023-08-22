@@ -11,6 +11,7 @@ DBT_LOG_DIR_NAME = "logs"
 DBT_TARGET_PATH_ENVVAR = "DBT_TARGET_PATH"
 DBT_TARGET_DIR_NAME = "target"
 DBT_LOG_FILENAME = "dbt.log"
+DBT_BINARY_NAME = "dbt"
 
 
 class LoadMode(Enum):

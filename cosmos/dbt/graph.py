@@ -157,7 +157,7 @@ class DbtGraph:
             env.update(env_vars)
 
             with tempfile.TemporaryDirectory() as tmpdir:
-                logger.info("Creating symlinks to the project from: `%s`", tmpdir)
+                logger.info("Creating symlinks from %s to `%s`", self.project.dir, tmpdir)
                 # We create symbolic links to the original directory files and directories.
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary
                 # artifact and also allow us to run `dbt deps`

@@ -16,7 +16,6 @@ from cosmos.constants import (
     LoadMode,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
-    DBT_TARGET_PATH_ENVVAR,
 )
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
@@ -151,29 +150,35 @@ class DbtGraph:
 
         with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
             (profile_path, env_vars) = profile_values
-            command.extend(
-                [
-                    "--project-dir",
-                    str(self.project.dir),
-                    "--profiles-dir",
-                    str(profile_path.parent),
-                    "--profile",
-                    self.profile_config.profile_name,
-                    "--target",
-                    self.profile_config.target_name,
-                ]
-            )
-
             env = os.environ.copy()
             env.update(env_vars)
 
             with tempfile.TemporaryDirectory() as tmpdir:
+                logger.info("Creating symlinks to the project from: `%s`", tmpdir)
+                # We create symbolic links to the original directory files and directories.
+                # This allows us to run the dbt command from within the temporary directory, outputting any necessary
+                # artifact and also allow us to run `dbt deps`
+                tmpdir_path = Path(tmpdir)
+                ignore_paths = ("target", "logs")
+                for child_name in os.listdir(self.project.dir):
+                    if child_name not in ignore_paths:
+                        os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
+
+                command.extend(
+                    [
+                        "--project-dir",
+                        str(tmpdir),
+                        "--profiles-dir",
+                        str(profile_path.parent),
+                        "--profile",
+                        self.profile_config.profile_name,
+                        "--target",
+                        self.profile_config.target_name,
+                    ]
+                )
                 logger.info("Running command: `%s`", " ".join(command))
                 logger.info("Environment variable keys: %s", env.keys())
                 log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir)
-                target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir)
-                env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
-                env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
 
                 process = Popen(
                     command,
@@ -194,7 +199,7 @@ class DbtGraph:
                         for line in logfile:
                             logger.debug(line.strip())
 
-                if stderr or "Runtime Error" in stdout:
+                if stderr or "Error" in stdout:
                     details = stderr or stdout
                     raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
 

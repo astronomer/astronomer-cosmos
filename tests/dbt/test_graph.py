@@ -172,6 +172,7 @@ def test_load_via_dbt_ls_with_exclude():
             ),
         ),
     )
+
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     assert len(dbt_graph.nodes) == 7

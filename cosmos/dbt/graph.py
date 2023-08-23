@@ -16,6 +16,9 @@ from cosmos.constants import (
     LoadMode,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
+    DBT_TARGET_PATH_ENVVAR,
+    DBT_LOG_DIR_NAME,
+    DBT_TARGET_DIR_NAME,
 )
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
@@ -159,7 +162,7 @@ class DbtGraph:
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary
                 # artifact and also allow us to run `dbt deps`
                 tmpdir_path = Path(tmpdir)
-                ignore_paths = ("target", "logs")
+                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME)
                 for child_name in os.listdir(self.project.dir):
                     if child_name not in ignore_paths:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
@@ -178,7 +181,10 @@ class DbtGraph:
                 )
                 logger.info("Running command: `%s`", " ".join(command))
                 logger.info("Environment variable keys: %s", env.keys())
-                log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir)
+                log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
+                target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
+                env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
+                env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
 
                 process = Popen(
                     command,

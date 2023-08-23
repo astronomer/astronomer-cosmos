@@ -162,7 +162,7 @@ class DbtGraph:
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary
                 # artifact and also allow us to run `dbt deps`
                 tmpdir_path = Path(tmpdir)
-                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME)
+                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "profiles.yml")
                 for child_name in os.listdir(self.project.dir):
                     if child_name not in ignore_paths:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)

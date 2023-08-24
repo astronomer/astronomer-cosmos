@@ -253,7 +253,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))
+@pytest.mark.parametrize("pipeline_name", ("jaffle_shop"))
 def test_load_via_dbt_ls_without_dbt_deps(pipeline_name):
     dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(

@@ -48,6 +48,7 @@ def get_dag_ids() -> list[str]:
     return dag_bag.dag_ids
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_parse_dags_without_connections(dag_id: str):
     dag_bag = get_dag_bag()

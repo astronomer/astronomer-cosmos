@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Render 3rd party workflows in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 authors = [
     { name = "Astronomer", email = "humans@astronomer.io" },
 ]
@@ -135,7 +135,7 @@ dependencies = [
 ]
 
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.7", "3.8", "3.9", "3.10"]
+python = ["3.8", "3.9", "3.10"]
 airflow = ["2.3", "2.4", "2.5", "2.6", "2.7"]
 
 [tool.hatch.envs.tests.overrides]

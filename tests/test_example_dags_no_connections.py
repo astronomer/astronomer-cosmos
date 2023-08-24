@@ -5,11 +5,8 @@ from pathlib import Path
 import airflow
 import pytest
 from airflow.models.dagbag import DagBag
-from airflow.utils.db import create_default_connections
-from airflow.utils.session import provide_session
 from packaging.version import Version
 
-from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"

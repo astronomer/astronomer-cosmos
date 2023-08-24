@@ -144,7 +144,7 @@ class BaseProfileMapping(ABC):
             logger.info("Using mock values for profile %s")
         else:
             profile_vars = self.profile
-            logger.info("Using real values for profile %s")
+            logger.info("Using real values for profile %s", profile_name)
 
         # filter out any null values
         profile_vars = {k: v for k, v in profile_vars.items() if v is not None}

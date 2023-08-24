@@ -141,7 +141,7 @@ class BaseProfileMapping(ABC):
         """
         if use_mock_values:
             profile_vars = self.mock_profile
-            logger.info("Using mock values for profile %s")
+            logger.info("Using mock values for profile %s", profile_name)
         else:
             profile_vars = self.profile
             logger.info("Using real values for profile %s", profile_name)

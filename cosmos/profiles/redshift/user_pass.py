@@ -14,6 +14,7 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "redshift"
+    dbt_profile_type: str = "redshift"
 
     required_fields = [
         "host",
@@ -41,7 +42,6 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
         "Gets profile."
         profile = {
             **self.mapped_params,
-            "type": "redshift",
             "port": 5439,
             **self.profile_args,
             # password should always get set as env var
@@ -49,3 +49,13 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
         }
 
         return self.filter_null(profile)
+
+    @property
+    def mock_profile(self) -> dict[str, Any | None]:
+        "Gets mock profile. Defaults port to 5439."
+        parent_mock = super().mock_profile
+
+        return {
+            **parent_mock,
+            "port": 5439,
+        }

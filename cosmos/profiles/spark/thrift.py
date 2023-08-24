@@ -14,6 +14,8 @@ class SparkThriftProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "spark"
+    dbt_profile_type: str = "spark"
+    dbt_profile_method: str = "thrift"
     is_community: bool = True
 
     required_fields = [
@@ -33,8 +35,6 @@ class SparkThriftProfileMapping(BaseProfileMapping):
         """
         profile_vars = {
             **self.mapped_params,
-            "type": "spark",
-            "method": "thrift",
             **self.profile_args,
         }
 

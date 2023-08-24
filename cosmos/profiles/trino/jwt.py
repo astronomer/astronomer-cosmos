@@ -14,6 +14,8 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
     https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 
+    dbt_profile_method: str = "jwt"
+
     required_fields = TrinoBaseProfileMapping.required_fields + [
         "jwt_token",
     ]
@@ -36,7 +38,6 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
 
         profile_vars = {
             **common_profile_vars,
-            "method": "jwt",
             **profile_args,
             # jwt_token should always get set as env var
             "jwt_token": self.get_env_var_format("jwt_token"),

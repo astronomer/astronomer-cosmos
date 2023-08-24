@@ -149,7 +149,7 @@ class DbtGraph:
         if self.select:
             command.extend(["--select", *self.select])
 
-        with self.profile_config.ensure_profile() as profile_values:
+        with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
             (profile_path, env_vars) = profile_values
             command.extend(
                 [

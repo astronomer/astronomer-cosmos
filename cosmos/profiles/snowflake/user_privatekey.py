@@ -18,6 +18,7 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "snowflake"
+    dbt_profile_type: str = "snowflake"
     is_community: bool = True
 
     required_fields = [
@@ -65,7 +66,6 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
         "Gets profile."
         profile_vars = {
             **self.mapped_params,
-            "type": "snowflake",
             **self.profile_args,
             # private_key should always get set as env var
             "private_key_content": self.get_env_var_format("private_key_content"),

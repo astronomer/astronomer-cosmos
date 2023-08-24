@@ -14,6 +14,8 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
     https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 
+    dbt_profile_method: str = "ldap"
+
     required_fields = TrinoBaseProfileMapping.required_fields + [
         "user",
         "password",
@@ -36,7 +38,6 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
         profile_vars = {
             **self.mapped_params,
             **common_profile_vars,
-            "method": "ldap",
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),

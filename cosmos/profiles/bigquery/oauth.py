@@ -16,6 +16,8 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "google_cloud_platform"
+    dbt_profile_type: str = "bigquery"
+    dbt_profile_method: str = "oauth"
 
     required_fields = [
         "project",
@@ -32,8 +34,17 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
         "Generates profile. Defaults `threads` to 1."
         return {
             **self.mapped_params,
-            "type": "bigquery",
             "method": "oauth",
             "threads": 1,
             **self.profile_args,
+        }
+
+    @property
+    def mock_profile(self) -> dict[str, Any | None]:
+        "Generates mock profile. Defaults `threads` to 1."
+        parent_mock_profile = super().mock_profile
+
+        return {
+            **parent_mock_profile,
+            "threads": 1,
         }

@@ -27,7 +27,9 @@ class BaseProfileMapping(ABC):
     Responsible for mapping Airflow connections to dbt profiles.
     """
 
-    airflow_connection_type: str = "generic"
+    airflow_connection_type: str = "unset"
+    dbt_profile_type: str = "unset"
+    dbt_profile_method: str | None = None
     is_community: bool = False
 
     required_fields: list[str] = []
@@ -92,6 +94,30 @@ class BaseProfileMapping(ABC):
         raise NotImplementedError
 
     @property
+    def mock_profile(self) -> dict[str, Any]:
+        """
+        Mocks a dbt profile based on the required parameters. Useful for testing and parsing,
+        where live connection values don't matter.
+        """
+        mock_profile = {
+            "type": self.dbt_profile_type,
+        }
+
+        if self.dbt_profile_method:
+            mock_profile["method"] = self.dbt_profile_method
+
+        for field in self.required_fields:
+            # if someone has passed in a value for this field, use it
+            if self.profile_args.get(field):
+                mock_profile[field] = self.profile_args[field]
+
+            # otherwise, use the default value
+            else:
+                mock_profile[field] = "mock_value"
+
+        return mock_profile
+
+    @property
     def env_vars(self) -> dict[str, str]:
         "Returns a dictionary of environment variables that should be set based on self.secret_fields."
         env_vars = {}
@@ -107,11 +133,18 @@ class BaseProfileMapping(ABC):
 
         return env_vars
 
-    def get_profile_file_contents(self, profile_name: str, target_name: str = "cosmos_target") -> str:
+    def get_profile_file_contents(
+        self, profile_name: str, target_name: str = "cosmos_target", use_mock_values: bool = False
+    ) -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.
         """
-        profile_vars = self.profile
+        if use_mock_values:
+            profile_vars = self.mock_profile
+            logger.info("Using mock values for profile %s")
+        else:
+            profile_vars = self.profile
+            logger.info("Using real values for profile %s")
 
         # filter out any null values
         profile_vars = {k: v for k, v in profile_vars.items() if v is not None}
@@ -165,7 +198,12 @@ class BaseProfileMapping(ABC):
     @property
     def mapped_params(self) -> dict[str, Any]:
         "Turns the self.airflow_param_mapping into a dictionary of dbt fields and their values."
-        mapped_params = {}
+        mapped_params = {
+            "type": self.dbt_profile_type,
+        }
+
+        if self.dbt_profile_method:
+            mapped_params["method"] = self.dbt_profile_method
 
         for dbt_field in self.airflow_param_mapping:
             mapped_params[dbt_field] = self.get_dbt_value(dbt_field)

@@ -133,7 +133,9 @@ class ProfileConfig:
             raise CosmosValueError("Either profiles_yml_filepath or profile_mapping must be set to render a profile")
 
     @contextlib.contextmanager
-    def ensure_profile(self, desired_profile_path: Path | None = None) -> Iterator[tuple[Path, dict[str, str]]]:
+    def ensure_profile(
+        self, desired_profile_path: Path | None = None, use_mock_values: bool = False
+    ) -> Iterator[tuple[Path, dict[str, str]]]:
         "Context manager to ensure that there is a profile. If not, create one."
         if self.profiles_yml_filepath:
             logger.info("Using user-supplied profiles.yml at %s", self.profiles_yml_filepath)
@@ -141,8 +143,13 @@ class ProfileConfig:
 
         elif self.profile_mapping:
             profile_contents = self.profile_mapping.get_profile_file_contents(
-                profile_name=self.profile_name, target_name=self.target_name
+                profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
             )
+
+            if use_mock_values:
+                env_vars = {}
+            else:
+                env_vars = self.profile_mapping.env_vars
 
             if desired_profile_path:
                 logger.info(
@@ -152,7 +159,7 @@ class ProfileConfig:
                 )
                 # write profile_contents to desired_profile_path using yaml library
                 desired_profile_path.write_text(profile_contents)
-                yield desired_profile_path, self.profile_mapping.env_vars
+                yield desired_profile_path, env_vars
             else:
                 with tempfile.TemporaryDirectory() as temp_dir:
                     temp_file = Path(temp_dir) / DEFAULT_PROFILES_FILE_NAME
@@ -162,7 +169,7 @@ class ProfileConfig:
                         profile_contents,
                     )
                     temp_file.write_text(profile_contents)
-                    yield temp_file, self.profile_mapping.env_vars
+                    yield temp_file, env_vars
 
 
 @dataclass

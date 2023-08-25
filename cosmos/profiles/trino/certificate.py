@@ -13,6 +13,8 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
     https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 
+    dbt_profile_method: str = "certificate"
+
     required_fields = TrinoBaseProfileMapping.required_fields + [
         "client_certificate",
         "client_private_key",
@@ -31,7 +33,6 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
         profile_vars = {
             **self.mapped_params,
             **common_profile_vars,
-            "method": "certificate",
             **self.profile_args,
         }
 

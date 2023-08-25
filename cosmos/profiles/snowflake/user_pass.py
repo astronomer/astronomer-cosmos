@@ -18,6 +18,7 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "snowflake"
+    dbt_profile_type: str = "snowflake"
 
     required_fields = [
         "account",
@@ -64,7 +65,6 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         "Gets profile."
         profile_vars = {
             **self.mapped_params,
-            "type": "snowflake",
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),

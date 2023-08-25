@@ -10,6 +10,7 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
     "Maps common fields for Airflow Trino connections to dbt profiles."
 
     airflow_connection_type: str = "trino"
+    dbt_profile_type: str = "trino"
     is_community: bool = True
 
     required_fields = [
@@ -30,7 +31,6 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
         "Gets profile."
         profile_vars = {
             **self.mapped_params,
-            "type": "trino",
             **self.profile_args,
         }
 

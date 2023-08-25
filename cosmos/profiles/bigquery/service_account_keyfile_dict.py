@@ -17,6 +17,8 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "google_cloud_platform"
+    dbt_profile_type: str = "bigquery"
+    dbt_profile_method: str = "service-account-json"
 
     required_fields = [
         "project",
@@ -45,10 +47,18 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         """
         return {
             **self.mapped_params,
-            "type": "bigquery",
-            "method": "service-account-json",
             "threads": 1,
             **self.profile_args,
+        }
+
+    @property
+    def mock_profile(self) -> dict[str, Any | None]:
+        "Generates mock profile. Defaults `threads` to 1."
+        parent_mock_profile = super().mock_profile
+
+        return {
+            **parent_mock_profile,
+            "threads": 1,
         }
 
     def transform_keyfile_json(self, keyfile_json: str | dict[str, str]) -> dict[str, str]:

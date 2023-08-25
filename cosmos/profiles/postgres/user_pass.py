@@ -14,6 +14,7 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "postgres"
+    dbt_profile_type: str = "postgres"
 
     required_fields = [
         "host",
@@ -40,7 +41,6 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         "Gets profile. The password is stored in an environment variable."
         profile = {
             **self.mapped_params,
-            "type": "postgres",
             "port": 5432,
             **self.profile_args,
             # password should always get set as env var
@@ -48,3 +48,13 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         }
 
         return self.filter_null(profile)
+
+    @property
+    def mock_profile(self) -> dict[str, Any | None]:
+        "Gets mock profile. Defaults port to 5432."
+        parent_mock = super().mock_profile
+
+        return {
+            **parent_mock,
+            "port": 5432,
+        }

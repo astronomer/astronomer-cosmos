@@ -15,6 +15,7 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
     """
 
     airflow_connection_type: str = "databricks"
+    dbt_profile_type: str = "databricks"
 
     required_fields = [
         "host",
@@ -39,7 +40,6 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
         "Generates profile. The token is stored in an environment variable."
         return {
             **self.mapped_params,
-            "type": "databricks",
             **self.profile_args,
             # token should always get set as env var
             "token": self.get_env_var_format("token"),

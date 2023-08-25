@@ -8,7 +8,7 @@ LOG_FORMAT: str = (
     "[%(blue)s%(asctime)s%(reset)s] "
     "{%(blue)s%(filename)s:%(reset)s%(lineno)d} "
     "%(log_color)s%(levelname)s%(reset)s - "
-    "%(yellow)s(astronomer-cosmos)%(reset)s - "
+    "%(purple)s(astronomer-cosmos)%(reset)s - "
     "%(log_color)s%(message)s%(reset)s"
 )
 

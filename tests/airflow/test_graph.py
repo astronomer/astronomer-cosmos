@@ -88,7 +88,6 @@ def test_build_airflow_graph_with_after_each():
             task_args=task_args,
             test_behavior=TestBehavior.AFTER_EACH,
             dbt_project_name="astro_shop",
-            conn_id="fake_conn",
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = [
@@ -138,7 +137,6 @@ def test_build_airflow_graph_with_after_all():
             task_args=task_args,
             test_behavior=TestBehavior.AFTER_ALL,
             dbt_project_name="astro_shop",
-            conn_id="fake_conn",
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = ["seed_parent_seed", "parent_run", "child_run", "astro_shop_test"]

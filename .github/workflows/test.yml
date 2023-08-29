@@ -118,8 +118,8 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: public
-          POSTGRES_SCHEMA: dbt_example
+          POSTGRES_DB: postgres
+          POSTGRES_SCHEMA: public
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
@@ -187,8 +187,8 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: public
-          POSTGRES_SCHEMA: dbt_example
+          POSTGRES_DB: postgres
+          POSTGRES_SCHEMA: public
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github

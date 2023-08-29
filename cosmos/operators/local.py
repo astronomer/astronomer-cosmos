@@ -191,9 +191,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     cwd=tmp_project_dir,
                 )
                 if emit_openlineage and is_open_lineage_available:
-                    dataset_uris = self.get_openlineage_dataset_uris(env, tmp_project_dir)
-                    outlets = [Dataset(uri) for uri in dataset_uris]
-                    self.register_outlets(outlets)
+                    inlets_uris, outlets_uris = self.get_openlineage_dataset_uris(env, tmp_project_dir)
+                    inlets = [Dataset(uri) for uri in inlets_uris]
+                    outlets = [Dataset(uri) for uri in outlets_uris]
+                    logger.info("Inlets: %s", inlets)
+                    logger.info("Outlets: %s", outlets)
+                    self.register_dataset(inlets, outlets)
                     # TODO:
                     # - register inlets
                     # - expose the lineage through the get_openlineage_facets methods - references:
@@ -231,25 +234,31 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             target=self.profile_config.target_name,
         )
         events = openlineage_processor.parse()
-        dataset_uris = []
+        outlets_uris = []
+        inlets_uris = []
         # TODO: handle the scenario when it is not successful
         # also extract inlets
         for completed in events.completes:
             for output in completed.outputs:
                 dataset_uri = output.namespace + "/" + output.name
-                dataset_uris.append(dataset_uri)
-        return dataset_uris
+                outlets_uris.append(dataset_uri)
+            for input in completed.inputs:
+                dataset_uri = input.namespace + "/" + input.name
+                inlets_uris.append(dataset_uri)
+        return (inlets_uris, outlets_uris)
 
-    def register_outlets(self, new_outlets: list[Dataset]) -> None:
+    def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset]) -> None:
         """
         Register a list of datasets as outlets of the current task.
         Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
         """
         with create_session() as session:
             self.outlets.extend(new_outlets)
+            self.inlets.extend(new_inlets)
             for task in self.dag.tasks:
                 if task.task_id == self.task_id:
                     task.outlets.extend(new_outlets)
+                    task.inlets.extend(new_inlets)
             DAG.bulk_write_to_db([self.dag], session=session)
             session.commit()
 

@@ -123,10 +123,8 @@ def build_airflow_graph(
     task_args: dict[str, Any],  # Cosmos/DBT - used to instantiate tasks
     test_behavior: TestBehavior,  # Cosmos-specific: how to inject tests to Airflow DAG
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
-    conn_id: str,  # Cosmos, dataset URI
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-    emit_datasets: bool = True,  # Cosmos
 ) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -141,10 +139,6 @@ def build_airflow_graph(
     a single test task will be added after the Cosmos leave tasks, and it is named using `dbt_project_name`.
     Finally, if the `test_behaviour` is `after_each`, a test will be added after each model.
 
-    If `emit_datasets` is True, tasks will create outlets using:
-    * `dbt_project_name`
-    * `conn_id`
-
     :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
     :param dag: Airflow DAG instance
     :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
@@ -152,11 +146,9 @@ def build_airflow_graph(
     :param task_args: Arguments to be used to instantiate an Airflow Task
     :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
     :param dbt_project_name: Name of the dbt pipeline of interest
-    :param conn_id: Airflow connection ID
     :param task_group: Airflow Task Group instance
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
-    :param emit_datasets: Decides if Cosmos should add outlets to model classes or not.
     """
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
@@ -166,8 +158,6 @@ def build_airflow_graph(
     # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
     for node_id, node in nodes.items():
         task_meta = create_task_metadata(node=node, execution_mode=execution_mode, args=task_args)
-        # if emit_datasets:
-        #    task_args["outlets"] = [get_dbt_dataset(conn_id, dbt_project_name, node.name)]
         if task_meta and node.resource_type != DbtResourceType.TEST:
             if node.resource_type == DbtResourceType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
@@ -189,7 +179,6 @@ def build_airflow_graph(
     # If test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
-        # task_args.pop("outlets", None)
         test_meta = create_test_task_metadata(
             f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback
         )

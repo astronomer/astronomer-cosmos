@@ -5,11 +5,12 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, TYPE_CHECKING
+
 
 import yaml
 from airflow import DAG
-from airflow.datasets import Dataset
+
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
@@ -18,10 +19,15 @@ from airflow.utils.session import NEW_SESSION, create_session, provide_session
 
 try:
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+    from airflow.datasets import Dataset
 except ModuleNotFoundError:
     is_open_lineage_available = False
 else:
     is_open_lineage_available = True
+
+if TYPE_CHECKING:
+    from airflow.datasets import Dataset  # noqa: F811
+
 from sqlalchemy.orm import Session
 
 from cosmos.config import ProfileConfig
@@ -65,6 +71,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
+        emit_datasets: bool = True,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -72,6 +79,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.callback = callback
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
+        self.emit_datasets = emit_datasets
         super().__init__(**kwargs)
 
     @cached_property
@@ -191,7 +199,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
-                if emit_openlineage and is_open_lineage_available:
+                if self.emit_datasets and emit_openlineage and is_open_lineage_available:
                     inlets_uris, outlets_uris = self.get_openlineage_dataset_uris(env, Path(tmp_project_dir))
                     inlets = [Dataset(uri) for uri in inlets_uris]
                     outlets = [Dataset(uri) for uri in outlets_uris]

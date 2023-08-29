@@ -205,7 +205,7 @@ class DbtGraph:
                         for line in logfile:
                             logger.debug(line.strip())
 
-                if stderr or "Error" in stdout:
+                if stderr or "error" in stdout.lower():
                     details = stderr or stdout
                     raise CosmosLoadDbtException(f"Unable to run the command due to the error:\n{details}")
 

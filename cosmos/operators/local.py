@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import yaml
-from airflow import Dataset, DAG
+from airflow import DAG
+from airflow.datasets import Dataset
 from airflow.compat.functools import cached_property
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
@@ -140,7 +141,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
     def run_command(
         self,
-        cmd: list[str | None],
+        cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
         emit_openlineage: bool = False,
@@ -191,7 +192,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     cwd=tmp_project_dir,
                 )
                 if emit_openlineage and is_open_lineage_available:
-                    inlets_uris, outlets_uris = self.get_openlineage_dataset_uris(env, tmp_project_dir)
+                    inlets_uris, outlets_uris = self.get_openlineage_dataset_uris(env, Path(tmp_project_dir))
                     inlets = [Dataset(uri) for uri in inlets_uris]
                     outlets = [Dataset(uri) for uri in outlets_uris]
                     logger.info("Inlets: %s", inlets)
@@ -210,7 +211,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
                 return result
 
-    def get_openlineage_dataset_uris(self, env: dict, project_dir: Path) -> list[str]:
+    def get_openlineage_dataset_uris(
+        self, env: dict[str, str | os.PathLike[Any] | bytes], project_dir: Path
+    ) -> tuple[list[str], list[str]]:
         """
         Use openlineage-dbt to extract lineage events from the artifacts generated after running the dbt command.
         Relies on the following files:
@@ -224,7 +227,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         # variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment variables
         # as an argument, so we need to inject them to the system environment variables.
         for key, value in env.items():
-            os.environ[key] = value
+            os.environ[key] = str(value)
 
         openlineage_processor = DbtLocalArtifactProcessor(
             producer="https://github.com/astronomer/astronomer-cosmos/",
@@ -266,9 +269,10 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self, context: Context, cmd_flags: list[str] | None = None, emit_openlineage: bool = False
     ) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
+        dbt_cmd = dbt_cmd or []
         return self.run_command(cmd=dbt_cmd, env=env, context=context, emit_openlineage=emit_openlineage)
 
-    def execute(self, context: Context) -> str:
+    def execute(self, context: Context) -> str:  # type: ignore[return]
         self.build_and_run_cmd(context=context).output
 
     def on_kill(self) -> None:
@@ -352,7 +356,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = ["run"]
 
-    def execute(self, context: Context) -> str:
+    def execute(self, context: Context) -> str:  # type: ignore[return]
         self.build_and_run_cmd(context=context, emit_openlineage=True).output
 
 

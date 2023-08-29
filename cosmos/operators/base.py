@@ -202,7 +202,7 @@ class DbtBaseOperator(BaseOperator):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-    ) -> Tuple[list[str | None], dict[str, str | bytes | os.PathLike[Any]]]:
+    ) -> Tuple[list[str], dict[str, str | bytes | os.PathLike[Any]]]:
         dbt_cmd = [self.dbt_executable_path]
 
         dbt_cmd.extend(self.dbt_cmd_global_flags)

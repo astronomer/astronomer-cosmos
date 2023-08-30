@@ -16,6 +16,8 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import test_dag as run_test_dag
 
 
+DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
@@ -139,12 +141,6 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
     assert env == expected_env
 
 
-# TATI IS HERE
-
-
-DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
-
-
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4"),
     reason="Airflow DAG did not have datasets until the 2.4 release",
@@ -157,13 +153,13 @@ def test_run_operator_dataset_inlets_and_outlets():
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
-            task_id="integration_task",
+            task_id="run",
             dbt_cmd_flags=["--models", "stg_customers"],
         )
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
-            task_id="integration_task",
+            task_id="test",
             dbt_cmd_flags=["--models", "stg_customers"],
         )
         run_operator

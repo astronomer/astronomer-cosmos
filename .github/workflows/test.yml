@@ -3,9 +3,7 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main]
-  pull_request: # Run on pull requests targeting the default branch
-    branches: [main]
-  pull_request_target: # Run on pull requests originated from forks
+  pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
 concurrency:

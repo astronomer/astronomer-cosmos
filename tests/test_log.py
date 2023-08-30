@@ -9,5 +9,6 @@ def test_get_logger():
     assert custom_string not in standard_logger.handlers[0].formatter._fmt
 
     custom_logger = get_logger("cosmos-log")
+    assert custom_logger.propagate is True
     assert custom_logger.handlers[0].formatter.__class__.__name__ == "CustomTTYColoredFormatter"
     assert custom_string in custom_logger.handlers[0].formatter._fmt

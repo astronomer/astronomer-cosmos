@@ -24,7 +24,6 @@ def get_logger(name: str | None = None) -> logging.Logger:
     [2023-08-09T14:20:55.532+0100] {subprocess.py:94} INFO - (astronomer-cosmos) - 13:20:55  Completed successfully
     """
     logger = logging.getLogger(name)
-    logger.propagate = False
     formatter: logging.Formatter = CustomTTYColoredFormatter(fmt=LOG_FORMAT)  # type: ignore
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)

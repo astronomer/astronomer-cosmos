@@ -163,22 +163,22 @@ class DbtGraph:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
 
                 local_flags = [
-                        "--project-dir",
-                        str(tmpdir),
-                        "--profiles-dir",
-                        str(profile_path.parent),
-                        "--profile",
-                        self.profile_config.profile_name,
-                        "--target",
-                        self.profile_config.target_name,
-                    ]
+                    "--project-dir",
+                    str(tmpdir),
+                    "--profiles-dir",
+                    str(profile_path.parent),
+                    "--profile",
+                    self.profile_config.profile_name,
+                    "--target",
+                    self.profile_config.target_name,
+                ]
                 log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(target_dir)
 
                 if self.dbt_deps:
-                    deps_command=[self.dbt_cmd, "deps"]
+                    deps_command = [self.dbt_cmd, "deps"]
                     deps_command.extend(local_flags)
                     logger.info("Running command: `%s`", " ".join(deps_command))
                     logger.info("Environment variable keys: %s", env.keys())
@@ -231,7 +231,9 @@ class DbtGraph:
 
                 if stderr or "Error" in stdout:
                     if 'Run "dbt deps" to install package dependencies' in stdout:
-                        raise CosmosLoadDbtException("Unable to run dbt ls command due to dbt_packages not installed. Set dbpt")
+                        raise CosmosLoadDbtException(
+                            "Unable to run dbt ls command due to dbt_packages not installed. Set dbpt"
+                        )
                     else:
                         details = stderr or stdout
                         raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")

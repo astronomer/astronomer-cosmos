@@ -147,7 +147,7 @@ DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
+    reason="Airflow DAG did not have datasets until the 2.4 release",
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets():

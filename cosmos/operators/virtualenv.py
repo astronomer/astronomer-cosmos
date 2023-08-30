@@ -50,7 +50,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.py_requirements = py_requirements or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
-        self._venv_tmp_dir = TemporaryDirectory()
+        self._venv_tmp_dir: None | TemporaryDirectory[str] = None
 
     @cached_property
     def venv_dbt_path(

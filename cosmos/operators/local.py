@@ -5,7 +5,7 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Sequence, TYPE_CHECKING
+from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
 
 
 import yaml
@@ -16,6 +16,11 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
+
+try:
+    from airflow.providers.openlineage.extractors.base import OperatorLineage
+except ImportError:
+    from openlineage.airflow.extractors.base import OperatorLineage
 
 try:
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
@@ -64,6 +69,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
+    openlineage_events_completes = [OperatorLineage]
 
     def __init__(
         self,
@@ -200,17 +206,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     cwd=tmp_project_dir,
                 )
                 if self.emit_datasets and emit_openlineage and is_open_lineage_available:
-                    inlets_uris, outlets_uris = self.get_openlineage_dataset_uris(env, Path(tmp_project_dir))
-                    inlets = [Dataset(uri) for uri in inlets_uris]
-                    outlets = [Dataset(uri) for uri in outlets_uris]
+                    self.calculate_openlineage_events_completes(env, Path(tmp_project_dir))
+                    inlets = self.get_datasets("inputs")
+                    outlets = self.get_datasets("outputs")
                     logger.info("Inlets: %s", inlets)
                     logger.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
-                    # TODO:
-                    # - register inlets
-                    # - expose the lineage through the get_openlineage_facets methods - references:
-                    # https://github.com/OpenLineage/OpenLineage/blob/main/integration/airflow/openlineage/airflow/extractors/dbt_cloud_extractor.py#L181
-                    # https://github.com/OpenLineage/OpenLineage/blob/main/integration/airflow/openlineage/airflow/extractors/manager.py#L40
 
                 self.exception_handling(result)
                 self.store_compiled_sql(tmp_project_dir, context)
@@ -219,21 +220,21 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
                 return result
 
-    def get_openlineage_dataset_uris(
+    def calculate_openlineage_events_completes(
         self, env: dict[str, str | os.PathLike[Any] | bytes], project_dir: Path
-    ) -> tuple[list[str], list[str]]:
+    ) -> None:
         """
-        Use openlineage-dbt to extract lineage events from the artifacts generated after running the dbt command.
-        Relies on the following files:
+        Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
+        command. Relies on the following files:
         * profiles
         * {project_dir}/target/manifest.json
         * {project_dir}/target/run_results.json
 
-        Return a list of Dataset URIs (strings).
+        Return a list of RunEvents
         """
-        # Since openlineage-dbt relies on the profiles definition, we need to make these newly introduced environment
-        # variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment variables
-        # as an argument, so we need to inject them to the system environment variables.
+        # Since openlineage-integration-common relies on the profiles definition, we need to make these newly introduced
+        # environment variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment
+        # variables as an argument, so we need to inject them to the system environment variables.
         for key, value in env.items():
             os.environ[key] = str(value)
 
@@ -245,18 +246,24 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             target=self.profile_config.target_name,
         )
         events = openlineage_processor.parse()
-        outlets_uris = []
-        inlets_uris = []
-        # TODO: handle the scenario when it is not successful
-        # also extract inlets
-        for completed in events.completes:
-            for output in completed.outputs:
+        self.openlineage_events_completes = events.completes
+
+    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
+        """
+        Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
+        command. Relies on the following files:
+        * profiles
+        * {project_dir}/target/manifest.json
+        * {project_dir}/target/run_results.json
+
+        Return a list of Dataset URIs (strings).
+        """
+        uris = []
+        for completed in self.openlineage_events_completes:
+            for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + output.name
-                outlets_uris.append(dataset_uri)
-            for input in completed.inputs:
-                dataset_uri = input.namespace + "/" + input.name
-                inlets_uris.append(dataset_uri)
-        return (inlets_uris, outlets_uris)
+                uris.append(dataset_uri)
+        return [Dataset(uri) for uri in uris]
 
     def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset]) -> None:
         """
@@ -272,6 +279,28 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     task.inlets.extend(new_inlets)
             DAG.bulk_write_to_db([self.dag], session=session)
             session.commit()
+
+    def get_openlineage_facets_on_complete(self) -> OperatorLineage:
+        """
+        Collect the input, output, job and run facets for this operator.
+        It relies on the calculate_openlineage_events_completes having being called before.
+        """
+        inputs = []
+        outputs = []
+        run_facets = []
+        job_facets = []
+        for completed in self.openlineage_events_completes:
+            inputs.extend(completed.inputs)
+            outputs.extend(completed.outputs)
+            run_facets.extend(completed.run.facets)
+            job_facets.extend(completed.job.facets)
+
+        return OperatorLineage(
+            inputs=list(set(inputs)),
+            outputs=list(set(outputs)),
+            run_facets=list(set(run_facets)),
+            job_facets=list(set(job_facets)),
+        )
 
     def build_and_run_cmd(
         self, context: Context, cmd_flags: list[str] | None = None, emit_openlineage: bool = False
@@ -365,7 +394,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["run"]
 
     def execute(self, context: Context) -> str:  # type: ignore[return]
-        self.build_and_run_cmd(context=context, emit_openlineage=True).output
+        self.build_and_run_cmd(context=context, emit_openlineage=True)
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):

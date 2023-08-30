@@ -120,9 +120,6 @@ class DbtToAirflowConverter:
         manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
 
-        if profile_config and profile_config.profile_mapping:
-            pass
-
         profile_args = {}
         if profile_config.profile_mapping:
             profile_args = profile_config.profile_mapping.profile_args

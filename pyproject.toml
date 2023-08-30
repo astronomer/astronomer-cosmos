@@ -53,7 +53,6 @@ dbt-all = [
     "dbt-redshift<=1.5.4",
     "dbt-snowflake<=1.5.4",
     "dbt-spark<=1.5.4",
-    "astronomer-cosmos[dbt-openlineage]"
 ]
 dbt-bigquery = [
     "dbt-bigquery<=1.5.4",
@@ -75,10 +74,6 @@ dbt-snowflake = [
 ]
 dbt-spark = [
     "dbt-spark<=1.5.4",
-]
-dbt-openlineage = [
-    "dbt-core<=1.5.4",
-    "openlineage-dbt>=0.21.1"
 ]
 all = [
     "astronomer-cosmos[dbt-all]",
@@ -131,7 +126,8 @@ include = [
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0"
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
+    "openlineage-airflow"
 ]
 
 [[tool.hatch.envs.tests.matrix]]

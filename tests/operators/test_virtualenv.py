@@ -5,6 +5,7 @@ from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 from airflow.models.connection import Connection
 
 from cosmos.config import ProfileConfig
+
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 profile_config = ProfileConfig(

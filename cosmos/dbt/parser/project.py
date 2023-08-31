@@ -174,13 +174,8 @@ class DbtModel:
                             first_arg = base_node.args[0]
                             # if it contains vars, render the value of the var
                             if isinstance(first_arg, jinja2.nodes.Concat):
-<<<<<<< HEAD
-                                value = ''
-                                for node in first_arg.nodes:
-=======
                                 value = ""
-                                for node in base_node.args[0].nodes:
->>>>>>> d71cdf07ea2f6f076ecca68e9b3040829f6e5dba
+                                for node in first_arg.nodes:
                                     if isinstance(node, jinja2.nodes.Const):
                                         value += node.value
                                     elif isinstance(node, jinja2.nodes.Call) and node.node.name == "var":

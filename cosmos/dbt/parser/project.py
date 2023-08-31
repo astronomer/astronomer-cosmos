@@ -179,8 +179,10 @@ class DbtModel:
                                     nested_first_arg = node.args[0]
                                     if isinstance(node, jinja2.nodes.Const):
                                         value += node.value
-                                    elif isinstance(node, jinja2.nodes.Call) and isinstance(node.node, jinja2.nodes.Name):
-                                        if isinstance(nested_first_arg, jinja2.nodes.Const) and node.node.name == "var" :
+                                    elif isinstance(node, jinja2.nodes.Call) and isinstance(
+                                        node.node, jinja2.nodes.Name
+                                    ):
+                                        if isinstance(nested_first_arg, jinja2.nodes.Const) and node.node.name == "var":
                                             value += var_args[nested_first_arg.value]
                                 config.upstream_models.add(value)
                             elif isinstance(first_arg, jinja2.nodes.Const):

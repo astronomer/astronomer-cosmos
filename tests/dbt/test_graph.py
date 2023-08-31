@@ -253,8 +253,8 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("pipeline_name", ("jaffle_shop"))
-def test_load_via_dbt_ls_without_dbt_deps(pipeline_name):
+def test_load_via_dbt_ls_without_dbt_deps():
+    pipeline_name = "jaffle_shop"
     dbt_project = DbtProject(name=pipeline_name, root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(
         dbt_deps=False,
@@ -294,7 +294,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
-    expected = "Unable to run the command due to the error:\nSome Runtime Error"
+    expected = "Unable to run dbt deps command due to the error:\nSome Runtime Error"
     assert err_info.value.args[0] == expected
     mock_popen_communicate.assert_called_once()
 

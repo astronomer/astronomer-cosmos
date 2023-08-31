@@ -133,7 +133,7 @@ def test_profile_args(
     assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
-        "private_key_content": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
+        "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
         "schema": mock_snowflake_conn.schema,
         "account": mock_snowflake_conn.extra_dejson.get("account"),
         "database": mock_snowflake_conn.extra_dejson.get("database"),
@@ -158,7 +158,7 @@ def test_profile_args_overrides(
     assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
-        "private_key_content": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
+        "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
         "schema": mock_snowflake_conn.schema,
         "account": mock_snowflake_conn.extra_dejson.get("account"),
         "database": "my_db_override",
@@ -176,7 +176,7 @@ def test_profile_env_vars(
         mock_snowflake_conn.conn_id,
     )
     assert profile_mapping.env_vars == {
-        "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT": mock_snowflake_conn.extra_dejson.get("private_key_content"),
+        "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY": mock_snowflake_conn.extra_dejson.get("private_key_content"),
     }
 
 
@@ -204,7 +204,7 @@ def test_old_snowflake_format() -> None:
         assert profile_mapping.profile == {
             "type": conn.conn_type,
             "user": conn.login,
-            "private_key_content": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
+            "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
             "schema": conn.schema,
             "account": conn.extra_dejson.get("account"),
             "database": conn.extra_dejson.get("database"),
@@ -237,7 +237,7 @@ def test_appends_region() -> None:
         assert profile_mapping.profile == {
             "type": conn.conn_type,
             "user": conn.login,
-            "private_key_content": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_CONTENT') }}",
+            "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
             "schema": conn.schema,
             "account": f"{conn.extra_dejson.get('account')}.{conn.extra_dejson.get('region')}",
             "database": conn.extra_dejson.get("database"),

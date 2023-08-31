@@ -178,9 +178,12 @@ class DbtModel:
                                 for node in first_arg.nodes:
                                     if isinstance(node, jinja2.nodes.Const):
                                         value += node.value
-                                    elif isinstance(node, jinja2.nodes.Call) and isinstance(
-                                        node.node, jinja2.nodes.Name
-                                    ) and isinstance(node.args[0], jinja2.nodes.Const) and node.node.name == "var":
+                                    elif (
+                                        isinstance(node, jinja2.nodes.Call)
+                                        and isinstance(node.node, jinja2.nodes.Name)
+                                        and isinstance(node.args[0], jinja2.nodes.Const)
+                                        and node.node.name == "var"
+                                    ):
                                         value += var_args[node.args[0].value]
                                 config.upstream_models.add(value)
                             elif isinstance(first_arg, jinja2.nodes.Const):

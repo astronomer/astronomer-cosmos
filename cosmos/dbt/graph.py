@@ -255,7 +255,7 @@ class DbtGraph:
             dbt_models_dir=self.project.models_dir.stem if self.project.models_dir else None,
             dbt_seeds_dir=self.project.seeds_dir.stem if self.project.seeds_dir else None,
             project_name=self.project.name,
-            operator_args=operator_args,
+            operator_args=self.operator_args,
         )
         nodes = {}
         models = itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items())

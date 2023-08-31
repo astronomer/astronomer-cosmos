@@ -16,6 +16,7 @@ DBT_PIPELINE_NAME = "jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
+SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 
 
 @pytest.fixture
@@ -252,6 +253,28 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
 
     expected = "Unable to find the dbt executable: /inexistent/dbt"
     assert err_info.value.args[0] == expected
+
+
+@pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
+@pytest.mark.integration
+def test_load_via_dbt_ls_with_sources(load_method):
+    pipeline_name = "simple"
+    dbt_graph = DbtGraph(
+        dbt_deps=False,
+        project=DbtProject(
+            name=pipeline_name,
+            root_dir=DBT_PROJECTS_ROOT_DIR,
+            manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
+        ),
+        profile_config=ProfileConfig(
+            profile_name="simple",
+            target_name="dev",
+            profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / pipeline_name / "profiles.yml"),
+        ),
+    )
+    getattr(dbt_graph, load_method)()
+    assert len(dbt_graph.nodes) == 3
+    assert "source.simple.imdb.movies_ratings" in dbt_graph.nodes
 
 
 @pytest.mark.integration

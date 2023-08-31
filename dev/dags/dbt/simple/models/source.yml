@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: imdb
+    description: Example of IMDB SQlite database
+    tables:
+      - name: movies_ratings
+        description: >
+          Ratings by movie

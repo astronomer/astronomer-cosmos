@@ -252,7 +252,7 @@ class DbtGraph:
                         logger.debug("Skipped dbt ls line: %s", line)
                     else:
                         node = DbtNode(
-                            name=node_dict["name"],
+                            name=node_dict["alias"],
                             unique_id=node_dict["unique_id"],
                             resource_type=DbtResourceType(node_dict["resource_type"]),
                             depends_on=node_dict.get("depends_on", {}).get("nodes", []),
@@ -337,7 +337,7 @@ class DbtGraph:
 
             for unique_id, node_dict in manifest.get("nodes", {}).items():
                 node = DbtNode(
-                    name=node_dict["name"],
+                    name=node_dict["alias"],
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),

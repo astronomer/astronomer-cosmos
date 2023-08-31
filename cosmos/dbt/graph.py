@@ -232,7 +232,7 @@ class DbtGraph:
                 if stderr or "Error" in stdout:
                     if 'Run "dbt deps" to install package dependencies' in stdout:
                         raise CosmosLoadDbtException(
-                            "Unable to run dbt ls command due to dbt_packages not installed. Set dbpt"
+                            "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
                         )
                     else:
                         details = stderr or stdout

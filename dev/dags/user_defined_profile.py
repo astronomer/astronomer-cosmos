@@ -35,9 +35,7 @@ def user_defined_profile() -> None:
             target_name="dev",
             profiles_yml_filepath=PROFILES_FILE_PATH,
         ),
-        operator_args={
-            "append_env": True,
-        },
+        operator_args={"append_env": True, "install_deps": True},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

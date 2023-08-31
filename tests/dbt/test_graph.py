@@ -272,7 +272,7 @@ def test_load_via_dbt_ls_without_dbt_deps():
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
 
-    expected = "Unable to run dbt ls command due to dbt_packages not installed."
+    expected = "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
     assert err_info.value.args[0] == expected
 
 

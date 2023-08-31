@@ -40,6 +40,7 @@ def cosmos_profile_mapping() -> None:
                 profile_args={"schema": "public"},
             ),
         ),
+        operator_args={"install_deps": True},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

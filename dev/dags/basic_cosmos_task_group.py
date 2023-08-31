@@ -40,6 +40,7 @@ def basic_cosmos_task_group() -> None:
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
         ),
+        operator_args={"install_deps": True},
         profile_config=profile_config,
     )
 

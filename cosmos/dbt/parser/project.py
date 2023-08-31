@@ -129,7 +129,7 @@ class DbtModel:
     name: str
     type: DbtModelType
     path: Path
-    operator_args: Dict[str, str] = field(default_factory=dict)
+    operator_args: Dict[str, Any] = field(default_factory=dict)
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
     def __post_init__(self) -> None:
@@ -138,7 +138,7 @@ class DbtModel:
         """
         # first, get an empty config
         config = DbtModelConfig()
-        var_args = self.operator_args.get("vars", {})
+        var_args: Dict[str, Any] = self.operator_args.get("vars", {})
 
         if self.type == DbtModelType.DBT_MODEL:
             # get the code from the file
@@ -175,7 +175,7 @@ class DbtModel:
                             # if it contains vars, render the value of the var
                             if isinstance(first_arg, jinja2.nodes.Concat):
                                 value = ''
-                                for node in base_node.args[0].nodes:
+                                for node in first_arg.nodes:
                                     if isinstance(node, jinja2.nodes.Const):
                                         value += node.value
                                     elif isinstance(node, jinja2.nodes.Call) and node.node.name == 'var':

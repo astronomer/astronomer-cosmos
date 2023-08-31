@@ -194,7 +194,7 @@ def test_dbtmodelconfig_with_sources(tmp_path):
 
 def test_dbtmodelconfig_with_vars(tmp_path):
     model_sql = SAMPLE_MODEL_SQL_PATH.read_text()
-    model_with_sources_sql = model_sql.replace("ref('stg_customers_'~ var('country_code'))")
+    model_with_sources_sql = model_sql.replace("ref('stg_customers')", "ref('stg_customers_'~ var('country_code'))")
     path_with_sources = tmp_path / "customers_with_sources.sql"
     path_with_sources.write_text(model_with_sources_sql)
 

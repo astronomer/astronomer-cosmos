@@ -198,5 +198,10 @@ def test_dbtmodelconfig_with_vars(tmp_path):
     path_with_sources = tmp_path / "customers_with_sources.sql"
     path_with_sources.write_text(model_with_sources_sql)
 
-    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=path_with_sources, operator_args={"vars": {"country_code": "us"}})
+    dbt_model = DbtModel(
+        name="some_name",
+        type=DbtModelType.DBT_MODEL,
+        path=path_with_sources,
+        operator_args={"vars": {"country_code": "us"}},
+    )
     assert "stg_customers_us" in dbt_model.config.upstream_models

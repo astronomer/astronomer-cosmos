@@ -174,11 +174,16 @@ class DbtModel:
                             first_arg = base_node.args[0]
                             # if it contains vars, render the value of the var
                             if isinstance(first_arg, jinja2.nodes.Concat):
+<<<<<<< HEAD
                                 value = ''
                                 for node in first_arg.nodes:
+=======
+                                value = ""
+                                for node in base_node.args[0].nodes:
+>>>>>>> d71cdf07ea2f6f076ecca68e9b3040829f6e5dba
                                     if isinstance(node, jinja2.nodes.Const):
                                         value += node.value
-                                    elif isinstance(node, jinja2.nodes.Call) and node.node.name == 'var':
+                                    elif isinstance(node, jinja2.nodes.Call) and node.node.name == "var":
                                         value += var_args[node.args[0].value]
                                 config.upstream_models.add(value)
                             elif isinstance(first_arg, jinja2.nodes.Const):
@@ -249,7 +254,7 @@ class DbtProject:
     models_dir: Path = field(init=False)
     snapshots_dir: Path = field(init=False)
     seeds_dir: Path = field(init=False)
-    
+
     operator_args: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

@@ -145,6 +145,7 @@ class DbtToAirflowConverter:
             select=select,
             dbt_cmd=dbt_executable_path,
             profile_config=profile_config,
+            operator_args=operator_args,
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 

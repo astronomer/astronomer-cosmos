@@ -60,3 +60,8 @@ class DbtResourceType(Enum):
     SEED = "seed"
     TEST = "test"
     SOURCE = "source"
+
+
+TESTABLE_DBT_RESOURCES = {
+    DbtResourceType.MODEL
+}  # TODO: extend with DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED)

@@ -107,7 +107,6 @@ def create_task_metadata(
     if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
         if node.resource_type == DbtResourceType.MODEL:
             task_id = f"{node.name}_run"
-
             if use_task_group is True:
                 task_id = "run"
         else:

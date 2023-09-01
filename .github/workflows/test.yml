@@ -185,7 +185,7 @@ jobs:
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-setup
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-expensive-setup
           DATABRICKS_UNIQUE_ID="${{github.run_id}}" hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-expensive
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/

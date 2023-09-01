@@ -164,8 +164,8 @@ def test_load_via_dbt_ls_with_exclude():
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(
         project=dbt_project,
-        select=["*customers*"],
-        exclude=["*orders*"],
+        select=["customers"],
+        exclude=["orders"],
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -178,15 +178,11 @@ def test_load_via_dbt_ls_with_exclude():
 
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 7
+    assert len(dbt_graph.nodes) == 3
     expected_keys = [
         "model.jaffle_shop.customers",
-        "model.jaffle_shop.stg_customers",
-        "seed.jaffle_shop.raw_customers",
         "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
-        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
         "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
-        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
     ]
     assert list(dbt_graph.nodes.keys()) == expected_keys
 

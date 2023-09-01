@@ -50,6 +50,7 @@ with DAG(
                 args={"table_name": seed},
                 project_dir=DBT_ROOT_PATH / "jaffle_shop",
                 profile_config=profile_config,
+                install_deps=True,
             )
 
     jaffle_shop_seed = DbtSeedOperator(
@@ -57,6 +58,7 @@ with DAG(
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         outlets=[Dataset("SEED://JAFFLE_SHOP")],
         profile_config=profile_config,
+        install_deps=True,
     )
 
     drop_seeds >> jaffle_shop_seed

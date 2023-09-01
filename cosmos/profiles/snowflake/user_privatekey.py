@@ -27,10 +27,10 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
         "database",
         "warehouse",
         "schema",
-        "private_key_content",
+        "private_key",
     ]
     secret_fields = [
-        "private_key_content",
+        "private_key",
     ]
     airflow_param_mapping = {
         "account": "extra.account",
@@ -39,7 +39,7 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
-        "private_key_content": "extra.private_key_content",
+        "private_key": "extra.private_key_content",
     }
 
     @property
@@ -68,7 +68,7 @@ class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
             **self.mapped_params,
             **self.profile_args,
             # private_key should always get set as env var
-            "private_key_content": self.get_env_var_format("private_key_content"),
+            "private_key": self.get_env_var_format("private_key"),
         }
 
         # remove any null values

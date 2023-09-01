@@ -28,6 +28,7 @@ basic_cosmos_dag = DbtDag(
         DBT_ROOT_PATH / "jaffle_shop",
     ),
     profile_config=profile_config,
+    operator_args={"install_deps": True},
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

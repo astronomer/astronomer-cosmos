@@ -114,6 +114,7 @@ class DbtToAirflowConverter:
         test_behavior = render_config.test_behavior
         select = render_config.select
         exclude = render_config.exclude
+        dbt_deps = render_config.dbt_deps
         execution_mode = execution_config.execution_mode
         load_mode = render_config.load_method
         manifest_path = project_config.parsed_manifest_path
@@ -146,6 +147,7 @@ class DbtToAirflowConverter:
             dbt_cmd=dbt_executable_path,
             profile_config=profile_config,
             operator_args=operator_args,
+            dbt_deps=dbt_deps,
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 

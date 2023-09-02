@@ -7,6 +7,7 @@ import yaml
 from airflow.utils.context import Context
 
 from cosmos.log import get_logger
+from cosmos.config import ProfileConfig
 from cosmos.operators.base import DbtBaseOperator
 
 
@@ -35,7 +36,8 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
 
     intercept_flag = False
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, profile_config: ProfileConfig, **kwargs: Any) -> None:
+        self.profile_config = profile_config
         super().__init__(**kwargs)
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
@@ -57,6 +59,16 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
+        
+        # Parse ProfileConfig and add additional arguments to the dbt_cmd
+        if self.profile_config.profiles_yml_filepath:
+            with self.profile_config.ensure_profile() as (profile_path, _):
+                dbt_cmd.extend(["--profiles-dir", str(profile_path.parent)])
+        if self.profile_config.profile_name:
+            dbt_cmd.extend(["--profile", self.profile_config.profile_name])
+        if self.profile_config.target_name:
+            dbt_cmd.extend(["--target", self.profile_config.target_name])
+        
         # set env vars
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd

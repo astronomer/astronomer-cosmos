@@ -164,7 +164,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not (example_cosmos_python_models or example_cosmos_python_modelsexample_virtualenv)'
+-k 'not (example_cosmos_python_models or example_cosmos_python_models or example_virtualenv)'
 """
 test-integration-expensive = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
@@ -173,7 +173,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'example_cosmos_python_models or example_cosmos_python_modelsexample_virtualenv'"""
+-k 'example_cosmos_python_models or example_cosmos_python_models or example_virtualenv'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [

@@ -160,7 +160,7 @@ def select_nodes(
             elif any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG]):
                 continue
             else:
-                raise CosmosValueError(f"Invalid {filter_type} filter: {filter_parameter}")
+                logger.warning(f"Invalid {filter_type} filter: {filter_parameter}")
 
     subset_ids: set[str] = set()
 

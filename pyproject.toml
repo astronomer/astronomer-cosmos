@@ -156,7 +156,6 @@ test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml -
 test-integration-setup = """pip uninstall dbt-postgres dbt-databricks; \
 rm -rf airflow.*; \
 airflow db init; \
-<<<<<<< HEAD
 pip install 'openlineage-dbt' 'dbt-postgres<=1.5.4' 'dbt-databricks<=1.5.5'"""
 test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \

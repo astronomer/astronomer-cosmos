@@ -77,7 +77,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
-    _openlineage_events_completes: list[RunEvent] = []
 
     def __init__(
         self,
@@ -94,6 +93,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         self.emit_datasets = emit_datasets
+        self.openlineage_events_completes: list[RunEvent] = []
         super().__init__(**kwargs)
 
     @cached_property

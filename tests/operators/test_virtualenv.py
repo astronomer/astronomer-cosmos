@@ -19,6 +19,7 @@ profile_config = ProfileConfig(
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
@@ -28,6 +29,7 @@ def test_run_command(
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_calculate_openlineage_events_completes,
     mock_execute,
 ):
     mock_get_connection.return_value = Connection(

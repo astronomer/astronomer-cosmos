@@ -75,8 +75,12 @@ dbt-snowflake = [
 dbt-spark = [
     "dbt-spark<=1.5.4",
 ]
+lineage = [
+    "openlineage-airflow",
+]
 all = [
     "astronomer-cosmos[dbt-all]",
+    "astronomer-cosmos[lineage  ]"
 ]
 docs =[
     "sphinx",
@@ -161,7 +165,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not (test_example_dags_no_connections[example_cosmos_python_models] or test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv])'
+-k 'not (example_cosmos_python_models or example_cosmos_python_modelsexample_virtualenv)'
 """
 test-integration-expensive = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
@@ -170,7 +174,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'test_example_dags_no_connections[example_cosmos_python_models] or test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv]'"""
+-k 'example_cosmos_python_models or example_cosmos_python_modelsexample_virtualenv'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [

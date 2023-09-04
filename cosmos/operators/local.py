@@ -7,34 +7,30 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
 
-
 import yaml
 from airflow import DAG
-
 from airflow.compat.functools import cached_property
+from airflow.configuration import conf
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
 
 try:
-    from airflow.providers.openlineage.extractors.base import OperatorLineage
-except ImportError:
-    from openlineage.airflow.extractors.base import OperatorLineage
-
-try:
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
     from airflow.datasets import Dataset
 except ModuleNotFoundError:
-    is_open_lineage_available = False
+    is_openlineage_available = False
 else:
-    is_open_lineage_available = True
+    is_openlineage_available = True
 
 if TYPE_CHECKING:
     from airflow.datasets import Dataset  # noqa: F811
+    from openlineage.client.run import RunEvent
 
 from sqlalchemy.orm import Session
 
+from cosmos.constants import OPENLINEAGE_PRODUCER
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import DbtBaseOperator
@@ -48,6 +44,18 @@ from cosmos.dbt.parser.output import (
 )
 
 logger = get_logger(__name__)
+lineage_namespace = conf.get("openlineage", "namespace", fallback=os.getenv("OPENLINEAGE_NAMESPACE", "default"))
+
+
+try:
+    from airflow.providers.openlineage.extractors.base import OperatorLineage
+except ImportError:
+    from openlineage.airflow.extractors.base import OperatorLineage
+except ModuleNotFoundError:
+    logger.warning(
+        "To enable emitting Openlineage events, please, upgrade to Airflow 2.7 or install `openlineage-airflow`."
+    )
+    is_openlineage_available = False
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):
@@ -69,7 +77,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
-    openlineage_events_completes = [OperatorLineage]
+    _openlineage_events_completes: list[RunEvent] = []
 
     def __init__(
         self,
@@ -158,7 +166,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
-        emit_openlineage: bool = False,
     ) -> FullOutputSubprocessResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -185,7 +192,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
-
             with self.profile_config.ensure_profile() as (profile_path, env_vars):
                 env.update(env_vars)
                 full_cmd = cmd + [
@@ -205,8 +211,13 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
-                if self.emit_datasets and emit_openlineage and is_open_lineage_available:
+                if is_openlineage_available:
                     self.calculate_openlineage_events_completes(env, Path(tmp_project_dir))
+                    context[
+                        "task_instance"
+                    ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
+
+                if self.emit_datasets:
                     inlets = self.get_datasets("inputs")
                     outlets = self.get_datasets("outputs")
                     logger.info("Inlets: %s", inlets)
@@ -239,12 +250,15 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             os.environ[key] = str(value)
 
         openlineage_processor = DbtLocalArtifactProcessor(
-            producer="https://github.com/astronomer/astronomer-cosmos/",
-            job_namespace=os.getenv("OPENLINEAGE_NAMESPACE"),
+            producer=OPENLINEAGE_PRODUCER,
+            job_namespace=lineage_namespace,
             project_dir=project_dir,
             profile_name=self.profile_config.profile_name,
             target=self.profile_config.target_name,
         )
+        # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
+        # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
+        openlineage_processor.should_raise_on_unsupported_command = False
         events = openlineage_processor.parse()
         self.openlineage_events_completes = events.completes
 
@@ -280,34 +294,33 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             DAG.bulk_write_to_db([self.dag], session=session)
             session.commit()
 
-    def get_openlineage_facets_on_complete(self) -> OperatorLineage:
+    def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
         Collect the input, output, job and run facets for this operator.
         It relies on the calculate_openlineage_events_completes having being called before.
         """
         inputs = []
         outputs = []
-        run_facets = []
-        job_facets = []
-        for completed in self.openlineage_events_completes:
+        run_facets: dict[str, Any] = {}
+        job_facets: dict[str, Any] = {}
+
+        for completed in task_instance.openlineage_events_completes:
             inputs.extend(completed.inputs)
             outputs.extend(completed.outputs)
-            run_facets.extend(completed.run.facets)
-            job_facets.extend(completed.job.facets)
+            run_facets = {**run_facets, **completed.run.facets}
+            job_facets = {**job_facets, **completed.job.facets}
 
         return OperatorLineage(
-            inputs=list(set(inputs)),
-            outputs=list(set(outputs)),
-            run_facets=list(set(run_facets)),
-            job_facets=list(set(job_facets)),
+            inputs=inputs,
+            outputs=outputs,
+            run_facets=run_facets,
+            job_facets=job_facets,
         )
 
-    def build_and_run_cmd(
-        self, context: Context, cmd_flags: list[str] | None = None, emit_openlineage: bool = False
-    ) -> FullOutputSubprocessResult:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
-        return self.run_command(cmd=dbt_cmd, env=env, context=context, emit_openlineage=emit_openlineage)
+        return self.run_command(cmd=dbt_cmd, env=env, context=context)
 
     def execute(self, context: Context) -> str:  # type: ignore[return]
         self.build_and_run_cmd(context=context).output
@@ -360,7 +373,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> str:
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags, emit_openlineage=True)
+        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
         return result.output
 
 
@@ -377,7 +390,7 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["snapshot"]
 
     def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context, emit_openlineage=True)
+        result = self.build_and_run_cmd(context=context)
         return result.output
 
 
@@ -394,7 +407,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["run"]
 
     def execute(self, context: Context) -> str:  # type: ignore[return]
-        self.build_and_run_cmd(context=context, emit_openlineage=True)
+        self.build_and_run_cmd(context=context)
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
@@ -447,7 +460,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
             self.on_warning_callback(warning_context)
 
     def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context, emit_openlineage=True)
+        result = self.build_and_run_cmd(context=context)
 
         if not self._should_run_tests(result):
             return result.output

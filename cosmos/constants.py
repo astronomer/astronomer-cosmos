@@ -12,6 +12,7 @@ DBT_TARGET_PATH_ENVVAR = "DBT_TARGET_PATH"
 DBT_TARGET_DIR_NAME = "target"
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
+OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 
 
 class LoadMode(Enum):

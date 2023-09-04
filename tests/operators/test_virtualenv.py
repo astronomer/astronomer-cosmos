@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 
@@ -46,10 +46,11 @@ def test_run_command(
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         py_requirements=["dbt-postgres==1.6.0b1"],
+        emit_datasets=False,
     )
     assert venv_operator._venv_tmp_dir is None  # Otherwise we are creating empty directories during DAG parsing time
     # and not deleting them
-    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={})
+    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 3
     python_cmd = run_command_args[0]

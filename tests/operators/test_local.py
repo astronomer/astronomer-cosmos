@@ -172,10 +172,10 @@ def test_run_operator_dataset_inlets_and_outlets():
 
 def test_run_operator_emits_events():
     class MockRun:
-        facets = [3]
+        facets = {"c": 3}
 
     class MockJob:
-        facets = [4]
+        facets = {"d": 4}
 
     class MockEvent:
         inputs = [1]
@@ -190,11 +190,11 @@ def test_run_operator_emits_events():
         should_store_compiled_sql=False,
     )
     dbt_base_operator.openlineage_events_completes = [MockEvent(), MockEvent()]
-    facets = dbt_base_operator.get_openlineage_facets_on_complete()
+    facets = dbt_base_operator.get_openlineage_facets_on_complete(dbt_base_operator)
     assert facets.inputs == [1]
     assert facets.outputs == [2]
-    assert facets.run_facets == [3]
-    assert facets.job_facets == [4]
+    assert facets.run_facets == {"c": 3}
+    assert facets.job_facets == {"d": 4}
 
 
 def test_store_compiled_sql() -> None:

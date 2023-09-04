@@ -305,8 +305,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         job_facets: dict[str, Any] = {}
 
         for completed in task_instance.openlineage_events_completes:
-            inputs.extend(completed.inputs)
-            outputs.extend(completed.outputs)
+            [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
+            [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
             run_facets = {**run_facets, **completed.run.facets}
             job_facets = {**job_facets, **completed.job.facets}
 

@@ -41,6 +41,8 @@ dependencies = [
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
+    "openlineage-integration-common",
+    "openlineage-airflow"
 ]
 
 [project.optional-dependencies]
@@ -52,7 +54,6 @@ dbt-all = [
     "dbt-redshift<=1.5.4",
     "dbt-snowflake<=1.5.4",
     "dbt-spark<=1.5.4",
-    "astronomer-cosmos[dbt-openlineage]"
 ]
 dbt-bigquery = [
     "dbt-bigquery<=1.5.4",
@@ -75,12 +76,12 @@ dbt-snowflake = [
 dbt-spark = [
     "dbt-spark<=1.5.4",
 ]
-dbt-openlineage = [
-    "dbt-core<=1.5.4",
-    "openlineage-dbt>=0.21.1"
+lineage = [
+    "openlineage-airflow",
 ]
 all = [
     "astronomer-cosmos[dbt-all]",
+    "astronomer-cosmos[lineage]"
 ]
 docs =[
     "sphinx",
@@ -130,7 +131,8 @@ include = [
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0"
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
+    "openlineage-airflow"
 ]
 
 [[tool.hatch.envs.tests.matrix]]
@@ -155,7 +157,7 @@ test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml -
 test-integration-setup = """pip uninstall dbt-postgres dbt-databricks; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install 'dbt-postgres<=1.5.4' 'dbt-databricks<=1.5.5'"""
+pip install 'dbt-postgres<=1.5.4' 'dbt-databricks<=1.5.4'"""
 test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
 --cov=cosmos \
@@ -163,7 +165,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not (test_example_dags_no_connections[example_cosmos_python_models] or test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv])'
+-k 'not (example_cosmos_python_models or example_cosmos_python_models or example_virtualenv)'
 """
 test-integration-expensive = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
@@ -172,7 +174,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'test_example_dags_no_connections[example_cosmos_python_models] or test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv]'"""
+-k 'example_cosmos_python_models or example_cosmos_python_models or example_virtualenv'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -193,6 +195,7 @@ dependencies = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
+    "openlineage-airflow"
 ]
 
 [tool.hatch.envs.docs.scripts]

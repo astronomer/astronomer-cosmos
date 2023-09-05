@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
 
+import airflow
 import yaml
 from airflow import DAG
 from airflow.compat.functools import cached_property
@@ -43,17 +44,17 @@ from cosmos.dbt.parser.output import (
 )
 
 logger = get_logger(__name__)
-lineage_namespace = conf.get("openlineage", "namespace", fallback=os.getenv("OPENLINEAGE_NAMESPACE", "default"))
 
 
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
-except (ImportError, ModuleNotFoundError):
-    from openlineage.airflow.extractors.base import OperatorLineage
-except (ImportError, ModuleNotFoundError):
+    from openlineage.airflow.extractors.base import OperatorLineage  # noqa
+except (ImportError, ModuleNotFoundError) as error:
     logger.warning(
-        "To enable emitting Openlineage events, please, upgrade to Airflow 2.7 or install `openlineage-airflow`."
+        "To enable emitting Openlineage events. In order to use openlineage, upgrade to Airflow 2.7 or "
+        "install astronomer-cosmos[openlineage]."
     )
+    logger.exception(error)
     is_openlineage_available = False
 
 
@@ -247,6 +248,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         # variables as an argument, so we need to inject them to the system environment variables.
         for key, value in env.items():
             os.environ[key] = str(value)
+
+        lineage_namespace = os.getenv("OPENLINEAGE_NAMESPACE", "default")
+        try:
+            lineage_namespace = conf.get("openlineage", "namespace")
+        except airflow.exceptions.AirflowConfigException:
+            pass
 
         openlineage_processor = DbtLocalArtifactProcessor(
             producer=OPENLINEAGE_PRODUCER,

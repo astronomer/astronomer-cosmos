@@ -172,6 +172,7 @@ def test_run_operator_dataset_inlets_and_outlets():
     assert test_operator.outlets == []
 
 
+@pytest.mark.integration
 def test_run_operator_emits_events():
     class MockRun:
         facets = {"c": 3}

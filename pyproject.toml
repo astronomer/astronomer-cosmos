@@ -80,7 +80,7 @@ openlineage = [
 ]
 all = [
     "astronomer-cosmos[dbt-all]",
-    "astronomer-cosmos[lineage]"
+    "astronomer-cosmos[openlineage]"
 ]
 docs =[
     "sphinx",
@@ -156,7 +156,9 @@ matrix.airflow.dependencies = [
 freeze = "pip freeze"
 type-check = "mypy cosmos"
 test = 'pytest -vv --durations=0 . -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py'
-test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py'
+test-cov = """rm -rf airflow.*; \
+airflow db init; \
+pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py"""
 # we install using the following workaround to overcome installation conflicts, such as:
 # apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
 test-integration-setup = """pip uninstall dbt-postgres dbt-databricks; \

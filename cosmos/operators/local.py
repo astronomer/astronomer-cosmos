@@ -48,14 +48,16 @@ logger = get_logger(__name__)
 
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
-    from openlineage.airflow.extractors.base import OperatorLineage  # noqa
-except (ImportError, ModuleNotFoundError) as error:
-    logger.warning(
-        "To enable emitting Openlineage events. In order to use openlineage, upgrade to Airflow 2.7 or "
-        "install astronomer-cosmos[openlineage]."
-    )
-    logger.exception(error)
-    is_openlineage_available = False
+except (ImportError, ModuleNotFoundError):
+    try:
+        from openlineage.airflow.extractors.base import OperatorLineage
+    except (ImportError, ModuleNotFoundError) as error:
+        logger.warning(
+            "To enable emitting Openlineage events. In order to use openlineage, upgrade to Airflow 2.7 or "
+            "install astronomer-cosmos[openlineage]."
+        )
+        logger.exception(error)
+        is_openlineage_available = False
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):

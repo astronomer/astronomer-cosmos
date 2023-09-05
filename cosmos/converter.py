@@ -120,10 +120,6 @@ class DbtToAirflowConverter:
         manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
 
-        conn_id = "unknown"
-        if profile_config and profile_config.profile_mapping:
-            conn_id = profile_config.profile_mapping.conn_id
-
         profile_args = {}
         if profile_config.profile_mapping:
             profile_args = profile_config.profile_mapping.profile_args
@@ -155,6 +151,7 @@ class DbtToAirflowConverter:
             # the following args may be only needed for local / venv:
             "project_dir": dbt_project.dir,
             "profile_config": profile_config,
+            "emit_datasets": emit_datasets,
         }
 
         if dbt_executable_path:
@@ -170,7 +167,5 @@ class DbtToAirflowConverter:
             task_args=task_args,
             test_behavior=test_behavior,
             dbt_project_name=dbt_project.name,
-            conn_id=conn_id,
             on_warning_callback=on_warning_callback,
-            emit_datasets=emit_datasets,
         )

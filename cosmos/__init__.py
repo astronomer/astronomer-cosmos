@@ -10,7 +10,6 @@ __version__ = "1.1.0a2"
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
-from cosmos.dataset import get_dbt_dataset
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.config import (
     ProjectConfig,
@@ -96,7 +95,6 @@ __all__ = [
     "DbtTestLocalOperator",
     "DbtDepsLocalOperator",
     "DbtSnapshotLocalOperator",
-    "get_dbt_dataset",
     "DbtDag",
     "DbtTaskGroup",
     "DbtLSDockerOperator",

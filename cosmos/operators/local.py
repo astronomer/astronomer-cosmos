@@ -49,9 +49,9 @@ lineage_namespace = conf.get("openlineage", "namespace", fallback=os.getenv("OPE
 
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     from openlineage.airflow.extractors.base import OperatorLineage
-except ModuleNotFoundError:
+except (ImportError, ModuleNotFoundError):
     logger.warning(
         "To enable emitting Openlineage events, please, upgrade to Airflow 2.7 or install `openlineage-airflow`."
     )

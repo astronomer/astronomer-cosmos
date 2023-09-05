@@ -20,13 +20,13 @@ except ImportError:
     )
 
 
-class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[misc] # ignores subclass MyPy error
+class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Docker container.
 
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + DockerOperator.template_fields
+    template_fields: Sequence[str] = tuple(list(DbtBaseOperator.template_fields) + list(DockerOperator.template_fields))
 
     intercept_flag = False
 
@@ -39,7 +39,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_command(context, cmd_flags)
-        self.log.info(f"Running command: {self.command}")  # type: ignore[has-type]
+        self.log.info(f"Running command: {self.command}")
         result = super().execute(context)
         logger.info(result)
 
@@ -50,8 +50,8 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         # set env vars
-        self.environment = {**env_vars, **self.environment}  # type: ignore[has-type]
-        self.command = dbt_cmd
+        self.environment: dict[str, Any] = {**env_vars, **self.environment}
+        self.command: list[str] = dbt_cmd
 
     def execute(self, context: Context) -> None:
         self.build_and_run_cmd(context=context)

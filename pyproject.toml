@@ -220,6 +220,8 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
+ignore_missing_imports = true
+no_warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 120

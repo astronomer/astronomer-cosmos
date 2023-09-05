@@ -33,10 +33,9 @@ jobs:
         with:
            path: |
              ~/.cache/pip
-             .nox
-           key: ${{ runner.os }}-${{ hashFiles('python-sdk/pyproject.toml') }}
-      - run: pip3 install nox
-      - run: nox -s type_check
+           key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      - run: pip3 install hatch mypy
+      - run: hatch run tests.py3.9-2.7:type-check
 
   Run-Unit-Tests:
     runs-on: ubuntu-latest

@@ -14,15 +14,17 @@ To emit lineage events, Cosmos can use one of the following:
 
 No change to the user DAG files is required to use OpenLineage.
 
+
 Installation
-............
+------------
+
 If using Airflow 2.7, no other dependency is required.
 
 Otherwise, install the Python package ``openlineage-airflow``.
 
 
 Namespace configuration
-.......................
+-----------------------
 
 Cosmos will use the Airflow ``[openlineage]`` ``namespace`` property as a namespace, `if available <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_.
 

@@ -41,7 +41,8 @@ dependencies = [
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
-    "openlineage-integration-common"
+    "openlineage-integration-common",
+    "openlineage-airflow"
 ]
 
 [project.optional-dependencies]

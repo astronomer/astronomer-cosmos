@@ -80,7 +80,7 @@ lineage = [
 ]
 all = [
     "astronomer-cosmos[dbt-all]",
-    "astronomer-cosmos[lineage  ]"
+    "astronomer-cosmos[lineage]"
 ]
 docs =[
     "sphinx",
@@ -194,6 +194,7 @@ dependencies = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
+    "openlineage-airflow"
 ]
 
 [tool.hatch.envs.docs.scripts]

@@ -105,6 +105,7 @@ class DbtToAirflowConverter:
     ) -> None:
         project_config.validate_project()
 
+        emit_datasets = render_config.emit_datasets
         dbt_root_path = project_config.dbt_project_path.parent
         dbt_project_name = project_config.dbt_project_path.name
         dbt_models_dir = project_config.models_relative_path

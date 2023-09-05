@@ -3,79 +3,29 @@
 Configuring Lineage
 ===================
 
-Cosmos uses the `dbt-ol <https://openlineage.io/blog/dbt-with-marquez/>`_ wrapper to emit lineage events to OpenLineage. Follow the instructions below to ensure Cosmos is configured properly to do this.
+Since Cosmos 1.1, it uses internally the `openlineage-integration-common <https://github.com/OpenLineage/OpenLineage/tree/main/integration/common>`_
+to parse artifacts generated with dbt commands and create lineage events. This feature is only available for the local
+and virtualenv execution methods (read `execution modes <../getting_started/execution-modes.html>`_ for more information).
 
-With a Virtual Environment
---------------------------
+To emit lineage events, Cosmos can use one of the following:
 
-1. Add steps in your ``Dockerfile`` for the venv and wrapping the dbt executable
+1. Airflow 2.7 `built-in support to OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_, or
+2. The `openlineage-airflow <https://openlineage.io/docs/integrations/airflow/>`_ package
 
-.. code-block:: Docker
+No change to the user DAG files is required to use OpenLineage.
 
-    FROM quay.io/astronomer/astro-runtime:7.2.0
+Installation
+............
+If using Airflow 2.7, no other dependency is required.
 
-    # install python virtualenv to run dbt
-    WORKDIR /usr/local/airflow
-    COPY dbt-requirements.txt ./
-    RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \
-        pip install --no-cache-dir -r dbt-requirements.txt && deactivate
-
-    # wrap the executable from the venv so that dbt-ol can access it
-    RUN echo -e '#!/bin/bash' > /usr/bin/dbt && \
-        echo -e 'source /usr/local/airflow/dbt_venv/bin/activate && dbt "$@"' >> /usr/bin/dbt
-
-    # ensure all users have access to the executable
-    RUN chmod -R 777 /usr/bin/dbt
-
-2. Create a ``dbt-requirements.txt`` file with the following contents. If you're using a different
-data warehouse than Redshift, then replace with the one that you're using (i.e. ``dbt-bigquery``,
-``dbt-snowflake``, etc.)
-
-.. code-block:: text
-
-    dbt-redshift
-    openlineage-dbt
-
-3. Add the following to your ``requirements.txt`` file
-
-.. code-block:: text
-
-    astronomer-cosmos
-
-4. When instantiating a Cosmos object be sure to use the ``dbt_executable_path`` parameter for the dbt-ol
-installed
-
-.. code-block:: python
-
-    jaffle_shop = DbtTaskGroup(
-        ...,
-        ExecutionConfig(
-            dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt-ol",
-        ),
-    )
+Otherwise, install the Python package ``openlineage-airflow``.
 
 
-With the Base Cosmos Python Package
------------------------------------
+Namespace configuration
+.......................
 
-If you're using the base Cosmos Python package, then you'll need to install the dbt-ol wrapper
-using the ``[dbt-openlineage]`` extra.
+Cosmos will use the Airflow ``[openlineage]`` ``namespace`` property as a namespace, `if available <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_.
 
-1. Add the following to your ``requirements.txt`` file
+Otherwise, it attempts to use the environment variable ``OPENLINEAGE_NAMESPACE`` as the namespace.
 
-.. code-block:: text
-
-    astronomer-cosmos[dbt-openlineage]
-
-
-2. When instantiating a Cosmos object be sure to use the ``dbt_executable_path`` parameter for the dbt-ol
-installed
-
-.. code-block:: python
-
-    jaffle_shop = DbtTaskGroup(
-        ...,
-        ExecutionConfig(
-            dbt_executable_path="/usr/local/airflow/dbt_venv/bin/dbt-ol",
-        ),
-    )
+If not defined, it uses ``"default"`` as the namespace.

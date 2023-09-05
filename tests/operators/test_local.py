@@ -155,12 +155,14 @@ def test_run_operator_dataset_inlets_and_outlets():
             project_dir=DBT_PROJ_DIR,
             task_id="run",
             dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
         )
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
             task_id="test",
             dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
         )
         run_operator
     run_test_dag(dag)

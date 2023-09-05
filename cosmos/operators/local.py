@@ -259,8 +259,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False
-        events = openlineage_processor.parse()
-        self.openlineage_events_completes = events.completes
+        try:
+            events = openlineage_processor.parse()
+            self.openlineage_events_completes = events.completes
+        except FileNotFoundError as error:
+            logger.exception(error)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
         """

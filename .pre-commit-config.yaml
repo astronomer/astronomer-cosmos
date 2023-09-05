@@ -1,5 +1,8 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+ci:
+  skip:
+    - mypy  # requires additional dependencies in ci
 repos:
   - repo: local
     hooks:

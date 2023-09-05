@@ -20,7 +20,7 @@ Installation
 
 If using Airflow 2.7, no other dependency is required.
 
-Otherwise, install the Python package ``openlineage-airflow``.
+Otherwise, install the Python package ``astronomer-cosmos[openlineage]`` or ``openlineage-airflow``.
 
 
 Namespace configuration

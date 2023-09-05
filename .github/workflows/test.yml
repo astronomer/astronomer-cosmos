@@ -21,6 +21,23 @@ jobs:
     steps:
       - run: true
 
+  Type-Check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+          architecture: 'x64'
+      - uses: actions/cache@v3
+        with:
+           path: |
+             ~/.cache/pip
+             .nox
+           key: ${{ runner.os }}-${{ hashFiles('python-sdk/pyproject.toml') }}
+      - run: pip3 install nox
+      - run: nox -s type_check
+
   Run-Unit-Tests:
     runs-on: ubuntu-latest
     strategy:

@@ -30,6 +30,25 @@ def mock_postgres_conn():  # type: ignore
         yield conn
 
 
+@pytest.fixture()
+def mock_postgres_conn_custom_port():  # type: ignore
+    """
+    Sets the connection as an environment variable.
+    """
+    conn = Connection(
+        conn_id="my_postgres_connection",
+        conn_type="postgres",
+        host="my_host",
+        login="my_user",
+        password="my_password",
+        port=7472,
+        schema="my_database",
+    )
+
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
 def test_connection_claiming() -> None:
     """
     Tests that the postgres profile mapping claims the correct connection type.
@@ -87,6 +106,11 @@ def test_profile_mapping_selected(
         {"schema": "my_schema"},
     )
     assert isinstance(profile_mapping, PostgresUserPasswordProfileMapping)
+
+
+def test_profile_mapping_keeps_custom_port(mock_postgres_conn_custom_port: Connection) -> None:
+    profile = PostgresUserPasswordProfileMapping(mock_postgres_conn_custom_port.conn_id, {"schema": "my_schema"})
+    assert profile.profile["port"] == 7472
 
 
 def test_profile_args(

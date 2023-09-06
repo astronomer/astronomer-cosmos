@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 from sqlalchemy.orm import Session
 
-from cosmos.constants import OPENLINEAGE_PRODUCER
+from cosmos.constants import DEFAULT_OPENLINEAGE_NAMESPACE, OPENLINEAGE_PRODUCER
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import DbtBaseOperator
@@ -251,7 +251,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         for key, value in env.items():
             os.environ[key] = str(value)
 
-        lineage_namespace = os.getenv("OPENLINEAGE_NAMESPACE", "default")
+        lineage_namespace = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
         try:
             lineage_namespace = conf.get("openlineage", "namespace")
         except airflow.exceptions.AirflowConfigException:

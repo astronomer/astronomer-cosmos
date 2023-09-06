@@ -38,4 +38,4 @@ Cosmos will use the Airflow ``[openlineage]`` ``namespace`` property as a namesp
 
 Otherwise, it attempts to use the environment variable ``OPENLINEAGE_NAMESPACE`` as the namespace.
 
-Finally, if neither are defined, it uses ``"default"`` as the namespace.
+Finally, if neither are defined, it uses ``"cosmos"`` as the namespace.

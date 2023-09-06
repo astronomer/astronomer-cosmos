@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
 
+import airflow
 import yaml
 from airflow import DAG
 from airflow.compat.functools import cached_property
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 
 from sqlalchemy.orm import Session
 
-from cosmos.constants import OPENLINEAGE_PRODUCER
+from cosmos.constants import DEFAULT_OPENLINEAGE_NAMESPACE, OPENLINEAGE_PRODUCER
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import DbtBaseOperator
@@ -43,18 +44,20 @@ from cosmos.dbt.parser.output import (
 )
 
 logger = get_logger(__name__)
-lineage_namespace = conf.get("openlineage", "namespace", fallback=os.getenv("OPENLINEAGE_NAMESPACE", "default"))
 
 
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
 except (ImportError, ModuleNotFoundError):
-    from openlineage.airflow.extractors.base import OperatorLineage
-except (ImportError, ModuleNotFoundError):
-    logger.warning(
-        "To enable emitting Openlineage events, please, upgrade to Airflow 2.7 or install `openlineage-airflow`."
-    )
-    is_openlineage_available = False
+    try:
+        from openlineage.airflow.extractors.base import OperatorLineage
+    except (ImportError, ModuleNotFoundError) as error:
+        logger.warning(
+            "To enable emitting Openlineage events. In order to use openlineage, upgrade to Airflow 2.7 or "
+            "install astronomer-cosmos[openlineage]."
+        )
+        logger.exception(error)
+        is_openlineage_available = False
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):
@@ -248,6 +251,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         for key, value in env.items():
             os.environ[key] = str(value)
 
+        lineage_namespace = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
+        try:
+            lineage_namespace = conf.get("openlineage", "namespace")
+        except airflow.exceptions.AirflowConfigException:
+            pass
+
         openlineage_processor = DbtLocalArtifactProcessor(
             producer=OPENLINEAGE_PRODUCER,
             job_namespace=lineage_namespace,
@@ -261,7 +270,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except FileNotFoundError as error:
+        except (FileNotFoundError, NotImplementedError) as error:
             logger.exception(error)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:

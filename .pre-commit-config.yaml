@@ -70,7 +70,7 @@ repos:
     rev: 'v1.5.1'
     hooks:
       - id: mypy
-        name: mypy-python-sdk
+        name: mypy-python
         additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil, apache-airflow]
         files: ^cosmos
 

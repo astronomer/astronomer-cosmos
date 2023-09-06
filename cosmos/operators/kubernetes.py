@@ -26,13 +26,15 @@ except ImportError:
     )
 
 
-class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore[misc]
+class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + KubernetesPodOperator.template_fields
+    template_fields: Sequence[str] = tuple(
+        list(DbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
+    )
 
     intercept_flag = False
 
@@ -41,12 +43,12 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
         super().__init__(**kwargs)
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
-        env_vars_dict = dict()
+        env_vars_dict: dict[str, str] = dict()
 
-        for env_var in self.env_vars:  # type: ignore[has-type]
+        for env_var in self.env_vars:
             env_vars_dict[env_var.name] = env_var.value
 
-        self.env_vars = convert_env_vars({**env, **env_vars_dict})
+        self.env_vars: list[Any] = convert_env_vars({**env, **env_vars_dict})
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_kube_args(context, cmd_flags)

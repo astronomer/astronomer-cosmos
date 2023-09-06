@@ -21,6 +21,22 @@ jobs:
     steps:
       - run: true
 
+  Type-Check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+          architecture: 'x64'
+      - uses: actions/cache@v3
+        with:
+           path: |
+             ~/.cache/pip
+           key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      - run: pip3 install hatch mypy
+      - run: hatch run tests.py3.9-2.7:type-check
+
   Run-Unit-Tests:
     runs-on: ubuntu-latest
     strategy:

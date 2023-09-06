@@ -40,7 +40,8 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")  # type: ignore[has-type]
-        return super().execute(context)
+        result = super().execute(context)
+        logger.info(result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt
@@ -53,8 +54,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
         self.command = dbt_cmd
 
     def execute(self, context: Context) -> None:
-        result = self.build_and_run_cmd(context=context)
-        logger.info(result.output)
+        self.build_and_run_cmd(context=context)
 
 
 class DbtLSDockerOperator(DbtDockerBaseOperator):
@@ -92,8 +92,7 @@ class DbtSeedDockerOperator(DbtDockerBaseOperator):
 
     def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        logger.info(result.output)
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
@@ -163,5 +162,4 @@ class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
 
     def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        logger.info(result.output)
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)

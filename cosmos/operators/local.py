@@ -40,7 +40,6 @@ from cosmos.hooks.subprocess import (
 )
 from cosmos.dbt.parser.output import (
     extract_log_issues,
-    parse_output,
 )
 
 logger = get_logger(__name__)
@@ -320,14 +319,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             job_facets=job_facets,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
-        return self.run_command(cmd=dbt_cmd, env=env, context=context)
+        result = self.run_command(cmd=dbt_cmd, env=env, context=context)
+        logger.info(result.output)
 
     def execute(self, context: Context) -> None:
-        result = self.build_and_run_cmd(context=context)
-        logger.info(result.output)
+        self.build_and_run_cmd(context=context)
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -373,8 +372,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        logger.info(result.output)
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
@@ -451,17 +449,6 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         if self.on_warning_callback:
             self.on_warning_callback(warning_context)
-
-    def execute(self, context: Context) -> None:
-        result = self.build_and_run_cmd(context=context)
-        if not self._should_run_tests(result):
-            output = result.output
-        else:
-            warnings = parse_output(result, "WARN")
-            if warnings > 0:
-                self._handle_warnings(result, context)
-            output = result.output
-        logger.info(output)
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):

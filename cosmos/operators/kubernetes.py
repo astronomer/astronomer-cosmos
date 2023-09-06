@@ -51,7 +51,8 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
-        return super().execute(context)
+        result = super().execute(context)
+        logger.info(result)
 
     def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt
@@ -71,6 +72,9 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd
 
+    def execute(self, context: Context) -> None:
+        self.build_and_run_cmd(context=context)
+
 
 class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
     """
@@ -82,9 +86,6 @@ class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["ls"]
-
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
@@ -108,9 +109,9 @@ class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
 
         return flags
 
-    def execute(self, context: Context) -> Any:
+    def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtSnapshotKubernetesOperator(DbtKubernetesBaseOperator):
@@ -125,9 +126,6 @@ class DbtSnapshotKubernetesOperator(DbtKubernetesBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = ["snapshot"]
 
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
-
 
 class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
     """
@@ -140,9 +138,6 @@ class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["run"]
-
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
@@ -157,9 +152,6 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
         self.base_cmd = ["test"]
         # as of now, on_warning_callback in kubernetes executor does nothing
         self.on_warning_callback = on_warning_callback
-
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
@@ -187,6 +179,6 @@ class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
             flags.append(yaml.dump(self.args))
         return flags
 
-    def execute(self, context: Context) -> Any:
+    def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)

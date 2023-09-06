@@ -1,39 +1,60 @@
 Changelog
 =========
 
-1.1.0a1 (2023-08-16)
+1.1.0 (2023-09-06)
 --------------------
 
-Feature (pending documentation!)
+Feature
+
 * Support dbt global flags (via dbt_cmd_global_flags in operator_args) by @tatiana in #469
+* Support parsing DAGs when there are no connections by @jlaneve in #489
 
 Enhancements
+
 * Hide sensitive field when using BigQuery keyfile_dict profile mapping by @jbandoro in #471
+* Consistent Airflow Dataset URIs, inlets and outlets with `Openlineage package <https://pypi.org/project/openlineage-integration-common/>`_ by @tatiana in #485. `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/lineage.html>`_.
+* Refactor ``LoadMethod.DBT_LS`` to run from a temporary directory with symbolic links by @tatiana in #488
+* Run ``dbt deps`` when using ``LoadMethod.DBT_LS`` by @DanMawdsleyBA in #481
+* Update Cosmos log color to purple by @harels in #494
+* Change operators to log ``dbt`` commands output as opposed to recording to XCom by @tatiana in #513
 
 Bug fixes
+
 * Fix bug on select node add exclude selector subset ids logic by @jensenity in #463
 * Refactor dbt ls to run from a temporary directory, to avoid Read-only file system errors during DAG parsing, by @tatiana in #414
+* Fix profile_config arg in DbtKubernetesBaseOperator by @david-mag in #505
+* Fix SnowflakePrivateKeyPemProfileMapping private_key reference by @nacpacheco in #501
+* Fix incorrect temporary directory creation in VirtualenvOperator init by @tatiana in #500
+* Fix log propagation issue by @tatiana in #498
+* Fix PostgresUserPasswordProfileMapping to retrieve port from connection by @jlneve in #511
 
 Others
+
 * Docs: Fix RenderConfig load argument by @jbandoro in #466
 * Enable CI integration tests from external forks by @tatiana in #458
 * Improve CI tests runtime by @tatiana in #457
 * Change CI to run coverage after tests pass by @tatiana in #461
 * Fix forks code revision in code coverage by @tatiana in #472
 * [pre-commit.ci] pre-commit autoupdate by @pre-commit-ci in #467
+* Drop support to Python 3.7 in the CI test matrix by @harels in #490
+* Add Airflow 2.7 to the CI test matrix by @tatiana in #487
+* Add MyPy type checks to CI since we exceeded pre-commit disk quota usage by @tatiana in #510
 
 1.0.5 (2023-08-09)
 ------------------
 
 Enhancements
+
 * Improve logs to include astornomer-cosmos identifier by @tatiana in #450
 * Support OAuth authentication for Big Query by @MonideepDe in #431
 
 Bug fixes
+
 * Fix selector for config tags by @javihernovoa in #441
 * Fix BigQuery keyfile_dict mapping for connection created from webserver UI by @jbandoro in #449
 
 Others
+
 * [pre-commit.ci] pre-commit autoupdate by @pre-commit-ci in #446
 * Resolve MyPy errors when adding Airflow pre-commit dependency by @abhi12mohan in #434
 

@@ -325,8 +325,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         dbt_cmd = dbt_cmd or []
         return self.run_command(cmd=dbt_cmd, env=env, context=context)
 
-    def execute(self, context: Context) -> str:  # type: ignore[return]
-        self.build_and_run_cmd(context=context).output
+    def execute(self, context: Context) -> None:
+        result = self.build_and_run_cmd(context=context)
+        logger.info(result.output)
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -347,10 +348,6 @@ class DbtLSLocalOperator(DbtLocalBaseOperator):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["ls"]
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
 
 
 class DbtSeedLocalOperator(DbtLocalBaseOperator):
@@ -374,10 +371,10 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
         return flags
 
-    def execute(self, context: Context) -> str:
+    def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
         result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output
+        logger.info(result.output)
 
 
 class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
@@ -392,10 +389,6 @@ class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = ["snapshot"]
 
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
-
 
 class DbtRunLocalOperator(DbtLocalBaseOperator):
     """
@@ -408,9 +401,6 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["run"]
-
-    def execute(self, context: Context) -> str:  # type: ignore[return]
-        self.build_and_run_cmd(context=context)
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
@@ -462,17 +452,16 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         if self.on_warning_callback:
             self.on_warning_callback(warning_context)
 
-    def execute(self, context: Context) -> str:
+    def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context)
-
         if not self._should_run_tests(result):
-            return result.output
-
-        warnings = parse_output(result, "WARN")
-        if warnings > 0:
-            self._handle_warnings(result, context)
-
-        return result.output
+            output = result.output
+        else:
+            warnings = parse_output(result, "WARN")
+            if warnings > 0:
+                self._handle_warnings(result, context)
+            output = result.output
+        logger.info(output)
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
@@ -500,11 +489,6 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
             flags.append(yaml.dump(self.args))
         return flags
 
-    def execute(self, context: Context) -> str:
-        cmd_flags = self.add_cmd_flags()
-        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
-        return result.output
-
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """
@@ -519,10 +503,6 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["docs", "generate"]
-
-    def execute(self, context: Context) -> str:
-        result = self.build_and_run_cmd(context=context)
-        return result.output
 
 
 class DbtDocsS3LocalOperator(DbtDocsLocalOperator):

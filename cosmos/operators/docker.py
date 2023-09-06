@@ -52,6 +52,10 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore[mi
         self.environment = {**env_vars, **self.environment}  # type: ignore[has-type]
         self.command = dbt_cmd
 
+    def execute(self, context: Context) -> None:
+        result = self.build_and_run_cmd(context=context)
+        logger.info(result.output)
+
 
 class DbtLSDockerOperator(DbtDockerBaseOperator):
     """
@@ -63,9 +67,6 @@ class DbtLSDockerOperator(DbtDockerBaseOperator):
     def __init__(self, **kwargs: str) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["ls"]
-
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtSeedDockerOperator(DbtDockerBaseOperator):
@@ -89,9 +90,10 @@ class DbtSeedDockerOperator(DbtDockerBaseOperator):
 
         return flags
 
-    def execute(self, context: Context) -> Any:
+    def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        logger.info(result.output)
 
 
 class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
@@ -106,9 +108,6 @@ class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = ["snapshot"]
 
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
-
 
 class DbtRunDockerOperator(DbtDockerBaseOperator):
     """
@@ -121,9 +120,6 @@ class DbtRunDockerOperator(DbtDockerBaseOperator):
     def __init__(self, **kwargs: str) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["run"]
-
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtTestDockerOperator(DbtDockerBaseOperator):
@@ -138,9 +134,6 @@ class DbtTestDockerOperator(DbtDockerBaseOperator):
         self.base_cmd = ["test"]
         # as of now, on_warning_callback in docker executor does nothing
         self.on_warning_callback = on_warning_callback
-
-    def execute(self, context: Context) -> Any:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
@@ -168,6 +161,7 @@ class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
             flags.append(yaml.dump(self.args))
         return flags
 
-    def execute(self, context: Context) -> Any:
+    def execute(self, context: Context) -> None:
         cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        result = self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        logger.info(result.output)

@@ -91,11 +91,11 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(command, *args, **kwargs)
         return subprocess_result
 
-    def execute(self, context: Context) -> str:
+    def execute(self, context: Context) -> None:
         output = super().execute(context)
         if self._venv_tmp_dir:
             self._venv_tmp_dir.cleanup()
-        return output
+        logger.info(output)
 
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):

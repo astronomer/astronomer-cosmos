@@ -40,8 +40,8 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
         profile = {
-            **self.mapped_params,
             "port": 5432,
+            **self.mapped_params,
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),
@@ -55,6 +55,6 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         parent_mock = super().mock_profile
 
         return {
-            **parent_mock,
             "port": 5432,
+            **parent_mock,
         }

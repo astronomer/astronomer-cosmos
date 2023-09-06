@@ -270,7 +270,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except FileNotFoundError as error:
+        except (FileNotFoundError, NotImplementedError) as error:
             logger.exception(error)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:

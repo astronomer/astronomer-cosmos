@@ -7,6 +7,16 @@ models:
         tests:
           - unique
           - not_null
+      - name: first_name
+      - name: last_name
+      - name: full_name
+    versions:
+      - v: 1
+        columns:
+          - include: all
+            exclude:
+              - full_name
+      - v: 2
 
   - name: stg_orders
     columns:
@@ -18,6 +28,8 @@ models:
         tests:
           - accepted_values:
               values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
+    versions:
+      - v: 1
 
   - name: stg_payments
     columns:

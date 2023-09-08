@@ -17,6 +17,9 @@ models:
       - name: last_name
         description: Customer's last name. PII.
 
+      - name: full_name
+        description: Customer's full name. PII.
+
       - name: first_order
         description: Date (UTC) of a customer's first order
 
@@ -28,6 +31,13 @@ models:
 
       - name: total_order_amount
         description: Total value (AUD) of a customer's orders
+    versions:
+      - v: 1
+        columns:
+          - include: all
+            exclude:
+              - full_name
+      - v: 2
 
   - name: orders
     description: This table has basic information about orders, as well as some derived facts based on payments

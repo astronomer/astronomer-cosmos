@@ -25,7 +25,7 @@ profile_config = ProfileConfig(
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop_with_model_version",
+        DBT_ROOT_PATH / "model_version",
     ),
     profile_config=profile_config,
     operator_args={"install_deps": True},

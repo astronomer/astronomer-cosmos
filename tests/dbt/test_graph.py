@@ -15,6 +15,7 @@ DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PIPELINE_NAME = "jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
+SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
 
 
 @pytest.fixture
@@ -389,3 +390,40 @@ def test_update_node_dependency_test_not_exist():
 
     for _, nodes in dbt_graph.filtered_nodes.items():
         assert nodes.has_test is False
+
+
+@pytest.mark.parametrize("load_method", ["load_via_dbt_ls"])
+def test_load_via_dbt_ls_with_model_version(load_method):
+    pipeline_name = "model_version"
+    dbt_graph = DbtGraph(
+        project=DbtProject(
+            name=pipeline_name,
+            root_dir=DBT_PROJECTS_ROOT_DIR,
+            manifest_path=SAMPLE_MANIFEST_MODEL_VERSION if load_method == "load_from_dbt_manifest" else None,
+        ),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+    getattr(dbt_graph, load_method)()
+    expected_dbt_nodes = {
+        "seed.jaffle_shop.raw_customers": "raw_customers",
+        "seed.jaffle_shop.raw_orders": "raw_orders",
+        "seed.jaffle_shop.raw_payments": "raw_payments",
+        "model.jaffle_shop.stg_customers.v1": "stg_customers_v1",
+        "model.jaffle_shop.stg_customers.v2": "stg_customers_v2",
+        "model.jaffle_shop.customers.v1": "customers_v1",
+        "model.jaffle_shop.customers.v2": "customers_v2",
+        "model.jaffle_shop.stg_orders.v1": "stg_orders_v1",
+        "model.jaffle_shop.stg_payments": "stg_payments",
+        "model.jaffle_shop.orders": "orders",
+    }
+
+    for unique_id, name in expected_dbt_nodes.items():
+        assert unique_id in dbt_graph.nodes
+        assert name == dbt_graph.nodes[unique_id].name

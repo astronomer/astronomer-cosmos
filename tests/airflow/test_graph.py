@@ -246,6 +246,7 @@ def test_create_task_metadata_model_use_name_as_task_id_prefix(caplog):
     )
     assert metadata.id == "run"
 
+
 @pytest.mark.parametrize("use_name_as_task_id_prefix", (None, True, False))
 def test_create_task_metadata_seed(caplog, use_name_as_task_id_prefix):
     sample_node = DbtNode(

@@ -394,10 +394,9 @@ def test_update_node_dependency_test_not_exist():
 
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls"])
 def test_load_via_dbt_ls_with_model_version(load_method):
-    pipeline_name = "model_version"
     dbt_graph = DbtGraph(
         project=DbtProject(
-            name=pipeline_name,
+            name="model_version",
             root_dir=DBT_PROJECTS_ROOT_DIR,
             manifest_path=SAMPLE_MANIFEST_MODEL_VERSION if load_method == "load_from_dbt_manifest" else None,
         ),

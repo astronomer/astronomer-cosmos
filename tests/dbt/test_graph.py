@@ -392,6 +392,7 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_test is False
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 def test_load_dbt_ls_and_manifest_with_model_version(load_method):
     dbt_graph = DbtGraph(

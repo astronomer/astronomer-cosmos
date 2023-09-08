@@ -138,7 +138,8 @@ class DbtGraph:
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
 
-        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead.
+        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
+        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
 
         Updates in-place:
         * self.nodes
@@ -329,7 +330,8 @@ class DbtGraph:
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).
 
-        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead.
+        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
+        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
 
         Updates in-place:
         * self.nodes

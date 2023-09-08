@@ -26,7 +26,7 @@ Otherwise, install Cosmos using ``astronomer-cosmos[openlineage]``.
 Configuration
 -------------
 
-If using Airflow 2.7, follow `these instructions <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_ on how to configure OpenLineage.
+If using Airflow 2.7, follow `the instructions <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_ on how to configure OpenLineage.
 
 Otherwise, follow `these instructions <https://openlineage.io/docs/integrations/airflow/>`_.
 

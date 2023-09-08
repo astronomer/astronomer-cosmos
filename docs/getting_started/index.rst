@@ -11,6 +11,7 @@
    Execution Modes <execution-modes>
    Docker Execution Mode <docker>
    Kubernetes Execution Mode <kubernetes>
+   dbt and Airflow Similar Concepts <dbt-airflow-concepts>
 
 
 Getting Started
@@ -38,3 +39,9 @@ For specific guides, see the following:
 
 - `Executing dbt DAGs with Docker Operators <docker.html>`__
 - `Executing dbt DAGs with KubernetesPodOperators <kubernetes.html>`__
+
+
+Concepts Overview
+-----------------
+
+How do dbt and Airflow concepts map to each other? Learn more `in this link <dbt-airflow-concepts.html>`__.

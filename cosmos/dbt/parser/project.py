@@ -129,6 +129,7 @@ class DbtModel:
     name: str
     type: DbtModelType
     path: Path
+    operator_args: Dict[str, Any] = field(default_factory=dict)
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
     def __post_init__(self) -> None:
@@ -137,6 +138,7 @@ class DbtModel:
         """
         # first, get an empty config
         config = DbtModelConfig()
+        var_args: Dict[str, Any] = self.operator_args.get("vars", {})
 
         if self.type == DbtModelType.DBT_MODEL:
             # get the code from the file
@@ -165,23 +167,40 @@ class DbtModel:
             # iterate over the jinja nodes to extract info
             for base_node in jinja2_ast.find_all(jinja2.nodes.Call):
                 if hasattr(base_node.node, "name"):
-                    # check we have a ref - this indicates a dependency
-                    if base_node.node.name == "ref":
-                        # if it is, get the first argument
-                        first_arg = base_node.args[0]
-                        if isinstance(first_arg, jinja2.nodes.Const):
-                            # and add it to the config
-                            config.upstream_models.add(first_arg.value)
+                    try:
+                        # check we have a ref - this indicates a dependency
+                        if base_node.node.name == "ref":
+                            # if it is, get the first argument
+                            first_arg = base_node.args[0]
+                            # if it contains vars, render the value of the var
+                            if isinstance(first_arg, jinja2.nodes.Concat):
+                                value = ""
+                                for node in first_arg.nodes:
+                                    if isinstance(node, jinja2.nodes.Const):
+                                        value += node.value
+                                    elif (
+                                        isinstance(node, jinja2.nodes.Call)
+                                        and isinstance(node.node, jinja2.nodes.Name)
+                                        and isinstance(node.args[0], jinja2.nodes.Const)
+                                        and node.node.name == "var"
+                                    ):
+                                        value += var_args[node.args[0].value]
+                                config.upstream_models.add(value)
+                            elif isinstance(first_arg, jinja2.nodes.Const):
+                                # and add it to the config
+                                config.upstream_models.add(first_arg.value)
 
-                    # check if we have a config - this could contain tags
-                    if base_node.node.name == "config":
-                        # if it is, check if any kwargs are tags
-                        for kwarg in base_node.kwargs:
-                            for selector in self.config.config_types:
-                                extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
-                                config.config_selectors |= (
-                                    set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
-                                )
+                        # check if we have a config - this could contain tags
+                        if base_node.node.name == "config":
+                            # if it is, check if any kwargs are tags
+                            for kwarg in base_node.kwargs:
+                                for selector in self.config.config_types:
+                                    extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
+                                    config.config_selectors |= (
+                                        set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
+                                    )
+                    except KeyError as e:
+                        logger.warning(f"Could not add upstream model for config in {self.path}: {e}")
 
         # set the config and set the parsed file flag to true
         self.config = config
@@ -236,6 +255,8 @@ class DbtProject:
     snapshots_dir: Path = field(init=False)
     seeds_dir: Path = field(init=False)
 
+    operator_args: Dict[str, Any] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
         """
         Initializes the parser.
@@ -287,6 +308,7 @@ class DbtProject:
             name=model_name,
             type=DbtModelType.DBT_SEED,
             path=path,
+            operator_args=self.operator_args,
         )
         # add the model to the project
         self.seeds[model_name] = model
@@ -304,6 +326,7 @@ class DbtProject:
                 name=model_name,
                 type=DbtModelType.DBT_MODEL,
                 path=path,
+                operator_args=self.operator_args,
             )
             # add the model to the project
             self.models[model.name] = model
@@ -313,6 +336,7 @@ class DbtProject:
                 name=model_name,
                 type=DbtModelType.DBT_SNAPSHOT,
                 path=path,
+                operator_args=self.operator_args,
             )
             # add the snapshot to the project
             self.snapshots[model.name] = model

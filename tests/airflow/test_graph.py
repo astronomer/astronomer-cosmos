@@ -261,7 +261,12 @@ def test_create_task_metadata_seed(caplog, use_name_as_task_id_prefix):
     if use_name_as_task_id_prefix is None:
         metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
     else:
-        metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
+        metadata = create_task_metadata(
+            sample_node,
+            execution_mode=ExecutionMode.DOCKER,
+            args={},
+            use_name_as_task_id_prefix=use_name_as_task_id_prefix,
+        )
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
     assert metadata.arguments == {"models": "my_seed"}

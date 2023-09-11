@@ -209,11 +209,8 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
     facets = dbt_base_operator.get_openlineage_facets_on_complete(dbt_base_operator)
-    assert facets.inputs == []
-    assert facets.outputs == []
-    assert facets.run_facets == {}
-    assert facets.job_facets == {}
-    log = "Unable to emit OpenLineage events since dependencies are not installed"
+    assert facets is None
+    log = "Unable to emit OpenLineage events since no events were created."
     assert log in caplog.text
 
 

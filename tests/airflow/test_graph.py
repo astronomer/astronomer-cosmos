@@ -272,25 +272,6 @@ def test_create_task_metadata_seed(caplog, use_name_as_task_id_prefix):
     assert metadata.arguments == {"models": "my_seed"}
 
 
-@pytest.mark.parametrize("use_name_as_task_id_prefix", (True, False))
-def test_create_task_metadata_seed_use_name_as_task_id_prefix(caplog, use_name_as_task_id_prefix):
-    sample_node = DbtNode(
-        name="my_seed",
-        unique_id="my_folder.my_seed",
-        resource_type=DbtResourceType.SEED,
-        depends_on=[],
-        file_path="",
-        tags=[],
-        config={},
-    )
-    metadata = create_task_metadata(
-        sample_node, execution_mode=ExecutionMode.DOCKER, args={}, use_name_as_task_id_prefix=use_name_as_task_id_prefix
-    )
-    assert metadata.id == "my_seed_seed"
-    assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
-    assert metadata.arguments == {"models": "my_seed"}
-
-
 def test_create_task_metadata_snapshot(caplog):
     sample_node = DbtNode(
         name="my_snapshot",

@@ -427,3 +427,19 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
     for unique_id, name in expected_dbt_nodes.items():
         assert unique_id in dbt_graph.nodes
         assert name == dbt_graph.nodes[unique_id].name
+
+    # Test dependencies
+    assert {
+        "model.jaffle_shop.stg_customers.v1",
+        "model.jaffle_shop.stg_orders.v1",
+        "model.jaffle_shop.stg_payments",
+    } == set(dbt_graph.nodes["model.jaffle_shop.customers.v1"].depends_on)
+    assert {
+        "model.jaffle_shop.stg_customers.v2",
+        "model.jaffle_shop.stg_orders.v1",
+        "model.jaffle_shop.stg_payments",
+    } == set(dbt_graph.nodes["model.jaffle_shop.customers.v2"].depends_on)
+    assert {
+        "model.jaffle_shop.stg_orders.v1",
+        "model.jaffle_shop.stg_payments",
+    } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)

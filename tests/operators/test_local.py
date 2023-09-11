@@ -200,6 +200,20 @@ def test_run_operator_emits_events():
     assert facets.job_facets == {"d": 4}
 
 
+def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
+    dbt_base_operator = DbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    delattr(dbt_base_operator, "openlineage_events_completes")
+    facets = dbt_base_operator.get_openlineage_facets_on_complete(dbt_base_operator)
+    assert facets is None
+    log = "cosmos.operators.local:local.py:332 Unable to emit OpenLineage events since dependencies are not installed."
+    assert log in caplog.text
+
+
 def test_store_compiled_sql() -> None:
     dbt_base_operator = DbtLocalBaseOperator(
         profile_config=profile_config,

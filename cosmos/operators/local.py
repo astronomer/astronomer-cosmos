@@ -305,7 +305,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             DAG.bulk_write_to_db([self.dag], session=session)
             session.commit()
 
-    def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
+    def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage | None:
         """
         Collect the input, output, job and run facets for this operator.
         It relies on the calculate_openlineage_events_completes having being called before.
@@ -315,18 +315,22 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         run_facets: dict[str, Any] = {}
         job_facets: dict[str, Any] = {}
 
-        for completed in task_instance.openlineage_events_completes:
-            [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
-            [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
-            run_facets = {**run_facets, **completed.run.facets}
-            job_facets = {**job_facets, **completed.job.facets}
+        if is_openlineage_available and hasattr(task_instance, "openlineage_events_completes"):
+            for completed in task_instance.openlineage_events_completes:
+                [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
+                [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
+                run_facets = {**run_facets, **completed.run.facets}
+                job_facets = {**job_facets, **completed.job.facets}
 
-        return OperatorLineage(
-            inputs=inputs,
-            outputs=outputs,
-            run_facets=run_facets,
-            job_facets=job_facets,
-        )
+            return OperatorLineage(
+                inputs=inputs,
+                outputs=outputs,
+                run_facets=run_facets,
+                job_facets=job_facets,
+            )
+        else:
+            logger.warning("Unable to emit OpenLineage events since dependencies are not installed.")
+            return None
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)

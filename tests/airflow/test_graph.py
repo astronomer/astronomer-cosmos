@@ -1,5 +1,5 @@
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -10,15 +10,14 @@ from packaging import version
 from cosmos.airflow.graph import (
     build_airflow_graph,
     calculate_leaves,
+    calculate_operator_class,
     create_task_metadata,
     create_test_task_metadata,
-    calculate_operator_class,
 )
 from cosmos.config import ProfileConfig
-from cosmos.profiles import PostgresUserPasswordProfileMapping
-from cosmos.constants import ExecutionMode, DbtResourceType, TestBehavior
+from cosmos.constants import DbtResourceType, ExecutionMode, TestBehavior
 from cosmos.dbt.graph import DbtNode
-
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 
@@ -92,23 +91,23 @@ def test_build_airflow_graph_with_after_each():
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = [
         "seed_parent_seed",
-        "parent.parent_run",
-        "parent.parent_test",
-        "child.child_run",
-        "child.child_test",
+        "parent.run",
+        "parent.test",
+        "child.run",
+        "child.test",
     ]
     assert topological_sort == expected_sort
     task_groups = dag.task_group_dict
     assert len(task_groups) == 2
 
     assert task_groups["parent"].upstream_task_ids == {"seed_parent_seed"}
-    assert list(task_groups["parent"].children.keys()) == ["parent.parent_run", "parent.parent_test"]
+    assert list(task_groups["parent"].children.keys()) == ["parent.run", "parent.test"]
 
-    assert task_groups["child"].upstream_task_ids == {"parent.parent_test"}
-    assert list(task_groups["child"].children.keys()) == ["child.child_run", "child.child_test"]
+    assert task_groups["child"].upstream_task_ids == {"parent.test"}
+    assert list(task_groups["child"].children.keys()) == ["child.run", "child.test"]
 
     assert len(dag.leaves) == 1
-    assert dag.leaves[0].task_id == "child.child_test"
+    assert dag.leaves[0].task_id == "child.test"
 
 
 @pytest.mark.skipif(
@@ -232,7 +231,24 @@ def test_create_task_metadata_model(caplog):
     assert metadata.arguments == {"models": "my_model"}
 
 
-def test_create_task_metadata_seed(caplog):
+def test_create_task_metadata_model_use_name_as_task_id_prefix(caplog):
+    child_node = DbtNode(
+        name="my_model",
+        unique_id="my_folder.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=Path(""),
+        tags=[],
+        config={},
+    )
+    metadata = create_task_metadata(
+        child_node, execution_mode=ExecutionMode.LOCAL, args={}, use_name_as_task_id_prefix=False
+    )
+    assert metadata.id == "run"
+
+
+@pytest.mark.parametrize("use_name_as_task_id_prefix", (None, True, False))
+def test_create_task_metadata_seed(caplog, use_name_as_task_id_prefix):
     sample_node = DbtNode(
         name="my_seed",
         unique_id="my_folder.my_seed",
@@ -242,7 +258,15 @@ def test_create_task_metadata_seed(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
+    if use_name_as_task_id_prefix is None:
+        metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
+    else:
+        metadata = create_task_metadata(
+            sample_node,
+            execution_mode=ExecutionMode.DOCKER,
+            args={},
+            use_name_as_task_id_prefix=use_name_as_task_id_prefix,
+        )
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
     assert metadata.arguments == {"models": "my_seed"}

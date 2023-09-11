@@ -80,12 +80,14 @@ class DbtGraph:
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
         profile_config: ProfileConfig | None = None,
+        operator_args: dict[str, Any] | None = None,
         dbt_deps: bool | None = True,
     ):
         self.project = project
         self.exclude = exclude or []
         self.select = select or []
         self.profile_config = profile_config
+        self.operator_args = operator_args or {}
         self.dbt_deps = dbt_deps
 
         # specific to loading using ls
@@ -282,6 +284,7 @@ class DbtGraph:
             dbt_models_dir=self.project.models_dir.stem if self.project.models_dir else None,
             dbt_seeds_dir=self.project.seeds_dir.stem if self.project.seeds_dir else None,
             project_name=self.project.name,
+            operator_args=self.operator_args,
         )
         nodes = {}
         models = itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items())

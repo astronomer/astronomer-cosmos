@@ -190,3 +190,18 @@ def test_dbtmodelconfig_with_sources(tmp_path):
 
     dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=path_with_sources)
     assert "sample_source" not in dbt_model.config.upstream_models
+
+
+def test_dbtmodelconfig_with_vars(tmp_path):
+    model_sql = SAMPLE_MODEL_SQL_PATH.read_text()
+    model_with_vars_sql = model_sql.replace("ref('stg_customers')", "ref('stg_customers_'~ var('country_code'))")
+    path_with_sources = tmp_path / "customers_with_sources.sql"
+    path_with_sources.write_text(model_with_vars_sql)
+
+    dbt_model = DbtModel(
+        name="some_name",
+        type=DbtModelType.DBT_MODEL,
+        path=path_with_sources,
+        operator_args={"vars": {"country_code": "us"}},
+    )
+    assert "stg_customers_us" in dbt_model.config.upstream_models

@@ -41,8 +41,8 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile."
         profile = {
-            **self.mapped_params,
             "port": 5439,
+            **self.mapped_params,
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),
@@ -56,6 +56,6 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
         parent_mock = super().mock_profile
 
         return {
-            **parent_mock,
             "port": 5439,
+            **parent_mock,
         }

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import contextlib
 import tempfile
 from dataclasses import dataclass, field
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Iterator
 
 from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
+from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
@@ -180,9 +180,9 @@ class ExecutionConfig:
     Contains configuration about how to execute dbt.
 
     :param execution_mode: The execution mode for dbt. Defaults to local
-    :param dbt_executable_path: The path to the dbt executable. Defaults to dbt-ol or dbt if
+    :param dbt_executable_path: The path to the dbt executable. Defaults to dbt if
     available on the path.
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
-    dbt_executable_path: str | Path = shutil.which("dbt-ol") or shutil.which("dbt") or "dbt"
+    dbt_executable_path: str | Path = get_system_dbt()

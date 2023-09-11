@@ -41,6 +41,7 @@ dependencies = [
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
+    "openlineage-integration-common",
 ]
 
 [project.optional-dependencies]
@@ -52,7 +53,6 @@ dbt-all = [
     "dbt-redshift<=1.5.4",
     "dbt-snowflake<=1.5.4",
     "dbt-spark<=1.5.4",
-    "astronomer-cosmos[dbt-openlineage]"
 ]
 dbt-bigquery = [
     "dbt-bigquery<=1.5.4",
@@ -75,12 +75,12 @@ dbt-snowflake = [
 dbt-spark = [
     "dbt-spark<=1.5.4",
 ]
-dbt-openlineage = [
-    "dbt-core<=1.5.4",
-    "openlineage-dbt>=0.21.1"
+openlineage = [
+    "openlineage-airflow",
 ]
 all = [
     "astronomer-cosmos[dbt-all]",
+    "astronomer-cosmos[openlineage]"
 ]
 docs =[
     "sphinx",
@@ -130,7 +130,13 @@ include = [
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0"
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
+    "types-PyYAML",
+    "types-attrs",
+    "attrs",
+    "types-requests",
+    "types-python-dateutil",
+    "apache-airflow"
 ]
 
 [[tool.hatch.envs.tests.matrix]]
@@ -148,14 +154,15 @@ matrix.airflow.dependencies = [
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
+type-check = "mypy cosmos"
 test = 'pytest -vv --durations=0 . -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py'
-test-cov = 'pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py'
+test-cov = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py"""
 # we install using the following workaround to overcome installation conflicts, such as:
 # apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
 test-integration-setup = """pip uninstall dbt-postgres dbt-databricks; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install 'dbt-postgres<=1.5.4' 'dbt-databricks<=1.5.5'"""
+pip install  'dbt-core==1.5.4'  'dbt-databricks<=1.5.4' 'dbt-postgres<=1.5.4' 'openlineage-airflow'"""
 test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
 --cov=cosmos \
@@ -163,7 +170,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not (test_example_dags_no_connections[example_cosmos_python_models] or test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv])'
+-k 'not (example_cosmos_python_models or example_virtualenv)'
 """
 test-integration-expensive = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
@@ -172,7 +179,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'test_example_dags_no_connections[example_cosmos_python_models] or test_example_dag[example_cosmos_python_models] or test_example_dag[example_virtualenv]'"""
+-k 'example_cosmos_python_models or example_virtualenv'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -193,6 +200,7 @@ dependencies = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
+    "openlineage-airflow"
 ]
 
 [tool.hatch.envs.docs.scripts]
@@ -212,6 +220,8 @@ known_third_party = ["airflow", "jinja2"]
 
 [tool.mypy]
 strict = true
+ignore_missing_imports = true
+no_warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 120

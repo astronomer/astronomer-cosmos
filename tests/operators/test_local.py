@@ -2,18 +2,35 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow import DAG
+from airflow import __version__ as airflow_version
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessResult
 from airflow.utils.context import Context
+from packaging import version
 from pendulum import datetime
 
-from cosmos.operators.local import DbtLocalBaseOperator
 from cosmos.config import ProfileConfig
+from cosmos.operators.local import DbtLocalBaseOperator, DbtRunLocalOperator, DbtTestLocalOperator
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import test_dag as run_test_dag
+
+
+DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=MagicMock(),
+)
+
+real_profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
 )
 
 
@@ -122,6 +139,65 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         "START_DATE": "2023-02-15 12:30:00",
     }
     assert env == expected_env
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4"),
+    reason="Airflow DAG did not have datasets until the 2.4 release",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets():
+    from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+        )
+        run_operator
+    run_test_dag(dag)
+    assert run_operator.inlets == []
+    assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
+    assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
+    assert test_operator.outlets == []
+
+
+@pytest.mark.integration
+def test_run_operator_emits_events():
+    class MockRun:
+        facets = {"c": 3}
+
+    class MockJob:
+        facets = {"d": 4}
+
+    class MockEvent:
+        inputs = [1]
+        outputs = [2]
+        run = MockRun()
+        job = MockJob()
+
+    dbt_base_operator = DbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    dbt_base_operator.openlineage_events_completes = [MockEvent(), MockEvent()]
+    facets = dbt_base_operator.get_openlineage_facets_on_complete(dbt_base_operator)
+    assert facets.inputs == [1]
+    assert facets.outputs == [2]
+    assert facets.run_facets == {"c": 3}
+    assert facets.job_facets == {"d": 4}
 
 
 def test_store_compiled_sql() -> None:

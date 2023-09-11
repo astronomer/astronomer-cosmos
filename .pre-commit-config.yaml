@@ -50,7 +50,7 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.284
+    rev: v0.0.287
     hooks:
       - id: ruff
         args:
@@ -61,19 +61,22 @@ repos:
       - id: black
         args: [ "--config", "./pyproject.toml" ]
   - repo: https://github.com/asottile/blacken-docs
-    rev: 1.15.0
+    rev: 1.16.0
     hooks:
       - id: blacken-docs
         alias: black
         additional_dependencies: [black>=22.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.5.0'
+    rev: 'v1.5.1'
     hooks:
       - id: mypy
-        name: mypy-python-sdk
+        name: mypy-python
         additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil, apache-airflow]
         files: ^cosmos
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
   autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate
+  skip:
+    - mypy  # build of https://github.com/pre-commit/mirrors-mypy:types-PyYAML,types-attrs,attrs,types-requests,
+    #types-python-dateutil,apache-airflow@v1.5.0 for python@python3 exceeds tier max size 250MiB: 262.6MiB

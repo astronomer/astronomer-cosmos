@@ -50,8 +50,40 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     return leaves
 
 
+def create_test_task_metadata(
+    test_task_name: str,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    on_warning_callback: Callable[..., Any] | None = None,
+    model_name: str | None = None,
+) -> TaskMetadata:
+    """
+    Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
+
+    :param test_task_name: Name of the Airflow task to be created
+    :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
+    :param task_args: Arguments to be used to instantiate an Airflow Task
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+    and “test_results” of type List.
+    :param model_name: If the test relates to a specific model, the name of the model it relates to
+    :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
+    """
+    task_args = dict(task_args)
+    task_args["on_warning_callback"] = on_warning_callback
+    if model_name is not None:
+        task_args["models"] = model_name
+    return TaskMetadata(
+        id=test_task_name,
+        operator_class=calculate_operator_class(
+            execution_mode=execution_mode,
+            dbt_class="DbtTest",
+        ),
+        arguments=task_args,
+    )
+
+
 def create_task_metadata(
-    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix=True
+    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix: bool = True
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -92,38 +124,6 @@ def create_task_metadata(
     else:
         logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
         return None
-
-
-def create_test_task_metadata(
-    test_task_name: str,
-    execution_mode: ExecutionMode,
-    task_args: dict[str, Any],
-    on_warning_callback: Callable[..., Any] | None = None,
-    model_name: str | None = None,
-) -> TaskMetadata:
-    """
-    Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
-
-    :param test_task_name: Name of the Airflow task to be created
-    :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
-    :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
-    and “test_results” of type List.
-    :param model_name: If the test relates to a specific model, the name of the model it relates to
-    :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
-    """
-    task_args = dict(task_args)
-    task_args["on_warning_callback"] = on_warning_callback
-    if model_name is not None:
-        task_args["models"] = model_name
-    return TaskMetadata(
-        id=test_task_name,
-        operator_class=calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        ),
-        arguments=task_args,
-    )
 
 
 def build_airflow_graph(

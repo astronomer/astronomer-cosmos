@@ -30,50 +30,6 @@ def calculate_operator_class(
     return f"cosmos.operators.{execution_mode.value}.{dbt_class}{execution_mode.value.capitalize()}Operator"
 
 
-def create_task_metadata(
-    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix: bool = True
-) -> TaskMetadata | None:
-    """
-    Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
-
-    :param node: The dbt node which we desired to convert into an Airflow Task
-    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
-         Default is ExecutionMode.LOCAL.
-    :param args: Arguments to be used to instantiate an Airflow Task
-    :param use_name_as_task_id_prefix: If resource_type is DbtResourceType.MODEL, it determines whether
-         using name as task id prefix or not. If it is True task_id = <node.name>_run, else task_id=run.
-    :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
-    """
-    dbt_resource_to_class = {
-        DbtResourceType.MODEL: "DbtRun",
-        DbtResourceType.SNAPSHOT: "DbtSnapshot",
-        DbtResourceType.SEED: "DbtSeed",
-        DbtResourceType.TEST: "DbtTest",
-    }
-    args = {**args, **{"models": node.name}}
-
-    if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
-        if node.resource_type == DbtResourceType.MODEL:
-            if use_name_as_task_id_prefix:
-                task_id = f"{node.name}_run"
-            else:
-                task_id = "run"
-        else:
-            task_id = f"{node.name}_{node.resource_type.value}"
-
-        task_metadata = TaskMetadata(
-            id=task_id,
-            operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
-            ),
-            arguments=args,
-        )
-        return task_metadata
-    else:
-        logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
-        return None
-
-
 def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:
     """
     Return a list of unique_ids for nodes that are not parents (don't have dependencies on other tasks).
@@ -124,6 +80,50 @@ def create_test_task_metadata(
         ),
         arguments=task_args,
     )
+
+
+def create_task_metadata(
+    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix: bool = True
+) -> TaskMetadata | None:
+    """
+    Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
+
+    :param node: The dbt node which we desired to convert into an Airflow Task
+    :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
+         Default is ExecutionMode.LOCAL.
+    :param args: Arguments to be used to instantiate an Airflow Task
+    :param use_name_as_task_id_prefix: If resource_type is DbtResourceType.MODEL, it determines whether
+         using name as task id prefix or not. If it is True task_id = <node.name>_run, else task_id=run.
+    :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
+    """
+    dbt_resource_to_class = {
+        DbtResourceType.MODEL: "DbtRun",
+        DbtResourceType.SNAPSHOT: "DbtSnapshot",
+        DbtResourceType.SEED: "DbtSeed",
+        DbtResourceType.TEST: "DbtTest",
+    }
+    args = {**args, **{"models": node.name}}
+
+    if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
+        if node.resource_type == DbtResourceType.MODEL:
+            if use_name_as_task_id_prefix:
+                task_id = f"{node.name}_run"
+            else:
+                task_id = "run"
+        else:
+            task_id = f"{node.name}_{node.resource_type.value}"
+
+        task_metadata = TaskMetadata(
+            id=task_id,
+            operator_class=calculate_operator_class(
+                execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
+            ),
+            arguments=args,
+        )
+        return task_metadata
+    else:
+        logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
+        return None
 
 
 def build_airflow_graph(

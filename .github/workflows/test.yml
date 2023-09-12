@@ -33,12 +33,7 @@ jobs:
           python-version: '3.9'
           architecture: 'x64'
 
-      - uses: actions/cache@v3
-        with:
-           path: |
-             ~/.cache/pip
-           key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
-      - run: pip3 install hatch mypy
+      - run: pip3 install hatch
       - run: hatch run tests.py3.9-2.7:type-check
 
   Run-Unit-Tests:

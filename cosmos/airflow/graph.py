@@ -51,7 +51,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
 
 
 def create_task_metadata(
-    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix=True
+    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix: bool = True
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.

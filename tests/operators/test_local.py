@@ -245,6 +245,7 @@ def test_store_compiled_sql() -> None:
     "operator_class,kwargs,expected_call_kwargs",
     [
         (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
@@ -264,7 +265,6 @@ def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwa
     (
         DbtLSLocalOperator,
         DbtSnapshotLocalOperator,
-        DbtRunLocalOperator,
         DbtTestLocalOperator,
         DbtDocsLocalOperator,
         DbtDocsS3LocalOperator,

@@ -30,26 +30,6 @@ def calculate_operator_class(
     return f"cosmos.operators.{execution_mode.value}.{dbt_class}{execution_mode.value.capitalize()}Operator"
 
 
-def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:
-    """
-    Return a list of unique_ids for nodes that are not parents (don't have dependencies on other tasks).
-
-    :param tasks_ids: Node/task IDs which are materialized in the Airflow DAG
-    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
-    :returns: List of unique_ids for the nodes that are graph leaves
-    """
-    parents = []
-    leaves = []
-    materialized_nodes = [node for node in nodes.values() if node.unique_id in tasks_ids]
-    for node in materialized_nodes:
-        parents.extend(node.depends_on)
-    parents_ids = set(parents)
-    for node in materialized_nodes:
-        if node.unique_id not in parents_ids:
-            leaves.append(node.unique_id)
-    return leaves
-
-
 def create_task_metadata(
     node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix: bool = True
 ) -> TaskMetadata | None:
@@ -92,6 +72,26 @@ def create_task_metadata(
     else:
         logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
         return None
+
+
+def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:
+    """
+    Return a list of unique_ids for nodes that are not parents (don't have dependencies on other tasks).
+
+    :param tasks_ids: Node/task IDs which are materialized in the Airflow DAG
+    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
+    :returns: List of unique_ids for the nodes that are graph leaves
+    """
+    parents = []
+    leaves = []
+    materialized_nodes = [node for node in nodes.values() if node.unique_id in tasks_ids]
+    for node in materialized_nodes:
+        parents.extend(node.depends_on)
+    parents_ids = set(parents)
+    for node in materialized_nodes:
+        if node.unique_id not in parents_ids:
+            leaves.append(node.unique_id)
+    return leaves
 
 
 def create_test_task_metadata(

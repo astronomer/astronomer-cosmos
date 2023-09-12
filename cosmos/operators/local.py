@@ -485,6 +485,10 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
             flags.append(yaml.dump(self.args))
         return flags
 
+    def execute(self, context: Context) -> None:
+        cmd_flags = self.add_cmd_flags()
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """

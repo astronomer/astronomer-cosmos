@@ -42,7 +42,6 @@ dependencies = [
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
-    "openlineage-integration-common",
 ]
 
 [project.optional-dependencies]
@@ -77,6 +76,7 @@ dbt-spark = [
     "dbt-spark<=1.5.4",
 ]
 openlineage = [
+    "openlineage-integration-common",
     "openlineage-airflow",
 ]
 all = [

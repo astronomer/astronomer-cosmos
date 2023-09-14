@@ -405,9 +405,20 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+        self.full_refresh = full_refresh
         super().__init__(**kwargs)
         self.base_cmd = ["run"]
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+        if self.full_refresh is True:
+            flags.append("--full-refresh")
+        return flags
+
+    def execute(self, context: Context) -> None:
+        cmd_flags = self.add_cmd_flags()
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtTestLocalOperator(DbtLocalBaseOperator):
@@ -484,6 +495,10 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
             flags.append("--args")
             flags.append(yaml.dump(self.args))
         return flags
+
+    def execute(self, context: Context) -> None:
+        cmd_flags = self.add_cmd_flags()
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):

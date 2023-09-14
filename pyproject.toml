@@ -113,7 +113,8 @@ kubernetes = [
 
 [project.urls]
 Homepage = "https://github.com/astronomer/astronomer-cosmos"
-Documentation = "https://github.com/astronomer/astronomer-cosmos"
+Documentation = "https://astronomer.github.io/astronomer-cosmos"
+"Source code" = "https://github.com/astronomer/astronomer-cosmos"
 
 [tool.hatch.version]
 path = "cosmos/__init__.py"

@@ -33,7 +33,6 @@ class CosmosLoadDbtException(Exception):
     """
     Exception raised while trying to load a `dbt` project as a `DbtGraph` instance.
     """
-
     pass
 
 
@@ -83,6 +82,7 @@ class DbtGraph:
         profile_config: ProfileConfig | None = None,
         operator_args: dict[str, Any] | None = None,
         dbt_deps: bool | None = True,
+        emit_datasets: bool = True
     ):
         self.project = project
         self.exclude = exclude or []
@@ -90,6 +90,7 @@ class DbtGraph:
         self.profile_config = profile_config
         self.operator_args = operator_args or {}
         self.dbt_deps = dbt_deps
+        self.emit_datasets = emit_datasets
 
         # specific to loading using ls
         self.dbt_deps = dbt_deps
@@ -131,6 +132,29 @@ class DbtGraph:
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
 
         load_method[method]()
+
+    def build_dataset_uris(self, project_dir):
+
+        if self.emit_datasets:
+            from cosmos.openlineage_custom import CustomDbtLocalArtifactProcessor
+            # todo: try/catch
+            # different from running dbt ls, which does not rely on going to the database,
+            # in order to build the dataset URIs we depend on the real profile information:
+            with self.profile_config.ensure_profile() as (profile_path, env_vars):
+                env = os.environ.copy()
+                env.update(env_vars)
+                openlineage_processor = CustomDbtLocalArtifactProcessor(
+                    profile_filepath=profile_path,
+                    manifest_dir=Path(project_dir),
+                    project_dir=str(project_dir),
+                    profile_name="default",
+                    #profile_name=self.profile_config.profile_name,
+                    target=self.profile_config.target_name,
+                    env_vars=env
+                )
+                # TODO: try/catch
+                events = openlineage_processor.parse()
+                breakpoint()
 
     def load_via_dbt_ls(self) -> None:
         """
@@ -226,6 +250,10 @@ class DbtGraph:
 
                 stdout, stderr = process.communicate()
                 returncode = process.returncode
+
+                self.build_dataset_uris(
+                    project_dir=tmpdir
+                )
 
                 logger.debug("dbt output: %s", stdout)
                 log_filepath = log_dir / DBT_LOG_FILENAME

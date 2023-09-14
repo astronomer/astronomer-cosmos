@@ -35,13 +35,13 @@ classifiers = [
 ]
 dependencies = [
     # Airflow & Pydantic issue: https://github.com/apache/airflow/issues/32311
+    "attrs",
     "pydantic>=1.10.0,<2.0.0",
     "apache-airflow>=2.3.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
-    "openlineage-integration-common",
 ]
 
 [project.optional-dependencies]
@@ -76,6 +76,7 @@ dbt-spark = [
     "dbt-spark<=1.5.4",
 ]
 openlineage = [
+    "openlineage-integration-common",
     "openlineage-airflow",
 ]
 all = [
@@ -134,7 +135,6 @@ dependencies = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
     "types-PyYAML",
     "types-attrs",
-    "attrs",
     "types-requests",
     "types-python-dateutil",
     "apache-airflow"

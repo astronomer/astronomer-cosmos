@@ -4,6 +4,7 @@ import os
 import shutil
 import signal
 import tempfile
+from attr import define
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
 
@@ -53,11 +54,23 @@ except (ImportError, ModuleNotFoundError):
         from openlineage.airflow.extractors.base import OperatorLineage
     except (ImportError, ModuleNotFoundError) as error:
         logger.warning(
-            "To enable emitting Openlineage events. In order to use openlineage, upgrade to Airflow 2.7 or "
-            "install astronomer-cosmos[openlineage]."
+            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
         )
         logger.exception(error)
         is_openlineage_available = False
+
+        @define
+        class OperatorLineage:  # type: ignore
+            inputs: list[str] = list()
+            outputs: list[str] = list()
+            run_facets: dict[str, str] = dict()
+            job_facets: dict[str, str] = dict()
+
+
+try:
+    LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
+except airflow.exceptions.AirflowConfigException:
+    LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 
 class DbtLocalBaseOperator(DbtBaseOperator):
@@ -251,15 +264,9 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         for key, value in env.items():
             os.environ[key] = str(value)
 
-        lineage_namespace = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
-        try:
-            lineage_namespace = conf.get("openlineage", "namespace")
-        except airflow.exceptions.AirflowConfigException:
-            pass
-
         openlineage_processor = DbtLocalArtifactProcessor(
             producer=OPENLINEAGE_PRODUCER,
-            job_namespace=lineage_namespace,
+            job_namespace=LINEAGE_NAMESPACE,
             project_dir=project_dir,
             profile_name=self.profile_config.profile_name,
             target=self.profile_config.target_name,
@@ -270,8 +277,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except (FileNotFoundError, NotImplementedError) as error:
-            logger.exception(error)
+        except (FileNotFoundError, NotImplementedError):
+            logger.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
         """
@@ -309,17 +316,32 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         """
         Collect the input, output, job and run facets for this operator.
         It relies on the calculate_openlineage_events_completes having being called before.
+
+        This method is called by Openlineage even if `execute` fails, because `get_openlineage_facets_on_failure`
+        is not implemented.
         """
+
         inputs = []
         outputs = []
         run_facets: dict[str, Any] = {}
         job_facets: dict[str, Any] = {}
 
-        for completed in task_instance.openlineage_events_completes:
-            [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
-            [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
-            run_facets = {**run_facets, **completed.run.facets}
-            job_facets = {**job_facets, **completed.job.facets}
+        openlineage_events_completes = None
+        if hasattr(self, "openlineage_events_completes"):
+            openlineage_events_completes = self.openlineage_events_completes
+        elif hasattr(task_instance, "openlineage_events_completes"):
+            openlineage_events_completes = task_instance.openlineage_events_completes
+        else:
+            logger.info("Unable to emit OpenLineage events due to lack of data.")
+
+        if openlineage_events_completes is not None:
+            for completed in openlineage_events_completes:
+                [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
+                [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
+                run_facets = {**run_facets, **completed.run.facets}
+                job_facets = {**job_facets, **completed.job.facets}
+        else:
+            logger.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
         return OperatorLineage(
             inputs=inputs,

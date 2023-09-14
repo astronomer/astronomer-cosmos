@@ -1,10 +1,29 @@
 Changelog
 =========
 
-1.1.0 (2023-09-06)
---------------------
+1.1.1 (2023-09-14)
+------------------
 
-Feature
+Bug fixes
+
+* Fix attempt of emitting OpenLineage events if task execution fails by @tatiana in #526
+* Fix Rust dependency for Windows users by @tatiana in #526
+* Fix DbtRunOperationLocalOperator missing flags by @tatiana in #529
+* Fix DbtRunLocalOperator to support the full refresh argument by @tatiana in #529
+* Remove redundant prefix of task names when test_behavior = TestBehavior.AFTER_EACH by @binhnq94 in #524
+* Fix rendering vars in ``DbtModel`` when using ``LoadMode.CUSTOM`` by @dojinkimm in #502
+
+Others
+
+* Docs: add `documentation comparing Airflow and dbt concepts <https://astronomer.github.io/astronomer-cosmos/getting_started/dbt-airflow-concepts.html>`_ by @tatiana in #523.
+* Update PyPI project links by @tatiana in #528
+* pre-commit updates
+
+
+1.1.0 (2023-09-06)
+------------------
+
+Features
 
 * Support dbt global flags (via dbt_cmd_global_flags in operator_args) by @tatiana in #469
 * Support parsing DAGs when there are no connections by @jlaneve in #489

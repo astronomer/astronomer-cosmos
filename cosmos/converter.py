@@ -144,7 +144,7 @@ class DbtToAirflowConverter:
             profile_config=profile_config,
             operator_args=operator_args,
             dbt_deps=dbt_deps,
-            emit_datasets=emit_datasets
+            emit_datasets=emit_datasets,
         )
         dbt_graph.load(method=load_mode, execution_mode=execution_mode)
 

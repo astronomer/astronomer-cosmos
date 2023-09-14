@@ -8,7 +8,6 @@ from airflow.compat.functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
-from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtDocsLocalOperator,
     DbtLocalBaseOperator,
@@ -22,8 +21,6 @@ from cosmos.operators.local import (
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
-
-logger = get_logger(__name__)
 
 
 PY_INTERPRETER = "python3"
@@ -95,7 +92,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         output = super().execute(context)
         if self._venv_tmp_dir:
             self._venv_tmp_dir.cleanup()
-        logger.info(output)
+
+        self.log.info(output)
 
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):

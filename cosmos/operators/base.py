@@ -9,10 +9,6 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.log import get_logger
-
-
-logger = get_logger(__name__)
 
 
 class DbtBaseOperator(BaseOperator):
@@ -163,14 +159,14 @@ class DbtBaseOperator(BaseOperator):
                 filtered_env[key] = val
             else:
                 if isinstance(key, accepted_types):
-                    logger.warning(
+                    self.log.warning(
                         "Env var %s was ignored because its key is not a valid type. Must be one of %s",
                         key,
                         accepted_types,
                     )
 
                 if isinstance(val, accepted_types):
-                    logger.warning(
+                    self.log.warning(
                         "Env var %s was ignored because its value is not a valid type. Must be one of %s",
                         key,
                         accepted_types,

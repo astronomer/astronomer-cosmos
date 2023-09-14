@@ -5,10 +5,7 @@ from typing import Any, Callable, Sequence
 import yaml
 from airflow.utils.context import Context
 
-from cosmos.log import get_logger
 from cosmos.operators.base import DbtBaseOperator
-
-logger = get_logger(__name__)
 
 # docker is an optional dependency, so we need to check if it's installed
 try:
@@ -41,7 +38,7 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = super().execute(context)
-        logger.info(result)
+        self.log.info(result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt

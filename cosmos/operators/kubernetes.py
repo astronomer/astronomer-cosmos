@@ -6,12 +6,9 @@ from typing import Any, Callable, Sequence
 import yaml
 from airflow.utils.context import Context
 
-from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import DbtBaseOperator
 
-
-logger = get_logger(__name__)
 
 # kubernetes is an optional dependency, so we need to check if it's installed
 try:
@@ -54,7 +51,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
         result = super().execute(context)
-        logger.info(result)
+        self.log.info(result)
 
     def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt

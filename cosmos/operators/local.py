@@ -170,7 +170,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             ).delete()
             session.add(rtif)
         else:
-            logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+            self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
     def run_subprocess(self, *args: Any, **kwargs: Any) -> FullOutputSubprocessResult:
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
@@ -186,7 +186,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         Copies the dbt project to a temporary directory and runs the command.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
-            logger.info(
+            self.log.info(
                 "Cloning project to writable temp directory %s from %s",
                 tmp_dir,
                 self.project_dir,
@@ -218,8 +218,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     self.profile_config.target_name,
                 ]
 
-                logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
-                logger.info("Using environment variables keys: %s", env.keys())
+                self.log.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
+                self.log.info("Using environment variables keys: %s", env.keys())
                 result = self.run_subprocess(
                     command=full_cmd,
                     env=env,
@@ -235,8 +235,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 if self.emit_datasets:
                     inlets = self.get_datasets("inputs")
                     outlets = self.get_datasets("outputs")
-                    logger.info("Inlets: %s", inlets)
-                    logger.info("Outlets: %s", outlets)
+                    self.log.info("Inlets: %s", inlets)
+                    self.log.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
 
                 self.exception_handling(result)
@@ -278,7 +278,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
         except (FileNotFoundError, NotImplementedError):
-            logger.debug("Unable to parse OpenLineage events", stack_info=True)
+            self.log.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
         """
@@ -332,7 +332,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         elif hasattr(task_instance, "openlineage_events_completes"):
             openlineage_events_completes = task_instance.openlineage_events_completes
         else:
-            logger.info("Unable to emit OpenLineage events due to lack of data.")
+            self.log.info("Unable to emit OpenLineage events due to lack of data.")
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
@@ -341,7 +341,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 run_facets = {**run_facets, **completed.run.facets}
                 job_facets = {**job_facets, **completed.job.facets}
         else:
-            logger.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
+            self.log.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
         return OperatorLineage(
             inputs=inputs,
@@ -354,7 +354,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(cmd=dbt_cmd, env=env, context=context)
-        logger.info(result.output)
+        self.log.info(result.output)
 
     def execute(self, context: Context) -> None:
         self.build_and_run_cmd(context=context)
@@ -569,7 +569,7 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
 
     def upload_to_s3(self, project_dir: str) -> None:
         "Uploads the generated documentation to S3."
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
             self.aws_conn_id,
         )
@@ -586,7 +586,7 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
+            self.log.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
 
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 
@@ -629,7 +629,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
 
     def upload_to_azure(self, project_dir: str) -> None:
         "Uploads the generated documentation to Azure Blob Storage."
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
             self.azure_conn_id,
         )
@@ -643,7 +643,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info(
+            self.log.info(
                 "Uploading %s to %s",
                 filename,
                 f"wasb://{self.container_name}/{filename}",

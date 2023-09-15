@@ -171,10 +171,14 @@ def build_airflow_graph(
             node=node,
             execution_mode=execution_mode,
             args=task_args,
-            use_name_as_task_id_prefix=test_behavior != TestBehavior.AFTER_EACH,
+            use_name_as_task_id_prefix=not (test_behavior == TestBehavior.AFTER_EACH and node.has_test),
         )
         if task_meta and node.resource_type != DbtResourceType.TEST:
-            if node.resource_type == DbtResourceType.MODEL and test_behavior == TestBehavior.AFTER_EACH:
+            if (
+                node.resource_type == DbtResourceType.MODEL
+                and node.has_test is True
+                and test_behavior == TestBehavior.AFTER_EACH
+            ):
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
                     task = create_airflow_task(task_meta, dag, task_group=model_task_group)
                     test_meta = create_test_task_metadata(

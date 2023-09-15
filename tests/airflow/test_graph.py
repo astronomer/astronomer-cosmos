@@ -36,6 +36,7 @@ parent_node = DbtNode(
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view"},
+    has_test=True,
 )
 test_parent_node = DbtNode(
     name="test_parent", unique_id="test_parent", resource_type=DbtResourceType.TEST, depends_on=["parent"], file_path=""
@@ -49,15 +50,8 @@ child_node = DbtNode(
     tags=["nightly"],
     config={"materialized": "table"},
 )
-test_child_node = DbtNode(
-    name="test_child",
-    unique_id="test_child",
-    resource_type=DbtResourceType.TEST,
-    depends_on=["child"],
-    file_path="",
-)
 
-sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, test_child_node]
+sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node]
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
 
 
@@ -93,21 +87,18 @@ def test_build_airflow_graph_with_after_each():
         "seed_parent_seed",
         "parent.run",
         "parent.test",
-        "child.run",
-        "child.test",
+        "child_run",
     ]
+
     assert topological_sort == expected_sort
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 2
+    assert len(task_groups) == 1
 
     assert task_groups["parent"].upstream_task_ids == {"seed_parent_seed"}
     assert list(task_groups["parent"].children.keys()) == ["parent.run", "parent.test"]
 
-    assert task_groups["child"].upstream_task_ids == {"parent.test"}
-    assert list(task_groups["child"].children.keys()) == ["child.run", "child.test"]
-
     assert len(dag.leaves) == 1
-    assert dag.leaves[0].task_id == "child.test"
+    assert dag.leaves[0].task_id == "child_run"
 
 
 @pytest.mark.skipif(

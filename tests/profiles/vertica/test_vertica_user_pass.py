@@ -87,7 +87,7 @@ def test_connection_claiming() -> None:
 
     # also test when there's no database
     conn = Connection(**potential_values)  # type: ignore
-    conn.extra = ''
+    conn.extra = ""
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = VerticaUserPasswordProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()

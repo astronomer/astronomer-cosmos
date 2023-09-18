@@ -22,7 +22,7 @@ def mock_vertica_conn():  # type: ignore
         host="my_host",
         login="my_user",
         password="my_password",
-        port=5432,
+        port=5433,
         schema="my_schema",
         extra='{"database": "my_database"}',
     )
@@ -110,6 +110,14 @@ def test_profile_mapping_selected(
         {"schema": "my_schema"},
     )
     assert isinstance(profile_mapping, VerticaUserPasswordProfileMapping)
+
+
+def test_mock_profile() -> None:
+    """
+    Tests that the mock profile port value get set correctly.
+    """
+    profile = VerticaUserPasswordProfileMapping("mock_conn_id")
+    assert profile.mock_profile.get("port") == 5433
 
 
 def test_profile_mapping_keeps_custom_port(mock_vertica_conn_custom_port: Connection) -> None:

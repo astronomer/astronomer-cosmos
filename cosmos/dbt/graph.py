@@ -193,9 +193,10 @@ class DbtGraph:
                         env=env,
                     )
                     stdout, stderr = process.communicate()
+                    returncode = process.returncode
                     logger.debug("dbt deps output: %s", stdout)
 
-                    if stderr or "Error" in stdout:
+                    if returncode:
                         details = stderr or stdout
                         raise CosmosLoadDbtException(f"Unable to run dbt deps command due to the error:\n{details}")
 
@@ -222,6 +223,7 @@ class DbtGraph:
                 )
 
                 stdout, stderr = process.communicate()
+                returncode = process.returncode
 
                 logger.debug("dbt output: %s", stdout)
                 log_filepath = log_dir / DBT_LOG_FILENAME
@@ -231,14 +233,14 @@ class DbtGraph:
                         for line in logfile:
                             logger.debug(line.strip())
 
-                if stderr or "Error" in stdout:
-                    if 'Run "dbt deps" to install package dependencies' in stdout:
-                        raise CosmosLoadDbtException(
-                            "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
-                        )
-                    else:
-                        details = stderr or stdout
-                        raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")
+                if 'Run "dbt deps" to install package dependencies' in stdout:
+                    raise CosmosLoadDbtException(
+                        "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
+                    )
+
+                if returncode:
+                    details = stderr or stdout
+                    raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")
 
                 nodes = {}
                 for line in stdout.split("\n"):

@@ -196,7 +196,7 @@ class DbtGraph:
                     returncode = process.returncode
                     logger.debug("dbt deps output: %s", stdout)
 
-                    if returncode:
+                    if returncode or "Error" in stdout:
                         details = stderr or stdout
                         raise CosmosLoadDbtException(f"Unable to run dbt deps command due to the error:\n{details}")
 
@@ -238,7 +238,7 @@ class DbtGraph:
                         "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
                     )
 
-                if returncode:
+                if returncode or "Error" in stdout:
                     details = stderr or stdout
                     raise CosmosLoadDbtException(f"Unable to run dbt ls command due to the error:\n{details}")
 

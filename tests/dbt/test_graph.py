@@ -132,6 +132,7 @@ def test_load(
 @patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_popen, tmp_dbt_project_dir):
     mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
@@ -277,8 +278,11 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
 
 @pytest.mark.integration
-@patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
-def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
+@patch("cosmos.dbt.graph.Popen")
+def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen):
+    mock_popen().communicate.return_value = ("Some Runtime Error", "")
+    mock_popen().returncode = 1
+
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
     dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
     dbt_graph = DbtGraph(
@@ -296,7 +300,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
         dbt_graph.load_via_dbt_ls()
     expected = "Unable to run dbt deps command due to the error:\nSome Runtime Error"
     assert err_info.value.args[0] == expected
-    mock_popen_communicate.assert_called_once()
+    mock_popen().communicate.assert_called_once()
 
 
 @pytest.mark.parametrize("pipeline_name", ("jaffle_shop", "jaffle_shop_python"))

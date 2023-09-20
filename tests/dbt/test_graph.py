@@ -279,6 +279,28 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
+def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(mock_popen, tmp_dbt_project_dir):
+    mock_popen().communicate.return_value = ("", "Some stderr warnings")
+    mock_popen().returncode = 0
+
+    dbt_project = DbtProject(name=DBT_PIPELINE_NAME, root_dir=tmp_dbt_project_dir)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+
+    dbt_graph.load_via_dbt_ls()  # does not raise exception
+
+
+@pytest.mark.integration
+@patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
     mock_popen().communicate.return_value = ("", "Some stderr message")
     mock_popen().returncode = 1

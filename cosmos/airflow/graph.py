@@ -83,7 +83,7 @@ def create_test_task_metadata(
 
 
 def create_task_metadata(
-    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_name_as_task_id_prefix: bool = True
+    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_task_group: bool = False
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -106,9 +106,9 @@ def create_task_metadata(
 
     if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
         if node.resource_type == DbtResourceType.MODEL:
-            if use_name_as_task_id_prefix:
-                task_id = f"{node.name}_run"
-            else:
+            task_id = f"{node.name}_run"
+
+            if use_task_group is True:
                 task_id = "run"
         else:
             task_id = f"{node.name}_{node.resource_type.value}"
@@ -167,18 +167,18 @@ def build_airflow_graph(
     # The exception are the test nodes, since it would be too slow to run test tasks individually.
     # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
     for node_id, node in nodes.items():
-        task_meta = create_task_metadata(
-            node=node,
-            execution_mode=execution_mode,
-            args=task_args,
-            use_name_as_task_id_prefix=not (test_behavior == TestBehavior.AFTER_EACH and node.has_test),
+        use_task_group = (
+            node.resource_type == DbtResourceType.MODEL
+            and test_behavior == TestBehavior.AFTER_EACH
+            and node.has_test is True
         )
+
+        task_meta = create_task_metadata(
+            node=node, execution_mode=execution_mode, args=task_args, use_task_group=use_task_group
+        )
+
         if task_meta and node.resource_type != DbtResourceType.TEST:
-            if (
-                node.resource_type == DbtResourceType.MODEL
-                and node.has_test is True
-                and test_behavior == TestBehavior.AFTER_EACH
-            ):
+            if use_task_group is True:
                 with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
                     task = create_airflow_task(task_meta, dag, task_group=model_task_group)
                     test_meta = create_test_task_metadata(

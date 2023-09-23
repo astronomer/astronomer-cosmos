@@ -222,7 +222,7 @@ def test_create_task_metadata_model(caplog):
     assert metadata.arguments == {"models": "my_model"}
 
 
-def test_create_task_metadata_model_use_name_as_task_id_prefix(caplog):
+def test_create_task_metadata_model_use_task_group(caplog):
     child_node = DbtNode(
         name="my_model",
         unique_id="my_folder.my_model",
@@ -232,14 +232,12 @@ def test_create_task_metadata_model_use_name_as_task_id_prefix(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(
-        child_node, execution_mode=ExecutionMode.LOCAL, args={}, use_name_as_task_id_prefix=False
-    )
+    metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={}, use_task_group=True)
     assert metadata.id == "run"
 
 
-@pytest.mark.parametrize("use_name_as_task_id_prefix", (None, True, False))
-def test_create_task_metadata_seed(caplog, use_name_as_task_id_prefix):
+@pytest.mark.parametrize("use_task_group", (None, True, False))
+def test_create_task_metadata_seed(caplog, use_task_group):
     sample_node = DbtNode(
         name="my_seed",
         unique_id="my_folder.my_seed",
@@ -249,14 +247,14 @@ def test_create_task_metadata_seed(caplog, use_name_as_task_id_prefix):
         tags=[],
         config={},
     )
-    if use_name_as_task_id_prefix is None:
+    if use_task_group is None:
         metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
     else:
         metadata = create_task_metadata(
             sample_node,
             execution_mode=ExecutionMode.DOCKER,
             args={},
-            use_name_as_task_id_prefix=use_name_as_task_id_prefix,
+            use_task_group=use_task_group,
         )
     assert metadata.id == "my_seed_seed"
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"

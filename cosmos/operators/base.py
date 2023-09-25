@@ -56,6 +56,8 @@ class DbtBaseOperator(BaseOperator):
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
     :param dbt_cmd_flags: List of flags to pass to dbt command
     :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
+    :param emit_datasets: If enabled model nodes emit Airflow Datasets for downstream cross-DAG dependencies.
+        Defaults to True
     """
 
     template_fields: Sequence[str] = ("env", "vars")
@@ -102,6 +104,7 @@ class DbtBaseOperator(BaseOperator):
         dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
         dbt_cmd_global_flags: list[str] | None = None,
+        emit_datasets: bool = True,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -127,6 +130,7 @@ class DbtBaseOperator(BaseOperator):
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
+        self.emit_datasets = emit_datasets
         super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:

@@ -33,6 +33,7 @@ class DbtBaseOperator(BaseOperator):
     :param cache_selected_only:
     :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
         the dbt_project.yml file ('require-dbt-version')
+    :param emit_datasets: Enable emitting inlets and outlets during task execution
     :param fail_fast: dbt optional argument to make dbt exit immediately if a single resource fails to build.
     :param quiet: dbt optional argument to show only error logs in stdout
     :param warn_error: dbt optional argument to convert dbt warnings into errors
@@ -87,6 +88,7 @@ class DbtBaseOperator(BaseOperator):
         selector: str | None = None,
         vars: dict[str, str] | None = None,
         models: str | None = None,
+        emit_datasets: bool = True,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
         fail_fast: bool = False,
@@ -112,6 +114,7 @@ class DbtBaseOperator(BaseOperator):
         self.selector = selector
         self.vars = vars
         self.models = models
+        self.emit_datasets = emit_datasets
         self.cache_selected_only = cache_selected_only
         self.no_version_check = no_version_check
         self.fail_fast = fail_fast

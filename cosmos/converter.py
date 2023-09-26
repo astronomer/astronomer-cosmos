@@ -154,7 +154,6 @@ class DbtToAirflowConverter:
             "profile_config": profile_config,
             "emit_datasets": emit_datasets,
         }
-
         if dbt_executable_path:
             task_args["dbt_executable_path"] = dbt_executable_path
 

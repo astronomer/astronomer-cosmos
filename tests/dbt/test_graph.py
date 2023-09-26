@@ -361,3 +361,32 @@ def test_load_via_load_via_custom_parser(pipeline_name):
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     # the custom parser does not add dbt test nodes
     assert len(dbt_graph.nodes) == 8
+
+
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency", return_value=None)
+def test_update_node_dependency_called(mock_update_node_dependency):
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
+    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph.load()
+
+    assert mock_update_node_dependency.called
+
+
+def test_update_node_dependency_target_exist():
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
+    dbt_graph = DbtGraph(project=dbt_project)
+    dbt_graph.load()
+
+    for _, nodes in dbt_graph.nodes.items():
+        if nodes.resource_type == DbtResourceType.TEST:
+            for node_id in nodes.depends_on:
+                assert dbt_graph.nodes[node_id].has_test is True
+
+
+def test_update_node_dependency_test_not_exist():
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
+    dbt_graph = DbtGraph(project=dbt_project, exclude=["config.materialized:test"])
+    dbt_graph.load_from_dbt_manifest()
+
+    for _, nodes in dbt_graph.filtered_nodes.items():
+        assert nodes.has_test is False

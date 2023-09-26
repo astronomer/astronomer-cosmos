@@ -313,10 +313,7 @@ def test_test_operator_execute_with_on_warning_callback(mock_build_and_run_cmd, 
     warning_handler = MagicMock()
 
     test_operator = DbtTestLocalOperator(
-        profile_config=profile_config,
-        project_dir="my/dir",
-        task_id="test",
-        on_warning_callback=warning_handler
+        profile_config=profile_config, project_dir="my/dir", task_id="test", on_warning_callback=warning_handler
     )
     test_operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once()
@@ -332,10 +329,7 @@ def test_test_operator_execute_without_on_warning_callback(mock_build_and_run_cm
     warning_handler = MagicMock()
 
     test_operator = DbtTestLocalOperator(
-        profile_config=profile_config,
-        project_dir="my/dir",
-        task_id="test",
-        on_warning_callback=warning_handler
+        profile_config=profile_config, project_dir="my/dir", task_id="test", on_warning_callback=warning_handler
     )
     test_operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once()

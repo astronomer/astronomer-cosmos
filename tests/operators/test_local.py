@@ -302,3 +302,41 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     )
     task.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(context={})
+
+
+@patch("cosmos.operators.local.parse_output")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_test_operator_execute_with_on_warning_callback(mock_build_and_run_cmd, mock_parse_output):
+    # simulate when there is warning
+    mock_parse_output.return_value = 1
+
+    warning_handler = MagicMock()
+
+    test_operator = DbtTestLocalOperator(
+        profile_config=profile_config,
+        project_dir="my/dir",
+        task_id="test",
+        on_warning_callback=warning_handler
+    )
+    test_operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    warning_handler.assert_called_once()
+
+
+@patch("cosmos.operators.local.parse_output")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_test_operator_execute_without_on_warning_callback(mock_build_and_run_cmd, mock_parse_output):
+    # simulate when there is no warning
+    mock_parse_output.return_value = 0
+
+    warning_handler = MagicMock()
+
+    test_operator = DbtTestLocalOperator(
+        profile_config=profile_config,
+        project_dir="my/dir",
+        task_id="test",
+        on_warning_callback=warning_handler
+    )
+    test_operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    warning_handler.assert_not_called()

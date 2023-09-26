@@ -494,17 +494,15 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         if self.on_warning_callback:
             self.on_warning_callback(warning_context)
 
-    def execute(self, context: Context) -> str:
+    def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context)
 
         if not self._should_run_tests(result):
-            return result.output
+            return
 
         warnings = parse_output(result, "WARN")
         if warnings > 0:
             self._handle_warnings(result, context)
-
-        return result.output
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):

@@ -226,6 +226,31 @@ def test_run_test_operator_with_callback(failing_test_dbt_project):
 
 
 @pytest.mark.integration
+def test_run_test_operator_without_callback():
+    on_warning_callback = MagicMock()
+
+    with DAG("test-id-3", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dbt_cmd_flags=["--models", "orders"],
+            install_deps=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dbt_cmd_flags=["--models", "orders"],
+            install_deps=True,
+            exclude="relationships_orders_customer_id__customer_id__ref_customers_",
+        )
+        run_operator >> test_operator
+    run_test_dag(dag)
+    assert not on_warning_callback.called
+
+
+@pytest.mark.integration
 def test_run_operator_emits_events():
     class MockRun:
         facets = {"c": 3}

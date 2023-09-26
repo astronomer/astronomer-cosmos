@@ -24,11 +24,11 @@ except ImportError:
         # apache-airflow-providers-cncf-kubernetes < 7.4.0
         from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
     except ImportError as error:
-        logger.info(
+        logger.exception(error)
+        raise ImportError(
             "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
             "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
         )
-        logger.exception(error)
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore

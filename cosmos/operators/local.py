@@ -42,6 +42,7 @@ from cosmos.hooks.subprocess import (
 )
 from cosmos.dbt.parser.output import (
     extract_log_issues,
+    parse_output
 )
 
 logger = get_logger(__name__)
@@ -354,10 +355,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(cmd=dbt_cmd, env=env, context=context)
-        logger.info(result.output)
+        return result
 
     def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context)
+        result = self.build_and_run_cmd(context=context)
+        logger.info(result.output)
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -461,24 +463,10 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["test"]
         self.on_warning_callback = on_warning_callback
 
-    def _should_run_tests(
-        self,
-        result: FullOutputSubprocessResult,
-        no_tests_message: str = "Nothing to do",
-    ) -> bool:
-        """
-        Check if any tests are defined to run in the DAG. If tests are defined
-        and on_warning_callback is set, then function returns True.
-
-        :param result: The output from the build and run command.
-        """
-
-        return self.on_warning_callback is not None and no_tests_message not in result.output
-
     def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
-         Handles warnings by extracting log issues, creating additional context, and calling the
-         on_warning_callback with the updated context.
+        Handles warnings by extracting log issues, creating additional context, and calling the
+        on_warning_callback with the updated context.
 
         :param result: The result object from the build and run command.
         :param context: The original airflow context in which the build and run command was executed.
@@ -489,8 +477,15 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         warning_context["test_names"] = test_names
         warning_context["test_results"] = test_results
 
+        self.on_warning_callback(warning_context)
+
+    def execute(self, context: Context) -> None:
+        result = self.build_and_run_cmd(context=context)
+
         if self.on_warning_callback:
-            self.on_warning_callback(warning_context)
+            self._handle_warnings(result, context)
+
+        logger.info(result.output)
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):

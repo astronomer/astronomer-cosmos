@@ -302,3 +302,38 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     )
     task.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(context={})
+
+@pytest.mark.integration
+def test_dbt_test_local_operator_on_warning_callback():
+    on_warning_callback_mock = MagicMock()
+
+    with DAG("my-test-dag", start_date=datetime(2022, 1, 1)) as dag:
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="my-task",
+            install_deps=True,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            on_warning_callback=on_warning_callback_mock
+        )
+        test_operator
+
+    run_test_dag(dag)
+    on_warning_callback_mock.assert_called_once()
+
+@pytest.mark.integration
+def test_on_warning_callback_not_triggered():
+    on_warning_callback_mock = MagicMock()
+
+    with DAG("my-test-dag", start_date=datetime(2022, 1, 1)) as dag:
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            install_deps=True,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            task_id="my-task",
+        )
+        test_operator
+
+    run_test_dag(dag)
+    on_warning_callback_mock.assert_not_called()

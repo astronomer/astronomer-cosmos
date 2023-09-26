@@ -36,12 +36,13 @@ parent_seed = DbtNode(
 )
 nodes = {"seed_parent": parent_seed}
 
+
 @pytest.mark.parametrize(
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
         # (ExecutionMode.DOCKER, {"image": "sample-image"}),
-    ]
+    ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
@@ -49,15 +50,9 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
     """
     This test will raise exceptions if we are trying to pass incorrect arguments to operator constructors.
     """
-    project_config = ProjectConfig(
-        dbt_project_path=SAMPLE_DBT_PROJECT
-    )
-    execution_config = ExecutionConfig(
-        execution_mode=execution_mode
-    )
-    render_config = RenderConfig(
-        emit_datasets=True
-    )
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    render_config = RenderConfig(emit_datasets=True)
     profile_config = ProfileConfig(
         profile_name="my_profile_name",
         target_name="my_target_name",
@@ -69,6 +64,6 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
         profile_config=profile_config,
         execution_config=execution_config,
         render_config=render_config,
-        operator_args=operator_args
+        operator_args=operator_args,
     )
     assert converter

@@ -13,17 +13,22 @@ from cosmos.operators.base import DbtBaseOperator
 
 logger = get_logger(__name__)
 
-# kubernetes is an optional dependency, so we need to check if it's installed
 try:
+    # apache-airflow-providers-cncf-kubernetes >= 7.4.0
     from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
         convert_env_vars,
     )
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 except ImportError:
-    raise ImportError(
-        "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
-        "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
-    )
+    try:
+        # apache-airflow-providers-cncf-kubernetes < 7.4.0
+        from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+    except ImportError as error:
+        logger.info(
+            "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
+            "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
+        )
+        logger.exception(error)
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore

@@ -40,10 +40,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
-from cosmos.dbt.parser.output import (
-    extract_log_issues,
-    parse_output
-)
+from cosmos.dbt.parser.output import extract_log_issues
 
 logger = get_logger(__name__)
 

@@ -40,9 +40,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
-from cosmos.dbt.parser.output import (
-    extract_log_issues,
-)
+from cosmos.dbt.parser.output import extract_log_issues, parse_output
 
 logger = get_logger(__name__)
 
@@ -349,11 +347,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             job_facets=job_facets,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(cmd=dbt_cmd, env=env, context=context)
         logger.info(result.output)
+        return result
 
     def execute(self, context: Context) -> None:
         self.build_and_run_cmd(context=context)
@@ -471,7 +470,6 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         :param result: The output from the build and run command.
         """
-
         return self.on_warning_callback is not None and no_tests_message not in result.output
 
     def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
@@ -490,6 +488,13 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         if self.on_warning_callback:
             self.on_warning_callback(warning_context)
+
+    def execute(self, context: Context) -> None:
+        result = self.build_and_run_cmd(context=context)
+        if self._should_run_tests(result):
+            warnings = parse_output(result, "WARN")
+            if warnings > 0:
+                self._handle_warnings(result, context)
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):

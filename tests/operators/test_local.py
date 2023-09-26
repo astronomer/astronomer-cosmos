@@ -1,3 +1,6 @@
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +31,8 @@ from tests.utils import test_dag as run_test_dag
 
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+SCHEMA_FAILING_TEST = Path(__file__).parent.parent / "sample/schema_failing_test.yml"
+
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -43,6 +48,18 @@ real_profile_config = ProfileConfig(
         profile_args={"schema": "public"},
     ),
 )
+
+
+@pytest.fixture
+def failing_test_dbt_project(tmp_path):
+    tmp_dir = tempfile.TemporaryDirectory()
+    tmp_dir_path = Path(tmp_dir.name) / "jaffle_shop"
+    shutil.copytree(DBT_PROJ_DIR, tmp_dir_path)
+    target_schema = tmp_dir_path / "models/schema.yml"
+    os.remove(target_schema)
+    shutil.copy(SCHEMA_FAILING_TEST, target_schema)
+    yield tmp_dir_path
+    tmp_dir.cleanup()
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
@@ -175,12 +192,37 @@ def test_run_operator_dataset_inlets_and_outlets():
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
         )
-        run_operator
+        run_operator >> test_operator
     run_test_dag(dag)
     assert run_operator.inlets == []
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+@pytest.mark.integration
+def test_run_test_operator_with_callback(failing_test_dbt_project):
+    on_warning_callback = MagicMock()
+
+    with DAG("test-id-2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="run",
+            dbt_cmd_flags=["--models", "orders"],
+            install_deps=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="test",
+            dbt_cmd_flags=["--models", "orders"],
+            install_deps=True,
+            on_warning_callback=on_warning_callback,
+        )
+        run_operator >> test_operator
+    run_test_dag(dag)
+    assert on_warning_callback.called
 
 
 @pytest.mark.integration

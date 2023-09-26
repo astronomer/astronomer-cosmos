@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pytest
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import ExecutionMode, DbtResourceType
-from cosmos.dbt.graph import DbtGraph, LoadMode, CosmosLoadDbtException
+from cosmos.constants import DbtResourceType, ExecutionMode
+from cosmos.dbt.graph import CosmosLoadDbtException, DbtGraph, LoadMode
 from cosmos.dbt.project import DbtProject
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -132,6 +132,7 @@ def test_load(
 @patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_popen, tmp_dbt_project_dir):
     mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
@@ -277,6 +278,53 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
 
 @pytest.mark.integration
+@patch("cosmos.dbt.graph.Popen")
+def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(mock_popen, tmp_dbt_project_dir):
+    mock_popen().communicate.return_value = ("", "Some stderr warnings")
+    mock_popen().returncode = 0
+
+    dbt_project = DbtProject(name=DBT_PIPELINE_NAME, root_dir=tmp_dbt_project_dir)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+
+    dbt_graph.load_via_dbt_ls()  # does not raise exception
+
+
+@pytest.mark.integration
+@patch("cosmos.dbt.graph.Popen")
+def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
+    mock_popen().communicate.return_value = ("", "Some stderr message")
+    mock_popen().returncode = 1
+
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR)
+    dbt_graph = DbtGraph(
+        project=dbt_project,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_via_dbt_ls()
+
+    expected = "Unable to run dbt deps command due to the error:\nSome stderr message"
+    assert err_info.value.args[0] == expected
+
+
+@pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
 def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
@@ -294,6 +342,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
+
     expected = "Unable to run dbt deps command due to the error:\nSome Runtime Error"
     assert err_info.value.args[0] == expected
     mock_popen_communicate.assert_called_once()

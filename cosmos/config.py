@@ -81,7 +81,7 @@ class ProjectConfig:
         }
         for name, path in mandatory_paths.items():
             if path is None or not Path(path).exists():
-                raise CosmosValueError(f"Could not find {name} at {project_yml_path}")
+                raise CosmosValueError(f"Could not find {name} at {path}")
 
     def is_manifest_available(self) -> bool:
         """

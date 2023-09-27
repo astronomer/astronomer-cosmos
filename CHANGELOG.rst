@@ -1,6 +1,26 @@
 Changelog
 =========
 
+1.1.2 (2023-09-27)
+------------------
+
+Bug fixes
+
+* Fix using ``ExecutionMode.KUBERNETES`` by @pgoslatara and @tatiana in #554
+* Add support to ``apache-airflow-providers-cncf-kubernetes < 7.4.0`` by @tatiana in #553
+* Fix ``on_warning_callback`` behaviour on ``DbtTestLocalOperator`` by @edgga, @marco9663 and @tatiana in #558
+* Use ``returncode`` instead of ``stderr`` to determine dbt graph loading errors by @cliff-lau-cloverhealth in #547
+* Improve error message in ``config.py`` by @meyobagero in #532
+* Fix ``DbtTestOperator`` when test does not have ``test_metadata`` by @tatiana in #558
+* Fix ``target-path`` not specified issue in ``dbt-project.yml`` by @tatiana in #533
+
+Others
+
+* Docs: add reference links to dbt and Airflow columns by @TJaniF in #542
+* pre-commit updates #552 and #546
+
+
+
 1.1.1 (2023-09-14)
 ------------------
 

@@ -195,7 +195,7 @@ def test_run_operator_dataset_inlets_and_outlets():
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
         )
-        run_operator >> test_operator
+        run_operator
     run_test_dag(dag)
     assert run_operator.inlets == []
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]

@@ -348,7 +348,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             job_facets=job_facets,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(cmd=dbt_cmd, env=env, context=context)

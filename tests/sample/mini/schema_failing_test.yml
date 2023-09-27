@@ -1,0 +1,18 @@
+version: 2
+
+seeds:
+
+  - name: mini_orders
+    description: This table has basic information about orders, as well as some derived facts based on payments
+
+    columns:
+
+      - name: status
+        description: 'Order status'
+        tests:
+          - accepted_values:
+              # this will intentionally fail, since the seed has other values for this column
+              values: ['placed']
+              config:
+                severity: warn
+                warn_if: ">1"

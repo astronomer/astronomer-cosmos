@@ -30,20 +30,27 @@ For instance,
 
 .. code-block:: text
 
-    DbtTaskGroup(
-        ...
+    run_models = DbtTaskGroup(
+        profile_config=ProfileConfig(
+            profile_name="postgres_profile",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="postgres_default",
+                profile_args={
+                    "schema": "public",
+                },
+            ),
+        ),
+        project_config=ProjectConfig(PROJECT_DIR),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.KUBERNETES,
+        ),
         operator_args={
-            "queue": "kubernetes",
-            "image": "dbt-jaffle-shop:1.0.0",
-            "image_pull_policy": "Always",
+            "image": DBT_IMAGE,
             "get_logs": True,
             "is_delete_operator_pod": False,
-            "namespace": "default",
-            "env_vars": {
-                ...
-            },
+            "secrets": [postgres_password_secret, postgres_host_secret],
         },
-        execution_mode="kubernetes",
     )
 
 Step-by-step instructions
@@ -53,7 +60,7 @@ Using installed `Kind <https://kind.sigs.k8s.io/>`_, you can setup a local kuber
 
 .. code-block:: bash
 
-    kind cluster create
+    kind create cluster
 
 Deploy a Postgres pod to Kind using `Helm <https://helm.sh/docs/helm/helm_install/>`_
 

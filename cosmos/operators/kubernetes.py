@@ -13,17 +13,22 @@ from cosmos.operators.base import DbtBaseOperator
 
 logger = get_logger(__name__)
 
-# kubernetes is an optional dependency, so we need to check if it's installed
 try:
+    # apache-airflow-providers-cncf-kubernetes >= 7.4.0
     from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
         convert_env_vars,
     )
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 except ImportError:
-    raise ImportError(
-        "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
-        "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
-    )
+    try:
+        # apache-airflow-providers-cncf-kubernetes < 7.4.0
+        from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+    except ImportError as error:
+        logger.exception(error)
+        raise ImportError(
+            "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
+            "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
+        )
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore
@@ -69,6 +74,9 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
                 dbt_cmd.extend(["--profile", self.profile_config.profile_name])
             if self.profile_config.target_name:
                 dbt_cmd.extend(["--target", self.profile_config.target_name])
+
+        if self.project_dir:
+            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
 
         # set env vars
         self.build_env_args(env_vars)

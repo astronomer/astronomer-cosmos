@@ -40,9 +40,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
-from cosmos.dbt.parser.output import (
-    extract_log_issues,
-)
+from cosmos.dbt.parser.output import extract_log_issues, parse_output
 
 logger = get_logger(__name__)
 
@@ -82,6 +80,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param profile_name: A name to use for the dbt profile. If not provided, and no profile target is found
         in your project's dbt_project.yml, "cosmos_profile" is used.
     :param install_deps: If true, install dependencies before running the command
+    :param install_deps: If true, the operator will set inlets and outlets
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -99,7 +98,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
-        emit_datasets: bool = True,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -107,7 +105,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.callback = callback
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
-        self.emit_datasets = emit_datasets
         self.openlineage_events_completes: list[RunEvent] = []
         super().__init__(**kwargs)
 
@@ -277,7 +274,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except (FileNotFoundError, NotImplementedError):
+        except (FileNotFoundError, NotImplementedError, ValueError):
             logger.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
@@ -350,11 +347,12 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             job_facets=job_facets,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(cmd=dbt_cmd, env=env, context=context)
         logger.info(result.output)
+        return result
 
     def execute(self, context: Context) -> None:
         self.build_and_run_cmd(context=context)
@@ -461,20 +459,6 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["test"]
         self.on_warning_callback = on_warning_callback
 
-    def _should_run_tests(
-        self,
-        result: FullOutputSubprocessResult,
-        no_tests_message: str = "Nothing to do",
-    ) -> bool:
-        """
-        Check if any tests are defined to run in the DAG. If tests are defined
-        and on_warning_callback is set, then function returns True.
-
-        :param result: The output from the build and run command.
-        """
-
-        return self.on_warning_callback is not None and no_tests_message not in result.output
-
     def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
@@ -491,6 +475,13 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
         if self.on_warning_callback:
             self.on_warning_callback(warning_context)
+
+    def execute(self, context: Context) -> None:
+        result = self.build_and_run_cmd(context=context)
+        if self.on_warning_callback and "WARN" in result.output:
+            warnings = parse_output(result, "WARN")
+            if warnings > 0:
+                self._handle_warnings(result, context)
 
 
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):

@@ -98,6 +98,8 @@ def test_dbt_kubernetes_build_command():
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
             "--no-version-check",
+            "--project-dir",
+            "my/dir",
         ]
 
 
@@ -150,6 +152,8 @@ def test_created_pod(test_hook):
                         "data_interval_start.strftime(''%Y%m%d%H%M%S'') "
                         "}}'\n",
                         "--no-version-check",
+                        "--project-dir",
+                        "my/dir",
                     ],
                     "command": [],
                     "env": [{"name": "FOO", "value": "BAR", "value_from": None}],

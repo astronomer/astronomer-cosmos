@@ -9,15 +9,15 @@ __version__ = "1.1.1"
 
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
-from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
-from cosmos.operators.lazy_load import MissingPackage
 from cosmos.config import (
     ProjectConfig,
     ProfileConfig,
     ExecutionConfig,
     RenderConfig,
 )
-
+from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.log import get_logger
+from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (
     DbtDepsLocalOperator,
     DbtLSLocalOperator,
@@ -27,6 +27,8 @@ from cosmos.operators.local import (
     DbtSnapshotLocalOperator,
     DbtTestLocalOperator,
 )
+
+logger = get_logger()
 
 try:
     from cosmos.operators.docker import (
@@ -57,7 +59,8 @@ try:
         DbtSnapshotKubernetesOperator,
         DbtTestKubernetesOperator,
     )
-except ImportError:
+except ImportError as error:
+    logger.exception(error)
     DbtLSKubernetesOperator = MissingPackage(
         "cosmos.operators.kubernetes.DbtLSKubernetesOperator",
         "kubernetes",

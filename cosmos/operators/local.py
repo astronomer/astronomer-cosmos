@@ -42,8 +42,10 @@ from cosmos.hooks.subprocess import (
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
 
-logger = get_logger(__name__)
+DBT_NO_TESTS_MSG = "Nothing to do"
+DBT_WARN_MSG = "WARN"
 
+logger = get_logger(__name__)
 
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
@@ -473,12 +475,18 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         warning_context["test_names"] = test_names
         warning_context["test_results"] = test_results
 
-        if self.on_warning_callback:
-            self.on_warning_callback(warning_context)
+        self.on_warning_callback and self.on_warning_callback(warning_context)
 
     def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context)
-        if self.on_warning_callback and "WARN" in result.output:
+        should_trigger_callback = all(
+            [
+                self.on_warning_callback,
+                DBT_NO_TESTS_MSG not in result.output,
+                DBT_WARN_MSG in result.output,
+            ]
+        )
+        if should_trigger_callback:
             warnings = parse_output(result, "WARN")
             if warnings > 0:
                 self._handle_warnings(result, context)

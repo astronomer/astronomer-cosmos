@@ -50,7 +50,6 @@ class DbtNode:
     file_path: Path
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
-    has_test: bool = False
 
 
 class DbtGraph:
@@ -265,8 +264,6 @@ class DbtGraph:
                 self.nodes = nodes
                 self.filtered_nodes = nodes
 
-        self.update_node_dependency()
-
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
@@ -311,8 +308,6 @@ class DbtGraph:
             project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
         )
 
-        self.update_node_dependency()
-
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
@@ -342,28 +337,11 @@ class DbtGraph:
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                 )
-
                 nodes[node.unique_id] = node
 
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
                 project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
             )
-
-            self.update_node_dependency()
-
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
-
-    def update_node_dependency(self) -> None:
-        """
-        This will update the property `has_text` if node has `dbt` test
-
-        Updates in-place:
-        * self.filtered_nodes
-        """
-        for _, node in self.filtered_nodes.items():
-            if node.resource_type == DbtResourceType.TEST:
-                for node_id in node.depends_on:
-                    if node_id in self.filtered_nodes:
-                        self.filtered_nodes[node_id].has_test = True

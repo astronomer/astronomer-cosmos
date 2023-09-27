@@ -172,7 +172,6 @@ def build_airflow_graph(
             and test_behavior == TestBehavior.AFTER_EACH
             and node.has_test is True
         )
-
         task_meta = create_task_metadata(
             node=node, execution_mode=execution_mode, args=task_args, use_task_group=use_task_group
         )

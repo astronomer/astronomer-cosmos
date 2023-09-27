@@ -75,6 +75,9 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
             if self.profile_config.target_name:
                 dbt_cmd.extend(["--target", self.profile_config.target_name])
 
+        if self.project_dir:
+            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
+
         # set env vars
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd

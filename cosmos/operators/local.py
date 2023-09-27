@@ -274,7 +274,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except (FileNotFoundError, NotImplementedError):
+        except (FileNotFoundError, NotImplementedError, ValueError):
             logger.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:

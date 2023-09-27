@@ -1,17 +1,17 @@
 version: 2
 
-models:
+seeds:
 
-  - name: orders
+  - name: mini_orders
     description: This table has basic information about orders, as well as some derived facts based on payments
 
     columns:
 
       - name: status
-        description: '{{ doc("orders_status") }}'
+        description: 'Order status'
         tests:
           - accepted_values:
-              # this test will fail, since this column has more values
+              # this will intentionally fail, since the seed has other values for this column
               values: ['placed']
               config:
                 severity: warn

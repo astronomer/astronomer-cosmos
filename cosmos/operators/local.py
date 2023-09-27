@@ -478,7 +478,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context)
-        if self.on_warning_callback:
+        if self.on_warning_callback and "WARN" in result.output:
             warnings = parse_output(result, "WARN")
             if warnings > 0:
                 self._handle_warnings(result, context)

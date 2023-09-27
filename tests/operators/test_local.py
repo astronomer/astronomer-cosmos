@@ -182,18 +182,20 @@ def test_run_operator_dataset_inlets_and_outlets():
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(
-            profile_config=mini_profile_config,
+            profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
             task_id="run",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
+            append_env=True,
         )
         test_operator = DbtTestLocalOperator(
-            profile_config=mini_profile_config,
+            profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
             task_id="test",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
+            append_env=True,
         )
         run_operator
     run_test_dag(dag)

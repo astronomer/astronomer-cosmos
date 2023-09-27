@@ -1,3 +1,6 @@
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +31,9 @@ from tests.utils import test_dag as run_test_dag
 
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+MINI_DBT_PROJ_DIR = Path(__file__).parent.parent / "sample/mini"
+MINI_DBT_PROJ_DIR_FAILING_SCHEMA = MINI_DBT_PROJ_DIR / "schema_failing_test.yml"
+MINI_DBT_PROJ_PROFILE = MINI_DBT_PROJ_DIR / "profiles.yml"
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -43,6 +49,20 @@ real_profile_config = ProfileConfig(
         profile_args={"schema": "public"},
     ),
 )
+
+mini_profile_config = ProfileConfig(profile_name="mini", target_name="dev", profiles_yml_filepath=MINI_DBT_PROJ_PROFILE)
+
+
+@pytest.fixture
+def failing_test_dbt_project(tmp_path):
+    tmp_dir = tempfile.TemporaryDirectory()
+    tmp_dir_path = Path(tmp_dir.name) / "mini"
+    shutil.copytree(MINI_DBT_PROJ_DIR, tmp_dir_path)
+    target_schema = tmp_dir_path / "models/schema.yml"
+    target_schema.exists() and os.remove(target_schema)
+    shutil.copy(MINI_DBT_PROJ_DIR_FAILING_SCHEMA, target_schema)
+    yield tmp_dir_path
+    tmp_dir.cleanup()
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
@@ -167,6 +187,7 @@ def test_run_operator_dataset_inlets_and_outlets():
             task_id="run",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
+            append_env=True,
         )
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
@@ -174,6 +195,7 @@ def test_run_operator_dataset_inlets_and_outlets():
             task_id="test",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
+            append_env=True,
         )
         run_operator
     run_test_dag(dag)
@@ -181,6 +203,52 @@ def test_run_operator_dataset_inlets_and_outlets():
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+@pytest.mark.integration
+def test_run_test_operator_with_callback(failing_test_dbt_project):
+    on_warning_callback = MagicMock()
+
+    with DAG("test-id-2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtSeedLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="run",
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="test",
+            append_env=True,
+            on_warning_callback=on_warning_callback,
+        )
+        run_operator >> test_operator
+    run_test_dag(dag)
+    assert on_warning_callback.called
+
+
+@pytest.mark.integration
+def test_run_test_operator_without_callback():
+    on_warning_callback = MagicMock()
+
+    with DAG("test-id-3", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtSeedLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=MINI_DBT_PROJ_DIR,
+            task_id="run",
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=MINI_DBT_PROJ_DIR,
+            task_id="test",
+            append_env=True,
+            on_warning_callback=on_warning_callback,
+        )
+        run_operator >> test_operator
+    run_test_dag(dag)
+    assert not on_warning_callback.called
 
 
 @pytest.mark.integration

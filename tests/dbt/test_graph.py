@@ -359,8 +359,7 @@ def test_load_via_load_via_custom_parser(pipeline_name):
     dbt_graph.load_via_custom_parser()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    # the custom parser does not add dbt test nodes
-    assert len(dbt_graph.nodes) == 8
+    assert len(dbt_graph.nodes) == 28
 
 
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency", return_value=None)

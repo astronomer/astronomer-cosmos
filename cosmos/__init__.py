@@ -59,8 +59,8 @@ try:
         DbtSnapshotKubernetesOperator,
         DbtTestKubernetesOperator,
     )
-except ImportError as error:
-    logger.exception(error)
+except ImportError:
+    logger.debug("To import Kubernetes modules, install astronomer-cosmos[kubernetes].", stack_info=True)
     DbtLSKubernetesOperator = MissingPackage(
         "cosmos.operators.kubernetes.DbtLSKubernetesOperator",
         "kubernetes",

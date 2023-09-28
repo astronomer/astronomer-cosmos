@@ -23,6 +23,7 @@ try:
     from airflow.datasets import Dataset
 except ModuleNotFoundError:
     is_openlineage_available = False
+    DbtLocalArtifactProcessor = None
 else:
     is_openlineage_available = True
 
@@ -52,11 +53,11 @@ try:
 except (ImportError, ModuleNotFoundError):
     try:
         from openlineage.airflow.extractors.base import OperatorLineage
-    except (ImportError, ModuleNotFoundError) as error:
+    except (ImportError, ModuleNotFoundError):
         logger.warning(
-            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
+            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage].",
+            stack_info=True,
         )
-        logger.exception(error)
         is_openlineage_available = False
 
         @define
@@ -276,7 +277,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except (FileNotFoundError, NotImplementedError, ValueError):
+        except (FileNotFoundError, NotImplementedError, ValueError, KeyError):
             logger.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:

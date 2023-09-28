@@ -23,6 +23,7 @@ try:
     from airflow.datasets import Dataset
 except ModuleNotFoundError:
     is_openlineage_available = False
+    DbtLocalArtifactProcessor = None
 else:
     is_openlineage_available = True
 

@@ -1,6 +1,18 @@
 Changelog
 =========
 
+1.1.3 (2023-09-28)
+------------------
+
+Bug fixes
+
+* Only create task group and test task only if the model has a test by @raffifu in #543
+* Fix parsing test nodes when using the custom load method (LoadMethod.CUSTOM) by @raffifu in #563
+* Fix ``DbtTestOperator`` when test does not have ``test_metadata`` by @javihernovoa and @tatiana in #565
+* Support dbt 1.6 and apache-airflow-providers-cncf-kubernetes 7.3.0  by @tatiana in #564
+
+
+
 1.1.2 (2023-09-27)
 ------------------
 

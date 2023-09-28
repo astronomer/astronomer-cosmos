@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tempfile
@@ -370,3 +371,17 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     )
     task.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(context={})
+
+
+@patch("cosmos.operators.local.DbtLocalArtifactProcessor.parse", side_effect=KeyError)
+def test_calculate_openlineage_events_completes_openlineage_errors(mock_parse, caplog):
+    caplog.set_level(logging.DEBUG)
+
+    dbt_base_operator = DbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir=DBT_PROJ_DIR,
+        should_store_compiled_sql=False,
+    )
+    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+    assert mock_parse.called

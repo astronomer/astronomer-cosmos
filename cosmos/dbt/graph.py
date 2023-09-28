@@ -292,7 +292,9 @@ class DbtGraph:
             operator_args=self.operator_args,
         )
         nodes = {}
-        models = itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items())
+        models = itertools.chain(
+            project.models.items(), project.snapshots.items(), project.seeds.items(), project.tests.items()
+        )
         for model_name, model in models:
             config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
             node = DbtNode(

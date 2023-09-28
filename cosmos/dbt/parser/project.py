@@ -25,12 +25,13 @@ PYTHON_FILE_SUFFIX = ".py"
 
 class DbtModelType(Enum):
     """
-    Represents type of dbt unit (model, snapshot, seed)
+    Represents type of dbt unit (model, snapshot, seed, test)
     """
 
     DBT_MODEL = "model"
     DBT_SNAPSHOT = "snapshot"
     DBT_SEED = "seed"
+    DBT_TEST = "test"
 
 
 @dataclass
@@ -155,8 +156,8 @@ class DbtModel:
             code = code.split("%}")[1]
             code = code.split("{%")[0]
 
-        elif self.type == DbtModelType.DBT_SEED:
-            code = ""
+        elif self.type == DbtModelType.DBT_SEED or self.type == DbtModelType.DBT_TEST:
+            return
 
         if self.path.suffix == PYTHON_FILE_SUFFIX:
             config.upstream_models = config.upstream_models.union(set(extract_python_file_upstream_requirements(code)))
@@ -250,6 +251,7 @@ class DbtProject:
     models: Dict[str, DbtModel] = field(default_factory=dict)
     snapshots: Dict[str, DbtModel] = field(default_factory=dict)
     seeds: Dict[str, DbtModel] = field(default_factory=dict)
+    tests: Dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
     models_dir: Path = field(init=False)
     snapshots_dir: Path = field(init=False)
@@ -349,19 +351,42 @@ class DbtProject:
         config_dict = yaml.safe_load(path.read_text())
 
         # iterate over the models in the config
-        if not (config_dict and config_dict.get("models")):
+        if not config_dict:
             return
 
-        for model in config_dict["models"]:
+        for model in config_dict.get("models", []):
             model_name = model.get("name")
 
             # if the model doesn't exist, we can't do anything
+            if not model_name:
+                continue
+
+            # tests
+            for column in model.get("columns", []):
+                for test in column.get("tests", []):
+                    if not column.get("name"):
+                        continue
+
+                    # Get the test name
+                    if not isinstance(test, str):
+                        test = list(test.keys())[0]
+
+                    test_model = DbtModel(
+                        name=f"{test}_{column['name']}_{model_name}",
+                        type=DbtModelType.DBT_TEST,
+                        path=path,
+                        operator_args=self.operator_args,
+                        config=DbtModelConfig(upstream_models=set({model_name})),
+                    )
+
+                    self.tests[test_model.name] = test_model
+
+            # config_selectors
             if model_name not in self.models:
                 continue
 
-            # config_selectors
             config_selectors = []
-            for selector in self.models[model_name].config.config_types:
+            for selector in DbtModelConfig.config_types:
                 config_value = model.get("config", {}).get(selector)
                 if config_value:
                     if isinstance(config_value, str):

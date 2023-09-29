@@ -163,8 +163,9 @@ test-cov = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml
 test-integration-setup = """pip uninstall dbt-postgres dbt-databricks; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install  'dbt-core==1.5.4'  'dbt-databricks<=1.5.4' 'dbt-postgres<=1.5.4' 'openlineage-airflow'"""
+pip install  'dbt-core'  'dbt-databricks' 'dbt-postgres' 'openlineage-airflow'"""
 test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
+rm -rf dev/dags/dbt/model_version/dbt_packages;
 pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \
@@ -174,6 +175,7 @@ pytest -vv \
 -k 'not (example_cosmos_python_models or example_virtualenv)'
 """
 test-integration-expensive = """rm -rf dbt/jaffle_shop/dbt_packages;
+rm -rf dbt/model_version/dbt_packages;
 pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \

@@ -40,7 +40,7 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
         profile = {
-            "port": 5432,
+            "port": self.conn.port,
             **self.mapped_params,
             **self.profile_args,
             # password should always get set as env var

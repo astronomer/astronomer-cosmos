@@ -122,8 +122,13 @@ def create_task_metadata(
         )
         return task_metadata
     else:
-        logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
+        msg = (
+            f"Unavailable conversion function for <{node.resource_type}> (node <{node.unique_id}>). "
+            "Define a converter function using render_config.dbt_resource_converter."
+        )
+        logger.warning(msg)
         return None
+
 
 def generate_task_or_group(
     dag: DAG,
@@ -135,7 +140,6 @@ def generate_task_or_group(
     on_warning_callback: Callable[..., Any] | None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
-
     task_or_group: BaseOperator | TaskGroup | None = None
 
     use_task_group = (
@@ -145,10 +149,7 @@ def generate_task_or_group(
     )
 
     task_meta = create_task_metadata(
-        node=node,
-        execution_mode=execution_mode,
-        args=task_args,
-        use_task_group=use_task_group
+        node=node, execution_mode=execution_mode, args=task_args, use_task_group=use_task_group
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task

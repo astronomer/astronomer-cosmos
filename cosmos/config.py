@@ -39,7 +39,7 @@ class RenderConfig:
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
     dbt_deps: bool = True
-    dbt_resource_converter: dict[DbtResourceType, Callable[..., Any]] | None = None
+    node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
 
 
 @dataclass

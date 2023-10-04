@@ -204,7 +204,7 @@ def test_create_task_metadata_unsupported(caplog):
     assert response is None
     expected_msg = (
         "Unavailable conversion function for <unsupported> (node <unsupported>). "
-        "Define a converter function using render_config.dbt_resource_converter."
+        "Define a converter function using render_config.node_converters."
     )
     assert caplog.messages[0] == expected_msg
 

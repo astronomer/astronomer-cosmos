@@ -124,7 +124,7 @@ def create_task_metadata(
     else:
         msg = (
             f"Unavailable conversion function for <{node.resource_type}> (node <{node.unique_id}>). "
-            "Define a converter function using render_config.dbt_resource_converter."
+            "Define a converter function using render_config.node_converters."
         )
         logger.warning(msg)
         return None
@@ -183,7 +183,7 @@ def build_airflow_graph(
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-    dbt_resource_converter: dict[DbtResourceType, Callable[..., Any]] | None = None,
+    node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None,
 ) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -209,12 +209,12 @@ def build_airflow_graph(
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     """
-    dbt_resource_converter = dbt_resource_converter or {}
+    node_converters = node_converters or {}
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
 
     for node_id, node in nodes.items():
-        conversion_function = dbt_resource_converter.get(node.resource_type, generate_task_or_group)
+        conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         logger.info(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
         task_or_group = conversion_function(
             dag=dag,

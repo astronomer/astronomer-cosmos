@@ -45,6 +45,10 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
             "token": self.get_env_var_format("token"),
         }
 
+    @property
+    def openlineage_namespace(self):
+        return f"databricks://{self.profile['host']}"
+
     def transform_host(self, host: str) -> str:
         "Removes the https:// prefix."
         return host.replace("https://", "")

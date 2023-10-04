@@ -136,7 +136,8 @@ class DbtGraph:
 
     def build_dataset_uris(self, project_dir):
         if self.emit_datasets:
-            from cosmos.openlineage_custom import CustomDbtLocalArtifactProcessor
+            from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+            #from cosmos.openlineage_custom import CustomDbtLocalArtifactProcessor
 
             # todo: try/catch
             # different from running dbt ls, which does not rely on going to the database,
@@ -144,15 +145,23 @@ class DbtGraph:
             with self.profile_config.ensure_profile() as (profile_path, env_vars):
                 env = os.environ.copy()
                 env.update(env_vars)
-                openlineage_processor = CustomDbtLocalArtifactProcessor(
+                openlineage_processor = DbtLocalArtifactProcessor(
                     profile_filepath=profile_path,
                     manifest_dir=Path(project_dir),
                     project_dir=str(project_dir),
-                    profile_name="default",
-                    # profile_name=self.profile_config.profile_name,
+                    profile_name=self.profile_config.profile_name,
                     target=self.profile_config.target_name,
                     env_vars=env,
                 )
+                #openlineage_processor = CustomDbtLocalArtifactProcessor(
+                #    profile_filepath=profile_path,
+                #    manifest_dir=Path(project_dir),
+                #    project_dir=str(project_dir),
+                #    profile_name="default",
+                #    # profile_name=self.profile_config.profile_name,
+                #    target=self.profile_config.target_name,
+                #    env_vars=env,
+                #)
                 # TODO: try/catch
                 openlineage_processor.parse()
                 breakpoint()

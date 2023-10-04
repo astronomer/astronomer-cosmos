@@ -28,6 +28,13 @@ def mock_databricks_conn():  # type: ignore
         yield conn
 
 
+def test_openlineage_namespace(mock_databricks_conn):
+    profile_mapping = DatabricksTokenProfileMapping(
+        conn_id=mock_databricks_conn.conn_id,
+    )
+    assert profile_mapping.openlineage_namespace == "databricks://my_host"
+
+
 def test_connection_claiming() -> None:
     """
     Tests that the Databricks profile mapping claims the correct connection type.

@@ -12,22 +12,49 @@ from cosmos.profiles.snowflake import (
 )
 
 
-@pytest.fixture()
-def mock_snowflake_conn():  # type: ignore
+@pytest.fixture
+def mock_snowflake_conn(request):  # type: ignore
     """
     Sets the connection as an environment variable.
     """
+    account = "my_account"
+    if hasattr(request, "param") and "account" in request.param:
+        account = request.param["account"]
+    extra = {"account": account, "database": "my_database", "warehouse": "my_warehouse"}
     conn = Connection(
         conn_id="my_snowflake_password_connection",
         conn_type="snowflake",
         login="my_user",
         password="my_password",
         schema="my_schema",
-        extra='{"account": "my_account", "database": "my_database", "warehouse": "my_warehouse"}',
+        extra=json.dumps(extra),
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         yield conn
+
+
+@pytest.mark.parametrize(
+    "mock_snowflake_conn",
+    [
+        {"account": "my_account"},
+        {"account": "some-account.us-west-2"},
+        {"account": "gp21412.us-east-1.snowflakecomputing.com"},
+    ],
+    indirect=True,
+    ids=["amend_host_and_cloud", "amend_cloud", "no_amends"],
+)
+def test_openlineage_namespace_amending_host_and_cloud(mock_snowflake_conn):
+    account_to_namespace = {
+        "my_account": "snowflake://my_account.us-west-1.aws",
+        "some-account.us-west-2": "snowflake://some-account.us-west-2.aws",
+        "gp21412.us-east-1.snowflakecomputing.com": "snowflake://gp21412.us-east-1.snowflakecomputing.com",
+    }
+    profile_mapping = SnowflakeUserPasswordProfileMapping(
+        conn_id=mock_snowflake_conn.conn_id,
+    )
+    expected = account_to_namespace[json.loads(mock_snowflake_conn.extra)["account"]]
+    assert profile_mapping.openlineage_namespace == expected
 
 
 def test_connection_claiming() -> None:

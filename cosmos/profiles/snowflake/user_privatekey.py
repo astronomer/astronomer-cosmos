@@ -4,42 +4,33 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from ..base import BaseProfileMapping
+from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
+
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakePrivateKeyPemProfileMapping(BaseProfileMapping):
+class SnowflakePrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/private key.
     https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
-    airflow_connection_type: str = "snowflake"
-    dbt_profile_type: str = "snowflake"
     is_community: bool = True
 
-    required_fields = [
-        "account",
-        "user",
-        "database",
-        "warehouse",
-        "schema",
+    required_fields = SnowflakeBaseProfileMapping.required_fields + [
         "private_key",
     ]
     secret_fields = [
         "private_key",
     ]
     airflow_param_mapping = {
-        "account": "extra.account",
-        "user": "login",
-        "database": "extra.database",
-        "warehouse": "extra.warehouse",
-        "schema": "schema",
-        "role": "extra.role",
-        "private_key": "extra.private_key_content",
+        **SnowflakeBaseProfileMapping.airflow_param_mapping,
+        **{
+            "private_key": "extra.private_key_content",
+        },
     }
 
     @property

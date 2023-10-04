@@ -50,6 +50,10 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         return self.filter_null(profile)
 
     @property
+    def openlineage_namespace(self):
+        return f"postgres://{self.profile['host']}:{self.profile['port']}"
+
+    @property
     def mock_profile(self) -> dict[str, Any | None]:
         "Gets mock profile. Defaults port to 5432."
         parent_mock = super().mock_profile

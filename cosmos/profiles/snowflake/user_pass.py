@@ -4,42 +4,24 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from ..base import BaseProfileMapping
+from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
+class SnowflakeUserPasswordProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/password.
     https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
-    airflow_connection_type: str = "snowflake"
-    dbt_profile_type: str = "snowflake"
-
-    required_fields = [
-        "account",
-        "user",
-        "database",
-        "warehouse",
-        "schema",
-        "password",
-    ]
+    required_fields = SnowflakeBaseProfileMapping.required_fields + ["password"]
     secret_fields = [
         "password",
     ]
-    airflow_param_mapping = {
-        "account": "extra.account",
-        "user": "login",
-        "password": "password",
-        "database": "extra.database",
-        "warehouse": "extra.warehouse",
-        "schema": "schema",
-        "role": "extra.role",
-    }
+    airflow_param_mapping = {**SnowflakeBaseProfileMapping.airflow_param_mapping, **{"password": "password"}}
 
     @property
     def conn(self) -> Connection:

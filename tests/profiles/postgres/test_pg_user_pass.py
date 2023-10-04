@@ -108,6 +108,14 @@ def test_profile_mapping_selected(
     assert isinstance(profile_mapping, PostgresUserPasswordProfileMapping)
 
 
+def test_openlineage_namespace(mock_postgres_conn_custom_port):
+    profile_mapping = PostgresUserPasswordProfileMapping(
+        conn_id=mock_postgres_conn_custom_port.conn_id,
+        profile_args={"schema": "my_schema"},
+    )
+    assert profile_mapping.openlineage_namespace == "postgres://my_host:7472"
+
+
 def test_profile_mapping_keeps_custom_port(mock_postgres_conn_custom_port: Connection) -> None:
     profile = PostgresUserPasswordProfileMapping(mock_postgres_conn_custom_port.conn_id, {"schema": "my_schema"})
     assert profile.profile["port"] == 7472

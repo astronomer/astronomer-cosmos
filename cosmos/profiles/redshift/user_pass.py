@@ -38,6 +38,10 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
     }
 
     @property
+    def openlineage_namespace(self):
+        return f"redshift://{self.profile['host']}:{self.profile['port']}"
+
+    @property
     def profile(self) -> dict[str, Any | None]:
         "Gets profile."
         profile = {

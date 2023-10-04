@@ -89,6 +89,14 @@ def test_profile_mapping_selected(
     assert isinstance(profile_mapping, RedshiftUserPasswordProfileMapping)
 
 
+def test_openlineage_namespace(mock_redshift_conn):
+    profile_mapping = RedshiftUserPasswordProfileMapping(
+        conn_id=mock_redshift_conn.conn_id,
+        profile_args={"schema": "my_schema"},
+    )
+    assert profile_mapping.openlineage_namespace == "redshift://my_host:5439"
+
+
 def test_profile_args(
     mock_redshift_conn: Connection,
 ) -> None:

@@ -46,7 +46,7 @@ with DAG(
         for seed in ["raw_customers", "raw_payments", "raw_orders"]:
             DbtRunOperationOperator(
                 task_id=f"drop_{seed}_if_exists",
-                macro_name="drop_table",
+                macro_name="drop_table_by_name",
                 args={"table_name": seed},
                 project_dir=DBT_ROOT_PATH / "jaffle_shop",
                 profile_config=profile_config,

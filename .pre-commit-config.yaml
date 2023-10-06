@@ -31,6 +31,8 @@ repos:
         name: Run codespell to check for common misspellings in files
         language: python
         types: [text]
+        args:
+          - --exclude-file=tests/sample/manifest_model_version.json
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import itertools
 import json
 import os
@@ -6,19 +7,19 @@ import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from subprocess import Popen, PIPE
+from subprocess import PIPE, Popen
 from typing import Any
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    DBT_LOG_DIR_NAME,
+    DBT_LOG_FILENAME,
+    DBT_LOG_PATH_ENVVAR,
+    DBT_TARGET_DIR_NAME,
+    DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
     ExecutionMode,
     LoadMode,
-    DBT_LOG_FILENAME,
-    DBT_LOG_PATH_ENVVAR,
-    DBT_TARGET_PATH_ENVVAR,
-    DBT_LOG_DIR_NAME,
-    DBT_TARGET_DIR_NAME,
 )
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
@@ -137,6 +138,9 @@ class DbtGraph:
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
 
+        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
+        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
+
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -252,7 +256,7 @@ class DbtGraph:
                         logger.debug("Skipped dbt ls line: %s", line)
                     else:
                         node = DbtNode(
-                            name=node_dict["name"],
+                            name=node_dict.get("alias", node_dict["name"]),
                             unique_id=node_dict["unique_id"],
                             resource_type=DbtResourceType(node_dict["resource_type"]),
                             depends_on=node_dict.get("depends_on", {}).get("nodes", []),
@@ -326,6 +330,9 @@ class DbtGraph:
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).
 
+        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
+        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
+
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -337,7 +344,7 @@ class DbtGraph:
 
             for unique_id, node_dict in manifest.get("nodes", {}).items():
                 node = DbtNode(
-                    name=node_dict["name"],
+                    name=node_dict.get("alias", node_dict["name"]),
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict["depends_on"].get("nodes", []),

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Type
 
 
+from .athena import AthenaAccessKeyProfileMapping
 from .base import BaseProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
@@ -21,6 +22,7 @@ from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
 
 profile_mappings: list[Type[BaseProfileMapping]] = [
+    AthenaAccessKeyProfileMapping,
     GoogleCloudServiceAccountFileProfileMapping,
     GoogleCloudServiceAccountDictProfileMapping,
     GoogleCloudOauthProfileMapping,

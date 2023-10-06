@@ -212,3 +212,21 @@ def test_select_nodes_by_exclude_union_config_test_tags():
         child_node.unique_id: child_node,
     }
     assert selected == expected
+
+
+def test_select_nodes_by_path_dir():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen3/models"])
+    expected = {
+        child_node.unique_id: child_node,
+        grandchild_1_test_node.unique_id: grandchild_1_test_node,
+        grandchild_2_test_node.unique_id: grandchild_2_test_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_path_file():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/parent.sql"])
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected

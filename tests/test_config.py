@@ -22,15 +22,18 @@ def test_valid_parameters():
 
 # Since dbt_project_path is now an optional parameter, we should test each combination for init and validation
 
+
 # Passing a manifest AND project together should succeed, as previous
 def test_init_with_manifest_and_project():
     project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
     assert project_config.parsed_manifest_path == Path("target/manifest.json")
 
+
 # Since dbt_project_path is optional, we should be able to operate with only a manifest
 def test_init_with_manifest_and_not_project():
     project_config = ProjectConfig(manifest_path="target/manifest.json")
     assert project_config.parsed_manifest_path == Path("target/manifest.json")
+
 
 # supplying both project and manifest paths as previous should be permitted
 def test_validate_project_success_project_and_manifest():
@@ -39,29 +42,28 @@ def test_validate_project_success_project_and_manifest():
     )
     assert project_config.validate_project() is None
 
+
 # with updated logic, passing a project alone should be permitted
 def test_validate_project_success_project_and_not_manifest():
-    project_config = ProjectConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR
-    )
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR)
     assert project_config.validate_project() is None
+
 
 # with updated logic, passing a manifest alone should fail since we also require a project_name
 def test_validate_project_failure_not_project_and_manifest():
-    project_config = ProjectConfig(
-        manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json"
-    )
+    project_config = ProjectConfig(manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json")
     with pytest.raises(CosmosValueError) as err_info:
         assert project_config.validate_project() is None
     print(err_info.value.args[0])
-    assert err_info.value.args[0] == "A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not."
+    assert (
+        err_info.value.args[0]
+        == "A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not."
+    )
+
 
 # with updated logic, passing a manifest and project name together should succeed.
 def test_validate_project_success_not_project_and_manifest():
-    project_config = ProjectConfig(
-        manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json",
-        project_name="test-project"
-    )
+    project_config = ProjectConfig(manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json", project_name="test-project")
     assert project_config.validate_project() is None
 
 

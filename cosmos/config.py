@@ -99,12 +99,14 @@ class ProjectConfig:
             }
         elif self.parsed_manifest_path:
             if not self.project_name:
-                raise CosmosValueError(f"A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not.")
-            mandatory_paths = {
-                "manifest file": self.parsed_manifest_path
-            }
+                raise CosmosValueError(
+                    "A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not."
+                )
+            mandatory_paths = {"manifest file": self.parsed_manifest_path}
         else:
-            raise CosmosValueError("A required project field was not present - the user must provide either dbt_project_path or manifest_path")
+            raise CosmosValueError(
+                "A required project field was not present - the user must provide either dbt_project_path or manifest_path"
+            )
 
         for name, path in mandatory_paths.items():
             if path is None or not Path(path).exists():
@@ -118,6 +120,7 @@ class ProjectConfig:
             return False
 
         return self.parsed_manifest_path.exists()
+
 
 @dataclass
 class ProfileConfig:

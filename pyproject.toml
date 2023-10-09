@@ -173,9 +173,7 @@ test-integration = """pytest -vv \
 -m integration  \
 -k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv or cosmos_manifest_example)'
 """
-test-integration-expensive = """
-rm -rf dbt/model_version/dbt_packages;
-pytest -vv \
+test-integration-expensive = """pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \
 --cov-report=xml \
@@ -186,7 +184,7 @@ test-integration-sqlite-setup = """pip uninstall -y dbt-core dbt-sqlite openline
 rm -rf airflow.*; \
 airflow db init; \
 pip install 'dbt-core==1.4' 'dbt-sqlite<=1.4' 'dbt-databricks<=1.4' 'dbt-postgres<=1.4' """
-test-integration-sqlite = """rm -rf dbt/jaffle_shop/dbt_packages;
+test-integration-sqlite = """
 pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \

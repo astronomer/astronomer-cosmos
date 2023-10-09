@@ -213,7 +213,8 @@ dependencies = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
-    "openlineage-airflow"
+    "openlineage-airflow",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 
 [tool.hatch.envs.docs.scripts]

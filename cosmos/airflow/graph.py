@@ -215,6 +215,11 @@ def build_airflow_graph(
 
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
+        if conversion_function != generate_task_or_group:
+            logger.warning(
+                "The `node_converters` attribute is an experimental feature. "
+                "Its syntax and behavior can be changed before a major release."
+            )
         logger.info(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
         task_or_group = conversion_function(
             dag=dag,

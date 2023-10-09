@@ -23,6 +23,7 @@ profile_config = ProfileConfig(
 )
 
 
+# [START custom_dbt_nodes]
 def convert_source(dag: DAG, task_group: TaskGroup, node: DbtNode, **kwargs):
     return DummyOperator(dag=dag, task_group=task_group, task_id=f"{node.name}_source")
 
@@ -50,3 +51,4 @@ example_cosmos_sources = DbtDag(
     catchup=False,
     dag_id="example_cosmos_sources",
 )
+# [END custom_dbt_nodes]

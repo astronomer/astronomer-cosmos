@@ -46,39 +46,66 @@ class ProjectConfig:
     """
     Class for setting project config.
 
-    :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project
+    :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
     snapshots
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
+    :param project_name: Allows the user to define the project name.
+    Required if dbt_project_path is not defined. Defaults to the folder name of dbt_project_path.
     """
 
-    dbt_project_path: str | Path
+    dbt_project_path: str | Path | None = None
     models_relative_path: str | Path = "models"
     seeds_relative_path: str | Path = "seeds"
     snapshots_relative_path: str | Path = "snapshots"
     manifest_path: str | Path | None = None
 
+    parsed_dbt_project_path: Path | None = None
     parsed_manifest_path: Path | None = None
+
+    project_name: str | None = None
 
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
-        self.dbt_project_path = Path(self.dbt_project_path)
-        self.models_relative_path = self.dbt_project_path / Path(self.models_relative_path)
-        self.seeds_relative_path = self.dbt_project_path / Path(self.seeds_relative_path)
-        self.snapshots_relative_path = self.dbt_project_path / Path(self.snapshots_relative_path)
+        if self.dbt_project_path:
+            self.parsed_dbt_project_path = Path(self.dbt_project_path)
+            self.models_relative_path = self.parsed_dbt_project_path / Path(self.models_relative_path)
+            self.seeds_relative_path = self.parsed_dbt_project_path / Path(self.seeds_relative_path)
+            self.snapshots_relative_path = self.parsed_dbt_project_path / Path(self.snapshots_relative_path)
+            if not self.project_name:
+                self.project_name = self.parsed_dbt_project_path.stem
 
         if self.manifest_path:
             self.parsed_manifest_path = Path(self.manifest_path)
 
     def validate_project(self) -> None:
-        "Validates that the project, models, and seeds directories exist."
-        project_yml_path = Path(self.dbt_project_path) / "dbt_project.yml"
-        mandatory_paths = {
-            "dbt_project.yml": project_yml_path,
-            "models directory ": self.models_relative_path,
-        }
+        """
+        Validates necessary context is present for a project.
+        There are 2 cases we need to account for
+          1 - the entire dbt project
+          2 - the dbt manifest
+        Here, we can assume if the project path is provided, we have scenario 1. If the project path is not provided, we have a scenario 2
+        """
+
+        mandatory_paths = {}
+
+        if self.parsed_dbt_project_path:
+            project_yml_path = self.parsed_dbt_project_path / "dbt_project.yml"
+            mandatory_paths = {
+                "dbt_project.yml": project_yml_path,
+                "models directory ": self.models_relative_path,
+            }
+        elif self.parsed_manifest_path:
+            if not self.project_name:
+                raise CosmosValueError(f"A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not.")
+            mandatory_paths = {
+                "manifest file": self.parsed_manifest_path
+            }
+        else:
+            raise CosmosValueError("A required project field was not present - the user must provide either dbt_project_path or manifest_path")
+
         for name, path in mandatory_paths.items():
             if path is None or not Path(path).exists():
                 raise CosmosValueError(f"Could not find {name} at {path}")
@@ -91,12 +118,6 @@ class ProjectConfig:
             return False
 
         return self.parsed_manifest_path.exists()
-
-    @property
-    def project_name(self) -> str:
-        "The name of the dbt project."
-        return Path(self.dbt_project_path).stem
-
 
 @dataclass
 class ProfileConfig:

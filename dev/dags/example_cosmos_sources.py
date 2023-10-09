@@ -27,7 +27,13 @@ def convert_source(dag: DAG, task_group: TaskGroup, node: DbtNode, **kwargs):
     return DummyOperator(dag=dag, task_group=task_group, task_id=f"{node.name}_source")
 
 
-render_config = RenderConfig(dbt_resource_converter={DbtResourceType.SOURCE: convert_source})
+def convert_exposure(dag: DAG, task_group: TaskGroup, node: DbtNode, **kwargs):
+    return DummyOperator(dag=dag, task_group=task_group, task_id=f"{node.name}_exposure")
+
+
+render_config = RenderConfig(
+    node_converters={DbtResourceType.SOURCE: convert_source, DbtResourceType("exposure"): convert_exposure}
+)
 
 
 example_cosmos_sources = DbtDag(

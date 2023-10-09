@@ -6,7 +6,7 @@ from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, TESTABLE_DBT_RESOURCES
+from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, TESTABLE_DBT_RESOURCES, DEFAULT_DBT_RESOURCES
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
@@ -105,7 +105,7 @@ def create_task_metadata(
     }
     args = {**args, **{"models": node.name}}
 
-    if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
+    if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         if node.resource_type == DbtResourceType.MODEL:
             task_id = f"{node.name}_run"
             if use_task_group is True:

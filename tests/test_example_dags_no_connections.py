@@ -5,11 +5,13 @@ from pathlib import Path
 import airflow
 import pytest
 from airflow.models.dagbag import DagBag
+from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
+DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
@@ -28,13 +30,16 @@ def get_dag_bag() -> DagBag:
             if Version(airflow.__version__) < min_version:
                 print(f"Adding {files} to .airflowignore")
                 file.writelines([f"{file_name}\n" for file_name in files])
-
+        a = 1 + 2
+        b = 3 + 4
+        a + b
+        if DBT_VERSION >= Version("1.5.0"):
+            file.writelines(["example_cosmos_sources.py\n"])
         # cosmos_profile_mapping uses the automatic profile rendering from an Airflow connection.
         # so we can't parse that without live connections
         for file_name in ["cosmos_profile_mapping.py"]:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
-
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

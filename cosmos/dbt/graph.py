@@ -342,7 +342,7 @@ class DbtGraph:
         with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)
 
-            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {})}
+            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
                 node = DbtNode(
                     name=node_dict.get("alias", node_dict["name"]),

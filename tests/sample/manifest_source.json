@@ -1,9 +1,12 @@
 {
   "child_map": {
+    "exposure.simple.weekly_metrics": [],
     "model.simple.movies_ratings_simplified": [
       "model.simple.top_animations"
     ],
-    "model.simple.top_animations": [],
+    "model.simple.top_animations": [
+      "exposure.simple.weekly_metrics"
+    ],
     "source.simple.imdb.movies_ratings": [
       "model.simple.movies_ratings_simplified"
     ]
@@ -20,11 +23,53 @@
       "unique_id": "doc.dbt.__overview__"
     }
   },
-  "exposures": {},
+  "exposures": {
+    "exposure.simple.weekly_metrics": {
+      "config": {
+        "enabled": true
+      },
+      "created_at": 1696859933.549042,
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.simple.top_animations"
+        ]
+      },
+      "description": "",
+      "fqn": [
+        "simple",
+        "weekly_metrics"
+      ],
+      "label": "Jaffle shop metrics",
+      "maturity": "high",
+      "meta": {},
+      "metrics": [],
+      "name": "weekly_metrics",
+      "original_file_path": "models/exposures.yml",
+      "owner": {
+        "email": "team@astronomer-cosmos.org",
+        "name": "Cosmos Team"
+      },
+      "package_name": "simple",
+      "path": "exposures.yml",
+      "refs": [
+        [
+          "top_animations"
+        ]
+      ],
+      "resource_type": "exposure",
+      "sources": [],
+      "tags": [],
+      "type": "dashboard",
+      "unique_id": "exposure.simple.weekly_metrics",
+      "unrendered_config": {},
+      "url": null
+    }
+  },
   "macros": {
     "macro.dbt._split_part_negative": {
       "arguments": [],
-      "created_at": 1693492883.7292302,
+      "created_at": 1696859933.423734,
       "depends_on": {
         "macros": []
       },
@@ -46,7 +91,7 @@
     },
     "macro.dbt.after_commit": {
       "arguments": [],
-      "created_at": 1693492883.623133,
+      "created_at": 1696859933.348661,
       "depends_on": {
         "macros": [
           "macro.dbt.make_hook_config"
@@ -70,7 +115,7 @@
     },
     "macro.dbt.alter_column_comment": {
       "arguments": [],
-      "created_at": 1693492883.749645,
+      "created_at": 1696859933.438276,
       "depends_on": {
         "macros": [
           "macro.dbt.default__alter_column_comment"
@@ -94,7 +139,7 @@
     },
     "macro.dbt.alter_column_type": {
       "arguments": [],
-      "created_at": 1693492883.757477,
+      "created_at": 1696859933.4439082,
       "depends_on": {
         "macros": [
           "macro.dbt.default__alter_column_type"
@@ -118,7 +163,7 @@
     },
     "macro.dbt.alter_relation_add_remove_columns": {
       "arguments": [],
-      "created_at": 1693492883.7583869,
+      "created_at": 1696859933.444509,
       "depends_on": {
         "macros": [
           "macro.dbt.default__alter_relation_add_remove_columns"
@@ -142,7 +187,7 @@
     },
     "macro.dbt.alter_relation_comment": {
       "arguments": [],
-      "created_at": 1693492883.75002,
+      "created_at": 1696859933.438538,
       "depends_on": {
         "macros": [
           "macro.dbt.default__alter_relation_comment"
@@ -166,7 +211,7 @@
     },
     "macro.dbt.any_value": {
       "arguments": [],
-      "created_at": 1693492883.7229,
+      "created_at": 1696859933.419189,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__any_value"
@@ -190,7 +235,7 @@
     },
     "macro.dbt.apply_grants": {
       "arguments": [],
-      "created_at": 1693492883.7478132,
+      "created_at": 1696859933.436969,
       "depends_on": {
         "macros": [
           "macro.dbt.default__apply_grants"
@@ -214,7 +259,7 @@
     },
     "macro.dbt.array_append": {
       "arguments": [],
-      "created_at": 1693492883.73064,
+      "created_at": 1696859933.42466,
       "depends_on": {
         "macros": [
           "macro.dbt.default__array_append"
@@ -238,7 +283,7 @@
     },
     "macro.dbt.array_concat": {
       "arguments": [],
-      "created_at": 1693492883.727057,
+      "created_at": 1696859933.4221408,
       "depends_on": {
         "macros": [
           "macro.dbt.default__array_concat"
@@ -262,7 +307,7 @@
     },
     "macro.dbt.array_construct": {
       "arguments": [],
-      "created_at": 1693492883.730113,
+      "created_at": 1696859933.424287,
       "depends_on": {
         "macros": [
           "macro.dbt.default__array_construct"
@@ -286,7 +331,7 @@
     },
     "macro.dbt.before_begin": {
       "arguments": [],
-      "created_at": 1693492883.622847,
+      "created_at": 1696859933.348465,
       "depends_on": {
         "macros": [
           "macro.dbt.make_hook_config"
@@ -310,7 +355,7 @@
     },
     "macro.dbt.bool_or": {
       "arguments": [],
-      "created_at": 1693492883.727447,
+      "created_at": 1696859933.422406,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__bool_or"
@@ -334,7 +379,7 @@
     },
     "macro.dbt.build_config_dict": {
       "arguments": [],
-      "created_at": 1693492883.761755,
+      "created_at": 1696859933.446951,
       "depends_on": {
         "macros": []
       },
@@ -356,7 +401,7 @@
     },
     "macro.dbt.build_ref_function": {
       "arguments": [],
-      "created_at": 1693492883.760693,
+      "created_at": 1696859933.446188,
       "depends_on": {
         "macros": []
       },
@@ -378,7 +423,7 @@
     },
     "macro.dbt.build_snapshot_staging_table": {
       "arguments": [],
-      "created_at": 1693492883.639839,
+      "created_at": 1696859933.360894,
       "depends_on": {
         "macros": [
           "macro.dbt.make_temp_relation",
@@ -405,7 +450,7 @@
     },
     "macro.dbt.build_snapshot_table": {
       "arguments": [],
-      "created_at": 1693492883.6391501,
+      "created_at": 1696859933.360416,
       "depends_on": {
         "macros": [
           "macro.dbt.default__build_snapshot_table"
@@ -429,7 +474,7 @@
     },
     "macro.dbt.build_source_function": {
       "arguments": [],
-      "created_at": 1693492883.7611752,
+      "created_at": 1696859933.446528,
       "depends_on": {
         "macros": []
       },
@@ -451,7 +496,7 @@
     },
     "macro.dbt.call_dcl_statements": {
       "arguments": [],
-      "created_at": 1693492883.7473369,
+      "created_at": 1696859933.436629,
       "depends_on": {
         "macros": [
           "macro.dbt.default__call_dcl_statements"
@@ -475,7 +520,7 @@
     },
     "macro.dbt.cast_bool_to_text": {
       "arguments": [],
-      "created_at": 1693492883.7225049,
+      "created_at": 1696859933.418902,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__cast_bool_to_text"
@@ -499,7 +544,7 @@
     },
     "macro.dbt.check_for_schema_changes": {
       "arguments": [],
-      "created_at": 1693492883.6809,
+      "created_at": 1696859933.3894122,
       "depends_on": {
         "macros": [
           "macro.dbt.diff_columns",
@@ -524,7 +569,7 @@
     },
     "macro.dbt.check_schema_exists": {
       "arguments": [],
-      "created_at": 1693492883.7538078,
+      "created_at": 1696859933.441201,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__check_schema_exists"
@@ -548,7 +593,7 @@
     },
     "macro.dbt.collect_freshness": {
       "arguments": [],
-      "created_at": 1693492883.742094,
+      "created_at": 1696859933.4328918,
       "depends_on": {
         "macros": [
           "macro.dbt.default__collect_freshness"
@@ -572,7 +617,7 @@
     },
     "macro.dbt.concat": {
       "arguments": [],
-      "created_at": 1693492883.717628,
+      "created_at": 1696859933.415433,
       "depends_on": {
         "macros": [
           "macro.dbt.default__concat"
@@ -596,7 +641,7 @@
     },
     "macro.dbt.convert_datetime": {
       "arguments": [],
-      "created_at": 1693492883.714323,
+      "created_at": 1696859933.4131432,
       "depends_on": {
         "macros": []
       },
@@ -618,7 +663,7 @@
     },
     "macro.dbt.copy_grants": {
       "arguments": [],
-      "created_at": 1693492883.744273,
+      "created_at": 1696859933.43445,
       "depends_on": {
         "macros": [
           "macro.dbt.default__copy_grants"
@@ -642,7 +687,7 @@
     },
     "macro.dbt.create_columns": {
       "arguments": [],
-      "created_at": 1693492883.637043,
+      "created_at": 1696859933.358933,
       "depends_on": {
         "macros": [
           "macro.dbt.default__create_columns"
@@ -666,7 +711,7 @@
     },
     "macro.dbt.create_csv_table": {
       "arguments": [],
-      "created_at": 1693492883.701708,
+      "created_at": 1696859933.403973,
       "depends_on": {
         "macros": [
           "macro.dbt.default__create_csv_table"
@@ -690,7 +735,7 @@
     },
     "macro.dbt.create_indexes": {
       "arguments": [],
-      "created_at": 1693492883.733857,
+      "created_at": 1696859933.42699,
       "depends_on": {
         "macros": [
           "macro.dbt.default__create_indexes"
@@ -714,7 +759,7 @@
     },
     "macro.dbt.create_or_replace_view": {
       "arguments": [],
-      "created_at": 1693492883.6919281,
+      "created_at": 1696859933.397109,
       "depends_on": {
         "macros": [
           "macro.dbt.run_hooks",
@@ -744,7 +789,7 @@
     },
     "macro.dbt.create_schema": {
       "arguments": [],
-      "created_at": 1693492883.7311401,
+      "created_at": 1696859933.4250371,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__create_schema"
@@ -768,7 +813,7 @@
     },
     "macro.dbt.create_table_as": {
       "arguments": [],
-      "created_at": 1693492883.686808,
+      "created_at": 1696859933.393523,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__create_table_as"
@@ -792,7 +837,7 @@
     },
     "macro.dbt.create_view_as": {
       "arguments": [],
-      "created_at": 1693492883.692636,
+      "created_at": 1696859933.3976068,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__create_view_as"
@@ -816,7 +861,7 @@
     },
     "macro.dbt.current_timestamp": {
       "arguments": [],
-      "created_at": 1693492883.7321541,
+      "created_at": 1696859933.425768,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__current_timestamp"
@@ -840,7 +885,7 @@
     },
     "macro.dbt.current_timestamp_backcompat": {
       "arguments": [],
-      "created_at": 1693492883.7327092,
+      "created_at": 1696859933.426166,
       "depends_on": {
         "macros": [
           "macro.dbt.default__current_timestamp_backcompat"
@@ -864,7 +909,7 @@
     },
     "macro.dbt.current_timestamp_in_utc_backcompat": {
       "arguments": [],
-      "created_at": 1693492883.732942,
+      "created_at": 1696859933.4263391,
       "depends_on": {
         "macros": [
           "macro.dbt.default__current_timestamp_in_utc_backcompat"
@@ -888,7 +933,7 @@
     },
     "macro.dbt.date_trunc": {
       "arguments": [],
-      "created_at": 1693492883.729504,
+      "created_at": 1696859933.423926,
       "depends_on": {
         "macros": [
           "macro.dbt.default__date_trunc"
@@ -912,7 +957,7 @@
     },
     "macro.dbt.dateadd": {
       "arguments": [],
-      "created_at": 1693492883.7184398,
+      "created_at": 1696859933.416018,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__dateadd"
@@ -936,7 +981,7 @@
     },
     "macro.dbt.datediff": {
       "arguments": [],
-      "created_at": 1693492883.7212522,
+      "created_at": 1696859933.4179342,
       "depends_on": {
         "macros": [
           "macro.dbt.default__datediff"
@@ -960,7 +1005,7 @@
     },
     "macro.dbt.dates_in_range": {
       "arguments": [],
-      "created_at": 1693492883.715599,
+      "created_at": 1696859933.413988,
       "depends_on": {
         "macros": [
           "macro.dbt.convert_datetime"
@@ -984,7 +1029,7 @@
     },
     "macro.dbt.default__alter_column_comment": {
       "arguments": [],
-      "created_at": 1693492883.749813,
+      "created_at": 1696859933.438398,
       "depends_on": {
         "macros": []
       },
@@ -1006,7 +1051,7 @@
     },
     "macro.dbt.default__alter_column_type": {
       "arguments": [],
-      "created_at": 1693492883.7581298,
+      "created_at": 1696859933.4443278,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1030,7 +1075,7 @@
     },
     "macro.dbt.default__alter_relation_add_remove_columns": {
       "arguments": [],
-      "created_at": 1693492883.759163,
+      "created_at": 1696859933.4450629,
       "depends_on": {
         "macros": [
           "macro.dbt.run_query"
@@ -1054,7 +1099,7 @@
     },
     "macro.dbt.default__alter_relation_comment": {
       "arguments": [],
-      "created_at": 1693492883.750187,
+      "created_at": 1696859933.438658,
       "depends_on": {
         "macros": []
       },
@@ -1076,7 +1121,7 @@
     },
     "macro.dbt.default__any_value": {
       "arguments": [],
-      "created_at": 1693492883.723,
+      "created_at": 1696859933.419261,
       "depends_on": {
         "macros": []
       },
@@ -1098,7 +1143,7 @@
     },
     "macro.dbt.default__apply_grants": {
       "arguments": [],
-      "created_at": 1693492883.748949,
+      "created_at": 1696859933.437767,
       "depends_on": {
         "macros": [
           "macro.dbt.run_query",
@@ -1125,7 +1170,7 @@
     },
     "macro.dbt.default__array_append": {
       "arguments": [],
-      "created_at": 1693492883.730768,
+      "created_at": 1696859933.424763,
       "depends_on": {
         "macros": []
       },
@@ -1147,7 +1192,7 @@
     },
     "macro.dbt.default__array_concat": {
       "arguments": [],
-      "created_at": 1693492883.727186,
+      "created_at": 1696859933.422234,
       "depends_on": {
         "macros": []
       },
@@ -1169,7 +1214,7 @@
     },
     "macro.dbt.default__array_construct": {
       "arguments": [],
-      "created_at": 1693492883.7303622,
+      "created_at": 1696859933.424462,
       "depends_on": {
         "macros": []
       },
@@ -1191,7 +1236,7 @@
     },
     "macro.dbt.default__bool_or": {
       "arguments": [],
-      "created_at": 1693492883.727552,
+      "created_at": 1696859933.4224782,
       "depends_on": {
         "macros": []
       },
@@ -1213,7 +1258,7 @@
     },
     "macro.dbt.default__build_snapshot_table": {
       "arguments": [],
-      "created_at": 1693492883.639404,
+      "created_at": 1696859933.360595,
       "depends_on": {
         "macros": []
       },
@@ -1235,7 +1280,7 @@
     },
     "macro.dbt.default__call_dcl_statements": {
       "arguments": [],
-      "created_at": 1693492883.747586,
+      "created_at": 1696859933.436807,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1259,7 +1304,7 @@
     },
     "macro.dbt.default__cast_bool_to_text": {
       "arguments": [],
-      "created_at": 1693492883.7226582,
+      "created_at": 1696859933.419014,
       "depends_on": {
         "macros": []
       },
@@ -1281,7 +1326,7 @@
     },
     "macro.dbt.default__check_schema_exists": {
       "arguments": [],
-      "created_at": 1693492883.754132,
+      "created_at": 1696859933.4414232,
       "depends_on": {
         "macros": [
           "macro.dbt.replace",
@@ -1306,7 +1351,7 @@
     },
     "macro.dbt.default__collect_freshness": {
       "arguments": [],
-      "created_at": 1693492883.742513,
+      "created_at": 1696859933.433185,
       "depends_on": {
         "macros": [
           "macro.dbt.statement",
@@ -1331,7 +1376,7 @@
     },
     "macro.dbt.default__concat": {
       "arguments": [],
-      "created_at": 1693492883.717748,
+      "created_at": 1696859933.415519,
       "depends_on": {
         "macros": []
       },
@@ -1353,7 +1398,7 @@
     },
     "macro.dbt.default__copy_grants": {
       "arguments": [],
-      "created_at": 1693492883.744391,
+      "created_at": 1696859933.434531,
       "depends_on": {
         "macros": []
       },
@@ -1375,7 +1420,7 @@
     },
     "macro.dbt.default__create_columns": {
       "arguments": [],
-      "created_at": 1693492883.637333,
+      "created_at": 1696859933.3591318,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1399,7 +1444,7 @@
     },
     "macro.dbt.default__create_csv_table": {
       "arguments": [],
-      "created_at": 1693492883.7026281,
+      "created_at": 1696859933.404623,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1423,7 +1468,7 @@
     },
     "macro.dbt.default__create_indexes": {
       "arguments": [],
-      "created_at": 1693492883.734252,
+      "created_at": 1696859933.42727,
       "depends_on": {
         "macros": [
           "macro.dbt.get_create_index_sql",
@@ -1448,7 +1493,7 @@
     },
     "macro.dbt.default__create_schema": {
       "arguments": [],
-      "created_at": 1693492883.7313228,
+      "created_at": 1696859933.425164,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1472,7 +1517,7 @@
     },
     "macro.dbt.default__create_table_as": {
       "arguments": [],
-      "created_at": 1693492883.687223,
+      "created_at": 1696859933.393813,
       "depends_on": {
         "macros": []
       },
@@ -1494,7 +1539,7 @@
     },
     "macro.dbt.default__create_view_as": {
       "arguments": [],
-      "created_at": 1693492883.692897,
+      "created_at": 1696859933.397789,
       "depends_on": {
         "macros": []
       },
@@ -1516,7 +1561,7 @@
     },
     "macro.dbt.default__current_timestamp": {
       "arguments": [],
-      "created_at": 1693492883.7323022,
+      "created_at": 1696859933.425882,
       "depends_on": {
         "macros": []
       },
@@ -1538,7 +1583,7 @@
     },
     "macro.dbt.default__current_timestamp_backcompat": {
       "arguments": [],
-      "created_at": 1693492883.7327812,
+      "created_at": 1696859933.426223,
       "depends_on": {
         "macros": []
       },
@@ -1560,7 +1605,7 @@
     },
     "macro.dbt.default__current_timestamp_in_utc_backcompat": {
       "arguments": [],
-      "created_at": 1693492883.7331069,
+      "created_at": 1696859933.4264572,
       "depends_on": {
         "macros": [
           "macro.dbt.current_timestamp_backcompat",
@@ -1585,7 +1630,7 @@
     },
     "macro.dbt.default__date_trunc": {
       "arguments": [],
-      "created_at": 1693492883.72963,
+      "created_at": 1696859933.4240158,
       "depends_on": {
         "macros": []
       },
@@ -1607,7 +1652,7 @@
     },
     "macro.dbt.default__dateadd": {
       "arguments": [],
-      "created_at": 1693492883.718601,
+      "created_at": 1696859933.416137,
       "depends_on": {
         "macros": []
       },
@@ -1629,7 +1674,7 @@
     },
     "macro.dbt.default__datediff": {
       "arguments": [],
-      "created_at": 1693492883.7214131,
+      "created_at": 1696859933.4180522,
       "depends_on": {
         "macros": []
       },
@@ -1651,7 +1696,7 @@
     },
     "macro.dbt.default__drop_relation": {
       "arguments": [],
-      "created_at": 1693492883.739479,
+      "created_at": 1696859933.431044,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1675,7 +1720,7 @@
     },
     "macro.dbt.default__drop_schema": {
       "arguments": [],
-      "created_at": 1693492883.731673,
+      "created_at": 1696859933.4254122,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1699,7 +1744,7 @@
     },
     "macro.dbt.default__escape_single_quotes": {
       "arguments": [],
-      "created_at": 1693492883.719309,
+      "created_at": 1696859933.4166322,
       "depends_on": {
         "macros": []
       },
@@ -1721,7 +1766,7 @@
     },
     "macro.dbt.default__except": {
       "arguments": [],
-      "created_at": 1693492883.71689,
+      "created_at": 1696859933.414905,
       "depends_on": {
         "macros": []
       },
@@ -1743,7 +1788,7 @@
     },
     "macro.dbt.default__generate_alias_name": {
       "arguments": [],
-      "created_at": 1693492883.706801,
+      "created_at": 1696859933.4075441,
       "depends_on": {
         "macros": []
       },
@@ -1765,7 +1810,7 @@
     },
     "macro.dbt.default__generate_database_name": {
       "arguments": [],
-      "created_at": 1693492883.708533,
+      "created_at": 1696859933.408768,
       "depends_on": {
         "macros": []
       },
@@ -1787,7 +1832,7 @@
     },
     "macro.dbt.default__generate_schema_name": {
       "arguments": [],
-      "created_at": 1693492883.7075999,
+      "created_at": 1696859933.408106,
       "depends_on": {
         "macros": []
       },
@@ -1809,7 +1854,7 @@
     },
     "macro.dbt.default__get_batch_size": {
       "arguments": [],
-      "created_at": 1693492883.704191,
+      "created_at": 1696859933.4057531,
       "depends_on": {
         "macros": []
       },
@@ -1831,7 +1876,7 @@
     },
     "macro.dbt.default__get_binding_char": {
       "arguments": [],
-      "created_at": 1693492883.7039208,
+      "created_at": 1696859933.405555,
       "depends_on": {
         "macros": []
       },
@@ -1853,7 +1898,7 @@
     },
     "macro.dbt.default__get_catalog": {
       "arguments": [],
-      "created_at": 1693492883.7528179,
+      "created_at": 1696859933.440508,
       "depends_on": {
         "macros": []
       },
@@ -1875,7 +1920,7 @@
     },
     "macro.dbt.default__get_columns_in_query": {
       "arguments": [],
-      "created_at": 1693492883.757248,
+      "created_at": 1696859933.4436722,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -1899,7 +1944,7 @@
     },
     "macro.dbt.default__get_columns_in_relation": {
       "arguments": [],
-      "created_at": 1693492883.7564201,
+      "created_at": 1696859933.4430761,
       "depends_on": {
         "macros": []
       },
@@ -1921,7 +1966,7 @@
     },
     "macro.dbt.default__get_create_index_sql": {
       "arguments": [],
-      "created_at": 1693492883.7337012,
+      "created_at": 1696859933.426882,
       "depends_on": {
         "macros": []
       },
@@ -1943,7 +1988,7 @@
     },
     "macro.dbt.default__get_create_table_as_sql": {
       "arguments": [],
-      "created_at": 1693492883.686367,
+      "created_at": 1696859933.3932219,
       "depends_on": {
         "macros": [
           "macro.dbt.create_table_as"
@@ -1967,7 +2012,7 @@
     },
     "macro.dbt.default__get_create_view_as_sql": {
       "arguments": [],
-      "created_at": 1693492883.6924522,
+      "created_at": 1696859933.397483,
       "depends_on": {
         "macros": [
           "macro.dbt.create_view_as"
@@ -1991,7 +2036,7 @@
     },
     "macro.dbt.default__get_csv_sql": {
       "arguments": [],
-      "created_at": 1693492883.7036679,
+      "created_at": 1696859933.4053729,
       "depends_on": {
         "macros": []
       },
@@ -2013,7 +2058,7 @@
     },
     "macro.dbt.default__get_dcl_statement_list": {
       "arguments": [],
-      "created_at": 1693492883.747138,
+      "created_at": 1696859933.4364831,
       "depends_on": {
         "macros": [
           "macro.dbt.support_multiple_grantees_per_dcl_statement"
@@ -2037,7 +2082,7 @@
     },
     "macro.dbt.default__get_delete_insert_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.66355,
+      "created_at": 1696859933.377393,
       "depends_on": {
         "macros": [
           "macro.dbt.get_quoted_csv"
@@ -2061,7 +2106,7 @@
     },
     "macro.dbt.default__get_grant_sql": {
       "arguments": [],
-      "created_at": 1693492883.7457862,
+      "created_at": 1696859933.43547,
       "depends_on": {
         "macros": []
       },
@@ -2083,7 +2128,7 @@
     },
     "macro.dbt.default__get_incremental_append_sql": {
       "arguments": [],
-      "created_at": 1693492883.666255,
+      "created_at": 1696859933.379318,
       "depends_on": {
         "macros": [
           "macro.dbt.get_insert_into_sql"
@@ -2107,7 +2152,7 @@
     },
     "macro.dbt.default__get_incremental_default_sql": {
       "arguments": [],
-      "created_at": 1693492883.6681669,
+      "created_at": 1696859933.38061,
       "depends_on": {
         "macros": [
           "macro.dbt.get_incremental_append_sql"
@@ -2131,7 +2176,7 @@
     },
     "macro.dbt.default__get_incremental_delete_insert_sql": {
       "arguments": [],
-      "created_at": 1693492883.6667478,
+      "created_at": 1696859933.379654,
       "depends_on": {
         "macros": [
           "macro.dbt.get_delete_insert_merge_sql"
@@ -2155,7 +2200,7 @@
     },
     "macro.dbt.default__get_incremental_insert_overwrite_sql": {
       "arguments": [],
-      "created_at": 1693492883.667815,
+      "created_at": 1696859933.380308,
       "depends_on": {
         "macros": [
           "macro.dbt.get_insert_overwrite_merge_sql"
@@ -2179,7 +2224,7 @@
     },
     "macro.dbt.default__get_incremental_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.667242,
+      "created_at": 1696859933.37999,
       "depends_on": {
         "macros": [
           "macro.dbt.get_merge_sql"
@@ -2203,7 +2248,7 @@
     },
     "macro.dbt.default__get_insert_overwrite_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.664474,
+      "created_at": 1696859933.378048,
       "depends_on": {
         "macros": [
           "macro.dbt.get_quoted_csv"
@@ -2227,7 +2272,7 @@
     },
     "macro.dbt.default__get_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.662267,
+      "created_at": 1696859933.376477,
       "depends_on": {
         "macros": [
           "macro.dbt.get_quoted_csv",
@@ -2252,7 +2297,7 @@
     },
     "macro.dbt.default__get_merge_update_columns": {
       "arguments": [],
-      "created_at": 1693492883.653697,
+      "created_at": 1696859933.3705962,
       "depends_on": {
         "macros": []
       },
@@ -2274,7 +2319,7 @@
     },
     "macro.dbt.default__get_or_create_relation": {
       "arguments": [],
-      "created_at": 1693492883.741106,
+      "created_at": 1696859933.4321868,
       "depends_on": {
         "macros": []
       },
@@ -2296,7 +2341,7 @@
     },
     "macro.dbt.default__get_revoke_sql": {
       "arguments": [],
-      "created_at": 1693492883.746235,
+      "created_at": 1696859933.435837,
       "depends_on": {
         "macros": []
       },
@@ -2318,7 +2363,7 @@
     },
     "macro.dbt.default__get_show_grant_sql": {
       "arguments": [],
-      "created_at": 1693492883.745355,
+      "created_at": 1696859933.435174,
       "depends_on": {
         "macros": []
       },
@@ -2340,7 +2385,7 @@
     },
     "macro.dbt.default__get_test_sql": {
       "arguments": [],
-      "created_at": 1693492883.6490052,
+      "created_at": 1696859933.367347,
       "depends_on": {
         "macros": []
       },
@@ -2362,7 +2407,7 @@
     },
     "macro.dbt.default__get_true_sql": {
       "arguments": [],
-      "created_at": 1693492883.6378481,
+      "created_at": 1696859933.3594959,
       "depends_on": {
         "macros": []
       },
@@ -2384,7 +2429,7 @@
     },
     "macro.dbt.default__get_where_subquery": {
       "arguments": [],
-      "created_at": 1693492883.6498072,
+      "created_at": 1696859933.367875,
       "depends_on": {
         "macros": []
       },
@@ -2406,7 +2451,7 @@
     },
     "macro.dbt.default__handle_existing_table": {
       "arguments": [],
-      "created_at": 1693492883.6903858,
+      "created_at": 1696859933.3960419,
       "depends_on": {
         "macros": []
       },
@@ -2428,7 +2473,7 @@
     },
     "macro.dbt.default__hash": {
       "arguments": [],
-      "created_at": 1693492883.722262,
+      "created_at": 1696859933.4187279,
       "depends_on": {
         "macros": []
       },
@@ -2450,7 +2495,7 @@
     },
     "macro.dbt.default__information_schema_name": {
       "arguments": [],
-      "created_at": 1693492883.7531571,
+      "created_at": 1696859933.440751,
       "depends_on": {
         "macros": []
       },
@@ -2472,7 +2517,7 @@
     },
     "macro.dbt.default__intersect": {
       "arguments": [],
-      "created_at": 1693492883.718892,
+      "created_at": 1696859933.416348,
       "depends_on": {
         "macros": []
       },
@@ -2494,7 +2539,7 @@
     },
     "macro.dbt.default__last_day": {
       "arguments": [],
-      "created_at": 1693492883.7283149,
+      "created_at": 1696859933.4230862,
       "depends_on": {
         "macros": [
           "macro.dbt.default_last_day"
@@ -2518,7 +2563,7 @@
     },
     "macro.dbt.default__length": {
       "arguments": [],
-      "created_at": 1693492883.718103,
+      "created_at": 1696859933.4157782,
       "depends_on": {
         "macros": []
       },
@@ -2540,7 +2585,7 @@
     },
     "macro.dbt.default__list_relations_without_caching": {
       "arguments": [],
-      "created_at": 1693492883.754478,
+      "created_at": 1696859933.441668,
       "depends_on": {
         "macros": []
       },
@@ -2562,7 +2607,7 @@
     },
     "macro.dbt.default__list_schemas": {
       "arguments": [],
-      "created_at": 1693492883.75358,
+      "created_at": 1696859933.4410439,
       "depends_on": {
         "macros": [
           "macro.dbt.information_schema_name",
@@ -2587,7 +2632,7 @@
     },
     "macro.dbt.default__listagg": {
       "arguments": [],
-      "created_at": 1693492883.7209148,
+      "created_at": 1696859933.417692,
       "depends_on": {
         "macros": []
       },
@@ -2609,7 +2654,7 @@
     },
     "macro.dbt.default__load_csv_rows": {
       "arguments": [],
-      "created_at": 1693492883.706184,
+      "created_at": 1696859933.407104,
       "depends_on": {
         "macros": [
           "macro.dbt.get_batch_size",
@@ -2635,7 +2680,7 @@
     },
     "macro.dbt.default__make_backup_relation": {
       "arguments": [],
-      "created_at": 1693492883.739081,
+      "created_at": 1696859933.430766,
       "depends_on": {
         "macros": []
       },
@@ -2657,7 +2702,7 @@
     },
     "macro.dbt.default__make_intermediate_relation": {
       "arguments": [],
-      "created_at": 1693492883.73799,
+      "created_at": 1696859933.43,
       "depends_on": {
         "macros": [
           "macro.dbt.default__make_temp_relation"
@@ -2681,7 +2726,7 @@
     },
     "macro.dbt.default__make_temp_relation": {
       "arguments": [],
-      "created_at": 1693492883.738518,
+      "created_at": 1696859933.4303622,
       "depends_on": {
         "macros": []
       },
@@ -2703,7 +2748,7 @@
     },
     "macro.dbt.default__persist_docs": {
       "arguments": [],
-      "created_at": 1693492883.751004,
+      "created_at": 1696859933.4391859,
       "depends_on": {
         "macros": [
           "macro.dbt.run_query",
@@ -2729,7 +2774,7 @@
     },
     "macro.dbt.default__position": {
       "arguments": [],
-      "created_at": 1693492883.7234292,
+      "created_at": 1696859933.419564,
       "depends_on": {
         "macros": []
       },
@@ -2751,7 +2796,7 @@
     },
     "macro.dbt.default__post_snapshot": {
       "arguments": [],
-      "created_at": 1693492883.6375911,
+      "created_at": 1696859933.359317,
       "depends_on": {
         "macros": []
       },
@@ -2773,7 +2818,7 @@
     },
     "macro.dbt.default__rename_relation": {
       "arguments": [],
-      "created_at": 1693492883.7403038,
+      "created_at": 1696859933.4316192,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -2797,7 +2842,7 @@
     },
     "macro.dbt.default__replace": {
       "arguments": [],
-      "created_at": 1693492883.717385,
+      "created_at": 1696859933.415259,
       "depends_on": {
         "macros": []
       },
@@ -2819,7 +2864,7 @@
     },
     "macro.dbt.default__reset_csv_table": {
       "arguments": [],
-      "created_at": 1693492883.703344,
+      "created_at": 1696859933.405142,
       "depends_on": {
         "macros": [
           "macro.dbt.create_csv_table"
@@ -2843,7 +2888,7 @@
     },
     "macro.dbt.default__right": {
       "arguments": [],
-      "created_at": 1693492883.719745,
+      "created_at": 1696859933.416939,
       "depends_on": {
         "macros": []
       },
@@ -2865,7 +2910,7 @@
     },
     "macro.dbt.default__safe_cast": {
       "arguments": [],
-      "created_at": 1693492883.721847,
+      "created_at": 1696859933.418354,
       "depends_on": {
         "macros": []
       },
@@ -2887,7 +2932,7 @@
     },
     "macro.dbt.default__snapshot_get_time": {
       "arguments": [],
-      "created_at": 1693492883.732546,
+      "created_at": 1696859933.426052,
       "depends_on": {
         "macros": [
           "macro.dbt.current_timestamp"
@@ -2911,7 +2956,7 @@
     },
     "macro.dbt.default__snapshot_hash_arguments": {
       "arguments": [],
-      "created_at": 1693492883.628897,
+      "created_at": 1696859933.3532312,
       "depends_on": {
         "macros": []
       },
@@ -2933,7 +2978,7 @@
     },
     "macro.dbt.default__snapshot_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.6249018,
+      "created_at": 1696859933.3498728,
       "depends_on": {
         "macros": []
       },
@@ -2955,7 +3000,7 @@
     },
     "macro.dbt.default__snapshot_staging_table": {
       "arguments": [],
-      "created_at": 1693492883.6389601,
+      "created_at": 1696859933.3602822,
       "depends_on": {
         "macros": [
           "macro.dbt.snapshot_get_time"
@@ -2979,7 +3024,7 @@
     },
     "macro.dbt.default__snapshot_string_as_time": {
       "arguments": [],
-      "created_at": 1693492883.6299698,
+      "created_at": 1696859933.353985,
       "depends_on": {
         "macros": []
       },
@@ -3001,7 +3046,7 @@
     },
     "macro.dbt.default__split_part": {
       "arguments": [],
-      "created_at": 1693492883.729007,
+      "created_at": 1696859933.423578,
       "depends_on": {
         "macros": []
       },
@@ -3023,7 +3068,7 @@
     },
     "macro.dbt.default__string_literal": {
       "arguments": [],
-      "created_at": 1693492883.7237718,
+      "created_at": 1696859933.419806,
       "depends_on": {
         "macros": []
       },
@@ -3045,7 +3090,7 @@
     },
     "macro.dbt.default__support_multiple_grantees_per_dcl_statement": {
       "arguments": [],
-      "created_at": 1693492883.744729,
+      "created_at": 1696859933.434727,
       "depends_on": {
         "macros": []
       },
@@ -3067,7 +3112,7 @@
     },
     "macro.dbt.default__test_accepted_values": {
       "arguments": [],
-      "created_at": 1693492883.709978,
+      "created_at": 1696859933.4098072,
       "depends_on": {
         "macros": []
       },
@@ -3089,7 +3134,7 @@
     },
     "macro.dbt.default__test_not_null": {
       "arguments": [],
-      "created_at": 1693492883.709167,
+      "created_at": 1696859933.409229,
       "depends_on": {
         "macros": [
           "macro.dbt.should_store_failures"
@@ -3113,7 +3158,7 @@
     },
     "macro.dbt.default__test_relationships": {
       "arguments": [],
-      "created_at": 1693492883.7088761,
+      "created_at": 1696859933.4090219,
       "depends_on": {
         "macros": []
       },
@@ -3135,7 +3180,7 @@
     },
     "macro.dbt.default__test_unique": {
       "arguments": [],
-      "created_at": 1693492883.709409,
+      "created_at": 1696859933.409406,
       "depends_on": {
         "macros": []
       },
@@ -3157,7 +3202,7 @@
     },
     "macro.dbt.default__truncate_relation": {
       "arguments": [],
-      "created_at": 1693492883.739825,
+      "created_at": 1696859933.431284,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -3181,7 +3226,7 @@
     },
     "macro.dbt.default__type_bigint": {
       "arguments": [],
-      "created_at": 1693492883.726176,
+      "created_at": 1696859933.421519,
       "depends_on": {
         "macros": []
       },
@@ -3203,7 +3248,7 @@
     },
     "macro.dbt.default__type_boolean": {
       "arguments": [],
-      "created_at": 1693492883.726781,
+      "created_at": 1696859933.4219398,
       "depends_on": {
         "macros": []
       },
@@ -3225,7 +3270,7 @@
     },
     "macro.dbt.default__type_float": {
       "arguments": [],
-      "created_at": 1693492883.7255309,
+      "created_at": 1696859933.42106,
       "depends_on": {
         "macros": []
       },
@@ -3247,7 +3292,7 @@
     },
     "macro.dbt.default__type_int": {
       "arguments": [],
-      "created_at": 1693492883.7264771,
+      "created_at": 1696859933.42173,
       "depends_on": {
         "macros": []
       },
@@ -3269,7 +3314,7 @@
     },
     "macro.dbt.default__type_numeric": {
       "arguments": [],
-      "created_at": 1693492883.7258701,
+      "created_at": 1696859933.4213,
       "depends_on": {
         "macros": []
       },
@@ -3291,7 +3336,7 @@
     },
     "macro.dbt.default__type_string": {
       "arguments": [],
-      "created_at": 1693492883.724844,
+      "created_at": 1696859933.4206212,
       "depends_on": {
         "macros": []
       },
@@ -3313,7 +3358,7 @@
     },
     "macro.dbt.default__type_timestamp": {
       "arguments": [],
-      "created_at": 1693492883.725159,
+      "created_at": 1696859933.420844,
       "depends_on": {
         "macros": []
       },
@@ -3335,7 +3380,7 @@
     },
     "macro.dbt.default_last_day": {
       "arguments": [],
-      "created_at": 1693492883.728173,
+      "created_at": 1696859933.42298,
       "depends_on": {
         "macros": [
           "macro.dbt.dateadd",
@@ -3360,7 +3405,7 @@
     },
     "macro.dbt.diff_column_data_types": {
       "arguments": [],
-      "created_at": 1693492883.652713,
+      "created_at": 1696859933.3699222,
       "depends_on": {
         "macros": []
       },
@@ -3382,7 +3427,7 @@
     },
     "macro.dbt.diff_columns": {
       "arguments": [],
-      "created_at": 1693492883.6520362,
+      "created_at": 1696859933.369442,
       "depends_on": {
         "macros": []
       },
@@ -3404,7 +3449,7 @@
     },
     "macro.dbt.drop_relation": {
       "arguments": [],
-      "created_at": 1693492883.73926,
+      "created_at": 1696859933.430892,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__drop_relation"
@@ -3428,7 +3473,7 @@
     },
     "macro.dbt.drop_relation_if_exists": {
       "arguments": [],
-      "created_at": 1693492883.741667,
+      "created_at": 1696859933.432588,
       "depends_on": {
         "macros": []
       },
@@ -3450,7 +3495,7 @@
     },
     "macro.dbt.drop_schema": {
       "arguments": [],
-      "created_at": 1693492883.731488,
+      "created_at": 1696859933.4252858,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__drop_schema"
@@ -3474,7 +3519,7 @@
     },
     "macro.dbt.escape_single_quotes": {
       "arguments": [],
-      "created_at": 1693492883.7191691,
+      "created_at": 1696859933.416533,
       "depends_on": {
         "macros": [
           "macro.dbt.default__escape_single_quotes"
@@ -3498,7 +3543,7 @@
     },
     "macro.dbt.except": {
       "arguments": [],
-      "created_at": 1693492883.716815,
+      "created_at": 1696859933.4148521,
       "depends_on": {
         "macros": [
           "macro.dbt.default__except"
@@ -3522,7 +3567,7 @@
     },
     "macro.dbt.generate_alias_name": {
       "arguments": [],
-      "created_at": 1693492883.7065759,
+      "created_at": 1696859933.407381,
       "depends_on": {
         "macros": [
           "macro.dbt.default__generate_alias_name"
@@ -3546,7 +3591,7 @@
     },
     "macro.dbt.generate_database_name": {
       "arguments": [],
-      "created_at": 1693492883.708286,
+      "created_at": 1696859933.4085891,
       "depends_on": {
         "macros": [
           "macro.dbt.default__generate_database_name"
@@ -3570,7 +3615,7 @@
     },
     "macro.dbt.generate_schema_name": {
       "arguments": [],
-      "created_at": 1693492883.7073338,
+      "created_at": 1696859933.407924,
       "depends_on": {
         "macros": [
           "macro.dbt.default__generate_schema_name"
@@ -3594,7 +3639,7 @@
     },
     "macro.dbt.generate_schema_name_for_env": {
       "arguments": [],
-      "created_at": 1693492883.707886,
+      "created_at": 1696859933.408309,
       "depends_on": {
         "macros": []
       },
@@ -3616,7 +3661,7 @@
     },
     "macro.dbt.get_batch_size": {
       "arguments": [],
-      "created_at": 1693492883.704076,
+      "created_at": 1696859933.405671,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_batch_size"
@@ -3640,7 +3685,7 @@
     },
     "macro.dbt.get_binding_char": {
       "arguments": [],
-      "created_at": 1693492883.7038069,
+      "created_at": 1696859933.405473,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__get_binding_char"
@@ -3664,7 +3709,7 @@
     },
     "macro.dbt.get_catalog": {
       "arguments": [],
-      "created_at": 1693492883.752564,
+      "created_at": 1696859933.440316,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__get_catalog"
@@ -3688,7 +3733,7 @@
     },
     "macro.dbt.get_columns_in_query": {
       "arguments": [],
-      "created_at": 1693492883.756914,
+      "created_at": 1696859933.443427,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_columns_in_query"
@@ -3712,7 +3757,7 @@
     },
     "macro.dbt.get_columns_in_relation": {
       "arguments": [],
-      "created_at": 1693492883.756265,
+      "created_at": 1696859933.442955,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_columns_in_relation"
@@ -3736,7 +3781,7 @@
     },
     "macro.dbt.get_create_index_sql": {
       "arguments": [],
-      "created_at": 1693492883.733567,
+      "created_at": 1696859933.426786,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_create_index_sql"
@@ -3760,7 +3805,7 @@
     },
     "macro.dbt.get_create_table_as_sql": {
       "arguments": [],
-      "created_at": 1693492883.686174,
+      "created_at": 1696859933.393095,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_create_table_as_sql"
@@ -3784,7 +3829,7 @@
     },
     "macro.dbt.get_create_view_as_sql": {
       "arguments": [],
-      "created_at": 1693492883.692291,
+      "created_at": 1696859933.3973691,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_create_view_as_sql"
@@ -3808,7 +3853,7 @@
     },
     "macro.dbt.get_csv_sql": {
       "arguments": [],
-      "created_at": 1693492883.7035341,
+      "created_at": 1696859933.405278,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_csv_sql"
@@ -3832,7 +3877,7 @@
     },
     "macro.dbt.get_dcl_statement_list": {
       "arguments": [],
-      "created_at": 1693492883.746464,
+      "created_at": 1696859933.4360042,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_dcl_statement_list"
@@ -3856,7 +3901,7 @@
     },
     "macro.dbt.get_delete_insert_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.662534,
+      "created_at": 1696859933.376683,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_delete_insert_merge_sql"
@@ -3880,7 +3925,7 @@
     },
     "macro.dbt.get_grant_sql": {
       "arguments": [],
-      "created_at": 1693492883.745578,
+      "created_at": 1696859933.435332,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_grant_sql"
@@ -3904,7 +3949,7 @@
     },
     "macro.dbt.get_incremental_append_sql": {
       "arguments": [],
-      "created_at": 1693492883.6660202,
+      "created_at": 1696859933.3791559,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_incremental_append_sql"
@@ -3928,7 +3973,7 @@
     },
     "macro.dbt.get_incremental_default_sql": {
       "arguments": [],
-      "created_at": 1693492883.6680121,
+      "created_at": 1696859933.380435,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_incremental_default_sql"
@@ -3952,7 +3997,7 @@
     },
     "macro.dbt.get_incremental_delete_insert_sql": {
       "arguments": [],
-      "created_at": 1693492883.666443,
+      "created_at": 1696859933.37945,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_incremental_delete_insert_sql"
@@ -3976,7 +4021,7 @@
     },
     "macro.dbt.get_incremental_insert_overwrite_sql": {
       "arguments": [],
-      "created_at": 1693492883.667495,
+      "created_at": 1696859933.380125,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_incremental_insert_overwrite_sql"
@@ -4000,7 +4045,7 @@
     },
     "macro.dbt.get_incremental_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.666937,
+      "created_at": 1696859933.379788,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_incremental_merge_sql"
@@ -4024,7 +4069,7 @@
     },
     "macro.dbt.get_insert_into_sql": {
       "arguments": [],
-      "created_at": 1693492883.668458,
+      "created_at": 1696859933.380807,
       "depends_on": {
         "macros": [
           "macro.dbt.get_quoted_csv"
@@ -4048,7 +4093,7 @@
     },
     "macro.dbt.get_insert_overwrite_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.663821,
+      "created_at": 1696859933.377585,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_insert_overwrite_merge_sql"
@@ -4072,7 +4117,7 @@
     },
     "macro.dbt.get_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.660498,
+      "created_at": 1696859933.375341,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_merge_sql"
@@ -4096,7 +4141,7 @@
     },
     "macro.dbt.get_merge_update_columns": {
       "arguments": [],
-      "created_at": 1693492883.652949,
+      "created_at": 1696859933.37009,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_merge_update_columns"
@@ -4120,7 +4165,7 @@
     },
     "macro.dbt.get_or_create_relation": {
       "arguments": [],
-      "created_at": 1693492883.740549,
+      "created_at": 1696859933.431798,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_or_create_relation"
@@ -4144,7 +4189,7 @@
     },
     "macro.dbt.get_quoted_csv": {
       "arguments": [],
-      "created_at": 1693492883.651482,
+      "created_at": 1696859933.3690538,
       "depends_on": {
         "macros": []
       },
@@ -4166,7 +4211,7 @@
     },
     "macro.dbt.get_revoke_sql": {
       "arguments": [],
-      "created_at": 1693492883.746036,
+      "created_at": 1696859933.435627,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_revoke_sql"
@@ -4190,7 +4235,7 @@
     },
     "macro.dbt.get_seed_column_quoted_csv": {
       "arguments": [],
-      "created_at": 1693492883.7046652,
+      "created_at": 1696859933.4061,
       "depends_on": {
         "macros": []
       },
@@ -4212,7 +4257,7 @@
     },
     "macro.dbt.get_show_grant_sql": {
       "arguments": [],
-      "created_at": 1693492883.745257,
+      "created_at": 1696859933.435102,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_show_grant_sql"
@@ -4236,7 +4281,7 @@
     },
     "macro.dbt.get_test_sql": {
       "arguments": [],
-      "created_at": 1693492883.648696,
+      "created_at": 1696859933.367132,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__get_test_sql"
@@ -4260,7 +4305,7 @@
     },
     "macro.dbt.get_true_sql": {
       "arguments": [],
-      "created_at": 1693492883.637735,
+      "created_at": 1696859933.3594182,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_true_sql"
@@ -4284,7 +4329,7 @@
     },
     "macro.dbt.get_where_subquery": {
       "arguments": [],
-      "created_at": 1693492883.649409,
+      "created_at": 1696859933.3676128,
       "depends_on": {
         "macros": [
           "macro.dbt.default__get_where_subquery"
@@ -4308,7 +4353,7 @@
     },
     "macro.dbt.handle_existing_table": {
       "arguments": [],
-      "created_at": 1693492883.690162,
+      "created_at": 1696859933.3958871,
       "depends_on": {
         "macros": [
           "macro.dbt.default__handle_existing_table"
@@ -4332,7 +4377,7 @@
     },
     "macro.dbt.hash": {
       "arguments": [],
-      "created_at": 1693492883.722103,
+      "created_at": 1696859933.41854,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__hash"
@@ -4356,7 +4401,7 @@
     },
     "macro.dbt.in_transaction": {
       "arguments": [],
-      "created_at": 1693492883.6229901,
+      "created_at": 1696859933.348566,
       "depends_on": {
         "macros": [
           "macro.dbt.make_hook_config"
@@ -4380,7 +4425,7 @@
     },
     "macro.dbt.incremental_validate_on_schema_change": {
       "arguments": [],
-      "created_at": 1693492883.679643,
+      "created_at": 1696859933.388559,
       "depends_on": {
         "macros": []
       },
@@ -4402,7 +4447,7 @@
     },
     "macro.dbt.information_schema_name": {
       "arguments": [],
-      "created_at": 1693492883.753006,
+      "created_at": 1696859933.440643,
       "depends_on": {
         "macros": [
           "macro.dbt.default__information_schema_name"
@@ -4426,7 +4471,7 @@
     },
     "macro.dbt.intersect": {
       "arguments": [],
-      "created_at": 1693492883.718821,
+      "created_at": 1696859933.4162948,
       "depends_on": {
         "macros": [
           "macro.dbt.default__intersect"
@@ -4450,7 +4495,7 @@
     },
     "macro.dbt.is_incremental": {
       "arguments": [],
-      "created_at": 1693492883.6651142,
+      "created_at": 1696859933.378502,
       "depends_on": {
         "macros": [
           "macro.dbt.should_full_refresh"
@@ -4474,7 +4519,7 @@
     },
     "macro.dbt.last_day": {
       "arguments": [],
-      "created_at": 1693492883.727906,
+      "created_at": 1696859933.422722,
       "depends_on": {
         "macros": [
           "macro.dbt.default__last_day"
@@ -4498,7 +4543,7 @@
     },
     "macro.dbt.length": {
       "arguments": [],
-      "created_at": 1693492883.7179992,
+      "created_at": 1696859933.415703,
       "depends_on": {
         "macros": [
           "macro.dbt.default__length"
@@ -4522,7 +4567,7 @@
     },
     "macro.dbt.list_relations_without_caching": {
       "arguments": [],
-      "created_at": 1693492883.754316,
+      "created_at": 1696859933.4415529,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__list_relations_without_caching"
@@ -4546,7 +4591,7 @@
     },
     "macro.dbt.list_schemas": {
       "arguments": [],
-      "created_at": 1693492883.753336,
+      "created_at": 1696859933.440877,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__list_schemas"
@@ -4570,7 +4615,7 @@
     },
     "macro.dbt.listagg": {
       "arguments": [],
-      "created_at": 1693492883.7204149,
+      "created_at": 1696859933.417399,
       "depends_on": {
         "macros": [
           "macro.dbt.default__listagg"
@@ -4594,7 +4639,7 @@
     },
     "macro.dbt.load_cached_relation": {
       "arguments": [],
-      "created_at": 1693492883.741337,
+      "created_at": 1696859933.432352,
       "depends_on": {
         "macros": []
       },
@@ -4616,7 +4661,7 @@
     },
     "macro.dbt.load_csv_rows": {
       "arguments": [],
-      "created_at": 1693492883.7048478,
+      "created_at": 1696859933.406237,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__load_csv_rows"
@@ -4640,7 +4685,7 @@
     },
     "macro.dbt.load_relation": {
       "arguments": [],
-      "created_at": 1693492883.741477,
+      "created_at": 1696859933.43245,
       "depends_on": {
         "macros": [
           "macro.dbt.load_cached_relation"
@@ -4664,7 +4709,7 @@
     },
     "macro.dbt.make_backup_relation": {
       "arguments": [],
-      "created_at": 1693492883.73876,
+      "created_at": 1696859933.430537,
       "depends_on": {
         "macros": [
           "macro.dbt.default__make_backup_relation"
@@ -4688,7 +4733,7 @@
     },
     "macro.dbt.make_hook_config": {
       "arguments": [],
-      "created_at": 1693492883.622705,
+      "created_at": 1696859933.348366,
       "depends_on": {
         "macros": []
       },
@@ -4710,7 +4755,7 @@
     },
     "macro.dbt.make_intermediate_relation": {
       "arguments": [],
-      "created_at": 1693492883.737746,
+      "created_at": 1696859933.429812,
       "depends_on": {
         "macros": [
           "macro.dbt.default__make_intermediate_relation"
@@ -4734,7 +4779,7 @@
     },
     "macro.dbt.make_temp_relation": {
       "arguments": [],
-      "created_at": 1693492883.738225,
+      "created_at": 1696859933.430153,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__make_temp_relation"
@@ -4758,7 +4803,7 @@
     },
     "macro.dbt.materialization_incremental_default": {
       "arguments": [],
-      "created_at": 1693492883.6736388,
+      "created_at": 1696859933.384355,
       "depends_on": {
         "macros": [
           "macro.dbt.load_cached_relation",
@@ -4799,7 +4844,7 @@
     },
     "macro.dbt.materialization_seed_default": {
       "arguments": [],
-      "created_at": 1693492883.696267,
+      "created_at": 1696859933.4001658,
       "depends_on": {
         "macros": [
           "macro.dbt.should_full_refresh",
@@ -4835,7 +4880,7 @@
     },
     "macro.dbt.materialization_snapshot_default": {
       "arguments": [],
-      "created_at": 1693492883.646112,
+      "created_at": 1696859933.365352,
       "depends_on": {
         "macros": [
           "macro.dbt.get_or_create_relation",
@@ -4874,7 +4919,7 @@
     },
     "macro.dbt.materialization_table_default": {
       "arguments": [],
-      "created_at": 1693492883.685652,
+      "created_at": 1696859933.3927271,
       "depends_on": {
         "macros": [
           "macro.dbt.load_cached_relation",
@@ -4910,7 +4955,7 @@
     },
     "macro.dbt.materialization_test_default": {
       "arguments": [],
-      "created_at": 1693492883.6482391,
+      "created_at": 1696859933.3668091,
       "depends_on": {
         "macros": [
           "macro.dbt.should_store_failures",
@@ -4939,7 +4984,7 @@
     },
     "macro.dbt.materialization_view_default": {
       "arguments": [],
-      "created_at": 1693492883.6898491,
+      "created_at": 1696859933.3956711,
       "depends_on": {
         "macros": [
           "macro.dbt.load_cached_relation",
@@ -4974,7 +5019,7 @@
     },
     "macro.dbt.noop_statement": {
       "arguments": [],
-      "created_at": 1693492883.7120562,
+      "created_at": 1696859933.41152,
       "depends_on": {
         "macros": []
       },
@@ -4996,7 +5041,7 @@
     },
     "macro.dbt.partition_range": {
       "arguments": [],
-      "created_at": 1693492883.7163498,
+      "created_at": 1696859933.414516,
       "depends_on": {
         "macros": [
           "macro.dbt.dates_in_range"
@@ -5020,7 +5065,7 @@
     },
     "macro.dbt.persist_docs": {
       "arguments": [],
-      "created_at": 1693492883.750456,
+      "created_at": 1696859933.438844,
       "depends_on": {
         "macros": [
           "macro.dbt.default__persist_docs"
@@ -5044,7 +5089,7 @@
     },
     "macro.dbt.position": {
       "arguments": [],
-      "created_at": 1693492883.723291,
+      "created_at": 1696859933.419466,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__position"
@@ -5068,7 +5113,7 @@
     },
     "macro.dbt.post_snapshot": {
       "arguments": [],
-      "created_at": 1693492883.637502,
+      "created_at": 1696859933.359251,
       "depends_on": {
         "macros": [
           "macro.dbt.default__post_snapshot"
@@ -5092,7 +5137,7 @@
     },
     "macro.dbt.process_schema_changes": {
       "arguments": [],
-      "created_at": 1693492883.6829891,
+      "created_at": 1696859933.390868,
       "depends_on": {
         "macros": [
           "macro.dbt.check_for_schema_changes",
@@ -5117,7 +5162,7 @@
     },
     "macro.dbt.py_current_timestring": {
       "arguments": [],
-      "created_at": 1693492883.716584,
+      "created_at": 1696859933.414689,
       "depends_on": {
         "macros": []
       },
@@ -5139,7 +5184,7 @@
     },
     "macro.dbt.py_script_comment": {
       "arguments": [],
-      "created_at": 1693492883.762235,
+      "created_at": 1696859933.447296,
       "depends_on": {
         "macros": []
       },
@@ -5161,7 +5206,7 @@
     },
     "macro.dbt.py_script_postfix": {
       "arguments": [],
-      "created_at": 1693492883.762166,
+      "created_at": 1696859933.447246,
       "depends_on": {
         "macros": [
           "macro.dbt.build_ref_function",
@@ -5189,7 +5234,7 @@
     },
     "macro.dbt.rename_relation": {
       "arguments": [],
-      "created_at": 1693492883.7400231,
+      "created_at": 1696859933.431423,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__rename_relation"
@@ -5213,7 +5258,7 @@
     },
     "macro.dbt.replace": {
       "arguments": [],
-      "created_at": 1693492883.71722,
+      "created_at": 1696859933.415141,
       "depends_on": {
         "macros": [
           "macro.dbt.default__replace"
@@ -5237,7 +5282,7 @@
     },
     "macro.dbt.reset_csv_table": {
       "arguments": [],
-      "created_at": 1693492883.7028632,
+      "created_at": 1696859933.4047942,
       "depends_on": {
         "macros": [
           "macro.dbt.default__reset_csv_table"
@@ -5261,7 +5306,7 @@
     },
     "macro.dbt.right": {
       "arguments": [],
-      "created_at": 1693492883.7196019,
+      "created_at": 1696859933.416839,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__right"
@@ -5285,7 +5330,7 @@
     },
     "macro.dbt.run_hooks": {
       "arguments": [],
-      "created_at": 1693492883.622509,
+      "created_at": 1696859933.348225,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -5309,7 +5354,7 @@
     },
     "macro.dbt.run_query": {
       "arguments": [],
-      "created_at": 1693492883.712348,
+      "created_at": 1696859933.411741,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -5333,7 +5378,7 @@
     },
     "macro.dbt.safe_cast": {
       "arguments": [],
-      "created_at": 1693492883.7217128,
+      "created_at": 1696859933.4182541,
       "depends_on": {
         "macros": [
           "macro.dbt.default__safe_cast"
@@ -5357,7 +5402,7 @@
     },
     "macro.dbt.set_sql_header": {
       "arguments": [],
-      "created_at": 1693492883.623517,
+      "created_at": 1696859933.3489301,
       "depends_on": {
         "macros": []
       },
@@ -5379,7 +5424,7 @@
     },
     "macro.dbt.should_full_refresh": {
       "arguments": [],
-      "created_at": 1693492883.623821,
+      "created_at": 1696859933.349144,
       "depends_on": {
         "macros": []
       },
@@ -5401,7 +5446,7 @@
     },
     "macro.dbt.should_revoke": {
       "arguments": [],
-      "created_at": 1693492883.7450721,
+      "created_at": 1696859933.4349701,
       "depends_on": {
         "macros": [
           "macro.dbt.copy_grants"
@@ -5425,7 +5470,7 @@
     },
     "macro.dbt.should_store_failures": {
       "arguments": [],
-      "created_at": 1693492883.6241899,
+      "created_at": 1696859933.349358,
       "depends_on": {
         "macros": []
       },
@@ -5447,7 +5492,7 @@
     },
     "macro.dbt.snapshot_check_all_get_existing_columns": {
       "arguments": [],
-      "created_at": 1693492883.631387,
+      "created_at": 1696859933.354965,
       "depends_on": {
         "macros": [
           "macro.dbt.get_columns_in_query"
@@ -5471,7 +5516,7 @@
     },
     "macro.dbt.snapshot_check_strategy": {
       "arguments": [],
-      "created_at": 1693492883.632769,
+      "created_at": 1696859933.3558788,
       "depends_on": {
         "macros": [
           "macro.dbt.snapshot_get_time",
@@ -5498,7 +5543,7 @@
     },
     "macro.dbt.snapshot_get_time": {
       "arguments": [],
-      "created_at": 1693492883.7324429,
+      "created_at": 1696859933.425979,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__snapshot_get_time"
@@ -5522,7 +5567,7 @@
     },
     "macro.dbt.snapshot_hash_arguments": {
       "arguments": [],
-      "created_at": 1693492883.6286771,
+      "created_at": 1696859933.353062,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__snapshot_hash_arguments"
@@ -5546,7 +5591,7 @@
     },
     "macro.dbt.snapshot_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.6246269,
+      "created_at": 1696859933.349678,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__snapshot_merge_sql"
@@ -5570,7 +5615,7 @@
     },
     "macro.dbt.snapshot_staging_table": {
       "arguments": [],
-      "created_at": 1693492883.638054,
+      "created_at": 1696859933.359636,
       "depends_on": {
         "macros": [
           "macro.dbt.default__snapshot_staging_table"
@@ -5594,7 +5639,7 @@
     },
     "macro.dbt.snapshot_string_as_time": {
       "arguments": [],
-      "created_at": 1693492883.629798,
+      "created_at": 1696859933.3538601,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__snapshot_string_as_time"
@@ -5618,7 +5663,7 @@
     },
     "macro.dbt.snapshot_timestamp_strategy": {
       "arguments": [],
-      "created_at": 1693492883.629633,
+      "created_at": 1696859933.3537412,
       "depends_on": {
         "macros": [
           "macro.dbt.snapshot_hash_arguments"
@@ -5642,7 +5687,7 @@
     },
     "macro.dbt.split_part": {
       "arguments": [],
-      "created_at": 1693492883.728846,
+      "created_at": 1696859933.423462,
       "depends_on": {
         "macros": [
           "macro.dbt.default__split_part"
@@ -5666,7 +5711,7 @@
     },
     "macro.dbt.sql_convert_columns_in_relation": {
       "arguments": [],
-      "created_at": 1693492883.756733,
+      "created_at": 1696859933.443299,
       "depends_on": {
         "macros": []
       },
@@ -5688,7 +5733,7 @@
     },
     "macro.dbt.statement": {
       "arguments": [],
-      "created_at": 1693492883.711477,
+      "created_at": 1696859933.411077,
       "depends_on": {
         "macros": []
       },
@@ -5710,7 +5755,7 @@
     },
     "macro.dbt.strategy_dispatch": {
       "arguments": [],
-      "created_at": 1693492883.628504,
+      "created_at": 1696859933.3529348,
       "depends_on": {
         "macros": []
       },
@@ -5732,7 +5777,7 @@
     },
     "macro.dbt.string_literal": {
       "arguments": [],
-      "created_at": 1693492883.723671,
+      "created_at": 1696859933.419734,
       "depends_on": {
         "macros": [
           "macro.dbt.default__string_literal"
@@ -5756,7 +5801,7 @@
     },
     "macro.dbt.support_multiple_grantees_per_dcl_statement": {
       "arguments": [],
-      "created_at": 1693492883.744555,
+      "created_at": 1696859933.434651,
       "depends_on": {
         "macros": [
           "macro.dbt.default__support_multiple_grantees_per_dcl_statement"
@@ -5780,7 +5825,7 @@
     },
     "macro.dbt.sync_column_schemas": {
       "arguments": [],
-      "created_at": 1693492883.682119,
+      "created_at": 1696859933.39026,
       "depends_on": {
         "macros": [
           "macro.dbt.alter_relation_add_remove_columns",
@@ -5805,7 +5850,7 @@
     },
     "macro.dbt.test_accepted_values": {
       "arguments": [],
-      "created_at": 1693492883.7632692,
+      "created_at": 1696859933.448046,
       "depends_on": {
         "macros": [
           "macro.dbt.default__test_accepted_values"
@@ -5829,7 +5874,7 @@
     },
     "macro.dbt.test_not_null": {
       "arguments": [],
-      "created_at": 1693492883.7629828,
+      "created_at": 1696859933.447841,
       "depends_on": {
         "macros": [
           "macro.dbt.default__test_not_null"
@@ -5853,7 +5898,7 @@
     },
     "macro.dbt.test_relationships": {
       "arguments": [],
-      "created_at": 1693492883.7635462,
+      "created_at": 1696859933.448239,
       "depends_on": {
         "macros": [
           "macro.dbt.default__test_relationships"
@@ -5877,7 +5922,7 @@
     },
     "macro.dbt.test_unique": {
       "arguments": [],
-      "created_at": 1693492883.762753,
+      "created_at": 1696859933.447676,
       "depends_on": {
         "macros": [
           "macro.dbt.default__test_unique"
@@ -5901,7 +5946,7 @@
     },
     "macro.dbt.truncate_relation": {
       "arguments": [],
-      "created_at": 1693492883.7396648,
+      "created_at": 1696859933.4311721,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.sqlite__truncate_relation"
@@ -5925,7 +5970,7 @@
     },
     "macro.dbt.type_bigint": {
       "arguments": [],
-      "created_at": 1693492883.726028,
+      "created_at": 1696859933.4214149,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_bigint"
@@ -5949,7 +5994,7 @@
     },
     "macro.dbt.type_boolean": {
       "arguments": [],
-      "created_at": 1693492883.726636,
+      "created_at": 1696859933.42184,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_boolean"
@@ -5973,7 +6018,7 @@
     },
     "macro.dbt.type_float": {
       "arguments": [],
-      "created_at": 1693492883.725378,
+      "created_at": 1696859933.420956,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_float"
@@ -5997,7 +6042,7 @@
     },
     "macro.dbt.type_int": {
       "arguments": [],
-      "created_at": 1693492883.7263339,
+      "created_at": 1696859933.4216309,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_int"
@@ -6021,7 +6066,7 @@
     },
     "macro.dbt.type_numeric": {
       "arguments": [],
-      "created_at": 1693492883.7256908,
+      "created_at": 1696859933.421175,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_numeric"
@@ -6045,7 +6090,7 @@
     },
     "macro.dbt.type_string": {
       "arguments": [],
-      "created_at": 1693492883.724689,
+      "created_at": 1696859933.420512,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_string"
@@ -6069,7 +6114,7 @@
     },
     "macro.dbt.type_timestamp": {
       "arguments": [],
-      "created_at": 1693492883.7250051,
+      "created_at": 1696859933.420735,
       "depends_on": {
         "macros": [
           "macro.dbt.default__type_timestamp"
@@ -6093,7 +6138,7 @@
     },
     "macro.dbt_sqlite.materialization_incremental_sqlite": {
       "arguments": [],
-      "created_at": 1693492883.615467,
+      "created_at": 1696859933.3433468,
       "depends_on": {
         "macros": [
           "macro.dbt.load_relation",
@@ -6128,7 +6173,7 @@
     },
     "macro.dbt_sqlite.materialization_table_sqlite": {
       "arguments": [],
-      "created_at": 1693492883.616985,
+      "created_at": 1696859933.3443909,
       "depends_on": {
         "macros": [
           "macro.dbt.run_hooks",
@@ -6157,7 +6202,7 @@
     },
     "macro.dbt_sqlite.materialization_view_sqlite": {
       "arguments": [],
-      "created_at": 1693492883.618403,
+      "created_at": 1696859933.3453598,
       "depends_on": {
         "macros": [
           "macro.dbt.run_hooks",
@@ -6186,7 +6231,7 @@
     },
     "macro.dbt_sqlite.ref": {
       "arguments": [],
-      "created_at": 1693492883.600008,
+      "created_at": 1696859933.3326359,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.ref"
@@ -6210,7 +6255,7 @@
     },
     "macro.dbt_sqlite.source": {
       "arguments": [],
-      "created_at": 1693492883.600321,
+      "created_at": 1696859933.332862,
       "depends_on": {
         "macros": [
           "macro.dbt_sqlite.source"
@@ -6234,7 +6279,7 @@
     },
     "macro.dbt_sqlite.sqlite__any_value": {
       "arguments": [],
-      "created_at": 1693492883.6211,
+      "created_at": 1696859933.34724,
       "depends_on": {
         "macros": []
       },
@@ -6256,7 +6301,7 @@
     },
     "macro.dbt_sqlite.sqlite__bool_or": {
       "arguments": [],
-      "created_at": 1693492883.621399,
+      "created_at": 1696859933.347444,
       "depends_on": {
         "macros": []
       },
@@ -6278,7 +6323,7 @@
     },
     "macro.dbt_sqlite.sqlite__cast_bool_to_text": {
       "arguments": [],
-      "created_at": 1693492883.620972,
+      "created_at": 1696859933.34715,
       "depends_on": {
         "macros": []
       },
@@ -6300,7 +6345,7 @@
     },
     "macro.dbt_sqlite.sqlite__check_schema_exists": {
       "arguments": [],
-      "created_at": 1693492883.606016,
+      "created_at": 1696859933.336681,
       "depends_on": {
         "macros": [
           "macro.dbt.list_schemas",
@@ -6325,7 +6370,7 @@
     },
     "macro.dbt_sqlite.sqlite__create_schema": {
       "arguments": [],
-      "created_at": 1693492883.604652,
+      "created_at": 1696859933.3357031,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -6349,7 +6394,7 @@
     },
     "macro.dbt_sqlite.sqlite__create_table_as": {
       "arguments": [],
-      "created_at": 1693492883.606957,
+      "created_at": 1696859933.337333,
       "depends_on": {
         "macros": []
       },
@@ -6371,7 +6416,7 @@
     },
     "macro.dbt_sqlite.sqlite__create_view_as": {
       "arguments": [],
-      "created_at": 1693492883.607113,
+      "created_at": 1696859933.337445,
       "depends_on": {
         "macros": []
       },
@@ -6393,7 +6438,7 @@
     },
     "macro.dbt_sqlite.sqlite__current_timestamp": {
       "arguments": [],
-      "created_at": 1693492883.6078908,
+      "created_at": 1696859933.337995,
       "depends_on": {
         "macros": []
       },
@@ -6415,7 +6460,7 @@
     },
     "macro.dbt_sqlite.sqlite__dateadd": {
       "arguments": [],
-      "created_at": 1693492883.6186318,
+      "created_at": 1696859933.345522,
       "depends_on": {
         "macros": []
       },
@@ -6437,7 +6482,7 @@
     },
     "macro.dbt_sqlite.sqlite__datediff_broken": {
       "arguments": [],
-      "created_at": 1693492883.620548,
+      "created_at": 1696859933.346851,
       "depends_on": {
         "macros": [
           "macro.dbt.datediff"
@@ -6461,7 +6506,7 @@
     },
     "macro.dbt_sqlite.sqlite__drop_relation": {
       "arguments": [],
-      "created_at": 1693492883.605265,
+      "created_at": 1696859933.336141,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -6485,7 +6530,7 @@
     },
     "macro.dbt_sqlite.sqlite__drop_schema": {
       "arguments": [],
-      "created_at": 1693492883.605044,
+      "created_at": 1696859933.3359811,
       "depends_on": {
         "macros": [
           "macro.dbt.list_relations_without_caching",
@@ -6510,7 +6555,7 @@
     },
     "macro.dbt_sqlite.sqlite__get_binding_char": {
       "arguments": [],
-      "created_at": 1693492883.611767,
+      "created_at": 1696859933.340817,
       "depends_on": {
         "macros": []
       },
@@ -6532,7 +6577,7 @@
     },
     "macro.dbt_sqlite.sqlite__get_catalog": {
       "arguments": [],
-      "created_at": 1693492883.6004758,
+      "created_at": 1696859933.332984,
       "depends_on": {
         "macros": []
       },
@@ -6554,7 +6599,7 @@
     },
     "macro.dbt_sqlite.sqlite__get_test_sql": {
       "arguments": [],
-      "created_at": 1693492883.608379,
+      "created_at": 1696859933.3383381,
       "depends_on": {
         "macros": []
       },
@@ -6576,7 +6621,7 @@
     },
     "macro.dbt_sqlite.sqlite__hash": {
       "arguments": [],
-      "created_at": 1693492883.6207979,
+      "created_at": 1696859933.347031,
       "depends_on": {
         "macros": []
       },
@@ -6598,7 +6643,7 @@
     },
     "macro.dbt_sqlite.sqlite__list_relations_without_caching": {
       "arguments": [],
-      "created_at": 1693492883.606755,
+      "created_at": 1696859933.33719,
       "depends_on": {
         "macros": [
           "macro.dbt.list_schemas",
@@ -6623,7 +6668,7 @@
     },
     "macro.dbt_sqlite.sqlite__list_schemas": {
       "arguments": [],
-      "created_at": 1693492883.604117,
+      "created_at": 1696859933.335351,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -6647,7 +6692,7 @@
     },
     "macro.dbt_sqlite.sqlite__load_csv_rows": {
       "arguments": [],
-      "created_at": 1693492883.6115992,
+      "created_at": 1696859933.340689,
       "depends_on": {
         "macros": [
           "macro.dbt.get_seed_column_quoted_csv",
@@ -6672,7 +6717,7 @@
     },
     "macro.dbt_sqlite.sqlite__make_temp_relation": {
       "arguments": [],
-      "created_at": 1693492883.6078131,
+      "created_at": 1696859933.3379378,
       "depends_on": {
         "macros": []
       },
@@ -6694,7 +6739,7 @@
     },
     "macro.dbt_sqlite.sqlite__position": {
       "arguments": [],
-      "created_at": 1693492883.62127,
+      "created_at": 1696859933.3473558,
       "depends_on": {
         "macros": []
       },
@@ -6716,7 +6761,7 @@
     },
     "macro.dbt_sqlite.sqlite__rename_relation": {
       "arguments": [],
-      "created_at": 1693492883.6072161,
+      "created_at": 1696859933.3375208,
       "depends_on": {
         "macros": []
       },
@@ -6738,7 +6783,7 @@
     },
     "macro.dbt_sqlite.sqlite__right": {
       "arguments": [],
-      "created_at": 1693492883.618864,
+      "created_at": 1696859933.345681,
       "depends_on": {
         "macros": []
       },
@@ -6760,7 +6805,7 @@
     },
     "macro.dbt_sqlite.sqlite__snapshot_get_time": {
       "arguments": [],
-      "created_at": 1693492883.607292,
+      "created_at": 1696859933.3375769,
       "depends_on": {
         "macros": []
       },
@@ -6782,7 +6827,7 @@
     },
     "macro.dbt_sqlite.sqlite__snapshot_hash_arguments": {
       "arguments": [],
-      "created_at": 1693492883.609548,
+      "created_at": 1696859933.33918,
       "depends_on": {
         "macros": []
       },
@@ -6804,7 +6849,7 @@
     },
     "macro.dbt_sqlite.sqlite__snapshot_merge_sql": {
       "arguments": [],
-      "created_at": 1693492883.609243,
+      "created_at": 1696859933.338964,
       "depends_on": {
         "macros": []
       },
@@ -6826,7 +6871,7 @@
     },
     "macro.dbt_sqlite.sqlite__snapshot_string_as_time": {
       "arguments": [],
-      "created_at": 1693492883.607467,
+      "created_at": 1696859933.337692,
       "depends_on": {
         "macros": []
       },
@@ -6848,7 +6893,7 @@
     },
     "macro.dbt_sqlite.sqlite__truncate_relation": {
       "arguments": [],
-      "created_at": 1693492883.605431,
+      "created_at": 1696859933.336266,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -6872,7 +6917,7 @@
     },
     "macro.dbt_sqlite.sqlite_incremental_upsert": {
       "arguments": [],
-      "created_at": 1693492883.613229,
+      "created_at": 1696859933.341859,
       "depends_on": {
         "macros": [
           "macro.dbt.statement"
@@ -6900,11 +6945,11 @@
     "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v8.json",
     "dbt_version": "1.4.0",
     "env": {},
-    "generated_at": "2023-08-31T14:42:49.633133Z",
-    "invocation_id": "5c115f63-5b60-43d8-adb9-528d99a2032b",
+    "generated_at": "2023-10-09T13:58:53.320926Z",
+    "invocation_id": "1790dc18-1177-4ca0-b993-a8eeb59f0c4c",
     "project_id": "8dbdda48fb8748d6746f1965824e966a",
     "send_anonymous_usage_stats": true,
-    "user_id": "47910bfc-55f7-43d3-a6b4-a8d478224a92"
+    "user_id": "4bdc3972-5c9f-4f16-90bd-3769a225fbe6"
   },
   "metrics": {},
   "nodes": {
@@ -6941,7 +6986,7 @@
         "tags": [],
         "unique_key": null
       },
-      "created_at": 1693492883.882497,
+      "created_at": 1696859933.5317938,
       "database": "database",
       "deferred": false,
       "depends_on": {
@@ -6988,7 +7033,7 @@
       "alias": "top_animations",
       "build_path": null,
       "checksum": {
-        "checksum": "d235a0c6c4ff0c9e4d3deb220c2324d94ee118701607156e10e9a5ea6b529269",
+        "checksum": "fb6f8991e4c0acb2670b2bf94e4bfa741ffb9a3f222e8c3eba634bea3c38f0a4",
         "name": "sha256"
       },
       "columns": {},
@@ -7005,7 +7050,7 @@
         "full_refresh": null,
         "grants": {},
         "incremental_strategy": null,
-        "materialized": "view",
+        "materialized": "table",
         "meta": {},
         "on_schema_change": "ignore",
         "packages": [],
@@ -7017,7 +7062,7 @@
         "tags": [],
         "unique_key": null
       },
-      "created_at": 1693492883.889132,
+      "created_at": 1696859933.537527,
       "database": "database",
       "deferred": false,
       "depends_on": {
@@ -7043,7 +7088,7 @@
       "package_name": "simple",
       "patch_path": null,
       "path": "top_animations.sql",
-      "raw_code": "-- Use the `ref` function to select from other models\n\nselect Title, Rating\nfrom {{ ref('movies_ratings_simplified') }}\nWHERE Genre1=='Animation'\nORDER BY Rating desc\nLIMIT 5;",
+      "raw_code": "{{ config(materialized='table') }}\n\nSELECT Title, Rating\nFROM {{ ref('movies_ratings_simplified') }}\nWHERE Genre1=='Animation'\nORDER BY Rating desc\nLIMIT 5;",
       "refs": [
         [
           "movies_ratings_simplified"
@@ -7055,10 +7100,15 @@
       "sources": [],
       "tags": [],
       "unique_id": "model.simple.top_animations",
-      "unrendered_config": {}
+      "unrendered_config": {
+        "materialized": "table"
+      }
     }
   },
   "parent_map": {
+    "exposure.simple.weekly_metrics": [
+      "model.simple.top_animations"
+    ],
     "model.simple.movies_ratings_simplified": [
       "source.simple.imdb.movies_ratings"
     ],
@@ -7074,7 +7124,7 @@
       "config": {
         "enabled": true
       },
-      "created_at": 1693492883.901584,
+      "created_at": 1696859933.549542,
       "database": "database",
       "description": "Ratings by movie",
       "external": null,

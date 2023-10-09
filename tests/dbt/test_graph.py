@@ -251,6 +251,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
     assert err_info.value.args[0] == expected
 
 
+@pytest.mark.sqlite
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_sources(load_method):
@@ -269,8 +270,9 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
     )
     getattr(dbt_graph, load_method)()
-    assert len(dbt_graph.nodes) == 3
+    assert len(dbt_graph.nodes) == 4
     assert "source.simple.imdb.movies_ratings" in dbt_graph.nodes
+    assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
 
 
 @pytest.mark.integration

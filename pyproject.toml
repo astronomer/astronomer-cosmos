@@ -209,6 +209,7 @@ markers = [
 
 [tool.hatch.envs.docs]
 dependencies = [
+    "aenum",
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",

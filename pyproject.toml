@@ -46,6 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dbt-all = [
+    "dbt-athena",
     "dbt-bigquery",
     "dbt-databricks",
     "dbt-exasol",
@@ -53,6 +54,9 @@ dbt-all = [
     "dbt-redshift",
     "dbt-snowflake",
     "dbt-spark",
+]
+dbt-athena = [
+    "dbt-athena-community",
 ]
 dbt-bigquery = [
     "dbt-bigquery",

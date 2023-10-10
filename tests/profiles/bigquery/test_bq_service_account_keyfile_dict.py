@@ -72,6 +72,22 @@ def test_profile(mock_bigquery_conn_with_dict: Connection):
     assert profile_mapping.profile == expected
 
 
+def test_mock_profile(mock_bigquery_conn_with_dict: Connection):
+    """
+    Tests profile mock for keyfile_json is None. Giving keyfile_json a value will crash dbt ls.
+    """
+    profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
+    expected = {
+        "type": "bigquery",
+        "method": "service-account-json",
+        "project": "mock_value",
+        "dataset": "mock_value",
+        "threads": 1,
+        "keyfile_json": None,
+    }
+    assert profile_mapping.mock_profile == expected
+
+
 def test_profile_env_vars(mock_bigquery_conn_with_dict: Connection):
     """
     Tests that the environment variables get set correctly.

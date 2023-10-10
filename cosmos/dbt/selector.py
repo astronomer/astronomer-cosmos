@@ -173,7 +173,6 @@ def select_nodes_ids_by_dfs(nodes: dict[str, DbtNode], config: SelectorConfig) -
             break
 
     if not root:
-        logging.warn("Model in selector not found in DBT graph")
         return set()
 
     selected_nodes = set()
@@ -233,7 +232,11 @@ def select_nodes(
     filters = [["select", select], ["exclude", exclude]]
     for filter_type, filter in filters:
         for filter_parameter in filter:
-            if filter_parameter.startswith(PATH_SELECTOR) or filter_parameter.startswith(TAG_SELECTOR):
+            if (
+                filter_parameter.startswith(PATH_SELECTOR)
+                or filter_parameter.startswith(TAG_SELECTOR)
+                or filter_parameter.startswith(MODEL_UPSTREAM_SELECTOR)
+            ):
                 continue
             elif any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG]):
                 continue

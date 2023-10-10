@@ -230,6 +230,14 @@ def test_select_nodes_by_exclude_union_config_test_tags():
     )
     expected = {
         grandparent_node.unique_id: grandparent_node,
+        grandparent_sibling_node.unique_id: grandparent_sibling_node,
+        parent_node.unique_id: parent_node,
+        child_node.unique_id: child_node,
+        orphaned_node.unique_id: orphaned_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_dfs():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"])
     expected = {
@@ -247,6 +255,11 @@ def test_select_nodes_by_path_dir():
         child_node.unique_id: child_node,
         grandchild_1_test_node.unique_id: grandchild_1_test_node,
         grandchild_2_test_node.unique_id: grandchild_2_test_node,
+        orphaned_node.unique_id: orphaned_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_dfs_exclude_tags():
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"], exclude=["tag:has_child"]
@@ -264,6 +277,8 @@ def test_select_nodes_by_path_file():
         parent_node.unique_id: parent_node,
     }
     assert selected == expected
+
+
 def test_select_node_by_dfs_partial_tree():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+parent"])
     expected = {

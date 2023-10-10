@@ -164,7 +164,7 @@ test-cov = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml
 test-integration-setup = """pip uninstall -y dbt-core dbt-databricks dbt-sqlite dbt-postgres dbt-sqlite; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install 'dbt-core==1.5.4' 'dbt-databricks<=1.5.4' 'dbt-postgres<=1.5.4' 'openlineage-airflow'"""
+pip install 'dbt-core' 'dbt-databricks' 'dbt-postgres' 'openlineage-airflow'"""
 test-integration = """pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \

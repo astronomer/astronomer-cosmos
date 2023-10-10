@@ -16,9 +16,85 @@ To contribute to the cosmos project:
 #. Link your issue to the pull request
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
+Setup local development on host machine
+---------------------------------------
 
-Using Hatch for local development
----------------------------------
+This guide will setup astronomer development on host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
+
+.. code-block:: bash
+
+    git clone https://github.com/astronomer/astronomer-cosmos.git
+    cd astronomer-cosmos/
+
+Then install ``airflow`` and ``astronomer-cosmos`` using python-venv:
+
+.. code-block:: bash
+
+    python3 -venv m env && source env/bin/activate
+    pip3 install apache-airflow
+    pip3 install -e .[dbt-postgres,dbt-databricks]
+
+Set airflow home to the ``dev/`` directory and disabled loading example DAGs:
+
+.. code-block:: bash
+
+    export AIRFLOW_HOME=$(pwd)/dev/
+    export AIRFLOW__CORE__LOAD_EXAMPLES=false
+
+Then, initialize the database and create a new user, the command below will create a new user admin with password admin:
+
+    By default airflow will use sqlite as database, you can overwrite this by set variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the sql connection string.
+
+.. code-block:: bash
+
+    airflow db init
+
+    airflow users create \
+        --email admin@admin.com --firstname admin \
+        --lastname admin --password admin \
+        --role Admin --username admin
+
+Run the following airflow component on the separate terminal
+
+.. code-block:: bash
+
+    airflow webserver
+    airflow scheduler
+    airflow triggerer
+
+Once the airflow is up, you can access the Airflow UI at ``http://localhost:8080``.
+
+    Note: whenever you want to start the development server, you need to activate the ``virtualenv`` and set the ``environment variables``
+
+Using Docker Compose for local development
+--------------------------------------------
+
+It is also possible to just build the development environment using docker compose
+
+To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
+
+.. code-block:: bash
+
+    git clone https://github.com/astronomer/astronomer-cosmos.git
+    cd astronomer-cosmos/
+
+To prevent permission error on **Linux**, you must create dags, logs, and plugins folders and change owner to the user ``astro`` with the user ID 50000. To do this, run the following command:
+
+.. code-block:: bash
+
+    mkdir -p dev/dags dev/logs dev/plugins
+    sudo chown 50000:50000 -R dev/dags dev/logs dev/plugins
+
+Then, run the docker compose command:
+
+.. code-block:: bash
+
+    docker compose -f dev/docker-compose.yaml up -d --build
+
+Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
+
+Testing application with hatch
+------------------------------
 
 We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distributing ``astronomer-cosmos``.
 
@@ -57,40 +133,8 @@ If testing for the same Airflow and Python version, next runs of the integration
 
     hatch run tests.py3.8-2.5:test-integration
 
-Using Docker Compose for local development
-------------------------------------------
-
-It is also possible to just build the development environment using docker compose
-
-
-Local Sandbox
-+++++++++++++
-
-To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
-
-.. code-block:: bash
-
-    git clone https://github.com/astronomer/astronomer-cosmos.git
-    cd astronomer-cosmos/
-
-To prevent permission error on **Linux**, you must create dags, logs, and plugins folders and change owner to the user ``astro`` with the user ID 50000. To do this, run the following command:
-
-.. code-block:: bash
-
-    mkdir -p dev/dags dev/logs dev/plugins
-    sudo chown 50000:50000 -R dev/dags dev/logs dev/plugins
-
-Then, run the docker compose command:
-
-.. code-block:: bash
-
-    docker compose -f dev/docker-compose.yaml up -d --build
-
-Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
-
-
 Pre-Commit
-++++++++++
+----------
 
 We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
 

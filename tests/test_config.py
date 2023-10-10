@@ -55,16 +55,21 @@ def test_validate_project_failure_not_project_and_manifest():
     with pytest.raises(CosmosValueError) as err_info:
         assert project_config.validate_project() is None
     print(err_info.value.args[0])
-    assert (
-        err_info.value.args[0]
-        == "A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not."
-    )
+    assert err_info.value.args[0] == "project_name required when manifest_path is present and dbt_project_path is not."
 
 
 # with updated logic, passing a manifest and project name together should succeed.
 def test_validate_project_success_not_project_and_manifest():
     project_config = ProjectConfig(manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json", project_name="test-project")
     assert project_config.validate_project() is None
+
+
+# with updated logic, passing no manifest and no project directory should fail.
+def test_validate_project_fail_none():
+    project_config = ProjectConfig()
+    with pytest.raises(CosmosValueError) as err_info:
+        assert project_config.validate_project() is None
+    assert err_info.value.args[0] == "dbt_project_path or manifest_path are required parameters."
 
 
 def test_validate_project_fails():

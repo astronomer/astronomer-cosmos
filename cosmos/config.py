@@ -86,7 +86,8 @@ class ProjectConfig:
         There are 2 cases we need to account for
           1 - the entire dbt project
           2 - the dbt manifest
-        Here, we can assume if the project path is provided, we have scenario 1. If the project path is not provided, we have a scenario 2
+        Here, we can assume if the project path is provided, we have scenario 1.
+        If the project path is not provided, we have a scenario 2
         """
 
         mandatory_paths = {}
@@ -100,13 +101,11 @@ class ProjectConfig:
         elif self.parsed_manifest_path:
             if not self.project_name:
                 raise CosmosValueError(
-                    "A required project field was not present - project_name must be provided when manifest_path is provided and dbt_project_path is not."
+                    "project_name required when manifest_path is present and dbt_project_path is not."
                 )
             mandatory_paths = {"manifest file": self.parsed_manifest_path}
         else:
-            raise CosmosValueError(
-                "A required project field was not present - the user must provide either dbt_project_path or manifest_path"
-            )
+            raise CosmosValueError("dbt_project_path or manifest_path are required parameters.")
 
         for name, path in mandatory_paths.items():
             if path is None or not Path(path).exists():

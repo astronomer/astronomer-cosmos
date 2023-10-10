@@ -57,26 +57,6 @@ If testing for the same Airflow and Python version, next runs of the integration
 
     hatch run tests.py3.8-2.5:test-integration
 
-.. code-block:: bash
-
-    docker run --name postgres -p 5432:5432 -p 5433:5433 -e POSTGRES_PASSWORD=postgres postgres
-
-To run the integration tests for the first time, use:
-
-.. code-block:: bash
-
-    export AIRFLOW_HOME=`pwd`
-    export AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres
-    hatch run tests.py3.8-2.5:test-integration-setup
-    hatch run tests.py3.8-2.5:test-integration
-
-If testing for the same Airflow and Python version, next runs of the integration tests can be:
-
-.. code-block:: bash
-
-    hatch run tests.py3.8-2.5:test-integration
-
-
 Using Docker Compose for local development
 ------------------------------------------
 
@@ -86,13 +66,21 @@ It is also possible to just build the development environment using docker compo
 Local Sandbox
 +++++++++++++
 
-To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo:
+To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
 
 .. code-block:: bash
 
     git clone https://github.com/astronomer/astronomer-cosmos.git
+    cd astronomer-cosmos/
 
-Then, run the following command from the ``astronomer-cosmos`` directory:
+To prevent permission error on **Linux**, you must create dags, logs, and plugins folders and change owner to the user ``astro`` with the user ID 50000. To do this, run the following command:
+
+.. code-block:: bash
+
+    mkdir -p dev/dags dev/logs dev/plugins
+    sudo chown 50000:50000 -R dev/dags dev/logs dev/plugins
+
+Then, run the docker compose command:
 
 .. code-block:: bash
 

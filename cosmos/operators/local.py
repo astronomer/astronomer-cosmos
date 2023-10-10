@@ -109,6 +109,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
+        kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes        
         super().__init__(**kwargs)
 
     @cached_property

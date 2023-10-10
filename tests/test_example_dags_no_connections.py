@@ -35,6 +35,8 @@ def get_dag_bag() -> DagBag:
         a + b
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])
+        if DBT_VERSION < Version("1.6.0"):
+            file.writelines(["example_model_version.py\n"])
         # cosmos_profile_mapping uses the automatic profile rendering from an Airflow connection.
         # so we can't parse that without live connections
         for file_name in ["cosmos_profile_mapping.py"]:

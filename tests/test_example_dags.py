@@ -47,6 +47,8 @@ def get_dag_bag() -> DagBag:
             # The dbt sqlite adapter is only available until dbt 1.4
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])
+        if DBT_VERSION < Version("1.6.0"):
+            file.writelines(["example_model_version.py\n"])
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

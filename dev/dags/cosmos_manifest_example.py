@@ -36,5 +36,6 @@ cosmos_manifest_example = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="cosmos_manifest_example",
+    default_args={"retries": 2},
 )
 # [END local_example]

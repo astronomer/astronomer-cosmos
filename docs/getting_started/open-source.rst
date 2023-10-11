@@ -61,4 +61,5 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="my_cosmos_dag",
+        default_args={"retries": 2},
     )

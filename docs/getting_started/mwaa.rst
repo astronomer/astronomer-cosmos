@@ -109,4 +109,5 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="my_cosmos_dag",
+        default_args={"retries": 2},
     )

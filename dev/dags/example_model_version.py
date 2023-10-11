@@ -30,7 +30,7 @@ basic_cosmos_dag = DbtDag(
     profile_config=profile_config,
     operator_args={"install_deps": True},
     # normal dag parameters
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_model_version",

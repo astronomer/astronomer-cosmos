@@ -71,7 +71,7 @@ Make sure to rename the ``<your-adapter>`` value below to your adapter's Python 
             "py_requirements": ["<your-adapter>"],
         },
         # normal dag parameters
-        schedule_interval="@daily",
+        schedule="@daily",
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="my_cosmos_dag",

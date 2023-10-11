@@ -44,7 +44,7 @@ example_cosmos_python_models = DbtDag(
         "append_env": True,
     },
     # normal dag parameters
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_cosmos_python_models",

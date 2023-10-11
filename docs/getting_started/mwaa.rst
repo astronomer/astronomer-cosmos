@@ -111,3 +111,8 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
         dag_id="my_cosmos_dag",
         default_args={"retries": 2},
     )
+
+
+.. note::
+   In some cases, especially in projects containing a large number of DAGs, you might run into an error saying ``<> is not a valid ResourceType``. 
+   This error can be resolved by increasing the value of the Airflow configuration `AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT <https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dagbag-import-timeout>`_.

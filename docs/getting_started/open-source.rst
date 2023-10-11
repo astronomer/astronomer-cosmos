@@ -63,3 +63,8 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
         dag_id="my_cosmos_dag",
         default_args={"retries": 2},
     )
+
+
+.. note::
+   In some cases, especially in projects containing a large number of DAGs, you might run into an error saying ``<> is not a valid ResourceType``. 
+   This error can be resolved by increasing the value of the Airflow configuration `AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT <https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dagbag-import-timeout>`_.

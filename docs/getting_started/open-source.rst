@@ -66,6 +66,6 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
 
 
 .. note::
-   In some cases, especially in projects containing a large number of DAGs, you might run into an error saying ``<> is not a valid ResourceType``. 
+   In some cases, especially in projects containing a large number of DAGs, you might run into an error saying ``<> is not a valid ResourceType``.
    The recommended solution is to use the Cosmos manifest parsing method `dbt_manifest <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-manifest>`_.
    Alternatively, the error can be resolved by increasing the value of the Airflow configuration `core.dagbag_import_timeout <https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dagbag-import-timeout>`_.

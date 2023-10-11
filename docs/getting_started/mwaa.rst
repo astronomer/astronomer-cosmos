@@ -114,5 +114,5 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 
 
 .. note::
-   In some cases, especially in larger dbt projects, you might run into a ``DagBag import timeout`` error. 
+   In some cases, especially in larger dbt projects, you might run into a ``DagBag import timeout`` error.
    This error can be resolved by increasing the value of the Airflow configuration `core.dagbag_import_timeout <https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dagbag-import-timeout>`_.

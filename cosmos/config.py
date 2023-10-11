@@ -5,8 +5,10 @@ from __future__ import annotations
 import contextlib
 import tempfile
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Iterator
+
 
 from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
 from cosmos.dbt.executable import get_system_dbt
@@ -61,24 +63,24 @@ class ProjectConfig:
     seeds_relative_path: str | Path = "seeds"
     snapshots_relative_path: str | Path = "snapshots"
     manifest_path: str | Path | None = None
-
-    parsed_dbt_project_path: Path | None = None
-    parsed_manifest_path: Path | None = None
-
     project_name: str | None = None
+
+    @cached_property
+    def parsed_dbt_project_path(self) -> Path | None:
+        return Path(self.dbt_project_path) if self.dbt_project_path else None
+
+    @cached_property
+    def parsed_manifest_path(self) -> Path | None:
+        return Path(self.manifest_path) if self.manifest_path else None
 
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
-        if self.dbt_project_path:
-            self.parsed_dbt_project_path = Path(self.dbt_project_path)
+        if self.parsed_dbt_project_path:
             self.models_relative_path = self.parsed_dbt_project_path / Path(self.models_relative_path)
             self.seeds_relative_path = self.parsed_dbt_project_path / Path(self.seeds_relative_path)
             self.snapshots_relative_path = self.parsed_dbt_project_path / Path(self.snapshots_relative_path)
             if not self.project_name:
                 self.project_name = self.parsed_dbt_project_path.stem
-
-        if self.manifest_path:
-            self.parsed_manifest_path = Path(self.manifest_path)
 
     def validate_project(self) -> None:
         """

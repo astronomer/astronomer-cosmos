@@ -37,7 +37,7 @@ example_virtualenv = DbtDag(
         "install_deps": True,
     },
     # normal dag parameters
-    schedule="@daily",
+    schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_virtualenv",

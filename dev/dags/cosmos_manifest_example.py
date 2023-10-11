@@ -32,7 +32,7 @@ cosmos_manifest_example = DbtDag(
     render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:models/customers.sql"]),
     operator_args={"install_deps": True},
     # normal dag parameters
-    schedule="@daily",
+    schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="cosmos_manifest_example",

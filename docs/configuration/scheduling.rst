@@ -17,7 +17,7 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
     jaffle_shop = DbtDag(
         # ...
         start_date=datetime(2023, 1, 1),
-        schedule="@daily",
+        schedule_interval="@daily",
     )
 
 
@@ -45,12 +45,12 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
     project_one = DbtDag(
         # ...
         start_date=datetime(2023, 1, 1),
-        schedule="@daily",
+        schedule_interval="@daily",
     )
 
     project_two = DbtDag(
         # ...
-        schedule=[get_dbt_dataset("my_conn", "project_one", "my_model")],
+        schedule_interval=[get_dbt_dataset("my_conn", "project_one", "my_model")],
         dbt_project_name="project_two",
     )
 

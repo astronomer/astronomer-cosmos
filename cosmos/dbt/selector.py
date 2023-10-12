@@ -187,8 +187,6 @@ def select_nodes_ids_by_dfs(nodes: dict[str, DbtNode], config: SelectorConfig) -
         for child in node.depends_on:
             if child in nodes:
                 dfs(child, nodes[child], nodes)
-            else:
-                continue
 
     dfs(root_id, root, nodes)
     return selected_nodes

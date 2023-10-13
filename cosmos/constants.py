@@ -2,6 +2,8 @@ import os
 from enum import Enum
 from pathlib import Path
 
+import aenum
+
 
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
@@ -49,8 +51,7 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
 
 
-# Rename to DbtResourceType
-class DbtResourceType(Enum):
+class DbtResourceType(aenum.Enum):  # type: ignore
     """
     Type of dbt node.
     """
@@ -60,3 +61,16 @@ class DbtResourceType(Enum):
     SEED = "seed"
     TEST = "test"
     SOURCE = "source"
+
+    @classmethod
+    def _missing_value_(cls, value):  # type: ignore
+        aenum.extend_enum(cls, value.upper(), value.lower())
+        return getattr(DbtResourceType, value.upper())
+
+
+DEFAULT_DBT_RESOURCES = DbtResourceType.__members__.values()
+
+
+TESTABLE_DBT_RESOURCES = {
+    DbtResourceType.MODEL
+}  # TODO: extend with DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED)

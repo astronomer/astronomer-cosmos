@@ -219,7 +219,6 @@ dependencies = [
     "sphinx-autobuild",
     "sphinx-autoapi",
     "openlineage-airflow",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 
 [tool.hatch.envs.docs.scripts]

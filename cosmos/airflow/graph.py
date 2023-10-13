@@ -220,7 +220,7 @@ def build_airflow_graph(
                 "The `node_converters` attribute is an experimental feature. "
                 "Its syntax and behavior can be changed before a major release."
             )
-        logger.info(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
+        logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
         task_or_group = conversion_function(
             dag=dag,
             task_group=task_group,
@@ -232,7 +232,7 @@ def build_airflow_graph(
             node=node,
         )
         if task_or_group is not None:
-            logger.info(f"Conversion of <{node.unique_id}> was successful!")
+            logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG

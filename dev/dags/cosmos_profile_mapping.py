@@ -41,6 +41,7 @@ def cosmos_profile_mapping() -> None:
             ),
         ),
         operator_args={"install_deps": True},
+        default_args={"retries": 2},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

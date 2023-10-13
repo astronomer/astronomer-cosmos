@@ -50,7 +50,7 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
     project_two = DbtDag(
         # ...
-        schedule=[get_dbt_dataset("my_conn", "project_one", "my_model")],
+        schedule_interval=[get_dbt_dataset("my_conn", "project_one", "my_model")],
         dbt_project_name="project_two",
     )
 

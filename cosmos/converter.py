@@ -119,6 +119,7 @@ class DbtToAirflowConverter:
         load_mode = render_config.load_method
         manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
+        node_converters = render_config.node_converters
 
         profile_args = {}
         if profile_config.profile_mapping:
@@ -168,4 +169,5 @@ class DbtToAirflowConverter:
             test_behavior=test_behavior,
             dbt_project_name=dbt_project.name,
             on_warning_callback=on_warning_callback,
+            node_converters=node_converters,
         )

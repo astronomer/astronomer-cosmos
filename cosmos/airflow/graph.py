@@ -6,11 +6,12 @@ from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.constants import DbtResourceType, ExecutionMode, TestBehavior
+from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, TESTABLE_DBT_RESOURCES, DEFAULT_DBT_RESOURCES
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -104,10 +105,9 @@ def create_task_metadata(
     }
     args = {**args, **{"models": node.name}}
 
-    if hasattr(node.resource_type, "value") and node.resource_type in dbt_resource_to_class:
+    if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         if node.resource_type == DbtResourceType.MODEL:
             task_id = f"{node.name}_run"
-
             if use_task_group is True:
                 task_id = "run"
         else:
@@ -122,8 +122,56 @@ def create_task_metadata(
         )
         return task_metadata
     else:
-        logger.error(f"Unsupported resource type {node.resource_type} (node {node.unique_id}).")
+        msg = (
+            f"Unavailable conversion function for <{node.resource_type}> (node <{node.unique_id}>). "
+            "Define a converter function using render_config.node_converters."
+        )
+        logger.warning(msg)
         return None
+
+
+def generate_task_or_group(
+    dag: DAG,
+    task_group: TaskGroup | None,
+    node: DbtNode,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    test_behavior: TestBehavior,
+    on_warning_callback: Callable[..., Any] | None,
+    **kwargs: Any,
+) -> BaseOperator | TaskGroup | None:
+    task_or_group: BaseOperator | TaskGroup | None = None
+
+    use_task_group = (
+        node.resource_type in TESTABLE_DBT_RESOURCES
+        and test_behavior == TestBehavior.AFTER_EACH
+        and node.has_test is True
+    )
+
+    task_meta = create_task_metadata(
+        node=node, execution_mode=execution_mode, args=task_args, use_task_group=use_task_group
+    )
+
+    # In most cases, we'll  map one DBT node to one Airflow task
+    # The exception are the test nodes, since it would be too slow to run test tasks individually.
+    # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
+    if task_meta and node.resource_type != DbtResourceType.TEST:
+        if use_task_group:
+            with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
+                task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                test_meta = create_test_task_metadata(
+                    "test",
+                    execution_mode,
+                    task_args=task_args,
+                    model_name=node.name,
+                    on_warning_callback=on_warning_callback,
+                )
+                test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
+                task >> test_task
+                task_or_group = model_task_group
+        else:
+            task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+    return task_or_group
 
 
 def build_airflow_graph(
@@ -135,6 +183,7 @@ def build_airflow_graph(
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
+    node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None,
 ) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -160,41 +209,33 @@ def build_airflow_graph(
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     """
+    node_converters = node_converters or {}
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
 
-    # In most cases, we'll  map one DBT node to one Airflow task
-    # The exception are the test nodes, since it would be too slow to run test tasks individually.
-    # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
     for node_id, node in nodes.items():
-        use_task_group = (
-            node.resource_type == DbtResourceType.MODEL
-            and test_behavior == TestBehavior.AFTER_EACH
-            and node.has_test is True
+        conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
+        if conversion_function != generate_task_or_group:
+            logger.warning(
+                "The `node_converters` attribute is an experimental feature. "
+                "Its syntax and behavior can be changed before a major release."
+            )
+        logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
+        task_or_group = conversion_function(  # type: ignore
+            dag=dag,
+            task_group=task_group,
+            dbt_project_name=dbt_project_name,
+            execution_mode=execution_mode,
+            task_args=task_args,
+            test_behavior=test_behavior,
+            on_warning_callback=on_warning_callback,
+            node=node,
         )
-        task_meta = create_task_metadata(
-            node=node, execution_mode=execution_mode, args=task_args, use_task_group=use_task_group
-        )
-
-        if task_meta and node.resource_type != DbtResourceType.TEST:
-            if use_task_group is True:
-                with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                    task = create_airflow_task(task_meta, dag, task_group=model_task_group)
-                    test_meta = create_test_task_metadata(
-                        "test",
-                        execution_mode,
-                        task_args=task_args,
-                        model_name=node.name,
-                        on_warning_callback=on_warning_callback,
-                    )
-                    test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
-                    task >> test_task
-                    task_or_group = model_task_group
-            else:
-                task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+        if task_or_group is not None:
+            logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
-    # If test_behaviour=="after_all", there will be one test task, run "by the end" of the DAG
+    # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
         test_meta = create_test_task_metadata(

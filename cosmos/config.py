@@ -7,10 +7,9 @@ import tempfile
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator, Callable
 
-
-from cosmos.constants import TestBehavior, ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, LoadMode
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -41,6 +40,7 @@ class RenderConfig:
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
     dbt_deps: bool = True
+    node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
 
 
 @dataclass

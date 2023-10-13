@@ -221,7 +221,7 @@ def build_airflow_graph(
                 "Its syntax and behavior can be changed before a major release."
             )
         logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
-        task_or_group = conversion_function(
+        task_or_group = conversion_function(  # type: ignore
             dag=dag,
             task_group=task_group,
             dbt_project_name=dbt_project_name,

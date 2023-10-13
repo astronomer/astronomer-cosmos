@@ -1,6 +1,30 @@
 Changelog
 =========
 
+1.2.0 (2023-10-13)
+------------------
+
+Features
+
+* Add support to model versioning available since dbt 1.6 by @binhnq94 in #516
+* Add AWS Athena profile mapping by @benjamin-awd in #578
+* Support customizing how dbt nodes are converted to Airflow by @tatiana in #503
+* Make the arg ``dbt_project_path`` in the ``ProjectConfig`` optional by @MrBones757 in #581
+
+Bug fixes
+
+* Fix Cosmos custom selector to support filtering a single model by @jlaneve and @harels in #576
+* Fix using ``GoogleCloudServiceAccountDictProfileMapping`` together with ``LoadMethod.DBT_LS`` by @joppevos in #587
+* Fix using the ``full_refresh`` argument in projects that contain tests by @EgorSemenov and @tatiana in #590
+* Stop creating symbolic links for ``dbt_packages`` (solves ``LocalExecutor`` concurrency issue) by @tatiana in #600
+
+Others
+
+* Docs: add reference to original Jaffle Shop project by @erdos2n in #583
+* Docs: retries & note about DagBag error by @TJaniF in #592
+* pre-commit updates in #575 and #585
+
+
 1.1.3 (2023-09-28)
 ------------------
 

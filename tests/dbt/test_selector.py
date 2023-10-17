@@ -114,6 +114,7 @@ def test_select_nodes_by_select_config():
 def test_select_nodes_by_select_config_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child"])
     expected = {
+        parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
     }
     assert selected == expected
@@ -146,11 +147,24 @@ def test_select_nodes_by_select_union_config_test_tags():
     assert selected == expected
 
 
+def test_select_nodes_by_select_intersection_tag():
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["tag:is_child,config.materialized:view"]
+    )
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_select_intersection_config_tag():
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child,config.materialized:view"]
     )
-    assert selected == {}
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
 
 
 def test_select_nodes_by_select_path():

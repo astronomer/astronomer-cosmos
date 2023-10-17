@@ -9,7 +9,7 @@ DEFAULT_PROFILE_FILE_NAME = "profiles.yml"
 @dataclass
 class DbtProject:
     name: str
-    root_dir: Path
+    root_dir: Path | None = None
     models_dir: Path | None = None
     seeds_dir: Path | None = None
     snapshots_dir: Path | None = None
@@ -18,21 +18,27 @@ class DbtProject:
     _cosmos_created_profile_file: bool = False
 
     def __post_init__(self) -> None:
-        if self.models_dir is None:
-            self.models_dir = self.dir / "models"
-        if self.seeds_dir is None:
-            self.seeds_dir = self.dir / "seeds"
-        if self.snapshots_dir is None:
-            self.snapshots_dir = self.dir / "snapshots"
-        if self.profile_path is None:
-            self.profile_path = self.dir / "profiles.yml"
+        """
+        Since ProjectConfig does not require the dbt_project_path to be defined
+        DbtProject should also no longer require root_dir or any dependent paths
+        The project should be renderable with only a manifest.json
+        """
+        if self.dir:
+            if self.models_dir is None:
+                self.models_dir = self.dir / "models"
+            if self.seeds_dir is None:
+                self.seeds_dir = self.dir / "seeds"
+            if self.snapshots_dir is None:
+                self.snapshots_dir = self.dir / "snapshots"
+            if self.profile_path is None:
+                self.profile_path = self.dir / "profiles.yml"
 
     @property
-    def dir(self) -> Path:
+    def dir(self) -> Path | None:
         """
         Path to dbt pipeline, defined by self.root_dir and self.name.
         """
-        return self.root_dir / self.name
+        return self.root_dir / self.name if self.root_dir else None
 
     def is_manifest_available(self) -> bool:
         """

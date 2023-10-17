@@ -107,31 +107,45 @@ class DbtGraph:
         :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
             or dbt ls)
         :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.KUBERNETES)
+
+        Fundamentally, there are two different execution paths
+        There is automatic, and manual.
         """
-        load_method = {
-            LoadMode.CUSTOM: self.load_via_custom_parser,
-            LoadMode.DBT_LS: self.load_via_dbt_ls,
-            LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
-        }
+
+        def load_manual(method: LoadMode) -> None:
+            load_method = {
+                LoadMode.CUSTOM: self.load_via_custom_parser,
+                LoadMode.DBT_LS: self.load_via_dbt_ls,
+                LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
+            }
+
+            if method == LoadMode.DBT_MANIFEST:
+                if not self.project.is_manifest_available():
+                    raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
+            elif method in [LoadMode.DBT_LS, LoadMode.CUSTOM]:
+                if not self.project.dir:
+                    raise CosmosLoadDbtException(
+                        "Unable to load using dbt_ls or custom method - Project Dir was not provided or does not exist."
+                    )
+
+            load_method[method]()
+
+        def load_automatic() -> None:
+            try:
+                load_manual(method=LoadMode.DBT_MANIFEST)
+            except CosmosLoadDbtException:
+                if execution_mode == ExecutionMode.LOCAL and self.project.is_profile_yml_available():
+                    try:
+                        load_manual(method=LoadMode.DBT_LS)
+                    except FileNotFoundError:
+                        load_manual(method=LoadMode.CUSTOM)
+                else:
+                    load_manual(method=LoadMode.CUSTOM)
+
         if method == LoadMode.AUTOMATIC:
-            if self.project.is_manifest_available():
-                self.load_from_dbt_manifest()
-                return
-            elif execution_mode == ExecutionMode.LOCAL and self.project.is_profile_yml_available():
-                try:
-                    self.load_via_dbt_ls()
-                    return
-                except FileNotFoundError:
-                    self.load_via_custom_parser()
-                    return
-            else:
-                self.load_via_custom_parser()
-                return
-
-        if method == LoadMode.DBT_MANIFEST and not self.project.is_manifest_available():
-            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
-
-        load_method[method]()
+            load_automatic()
+        else:
+            load_manual(method=method)
 
     def load_via_dbt_ls(self) -> None:
         """
@@ -147,8 +161,8 @@ class DbtGraph:
         """
         logger.info("Trying to parse the dbt project `%s` in `%s` using dbt ls...", self.project.name, self.project.dir)
 
-        if not self.profile_config:
-            raise CosmosLoadDbtException("Unable to load dbt project without a profile config")
+        if not self.project.dir or not self.profile_config:
+            raise CosmosLoadDbtException("Unable to load dbt project without project files and a profile config")
 
         if not shutil.which(self.dbt_cmd):
             raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
@@ -288,6 +302,9 @@ class DbtGraph:
         * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.name)
+
+        if not self.project.dir:
+            raise CosmosLoadDbtException("Unable to load dbt project without project files")
 
         project = LegacyDbtProject(
             dbt_root_path=str(self.project.root_dir),

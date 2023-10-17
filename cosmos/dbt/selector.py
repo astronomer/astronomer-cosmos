@@ -27,7 +27,7 @@ class SelectorConfig:
     Supports to load it from a string.
     """
 
-    def __init__(self, project_dir: Path, statement: str):
+    def __init__(self, project_dir: Path | None, statement: str):
         """
         Create a selector config file.
 
@@ -63,6 +63,8 @@ class SelectorConfig:
         items = statement.split(",")
         for item in items:
             if item.startswith(PATH_SELECTOR):
+                if not self.project_dir:
+                    raise CosmosValueError("Can not select by path when no project directory is provided")
                 index = len(PATH_SELECTOR)
                 self.paths.append(self.project_dir / item[index:])
             elif item.startswith(TAG_SELECTOR):
@@ -165,7 +167,10 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
 
 
 def select_nodes(
-    project_dir: Path, nodes: dict[str, DbtNode], select: list[str] | None = None, exclude: list[str] | None = None
+    project_dir: Path | None,
+    nodes: dict[str, DbtNode],
+    select: list[str] | None = None,
+    exclude: list[str] | None = None,
 ) -> dict[str, DbtNode]:
     """
     Given a group of nodes within a project, apply select and exclude filters using

@@ -233,7 +233,7 @@ def test_load_via_dbt_ls_without_profile():
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
 
-    expected = "Unable to load dbt project without a profile config"
+    expected = "Unable to load dbt project without project files and a profile config"
     assert err_info.value.args[0] == expected
 
 

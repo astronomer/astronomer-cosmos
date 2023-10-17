@@ -45,7 +45,7 @@ grandparent_node = DbtNode(
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/grandparent.sql",
     tags=["has_child"],
-    config={"materialized": "view"},
+    config={"materialized": "view", "tags": ["has_child"]},
 )
 parent_node = DbtNode(
     name="parent",
@@ -53,8 +53,8 @@ parent_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=["grandparent"],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
-    tags=["has_child"],
-    config={"materialized": "view"},
+    tags=["has_child", "is_child"],
+    config={"materialized": "view", "tags": ["has_child", "is_child"]},
 )
 child_node = DbtNode(
     name="child",
@@ -62,8 +62,8 @@ child_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
-    tags=["nightly"],
-    config={"materialized": "table", "tags": ["is_child"]},
+    tags=["nightly", "is_child"],
+    config={"materialized": "table", "tags": ["nightly", "is_child"]},
 )
 
 grandchild_1_test_node = DbtNode(
@@ -72,8 +72,8 @@ grandchild_1_test_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/grandchild_1.sql",
-    tags=["nightly"],
-    config={"materialized": "table", "tags": ["deprecated", "test"]},
+    tags=["nightly", "deprecated", "test"],
+    config={"materialized": "table", "tags": ["nightly", "deprecated", "test"]},
 )
 
 grandchild_2_test_node = DbtNode(
@@ -82,8 +82,8 @@ grandchild_2_test_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/grandchild_2.sql",
-    tags=["nightly"],
-    config={"materialized": "table", "tags": ["deprecated", "test2"]},
+    tags=["nightly", "deprecated", "test2"],
+    config={"materialized": "table", "tags": ["nightly", "deprecated", "test2"]},
 )
 
 sample_nodes = {
@@ -114,6 +114,7 @@ def test_select_nodes_by_select_config():
 def test_select_nodes_by_select_config_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child"])
     expected = {
+        parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
     }
     assert selected == expected
@@ -146,11 +147,24 @@ def test_select_nodes_by_select_union_config_test_tags():
     assert selected == expected
 
 
+def test_select_nodes_by_select_intersection_tag():
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["tag:is_child,config.materialized:view"]
+    )
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_select_intersection_config_tag():
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child,config.materialized:view"]
     )
-    assert selected == {}
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
 
 
 def test_select_nodes_by_select_path():

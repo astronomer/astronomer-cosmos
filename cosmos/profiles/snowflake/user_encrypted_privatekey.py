@@ -1,4 +1,4 @@
-"Maps Airflow Snowflake connections to dbt profiles if they use a user/password."
+"Maps Airflow Snowflake connections to dbt profiles if they use a user/private key."
 from __future__ import annotations
 
 import json
@@ -10,15 +10,16 @@ if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
+class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
     """
-    Maps Airflow Snowflake connections to dbt profiles if they use a user/password.
-    https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
+    Maps Airflow Snowflake connections to dbt profiles if they use a user/private key.
+    https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
     airflow_connection_type: str = "snowflake"
     dbt_profile_type: str = "snowflake"
+    is_community: bool = True
 
     required_fields = [
         "account",
@@ -26,27 +27,22 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         "database",
         "warehouse",
         "schema",
-        "password",
+        "private_key_passphrase",
+        "private_key_path",
     ]
     secret_fields = [
-        "password",
+        "private_key_passphrase",
     ]
     airflow_param_mapping = {
         "account": "extra.account",
         "user": "login",
-        "password": "password",
         "database": "extra.database",
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
+        "private_key_passphrase": "password",
+        "private_key_path": "extra.private_key_file",
     }
-
-    def can_claim_connection(self) -> bool:
-        # Make sure this isn't a private key path credential
-        result = super().can_claim_connection()
-        if result and self.conn.extra_dejson.get("private_key_file") is not None:
-            return False
-        return result
 
     @property
     def conn(self) -> Connection:
@@ -73,8 +69,8 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         profile_vars = {
             **self.mapped_params,
             **self.profile_args,
-            # password should always get set as env var
-            "password": self.get_env_var_format("password"),
+            # private_key_passphrase should always get set as env var
+            "private_key_passphrase": self.get_env_var_format("private_key_passphrase"),
         }
 
         # remove any null values

@@ -106,7 +106,7 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
         visited_nodes.add(node_id)
 
         if config.tags:
-            if not (set(config.tags) == set(node.tags)):
+            if not (set(config.tags) <= set(node.tags)):
                 return False
 
         node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}

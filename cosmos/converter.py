@@ -246,9 +246,11 @@ class DbtToAirflowConverter:
         dbt_executable_path = execution_config.dbt_executable_path
         node_converters = render_config.node_converters
 
-        if (execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
-            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
+        if execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
+            logger.warning(
+                "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
+            )
 
         profile_args = {}
         if profile_config.profile_mapping:

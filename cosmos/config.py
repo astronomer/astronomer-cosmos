@@ -291,9 +291,10 @@ class ExecutionConfig:
     :param dbt_project_path Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     :param dbt_executable_path: The path to the dbt executable. Defaults to dbt if
     available on the path.
-    :param virtualenv_dir: Directory path to locate the (cached) virtual env that 
+    :param virtualenv_dir: Directory path to locate the (cached) virtual env that
     should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
     """
+
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = field(default_factory=get_system_dbt)

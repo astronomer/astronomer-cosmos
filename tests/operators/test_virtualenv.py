@@ -66,13 +66,14 @@ def test_run_command(
     assert dbt_cmd[0][0][1] == "do-something"
     assert mock_execute.call_count == 2
 
+
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
 @patch("airflow.hooks.base.BaseHook.get_connection")
-def test_supply_virtualenv_dir_flag(    
+def test_supply_virtualenv_dir_flag(
     mock_get_connection,
     mock_subprocess_hook,
     mock_exception_handling,

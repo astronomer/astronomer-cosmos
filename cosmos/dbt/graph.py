@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import itertools
 import json
 import os
@@ -6,19 +7,19 @@ import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from subprocess import Popen, PIPE
+from subprocess import PIPE, Popen
 from typing import Any
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    DBT_LOG_DIR_NAME,
+    DBT_LOG_FILENAME,
+    DBT_LOG_PATH_ENVVAR,
+    DBT_TARGET_DIR_NAME,
+    DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
     ExecutionMode,
     LoadMode,
-    DBT_LOG_FILENAME,
-    DBT_LOG_PATH_ENVVAR,
-    DBT_TARGET_PATH_ENVVAR,
-    DBT_LOG_DIR_NAME,
-    DBT_TARGET_DIR_NAME,
 )
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
@@ -137,6 +138,9 @@ class DbtGraph:
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
 
+        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
+        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
+
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -155,12 +159,13 @@ class DbtGraph:
             env.update(env_vars)
 
             with tempfile.TemporaryDirectory() as tmpdir:
+                logger.info("Content of the dbt project dir <%s>: `%s`", self.project.dir, os.listdir(self.project.dir))
                 logger.info("Creating symlinks from %s to `%s`", self.project.dir, tmpdir)
                 # We create symbolic links to the original directory files and directories.
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary
                 # artifact and also allow us to run `dbt deps`
                 tmpdir_path = Path(tmpdir)
-                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "profiles.yml")
+                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
                 for child_name in os.listdir(self.project.dir):
                     if child_name not in ignore_paths:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
@@ -251,7 +256,7 @@ class DbtGraph:
                         logger.debug("Skipped dbt ls line: %s", line)
                     else:
                         node = DbtNode(
-                            name=node_dict["name"],
+                            name=node_dict.get("alias", node_dict["name"]),
                             unique_id=node_dict["unique_id"],
                             resource_type=DbtResourceType(node_dict["resource_type"]),
                             depends_on=node_dict.get("depends_on", {}).get("nodes", []),
@@ -292,7 +297,9 @@ class DbtGraph:
             operator_args=self.operator_args,
         )
         nodes = {}
-        models = itertools.chain(project.models.items(), project.snapshots.items(), project.seeds.items())
+        models = itertools.chain(
+            project.models.items(), project.snapshots.items(), project.seeds.items(), project.tests.items()
+        )
         for model_name, model in models:
             config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
             node = DbtNode(
@@ -323,6 +330,9 @@ class DbtGraph:
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).
 
+        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
+        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
+
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -332,12 +342,13 @@ class DbtGraph:
         with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)
 
-            for unique_id, node_dict in manifest.get("nodes", {}).items():
+            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+            for unique_id, node_dict in resources.items():
                 node = DbtNode(
-                    name=node_dict["name"],
+                    name=node_dict.get("alias", node_dict["name"]),
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict["depends_on"].get("nodes", []),
+                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],
                     config=node_dict["config"],

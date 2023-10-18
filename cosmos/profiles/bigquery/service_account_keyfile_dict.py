@@ -56,10 +56,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         "Generates mock profile. Defaults `threads` to 1."
         parent_mock_profile = super().mock_profile
 
-        return {
-            **parent_mock_profile,
-            "threads": 1,
-        }
+        return {**parent_mock_profile, "threads": 1, "keyfile_json": None}
 
     def transform_keyfile_json(self, keyfile_json: str | dict[str, str]) -> dict[str, str]:
         """

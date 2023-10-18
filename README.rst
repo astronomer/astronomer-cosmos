@@ -37,7 +37,7 @@ Check out the Quickstart guide on our `docs <https://astronomer.github.io/astron
 Example Usage
 ___________________
 
-You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_:
 
 
 .. code-block:: python
@@ -61,7 +61,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
     with DAG(
         dag_id="extract_dag",
         start_date=datetime(2022, 11, 27),
-        schedule="@daily",
+        schedule_interval="@daily",
     ):
         e1 = EmptyOperator(task_id="pre_dbt")
 

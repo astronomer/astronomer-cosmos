@@ -4,6 +4,7 @@ import copy
 
 from typing import TYPE_CHECKING
 
+from cosmos.constants import DbtResourceType
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
@@ -76,6 +77,9 @@ class SelectorConfig:
                 self.other.append(item)
                 logger.warning("Unsupported select statement: %s", item)
 
+    def __repr__(self) -> str:
+        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other})"
+
 
 def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: SelectorConfig) -> set[str]:
     """
@@ -88,30 +92,55 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
     https://docs.getdbt.com/reference/node-selection/syntax
     https://docs.getdbt.com/reference/node-selection/yaml-selectors
     """
+    if config.is_empty:
+        return set(nodes.keys())
+
     selected_nodes = set()
+    visited_nodes = set()
 
-    if not config.is_empty:
-        for node_id, node in nodes.items():
-            if config.tags and not (sorted(node.tags) == sorted(config.tags)):
-                continue
+    def should_include_node(node_id: str, node: DbtNode) -> bool:
+        "Checks if a single node should be included. Only runs once per node with caching."
+        if node_id in visited_nodes:
+            return node_id in selected_nodes
 
-            supported_node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
-            config_tag = config.config.get("tags")
-            if config.config:
-                if config_tag and config_tag not in supported_node_config.get("tags", []):
-                    continue
+        visited_nodes.add(node_id)
 
-                # Remove 'tags' as they've already been filtered for
-                config_copy = copy.deepcopy(config.config)
-                config_copy.pop("tags", None)
-                supported_node_config.pop("tags", None)
+        if config.tags:
+            if not (set(config.tags) <= set(node.tags)):
+                return False
 
-                if not (config_copy.items() <= supported_node_config.items()):
-                    continue
+        node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
+        config_tags = config.config.get("tags")
+        if config_tags and config_tags not in node_config.get("tags", []):
+            return False
 
-            if config.paths and not (set(config.paths).issubset(set(node.file_path.parents))):
-                continue
+        # Remove 'tags' as they've already been filtered for
+        config_copy = copy.deepcopy(config.config)
+        config_copy.pop("tags", None)
+        node_config.pop("tags", None)
 
+        if not (config_copy.items() <= node_config.items()):
+            return False
+
+        if config.paths:
+            for filter_path in config.paths:
+                if filter_path in node.file_path.parents or filter_path == node.file_path:
+                    return True
+
+            # if it's a test coming from a schema.yml file, check the model's file_path
+            if node.resource_type == DbtResourceType.TEST and node.file_path.name == "schema.yml":
+                # try to get the corresponding model from node.depends_on
+                if len(node.depends_on) == 1:
+                    model_node = nodes.get(node.depends_on[0])
+                    if model_node:
+                        return should_include_node(node.depends_on[0], model_node)
+
+            return False
+
+        return True
+
+    for node_id, node in nodes.items():
+        if should_include_node(node_id, node):
             selected_nodes.add(node_id)
 
     return selected_nodes

@@ -1,3 +1,4 @@
+aenum
 sphinx
 pydata-sphinx-theme
 sphinx-autobuild

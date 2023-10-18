@@ -28,7 +28,7 @@ Additional KubernetesPodOperator parameters can be added on the operator_args pa
 
 For instance,
 
-.. code-block:: text
+.. code-block:: python
 
     run_models = DbtTaskGroup(
         profile_config=ProfileConfig(

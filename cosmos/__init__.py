@@ -5,7 +5,7 @@ Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
 Contains dags, task groups, and operators.
 """
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
@@ -59,8 +59,8 @@ try:
         DbtSnapshotKubernetesOperator,
         DbtTestKubernetesOperator,
     )
-except ImportError as error:
-    logger.exception(error)
+except ImportError:
+    logger.debug("To import Kubernetes modules, install astronomer-cosmos[kubernetes].", stack_info=True)
     DbtLSKubernetesOperator = MissingPackage(
         "cosmos.operators.kubernetes.DbtLSKubernetesOperator",
         "kubernetes",

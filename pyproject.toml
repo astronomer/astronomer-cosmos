@@ -35,6 +35,7 @@ classifiers = [
 ]
 dependencies = [
     # Airflow & Pydantic issue: https://github.com/apache/airflow/issues/32311
+    "aenum",
     "attrs",
     "pydantic>=1.10.0,<2.0.0",
     "apache-airflow>=2.3.0",
@@ -46,35 +47,39 @@ dependencies = [
 
 [project.optional-dependencies]
 dbt-all = [
-    "dbt-bigquery<=1.5.4",
-    "dbt-databricks<=1.5.4",
-    "dbt-exasol<=1.5.4",
-    "dbt-postgres<=1.5.4",
-    "dbt-redshift<=1.5.4",
-    "dbt-snowflake<=1.5.4",
-    "dbt-spark<=1.5.4",
-    "dbt-vertica<=1.5.4",
+    "dbt-athena",
+    "dbt-bigquery",
+    "dbt-databricks",
+    "dbt-exasol",
+    "dbt-postgres",
+    "dbt-redshift",
+    "dbt-snowflake",
+    "dbt-spark",
+    "dbt-vertica",
+]
+dbt-athena = [
+    "dbt-athena-community",
 ]
 dbt-bigquery = [
-    "dbt-bigquery<=1.5.4",
+    "dbt-bigquery",
 ]
 dbt-databricks = [
-    "dbt-databricks<=1.5.4",
+    "dbt-databricks",
 ]
 dbt-exasol = [
-    "dbt-exasol<=1.5.4",
+    "dbt-exasol",
 ]
 dbt-postgres = [
-    "dbt-postgres<=1.5.4",
+    "dbt-postgres",
 ]
 dbt-redshift = [
-    "dbt-redshift<=1.5.4",
+    "dbt-redshift",
 ]
 dbt-snowflake = [
-    "dbt-snowflake<=1.5.4",
+    "dbt-snowflake",
 ]
 dbt-spark = [
-    "dbt-spark<=1.5.4",
+    "dbt-spark",
 ]
 dbt-vertica = [
     "dbt-vertica<=1.5.4",
@@ -111,7 +116,7 @@ docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
 kubernetes = [
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
 
 
@@ -136,7 +141,7 @@ include = [
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1,<7.3.0",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "types-PyYAML",
     "types-attrs",
     "types-requests",
@@ -167,7 +172,7 @@ test-cov = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml
 test-integration-setup = """pip uninstall dbt-postgres dbt-databricks dbt-vertica; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install  'dbt-core==1.5.4'  'dbt-databricks<=1.5.4' 'dbt-postgres<=1.5.4' 'dbt-vertica<=1.5.4' 'openlineage-airflow'"""
+pip install  'dbt-core'  'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'"""
 test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
 --cov=cosmos \
@@ -175,16 +180,26 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not (example_cosmos_python_models or example_virtualenv)'
-"""
-test-integration-expensive = """rm -rf dbt/jaffle_shop/dbt_packages;
-pytest -vv \
+-k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv or cosmos_manifest_example)'"""
+test-integration-expensive = """pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
 -k 'example_cosmos_python_models or example_virtualenv'"""
+test-integration-sqlite-setup = """pip uninstall -y dbt-core dbt-sqlite openlineage-airflow openlineage-integration-common; \
+rm -rf airflow.*; \
+airflow db init; \
+pip install 'dbt-core==1.4' 'dbt-sqlite<=1.4' 'dbt-databricks<=1.4' 'dbt-postgres<=1.4' """
+test-integration-sqlite = """
+pytest -vv \
+--cov=cosmos \
+--cov-report=term-missing \
+--cov-report=xml \
+--durations=0 \
+-m integration  \
+-k 'example_cosmos_sources or sqlite'"""
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -193,6 +208,7 @@ filterwarnings = [
 minversion = "6.0"
 markers = [
     "integration",
+    "sqlite"
 ]
 
 ######################################
@@ -201,11 +217,12 @@ markers = [
 
 [tool.hatch.envs.docs]
 dependencies = [
+    "aenum",
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
-    "openlineage-airflow"
+    "openlineage-airflow",
 ]
 
 [tool.hatch.envs.docs.scripts]

@@ -1,6 +1,62 @@
 Changelog
 =========
 
+1.2.0 (2023-10-13)
+------------------
+
+Features
+
+* Add support to model versioning available since dbt 1.6 by @binhnq94 in #516
+* Add AWS Athena profile mapping by @benjamin-awd in #578
+* Support customizing how dbt nodes are converted to Airflow by @tatiana in #503
+* Make the arg ``dbt_project_path`` in the ``ProjectConfig`` optional by @MrBones757 in #581
+
+Bug fixes
+
+* Fix Cosmos custom selector to support filtering a single model by @jlaneve and @harels in #576
+* Fix using ``GoogleCloudServiceAccountDictProfileMapping`` together with ``LoadMethod.DBT_LS`` by @joppevos in #587
+* Fix using the ``full_refresh`` argument in projects that contain tests by @EgorSemenov and @tatiana in #590
+* Stop creating symbolic links for ``dbt_packages`` (solves ``LocalExecutor`` concurrency issue) by @tatiana in #600
+
+Others
+
+* Docs: add reference to original Jaffle Shop project by @erdos2n in #583
+* Docs: retries & note about DagBag error by @TJaniF in #592
+* pre-commit updates in #575 and #585
+
+
+1.1.3 (2023-09-28)
+------------------
+
+Bug fixes
+
+* Only create task group and test task only if the model has a test by @raffifu in #543
+* Fix parsing test nodes when using the custom load method (LoadMethod.CUSTOM) by @raffifu in #563
+* Fix ``DbtTestOperator`` when test does not have ``test_metadata`` by @javihernovoa and @tatiana in #565
+* Support dbt 1.6 and apache-airflow-providers-cncf-kubernetes 7.3.0  by @tatiana in #564
+
+
+
+1.1.2 (2023-09-27)
+------------------
+
+Bug fixes
+
+* Fix using ``ExecutionMode.KUBERNETES`` by @pgoslatara and @tatiana in #554
+* Add support to ``apache-airflow-providers-cncf-kubernetes < 7.4.0`` by @tatiana in #553
+* Fix ``on_warning_callback`` behaviour on ``DbtTestLocalOperator`` by @edgga, @marco9663 and @tatiana in #558
+* Use ``returncode`` instead of ``stderr`` to determine dbt graph loading errors by @cliff-lau-cloverhealth in #547
+* Improve error message in ``config.py`` by @meyobagero in #532
+* Fix ``DbtTestOperator`` when test does not have ``test_metadata`` by @tatiana in #558
+* Fix ``target-path`` not specified issue in ``dbt-project.yml`` by @tatiana in #533
+
+Others
+
+* Docs: add reference links to dbt and Airflow columns by @TJaniF in #542
+* pre-commit updates #552 and #546
+
+
+
 1.1.1 (2023-09-14)
 ------------------
 

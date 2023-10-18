@@ -10,7 +10,7 @@ repos:
         types: [file]
         pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: check-added-large-files
       - id: check-merge-conflict
@@ -25,12 +25,15 @@ repos:
         args: ['--autofix']
       - id: trailing-whitespace
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.5
+    rev: v2.2.6
     hooks:
       - id: codespell
         name: Run codespell to check for common misspellings in files
         language: python
         types: [text]
+        args:
+          - --exclude-file=tests/sample/manifest_model_version.json
+          - --skip=**/manifest.json
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
@@ -43,14 +46,14 @@ repos:
       - id: remove-tabs
         exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.13.0
+    rev: v3.15.0
     hooks:
       - id: pyupgrade
         args:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.291
+    rev: v0.0.292
     hooks:
       - id: ruff
         args:
@@ -67,7 +70,7 @@ repos:
         alias: black
         additional_dependencies: [black>=22.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.5.1'
+    rev: 'v1.6.0'
     hooks:
       - id: mypy
         name: mypy-python

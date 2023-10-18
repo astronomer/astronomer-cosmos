@@ -42,6 +42,7 @@ def basic_cosmos_task_group() -> None:
         ),
         operator_args={"install_deps": True},
         profile_config=profile_config,
+        default_args={"retries": 2},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

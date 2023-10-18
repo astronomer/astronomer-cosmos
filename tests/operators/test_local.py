@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tempfile
@@ -331,6 +332,7 @@ def test_store_compiled_sql() -> None:
     [
         (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (DbtTestLocalOperator, {"full_refresh": True}, {"context": {}}),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
@@ -370,3 +372,21 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     )
     task.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(context={})
+
+
+@patch("cosmos.operators.local.DbtLocalArtifactProcessor")
+def test_calculate_openlineage_events_completes_openlineage_errors(mock_processor, caplog):
+    instance = mock_processor.return_value
+    instance.parse = MagicMock(side_effect=KeyError)
+    caplog.set_level(logging.DEBUG)
+    dbt_base_operator = DbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir=DBT_PROJ_DIR,
+        should_store_compiled_sql=False,
+    )
+
+    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+    assert instance.parse.called
+    err_msg = "Unable to parse OpenLineage events"
+    assert err_msg in caplog.text

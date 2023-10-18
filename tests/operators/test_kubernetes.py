@@ -171,7 +171,7 @@ def test_created_pod(test_hook):
                     "stdin": None,
                     "stdin_once": None,
                     "termination_message_path": None,
-                    "termination_message_policy": None,
+                    # "termination_message_policy": None,
                     "tty": None,
                     "volume_devices": None,
                     "volume_mounts": [],
@@ -213,6 +213,8 @@ def test_created_pod(test_hook):
         },
         "status": None,
     }
+
     computed_result = pod_obj.to_dict()
+    computed_result["spec"]["containers"][0].pop("termination_message_policy")
     computed_result["metadata"].pop("namespace")
     assert computed_result == expected_result

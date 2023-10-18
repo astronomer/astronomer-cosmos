@@ -16,6 +16,7 @@ DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags
 SAMPLE_CSV_PATH = DBT_PROJECT_PATH / "jaffle_shop/seeds/raw_customers.csv"
 SAMPLE_MODEL_SQL_PATH = DBT_PROJECT_PATH / "jaffle_shop/models/customers.sql"
 SAMPLE_SNAPSHOT_SQL_PATH = DBT_PROJECT_PATH / "jaffle_shop/models/orders.sql"
+SAMPLE_YML_PATH = DBT_PROJECT_PATH / "jaffle_shop/models/schema.yml"
 
 
 def test_dbtproject__handle_csv_file():
@@ -62,6 +63,22 @@ def test_dbtproject__handle_sql_file_snapshot():
     assert raw_customers.name == "orders"
     assert raw_customers.type == DbtModelType.DBT_MODEL
     assert raw_customers.path == SAMPLE_SNAPSHOT_SQL_PATH
+
+
+def test_dbtproject__handle_config_file():
+    dbt_project = DbtProject(
+        project_name="jaffle_shop",
+        dbt_root_path=DBT_PROJECT_PATH,
+    )
+    dbt_project.tests = {}
+
+    dbt_project._handle_config_file(SAMPLE_YML_PATH)
+
+    assert len(dbt_project.tests) == 12
+    assert "not_null_customer_id_customers" in dbt_project.tests
+    sample_test = dbt_project.tests["not_null_customer_id_customers"]
+    assert sample_test.type == DbtModelType.DBT_TEST
+    assert sample_test.path == SAMPLE_YML_PATH
 
 
 def test_dbtproject__handle_config_file_empty_file():

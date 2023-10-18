@@ -23,6 +23,7 @@ try:
     from airflow.datasets import Dataset
 except ModuleNotFoundError:
     is_openlineage_available = False
+    DbtLocalArtifactProcessor = None
 else:
     is_openlineage_available = True
 
@@ -42,19 +43,21 @@ from cosmos.hooks.subprocess import (
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
 
-logger = get_logger(__name__)
+DBT_NO_TESTS_MSG = "Nothing to do"
+DBT_WARN_MSG = "WARN"
 
+logger = get_logger(__name__)
 
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
 except (ImportError, ModuleNotFoundError):
     try:
         from openlineage.airflow.extractors.base import OperatorLineage
-    except (ImportError, ModuleNotFoundError) as error:
+    except (ImportError, ModuleNotFoundError):
         logger.warning(
-            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
+            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage].",
+            stack_info=True,
         )
-        logger.exception(error)
         is_openlineage_available = False
 
         @define
@@ -106,6 +109,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
+        kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
         super().__init__(**kwargs)
 
     @cached_property
@@ -274,7 +278,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
-        except (FileNotFoundError, NotImplementedError, ValueError):
+        except (FileNotFoundError, NotImplementedError, ValueError, KeyError):
             logger.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
@@ -473,12 +477,18 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         warning_context["test_names"] = test_names
         warning_context["test_results"] = test_results
 
-        if self.on_warning_callback:
-            self.on_warning_callback(warning_context)
+        self.on_warning_callback and self.on_warning_callback(warning_context)
 
     def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context)
-        if self.on_warning_callback and "WARN" in result.output:
+        should_trigger_callback = all(
+            [
+                self.on_warning_callback,
+                DBT_NO_TESTS_MSG not in result.output,
+                DBT_WARN_MSG in result.output,
+            ]
+        )
+        if should_trigger_callback:
             warnings = parse_output(result, "WARN")
             if warnings > 0:
                 self._handle_warnings(result, context)

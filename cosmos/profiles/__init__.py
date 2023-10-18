@@ -20,6 +20,7 @@ from .spark.thrift import SparkThriftProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
+from .vertica.user_pass import VerticaUserPasswordProfileMapping
 
 profile_mappings: list[Type[BaseProfileMapping]] = [
     AthenaAccessKeyProfileMapping,
@@ -36,6 +37,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     TrinoLDAPProfileMapping,
     TrinoCertificateProfileMapping,
     TrinoJWTProfileMapping,
+    VerticaUserPasswordProfileMapping,
 ]
 
 
@@ -72,4 +74,5 @@ __all__ = [
     "TrinoLDAPProfileMapping",
     "TrinoCertificateProfileMapping",
     "TrinoJWTProfileMapping",
+    "VerticaUserPasswordProfileMapping",
 ]

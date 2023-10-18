@@ -16,7 +16,7 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
 from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
@@ -227,6 +227,17 @@ class DbtToAirflowConverter:
         env_vars = project_config.env_vars or operator_args.get("env")
         dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
+        if (execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
+            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
+
+        profile_args = {}
+        if profile_config.profile_mapping:
+            profile_args = profile_config.profile_mapping.profile_args
+
+        if not operator_args:
+            operator_args = {}
+
         cache_dir = None
         cache_identifier = None
         if settings.enable_cache:
@@ -275,6 +286,8 @@ class DbtToAirflowConverter:
             task_args,
             execution_mode=execution_config.execution_mode,
         )
+        if (execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
+            task_args["virtualenv_dir"] = execution_config.virtualenv_dir
 
         build_airflow_graph(
             nodes=self.dbt_graph.filtered_nodes,

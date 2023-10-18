@@ -288,16 +288,20 @@ class ExecutionConfig:
 
     :param execution_mode: The execution mode for dbt. Defaults to local
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
-    :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
     :param dbt_project_path Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param dbt_executable_path: The path to the dbt executable. Defaults to dbt if
+    available on the path.
+    :param virtualenv_dir: Directory path to locate the (cached) virtual env that 
+    should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
     """
-
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
     dbt_project_path: InitVar[str | Path | None] = None
+    virtualenv_dir: str | Path | None = None
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
+

@@ -15,6 +15,7 @@ from cosmos.airflow.graph import build_airflow_graph
 from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
+from cosmos.constants import ExecutionMode
 from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -223,6 +224,38 @@ class DbtToAirflowConverter:
 
         env_vars = project_config.env_vars or operator_args.pop("env", None)
         dbt_vars = project_config.dbt_vars or operator_args.pop("vars", None)
+        # We now have a guaranteed execution_config.project_path, but still need to process render_config.project_path
+        # We require render_config.project_path when we dont have a manifest
+        if not project_config.manifest_path and not render_config.project_path:
+            raise CosmosValueError(
+                "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
+            )
+        emit_datasets = render_config.emit_datasets
+        dbt_root_path = project_config.dbt_project_path.parent
+        dbt_project_name = project_config.dbt_project_path.name
+        dbt_models_dir = project_config.models_relative_path
+        dbt_seeds_dir = project_config.seeds_relative_path
+        dbt_snapshots_dir = project_config.snapshots_relative_path
+        test_behavior = render_config.test_behavior
+        select = render_config.select
+        exclude = render_config.exclude
+        dbt_deps = render_config.dbt_deps
+        execution_mode = execution_config.execution_mode
+        load_mode = render_config.load_method
+        manifest_path = project_config.parsed_manifest_path
+        dbt_executable_path = execution_config.dbt_executable_path
+        node_converters = render_config.node_converters
+
+        if (execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
+            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
+
+        profile_args = {}
+        if profile_config.profile_mapping:
+            profile_args = profile_config.profile_mapping.profile_args
+
+        if not operator_args:
+            operator_args = {}
 
         # Previously, we were creating a cosmos.dbt.project.DbtProject
         # DbtProject has now been replaced with ProjectConfig directly
@@ -261,6 +294,8 @@ class DbtToAirflowConverter:
             task_args,
             execution_mode=execution_config.execution_mode,
         )
+        if (execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
+            task_args["virtualenv_dir"] = execution_config.virtualenv_dir
 
         build_airflow_graph(
             nodes=dbt_graph.filtered_nodes,

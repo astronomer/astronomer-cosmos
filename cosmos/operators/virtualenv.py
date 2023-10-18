@@ -45,11 +45,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self,
         py_requirements: list[str] | None = None,
         py_system_site_packages: bool = False,
+        virtualenv_dir: Path | str | None = None,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
+        self._venv_dir = virtualenv_dir
         self._venv_tmp_dir: None | TemporaryDirectory[str] = None
 
     @cached_property
@@ -59,19 +61,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         """
         Path to the dbt binary within a Python virtualenv.
 
-        The first time this property is called, it creates a virtualenv and installs the dependencies based on the
-        self.py_requirements and self.py_system_site_packages. This value is cached for future calls.
+        The first time this property is called, it creates a new/temporary and installs the dependencies 
+        based on the self.py_requirements and self.py_system_site_packages,  or retrieves an existing virtualenv.
+        This value is cached for future calls.
         """
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
         # For this reason, we are not using contexts at this point.
         # The deletion of this directory is done explicitly at the end of the `execute` method.
-        self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
-        py_interpreter = prepare_virtualenv(
-            venv_directory=self._venv_tmp_dir.name,
-            python_bin=PY_INTERPRETER,
-            system_site_packages=self.py_system_site_packages,
-            requirements=self.py_requirements,
-        )
+        py_interpreter = self._get_or_create_venv_py_interpreter()
         dbt_binary = Path(py_interpreter).parent / "dbt"
         cmd_output = self.subprocess_hook.run_command(
             [
@@ -96,6 +93,31 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if self._venv_tmp_dir:
             self._venv_tmp_dir.cleanup()
         logger.info(output)
+
+    def _get_or_create_venv_py_interpreter(self) -> str:
+        if self._venv_dir is not None:
+            py_interpreter_path = Path(f"{self._venv_dir}/bin/python")
+
+            self.log.info(f"Checking for venv interpreter: {py_interpreter_path} : {py_interpreter_path.is_file()}")
+            if py_interpreter_path.is_file():
+
+                self.log.info(f"Found Python interpreter in cached virtualenv: `{str(py_interpreter_path)}`")
+                return str(py_interpreter_path)
+        
+            self.log.info(f"Creating virtualenv at `{self._venv_dir}")
+            venv_directory = str(self._venv_dir)
+        
+        else:
+            self.log.info(f"Creating temporary virtualenv")
+            self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
+            venv_directory = self._venv_tmp_dir.name
+
+        return prepare_virtualenv(
+            venv_directory=venv_directory,
+            python_bin=PY_INTERPRETER,
+            system_site_packages=self.py_system_site_packages,
+            requirements=self.py_requirements,
+        )
 
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):

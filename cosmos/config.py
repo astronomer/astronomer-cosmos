@@ -356,8 +356,10 @@ class ExecutionConfig:
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
-    :param virtualenv_dir: Directory path to locate the (cached) virtual env that should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
+    :param virtualenv_dir: Directory path to locate the (cached) virtual env that
+    should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
     """
+
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     invocation_mode: InvocationMode | None = None
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER

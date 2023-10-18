@@ -75,18 +75,22 @@ def test_run_command(
     assert mock_execute.call_count == 2
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 def test_virtualenv_operator_append_env_is_true_by_default():
     venv_operator = ConcreteDbtVirtualenvBaseOperator(
         dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
 =======
+=======
+
+>>>>>>> 7e8f82d (🎨 [pre-commit.ci] Auto format from pre-commit.com hooks)
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
 @patch("airflow.hooks.base.BaseHook.get_connection")
-def test_supply_virtualenv_dir_flag(    
+def test_supply_virtualenv_dir_flag(
     mock_get_connection,
     mock_subprocess_hook,
     mock_exception_handling,
@@ -115,6 +119,5 @@ def test_supply_virtualenv_dir_flag(
         invocation_mode=InvocationMode.SUBPROCESS,
         virtualenv_dir = "mock-venv",
     )
-
     assert venv_operator.append_env is True
     assert venv_operator.venv_dbt_path == "mock-venv/bin/dbt"

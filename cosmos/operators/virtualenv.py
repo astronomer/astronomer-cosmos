@@ -65,8 +65,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         """
         Path to the dbt binary within a Python virtualenv.
 
-        The first time this property is called, it creates a new/temporary and installs the dependencies 
-        based on the self.py_requirements, self.pip_install_options, and self.py_system_site_packages, or retrieves an existing virtualenv.
+        The first time this property is called, it creates a new/temporary and installs the dependencies
+        based on the self.py_requirements, self.pip_install_options,  and self.py_system_site_packages,  or retrieves an existing virtualenv.
         This value is cached for future calls.
         """
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
@@ -110,15 +110,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
             self.log.info(f"Checking for venv interpreter: {py_interpreter_path} : {py_interpreter_path.is_file()}")
             if py_interpreter_path.is_file():
-
                 self.log.info(f"Found Python interpreter in cached virtualenv: `{str(py_interpreter_path)}`")
                 return str(py_interpreter_path)
-        
+
             self.log.info(f"Creating virtualenv at `{self._venv_dir}")
             venv_directory = str(self._venv_dir)
-        
+
         else:
-            self.log.info(f"Creating temporary virtualenv")
+            self.log.info("Creating temporary virtualenv")
             self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
             venv_directory = self._venv_tmp_dir.name
 

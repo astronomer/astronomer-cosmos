@@ -227,9 +227,11 @@ class DbtToAirflowConverter:
         env_vars = project_config.env_vars or operator_args.get("env")
         dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
-        if (execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
-            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
+        if execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
+            logger.warning(
+                "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
+            )
 
         profile_args = {}
         if profile_config.profile_mapping:

@@ -70,7 +70,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore
 
 DEFAULT_DBT_RESOURCES = DbtResourceType.__members__.values()
 
-
-TESTABLE_DBT_RESOURCES = {
-    DbtResourceType.MODEL
-}  # TODO: extend with DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED)
+# dbt test runs tests defined on models, sources, snapshots, and seeds.
+# It expects that you have already created those resources through the appropriate commands.
+# https://docs.getdbt.com/reference/commands/test
+TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}

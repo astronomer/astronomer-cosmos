@@ -71,6 +71,7 @@ def create_test_task_metadata(
     """
     task_args = dict(task_args)
     task_args["on_warning_callback"] = on_warning_callback
+    task_args["indirect_selection"] = "buildable"
     if node is not None:
         if node.resource_type == DbtResourceType.MODEL:
             task_args["models"] = node.name

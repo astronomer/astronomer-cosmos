@@ -359,4 +359,4 @@ def test_create_test_task_metadata(node_type, node_unique_id, selector_key, sele
     )
     assert metadata.id == "test_no_nulls"
     assert metadata.operator_class == "cosmos.operators.local.DbtTestLocalOperator"
-    assert metadata.arguments == {"task_arg": "value", "on_warning_callback": True, selector_key: selector_value}
+    assert metadata.arguments == {"task_arg": "value", 'indirect_selection': 'buildable', "on_warning_callback": True, selector_key: selector_value}

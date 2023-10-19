@@ -49,7 +49,8 @@ nodes = {"seed_parent": parent_seed}
 @patch("cosmos.converter.DbtGraph.load")
 def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, operator_args):
     """
-    This test will raise exceptions if we are trying to pass incorrect arguments to operator constructors.
+    This test validates that a project, given only a project path as a Path() Object, and seeds
+    is able to successfully generate a converter
     """
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=execution_mode)
@@ -81,9 +82,9 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
 @patch("cosmos.converter.DbtGraph.load")
 def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execution_mode, operator_args):
     """
-    This test will raise exceptions if we are trying to pass incorrect arguments to operator constructors.
+    This test validates that a project, given only a project path as a string, and seeds
+    is able to successfully generate a converter
     """
-
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     execution_config = ExecutionConfig(execution_mode=execution_mode)
     render_config = RenderConfig(emit_datasets=True)
@@ -114,7 +115,8 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
 @patch("cosmos.converter.DbtGraph.load")
 def test_converter_creates_dag_with_no_project_dir(mock_load_dbt_graph, execution_mode, operator_args):
     """
-    This test will raise exceptions if we are trying to pass incorrect arguments to operator constructors.
+    This test validates that a project, given a manifest path and project name, with seeds
+    is able to successfully generate a converter
     """
     project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST.as_posix(), project_name="sample")
     execution_config = ExecutionConfig(execution_mode=execution_mode)

@@ -106,7 +106,6 @@ class DbtToAirflowConverter:
         project_config.validate_project()
 
         emit_datasets = render_config.emit_datasets
-        dbt_root_path = project_config.parsed_dbt_project_path
         dbt_project_name = project_config.project_name
         dbt_models_dir = project_config.models_relative_path
         dbt_seeds_dir = project_config.seeds_relative_path
@@ -131,7 +130,7 @@ class DbtToAirflowConverter:
 
         dbt_project = DbtProject(
             name=dbt_project_name,
-            root_dir=dbt_root_path.parent if dbt_root_path else None,
+            root_dir=project_config.dbt_project_path_parent,
             models_dir=Path(dbt_models_dir) if dbt_models_dir else None,
             seeds_dir=Path(dbt_seeds_dir) if dbt_seeds_dir else None,
             snapshots_dir=Path(dbt_snapshots_dir) if dbt_snapshots_dir else None,

@@ -25,8 +25,7 @@ profile_config = ProfileConfig(
 cosmos_manifest_example = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop",
-        manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+        manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json", project_name="jaffle_shop"
     ),
     profile_config=profile_config,
     render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:models/customers.sql"]),

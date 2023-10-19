@@ -73,6 +73,10 @@ class ProjectConfig:
     def parsed_manifest_path(self) -> Path | None:
         return Path(self.manifest_path) if self.manifest_path else None
 
+    @cached_property
+    def dbt_project_path_parent(self) -> Path | None:
+        return self.parsed_dbt_project_path.parent if self.parsed_dbt_project_path else None
+
     def __post_init__(self) -> None:
         "Converts paths to `Path` objects."
         if self.parsed_dbt_project_path:

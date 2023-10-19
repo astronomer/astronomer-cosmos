@@ -61,4 +61,10 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="my_cosmos_dag",
+        default_args={"retries": 2},
     )
+
+
+.. note::
+   In some cases, especially in larger dbt projects, you might run into a ``DagBag import timeout`` error.
+   This error can be resolved by increasing the value of the Airflow configuration `core.dagbag_import_timeout <https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dagbag-import-timeout>`_.

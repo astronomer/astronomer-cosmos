@@ -16,6 +16,7 @@ DBT_PIPELINE_NAME = "jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
+SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 
 
 @pytest.fixture
@@ -177,6 +178,7 @@ def test_load_via_dbt_ls_with_exclude():
 
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
+    # This test is dependent upon dbt >= 1.5.4
     assert len(dbt_graph.nodes) == 7
     expected_keys = [
         "model.jaffle_shop.customers",
@@ -187,7 +189,7 @@ def test_load_via_dbt_ls_with_exclude():
         "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
         "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
     ]
-    assert list(dbt_graph.nodes.keys()) == expected_keys
+    assert sorted(dbt_graph.nodes.keys()) == expected_keys
 
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
@@ -252,6 +254,30 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
 
     expected = "Unable to find the dbt executable: /inexistent/dbt"
     assert err_info.value.args[0] == expected
+
+
+@pytest.mark.sqlite
+@pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
+@pytest.mark.integration
+def test_load_via_dbt_ls_with_sources(load_method):
+    pipeline_name = "simple"
+    dbt_graph = DbtGraph(
+        dbt_deps=False,
+        project=DbtProject(
+            name=pipeline_name,
+            root_dir=DBT_PROJECTS_ROOT_DIR,
+            manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
+        ),
+        profile_config=ProfileConfig(
+            profile_name="simple",
+            target_name="dev",
+            profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / pipeline_name / "profiles.yml"),
+        ),
+    )
+    getattr(dbt_graph, load_method)()
+    assert len(dbt_graph.nodes) == 4
+    assert "source.simple.imdb.movies_ratings" in dbt_graph.nodes
+    assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
 
 
 @pytest.mark.integration

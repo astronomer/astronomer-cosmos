@@ -41,5 +41,6 @@ example_virtualenv = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_virtualenv",
+    default_args={"retries": 2},
 )
 # [END virtualenv_example]

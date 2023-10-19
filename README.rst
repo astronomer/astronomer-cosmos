@@ -61,7 +61,7 @@ You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an
     with DAG(
         dag_id="extract_dag",
         start_date=datetime(2022, 11, 27),
-        schedule="@daily",
+        schedule_interval="@daily",
     ):
         e1 = EmptyOperator(task_id="pre_dbt")
 

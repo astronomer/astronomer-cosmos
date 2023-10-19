@@ -165,7 +165,7 @@ class DbtGraph:
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary
                 # artifact and also allow us to run `dbt deps`
                 tmpdir_path = Path(tmpdir)
-                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "profiles.yml")
+                ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
                 for child_name in os.listdir(self.project.dir):
                     if child_name not in ignore_paths:
                         os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
@@ -342,12 +342,13 @@ class DbtGraph:
         with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)
 
-            for unique_id, node_dict in manifest.get("nodes", {}).items():
+            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+            for unique_id, node_dict in resources.items():
                 node = DbtNode(
                     name=node_dict.get("alias", node_dict["name"]),
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict["depends_on"].get("nodes", []),
+                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.project.dir / node_dict["original_file_path"],
                     tags=node_dict["tags"],
                     config=node_dict["config"],

@@ -36,11 +36,11 @@ profile_config = ProfileConfig(
 with DAG(
     dag_id="extract_dag",
     start_date=datetime(2022, 11, 27),
-    schedule="@daily",
+    schedule_interval="@daily",
     doc_md=__doc__,
     catchup=False,
     max_active_runs=1,
-    default_args={"owner": "01-EXTRACT"},
+    default_args={"owner": "01-EXTRACT", "retries": 2},
 ) as dag:
     with TaskGroup(group_id="drop_seeds_if_exist") as drop_seeds:
         for seed in ["raw_customers", "raw_payments", "raw_orders"]:

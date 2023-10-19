@@ -56,7 +56,7 @@ def create_test_task_metadata(
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
     on_warning_callback: Callable[..., Any] | None = None,
-    model_name: str | None = None,
+    node: DbtNode | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -66,13 +66,18 @@ def create_test_task_metadata(
     :param task_args: Arguments to be used to instantiate an Airflow Task
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
-    :param model_name: If the test relates to a specific model, the name of the model it relates to
+    :param node: If the test relates to a specific node, the node reference
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
     task_args["on_warning_callback"] = on_warning_callback
-    if model_name is not None:
-        task_args["models"] = model_name
+    if node is not None:
+        if node.resource_type == DbtResourceType.MODEL:
+            task_args["models"] = node.name
+        elif node.resource_type == DbtResourceType.SOURCE:
+            task_args["select"] = f"source:{node.unique_id[len('source.'):]}"
+        else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
+            task_args["select"] = node.name
     return TaskMetadata(
         id=test_task_name,
         operator_class=calculate_operator_class(
@@ -112,6 +117,8 @@ def create_task_metadata(
                 task_id = "run"
         else:
             task_id = f"{node.name}_{node.resource_type.value}"
+            if use_task_group is True:
+                task_id = node.resource_type.value
 
         task_metadata = TaskMetadata(
             id=task_id,
@@ -163,7 +170,7 @@ def generate_task_or_group(
                     "test",
                     execution_mode,
                     task_args=task_args,
-                    model_name=node.name,
+                    node=node,
                     on_warning_callback=on_warning_callback,
                 )
                 test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)

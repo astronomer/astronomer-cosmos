@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
+from airflow.utils.task_group import TaskGroup
 from packaging import version
 
 from cosmos.airflow.graph import (
@@ -13,6 +14,7 @@ from cosmos.airflow.graph import (
     calculate_operator_class,
     create_task_metadata,
     create_test_task_metadata,
+    generate_task_or_group,
 )
 from cosmos.config import ProfileConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, TestBehavior
@@ -99,6 +101,50 @@ def test_build_airflow_graph_with_after_each():
 
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "child_run"
+
+
+@pytest.mark.parametrize(
+    "node_type,task_suffix",
+    [(DbtResourceType.MODEL, "run"), (DbtResourceType.SEED, "seed"), (DbtResourceType.SNAPSHOT, "snapshot")],
+)
+def test_create_task_group_for_after_each_supported_nodes(node_type, task_suffix):
+    """
+    dbt test runs tests defined on models, sources, snapshots, and seeds.
+    It expects that you have already created those resources through the appropriate commands.
+    https://docs.getdbt.com/reference/commands/test
+    """
+    with DAG("test-task-group-after-each", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            name="dbt_node",
+            unique_id="dbt_node",
+            resource_type=node_type,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            tags=["has_child"],
+            config={"materialized": "view"},
+            depends_on=[],
+            has_test=True,
+        )
+    output = generate_task_or_group(
+        dag=dag,
+        task_group=None,
+        node=node,
+        execution_mode=ExecutionMode.LOCAL,
+        task_args={
+            "project_dir": SAMPLE_PROJ_PATH,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        },
+        test_behavior=TestBehavior.AFTER_EACH,
+        on_warning_callback=None,
+    )
+    assert isinstance(output, TaskGroup)
+    assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
 
 
 @pytest.mark.skipif(
@@ -259,7 +305,12 @@ def test_create_task_metadata_seed(caplog, use_task_group):
             args={},
             use_task_group=use_task_group,
         )
-    assert metadata.id == "my_seed_seed"
+
+    if not use_task_group:
+        assert metadata.id == "my_seed_seed"
+    else:
+        assert metadata.id == "seed"
+
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
     assert metadata.arguments == {"models": "my_seed"}
 
@@ -280,14 +331,32 @@ def test_create_task_metadata_snapshot(caplog):
     assert metadata.arguments == {"models": "my_snapshot"}
 
 
-def test_create_test_task_metadata():
+@pytest.mark.parametrize(
+    "node_type,node_unique_id,selector_key,selector_value",
+    [
+        (DbtResourceType.MODEL, "node_name", "models", "node_name"),
+        (DbtResourceType.SEED, "node_name", "select", "node_name"),
+        (DbtResourceType.SOURCE, "source.node_name", "select", "source:node_name"),
+        (DbtResourceType.SNAPSHOT, "node_name", "select", "node_name"),
+    ],
+)
+def test_create_test_task_metadata(node_type, node_unique_id, selector_key, selector_value):
+    sample_node = DbtNode(
+        name="node_name",
+        unique_id=node_unique_id,
+        resource_type=node_type,
+        depends_on=[],
+        file_path="",
+        tags=[],
+        config={},
+    )
     metadata = create_test_task_metadata(
         test_task_name="test_no_nulls",
         execution_mode=ExecutionMode.LOCAL,
         task_args={"task_arg": "value"},
         on_warning_callback=True,
-        model_name="my_model",
+        node=sample_node,
     )
     assert metadata.id == "test_no_nulls"
     assert metadata.operator_class == "cosmos.operators.local.DbtTestLocalOperator"
-    assert metadata.arguments == {"task_arg": "value", "on_warning_callback": True, "models": "my_model"}
+    assert metadata.arguments == {"task_arg": "value", "on_warning_callback": True, selector_key: selector_value}

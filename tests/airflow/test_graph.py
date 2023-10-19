@@ -17,7 +17,7 @@ from cosmos.airflow.graph import (
     generate_task_or_group,
 )
 from cosmos.config import ProfileConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, TestBehavior
+from cosmos.constants import DbtResourceType, ExecutionMode, TestBehavior, TestIndirectSelection
 from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -129,6 +129,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type, task_suffix
         task_group=None,
         node=node,
         execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
         task_args={
             "project_dir": SAMPLE_PROJ_PATH,
             "profile_config": ProfileConfig(
@@ -332,15 +333,30 @@ def test_create_task_metadata_snapshot(caplog):
 
 
 @pytest.mark.parametrize(
-    "node_type,node_unique_id,selector_key,selector_value",
+    "node_type,node_unique_id,test_indirect_selection,additional_arguments",
     [
-        (DbtResourceType.MODEL, "node_name", "models", "node_name"),
-        (DbtResourceType.SEED, "node_name", "select", "node_name"),
-        (DbtResourceType.SOURCE, "source.node_name", "select", "source:node_name"),
-        (DbtResourceType.SNAPSHOT, "node_name", "select", "node_name"),
+        (DbtResourceType.MODEL, "node_name", TestIndirectSelection.EAGER, {"models": "node_name"}),
+        (
+            DbtResourceType.SEED,
+            "node_name",
+            TestIndirectSelection.CAUTIOUS,
+            {"select": "node_name", "indirect_selection": "cautious"},
+        ),
+        (
+            DbtResourceType.SOURCE,
+            "source.node_name",
+            TestIndirectSelection.BUILDABLE,
+            {"select": "source:node_name", "indirect_selection": "buildable"},
+        ),
+        (
+            DbtResourceType.SNAPSHOT,
+            "node_name",
+            TestIndirectSelection.EMPTY,
+            {"select": "node_name", "indirect_selection": "empty"},
+        ),
     ],
 )
-def test_create_test_task_metadata(node_type, node_unique_id, selector_key, selector_value):
+def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_selection, additional_arguments):
     sample_node = DbtNode(
         name="node_name",
         unique_id=node_unique_id,
@@ -353,10 +369,17 @@ def test_create_test_task_metadata(node_type, node_unique_id, selector_key, sele
     metadata = create_test_task_metadata(
         test_task_name="test_no_nulls",
         execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=test_indirect_selection,
         task_args={"task_arg": "value"},
         on_warning_callback=True,
         node=sample_node,
     )
     assert metadata.id == "test_no_nulls"
     assert metadata.operator_class == "cosmos.operators.local.DbtTestLocalOperator"
-    assert metadata.arguments == {"task_arg": "value", 'indirect_selection': 'buildable', "on_warning_callback": True, selector_key: selector_value}
+    assert metadata.arguments == {
+        **{
+            "task_arg": "value",
+            "on_warning_callback": True,
+        },
+        **additional_arguments,
+    }

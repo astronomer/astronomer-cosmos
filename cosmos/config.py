@@ -9,7 +9,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterator, Callable
 
-from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, LoadMode, TestIndirectSelection
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -205,9 +205,11 @@ class ExecutionConfig:
     Contains configuration about how to execute dbt.
 
     :param execution_mode: The execution mode for dbt. Defaults to local
+    :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable. Defaults to dbt if
     available on the path.
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
+    test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = get_system_dbt()

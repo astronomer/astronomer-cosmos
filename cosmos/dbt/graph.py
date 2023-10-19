@@ -367,7 +367,8 @@ class DbtGraph:
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
-    def update_node_dependency(self, node_dependencies={}) -> None:
+    def update_node_dependency(self,
+                               node_dependencies: dict[str, Any] = {}) -> None:
         """
         This will update the property `has_test` if node has `dbt` test
 

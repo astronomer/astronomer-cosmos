@@ -86,8 +86,8 @@ with DAG(
         bucket_name="$web",
     )
 
-    generate_dbt_docs_azure = DbtDocsGCSOperator(
-        task_id="generate_dbt_docs_azure",
+    generate_dbt_docs_gcs = DbtDocsGCSOperator(
+        task_id="generate_dbt_docs_gcs",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
         connection_id=GCS_CONN_ID,

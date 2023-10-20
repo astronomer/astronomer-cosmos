@@ -652,7 +652,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
 
 class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
     """
-    Executes `dbt docs generate` command and upload to Azure Blob Storage.
+    Executes `dbt docs generate` command and upload to GCS.
 
     :param connection_id: Google Cloud Storage's Airflow connection ID
     :param bucket_name: Google Cloud Storage's bucket name

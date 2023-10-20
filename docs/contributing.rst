@@ -30,8 +30,8 @@ Then install ``airflow`` and ``astronomer-cosmos`` using python-venv:
 
 .. code-block:: bash
 
-    python3 -venv m env && source env/bin/activate
-    pip3 install apache-airflow
+    python3 -m venv env && source env/bin/activate
+    pip3 install apache-airflow[cncf.kubernetes,openlineage]
     pip3 install -e .[dbt-postgres,dbt-databricks]
 
 Set airflow home to the ``dev/`` directory and disabled loading example DAGs:
@@ -41,26 +41,13 @@ Set airflow home to the ``dev/`` directory and disabled loading example DAGs:
     export AIRFLOW_HOME=$(pwd)/dev/
     export AIRFLOW__CORE__LOAD_EXAMPLES=false
 
-Then, initialize the database and create a new user, the command below will create a new user admin with password admin:
+Then, run airflow in standalone mode, command below will create a new user (if not exist) and run necessary airflow component (webserver, scheduler and triggerer):
 
     By default airflow will use sqlite as database, you can overwrite this by set variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the sql connection string.
 
 .. code-block:: bash
 
-    airflow db init
-
-    airflow users create \
-        --email admin@admin.com --firstname admin \
-        --lastname admin --password admin \
-        --role Admin --username admin
-
-Run the following airflow component on the separate terminal
-
-.. code-block:: bash
-
-    airflow webserver
-    airflow scheduler
-    airflow triggerer
+    airflow standalone
 
 Once the airflow is up, you can access the Airflow UI at ``http://localhost:8080``.
 

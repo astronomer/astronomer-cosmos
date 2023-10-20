@@ -7,6 +7,7 @@ import tempfile
 from attr import define
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
+from abc import ABC, abstractmethod
 
 import airflow
 import yaml
@@ -539,11 +540,34 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         self.base_cmd = ["docs", "generate"]
 
 
-class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
+class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
+    def __init__(
+        self,
+        connection_id: str,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs: str,
+    ) -> None:
+        "Initializes the operator."
+        self.connection_id = connection_id
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+
+        super().__init__(**kwargs)
+
+        # override the callback with our own
+        self.callback = self.upload_to_cloud_storage
+
+    @abstractmethod
+    def upload_to_cloud_storage(self, project_dir: str) -> None:
+        pass
+
+
+class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
     """
     Executes `dbt docs generate` command and upload to S3 storage. Returns the S3 path to the generated documentation.
 
-    :param aws_conn_id: S3's Airflow connection ID
+    :param connection_id: S3's Airflow connection ID
     :param bucket_name: S3's bucket name
     :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
         uploaded.
@@ -551,28 +575,11 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
 
     ui_color = "#FF9900"
 
-    def __init__(
-        self,
-        aws_conn_id: str,
-        bucket_name: str,
-        folder_dir: str | None = None,
-        **kwargs: str,
-    ) -> None:
-        "Initializes the operator."
-        self.aws_conn_id = aws_conn_id
-        self.bucket_name = bucket_name
-        self.folder_dir = folder_dir
-
-        super().__init__(**kwargs)
-
-        # override the callback with our own
-        self.callback = self.upload_to_s3
-
-    def upload_to_s3(self, project_dir: str) -> None:
+    def upload_to_cloud_storage(self, project_dir: str) -> None:
         "Uploads the generated documentation to S3."
         logger.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
-            self.aws_conn_id,
+            self.connection_id,
         )
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -580,7 +587,7 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
         target_dir = f"{project_dir}/target"
 
         hook = S3Hook(
-            self.aws_conn_id,
+            self.connection_id,
             extra_args={
                 "ContentType": "text/html",
             },
@@ -599,40 +606,23 @@ class DbtDocsS3LocalOperator(DbtDocsLocalOperator):
             )
 
 
-class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
+class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
     """
     Executes `dbt docs generate` command and upload to Azure Blob Storage.
 
-    :param azure_conn_id: Azure Blob Storage's Airflow connection ID
-    :param container_name: Azure Blob Storage's bucket name
+    :param connection_id: Azure Blob Storage's Airflow connection ID
+    :param bucket_name: Azure Blob Storage's bucket name
     :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
         uploaded.
     """
 
     ui_color = "#007FFF"
 
-    def __init__(
-        self,
-        azure_conn_id: str,
-        container_name: str,
-        folder_dir: str | None = None,
-        **kwargs: str,
-    ) -> None:
-        "Initializes the operator."
-        self.azure_conn_id = azure_conn_id
-        self.container_name = container_name
-        self.folder_dir = folder_dir
-
-        super().__init__(**kwargs)
-
-        # override the callback with our own
-        self.callback = self.upload_to_azure
-
-    def upload_to_azure(self, project_dir: str) -> None:
+    def upload_to_cloud_storage(self, project_dir: str) -> None:
         "Uploads the generated documentation to Azure Blob Storage."
         logger.info(
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
-            self.azure_conn_id,
+            self.connection_id,
         )
 
         from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
@@ -640,23 +630,57 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsLocalOperator):
         target_dir = f"{project_dir}/target"
 
         hook = WasbHook(
-            self.azure_conn_id,
+            self.connection_id,
         )
 
         for filename in self.required_files:
             logger.info(
                 "Uploading %s to %s",
                 filename,
-                f"wasb://{self.container_name}/{filename}",
+                f"wasb://{self.bucket_name}/{filename}",
             )
 
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 
             hook.load_file(
                 file_path=f"{target_dir}/{filename}",
-                container_name=self.container_name,
+                container_name=self.bucket_name,
                 blob_name=blob_name,
                 overwrite=True,
+            )
+
+
+class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
+    """
+    Executes `dbt docs generate` command and upload to Azure Blob Storage.
+
+    :param connection_id: Google Cloud Storage's Airflow connection ID
+    :param bucket_name: Google Cloud Storage's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
+        uploaded.
+    """
+
+    ui_color = "#007FFF"
+
+    def upload_to_cloud_storage(self, project_dir: str) -> None:
+        "Uploads the generated documentation to Google Cloud Storage"
+        logger.info(
+            'Attempting to upload generated docs to Storage using GCSHook(conn_id="%s")',
+            self.connection_id,
+        )
+
+        from airflow.providers.google.cloud.hooks.gcs import GCSHook
+
+        target_dir = f"{project_dir}/target"
+        hook = GCSHook(self.connection_id)
+
+        for filename in self.required_files:
+            blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
+            logger.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
+            hook.upload(
+                filename=f"{target_dir}/{filename}",
+                bucket_name=self.bucket_name,
+                object_name=blob_name,
             )
 
 

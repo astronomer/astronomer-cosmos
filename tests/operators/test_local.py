@@ -24,6 +24,7 @@ from cosmos.operators.local import (
     DbtDocsLocalOperator,
     DbtDocsS3LocalOperator,
     DbtDocsAzureStorageLocalOperator,
+    DbtDocsGCSLocalOperator,
     DbtSeedLocalOperator,
     DbtRunOperationLocalOperator,
 )
@@ -356,13 +357,16 @@ def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwa
         DbtDocsLocalOperator,
         DbtDocsS3LocalOperator,
         DbtDocsAzureStorageLocalOperator,
+        DbtDocsGCSLocalOperator,
     ),
 )
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
 def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
+    cloud_docs_kwargs = {"connection_id": "fake-conn", "bucket_name": "fake-bucket"}
     operator_class_kwargs = {
-        DbtDocsS3LocalOperator: {"aws_conn_id": "fake-conn", "bucket_name": "fake-bucket"},
-        DbtDocsAzureStorageLocalOperator: {"azure_conn_id": "fake-conn", "container_name": "fake-container"},
+        DbtDocsS3LocalOperator: cloud_docs_kwargs,
+        DbtDocsAzureStorageLocalOperator: cloud_docs_kwargs,
+        DbtDocsGCSLocalOperator: cloud_docs_kwargs,
     }
     task = operator_class(
         profile_config=profile_config,

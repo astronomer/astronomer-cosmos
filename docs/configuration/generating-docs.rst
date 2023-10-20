@@ -11,6 +11,7 @@ Cosmos offers two pre-built ways of generating and uploading dbt docs and a fall
 
 - :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
 - :class:`~cosmos.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
+- :class:`~cosmos.operators.DbtDocsGCSOperator`: generates and uploads docs to a GCS bucket.
 - :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
 
 The first two operators require you to have a connection to the target storage. The third operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
@@ -36,7 +37,7 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,
         # docs-specific arguments
-        aws_conn_id="test_aws",
+        connection_id="test_aws",
         bucket_name="test_bucket",
     )
 
@@ -57,8 +58,29 @@ You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to genera
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,
         # docs-specific arguments
-        azure_conn_id="test_azure",
-        container_name="$web",
+        connection_id="test_azure",
+        bucket_name="$web",
+    )
+
+Upload to GCS
+~~~~~~~~~~~~~~~~~~~~~~~
+
+GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
+
+You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and upload docs to a S3 bucket. The following code snippet shows how to do this with the default jaffle_shop project:
+
+.. code-block:: python
+
+    from cosmos.operators import DbtDocsS3Operator
+
+    # then, in your DAG code:
+    generate_dbt_docs_aws = DbtDocsGCSOperator(
+        task_id="generate_dbt_docs_gcs",
+        project_dir="path/to/jaffle_shop",
+        profile_config=profile_config,
+        # docs-specific arguments
+        connection_id="test_gcs",
+        bucket_name="test_bucket",
     )
 
 Custom Callback

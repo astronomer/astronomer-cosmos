@@ -14,7 +14,7 @@ Cosmos offers two pre-built ways of generating and uploading dbt docs and a fall
 - :class:`~cosmos.operators.DbtDocsGCSOperator`: generates and uploads docs to a GCS bucket.
 - :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
 
-The first two operators require you to have a connection to the target storage. The third operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
+The first three operators require you to have a connection to the target storage. The last operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
 
 
 Examples

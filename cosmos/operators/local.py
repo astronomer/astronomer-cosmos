@@ -8,6 +8,7 @@ from attr import define
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
 from abc import ABC, abstractmethod
+import warnings
 
 import airflow
 import yaml
@@ -541,12 +542,16 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
+    """
+    Abstract class for operators that upload the generated documentation to cloud storage.
+    """
+
     def __init__(
         self,
         connection_id: str,
         bucket_name: str,
         folder_dir: str | None = None,
-        **kwargs: str,
+        **kwargs: Any,
     ) -> None:
         "Initializes the operator."
         self.connection_id = connection_id
@@ -572,6 +577,21 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
     :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
         uploaded.
     """
+
+    def __init__(
+        self,
+        *args: Any,
+        aws_conn_id: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if aws_conn_id:
+            warnings.warn(
+                "Please, use `connection_id` instead of `aws_conn_id`. The argument `aws_conn_id` will be"
+                " deprecated in Cosmos 2.0",
+                DeprecationWarning,
+            )
+            kwargs["connection_id"] = aws_conn_id
+        super().__init__(*args, **kwargs)
 
     ui_color = "#FF9900"
 
@@ -615,6 +635,29 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
     :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
         uploaded.
     """
+
+    def __init__(
+        self,
+        *args: Any,
+        azure_conn_id: str | None = None,
+        container_name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if azure_conn_id:
+            warnings.warn(
+                "Please, use `connection_id` instead of `azure_conn_id`. The argument `azure_conn_id` will"
+                " be deprecated in Cosmos 2.0",
+                DeprecationWarning,
+            )
+            kwargs["connection_id"] = azure_conn_id
+        if container_name:
+            warnings.warn(
+                "Please, use `bucket_name` instead of `container_name`. The argument `container_name` will"
+                " be deprecated in Cosmos 2.0",
+                DeprecationWarning,
+            )
+            kwargs["bucket_name"] = container_name
+        super().__init__(*args, **kwargs)
 
     ui_color = "#007FFF"
 

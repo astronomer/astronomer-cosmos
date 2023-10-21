@@ -43,7 +43,6 @@ class RenderConfig:
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
 
 
-@dataclass
 class ProjectConfig:
     """
     Class for setting project config.
@@ -58,33 +57,45 @@ class ProjectConfig:
     Required if dbt_project_path is not defined. Defaults to the folder name of dbt_project_path.
     """
 
-    dbt_project_path: str | Path | None = None
-    models_relative_path: str | Path = "models"
-    seeds_relative_path: str | Path = "seeds"
-    snapshots_relative_path: str | Path = "snapshots"
-    manifest_path: str | Path | None = None
-    project_name: str | None = None
+    dbt_project_path: Path | None = None
+    manifest_path: Path | None = None
+    models_path: Path | None = None
+    seeds_path: Path | None = None
+    snapshots_path: Path | None = None
+    project_name: str
 
-    @cached_property
-    def parsed_dbt_project_path(self) -> Path | None:
-        return Path(self.dbt_project_path) if self.dbt_project_path else None
+    def __init__(
+        self,
+        dbt_project_path: str | Path | None = None,
+        models_relative_path: str | Path = "models",
+        seeds_relative_path: str | Path = "seeds",
+        snapshots_relative_path: str | Path = "snapshots",
+        manifest_path: str | Path | None = None,
+        project_name: str | None = None,
+    ):
+        if not dbt_project_path:
+            if not manifest_path or not project_name:
+                raise CosmosValueError(
+                    "ProjectConfig requires dbt_project_path and/or manifest_path to be defined."
+                    " If only manifest_path is defined, project_name must also be defined."
+                )
+        if project_name:
+            self.project_name = project_name
 
-    @cached_property
-    def parsed_manifest_path(self) -> Path | None:
-        return Path(self.manifest_path) if self.manifest_path else None
+        if dbt_project_path:
+            self.dbt_project_path = Path(dbt_project_path)
+            self.models_path = self.dbt_project_path / Path(models_relative_path)
+            self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
+            self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
+            if not project_name:
+                self.project_name = self.dbt_project_path.stem
+
+        if manifest_path:
+            self.manifest_path = Path(manifest_path)
 
     @cached_property
     def dbt_project_path_parent(self) -> Path | None:
-        return self.parsed_dbt_project_path.parent if self.parsed_dbt_project_path else None
-
-    def __post_init__(self) -> None:
-        "Converts paths to `Path` objects."
-        if self.parsed_dbt_project_path:
-            self.models_relative_path = self.parsed_dbt_project_path / Path(self.models_relative_path)
-            self.seeds_relative_path = self.parsed_dbt_project_path / Path(self.seeds_relative_path)
-            self.snapshots_relative_path = self.parsed_dbt_project_path / Path(self.snapshots_relative_path)
-            if not self.project_name:
-                self.project_name = self.parsed_dbt_project_path.stem
+        return self.dbt_project_path.parent if self.dbt_project_path else None
 
     def validate_project(self) -> None:
         """
@@ -98,20 +109,14 @@ class ProjectConfig:
 
         mandatory_paths = {}
 
-        if self.parsed_dbt_project_path:
-            project_yml_path = self.parsed_dbt_project_path / "dbt_project.yml"
+        if self.dbt_project_path:
+            project_yml_path = self.dbt_project_path / "dbt_project.yml"
             mandatory_paths = {
                 "dbt_project.yml": project_yml_path,
-                "models directory ": self.models_relative_path,
+                "models directory ": self.models_path,
             }
-        elif self.parsed_manifest_path:
-            if not self.project_name:
-                raise CosmosValueError(
-                    "project_name required when manifest_path is present and dbt_project_path is not."
-                )
-            mandatory_paths = {"manifest file": self.parsed_manifest_path}
-        else:
-            raise CosmosValueError("dbt_project_path or manifest_path are required parameters.")
+        if self.manifest_path:
+            mandatory_paths["manifest"] = self.manifest_path
 
         for name, path in mandatory_paths.items():
             if path is None or not Path(path).exists():
@@ -121,10 +126,10 @@ class ProjectConfig:
         """
         Check if the `dbt` project manifest is set and if the file exists.
         """
-        if not self.parsed_manifest_path:
+        if not self.manifest_path:
             return False
 
-        return self.parsed_manifest_path.exists()
+        return self.manifest_path.exists()
 
 
 @dataclass
@@ -162,6 +167,12 @@ class ProfileConfig:
         "Validates that we have enough information to render a profile."
         if not self.profiles_yml_filepath and not self.profile_mapping:
             raise CosmosValueError("Either profiles_yml_filepath or profile_mapping must be set to render a profile")
+
+    def is_profile_yml_available(self) -> bool:
+        """
+        Check if the `dbt` profiles.yml file exists.
+        """
+        return Path(self.profiles_yml_filepath).exists() if self.profiles_yml_filepath else False
 
     @contextlib.contextmanager
     def ensure_profile(

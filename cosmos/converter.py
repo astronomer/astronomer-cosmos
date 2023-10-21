@@ -5,14 +5,12 @@ from __future__ import annotations
 
 import inspect
 from typing import Any, Callable
-from pathlib import Path
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.dbt.graph import DbtGraph
-from cosmos.dbt.project import DbtProject
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
 from cosmos.exceptions import CosmosValueError
@@ -93,7 +91,7 @@ class DbtToAirflowConverter:
     def __init__(
         self,
         project_config: ProjectConfig,
-        profile_config: ProfileConfig,
+        profile_config: ProfileConfig = None,
         execution_config: ExecutionConfig = ExecutionConfig(),
         render_config: RenderConfig = RenderConfig(),
         dag: DAG | None = None,
@@ -106,10 +104,6 @@ class DbtToAirflowConverter:
         project_config.validate_project()
 
         emit_datasets = render_config.emit_datasets
-        dbt_project_name = project_config.project_name
-        dbt_models_dir = project_config.models_relative_path
-        dbt_seeds_dir = project_config.seeds_relative_path
-        dbt_snapshots_dir = project_config.snapshots_relative_path
         test_behavior = render_config.test_behavior
         select = render_config.select
         exclude = render_config.exclude
@@ -117,9 +111,11 @@ class DbtToAirflowConverter:
         execution_mode = execution_config.execution_mode
         test_indirect_selection = execution_config.test_indirect_selection
         load_mode = render_config.load_method
-        manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
         node_converters = render_config.node_converters
+
+        if not profile_config:
+            profile_config = ProfileConfig(profiles_yml_filepath=project_config.dbt_project_path / "profiles.yml")
 
         profile_args = {}
         if profile_config.profile_mapping:
@@ -128,17 +124,18 @@ class DbtToAirflowConverter:
         if not operator_args:
             operator_args = {}
 
-        dbt_project = DbtProject(
-            name=dbt_project_name,
-            root_dir=project_config.dbt_project_path_parent,
-            models_dir=Path(dbt_models_dir) if dbt_models_dir else None,
-            seeds_dir=Path(dbt_seeds_dir) if dbt_seeds_dir else None,
-            snapshots_dir=Path(dbt_snapshots_dir) if dbt_snapshots_dir else None,
-            manifest_path=manifest_path,
-        )
-
+        # Previously, we were creating a cosmos.dbt.project.DbtProject
+        # DbtProject has now been replaced with ProjectConfig directly
+        #   since the interface of the two classes were effectively the same
+        # Under this previous implementation, we were passing:
+        #  - name, root dir, models dir, snapshots dir and manifest path
+        # Internally in the dbtProject class, we were defaulting the profile_path
+        #   To be root dir/profiles.yml
+        # To keep this logic working, if converter is given no ProfileConfig,
+        #   we can create a default retaining this value to preserve this functionality.
+        # We may want to consider defaulting this value in our actual ProjceConfig class?
         dbt_graph = DbtGraph(
-            project=dbt_project,
+            project=project_config,
             exclude=exclude,
             select=select,
             dbt_cmd=dbt_executable_path,
@@ -151,7 +148,7 @@ class DbtToAirflowConverter:
         task_args = {
             **operator_args,
             # the following args may be only needed for local / venv:
-            "project_dir": dbt_project.dir,
+            "project_dir": project_config.dbt_project_path,
             "profile_config": profile_config,
             "emit_datasets": emit_datasets,
         }
@@ -168,7 +165,7 @@ class DbtToAirflowConverter:
             task_args=task_args,
             test_behavior=test_behavior,
             test_indirect_selection=test_indirect_selection,
-            dbt_project_name=dbt_project.name,
+            dbt_project_name=project_config.project_name,
             on_warning_callback=on_warning_callback,
             node_converters=node_converters,
         )

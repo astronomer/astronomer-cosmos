@@ -63,10 +63,11 @@ class SelectorConfig:
         items = statement.split(",")
         for item in items:
             if item.startswith(PATH_SELECTOR):
-                if not self.project_dir:
-                    raise CosmosValueError("Can not select by path when no project directory is provided")
                 index = len(PATH_SELECTOR)
-                self.paths.append(self.project_dir / item[index:])
+                if self.project_dir:
+                    self.paths.append(self.project_dir / Path(item[index:]))
+                else:
+                    self.paths.append(Path(item[index:]))
             elif item.startswith(TAG_SELECTOR):
                 index = len(TAG_SELECTOR)
                 self.tags.append(item[index:])

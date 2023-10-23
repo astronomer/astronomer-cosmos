@@ -205,7 +205,8 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
 )
 def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualenv_dir, operator_args, caplog):
     """
-    This test will raise a warning if we are trying to pass ExecutionMode != `VirtualEnv` andm still pass a defined `virtualenv_dir`
+    This test will raise a warning if we are trying to pass ExecutionMode != `VirtualEnv` 
+    and still pass a defined `virtualenv_dir`
     """
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=execution_mode, virtualenv_dir=virtualenv_dir)

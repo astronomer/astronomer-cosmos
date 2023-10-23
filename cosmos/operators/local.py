@@ -74,6 +74,10 @@ except airflow.exceptions.AirflowConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 
+# In the spirit of: https://github.com/apache/airflow/blob/8531396c7c8bf1e016db10c7d32e5e19298d67e5/airflow/providers/openlineage/plugins/openlineage.py#L30
+is_openlineage_enabled = is_openlineage_available and os.getenv("OPENLINEAGE_DISABLED", "false").lower() != "true"
+
+
 class DbtLocalBaseOperator(DbtBaseOperator):
     """
     Executes a dbt core cli command locally.
@@ -227,7 +231,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available:
+                if is_openlineage_enabled:
                     self.calculate_openlineage_events_completes(env, Path(tmp_project_dir))
                     context[
                         "task_instance"

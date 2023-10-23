@@ -105,6 +105,9 @@ def select_nodes_ids_by_intersection(nodes: dict[str, DbtNode], config: Selector
 
         visited_nodes.add(node_id)
 
+        if node.resource_type == DbtResourceType.TEST:
+            node.tags = getattr(nodes.get(node.depends_on[0]), "tags", [])
+
         if config.tags:
             if not (set(config.tags) <= set(node.tags)):
                 return False

@@ -341,7 +341,6 @@ class DbtGraph:
         nodes = {}
         with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)
-            node_dependencies = manifest.get("child_map", {})
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
@@ -362,28 +361,20 @@ class DbtGraph:
                 project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
             )
 
-            self.update_node_dependency(node_dependencies=node_dependencies)
+            self.update_node_dependency()
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
-    def update_node_dependency(self, node_dependencies: dict[str, Any] = {}) -> None:
+    def update_node_dependency(self) -> None:
         """
-        This will update the property `has_test` if node has `dbt` test
+        This will update the property `has_text` if node has `dbt` test
 
         Updates in-place:
         * self.filtered_nodes
         """
-        if node_dependencies:
-            for node_id, node in self.filtered_nodes.items():
-                if node.resource_type == DbtResourceType.MODEL:
-                    for dependency in node_dependencies[node_id]:
-                        if self.nodes[dependency].resource_type == DbtResourceType.TEST:
-                            self.filtered_nodes[node_id].has_test = True
-                            break
-        else:
-            for _, node in self.filtered_nodes.items():
-                if node.resource_type == DbtResourceType.TEST:
-                    for node_id in node.depends_on:
-                        if node_id in self.filtered_nodes:
-                            self.filtered_nodes[node_id].has_test = True
+        for _, node in self.filtered_nodes.items():
+            if node.resource_type == DbtResourceType.TEST:
+                for node_id in node.depends_on:
+                    if node_id in self.filtered_nodes:
+                        self.filtered_nodes[node_id].has_test = True

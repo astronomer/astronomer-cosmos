@@ -105,7 +105,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
                 1. No: Create one in this directory and return it
                 2. Yes: Return this virtual env
         2. No: Create a temporary virtual env and return it
-        
+
         """
         if self._venv_dir is not None:
             if self._venv_dir.is_dir():

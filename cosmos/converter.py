@@ -91,7 +91,7 @@ class DbtToAirflowConverter:
     def __init__(
         self,
         project_config: ProjectConfig,
-        profile_config: ProfileConfig = None,
+        profile_config: ProfileConfig,
         execution_config: ExecutionConfig = ExecutionConfig(),
         render_config: RenderConfig = RenderConfig(),
         dag: DAG | None = None,
@@ -113,9 +113,6 @@ class DbtToAirflowConverter:
         load_mode = render_config.load_method
         dbt_executable_path = execution_config.dbt_executable_path
         node_converters = render_config.node_converters
-
-        if not profile_config:
-            profile_config = ProfileConfig(profiles_yml_filepath=project_config.dbt_project_path / "profiles.yml")
 
         profile_args = {}
         if profile_config.profile_mapping:

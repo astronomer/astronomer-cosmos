@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from cosmos.config import ProjectConfig
+from cosmos.config import ProfileConfig, ProjectConfig
 from cosmos.exceptions import CosmosValueError
 
 
@@ -113,3 +113,18 @@ def test_is_manifest_available_is_false():
 def test_project_name():
     dbt_project = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR)
     assert dbt_project.project_name == "sample"
+
+
+def test_profile_config_post_init():
+    with pytest.raises(CosmosValueError) as err_info:
+        ProfileConfig(profiles_yml_filepath="/tmp/some-profile", profile_name="test", target_name="test")
+        assert err_info.value.args[0] == "The file /tmp/some-profile does not exist."
+
+
+def test_profile_config_validate():
+    with pytest.raises(CosmosValueError) as err_info:
+        profile_config = ProfileConfig(profile_name="test", target_name="test")
+        assert profile_config.validate_profile() is None
+        assert (
+            err_info.value.args[0] == "Either profiles_yml_filepath or profile_mapping must be set to render a profile"
+        )

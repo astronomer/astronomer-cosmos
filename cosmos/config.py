@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 import tempfile
 from dataclasses import dataclass, field
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterator, Callable
 
@@ -92,10 +91,6 @@ class ProjectConfig:
 
         if manifest_path:
             self.manifest_path = Path(manifest_path)
-
-    @cached_property
-    def dbt_project_path_parent(self) -> Path | None:
-        return self.dbt_project_path.parent if self.dbt_project_path else None
 
     def validate_project(self) -> None:
         """

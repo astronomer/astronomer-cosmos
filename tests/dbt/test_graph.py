@@ -266,6 +266,16 @@ def test_load_via_dbt_ls_without_exclude(project_name):
     assert len(dbt_graph.nodes) == 28
 
 
+def test_load_via_custom_without_project_path():
+    project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="test")
+    dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=project_config)
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_via_custom_parser()
+
+    expected = "Unable to load dbt project without project files"
+    assert err_info.value.args[0] == expected
+
+
 def test_load_via_dbt_ls_without_profile():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=project_config)

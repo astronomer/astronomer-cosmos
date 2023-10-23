@@ -6,7 +6,14 @@ from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, TESTABLE_DBT_RESOURCES, DEFAULT_DBT_RESOURCES
+from cosmos.constants import (
+    DbtResourceType,
+    TestBehavior,
+    TestIndirectSelection,
+    ExecutionMode,
+    TESTABLE_DBT_RESOURCES,
+    DEFAULT_DBT_RESOURCES,
+)
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
@@ -54,6 +61,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
+    test_indirect_selection: TestIndirectSelection,
     task_args: dict[str, Any],
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
@@ -71,6 +79,8 @@ def create_test_task_metadata(
     """
     task_args = dict(task_args)
     task_args["on_warning_callback"] = on_warning_callback
+    if test_indirect_selection != TestIndirectSelection.EAGER:
+        task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
         if node.resource_type == DbtResourceType.MODEL:
             task_args["models"] = node.name
@@ -144,6 +154,7 @@ def generate_task_or_group(
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
     test_behavior: TestBehavior,
+    test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
@@ -169,6 +180,7 @@ def generate_task_or_group(
                 test_meta = create_test_task_metadata(
                     "test",
                     execution_mode,
+                    test_indirect_selection,
                     task_args=task_args,
                     node=node,
                     on_warning_callback=on_warning_callback,
@@ -187,6 +199,7 @@ def build_airflow_graph(
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
     task_args: dict[str, Any],  # Cosmos/DBT - used to instantiate tasks
     test_behavior: TestBehavior,  # Cosmos-specific: how to inject tests to Airflow DAG
+    test_indirect_selection: TestIndirectSelection,  # Cosmos/DBT - used to set test indirect selection mode
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
@@ -235,6 +248,7 @@ def build_airflow_graph(
             execution_mode=execution_mode,
             task_args=task_args,
             test_behavior=test_behavior,
+            test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             node=node,
         )
@@ -246,7 +260,11 @@ def build_airflow_graph(
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
         test_meta = create_test_task_metadata(
-            f"{dbt_project_name}_test", execution_mode, task_args=task_args, on_warning_callback=on_warning_callback
+            f"{dbt_project_name}_test",
+            execution_mode,
+            test_indirect_selection,
+            task_args=task_args,
+            on_warning_callback=on_warning_callback,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

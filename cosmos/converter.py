@@ -116,6 +116,7 @@ class DbtToAirflowConverter:
         exclude = render_config.exclude
         dbt_deps = render_config.dbt_deps
         execution_mode = execution_config.execution_mode
+        test_indirect_selection = execution_config.test_indirect_selection
         load_mode = render_config.load_method
         manifest_path = project_config.parsed_manifest_path
         dbt_executable_path = execution_config.dbt_executable_path
@@ -167,6 +168,7 @@ class DbtToAirflowConverter:
             execution_mode=execution_mode,
             task_args=task_args,
             test_behavior=test_behavior,
+            test_indirect_selection=test_indirect_selection,
             dbt_project_name=dbt_project.name,
             on_warning_callback=on_warning_callback,
             node_converters=node_converters,

@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-
+from pathlib import Path
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 
 from airflow.models.connection import Connection
@@ -98,6 +98,6 @@ def test_supply_virtualenv_dir_flag(
         py_system_site_packages=False,
         py_requirements=["dbt-postgres==1.6.0b1"],
         emit_datasets=False,
-        virtualenv_dir="mock-venv",
+        virtualenv_dir=Path("mock-venv"),
     )
     assert venv_operator.venv_dbt_path == "mock-venv/bin/dbt"

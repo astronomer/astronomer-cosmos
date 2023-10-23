@@ -71,7 +71,7 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
 
 .. code-block:: python
 
-    from cosmos.operators import DbtDocsS3Operator
+    from cosmos.operators import DbtDocsGCSOperator
 
     # then, in your DAG code:
     generate_dbt_docs_aws = DbtDocsGCSOperator(

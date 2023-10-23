@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from functools import cached_property
+import os
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
@@ -48,7 +50,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         py_requirements: list[str] | None = None,
         pip_install_options: list[str] | None = None,
         py_system_site_packages: bool = False,
-        virtualenv_dir: Path | str | None = None,
+        virtualenv_dir: Path | None = None,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
@@ -105,13 +107,27 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         logger.info(output)
 
     def _get_or_create_venv_py_interpreter(self) -> str:
+        """
+        Helper method that parses virtual env configuration and returns a DBT binary within the resulting virtualenv:
+        Do we have a persistent virtual env dir set in `self._venv_dir`?
+        1. Yes: Does a directory at that path exist?
+            1. No: Create it, and create a virtual env inside it
+            2. Yes: Does the directory have a virtual env inside it?
+                1. No: Create one in this directory and return it
+                2. Yes: Return this virtual env
+        2. No: Create a temporary virtual env and return it
+        
+        """
         if self._venv_dir is not None:
-            py_interpreter_path = Path(f"{self._venv_dir}/bin/python")
+            if self._venv_dir.is_dir():
+                py_interpreter_path = Path(f"{self._venv_dir}/bin/python")
 
-            self.log.info(f"Checking for venv interpreter: {py_interpreter_path} : {py_interpreter_path.is_file()}")
-            if py_interpreter_path.is_file():
-                self.log.info(f"Found Python interpreter in cached virtualenv: `{str(py_interpreter_path)}`")
-                return str(py_interpreter_path)
+                self.log.info(f"Checking for venv interpreter: {py_interpreter_path} : {py_interpreter_path.is_file()}")
+                if py_interpreter_path.is_file():
+                    self.log.info(f"Found Python interpreter in cached virtualenv: `{str(py_interpreter_path)}`")
+                    return str(py_interpreter_path)
+            else:
+                os.mkdir(self._venv_dir)
 
             self.log.info(f"Creating virtualenv at `{self._venv_dir}")
             venv_directory = str(self._venv_dir)

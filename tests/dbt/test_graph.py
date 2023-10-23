@@ -197,7 +197,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_pop
     assert not (tmp_dbt_project_dir / "logs").exists()
 
     used_cwd = Path(mock_popen.call_args[0][0][-5])
-    assert used_cwd != project_config.dir
+    assert used_cwd != project_config.dbt_project_path
     assert not used_cwd.exists()
 
 
@@ -482,7 +482,7 @@ def test_update_node_dependency_test_not_exist():
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 def test_load_dbt_ls_and_manifest_with_model_version(load_method):
     dbt_graph = DbtGraph(
-        project_config=ProjectConfig(
+        project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version",
             manifest_path=SAMPLE_MANIFEST_MODEL_VERSION if load_method == "load_from_dbt_manifest" else None,
         ),

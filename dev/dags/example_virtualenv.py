@@ -34,11 +34,11 @@ profile_config = ProfileConfig(
     catchup=False,
 )
 def example_virtualenv() -> None:
-    start_task = EmptyOperator(task_id='start-venv-examples')
-    end_task = EmptyOperator(task_id='end-venv-examples')
+    start_task = EmptyOperator(task_id="start-venv-examples")
+    end_task = EmptyOperator(task_id="end-venv-examples")
 
     tmp_venv_task_group = DbtTaskGroup(
-        group_id='tmp-venv-group',
+        group_id="tmp-venv-group",
         # dbt/cosmos-specific parameters
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
@@ -59,7 +59,7 @@ def example_virtualenv() -> None:
     )
 
     cached_venv_task_group = DbtTaskGroup(
-        group_id='cached-venv-group',
+        group_id="cached-venv-group",
         # dbt/cosmos-specific parameters
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
@@ -80,6 +80,6 @@ def example_virtualenv() -> None:
 
     start_task >> [tmp_venv_task_group, cached_venv_task_group] >> end_task
 
+
 example_virtualenv()
 # [END virtualenv_example]
-

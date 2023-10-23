@@ -53,13 +53,13 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.292
+    rev: v0.1.1
     hooks:
       - id: ruff
         args:
           - --fix
   - repo: https://github.com/psf/black
-    rev: 23.9.1
+    rev: 23.10.0
     hooks:
       - id: black
         args: [ "--config", "./pyproject.toml" ]
@@ -70,7 +70,7 @@ repos:
         alias: black
         additional_dependencies: [black>=22.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.6.0'
+    rev: 'v1.6.1'
     hooks:
       - id: mypy
         name: mypy-python

@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
+import logging
 
 import pytest
 from airflow.models import DAG
@@ -16,6 +17,7 @@ from cosmos.exceptions import CosmosValueError
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
 SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
+LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize("argument_key", ["tags", "paths"])
@@ -167,8 +169,7 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
-    ],
+    ]
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
@@ -194,6 +195,41 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
         operator_args=operator_args,
     )
     assert converter
+
+@pytest.mark.parametrize(
+    "execution_mode,virtualenv_dir,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, Path("/some/virtualenv/dir"), {}),
+        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+    ],
+)
+def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualenv_dir, operator_args, caplog):
+    """
+    This test will raise a warning if we are trying to pass ExecutionMode != `VirtualEnv` andm still pass a defined `virtualenv_dir`
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=execution_mode, virtualenv_dir=virtualenv_dir)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+
+    converter = DbtToAirflowConverter(
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args=operator_args,
+    )
+
+    assert converter
+
+    assert "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text
+
 
 
 @pytest.mark.parametrize(

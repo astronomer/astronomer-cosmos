@@ -180,7 +180,7 @@ pytest -vv \
 --cov-report=xml \
 --durations=0 \
 -m integration  \
--k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv or cosmos_manifest_example)'"""
+-k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv)'"""
 test-integration-expensive = """pytest -vv \
 --cov=cosmos \
 --cov-report=term-missing \

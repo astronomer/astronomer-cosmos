@@ -89,6 +89,7 @@ class DbtBaseOperator(BaseOperator):
         vars: dict[str, str] | None = None,
         models: str | None = None,
         emit_datasets: bool = True,
+        indirect_selection: str | None = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
         fail_fast: bool = False,
@@ -115,6 +116,7 @@ class DbtBaseOperator(BaseOperator):
         self.vars = vars
         self.models = models
         self.emit_datasets = emit_datasets
+        self.indirect_selection = indirect_selection
         self.cache_selected_only = cache_selected_only
         self.no_version_check = no_version_check
         self.fail_fast = fail_fast
@@ -212,6 +214,9 @@ class DbtBaseOperator(BaseOperator):
 
         if self.base_cmd:
             dbt_cmd.extend(self.base_cmd)
+
+        if self.indirect_selection:
+            dbt_cmd += ["--indirect-selection", self.indirect_selection]
 
         dbt_cmd.extend(self.add_global_flags())
 

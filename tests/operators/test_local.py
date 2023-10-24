@@ -120,6 +120,29 @@ def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
 
 
 @pytest.mark.parametrize(
+    "indirect_selection_type",
+    [None, "cautious", "buildable", "empty"],
+)
+def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> None:
+    dbt_base_operator = DbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        base_cmd=["run"],
+        indirect_selection=indirect_selection_type,
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    if indirect_selection_type:
+        assert cmd[-2] == "--indirect-selection"
+        assert cmd[-1] == indirect_selection_type
+    else:
+        assert cmd == ["dbt", "run"]
+
+
+@pytest.mark.parametrize(
     ["skip_exception", "exception_code_returned", "expected_exception"],
     [
         (99, 99, AirflowSkipException),

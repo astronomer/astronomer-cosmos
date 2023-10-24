@@ -58,6 +58,11 @@ def which_upload():
         downstream_tasks_to_run += ["generate_dbt_docs_azure"]
     except AirflowNotFoundException:
         pass
+    try:
+        BaseHook.get_connection(GCS_CONN_ID)
+        downstream_tasks_to_run += ["generate_dbt_docs_gcs"]
+    except AirflowNotFoundException:
+        pass
 
     return downstream_tasks_to_run
 
@@ -94,4 +99,4 @@ with DAG(
         bucket_name="cosmos-docs",
     )
 
-    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure]
+    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure, generate_dbt_docs_gcs]

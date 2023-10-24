@@ -396,6 +396,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#F58D7E"
+    template_fields: Sequence[str] = ("full_refresh",)
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
@@ -434,6 +435,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
+    template_fields: Sequence[str] = ("full_refresh",)
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
@@ -459,6 +461,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
+    template_fields: Sequence[str] = ("full_refresh",)
 
     def __init__(
         self,

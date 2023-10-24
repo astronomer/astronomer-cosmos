@@ -51,6 +51,17 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
 
 
+class TestIndirectSelection(Enum):
+    """
+    Modes to configure the test behavior when performing indirect selection.
+    """
+
+    EAGER = "eager"
+    CAUTIOUS = "cautious"
+    BUILDABLE = "buildable"
+    EMPTY = "empty"
+
+
 class DbtResourceType(aenum.Enum):  # type: ignore
     """
     Type of dbt node.

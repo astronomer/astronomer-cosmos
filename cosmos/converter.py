@@ -112,6 +112,7 @@ class DbtToAirflowConverter:
         test_indirect_selection = execution_config.test_indirect_selection
         load_mode = render_config.load_method
         dbt_executable_path = execution_config.dbt_executable_path
+        dbt_project_path_runtime_root = execution_config.dbt_project_path_root
         node_converters = render_config.node_converters
 
         profile_args = {}
@@ -145,7 +146,9 @@ class DbtToAirflowConverter:
         task_args = {
             **operator_args,
             # the following args may be only needed for local / venv:
-            "project_dir": project_config.dbt_project_path,
+            "project_dir": project_config.dbt_project_path
+            if project_config.dbt_project_path
+            else dbt_project_path_runtime_root / project_config.project_name,
             "profile_config": profile_config,
             "emit_datasets": emit_datasets,
         }

@@ -565,7 +565,7 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
 
     @abstractmethod
     def upload_to_cloud_storage(self, project_dir: str) -> None:
-        pass
+        """Abstract method to upload the generated documentation to cloud storage."""
 
 
 class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):

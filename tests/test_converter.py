@@ -113,7 +113,7 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
-def test_converter_creates_dag_with_no_project_dir(mock_load_dbt_graph, execution_mode, operator_args):
+def test_converter_fails_no_project_dir(mock_load_dbt_graph, execution_mode, operator_args):
     """
     This test validates that a project, given a manifest path and project name, with seeds
     is able to successfully generate a converter
@@ -126,12 +126,13 @@ def test_converter_creates_dag_with_no_project_dir(mock_load_dbt_graph, executio
         target_name="my_target_name",
         profiles_yml_filepath=SAMPLE_PROFILE_YML,
     )
-    converter = DbtToAirflowConverter(
-        nodes=nodes,
-        project_config=project_config,
-        profile_config=profile_config,
-        execution_config=execution_config,
-        render_config=render_config,
-        operator_args=operator_args,
-    )
-    assert converter
+    with pytest.raises(CosmosValueError) as err_info:
+        DbtToAirflowConverter(
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args=operator_args,
+        )
+        assert err_info.value.args[0] == "A Project Path in ProjectConfig is required for generating a Task Operators."

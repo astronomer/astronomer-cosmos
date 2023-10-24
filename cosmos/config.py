@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -224,4 +223,3 @@ class ExecutionConfig:
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = get_system_dbt()
-    dbt_project_path_root: str | Path = Path(os.environ.get("AIRFLOW_HOME", "/dbt")) / "dags" / "dbt"

@@ -163,12 +163,6 @@ class ProfileConfig:
         if not self.profiles_yml_filepath and not self.profile_mapping:
             raise CosmosValueError("Either profiles_yml_filepath or profile_mapping must be set to render a profile")
 
-    def is_profile_yml_available(self) -> bool:
-        """
-        Check if the `dbt` profiles.yml file exists.
-        """
-        return Path(self.profiles_yml_filepath).exists() if self.profiles_yml_filepath else False
-
     @contextlib.contextmanager
     def ensure_profile(
         self, desired_profile_path: Path | None = None, use_mock_values: bool = False

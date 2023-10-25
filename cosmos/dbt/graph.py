@@ -121,11 +121,7 @@ class DbtGraph:
             if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
             else:
-                if (
-                    execution_mode == ExecutionMode.LOCAL
-                    and self.profile_config
-                    and self.profile_config.is_profile_yml_available()
-                ):
+                if execution_mode == ExecutionMode.LOCAL and self.profile_config:
                     try:
                         self.load_via_dbt_ls()
                     except FileNotFoundError:

@@ -578,6 +578,8 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
         uploaded.
     """
 
+    ui_color = "#FF9900"
+
     def __init__(
         self,
         *args: Any,
@@ -592,8 +594,6 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
             )
             kwargs["connection_id"] = aws_conn_id
         super().__init__(*args, **kwargs)
-
-    ui_color = "#FF9900"
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
         "Uploads the generated documentation to S3."
@@ -636,6 +636,8 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
         uploaded.
     """
 
+    ui_color = "#007FFF"
+
     def __init__(
         self,
         *args: Any,
@@ -658,8 +660,6 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
             )
             kwargs["bucket_name"] = container_name
         super().__init__(*args, **kwargs)
-
-    ui_color = "#007FFF"
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
         "Uploads the generated documentation to Azure Blob Storage."
@@ -703,7 +703,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
         uploaded.
     """
 
-    ui_color = "#007FFF"
+    ui_color = "#4772d5"
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
         "Uploads the generated documentation to Google Cloud Storage"

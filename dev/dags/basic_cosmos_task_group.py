@@ -38,7 +38,7 @@ def basic_cosmos_task_group() -> None:
     jaffle_shop = DbtTaskGroup(
         group_id="test_123",
         project_config=ProjectConfig(
-            DBT_ROOT_PATH / "jaffle_shop",
+            (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
         ),
         operator_args={"install_deps": True},
         profile_config=profile_config,

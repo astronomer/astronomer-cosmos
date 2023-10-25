@@ -57,7 +57,10 @@ except (ImportError, ModuleNotFoundError):
         from openlineage.airflow.extractors.base import OperatorLineage
     except (ImportError, ModuleNotFoundError):
         logger.warning(
-            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage].",
+            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
+        )
+        logger.debug(
+            "Further details on lack of Openlineage:",
             stack_info=True,
         )
         is_openlineage_available = False

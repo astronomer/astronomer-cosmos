@@ -139,7 +139,8 @@ def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> No
         assert cmd[-2] == "--indirect-selection"
         assert cmd[-1] == indirect_selection_type
     else:
-        assert cmd == ["dbt", "run"]
+        assert cmd[0].endswith("dbt")
+        assert cmd[1] == "run"
 
 
 @pytest.mark.parametrize(

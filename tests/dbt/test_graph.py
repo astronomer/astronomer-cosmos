@@ -82,16 +82,32 @@ def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
     assert mock_load_from_dbt_manifest.called
 
 
-@patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=FileNotFoundError())
+@patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
-def test_load_automatic_without_manifest(mock_load_via_dbt_ls, mock_load_via_custom_parser):
-    project_config = ProjectConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path="/tmp/manifest.json"
-    )
+def test_load_automatic_without_manifest_with_profile_yml(mock_load_via_dbt_ls, mock_load_via_custom_parser):
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    dbt_graph.load(execution_mode=ExecutionMode.LOCAL)
+    assert mock_load_via_dbt_ls.called
+    assert not mock_load_via_custom_parser.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
+def test_load_automatic_without_manifest_with_profile_mapping(mock_load_via_dbt_ls, mock_load_via_custom_parser):
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="airflow_db",
+            profile_args={"schema": "public"},
+        ),
     )
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
     dbt_graph.load(execution_mode=ExecutionMode.LOCAL)

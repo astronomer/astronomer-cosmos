@@ -10,7 +10,7 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
 
-from cosmos.config import ProfileConfig
+from cosmos.config import ProfileConfig, ProjectConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
@@ -22,8 +22,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.dbt.parser.project import DbtProject as LegacyDbtProject
-from cosmos.dbt.project import DbtProject
+from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -64,7 +63,7 @@ class DbtGraph:
     Example of how to use:
 
         dbt_graph = DbtGraph(
-            project=DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR),
+            project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
             exclude=["*orders*"],
             select=[],
             dbt_cmd="/usr/local/bin/dbt",
@@ -77,11 +76,11 @@ class DbtGraph:
 
     def __init__(
         self,
-        project: DbtProject,
+        project: ProjectConfig,
+        profile_config: ProfileConfig | None = None,
         exclude: list[str] | None = None,
         select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
-        profile_config: ProfileConfig | None = None,
         operator_args: dict[str, Any] | None = None,
         dbt_deps: bool | None = True,
     ):
@@ -107,31 +106,34 @@ class DbtGraph:
         :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
             or dbt ls)
         :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.KUBERNETES)
+
+        Fundamentally, there are two different execution paths
+        There is automatic, and manual.
         """
+
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
+
         if method == LoadMode.AUTOMATIC:
             if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
-                return
-            elif execution_mode == ExecutionMode.LOCAL and self.project.is_profile_yml_available():
-                try:
-                    self.load_via_dbt_ls()
-                    return
-                except FileNotFoundError:
-                    self.load_via_custom_parser()
-                    return
             else:
-                self.load_via_custom_parser()
-                return
-
-        if method == LoadMode.DBT_MANIFEST and not self.project.is_manifest_available():
-            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
-
-        load_method[method]()
+                if (
+                    execution_mode == ExecutionMode.LOCAL
+                    and self.profile_config
+                    and self.profile_config.is_profile_yml_available()
+                ):
+                    try:
+                        self.load_via_dbt_ls()
+                    except FileNotFoundError:
+                        self.load_via_custom_parser()
+                else:
+                    self.load_via_custom_parser()
+        else:
+            load_method[method]()
 
     def load_via_dbt_ls(self) -> None:
         """
@@ -145,10 +147,14 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project `%s` in `%s` using dbt ls...", self.project.name, self.project.dir)
+        logger.info(
+            "Trying to parse the dbt project `%s` in `%s` using dbt ls...",
+            self.project.project_name,
+            self.project.dbt_project_path,
+        )
 
-        if not self.profile_config:
-            raise CosmosLoadDbtException("Unable to load dbt project without a profile config")
+        if not self.project.dbt_project_path or not self.profile_config:
+            raise CosmosLoadDbtException("Unable to load dbt project without project files and a profile config")
 
         if not shutil.which(self.dbt_cmd):
             raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
@@ -159,16 +165,20 @@ class DbtGraph:
             env.update(env_vars)
 
             with tempfile.TemporaryDirectory() as tmpdir:
-                logger.info("Content of the dbt project dir <%s>: `%s`", self.project.dir, os.listdir(self.project.dir))
-                logger.info("Creating symlinks from %s to `%s`", self.project.dir, tmpdir)
+                logger.info(
+                    "Content of the dbt project dir <%s>: `%s`",
+                    self.project.dbt_project_path,
+                    os.listdir(self.project.dbt_project_path),
+                )
+                logger.info("Creating symlinks from %s to `%s`", self.project.dbt_project_path, tmpdir)
                 # We create symbolic links to the original directory files and directories.
                 # This allows us to run the dbt command from within the temporary directory, outputting any necessary
                 # artifact and also allow us to run `dbt deps`
                 tmpdir_path = Path(tmpdir)
                 ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
-                for child_name in os.listdir(self.project.dir):
+                for child_name in os.listdir(self.project.dbt_project_path):
                     if child_name not in ignore_paths:
-                        os.symlink(self.project.dir / child_name, tmpdir_path / child_name)
+                        os.symlink(self.project.dbt_project_path / child_name, tmpdir_path / child_name)
 
                 local_flags = [
                     "--project-dir",
@@ -260,7 +270,7 @@ class DbtGraph:
                             unique_id=node_dict["unique_id"],
                             resource_type=DbtResourceType(node_dict["resource_type"]),
                             depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                            file_path=self.project.dir / node_dict["original_file_path"],
+                            file_path=self.project.dbt_project_path / node_dict["original_file_path"],
                             tags=node_dict["tags"],
                             config=node_dict["config"],
                         )
@@ -287,13 +297,16 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.name)
+        logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
+
+        if not self.project.dbt_project_path or not self.project.models_path or not self.project.seeds_path:
+            raise CosmosLoadDbtException("Unable to load dbt project without project files")
 
         project = LegacyDbtProject(
-            dbt_root_path=str(self.project.root_dir),
-            dbt_models_dir=self.project.models_dir.stem if self.project.models_dir else None,
-            dbt_seeds_dir=self.project.seeds_dir.stem if self.project.seeds_dir else None,
-            project_name=self.project.name,
+            project_name=self.project.dbt_project_path.stem,
+            dbt_root_path=self.project.dbt_project_path.parent.as_posix(),
+            dbt_models_dir=self.project.models_path.stem,
+            dbt_seeds_dir=self.project.seeds_path.stem,
             operator_args=self.operator_args,
         )
         nodes = {}
@@ -315,7 +328,7 @@ class DbtGraph:
 
         self.nodes = nodes
         self.filtered_nodes = select_nodes(
-            project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
+            project_dir=self.project.dbt_project_path, nodes=nodes, select=self.select, exclude=self.exclude
         )
 
         self.update_node_dependency()
@@ -337,7 +350,11 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.name)
+        logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
+
+        if not self.project.is_manifest_available():
+            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
+
         nodes = {}
         with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
             manifest = json.load(fp)
@@ -349,7 +366,9 @@ class DbtGraph:
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.project.dir / node_dict["original_file_path"],
+                    file_path=self.project.dbt_project_path / Path(node_dict["original_file_path"])
+                    if self.project.dbt_project_path
+                    else Path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                 )
@@ -358,7 +377,7 @@ class DbtGraph:
 
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
-                project_dir=self.project.dir, nodes=nodes, select=self.select, exclude=self.exclude
+                project_dir=self.project.dbt_project_path, nodes=nodes, select=self.select, exclude=self.exclude
             )
 
             self.update_node_dependency()

@@ -233,7 +233,7 @@ class DbtModel:
 
 
 @dataclass
-class DbtProject:
+class LegacyDbtProject:
     """
     Represents a single dbt project.
     """

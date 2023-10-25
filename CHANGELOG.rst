@@ -1,6 +1,26 @@
 Changelog
 =========
 
+1.2.1 (2023-10-25)
+------------------
+
+Bug fixes
+
+* Resolve errors occurring when ``dbt_project_path`` is str and partial support ``dbt_project_path=None`` by @MrBones757 in #605
+* Fix running dbt tests that depend on multiple models (support ``--indirect-selection buildable``) by @david-mag in #613
+* Add tests to sources, snapshots and seeds when using ``TestBehavior.AFTER_EACH`` by @tatiana in #599
+* Fix custom selector when select has a subset of tags of the models' tags by @david-mag in #606
+* Fix ``LoadMode.AUTOMATIC`` behaviour to use ``LoadMode.DBT_LS`` when ``ProfileMapping`` is used by @tatiana in #625
+* Fix failure if ``openlineage-common`` raises a jinja exception by @tatiana in #626
+
+Others
+
+* Update contributing guide docs by @raffifu in #591
+* Remove unnecessary stack trace from Cosmos initialization by @tatiana in #624
+* Fix running test that validates manifest-based DAGs by @tatiana in #619
+* pre-commit updates in #604 and #621
+
+
 1.2.0 (2023-10-13)
 ------------------
 

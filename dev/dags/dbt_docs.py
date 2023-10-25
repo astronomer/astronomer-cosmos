@@ -20,6 +20,7 @@ from cosmos import ProfileConfig
 from cosmos.operators import (
     DbtDocsAzureStorageOperator,
     DbtDocsS3Operator,
+    DbtDocsGCSOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -28,6 +29,7 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 S3_CONN_ID = "aws_docs"
 AZURE_CONN_ID = "azure_docs"
+GCS_CONN_ID = "gcs_docs"
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -56,6 +58,11 @@ def which_upload():
         downstream_tasks_to_run += ["generate_dbt_docs_azure"]
     except AirflowNotFoundException:
         pass
+    try:
+        BaseHook.get_connection(GCS_CONN_ID)
+        downstream_tasks_to_run += ["generate_dbt_docs_gcs"]
+    except AirflowNotFoundException:
+        pass
 
     return downstream_tasks_to_run
 
@@ -72,7 +79,7 @@ with DAG(
         task_id="generate_dbt_docs_aws",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
-        aws_conn_id=S3_CONN_ID,
+        connection_id=S3_CONN_ID,
         bucket_name="cosmos-docs",
     )
 
@@ -80,8 +87,16 @@ with DAG(
         task_id="generate_dbt_docs_azure",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
-        azure_conn_id=AZURE_CONN_ID,
-        container_name="$web",
+        connection_id=AZURE_CONN_ID,
+        bucket_name="$web",
     )
 
-    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure]
+    generate_dbt_docs_gcs = DbtDocsGCSOperator(
+        task_id="generate_dbt_docs_gcs",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
+        profile_config=profile_config,
+        connection_id=GCS_CONN_ID,
+        bucket_name="cosmos-docs",
+    )
+
+    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure, generate_dbt_docs_gcs]

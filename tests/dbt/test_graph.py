@@ -418,6 +418,17 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_test is False
 
 
+def test_tag_selected_node_test_exist():
+    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
+    dbt_graph = DbtGraph(project=dbt_project, select=["tag:test_tag"])
+    dbt_graph.load_from_dbt_manifest()
+
+    for _, node in dbt_graph.filtered_nodes.items():
+        assert node.tags == ["test_tag"]
+        if node.resource_type == DbtResourceType.MODEL:
+            assert node.has_test is True
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 def test_load_dbt_ls_and_manifest_with_model_version(load_method):

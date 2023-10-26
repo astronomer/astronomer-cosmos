@@ -7576,7 +7576,7 @@
       "resource_type": "model",
       "schema": "public",
       "sources": [],
-      "tags": [],
+      "tags": ["test_tag"],
       "unique_id": "model.jaffle_shop.customers",
       "unrendered_config": {
         "materialized": "table"
@@ -7754,7 +7754,7 @@
       "resource_type": "model",
       "schema": "public",
       "sources": [],
-      "tags": [],
+      "tags": ["test_tag"],
       "unique_id": "model.jaffle_shop.orders",
       "unrendered_config": {
         "materialized": "table"

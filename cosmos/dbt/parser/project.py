@@ -354,47 +354,21 @@ class LegacyDbtProject:
         if not config_dict:
             return
 
-        for model in config_dict.get("models", []):
-            model_name = model.get("name")
+        for model_config in config_dict.get("models", []):
+            model_name = model_config.get("name")
 
             # if the model doesn't exist, we can't do anything
             if not model_name:
                 continue
-
             # tests
-            for column in model.get("columns", []):
-                for test in column.get("tests", []):
-                    if not column.get("name"):
-                        continue
-
-                    # Get the test name
-                    if not isinstance(test, str):
-                        test = list(test.keys())[0]
-
-                    test_model = DbtModel(
-                        name=f"{test}_{column['name']}_{model_name}",
-                        type=DbtModelType.DBT_TEST,
-                        path=path,
-                        operator_args=self.operator_args,
-                        config=DbtModelConfig(upstream_models=set({model_name})),
-                    )
-
-                    self.tests[test_model.name] = test_model
+            model_tests = self._extract_model_tests(model_name, model_config, path)
+            self.tests.update(model_tests)
 
             # config_selectors
             if model_name not in self.models:
                 continue
 
-            config_selectors = []
-            for selector in DbtModelConfig.config_types:
-                config_value = model.get("config", {}).get(selector)
-                if config_value:
-                    if isinstance(config_value, str):
-                        config_selectors.append(f"{selector}:{config_value}")
-                    else:
-                        for item in config_value:
-                            if item:
-                                config_selectors.append(f"{selector}:{item}")
+            config_selectors = self._extract_config_selectors(model_config)
 
             # dbt default ensures "materialized:view" is set for all models if nothing is specified so that it will
             # work in a select/exclude list
@@ -407,3 +381,40 @@ class LegacyDbtProject:
             # then, get the model and merge the configs
             model = self.models[model_name]
             model.config = model.config + DbtModelConfig(config_selectors=set(config_selectors))
+
+    def _extract_model_tests(
+        self, model_name: str, model_config: dict[str, list[dict[str, dict[str, list[str]]]]], path: Path
+    ) -> dict[str, DbtModel]:
+        """Extracts tests from a dbt config file model."""
+        tests = {}
+        for column in model_config.get("columns", []):
+            for test in column.get("tests", []):
+                if not column.get("name"):
+                    continue
+                # Get the test name
+                if not isinstance(test, str):
+                    test = list(test.keys())[0]
+
+                test_model = DbtModel(
+                    name=f"{test}_{column['name']}_{model_name}",
+                    type=DbtModelType.DBT_TEST,
+                    path=path,
+                    operator_args=self.operator_args,
+                    config=DbtModelConfig(upstream_models=set({model_name})),
+                )
+                tests[test_model.name] = test_model
+        return tests
+
+    def _extract_config_selectors(self, model_config: dict[str, dict[str, str | list[str]]]) -> list[str]:
+        """Extracts config selectors from a dbt config file model."""
+        config_selectors = []
+        for selector in DbtModelConfig.config_types:
+            config_value = model_config.get("config", {}).get(selector)
+            if config_value:
+                if isinstance(config_value, str):
+                    config_selectors.append(f"{selector}:{config_value}")
+                else:
+                    for item in config_value:
+                        if item:
+                            config_selectors.append(f"{selector}:{item}")
+        return config_selectors

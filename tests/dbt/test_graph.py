@@ -505,8 +505,15 @@ def test_update_node_dependency_test_not_exist():
 
 
 def test_tag_selected_node_test_exist():
-    dbt_project = DbtProject(name="jaffle_shop", root_dir=DBT_PROJECTS_ROOT_DIR, manifest_path=SAMPLE_MANIFEST)
-    dbt_graph = DbtGraph(project=dbt_project, select=["tag:test_tag"])
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, select=["tag:test_tag"])
     dbt_graph.load_from_dbt_manifest()
 
     for _, node in dbt_graph.filtered_nodes.items():

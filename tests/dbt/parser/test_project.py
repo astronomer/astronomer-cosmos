@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from cosmos.dbt.parser.project import DbtModel, DbtModelType, DbtProject
+from cosmos.dbt.parser.project import DbtModel, DbtModelType, LegacyDbtProject
 
 DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags/dbt/"
 SAMPLE_CSV_PATH = DBT_PROJECT_PATH / "jaffle_shop/seeds/raw_customers.csv"
@@ -19,8 +19,8 @@ SAMPLE_SNAPSHOT_SQL_PATH = DBT_PROJECT_PATH / "jaffle_shop/models/orders.sql"
 SAMPLE_YML_PATH = DBT_PROJECT_PATH / "jaffle_shop/models/schema.yml"
 
 
-def test_dbtproject__handle_csv_file():
-    dbt_project = DbtProject(
+def test_LegacyDbtProject__handle_csv_file():
+    dbt_project = LegacyDbtProject(
         project_name="jaffle_shop",
     )
     assert not dbt_project.seeds
@@ -33,8 +33,8 @@ def test_dbtproject__handle_csv_file():
     assert raw_customers.path == SAMPLE_CSV_PATH
 
 
-def test_dbtproject__handle_sql_file_model():
-    dbt_project = DbtProject(
+def test_LegacyDbtProject__handle_sql_file_model():
+    dbt_project = LegacyDbtProject(
         project_name="jaffle_shop",
         dbt_root_path=DBT_PROJECT_PATH,
     )
@@ -49,8 +49,8 @@ def test_dbtproject__handle_sql_file_model():
     assert raw_customers.path == SAMPLE_MODEL_SQL_PATH
 
 
-def test_dbtproject__handle_sql_file_snapshot():
-    dbt_project = DbtProject(
+def test_LegacyDbtProject__handle_sql_file_snapshot():
+    dbt_project = LegacyDbtProject(
         project_name="jaffle_shop",
         dbt_root_path=DBT_PROJECT_PATH,
     )
@@ -65,8 +65,8 @@ def test_dbtproject__handle_sql_file_snapshot():
     assert raw_customers.path == SAMPLE_SNAPSHOT_SQL_PATH
 
 
-def test_dbtproject__handle_config_file():
-    dbt_project = DbtProject(
+def test_LegacyDbtProject__handle_config_file():
+    dbt_project = LegacyDbtProject(
         project_name="jaffle_shop",
         dbt_root_path=DBT_PROJECT_PATH,
     )
@@ -81,25 +81,25 @@ def test_dbtproject__handle_config_file():
     assert sample_test.path == SAMPLE_YML_PATH
 
 
-def test_dbtproject__handle_config_file_empty_file():
+def test_LegacyDbtProject__handle_config_file_empty_file():
     with NamedTemporaryFile("w") as tmp_fp:
         tmp_fp.flush()
         sample_config_file_path = Path(tmp_fp.name)
 
-        dbt_project = DbtProject(project_name="empty_project")
+        dbt_project = LegacyDbtProject(project_name="empty_project")
         assert not dbt_project.models
         dbt_project._handle_config_file(sample_config_file_path)
         assert not dbt_project.models
 
 
-def test_dbtproject__handle_config_file_with_unknown_name():
+def test_LegacyDbtProject__handle_config_file_with_unknown_name():
     yaml_data = {"models": [{"name": "unknown"}]}
     with NamedTemporaryFile("w") as tmp_fp:
         yaml.dump(yaml_data, tmp_fp)
         tmp_fp.flush()
 
         sample_config_file_path = Path(tmp_fp.name)
-        dbt_project = DbtProject(project_name="empty_project")
+        dbt_project = LegacyDbtProject(project_name="empty_project")
         assert not dbt_project.models
         dbt_project._handle_config_file(sample_config_file_path)
         assert not dbt_project.models
@@ -112,8 +112,8 @@ def test_dbtproject__handle_config_file_with_unknown_name():
         (["tag1", "tag2"], {"materialized:view", "tags:tag1", "tags:tag2"}),
     ],
 )
-def test_dbtproject__handle_config_file_with_selector(input_tags, expected_config_selectors):
-    dbt_project = DbtProject(
+def test_LegacyDbtProject__handle_config_file_with_selector(input_tags, expected_config_selectors):
+    dbt_project = LegacyDbtProject(
         project_name="jaffle_shop",
         dbt_root_path=DBT_PROJECT_PATH,
     )

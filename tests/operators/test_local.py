@@ -1,9 +1,10 @@
 import logging
 import os
+import sys
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 from airflow import DAG
@@ -24,6 +25,7 @@ from cosmos.operators.local import (
     DbtDocsLocalOperator,
     DbtDocsS3LocalOperator,
     DbtDocsAzureStorageLocalOperator,
+    DbtDocsGCSLocalOperator,
     DbtSeedLocalOperator,
     DbtRunOperationLocalOperator,
 )
@@ -137,7 +139,8 @@ def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> No
         assert cmd[-2] == "--indirect-selection"
         assert cmd[-1] == indirect_selection_type
     else:
-        assert cmd == ["dbt", "run"]
+        assert cmd[0].endswith("dbt")
+        assert cmd[1] == "run"
 
 
 @pytest.mark.parametrize(
@@ -379,6 +382,7 @@ def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwa
         DbtDocsLocalOperator,
         DbtDocsS3LocalOperator,
         DbtDocsAzureStorageLocalOperator,
+        DbtDocsGCSLocalOperator,
     ),
 )
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
@@ -386,6 +390,7 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     operator_class_kwargs = {
         DbtDocsS3LocalOperator: {"aws_conn_id": "fake-conn", "bucket_name": "fake-bucket"},
         DbtDocsAzureStorageLocalOperator: {"azure_conn_id": "fake-conn", "container_name": "fake-container"},
+        DbtDocsGCSLocalOperator: {"connection_id": "fake-conn", "bucket_name": "fake-bucket"},
     }
     task = operator_class(
         profile_config=profile_config,
@@ -413,3 +418,30 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     assert instance.parse.called
     err_msg = "Unable to parse OpenLineage events"
     assert err_msg in caplog.text
+
+
+@patch.object(DbtDocsGCSLocalOperator, "required_files", ["file1", "file2"])
+def test_dbt_docs_gcs_local_operator():
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = DbtDocsGCSLocalOperator(
+            task_id="fake-task",
+            project_dir="fake-dir",
+            profile_config=profile_config,
+            connection_id="fake-conn",
+            bucket_name="fake-bucket",
+            folder_dir="fake-folder",
+        )
+        operator.upload_to_cloud_storage("fake-dir")
+
+        # assert that GCSHook was called with the connection id
+        mock_gcs.GCSHook.assert_called_once_with("fake-conn")
+
+        mock_hook = mock_gcs.GCSHook.return_value
+        # assert that upload was called twice with the expected arguments
+        assert mock_hook.upload.call_count == 2
+        expected_upload_calls = [
+            call(filename="fake-dir/target/file1", bucket_name="fake-bucket", object_name="fake-folder/file1"),
+            call(filename="fake-dir/target/file2", bucket_name="fake-bucket", object_name="fake-folder/file2"),
+        ]
+        mock_hook.upload.assert_has_calls(expected_upload_calls)

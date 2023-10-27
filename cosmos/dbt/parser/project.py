@@ -362,7 +362,7 @@ class LegacyDbtProject:
                 continue
             # tests
             model_tests = self._extract_model_tests(model_name, model_config, path)
-            self.tests |= model_tests
+            self.tests.update(model_tests)
 
             # config_selectors
             if model_name not in self.models:

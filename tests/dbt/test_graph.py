@@ -7,7 +7,15 @@ import pytest
 
 from cosmos.config import ProfileConfig, ProjectConfig
 from cosmos.constants import DbtResourceType, ExecutionMode
-from cosmos.dbt.graph import CosmosLoadDbtException, DbtGraph, LoadMode
+from cosmos.dbt.graph import (
+    CosmosLoadDbtException,
+    DbtGraph,
+    DbtNode,
+    LoadMode,
+    create_symlinks,
+    run_command,
+    parse_dbt_ls_output,
+)
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -554,3 +562,59 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
         "model.jaffle_shop.stg_orders.v1",
         "model.jaffle_shop.stg_payments",
     } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)
+
+
+def test_create_symlinks(tmp_path):
+    """Tests that symlinks are created for expected files in the dbt project directory."""
+    tmp_dir = tmp_path / "dbt-project"
+    tmp_dir.mkdir()
+
+    create_symlinks(DBT_PROJECTS_ROOT_DIR / "jaffle_shop", tmp_dir)
+    for child in tmp_dir.iterdir():
+        assert child.is_symlink()
+        assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
+
+
+@pytest.mark.parametrize(
+    "stdout,returncode",
+    [
+        ("all good", None),
+        pytest.param("fail", 599, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
+        pytest.param("Error", None, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
+    ],
+)
+@patch("cosmos.dbt.graph.Popen")
+def test_run_command(mock_popen, stdout, returncode):
+    fake_command = ["fake", "command"]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = (stdout, "")
+    mock_popen.return_value.returncode = returncode
+
+    return_value = run_command(fake_command, fake_dir, env_vars)
+    args, kwargs = mock_popen.call_args
+    assert args[0] == fake_command
+    assert kwargs["cwd"] == fake_dir
+    assert kwargs["env"] == env_vars
+
+    assert return_value == stdout
+
+
+def test_parse_dbt_ls_output():
+    fake_ls_stdout = '{"resource_type": "model", "name": "fake-name", "original_file_path": "fake-file-path.sql", "unique_id": "fake-unique-id", "tags": [], "config": {}}'
+
+    expected_nodes = {
+        "fake-unique-id": DbtNode(
+            name="fake-name",
+            unique_id="fake-unique-id",
+            resource_type=DbtResourceType.MODEL,
+            file_path=Path("fake-project/fake-file-path.sql"),
+            tags=[],
+            config={},
+            depends_on=[],
+        ),
+    }
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert expected_nodes == nodes

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.config import ProfileConfig, ProjectConfig
+from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
@@ -56,7 +56,8 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, exclude=["config.materialized:table"])
+    render_config = RenderConfig(exclude=["config.materialized:table"])
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.nodes) == 28
@@ -502,7 +503,8 @@ def test_update_node_dependency_test_not_exist():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, exclude=["config.materialized:test"])
+    render_config = RenderConfig(exclude=["config.materialized:test"])
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
     dbt_graph.load_from_dbt_manifest()
 
     for _, nodes in dbt_graph.filtered_nodes.items():

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Callable
 
@@ -40,6 +40,13 @@ class RenderConfig:
     exclude: list[str] = field(default_factory=list)
     dbt_deps: bool = True
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
+    dbt_executable_path: str | Path = get_system_dbt()
+    dbt_project_path: InitVar[str | Path | None] = None
+
+    project_path: Path | None = field(init=False)
+
+    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+        self.project_path = Path(dbt_project_path) if dbt_project_path else None
 
 
 class ProjectConfig:
@@ -217,3 +224,10 @@ class ExecutionConfig:
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = get_system_dbt()
+
+    dbt_project_path: InitVar[str | Path | None] = None
+
+    project_path: Path | None = field(init=False)
+
+    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+        self.project_path = Path(dbt_project_path) if dbt_project_path else None

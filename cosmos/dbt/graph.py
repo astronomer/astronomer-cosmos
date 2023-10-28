@@ -10,7 +10,7 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
 
-from cosmos.config import ProfileConfig, ProjectConfig
+from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
@@ -135,22 +135,15 @@ class DbtGraph:
     def __init__(
         self,
         project: ProjectConfig,
+        render_config: RenderConfig = RenderConfig(),
         profile_config: ProfileConfig | None = None,
-        exclude: list[str] | None = None,
-        select: list[str] | None = None,
         dbt_cmd: str = get_system_dbt(),
         operator_args: dict[str, Any] | None = None,
-        dbt_deps: bool | None = True,
     ):
         self.project = project
-        self.exclude = exclude or []
-        self.select = select or []
+        self.render_config = render_config
         self.profile_config = profile_config
         self.operator_args = operator_args or {}
-        self.dbt_deps = dbt_deps
-
-        # specific to loading using ls
-        self.dbt_deps = dbt_deps
         self.dbt_cmd = dbt_cmd
 
     def load(
@@ -193,11 +186,11 @@ class DbtGraph:
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [self.dbt_cmd, "ls", "--output", "json"]
 
-        if self.exclude:
-            ls_command.extend(["--exclude", *self.exclude])
+        if self.render_config.exclude:
+            ls_command.extend(["--exclude", *self.render_config.exclude])
 
-        if self.select:
-            ls_command.extend(["--select", *self.select])
+        if self.render_config.select:
+            ls_command.extend(["--select", *self.render_config.select])
 
         ls_command.extend(self.local_flags)
 
@@ -269,7 +262,7 @@ class DbtGraph:
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
-                if self.dbt_deps:
+                if self.render_config.dbt_deps:
                     deps_command = [self.dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)
@@ -328,7 +321,10 @@ class DbtGraph:
 
         self.nodes = nodes
         self.filtered_nodes = select_nodes(
-            project_dir=self.project.dbt_project_path, nodes=nodes, select=self.select, exclude=self.exclude
+            project_dir=self.project.dbt_project_path,
+            nodes=nodes,
+            select=self.render_config.select,
+            exclude=self.render_config.exclude,
         )
 
         self.update_node_dependency()
@@ -377,7 +373,10 @@ class DbtGraph:
 
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
-                project_dir=self.project.dbt_project_path, nodes=nodes, select=self.select, exclude=self.exclude
+                project_dir=self.project.dbt_project_path,
+                nodes=nodes,
+                select=self.render_config.select,
+                exclude=self.render_config.exclude,
             )
 
             self.update_node_dependency()

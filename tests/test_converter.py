@@ -113,7 +113,7 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
-def test_converter_fails_no_project_dir(mock_load_dbt_graph, execution_mode, operator_args):
+def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, execution_mode, operator_args):
     """
     This test validates that a project, given a manifest path and project name, with seeds
     is able to successfully generate a converter
@@ -135,4 +135,7 @@ def test_converter_fails_no_project_dir(mock_load_dbt_graph, execution_mode, ope
             render_config=render_config,
             operator_args=operator_args,
         )
-        assert err_info.value.args[0] == "A Project Path in ProjectConfig is required for generating a Task Operators."
+    assert (
+        err_info.value.args[0]
+        == "ExecutionConfig.project_path is required for the execution of dbt tasks in all execution modes."
+    )

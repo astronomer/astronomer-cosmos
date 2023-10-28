@@ -137,5 +137,5 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
         )
     assert (
         err_info.value.args[0]
-        == "ExecutionConfig.project_path is required for the execution of dbt tasks in all execution modes."
+        == "ExecutionConfig.dbt_project_path is required for the execution of dbt tasks in all execution modes."
     )

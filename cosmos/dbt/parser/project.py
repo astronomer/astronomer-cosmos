@@ -145,7 +145,6 @@ class DbtModel:
         code = self.path.read_text()
 
         if self.type == DbtModelType.DBT_SNAPSHOT:
-            code = self.path.read_text()
             snapshot_name = code.split("{%")[1]
             snapshot_name = snapshot_name.split("%}")[0]
             snapshot_name = snapshot_name.split(" ")[2]

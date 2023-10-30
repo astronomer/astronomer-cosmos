@@ -336,11 +336,11 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
 def test_load_via_dbt_ls_with_sources(load_method):
     project_name = "simple"
     dbt_graph = DbtGraph(
-        dbt_deps=False,
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
         ),
+        render_config=RenderConfig(dbt_deps=False),
         profile_config=ProfileConfig(
             profile_name="simple",
             target_name="dev",

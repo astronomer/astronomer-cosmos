@@ -516,6 +516,8 @@ def test_tag_selected_node_test_exist():
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, select=["tag:test_tag"])
     dbt_graph.load_from_dbt_manifest()
 
+    assert len(dbt_graph.filtered_nodes) > 0
+
     for _, node in dbt_graph.filtered_nodes.items():
         assert node.tags == ["test_tag"]
         if node.resource_type == DbtResourceType.MODEL:

@@ -504,6 +504,26 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_test is False
 
 
+def test_tag_selected_node_test_exist():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, select=["tag:test_tag"])
+    dbt_graph.load_from_dbt_manifest()
+
+    assert len(dbt_graph.filtered_nodes) > 0
+
+    for _, node in dbt_graph.filtered_nodes.items():
+        assert node.tags == ["test_tag"]
+        if node.resource_type == DbtResourceType.MODEL:
+            assert node.has_test is True
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 def test_load_dbt_ls_and_manifest_with_model_version(load_method):

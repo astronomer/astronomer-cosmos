@@ -462,7 +462,6 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
 
     def __init__(
         self,

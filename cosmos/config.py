@@ -31,6 +31,9 @@ class RenderConfig:
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
+    :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
+    :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
     """
 
     emit_datasets: bool = True
@@ -217,8 +220,8 @@ class ExecutionConfig:
 
     :param execution_mode: The execution mode for dbt. Defaults to local
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
-    :param dbt_executable_path: The path to the dbt executable. Defaults to dbt if
-    available on the path.
+    :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
+    :param dbt_project_path Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL

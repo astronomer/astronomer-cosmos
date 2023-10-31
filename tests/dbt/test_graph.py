@@ -438,11 +438,10 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
             ),
         ),
     )
-    with pytest.raises(CosmosLoadDbtException) as err_info:
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome Runtime Error"
+    with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
-    expected = "Unable to run dbt deps command due to the error:\nSome Runtime Error"
-    assert err_info.value.args[0] == expected
     mock_popen_communicate.assert_called_once()
 
 

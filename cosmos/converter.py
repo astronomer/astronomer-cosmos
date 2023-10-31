@@ -110,9 +110,6 @@ class DbtToAirflowConverter:
         # Since we now support both project_config.dbt_project_path, render_config.project_path and execution_config.project_path
         # We need to ensure that only one interface is being used.
         if project_config.dbt_project_path and (render_config.project_path or execution_config.project_path):
-            print(f"RenderConfig: {render_config.project_path}")
-            print(f"ExecutionConfig: {execution_config.project_path}")
-            print(f"ProjectConfig: {project_config.dbt_project_path}")
             raise CosmosValueError(
                 "ProjectConfig.dbt_project_path is mutually exclusive with RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path."
                 + "If using RenderConfig.dbt_project_path or ExecutionConfig.dbt_project_path, ProjectConfig.dbt_project_path should be None"

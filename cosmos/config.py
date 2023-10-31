@@ -82,11 +82,13 @@ class ProjectConfig:
         manifest_path: str | Path | None = None,
         project_name: str | None = None,
     ):
+        # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
+        #   dbt_project_path may not always be defined here.
+        # We do, however, still require that both manifest_path and project_name be defined, or neither be defined.
         if not dbt_project_path:
-            if not manifest_path or not project_name:
+            if manifest_path and not project_name or project_name and not manifest_path:
                 raise CosmosValueError(
-                    "ProjectConfig requires dbt_project_path and/or manifest_path to be defined."
-                    " If only manifest_path is defined, project_name must also be defined."
+                    "If ProjectConfig.dbt_project_path is not defined, ProjectConfig.manifest_path and ProjectConfig.project_name must be defined together, or both left undefined."
                 )
         if project_name:
             self.project_name = project_name

@@ -139,3 +139,79 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
         err_info.value.args[0]
         == "ExecutionConfig.dbt_project_path is required for the execution of dbt tasks in all execution modes."
     )
+
+
+@pytest.mark.parametrize(
+    "execution_mode,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, {}),
+        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_fails_project_config_path_and_execution_config_path(
+    mock_load_dbt_graph, execution_mode, operator_args
+):
+    """
+    This test ensures that we fail if we defined project path in ProjectConfig and ExecutionConfig
+    They are mutually exclusive, so this should be allowed.
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
+    execution_config = ExecutionConfig(execution_mode=execution_mode, dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    with pytest.raises(CosmosValueError) as err_info:
+        DbtToAirflowConverter(
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args=operator_args,
+        )
+    assert (
+        err_info.value.args[0]
+        == "ProjectConfig.dbt_project_path is mutually exclusive with RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path.If using RenderConfig.dbt_project_path or ExecutionConfig.dbt_project_path, ProjectConfig.dbt_project_path should be None"
+    )
+
+
+@pytest.mark.parametrize(
+    "execution_mode,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, {}),
+        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_fails_no_manifest_no_render_config(mock_load_dbt_graph, execution_mode, operator_args):
+    """
+    This test ensures that we fail if we define project path in ProjectConfig and ExecutionConfig
+    They are mutually exclusive, so this should be allowed.
+    """
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig(execution_mode=execution_mode, dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    with pytest.raises(CosmosValueError) as err_info:
+        DbtToAirflowConverter(
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args=operator_args,
+        )
+    assert (
+        err_info.value.args[0]
+        == "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
+    )

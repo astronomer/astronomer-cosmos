@@ -231,8 +231,7 @@ def test_load_via_dbt_ls_with_exclude():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
-        select=["*customers*"],
-        exclude=["*orders*"],
+        render_config=RenderConfig(select=["*customers*"], exclude=["*orders*"]),
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -357,8 +356,8 @@ def test_load_via_dbt_ls_with_sources(load_method):
 def test_load_via_dbt_ls_without_dbt_deps():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
-        dbt_deps=False,
         project=project_config,
+        render_config=RenderConfig(dbt_deps=False),
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -520,7 +519,8 @@ def test_tag_selected_node_test_exist():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, select=["tag:test_tag"])
+    render_config = RenderConfig(select=["tag:test_tag"])
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.filtered_nodes) > 0

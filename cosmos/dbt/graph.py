@@ -122,9 +122,8 @@ class DbtGraph:
 
         dbt_graph = DbtGraph(
             project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
-            exclude=["*orders*"],
-            select=[],
-            dbt_cmd="/usr/local/bin/dbt",
+            render_config=RenderConfig(exclude=["*orders*"], select=[]),
+            dbt_cmd="/usr/local/bin/dbt"
         )
         dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """

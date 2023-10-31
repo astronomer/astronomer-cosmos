@@ -415,11 +415,9 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
             ),
         ),
     )
-    with pytest.raises(CosmosLoadDbtException) as err_info:
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome stderr message"
+    with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
-
-    expected = "Unable to run dbt deps command due to the error:\nSome stderr message"
-    assert err_info.value.args[0] == expected
 
 
 @pytest.mark.integration

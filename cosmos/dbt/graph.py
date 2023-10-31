@@ -76,6 +76,11 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
     stdout, stderr = process.communicate()
     returncode = process.returncode
 
+    if 'Run "dbt deps" to install package dependencies' in stdout and command[1] == "ls":
+        raise CosmosLoadDbtException(
+            "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
+        )
+
     if returncode or "Error" in stdout:
         details = stderr or stdout
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
@@ -205,10 +210,6 @@ class DbtGraph:
             with open(log_filepath) as logfile:
                 for line in logfile:
                     logger.debug(line.strip())
-        if 'Run "dbt deps" to install package dependencies' in stdout:
-            raise CosmosLoadDbtException(
-                "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
-            )
 
         nodes = parse_dbt_ls_output(dbt_project_path, stdout)
         return nodes

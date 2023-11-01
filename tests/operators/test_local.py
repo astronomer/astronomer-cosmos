@@ -420,6 +420,19 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     assert err_msg in caplog.text
 
 
+@pytest.mark.parametrize(
+    "operator_class,expected_template",
+    [
+        (DbtSeedLocalOperator, ("env", "vars", "full_refresh")),
+        (DbtRunLocalOperator, ("env", "vars", "full_refresh")),
+    ],
+)
+def test_dbt_base_operator_template_fields(operator_class, expected_template):
+    # Check if value of template fields is what we expect for the operators we're validating
+    dbt_base_operator = operator_class(profile_config=profile_config, task_id="my-task", project_dir="my/dir")
+    assert dbt_base_operator.template_fields == expected_template
+
+
 @patch.object(DbtDocsGCSLocalOperator, "required_files", ["file1", "file2"])
 def test_dbt_docs_gcs_local_operator():
     mock_gcs = MagicMock()
@@ -446,14 +459,3 @@ def test_dbt_docs_gcs_local_operator():
         ]
         mock_hook.upload.assert_has_calls(expected_upload_calls)
 
-@pytest.mark.parametrize(
-    "operator_class,expected_template",
-    [
-        (DbtSeedLocalOperator, ("env", "vars", "full_refresh")),
-        (DbtRunLocalOperator, ("env", "vars", "full_refresh")),
-    ],
-)
-def test_dbt_base_operator_template_fields(operator_class, expected_template):
-    # Check if value of template fields is what we expect for the operators we're validating
-    dbt_base_operator = operator_class(profile_config=profile_config, task_id="my-task", project_dir="my/dir")
-    assert dbt_base_operator.template_fields == expected_template

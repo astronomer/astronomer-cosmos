@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
@@ -57,7 +57,13 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(exclude=["config.materialized:table"])
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.nodes) == 28
@@ -292,30 +298,48 @@ def test_load_via_dbt_ls_without_exclude(project_name):
 
 def test_load_via_custom_without_project_path():
     project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="test")
-    dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=project_config)
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig()
+    dbt_graph = DbtGraph(
+        dbt_cmd="/inexistent/dbt",
+        project=project_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_custom_parser()
 
-    expected = "Unable to load dbt project without project files"
+    expected = "Unable to load dbt project without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
     assert err_info.value.args[0] == expected
 
 
 def test_load_via_dbt_ls_without_profile():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    dbt_graph = DbtGraph(dbt_cmd="/inexistent/dbt", project=project_config)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        dbt_cmd="/inexistent/dbt",
+        project=project_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_via_dbt_ls()
 
-    expected = "Unable to load dbt project without project files and a profile config"
+    expected = "Unable to load project via dbt ls without a profile config."
     assert err_info.value.args[0] == expected
 
 
 def test_load_via_dbt_ls_with_invalid_dbt_path():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     with patch("pathlib.Path.exists", return_value=True):
         dbt_graph = DbtGraph(
             dbt_cmd="/inexistent/dbt",
             project=project_config,
+            execution_config=execution_config,
+            render_config=render_config,
             profile_config=ProfileConfig(
                 profile_name="default",
                 target_name="default",
@@ -446,12 +470,19 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
 @pytest.mark.parametrize("project_name", ("jaffle_shop", "jaffle_shop_python"))
 def test_load_via_load_via_custom_parser(project_name):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
 
     dbt_graph.load_via_custom_parser()
 
@@ -464,12 +495,13 @@ def test_update_node_dependency_called(mock_update_node_dependency):
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
     )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    dbt_graph = DbtGraph(project=project_config, execution_config=execution_config, profile_config=profile_config)
     dbt_graph.load()
 
     assert mock_update_node_dependency.called
@@ -484,7 +516,8 @@ def test_update_node_dependency_target_exist():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(project=project_config, execution_config=execution_config, profile_config=profile_config)
     dbt_graph.load()
 
     for _, nodes in dbt_graph.nodes.items():
@@ -503,7 +536,13 @@ def test_update_node_dependency_test_not_exist():
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(exclude=["config.materialized:test"])
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
     dbt_graph.load_from_dbt_manifest()
 
     for _, nodes in dbt_graph.filtered_nodes.items():
@@ -520,7 +559,13 @@ def test_tag_selected_node_test_exist():
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(select=["tag:test_tag"])
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.filtered_nodes) > 0

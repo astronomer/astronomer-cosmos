@@ -212,8 +212,12 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_pop
     assert not (tmp_dbt_project_dir / "logs").exists()
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -235,9 +239,14 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_pop
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_exclude():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, select=["*customers*"], exclude=["*orders*"]
+    )
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
-        render_config=RenderConfig(select=["*customers*"], exclude=["*orders*"]),
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -279,8 +288,12 @@ def test_load_via_dbt_ls_with_exclude():
 @pytest.mark.parametrize("project_name", ("jaffle_shop", "jaffle_shop_python"))
 def test_load_via_dbt_ls_without_exclude(project_name):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -363,7 +376,8 @@ def test_load_via_dbt_ls_with_sources(load_method):
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
         ),
-        render_config=RenderConfig(dbt_deps=False),
+        render_config=RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name, dbt_deps=False),
+        execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
             profile_name="simple",
             target_name="dev",
@@ -379,9 +393,12 @@ def test_load_via_dbt_ls_with_sources(load_method):
 @pytest.mark.integration
 def test_load_via_dbt_ls_without_dbt_deps():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
-        render_config=RenderConfig(dbt_deps=False),
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -406,8 +423,12 @@ def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(mock_popen, t
     mock_popen().returncode = 0
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -428,8 +449,12 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
     mock_popen().returncode = 1
 
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -449,8 +474,12 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
 def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",
@@ -584,6 +613,8 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version",
             manifest_path=SAMPLE_MANIFEST_MODEL_VERSION if load_method == "load_from_dbt_manifest" else None,
         ),
+        render_config=RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version"),
+        execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version"),
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="default",

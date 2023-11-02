@@ -146,7 +146,8 @@ dependencies = [
     "types-attrs",
     "types-requests",
     "types-python-dateutil",
-    "apache-airflow"
+    "apache-airflow",
+    "Werkzeug<3.0.0",
 ]
 
 [[tool.hatch.envs.tests.matrix]]

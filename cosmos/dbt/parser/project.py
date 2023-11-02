@@ -137,17 +137,14 @@ class DbtModel:
         """
         Parses the file and extracts metadata (dependencies, tags, etc)
         """
-        # first, get an empty config
+        if self.type == DbtModelType.DBT_SEED or self.type == DbtModelType.DBT_TEST:
+            return
+
         config = DbtModelConfig()
-        var_args: Dict[str, Any] = self.operator_args.get("vars", {})
+        self.var_args: Dict[str, Any] = self.operator_args.get("vars", {})
+        code = self.path.read_text()
 
-        if self.type == DbtModelType.DBT_MODEL:
-            # get the code from the file
-            code = self.path.read_text()
-
-        # we remove first and last line if the code is a snapshot
-        elif self.type == DbtModelType.DBT_SNAPSHOT:
-            code = self.path.read_text()
+        if self.type == DbtModelType.DBT_SNAPSHOT:
             snapshot_name = code.split("{%")[1]
             snapshot_name = snapshot_name.split("%}")[0]
             snapshot_name = snapshot_name.split(" ")[2]
@@ -156,55 +153,73 @@ class DbtModel:
             code = code.split("%}")[1]
             code = code.split("{%")[0]
 
-        elif self.type == DbtModelType.DBT_SEED or self.type == DbtModelType.DBT_TEST:
-            return
-
         if self.path.suffix == PYTHON_FILE_SUFFIX:
             config.upstream_models = config.upstream_models.union(set(extract_python_file_upstream_requirements(code)))
         else:
-            # get the dependencies
-            env = jinja2.Environment()
-            jinja2_ast = env.parse(code)
-            # iterate over the jinja nodes to extract info
-            for base_node in jinja2_ast.find_all(jinja2.nodes.Call):
-                if hasattr(base_node.node, "name"):
-                    try:
-                        # check we have a ref - this indicates a dependency
-                        if base_node.node.name == "ref":
-                            # if it is, get the first argument
-                            first_arg = base_node.args[0]
-                            # if it contains vars, render the value of the var
-                            if isinstance(first_arg, jinja2.nodes.Concat):
-                                value = ""
-                                for node in first_arg.nodes:
-                                    if isinstance(node, jinja2.nodes.Const):
-                                        value += node.value
-                                    elif (
-                                        isinstance(node, jinja2.nodes.Call)
-                                        and isinstance(node.node, jinja2.nodes.Name)
-                                        and isinstance(node.args[0], jinja2.nodes.Const)
-                                        and node.node.name == "var"
-                                    ):
-                                        value += var_args[node.args[0].value]
-                                config.upstream_models.add(value)
-                            elif isinstance(first_arg, jinja2.nodes.Const):
-                                # and add it to the config
-                                config.upstream_models.add(first_arg.value)
+            upstream_models, extracted_config = self.extract_sql_file_requirements(code)
+            config.upstream_models = config.upstream_models.union(set(upstream_models))
+            config.config_selectors |= extracted_config
 
-                        # check if we have a config - this could contain tags
-                        if base_node.node.name == "config":
-                            # if it is, check if any kwargs are tags
-                            for kwarg in base_node.kwargs:
-                                for selector in self.config.config_types:
-                                    extracted_config = self._extract_config(kwarg=kwarg, config_name=selector)
-                                    config.config_selectors |= (
-                                        set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
-                                    )
-                    except KeyError as e:
-                        logger.warning(f"Could not add upstream model for config in {self.path}: {e}")
-
-        # set the config and set the parsed file flag to true
         self.config = config
+
+    def extract_sql_file_requirements(self, code: str) -> tuple[list[str], set[str]]:
+        """Extracts upstream models and config selectors from a dbt sql file."""
+        # get the dependencies
+        env = jinja2.Environment()
+        jinja2_ast = env.parse(code)
+        upstream_models = []
+        config_selectors = set()
+        # iterate over the jinja nodes to extract info
+        for base_node in jinja2_ast.find_all(jinja2.nodes.Call):
+            if hasattr(base_node.node, "name"):
+                try:
+                    # check we have a ref - this indicates a dependency
+                    if base_node.node.name == "ref":
+                        upstream_model = self._parse_jinja_ref_node(base_node)
+                        if upstream_model:
+                            upstream_models.append(upstream_model)
+                    # check if we have a config - this could contain tags
+                    if base_node.node.name == "config":
+                        config_selectors |= self._parse_jinja_config_node(base_node)
+                except KeyError as e:
+                    logger.warning(f"Could not add upstream model for config in {self.path}: {e}")
+
+        return upstream_models, config_selectors
+
+    def _parse_jinja_ref_node(self, base_node: jinja2.nodes.Call) -> str | None:
+        """Parses a jinja ref node."""
+        # get the first argument
+        first_arg = base_node.args[0]
+        value = None
+        # if it contains vars, render the value of the var
+        if isinstance(first_arg, jinja2.nodes.Concat):
+            value = ""
+            for node in first_arg.nodes:
+                if isinstance(node, jinja2.nodes.Const):
+                    value += node.value
+                elif (
+                    isinstance(node, jinja2.nodes.Call)
+                    and isinstance(node.node, jinja2.nodes.Name)
+                    and isinstance(node.args[0], jinja2.nodes.Const)
+                    and node.node.name == "var"
+                ):
+                    value += self.var_args[node.args[0].value]
+        elif isinstance(first_arg, jinja2.nodes.Const):
+            # and add it to the config
+            value = first_arg.value
+
+        return value
+
+    def _parse_jinja_config_node(self, base_node: jinja2.nodes.Call) -> set[str]:
+        """Parses a jinja config node."""
+        # check if any kwargs are tags
+        selector_config = set()
+        for kwarg in base_node.kwargs:
+            for config_name in self.config.config_types:
+                if hasattr(kwarg, "key") and kwarg.key == config_name:
+                    extracted_config = self._extract_config(kwarg, config_name)
+                    selector_config |= set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
+        return selector_config
 
     # TODO following needs coverage:
     def _extract_config(self, kwarg: Any, config_name: str) -> Any:
@@ -354,47 +369,21 @@ class LegacyDbtProject:
         if not config_dict:
             return
 
-        for model in config_dict.get("models", []):
-            model_name = model.get("name")
+        for model_config in config_dict.get("models", []):
+            model_name = model_config.get("name")
 
             # if the model doesn't exist, we can't do anything
             if not model_name:
                 continue
-
             # tests
-            for column in model.get("columns", []):
-                for test in column.get("tests", []):
-                    if not column.get("name"):
-                        continue
-
-                    # Get the test name
-                    if not isinstance(test, str):
-                        test = list(test.keys())[0]
-
-                    test_model = DbtModel(
-                        name=f"{test}_{column['name']}_{model_name}",
-                        type=DbtModelType.DBT_TEST,
-                        path=path,
-                        operator_args=self.operator_args,
-                        config=DbtModelConfig(upstream_models=set({model_name})),
-                    )
-
-                    self.tests[test_model.name] = test_model
+            model_tests = self._extract_model_tests(model_name, model_config, path)
+            self.tests.update(model_tests)
 
             # config_selectors
             if model_name not in self.models:
                 continue
 
-            config_selectors = []
-            for selector in DbtModelConfig.config_types:
-                config_value = model.get("config", {}).get(selector)
-                if config_value:
-                    if isinstance(config_value, str):
-                        config_selectors.append(f"{selector}:{config_value}")
-                    else:
-                        for item in config_value:
-                            if item:
-                                config_selectors.append(f"{selector}:{item}")
+            config_selectors = self._extract_config_selectors(model_config)
 
             # dbt default ensures "materialized:view" is set for all models if nothing is specified so that it will
             # work in a select/exclude list
@@ -407,3 +396,40 @@ class LegacyDbtProject:
             # then, get the model and merge the configs
             model = self.models[model_name]
             model.config = model.config + DbtModelConfig(config_selectors=set(config_selectors))
+
+    def _extract_model_tests(
+        self, model_name: str, model_config: dict[str, list[dict[str, dict[str, list[str]]]]], path: Path
+    ) -> dict[str, DbtModel]:
+        """Extracts tests from a dbt config file model."""
+        tests = {}
+        for column in model_config.get("columns", []):
+            for test in column.get("tests", []):
+                if not column.get("name"):
+                    continue
+                # Get the test name
+                if not isinstance(test, str):
+                    test = list(test.keys())[0]
+
+                test_model = DbtModel(
+                    name=f"{test}_{column['name']}_{model_name}",
+                    type=DbtModelType.DBT_TEST,
+                    path=path,
+                    operator_args=self.operator_args,
+                    config=DbtModelConfig(upstream_models=set({model_name})),
+                )
+                tests[test_model.name] = test_model
+        return tests
+
+    def _extract_config_selectors(self, model_config: dict[str, dict[str, str | list[str]]]) -> list[str]:
+        """Extracts config selectors from a dbt config file model."""
+        config_selectors = []
+        for selector in DbtModelConfig.config_types:
+            config_value = model_config.get("config", {}).get(selector)
+            if config_value:
+                if isinstance(config_value, str):
+                    config_selectors.append(f"{selector}:{config_value}")
+                else:
+                    for item in config_value:
+                        if item:
+                            config_selectors.append(f"{selector}:{item}")
+        return config_selectors

@@ -111,6 +111,16 @@ To run the integration tests for the first time, use:
 
     export AIRFLOW_HOME=`pwd`
     export AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres
+    export DATABRICKS_HOST=''
+    export DATABRICKS_TOKEN=''
+    export DATABRICKS_WAREHOUSE_ID=''
+    export DATABRICKS_CLUSTER_ID=''
+    export POSTGRES_PORT=5432
+    export POSTGRES_SCHEMA=public
+    export POSTGRES_DB=postgres
+    export POSTGRES_PASSWORD=postgres
+    export POSTGRES_USER=postgres
+    export POSTGRES_HOST=localhost
     hatch run tests.py3.8-2.5:test-integration-setup
     hatch run tests.py3.8-2.5:test-integration
 

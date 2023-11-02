@@ -78,7 +78,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
 
     if 'Run "dbt deps" to install package dependencies' in stdout and command[1] == "ls":
         raise CosmosLoadDbtException(
-            "Unable to run dbt ls command due to missing dbt_packages. Set render_config.dbt_deps=True."
+            "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
         )
 
     if returncode or "Error" in stdout:

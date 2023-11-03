@@ -230,23 +230,8 @@ class DbtToAirflowConverter:
             raise CosmosValueError(
                 "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
             )
-        emit_datasets = render_config.emit_datasets
-        dbt_root_path = project_config.dbt_project_path.parent
-        dbt_project_name = project_config.dbt_project_path.name
-        dbt_models_dir = project_config.models_relative_path
-        dbt_seeds_dir = project_config.seeds_relative_path
-        dbt_snapshots_dir = project_config.snapshots_relative_path
-        test_behavior = render_config.test_behavior
-        select = render_config.select
-        exclude = render_config.exclude
-        dbt_deps = render_config.dbt_deps
-        execution_mode = execution_config.execution_mode
-        load_mode = render_config.load_method
-        manifest_path = project_config.parsed_manifest_path
-        dbt_executable_path = execution_config.dbt_executable_path
-        node_converters = render_config.node_converters
-
-        if execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
+        
+        if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             logger.warning(
                 "`ExecutionConfig.virtualenv_dir` is only supported when \
                 ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
@@ -296,7 +281,7 @@ class DbtToAirflowConverter:
             task_args,
             execution_mode=execution_config.execution_mode,
         )
-        if (execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None):
+        if execution_config.execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             task_args["virtualenv_dir"] = execution_config.virtualenv_dir
 
         build_airflow_graph(

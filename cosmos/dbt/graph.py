@@ -21,6 +21,7 @@ from cosmos.constants import (
     ExecutionMode,
     LoadMode,
 )
+from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import create_symlinks, environ
 from cosmos.dbt.selector import select_nodes
@@ -67,6 +68,14 @@ class DbtNode:
         Replace period (.) with underscore (_) due to versioned models.
         """
         return self.resource_name.replace(".", "_")
+
+
+def create_symlinks(project_path: Path, tmp_dir: Path) -> None:
+    """Helper function to create symlinks to the dbt project files."""
+    ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
+    for child_name in os.listdir(project_path):
+        if child_name not in ignore_paths:
+            os.symlink(project_path / child_name, tmp_dir / child_name)
 
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
@@ -124,6 +133,15 @@ class DbtGraph:
     Supports different ways of loading the `dbt` project into this representation.
 
     Different loading methods can result in different `nodes` and `filtered_nodes`.
+
+    Example of how to use:
+
+        dbt_graph = DbtGraph(
+            project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
+            render_config=RenderConfig(exclude=["*orders*"], select=[]),
+            dbt_cmd="/usr/local/bin/dbt"
+        )
+        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """
 
     nodes: dict[str, DbtNode] = dict()
@@ -137,12 +155,16 @@ class DbtGraph:
         profile_config: ProfileConfig | None = None,
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
+        dbt_cmd: str = get_system_dbt(),
+        operator_args: dict[str, Any] | None = None,
     ):
         self.project = project
         self.render_config = render_config
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.dbt_vars = dbt_vars or {}
+        self.operator_args = operator_args or {}
+        self.dbt_cmd = dbt_cmd
 
     def load(
         self,
@@ -181,9 +203,7 @@ class DbtGraph:
         else:
             load_method[method]()
 
-    def run_dbt_ls(
-        self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
-    ) -> dict[str, DbtNode]:
+    def run_dbt_ls(self, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [dbt_cmd, "ls", "--output", "json"]
 
@@ -223,15 +243,14 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
-        self.render_config.validate_dbt_command(fallback_cmd=self.execution_config.dbt_executable_path)
-        dbt_cmd = self.render_config.dbt_executable_path
-        dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
-
         logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
         if not self.render_config.project_path or not self.execution_config.project_path:
             raise CosmosLoadDbtException(
                 "Unable to load project via dbt ls without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
             )
+
+        if not self.profile_config:
+            raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
@@ -266,12 +285,12 @@ class DbtGraph:
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps:
-                    deps_command = [dbt_cmd, "deps"]
+                    deps_command = [self.dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)
                     logger.debug("dbt deps output: %s", stdout)
 
-                nodes = self.run_dbt_ls(dbt_cmd, self.execution_config.project_path, tmpdir_path, env)
+                nodes = self.run_dbt_ls(self.execution_config.project_path, tmpdir_path, env)
 
                 self.nodes = nodes
                 self.filtered_nodes = nodes

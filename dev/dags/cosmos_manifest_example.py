@@ -30,7 +30,7 @@ cosmos_manifest_example = DbtDag(
         project_name="jaffle_shop",
     ),
     profile_config=profile_config,
-    render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:models/customers.sql"]),
+    render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:seeds/raw_customers.csv"]),
     operator_args={"install_deps": True},
     # normal dag parameters
     schedule_interval="@daily",

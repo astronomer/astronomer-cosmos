@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Callable
 
@@ -31,6 +31,9 @@ class RenderConfig:
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
+    :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
+    :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
     """
 
     emit_datasets: bool = True
@@ -40,6 +43,13 @@ class RenderConfig:
     exclude: list[str] = field(default_factory=list)
     dbt_deps: bool = True
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
+    dbt_executable_path: str | Path = get_system_dbt()
+    dbt_project_path: InitVar[str | Path | None] = None
+
+    project_path: Path | None = field(init=False)
+
+    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+        self.project_path = Path(dbt_project_path) if dbt_project_path else None
 
 
 class ProjectConfig:
@@ -72,11 +82,13 @@ class ProjectConfig:
         manifest_path: str | Path | None = None,
         project_name: str | None = None,
     ):
+        # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
+        #   dbt_project_path may not always be defined here.
+        # We do, however, still require that both manifest_path and project_name be defined, or neither be defined.
         if not dbt_project_path:
-            if not manifest_path or not project_name:
+            if manifest_path and not project_name or project_name and not manifest_path:
                 raise CosmosValueError(
-                    "ProjectConfig requires dbt_project_path and/or manifest_path to be defined."
-                    " If only manifest_path is defined, project_name must also be defined."
+                    "If ProjectConfig.dbt_project_path is not defined, ProjectConfig.manifest_path and ProjectConfig.project_name must be defined together, or both left undefined."
                 )
         if project_name:
             self.project_name = project_name
@@ -210,10 +222,17 @@ class ExecutionConfig:
 
     :param execution_mode: The execution mode for dbt. Defaults to local
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
-    :param dbt_executable_path: The path to the dbt executable. Defaults to dbt if
-    available on the path.
+    :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
+    :param dbt_project_path Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = get_system_dbt()
+
+    dbt_project_path: InitVar[str | Path | None] = None
+
+    project_path: Path | None = field(init=False)
+
+    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+        self.project_path = Path(dbt_project_path) if dbt_project_path else None

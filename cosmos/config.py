@@ -367,6 +367,7 @@ class ExecutionConfig:
 
     dbt_project_path: InitVar[str | Path | None] = None
     virtualenv_dir: str | Path | None = None
+
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
@@ -385,4 +386,3 @@ class ExecutionConfig:
                 )
                 self.invocation_mode = InvocationMode.SUBPROCESS
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
-

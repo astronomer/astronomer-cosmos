@@ -36,17 +36,14 @@ def test_init_with_manifest_path_and_project_path_succeeds():
 
 def test_init_with_no_params():
     """
-    The constructor now validates that the required base fields are present
-    As such, we should test here that the correct exception is raised if these are not correctly defined
-    This functionality has been moved from the validate method
+    With the implementation of dbt_project_path in RenderConfig and ExecutionConfig
+    dbt_project_path becomes optional here. The only requirement is that if one of
+    manifest_path or project_name is defined, they should both be defined.
+    We used to enforce dbt_project_path or manifest_path and project_name, but this is
+    No longer the case
     """
-    with pytest.raises(CosmosValueError) as err_info:
-        ProjectConfig()
-        print(err_info.value.args[0])
-        assert err_info.value.args[0] == (
-            "ProjectConfig requires dbt_project_path and/or manifest_path to be defined."
-            "If only manifest_path is defined, project_name must also be defined."
-        )
+    project_config = ProjectConfig()
+    assert project_config
 
 
 def test_init_with_manifest_path_and_not_project_path_and_not_project_name_fails():
@@ -55,11 +52,9 @@ def test_init_with_manifest_path_and_not_project_path_and_not_project_name_fails
     """
     with pytest.raises(CosmosValueError) as err_info:
         ProjectConfig(manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json")
-        print(err_info.value.args[0])
-        assert err_info.value.args[0] == (
-            "ProjectConfig requires dbt_project_path and/or manifest_path to be defined."
-            "If only manifest_path is defined, project_name must also be defined."
-        )
+    assert err_info.value.args[0] == (
+        "If ProjectConfig.dbt_project_path is not defined, ProjectConfig.manifest_path and ProjectConfig.project_name must be defined together, or both left undefined."
+    )
 
 
 def test_validate_with_project_path_and_manifest_path_succeeds():
@@ -95,7 +90,7 @@ def test_validate_project_missing_fails():
     project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
     with pytest.raises(CosmosValueError) as err_info:
         assert project_config.validate_project() is None
-        assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"
+    assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"
 
 
 def test_is_manifest_available_is_true():
@@ -118,13 +113,11 @@ def test_project_name():
 def test_profile_config_post_init():
     with pytest.raises(CosmosValueError) as err_info:
         ProfileConfig(profiles_yml_filepath="/tmp/some-profile", profile_name="test", target_name="test")
-        assert err_info.value.args[0] == "The file /tmp/some-profile does not exist."
+    assert err_info.value.args[0] == "The file /tmp/some-profile does not exist."
 
 
 def test_profile_config_validate():
     with pytest.raises(CosmosValueError) as err_info:
         profile_config = ProfileConfig(profile_name="test", target_name="test")
         assert profile_config.validate_profile() is None
-        assert (
-            err_info.value.args[0] == "Either profiles_yml_filepath or profile_mapping must be set to render a profile"
-        )
+    assert err_info.value.args[0] == "Either profiles_yml_filepath or profile_mapping must be set to render a profile"

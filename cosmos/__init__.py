@@ -120,6 +120,8 @@ __all__ = [
 """
 Required provider info for using Airflow config for configuration
 """
+
+
 def get_provider_info():
     return {
         "package-name": "astronomer-cosmos",  # Required

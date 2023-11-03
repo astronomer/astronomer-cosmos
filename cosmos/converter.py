@@ -16,7 +16,6 @@ from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileC
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -92,8 +91,8 @@ class DbtToAirflowConverter:
         self,
         project_config: ProjectConfig,
         profile_config: ProfileConfig,
-        execution_config: ExecutionConfig = ExecutionConfig(),
-        render_config: RenderConfig = RenderConfig(),
+        execution_config: ExecutionConfig | None = None,
+        render_config: RenderConfig | None = None,
         dag: DAG | None = None,
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
@@ -103,19 +102,37 @@ class DbtToAirflowConverter:
     ) -> None:
         project_config.validate_project()
 
-        emit_datasets = render_config.emit_datasets
-        test_behavior = render_config.test_behavior
-        select = render_config.select
-        exclude = render_config.exclude
-        dbt_deps = render_config.dbt_deps
-        execution_mode = execution_config.execution_mode
-        test_indirect_selection = execution_config.test_indirect_selection
-        load_mode = render_config.load_method
-        dbt_executable_path = execution_config.dbt_executable_path
-        node_converters = render_config.node_converters
+        if not execution_config:
+            execution_config = ExecutionConfig()
+        if not render_config:
+            render_config = RenderConfig()
 
-        if not project_config.dbt_project_path:
-            raise CosmosValueError("A Project Path in ProjectConfig is required for generating a Task Operators.")
+        # Since we now support both project_config.dbt_project_path, render_config.project_path and execution_config.project_path
+        # We need to ensure that only one interface is being used.
+        if project_config.dbt_project_path and (render_config.project_path or execution_config.project_path):
+            raise CosmosValueError(
+                "ProjectConfig.dbt_project_path is mutually exclusive with RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path."
+                + "If using RenderConfig.dbt_project_path or ExecutionConfig.dbt_project_path, ProjectConfig.dbt_project_path should be None"
+            )
+
+        # If we are using the old interface, we should migrate it to the new interface
+        # This is safe to do now since we have validated which config interface we're using
+        if project_config.dbt_project_path:
+            render_config.project_path = project_config.dbt_project_path
+            execution_config.project_path = project_config.dbt_project_path
+
+        # At this point, execution_config.project_path should always be non-null
+        if not execution_config.project_path:
+            raise CosmosValueError(
+                "ExecutionConfig.dbt_project_path is required for the execution of dbt tasks in all execution modes."
+            )
+
+        # We now have a guaranteed execution_config.project_path, but still need to process render_config.project_path
+        # We require render_config.project_path when we dont have a manifest
+        if not project_config.manifest_path and not render_config.project_path:
+            raise CosmosValueError(
+                "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
+            )
 
         profile_args = {}
         if profile_config.profile_mapping:
@@ -136,36 +153,34 @@ class DbtToAirflowConverter:
         # We may want to consider defaulting this value in our actual ProjceConfig class?
         dbt_graph = DbtGraph(
             project=project_config,
-            exclude=exclude,
-            select=select,
-            dbt_cmd=dbt_executable_path,
+            render_config=render_config,
+            execution_config=execution_config,
+            dbt_cmd=render_config.dbt_executable_path,
             profile_config=profile_config,
             operator_args=operator_args,
-            dbt_deps=dbt_deps,
         )
-        dbt_graph.load(method=load_mode, execution_mode=execution_mode)
+        dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         task_args = {
             **operator_args,
-            # the following args may be only needed for local / venv:
-            "project_dir": project_config.dbt_project_path,
+            "project_dir": execution_config.project_path,
             "profile_config": profile_config,
-            "emit_datasets": emit_datasets,
+            "emit_datasets": render_config.emit_datasets,
         }
-        if dbt_executable_path:
-            task_args["dbt_executable_path"] = dbt_executable_path
+        if execution_config.dbt_executable_path:
+            task_args["dbt_executable_path"] = execution_config.dbt_executable_path
 
-        validate_arguments(select, exclude, profile_args, task_args)
+        validate_arguments(render_config.select, render_config.exclude, profile_args, task_args)
 
         build_airflow_graph(
             nodes=dbt_graph.filtered_nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,
-            execution_mode=execution_mode,
+            execution_mode=execution_config.execution_mode,
             task_args=task_args,
-            test_behavior=test_behavior,
-            test_indirect_selection=test_indirect_selection,
+            test_behavior=render_config.test_behavior,
+            test_indirect_selection=execution_config.test_indirect_selection,
             dbt_project_name=project_config.project_name,
             on_warning_callback=on_warning_callback,
-            node_converters=node_converters,
+            node_converters=render_config.node_converters,
         )

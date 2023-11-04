@@ -46,8 +46,8 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         result = super().can_claim_connection()
         if (
             result
-            and self.conn.extra_dejson.get("private_key_file") is not None
-            and self.conn.extra_dejson.get("private_key_content") is not None
+            and (self.conn.extra_dejson.get("private_key_file") is not None
+            or self.conn.extra_dejson.get("private_key_content") is not None)
         ):
             return False
         return result

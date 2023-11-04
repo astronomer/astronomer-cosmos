@@ -178,6 +178,7 @@ def test_profile_env_vars(
         mock_snowflake_conn.conn_id,
     )
     assert profile_mapping.env_vars == {
+        "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY": mock_snowflake_conn.extra_dejson.get("private_key_content"),
         "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE": mock_snowflake_conn.password,
     }
 

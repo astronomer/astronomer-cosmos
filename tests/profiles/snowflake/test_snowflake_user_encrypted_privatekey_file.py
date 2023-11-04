@@ -8,7 +8,7 @@ from airflow.models.connection import Connection
 
 from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.snowflake import (
-    SnowflakeEncryptedPrivateKeyPemProfileMapping,
+    SnowflakeEncryptedPrivateKeyFilePemProfileMapping,
 )
 
 
@@ -66,7 +66,7 @@ def test_connection_claiming() -> None:
         print("testing with", values)
 
         with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-            profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(
+            profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(
                 conn,
             )
             assert not profile_mapping.can_claim_connection()
@@ -76,7 +76,7 @@ def test_connection_claiming() -> None:
     conn.extra = '{"database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the database
@@ -84,7 +84,7 @@ def test_connection_claiming() -> None:
     conn.extra = '{"account": "my_account", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the warehouse
@@ -92,13 +92,13 @@ def test_connection_claiming() -> None:
     conn.extra = '{"account": "my_account", "database": "my_database", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert profile_mapping.can_claim_connection()
 
 
@@ -111,7 +111,7 @@ def test_profile_mapping_selected(
     profile_mapping = get_automatic_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
-    assert isinstance(profile_mapping, SnowflakeEncryptedPrivateKeyPemProfileMapping)
+    assert isinstance(profile_mapping, SnowflakeEncryptedPrivateKeyFilePemProfileMapping)
 
 
 def test_profile_args(
@@ -203,7 +203,7 @@ def test_old_snowflake_format() -> None:
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert profile_mapping.profile == {
             "type": conn.conn_type,
             "user": conn.login,

@@ -48,10 +48,7 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
     def can_claim_connection(self) -> bool:
         # Make sure this isn't a private key path credential
         result = super().can_claim_connection()
-        if (
-            result
-            and self.conn.extra_dejson.get("private_key_file") is not None
-        ):
+        if result and self.conn.extra_dejson.get("private_key_file") is not None:
             return False
         return result
 

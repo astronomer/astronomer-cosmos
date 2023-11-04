@@ -27,10 +27,11 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
         "database",
         "warehouse",
         "schema",
+        "private_key",
         "private_key_passphrase",
-        "private_key_path",
     ]
     secret_fields = [
+        "private_key",
         "private_key_passphrase",
     ]
     airflow_param_mapping = {
@@ -40,8 +41,8 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
+        "private_key": "extra.private_key_content",
         "private_key_passphrase": "password",
-        "private_key_path": "extra.private_key_file",
     }
 
     @property
@@ -69,7 +70,7 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
         profile_vars = {
             **self.mapped_params,
             **self.profile_args,
-            # private_key_passphrase should always get set as env var
+            "private_key": self.get_env_var_format("private_key"),
             "private_key_passphrase": self.get_env_var_format("private_key_passphrase"),
         }
 

@@ -1,4 +1,4 @@
-"Tests for the Snowflake user/private key profile."
+"Tests for the Snowflake user/private key file profile."
 
 import json
 from unittest.mock import patch
@@ -8,7 +8,7 @@ from airflow.models.connection import Connection
 
 from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.snowflake import (
-    SnowflakeEncryptedPrivateKeyPemProfileMapping,
+    SnowflakeEncryptedPrivateKeyFilePemProfileMapping,
 )
 
 
@@ -29,7 +29,7 @@ def mock_snowflake_conn():  # type: ignore
                 "region": "my_region",
                 "database": "my_database",
                 "warehouse": "my_warehouse",
-                "private_key_file": "path/to/private_key.p8",
+                "private_key_content": "my_private_key",
             }
         ),
     )
@@ -52,7 +52,7 @@ def test_connection_claiming() -> None:
                 "account": "my_account",
                 "database": "my_database",
                 "warehouse": "my_warehouse",
-                "private_key_file": "path/to/private_key.p8",
+                "private_key_content": "my_private_key",
             }
         ),
     }
@@ -66,7 +66,7 @@ def test_connection_claiming() -> None:
         print("testing with", values)
 
         with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-            profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(
+            profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(
                 conn,
             )
             assert not profile_mapping.can_claim_connection()
@@ -76,7 +76,7 @@ def test_connection_claiming() -> None:
     conn.extra = '{"database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the database
@@ -84,7 +84,7 @@ def test_connection_claiming() -> None:
     conn.extra = '{"account": "my_account", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # test when we're missing the warehouse
@@ -92,13 +92,13 @@ def test_connection_claiming() -> None:
     conn.extra = '{"account": "my_account", "database": "my_database", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert profile_mapping.can_claim_connection()
 
 
@@ -111,7 +111,7 @@ def test_profile_mapping_selected(
     profile_mapping = get_automatic_profile_mapping(
         mock_snowflake_conn.conn_id,
     )
-    assert isinstance(profile_mapping, SnowflakeEncryptedPrivateKeyPemProfileMapping)
+    assert isinstance(profile_mapping, SnowflakeEncryptedPrivateKeyFilePemProfileMapping)
 
 
 def test_profile_args(
@@ -130,8 +130,8 @@ def test_profile_args(
     assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
+        "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
         "private_key_passphrase": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}",
-        "private_key_path": mock_snowflake_conn.extra_dejson.get("private_key_file"),
         "schema": mock_snowflake_conn.schema,
         "account": f"{mock_account}.{mock_region}",
         "database": mock_snowflake_conn.extra_dejson.get("database"),
@@ -160,7 +160,7 @@ def test_profile_args_overrides(
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
         "private_key_passphrase": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}",
-        "private_key_path": mock_snowflake_conn.extra_dejson.get("private_key_file"),
+        "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
         "schema": mock_snowflake_conn.schema,
         "account": f"{mock_account}.{mock_region}",
         "database": "my_db_override",
@@ -197,18 +197,18 @@ def test_old_snowflake_format() -> None:
                 "extra__snowflake__account": "my_account",
                 "extra__snowflake__database": "my_database",
                 "extra__snowflake__warehouse": "my_warehouse",
-                "extra__snowflake__private_key_file": "path/to/private_key.p8",
+                "extra__snowflake__private_key_content": "my_private_key",
             }
         ),
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        profile_mapping = SnowflakeEncryptedPrivateKeyFilePemProfileMapping(conn)
         assert profile_mapping.profile == {
             "type": conn.conn_type,
             "user": conn.login,
+            "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
             "private_key_passphrase": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}",
-            "private_key_path": conn.extra_dejson.get("private_key_file"),
             "schema": conn.schema,
             "account": conn.extra_dejson.get("account"),
             "database": conn.extra_dejson.get("database"),

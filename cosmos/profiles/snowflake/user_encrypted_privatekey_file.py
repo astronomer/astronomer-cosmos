@@ -1,4 +1,4 @@
-"Maps Airflow Snowflake connections to dbt profiles if they use a user/private key."
+"Maps Airflow Snowflake connections to dbt profiles if they use a user/private key path."
 from __future__ import annotations
 
 import json
@@ -10,9 +10,9 @@ if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
+class SnowflakeEncryptedPrivateKeyFilePemProfileMapping(BaseProfileMapping):
     """
-    Maps Airflow Snowflake connections to dbt profiles if they use a user/private key.
+    Maps Airflow Snowflake connections to dbt profiles if they use a user/private key path.
     https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
@@ -43,6 +43,13 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(BaseProfileMapping):
         "private_key_passphrase": "password",
         "private_key_path": "extra.private_key_file",
     }
+
+    def can_claim_connection(self) -> bool:
+        # Make sure this isn't a private key environmentvariable
+        result = super().can_claim_connection()
+        if result and self.conn.extra_dejson.get("private_key_content") is not None:
+            return False
+        return result
 
     @property
     def conn(self) -> Connection:

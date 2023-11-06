@@ -232,3 +232,13 @@ class BaseProfileMapping(ABC):
         env_var_name = cls.get_env_var_name(field_name)
         # need to double the brackets to escape them in the template
         return f"{{{{ env_var('{env_var_name}') }}}}"
+
+    @property
+    def openlineage_namespace(self):
+        scheme = self.airflow_connection_type
+        authority = self.profile.get("host")
+        port = self.profile.get("port")
+        qualifiers = [self.profile.]
+        path = ".".join()
+
+        return f"{scheme}://{authority}:{port}/{path}"

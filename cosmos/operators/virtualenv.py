@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import psutil
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
@@ -29,7 +31,6 @@ logger = get_logger(__name__)
 
 PY_INTERPRETER = "python3"
 
-
 class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core cli command within a Python Virtual Environment, that is created before running the dbt command
@@ -41,6 +42,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the dbt job requires it.
     """
+    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir",)
 
     def __init__(
         self,
@@ -52,7 +54,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.py_requirements = py_requirements or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
-        self._venv_dir = virtualenv_dir
+        self.virtualenv_dir = virtualenv_dir
         self._venv_tmp_dir: None | TemporaryDirectory[str] = None
 
     @cached_property
@@ -96,42 +98,70 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         logger.info(output)
 
     def _get_or_create_venv_py_interpreter(self) -> str:
-        """
-        Helper method that parses virtual env configuration and returns a DBT binary within the resulting virtualenv:
-        Do we have a persistent virtual env dir set in `self._venv_dir`?
-        1. Yes: Does a directory at that path exist?
-            1. No: Create it, and create a virtual env inside it
-            2. Yes: Does the directory have a virtual env inside it?
-                1. No: Create one in this directory and return it
-                2. Yes: Return this virtual env
-        2. No: Create a temporary virtual env and return it
+        """Helper method that parses virtual env configuration 
+        and returns a DBT binary within the resulting virtualenv"""
 
-        """
-        if self._venv_dir is not None:
-            if self._venv_dir.is_dir():
-                py_interpreter_path = Path(f"{self._venv_dir}/bin/python")
-
-                self.log.info(f"Checking for venv interpreter: {py_interpreter_path} : {py_interpreter_path.is_file()}")
-                if py_interpreter_path.is_file():
-                    self.log.info(f"Found Python interpreter in cached virtualenv: `{str(py_interpreter_path)}`")
-                    return str(py_interpreter_path)
-            else:
-                os.mkdir(self._venv_dir)
-
-            self.log.info(f"Creating virtualenv at `{self._venv_dir}")
-            venv_directory = str(self._venv_dir)
-
-        else:
+        # No virtualenv_dir set, so revert to making a temporary virtualenv
+        if self.virtualenv_dir is None:
             self.log.info("Creating temporary virtualenv")
             self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
-            venv_directory = self._venv_tmp_dir.name
 
-        return prepare_virtualenv(
-            venv_directory=venv_directory,
+            return prepare_virtualenv(
+                venv_directory=self._venv_tmp_dir.name,
+                python_bin=PY_INTERPRETER,
+                system_site_packages=self.py_system_site_packages,
+                requirements=self.py_requirements,
+            )
+
+        self.log.info(f"Checking if {str(self._lock_file)} exists")
+        while not self._is_lock_available():
+            self.log.info("Waiting for lock to release")
+            time.sleep(1)
+
+        self.log.info(f"Creating virtualenv at `{self.virtualenv_dir}")
+        self.log.info(f"Acquiring available lock")
+        self._acquire_venv_lock()
+
+        py_bin = prepare_virtualenv(
+            venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,
             requirements=self.py_requirements,
         )
+
+        self.log.info("Releasing lock")
+        self._release_venv_lock()
+
+        return py_bin
+    
+    @property
+    def _lock_file(self) -> Path:
+        return Path(f"{self.virtualenv_dir}/LOCK")
+    
+    def _is_lock_available(self) -> bool:
+        if self._lock_file.is_file():
+            with open(self._lock_file, "r") as lf:
+                pid = int(lf.read())
+
+                self.log.info(f"Checking for running process with PID {pid}")
+                _process_running = psutil.Process(pid).is_running()
+
+                self.log.info(f"Process {pid} running: {_process_running}")
+                return not _process_running
+
+        return True
+
+    def _acquire_venv_lock(self) -> None:
+        if not self.virtualenv_dir.is_dir():
+            os.mkdir(str(self.virtualenv_dir))
+
+        with open(self._lock_file, "w") as lf:
+            pid = str(os.getpid())
+            self.log.info(f"Acquiring lock at {self._lock_file} with pid {pid}")
+            lf.write(pid)
+        
+    def _release_venv_lock(self) -> None:
+        self._lock_file.unlink()
 
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
@@ -181,3 +211,4 @@ class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator)
     Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
+

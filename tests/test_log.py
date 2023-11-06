@@ -1,5 +1,6 @@
 import logging
 
+from cosmos import get_provider_info
 from cosmos.log import get_logger
 from airflow.configuration import conf
 
@@ -21,3 +22,11 @@ def test_propagate_logs_conf():
     conf.set("cosmos", "propagate_logs", "False")
     custom_logger = get_logger("cosmos-log")
     assert custom_logger.propagate is False
+
+
+def test_get_provider_info():
+    provider_info = get_provider_info()
+    assert "cosmos" in provider_info.get("config").keys()
+    assert "options" in provider_info.get("config").get("cosmos").keys()
+    assert "propagate_logs" in provider_info.get("config").get("cosmos").get("options").keys()
+    assert provider_info["config"]["cosmos"]["options"]["propagate_logs"]["type"] == "boolean"

@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig, RenderConfig, LoadMode
+from cosmos import DbtDag, ProjectConfig, ProfileConfig, RenderConfig, LoadMode, ExecutionConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -25,12 +25,12 @@ profile_config = ProfileConfig(
 cosmos_manifest_example = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        dbt_project_path=DBT_ROOT_PATH / "jaffle_shop",
         manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
         project_name="jaffle_shop",
     ),
     profile_config=profile_config,
     render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:seeds/raw_customers.csv"]),
+    execution_config=ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "jaffle_shop"),
     operator_args={"install_deps": True},
     # normal dag parameters
     schedule_interval="@daily",

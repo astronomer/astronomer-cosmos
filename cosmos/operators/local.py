@@ -538,11 +538,12 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#8194E0"
 
-    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json", "run_results.json"]
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["docs", "generate"]
+
 
 class DbtFreshnessLocalOperator(DbtLocalBaseOperator):
     """
@@ -555,6 +556,7 @@ class DbtFreshnessLocalOperator(DbtLocalBaseOperator):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["source", "freshness"]
+
 
 class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
     """
@@ -569,11 +571,11 @@ class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
     ui_color = "#FF9900"
 
     def __init__(
-            self,
-            aws_conn_id: str,
-            bucket_name: str,
-            folder_dir: str | None = None,
-            **kwargs: str,
+        self,
+        aws_conn_id: str,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs: str,
     ) -> None:
         "Initializes the operator."
         self.aws_conn_id = aws_conn_id
@@ -613,6 +615,7 @@ class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
             key=key,
             replace=True,
         )
+
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
     """

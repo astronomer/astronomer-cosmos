@@ -572,13 +572,13 @@ class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
 
     def __init__(
         self,
-        aws_conn_id: str,
+        connection_id: str,
         bucket_name: str,
         folder_dir: str | None = None,
         **kwargs: str,
     ) -> None:
         "Initializes the operator."
-        self.aws_conn_id = aws_conn_id
+        self.connection_id = connection_id
         self.bucket_name = bucket_name
         self.folder_dir = folder_dir
 
@@ -591,7 +591,7 @@ class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
         "Uploads the generated documentation to S3."
         logger.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
-            self.aws_conn_id,
+            self.connection_id,
         )
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -599,7 +599,7 @@ class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
         target_dir = f"{project_dir}/target"
 
         hook = S3Hook(
-            self.aws_conn_id,
+            self.connection_id,
             extra_args={
                 "ContentType": "text/html",
             },

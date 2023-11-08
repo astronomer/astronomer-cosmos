@@ -45,7 +45,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the dbt job requires it.
     """
-    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir",)
+    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir",) # type: ignore[operator]
 
     def __init__(
         self,
@@ -124,14 +124,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
                 requirements=self.py_requirements,
             )
 
-        self.log.info(f"Checking if {str(self._lock_file)} exists")
+        self.log.info(f"Checking if {str(self.__lock_file)} exists")
         while not self._is_lock_available():
             self.log.info("Waiting for lock to release")
             time.sleep(1)
 
         self.log.info(f"Creating virtualenv at `{self.virtualenv_dir}")
         self.log.info(f"Acquiring available lock")
-        self._acquire_venv_lock()
+        self.__acquire_venv_lock()
 
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
@@ -142,17 +142,17 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         )
 
         self.log.info("Releasing lock")
-        self._release_venv_lock()
+        self.__release_venv_lock()
 
         return py_bin
     
     @property
-    def _lock_file(self) -> Path:
+    def __lock_file(self) -> Path:
         return Path(f"{self.virtualenv_dir}/LOCK")
     
     def _is_lock_available(self) -> bool:
-        if self._lock_file.is_file():
-            with open(self._lock_file, "r") as lf:
+        if self.__lock_file.is_file():
+            with open(self.__lock_file, "r") as lf:
                 pid = int(lf.read())
 
                 self.log.info(f"Checking for running process with PID {pid}")
@@ -163,17 +163,17 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
         return True
 
-    def _acquire_venv_lock(self) -> None:
+    def __acquire_venv_lock(self) -> None:
         if not self.virtualenv_dir.is_dir():
             os.mkdir(str(self.virtualenv_dir))
 
-        with open(self._lock_file, "w") as lf:
+        with open(self.__lock_file, "w") as lf:
             pid = str(os.getpid())
-            self.log.info(f"Acquiring lock at {self._lock_file} with pid {pid}")
+            self.log.info(f"Acquiring lock at {self.__lock_file} with pid {pid}")
             lf.write(pid)
         
-    def _release_venv_lock(self) -> None:
-        self._lock_file.unlink()
+    def __release_venv_lock(self) -> None:
+        self.__lock_file.unlink()
 
 
 class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]

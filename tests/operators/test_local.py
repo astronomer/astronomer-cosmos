@@ -458,4 +458,3 @@ def test_dbt_docs_gcs_local_operator():
             call(filename="fake-dir/target/file2", bucket_name="fake-bucket", object_name="fake-folder/file2"),
         ]
         mock_hook.upload.assert_has_calls(expected_upload_calls)
-

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.utils.python_virtualenv import prepare_virtualenv
 
+from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.log import get_logger
 from cosmos.operators.local import (
@@ -32,6 +33,16 @@ logger = get_logger(__name__)
 
 
 PY_INTERPRETER = "python3"
+
+def depends_on_virtualenv_dir(method):
+    def wrapper(operator: DbtVirtualenvBaseOperator, *args):
+        if operator.virtualenv_dir is None:
+            raise CosmosValueError(f"Method relies on value of parameter `virtualenv_dir` which is None.")
+        
+        logger.info(f"Operator: {operator}")
+        logger.info(f"Args: {args}")
+        method(operator, *args)
+    return wrapper
 
 class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     """
@@ -154,6 +165,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def _pid(self) -> int:
         return os.getpid()
     
+    @depends_on_virtualenv_dir
     def __is_lock_available(self) -> bool:
         if self.__lock_file.is_file():
             with open(self.__lock_file, "r") as lf:
@@ -167,6 +179,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
         return True
 
+    @depends_on_virtualenv_dir
     def __acquire_venv_lock(self) -> None:
         if not self.virtualenv_dir.is_dir():
             os.mkdir(str(self.virtualenv_dir))
@@ -175,6 +188,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.log.info(f"Acquiring lock at {self.__lock_file} with pid {str(self._pid)}")
             lf.write(str(self._pid))
         
+    @depends_on_virtualenv_dir
     def __release_venv_lock(self) -> None:
         if not self.__lock_file.is_file():
             raise FileNotFoundError(f"Lockfile {self.__lock_file} not found")

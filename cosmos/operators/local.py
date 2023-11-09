@@ -223,7 +223,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     deps_command = [self.dbt_executable_path, "deps"]
                     deps_command.extend(flags)
                     self.run_subprocess(
-                        command=[self.dbt_executable_path, "deps"],
+                        command=deps_command,
                         env=env,
                         output_encoding=self.output_encoding,
                         cwd=tmp_project_dir,

@@ -4,7 +4,7 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch, call, ANY
 
 import pytest
 from airflow import DAG
@@ -445,3 +445,24 @@ def test_dbt_docs_gcs_local_operator():
             call(filename="fake-dir/target/file2", bucket_name="fake-bucket", object_name="fake-folder/file2"),
         ]
         mock_hook.upload.assert_has_calls(expected_upload_calls)
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator.store_compiled_sql")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.exception_handling")
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_deps")
+def test_operator_execute_deps_parameters(
+    mock_build_and_run_cmd, mock_ensure_profile, mock_exception_handling, mock_store_compiled_sql
+):
+    expected_call_kwargs = ["--profiles-dir", "/path/to", "--profile", "default", "--target", "dev"]
+    task = DbtLocalBaseOperator(
+        profile_config=real_profile_config,
+        task_id="my-task",
+        project_dir=DBT_PROJ_DIR,
+        install_deps=True,
+        emit_datasets=False,
+        dbt_executable_path="/usr/local/bin/dbt",
+    )
+    mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
+    task.execute(context={"task_instance": MagicMock()})
+    mock_build_and_run_cmd.assert_called_once_with(expected_call_kwargs, env=ANY, tmp_project_dir=ANY)

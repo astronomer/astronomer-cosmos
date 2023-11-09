@@ -18,6 +18,7 @@ from cosmos.operators.local import (
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,
     DbtTestLocalOperator,
+    DbtSourceLocalOperator,
 )
 
 if TYPE_CHECKING:
@@ -143,5 +144,12 @@ class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperati
 class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator):
     """
     Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the dbt
+    command and deleted just after.
+    """
+
+
+class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOperator):
+    """
+    Executes `dbt source freshness` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """

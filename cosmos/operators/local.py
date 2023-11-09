@@ -742,3 +742,15 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
         raise DeprecationWarning(
             "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )
+
+
+class DbtSourceLocalOperator(DbtLocalBaseOperator):
+    """
+    Executes a dbt source freshness command.
+    """
+
+    ui_color = "#34CCEB"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.base_cmd = ["source", "freshness"]

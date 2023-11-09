@@ -114,7 +114,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             )
 
         self.log.info(f"Checking if {str(self.__lock_file)} exists")
-        while not self._is_lock_available():
+        while not self.__is_lock_available():
             self.log.info("Waiting for lock to release")
             time.sleep(1)
 
@@ -138,7 +138,11 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def __lock_file(self) -> Path:
         return Path(f"{self.virtualenv_dir}/LOCK")
     
-    def _is_lock_available(self) -> bool:
+    @property
+    def _pid(self) -> int:
+        return os.getpid()
+    
+    def __is_lock_available(self) -> bool:
         if self.__lock_file.is_file():
             with open(self.__lock_file, "r") as lf:
                 pid = int(lf.read())
@@ -156,12 +160,20 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self.__lock_file, "w") as lf:
-            pid = str(os.getpid())
-            self.log.info(f"Acquiring lock at {self.__lock_file} with pid {pid}")
-            lf.write(pid)
+            self.log.info(f"Acquiring lock at {self.__lock_file} with pid {str(self._pid)}")
+            lf.write(str(self._pid))
         
     def __release_venv_lock(self) -> None:
-        self.__lock_file.unlink()
+        if not self.__lock_file.is_file():
+            raise FileNotFoundError(f"Lockfile {self.__lock_file} not found")
+
+        with open(self.__lock_file, "r") as lf:
+            lock_file_pid = int(lf.read())
+
+            if lock_file_pid == self._pid:
+                return self.__lock_file.unlink()
+
+            self.log.warn(f"Lockfile owned by process of pid {lock_file_pid}, while operator has pid {self._pid}")
 
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):

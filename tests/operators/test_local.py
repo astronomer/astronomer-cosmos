@@ -474,4 +474,4 @@ def test_operator_execute_deps_parameters(
     )
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
     task.execute(context={"task_instance": MagicMock()})
-    assert mock_build_and_run_cmd.call_args.kwargs["command"] == expected_call_kwargs
+    assert mock_build_and_run_cmd.call_args_list[0].kwargs["command"] == expected_call_kwargs

@@ -199,7 +199,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 self.project_dir,
             )
 
-            # need a subfolder because shutil.copytree will fail if the destination dir already exists
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir))
 
             # if we need to install deps, do so

@@ -220,7 +220,12 @@ class DbtToAirflowConverter:
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
         if project_config.dbt_project_path:
-            execution_config, render_config = migrate_to_new_interface(execution_config, project_config, render_config)
+            # We copy the configuration so the change does not affect other DAGs or TaskGroups
+            # that may reuse the same original configuration
+            render_config = copy.deepcopy(render_config)
+            execution_config = copy.deepcopy(execution_config)
+            render_config.project_path = project_config.dbt_project_path
+            execution_config.project_path = project_config.dbt_project_path
 
         validate_adapted_user_config(execution_config, project_config, render_config)
 

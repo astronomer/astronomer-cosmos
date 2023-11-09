@@ -21,3 +21,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Selecting & Excluding <selecting-excluding>
    Operator Args <operator-args>
    Compiled SQL <compiled-sql>
+   Logging <logging>

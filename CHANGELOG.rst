@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.2.3 (2023-11-09)
+------------------
+
+Bug fixes
+
+* Fix reusing config across TaskGroups/DAGs by @tatiana in #664
+
+
 1.2.2 (2023-11-06)
 ------------------
 

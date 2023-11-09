@@ -11,6 +11,22 @@ Features
 * Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616
 
 
+1.2.2 (2023-11-06)
+------------------
+
+Bug fixes
+
+* Support ``ProjectConfig.dbt_project_path = None`` & different paths for Rendering and Execution by @MrBones757 in #634
+* Fix adding test nodes to DAGs built using ``LoadMethod.DBT_MANIFEST`` and ``LoadMethod.CUSTOM`` by @edgga in #615
+
+Others
+
+* Add pre-commit hook for McCabe max complexity check and fix errors by @jbandoro in #629
+* Update contributing docs for running integration tests by @jbandoro in #638
+* Fix CI issue running integration tests by @tatiana in #640 and #644
+* pre-commit updates in #637
+
+
 1.2.1 (2023-10-25)
 ------------------
 

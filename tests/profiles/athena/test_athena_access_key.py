@@ -22,6 +22,7 @@ def mock_athena_conn():  # type: ignore
         password="my_aws_secret_key",
         extra=json.dumps(
             {
+                "aws_session_token": "token123",
                 "database": "my_database",
                 "region_name": "my_region",
                 "s3_staging_dir": "s3://my_bucket/dbt/",
@@ -107,6 +108,7 @@ def test_athena_profile_args(
         "type": "athena",
         "aws_access_key_id": mock_athena_conn.login,
         "aws_secret_access_key": "{{ env_var('COSMOS_CONN_AWS_AWS_SECRET_ACCESS_KEY') }}",
+        "aws_session_token": "{{ env_var('COSMOS_CONN_AWS_AWS_SESSION_TOKEN') }}",
         "database": mock_athena_conn.extra_dejson.get("database"),
         "region_name": mock_athena_conn.extra_dejson.get("region_name"),
         "s3_staging_dir": mock_athena_conn.extra_dejson.get("s3_staging_dir"),
@@ -122,17 +124,20 @@ def test_athena_profile_args_overrides(
     """
     profile_mapping = get_automatic_profile_mapping(
         mock_athena_conn.conn_id,
-        profile_args={"schema": "my_custom_schema", "database": "my_custom_db"},
+        profile_args={"schema": "my_custom_schema", "database": "my_custom_db", "aws_session_token": "override_token"},
     )
+
     assert profile_mapping.profile_args == {
         "schema": "my_custom_schema",
         "database": "my_custom_db",
+        "aws_session_token": "override_token",
     }
 
     assert profile_mapping.profile == {
         "type": "athena",
         "aws_access_key_id": mock_athena_conn.login,
         "aws_secret_access_key": "{{ env_var('COSMOS_CONN_AWS_AWS_SECRET_ACCESS_KEY') }}",
+        "aws_session_token": "{{ env_var('COSMOS_CONN_AWS_AWS_SESSION_TOKEN') }}",
         "database": "my_custom_db",
         "region_name": mock_athena_conn.extra_dejson.get("region_name"),
         "s3_staging_dir": mock_athena_conn.extra_dejson.get("s3_staging_dir"),
@@ -151,4 +156,5 @@ def test_athena_profile_env_vars(
     )
     assert profile_mapping.env_vars == {
         "COSMOS_CONN_AWS_AWS_SECRET_ACCESS_KEY": mock_athena_conn.password,
+        "COSMOS_CONN_AWS_AWS_SESSION_TOKEN": mock_athena_conn.extra_dejson.get("aws_session_token"),
     }

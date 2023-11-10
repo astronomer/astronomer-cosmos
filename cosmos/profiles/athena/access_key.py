@@ -26,12 +26,11 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
         "s3_staging_dir",
         "schema",
     ]
-    secret_fields = [
-        "aws_secret_access_key",
-    ]
+    secret_fields = ["aws_secret_access_key", "aws_session_token"]
     airflow_param_mapping = {
         "aws_access_key_id": "login",
         "aws_secret_access_key": "password",
+        "aws_session_token": "extra.aws_session_token",
         "aws_profile_name": "extra.aws_profile_name",
         "database": "extra.database",
         "debug_query_state": "extra.debug_query_state",
@@ -53,7 +52,8 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
         profile = {
             **self.mapped_params,
             **self.profile_args,
-            # aws_secret_access_key should always get set as env var
+            # aws_secret_access_key and aws_session_token should always get set as env var
             "aws_secret_access_key": self.get_env_var_format("aws_secret_access_key"),
+            "aws_session_token": self.get_env_var_format("aws_session_token"),
         }
         return self.filter_null(profile)

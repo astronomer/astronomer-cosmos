@@ -201,17 +201,11 @@ class DbtLocalBaseOperator(DbtBaseOperator):
 
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir))
 
-            # if we need to install deps, do so
-            if self.install_deps:
-                self.run_subprocess(
-                    command=[self.dbt_executable_path, "deps"],
-                    env=env,
-                    output_encoding=self.output_encoding,
-                    cwd=tmp_project_dir,
-                )
-            with self.profile_config.ensure_profile() as (profile_path, env_vars):
+            with self.profile_config.ensure_profile() as profile_values:
+                (profile_path, env_vars) = profile_values
                 env.update(env_vars)
-                full_cmd = cmd + [
+
+                flags = [
                     "--profiles-dir",
                     str(profile_path.parent),
                     "--profile",
@@ -219,6 +213,18 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     "--target",
                     self.profile_config.target_name,
                 ]
+
+                if self.install_deps:
+                    deps_command = [self.dbt_executable_path, "deps"]
+                    deps_command.extend(flags)
+                    self.run_subprocess(
+                        command=deps_command,
+                        env=env,
+                        output_encoding=self.output_encoding,
+                        cwd=tmp_project_dir,
+                    )
+
+                full_cmd = cmd + flags
 
                 logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
                 logger.info("Using environment variables keys: %s", env.keys())

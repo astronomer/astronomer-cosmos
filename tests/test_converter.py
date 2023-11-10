@@ -5,7 +5,7 @@ import pytest
 
 from cosmos.converter import DbtToAirflowConverter, validate_arguments
 from cosmos.constants import DbtResourceType, ExecutionMode
-from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig
+from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig, CosmosConfigException
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 
@@ -138,6 +138,40 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
     assert (
         err_info.value.args[0]
         == "ExecutionConfig.dbt_project_path is required for the execution of dbt tasks in all execution modes."
+    )
+
+
+def test_converter_fails_render_config_invalid_dbt_path():
+    """
+    This test validates that a project, given a manifest path and project name, with seeds
+    is able to successfully generate a converter
+    """
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST.as_posix(), project_name="sample")
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL,
+        dbt_executable_path="invalid-execution-dbt",
+        dbt_project_path=SAMPLE_DBT_PROJECT,
+    )
+    render_config = RenderConfig(
+        emit_datasets=True,
+        dbt_executable_path="invalid-render-dbt",
+    )
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    with pytest.raises(CosmosConfigException) as err_info:
+        DbtToAirflowConverter(
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+    assert (
+        err_info.value.args[0]
+        == "Unable to find the dbt executable, attempted: <invalid-render-dbt> and <invalid-execution-dbt>."
     )
 
 

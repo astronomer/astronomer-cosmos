@@ -1,8 +1,9 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from cosmos.config import ProfileConfig, ProjectConfig
+from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
 from cosmos.exceptions import CosmosValueError
 
 
@@ -121,3 +122,38 @@ def test_profile_config_validate():
         profile_config = ProfileConfig(profile_name="test", target_name="test")
         assert profile_config.validate_profile() is None
     assert err_info.value.args[0] == "Either profiles_yml_filepath or profile_mapping must be set to render a profile"
+
+
+@patch("cosmos.config.shutil.which", return_value=None)
+def test_render_config_without_dbt_cmd(mock_which):
+    render_config = RenderConfig()
+    with pytest.raises(CosmosConfigException) as err_info:
+        render_config.validate_dbt_command("inexistent-dbt")
+
+    error_msg = err_info.value.args[0]
+    assert error_msg.startswith("Unable to find the dbt executable, attempted: <")
+    assert error_msg.endswith("dbt> and <inexistent-dbt>.")
+
+
+@patch("cosmos.config.shutil.which", return_value=None)
+def test_render_config_with_invalid_dbt_commands(mock_which):
+    render_config = RenderConfig(dbt_executable_path="invalid-dbt")
+    with pytest.raises(CosmosConfigException) as err_info:
+        render_config.validate_dbt_command()
+
+    error_msg = err_info.value.args[0]
+    assert error_msg == "Unable to find the dbt executable, attempted: <invalid-dbt>."
+
+
+@patch("cosmos.config.shutil.which", side_effect=(None, "fallback-dbt-path"))
+def test_render_config_uses_fallback_if_default_not_found(mock_which):
+    render_config = RenderConfig()
+    render_config.validate_dbt_command("fallback-dbt-path")
+    assert render_config.dbt_executable_path == "fallback-dbt-path"
+
+
+@patch("cosmos.config.shutil.which", side_effect=("user-dbt", "fallback-dbt-path"))
+def test_render_config_uses_default_if_exists(mock_which):
+    render_config = RenderConfig(dbt_executable_path="user-dbt")
+    render_config.validate_dbt_command("fallback-dbt-path")
+    assert render_config.dbt_executable_path == "user-dbt"

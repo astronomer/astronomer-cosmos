@@ -23,9 +23,9 @@ from cosmos.constants import (
 )
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import LegacyDbtProject
+from cosmos.dbt.project import create_symlinks
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
-from cosmos.utils import create_symlinks
 
 logger = get_logger(__name__)
 

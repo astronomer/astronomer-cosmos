@@ -44,7 +44,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
-from cosmos.utils import create_symlinks
+from cosmos.dbt.project import create_symlinks
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"

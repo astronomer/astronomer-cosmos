@@ -1,7 +1,7 @@
 from pathlib import Path
-from cosmos.utils import create_symlinks
+from cosmos.dbt.project import create_symlinks
 
-DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent / "dev/dags/dbt"
+DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
 
 def test_create_symlinks(tmp_path):

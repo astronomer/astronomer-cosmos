@@ -64,6 +64,7 @@ def get_automatic_profile_mapping(
 
 
 __all__ = [
+    "AthenaAccessKeyProfileMapping",
     "BaseProfileMapping",
     "GoogleCloudServiceAccountFileProfileMapping",
     "GoogleCloudServiceAccountDictProfileMapping",

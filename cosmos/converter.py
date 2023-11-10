@@ -108,7 +108,9 @@ class DbtToAirflowConverter:
         if not render_config:
             render_config = RenderConfig()
 
-        render_config.validate_dbt_command(fallback_cmd=execution_config.dbt_executable_path)
+        render_config.validate_dbt_command(
+            execution_mode=execution_config.execution_mode, fallback_cmd=execution_config.dbt_executable_path
+        )
 
         # Since we now support both project_config.dbt_project_path, render_config.project_path and execution_config.project_path
         # We need to ensure that only one interface is being used.

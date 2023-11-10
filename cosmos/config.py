@@ -60,27 +60,26 @@ class RenderConfig:
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
 
-    def validate_dbt_command(self, execution_mode: ExecutionMode, fallback_cmd: str | Path = "") -> None:
+    def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
         """
-        When using ExecutionMode.LOCAL or ExecutionMode.VIRTUALENV, the dbt executable path is necessary for rendering.
+        When using LoadMode.DBT_LS, the dbt executable path is necessary for rendering.
 
         Validates that the original dbt command works, if not, attempt to use the fallback_dbt_cmd.
         If neither works, raise an exception.
 
         The fallback behaviour is necessary for Cosmos < 1.2.2 backwards compatibility.
         """
-        if execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
-            if not shutil.which(self.dbt_executable_path):
-                if isinstance(fallback_cmd, Path):
-                    fallback_cmd = fallback_cmd.as_posix()
+        if not shutil.which(self.dbt_executable_path):
+            if isinstance(fallback_cmd, Path):
+                fallback_cmd = fallback_cmd.as_posix()
 
-                if fallback_cmd and shutil.which(fallback_cmd):
-                    self.dbt_executable_path = fallback_cmd
-                else:
-                    raise CosmosConfigException(
-                        "Unable to find the dbt executable, attempted: "
-                        f"<{self.dbt_executable_path}>" + (f" and <{fallback_cmd}>." if fallback_cmd else ".")
-                    )
+            if fallback_cmd and shutil.which(fallback_cmd):
+                self.dbt_executable_path = fallback_cmd
+            else:
+                raise CosmosConfigException(
+                    "Unable to find the dbt executable, attempted: "
+                    f"<{self.dbt_executable_path}>" + (f" and <{fallback_cmd}>." if fallback_cmd else ".")
+                )
 
 
 class ProjectConfig:

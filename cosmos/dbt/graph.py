@@ -115,15 +115,6 @@ class DbtGraph:
     Supports different ways of loading the `dbt` project into this representation.
 
     Different loading methods can result in different `nodes` and `filtered_nodes`.
-
-    Example of how to use:
-
-        dbt_graph = DbtGraph(
-            project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
-            render_config=RenderConfig(exclude=["*orders*"], select=[]),
-            dbt_cmd="/usr/local/bin/dbt"
-        )
-        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """
 
     nodes: dict[str, DbtNode] = dict()

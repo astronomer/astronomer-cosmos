@@ -117,6 +117,7 @@ def create_task_metadata(
         DbtResourceType.SNAPSHOT: "DbtSnapshot",
         DbtResourceType.SEED: "DbtSeed",
         DbtResourceType.TEST: "DbtTest",
+        DbtResourceType.SOURCE: "DbtSource",
     }
     args = {**args, **{"models": node.name}}
 
@@ -125,6 +126,18 @@ def create_task_metadata(
             task_id = f"{node.name}_run"
             if use_task_group is True:
                 task_id = "run"
+        if node.resource_type == DbtResourceType.SOURCE:
+            task_full_name = node.unique_id[len("source.") :]
+            task_id = f"{task_full_name}_source"
+            args["select"] = f"source:{node.unique_id[len('source.'):]}"
+            args["models"] = None
+            if use_task_group is True:
+                task_id = node.resource_type.value
+            if node.has_freshness is False:
+                return TaskMetadata(
+                    id=task_id,
+                    # arguments=args,
+                )
         else:
             task_id = f"{node.name}_{node.resource_type.value}"
             if use_task_group is True:

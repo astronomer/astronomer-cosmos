@@ -148,8 +148,8 @@ def test_render_config_with_invalid_dbt_commands(mock_which):
 @patch("cosmos.config.shutil.which", side_effect=(None, "fallback-dbt-path"))
 def test_render_config_uses_fallback_if_default_not_found(mock_which):
     render_config = RenderConfig()
-    render_config.validate_dbt_command("fallback-dbt-path")
-    assert render_config.dbt_executable_path == "fallback-dbt-path"
+    render_config.validate_dbt_command(Path("/tmp/fallback-dbt-path"))
+    assert render_config.dbt_executable_path == "/tmp/fallback-dbt-path"
 
 
 @patch("cosmos.config.shutil.which", side_effect=("user-dbt", "fallback-dbt-path"))

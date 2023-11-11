@@ -60,7 +60,7 @@ def test_run_command(
     dbt_cmd = run_command_args[2]
     assert python_cmd[0][0][0].endswith("/bin/python")
     assert python_cmd[0][-1][-1] == "from importlib.metadata import version; print(version('dbt-core'))"
-    assert dbt_deps[0][0][-1] == "deps"
+    assert dbt_deps[0][0][1] == "deps"
     assert dbt_deps[0][0][0].endswith("/bin/dbt")
     assert dbt_deps[0][0][0] == dbt_cmd[0][0][0]
     assert dbt_cmd[0][0][1] == "do-something"

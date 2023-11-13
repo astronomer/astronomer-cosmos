@@ -1,7 +1,7 @@
 version: 2
 
 sources:
-  - name: imdb
+  - name: main
     description: Example of IMDB SQlite database
     tables:
       - name: movies_ratings

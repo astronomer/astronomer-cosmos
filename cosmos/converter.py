@@ -160,7 +160,6 @@ class DbtToAirflowConverter:
             project=project_config,
             render_config=render_config,
             execution_config=execution_config,
-            dbt_cmd=render_config.dbt_executable_path,
             profile_config=profile_config,
             operator_args=operator_args,
         )

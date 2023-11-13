@@ -7,5 +7,5 @@ simple:
       database: 'database'
       schema: 'main'
       schemas_and_paths:
-        main: "{{ env_var('DBT_SQLITE_PATH') }}/imdb.db"
+        main: "{{ env_var('DBT_SQLITE_PATH') }}/main.db"
       schema_directory: "{{ env_var('DBT_SQLITE_PATH') }}"

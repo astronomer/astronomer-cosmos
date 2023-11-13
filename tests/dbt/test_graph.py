@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
@@ -312,9 +312,8 @@ def test_load_via_dbt_ls_without_exclude(project_name):
 def test_load_via_custom_without_project_path():
     project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="test")
     execution_config = ExecutionConfig()
-    render_config = RenderConfig()
+    render_config = RenderConfig(dbt_executable_path="/inexistent/dbt")
     dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,
@@ -326,12 +325,14 @@ def test_load_via_custom_without_project_path():
     assert err_info.value.args[0] == expected
 
 
-def test_load_via_dbt_ls_without_profile():
+@patch("cosmos.config.RenderConfig.validate_dbt_command", return_value=None)
+def test_load_via_dbt_ls_without_profile(mock_validate_dbt_command):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_executable_path="existing-dbt-cmd", dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    )
     dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,
@@ -346,10 +347,11 @@ def test_load_via_dbt_ls_without_profile():
 def test_load_via_dbt_ls_with_invalid_dbt_path():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_executable_path="/inexistent/dbt"
+    )
     with patch("pathlib.Path.exists", return_value=True):
         dbt_graph = DbtGraph(
-            dbt_cmd="/inexistent/dbt",
             project=project_config,
             execution_config=execution_config,
             render_config=render_config,
@@ -359,10 +361,10 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
                 profiles_yml_filepath=Path(__file__).parent.parent / "sample/profiles.yml",
             ),
         )
-        with pytest.raises(CosmosLoadDbtException) as err_info:
+        with pytest.raises(CosmosConfigException) as err_info:
             dbt_graph.load_via_dbt_ls()
 
-    expected = "Unable to find the dbt executable: /inexistent/dbt"
+    expected = "Unable to find the dbt executable, attempted: </inexistent/dbt> and <dbt>."
     assert err_info.value.args[0] == expected
 
 

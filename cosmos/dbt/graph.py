@@ -3,7 +3,6 @@ from __future__ import annotations
 import itertools
 import json
 import os
-import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,7 +20,6 @@ from cosmos.constants import (
     ExecutionMode,
     LoadMode,
 )
-from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import create_symlinks
 from cosmos.dbt.selector import select_nodes
@@ -110,15 +108,6 @@ class DbtGraph:
     Supports different ways of loading the `dbt` project into this representation.
 
     Different loading methods can result in different `nodes` and `filtered_nodes`.
-
-    Example of how to use:
-
-        dbt_graph = DbtGraph(
-            project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
-            render_config=RenderConfig(exclude=["*orders*"], select=[]),
-            dbt_cmd="/usr/local/bin/dbt"
-        )
-        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """
 
     nodes: dict[str, DbtNode] = dict()
@@ -130,7 +119,6 @@ class DbtGraph:
         render_config: RenderConfig = RenderConfig(),
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
-        dbt_cmd: str = get_system_dbt(),
         operator_args: dict[str, Any] | None = None,
     ):
         self.project = project
@@ -138,7 +126,6 @@ class DbtGraph:
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.operator_args = operator_args or {}
-        self.dbt_cmd = dbt_cmd
 
     def load(
         self,
@@ -176,9 +163,11 @@ class DbtGraph:
         else:
             load_method[method]()
 
-    def run_dbt_ls(self, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]) -> dict[str, DbtNode]:
+    def run_dbt_ls(
+        self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
+    ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [self.dbt_cmd, "ls", "--output", "json"]
+        ls_command = [dbt_cmd, "ls", "--output", "json"]
 
         if self.render_config.exclude:
             ls_command.extend(["--exclude", *self.render_config.exclude])
@@ -213,6 +202,10 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
+        self.render_config.validate_dbt_command(fallback_cmd=self.execution_config.dbt_executable_path)
+        dbt_cmd = self.render_config.dbt_executable_path
+        dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
+
         logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
         if not self.render_config.project_path or not self.execution_config.project_path:
             raise CosmosLoadDbtException(
@@ -221,9 +214,6 @@ class DbtGraph:
 
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
-
-        if not shutil.which(self.dbt_cmd):
-            raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.info(
@@ -253,12 +243,12 @@ class DbtGraph:
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps:
-                    deps_command = [self.dbt_cmd, "deps"]
+                    deps_command = [dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)
                     logger.debug("dbt deps output: %s", stdout)
 
-                nodes = self.run_dbt_ls(self.execution_config.project_path, tmpdir_path, env)
+                nodes = self.run_dbt_ls(dbt_cmd, self.execution_config.project_path, tmpdir_path, env)
 
                 self.nodes = nodes
                 self.filtered_nodes = nodes

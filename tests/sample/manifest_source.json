@@ -7,7 +7,7 @@
     "model.simple.top_animations": [
       "exposure.simple.weekly_metrics"
     ],
-    "source.simple.imdb.movies_ratings": [
+    "source.simple.main.movies_ratings": [
       "model.simple.movies_ratings_simplified"
     ]
   },
@@ -6992,7 +6992,7 @@
       "depends_on": {
         "macros": [],
         "nodes": [
-          "source.simple.imdb.movies_ratings"
+          "source.simple.main.movies_ratings"
         ]
       },
       "description": "",
@@ -7110,16 +7110,16 @@
       "model.simple.top_animations"
     ],
     "model.simple.movies_ratings_simplified": [
-      "source.simple.imdb.movies_ratings"
+      "source.simple.main.movies_ratings"
     ],
     "model.simple.top_animations": [
       "model.simple.movies_ratings_simplified"
     ],
-    "source.simple.imdb.movies_ratings": []
+    "source.simple.main.movies_ratings": []
   },
   "selectors": {},
   "sources": {
-    "source.simple.imdb.movies_ratings": {
+    "source.simple.main.movies_ratings": {
       "columns": {},
       "config": {
         "enabled": true
@@ -7166,7 +7166,7 @@
       "source_meta": {},
       "source_name": "imdb",
       "tags": [],
-      "unique_id": "source.simple.imdb.movies_ratings",
+      "unique_id": "source.simple.main.movies_ratings",
       "unrendered_config": {}
     }
   }

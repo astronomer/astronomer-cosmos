@@ -12,7 +12,6 @@ from cosmos.dbt.graph import (
     DbtGraph,
     DbtNode,
     LoadMode,
-    create_symlinks,
     run_command,
     parse_dbt_ls_output,
 )
@@ -388,7 +387,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     )
     getattr(dbt_graph, load_method)()
     assert len(dbt_graph.nodes) == 4
-    assert "source.simple.imdb.movies_ratings" in dbt_graph.nodes
+    assert "source.simple.main.movies_ratings" in dbt_graph.nodes
     assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
 
 
@@ -659,17 +658,6 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
         "model.jaffle_shop.stg_orders.v1",
         "model.jaffle_shop.stg_payments",
     } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)
-
-
-def test_create_symlinks(tmp_path):
-    """Tests that symlinks are created for expected files in the dbt project directory."""
-    tmp_dir = tmp_path / "dbt-project"
-    tmp_dir.mkdir()
-
-    create_symlinks(DBT_PROJECTS_ROOT_DIR / "jaffle_shop", tmp_dir)
-    for child in tmp_dir.iterdir():
-        assert child.is_symlink()
-        assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
 
 
 @pytest.mark.parametrize(

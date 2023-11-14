@@ -11,4 +11,4 @@ select
   "Domestic",
   "Foreign",
   "Worldwide"
-from {{ source('imdb', 'movies_ratings') }}
+from {{ source('main', 'movies_ratings') }}

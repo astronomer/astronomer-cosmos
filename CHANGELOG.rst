@@ -1,5 +1,21 @@
 Changelog
+
 =========
+
+1.2.4 (2023-11-14)
+------------------
+
+Bug fixes
+
+* Store ``compiled_sql`` even when task fails by @agreenburg in #671
+* Refactor ``LoadMethod.LOCAL`` to use symlinks instead of copying directory by @jbandoro in #660
+* Fix 'Unable to find the dbt executable: dbt' error by @tatiana in #666
+* Fix installing deps when using ``profile_mapping`` & ``ExecutionMode.LOCAL`` by @joppevos in #659
+
+Others
+
+* Docs fix: add execution config to MWAA code example by @ugmuka in #674
+
 
 1.2.3 (2023-11-09)
 ------------------

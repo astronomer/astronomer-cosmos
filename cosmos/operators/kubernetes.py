@@ -10,6 +10,12 @@ from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import DbtBaseOperator
 
+from airflow.models import TaskInstance
+from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
+from cosmos.dbt.parser.output import extract_log_issues
+
+DBT_NO_TESTS_MSG = "Nothing to do"
+DBT_WARN_MSG = "WARN"
 
 logger = get_logger(__name__)
 
@@ -158,10 +164,98 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
     ui_color = "#8194E0"
 
     def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+        if not on_warning_callback:
+            super().__init__(**kwargs)
+        else:
+            self.on_warning_callback = on_warning_callback
+            self.is_delete_operator_pod = kwargs.get("is_delete_operator_pod", None)
+            if self.is_delete_operator_pod is not None:
+                self.on_finish_action = (
+                    OnFinishAction.DELETE_POD if self.is_delete_operator_pod else OnFinishAction.KEEP_POD
+                )
+            else:
+                self.on_finish_action = OnFinishAction(kwargs.get("on_finish_action", "delete_pod"))
+                self.is_delete_operator_pod = self.on_finish_action == OnFinishAction.DELETE_POD
+            # In order to read the pod logs, we need to keep the pod around.
+            # Depending on the on_finish_action & is_delete_operator_pod settings,
+            # we will clean up the pod later in the _handle_warnings method, which
+            # is called in on_success_callback.
+            kwargs["is_delete_operator_pod"] = False
+            kwargs["on_finish_action"] = OnFinishAction.KEEP_POD
+
+            # Add an additional callback to both success and failure callbacks.
+            # In case of success, check for a warning in the logs and clean up the pod.
+            self.on_success_callback = kwargs.get("on_success_callback", None) or []
+            if isinstance(self.on_success_callback, list):
+                self.on_success_callback += [self._handle_warnings]
+            else:
+                self.on_success_callback = [self.on_success_callback, self._handle_warnings]
+            kwargs["on_success_callback"] = self.on_success_callback
+            # In case of failure, clean up the pod.
+            self.on_failure_callback = kwargs.get("on_failure_callback", None) or []
+            if isinstance(self.on_failure_callback, list):
+                self.on_failure_callback += [self._cleanup_pod]
+            else:
+                self.on_failure_callback = [self.on_failure_callback, self._cleanup_pod]
+            kwargs["on_failure_callback"] = self.on_failure_callback
+
+            super().__init__(**kwargs)
+
         self.base_cmd = ["test"]
-        # as of now, on_warning_callback in kubernetes executor does nothing
-        self.on_warning_callback = on_warning_callback
+
+    def _handle_warnings(self, context: Context) -> None:
+        """
+        Handles warnings by extracting log issues, creating additional context, and calling the
+        on_warning_callback with the updated context.
+
+        :param context: The original airflow context in which the build and run command was executed.
+        """
+        if not (
+            isinstance(context["task_instance"], TaskInstance)
+            and isinstance(context["task_instance"].task, KubernetesPodOperator)
+        ):
+            return
+        task = context["task_instance"].task
+        logs = [
+            log.decode("utf-8") for log in task.pod_manager.read_pod_logs(task.pod, "base") if log.decode("utf-8") != ""
+        ]
+
+        should_trigger_callback = all(
+            [
+                logs,
+                self.on_warning_callback,
+                DBT_NO_TESTS_MSG not in logs[-1],
+                DBT_WARN_MSG in logs[-1],
+            ]
+        )
+
+        if should_trigger_callback:
+            warnings = int(logs[-1].split(f"{DBT_WARN_MSG}=")[1].split()[0])
+            if warnings > 0:
+                test_names, test_results = extract_log_issues(logs)
+
+                # cotext_merge(context, test_names=test_names, test_results=test_results)
+
+                self.on_warning_callback(context)
+
+        self._cleanup_pod(context)
+
+    def _cleanup_pod(self, context: Context) -> None:
+        """
+        Handles the cleaning up of the pod after success or failure, if
+        there is a on_warning_callback function defined.
+
+        :param context: The original airflow context in which the build and run command was executed.
+        """
+        if not (
+            isinstance(context["task_instance"], TaskInstance)
+            and isinstance(context["task_instance"].task, KubernetesPodOperator)
+        ):
+            return
+        task = context["task_instance"].task
+        if task.pod:
+            task.on_finish_action = self.on_finish_action
+            task.cleanup(pod=task.pod, remote_pod=task.remote_pod)
 
 
 class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):

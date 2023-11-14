@@ -252,8 +252,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     logger.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
 
-                self.exception_handling(result)
                 self.store_compiled_sql(tmp_project_dir, context)
+                self.exception_handling(result)
                 if self.callback:
                     self.callback(tmp_project_dir)
 

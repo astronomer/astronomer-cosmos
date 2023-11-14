@@ -245,8 +245,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     logger.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
 
-                self.exception_handling(result)
                 self.store_compiled_sql(tmp_project_dir, context)
+                self.exception_handling(result)
                 if self.callback:
                     self.callback(tmp_project_dir)
 
@@ -395,6 +395,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#F58D7E"
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
@@ -433,6 +434,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh

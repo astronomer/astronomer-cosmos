@@ -21,6 +21,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
+from cosmos.dbt.project import create_symlinks
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -49,14 +50,6 @@ class DbtNode:
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_test: bool = False
-
-
-def create_symlinks(project_path: Path, tmp_dir: Path) -> None:
-    """Helper function to create symlinks to the dbt project files."""
-    ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
-    for child_name in os.listdir(project_path):
-        if child_name not in ignore_paths:
-            os.symlink(project_path / child_name, tmp_dir / child_name)
 
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:

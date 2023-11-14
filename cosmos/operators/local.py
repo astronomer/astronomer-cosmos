@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import signal
 import tempfile
 from attr import define
@@ -43,6 +42,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
+from cosmos.dbt.project import create_symlinks
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -190,19 +190,14 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_project_dir:
             logger.info(
                 "Cloning project to writable temp directory %s from %s",
-                tmp_dir,
+                tmp_project_dir,
                 self.project_dir,
             )
 
-            # need a subfolder because shutil.copytree will fail if the destination dir already exists
-            tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
-            shutil.copytree(
-                self.project_dir,
-                tmp_project_dir,
-            )
+            create_symlinks(Path(self.project_dir), Path(tmp_project_dir))
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values

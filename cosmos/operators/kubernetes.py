@@ -11,7 +11,6 @@ from cosmos.config import ProfileConfig
 from cosmos.operators.base import DbtBaseOperator
 
 from airflow.models import TaskInstance
-from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
 from cosmos.dbt.parser.output import extract_log_issues
 
 DBT_NO_TESTS_MSG = "Nothing to do"
@@ -35,6 +34,7 @@ except ImportError:
             "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
             "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
         )
+from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore

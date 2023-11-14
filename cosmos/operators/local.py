@@ -139,6 +139,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         Gets called after every dbt run.
         """
         if not self.should_store_compiled_sql:
+            logger.info("should_store_compiled_sql is False. Skipping")
             return
 
         compiled_queries = {}
@@ -403,7 +404,7 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#F58D7E"
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
@@ -442,7 +443,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh

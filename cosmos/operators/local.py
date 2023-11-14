@@ -139,7 +139,6 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         Gets called after every dbt run.
         """
         if not self.should_store_compiled_sql:
-            logger.info("should_store_compiled_sql is False. Skipping")
             return
 
         compiled_queries = {}

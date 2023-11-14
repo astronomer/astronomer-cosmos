@@ -4,7 +4,7 @@ from os import PathLike
 from typing import Any, Callable, Sequence
 
 import yaml
-from airflow.utils.context import Context
+from airflow.utils.context import Context, context_merge
 
 from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
@@ -24,6 +24,7 @@ try:
         convert_env_vars,
     )
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+    from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
 except ImportError:
     try:
         # apache-airflow-providers-cncf-kubernetes < 7.4.0
@@ -34,7 +35,6 @@ except ImportError:
             "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
             "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
         )
-from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
 
 
 class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore
@@ -212,7 +212,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
         """
         if not (
             isinstance(context["task_instance"], TaskInstance)
-            and isinstance(context["task_instance"].task, KubernetesPodOperator)
+            and isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
         ):
             return
         task = context["task_instance"].task
@@ -233,9 +233,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
             warnings = int(logs[-1].split(f"{DBT_WARN_MSG}=")[1].split()[0])
             if warnings > 0:
                 test_names, test_results = extract_log_issues(logs)
-
-                # cotext_merge(context, test_names=test_names, test_results=test_results)
-
+                context_merge(context, test_names=test_names, test_results=test_results)
                 self.on_warning_callback(context)
 
         self._cleanup_pod(context)
@@ -249,7 +247,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
         """
         if not (
             isinstance(context["task_instance"], TaskInstance)
-            and isinstance(context["task_instance"].task, KubernetesPodOperator)
+            and isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
         ):
             return
         task = context["task_instance"].task

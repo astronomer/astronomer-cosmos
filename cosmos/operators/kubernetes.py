@@ -168,14 +168,14 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
             super().__init__(**kwargs)
         else:
             self.on_warning_callback = on_warning_callback
-            self.is_delete_operator_pod = kwargs.get("is_delete_operator_pod", None)
-            if self.is_delete_operator_pod is not None:
-                self.on_finish_action = (
-                    OnFinishAction.DELETE_POD if self.is_delete_operator_pod else OnFinishAction.KEEP_POD
+            self.is_delete_operator_pod_original = kwargs.get("is_delete_operator_pod", None)
+            if self.is_delete_operator_pod_original is not None:
+                self.on_finish_action_original = (
+                    OnFinishAction.DELETE_POD if self.is_delete_operator_pod_original else OnFinishAction.KEEP_POD
                 )
             else:
-                self.on_finish_action = OnFinishAction(kwargs.get("on_finish_action", "delete_pod"))
-                self.is_delete_operator_pod = self.on_finish_action == OnFinishAction.DELETE_POD
+                self.on_finish_action_original = OnFinishAction(kwargs.get("on_finish_action", "delete_pod"))
+                self.is_delete_operator_pod_original = self.on_finish_action_original == OnFinishAction.DELETE_POD
             # In order to read the pod logs, we need to keep the pod around.
             # Depending on the on_finish_action & is_delete_operator_pod settings,
             # we will clean up the pod later in the _handle_warnings method, which
@@ -252,7 +252,7 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
             return
         task = context["task_instance"].task
         if task.pod:
-            task.on_finish_action = self.on_finish_action
+            task.on_finish_action = self.on_finish_action_original
             task.cleanup(pod=task.pod, remote_pod=task.remote_pod)
 
 

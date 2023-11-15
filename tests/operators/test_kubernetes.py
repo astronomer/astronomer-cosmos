@@ -14,11 +14,13 @@ from cosmos.operators.kubernetes import (
 
 from airflow.utils.context import Context, context_merge
 from airflow.models import TaskInstance
+
 try:
     from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
-    module_available=True
+
+    module_available = True
 except ImportError:
-    module_available=False
+    module_available = False
 
 
 def test_dbt_kubernetes_operator_add_global_flags() -> None:
@@ -147,7 +149,9 @@ def test_dbt_kubernetes_build_command():
         ({}, (1, 1, True, "delete_pod")),
     ],
 )
-@pytest.mark.skipif(not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available")
+@pytest.mark.skipif(
+    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
+)
 def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_results):
     test_operator = DbtTestKubernetesOperator(
         on_warning_callback=(lambda **kwargs: None), **additional_kwargs, **base_kwargs
@@ -191,7 +195,9 @@ class FakePodManager:
         return (log.encode("utf-8") for log in log_string.split("\n"))
 
 
-@pytest.mark.skipif(not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available")
+@pytest.mark.skipif(
+    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
+)
 def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     def on_warning_callback(context: Context):
         assert context["test_names"] == ["dbt_utils_accepted_range_table_col__12__0"]

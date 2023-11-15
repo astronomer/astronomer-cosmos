@@ -14,7 +14,11 @@ from cosmos.operators.kubernetes import (
 
 from airflow.utils.context import Context, context_merge
 from airflow.models import TaskInstance
-from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
+try:
+    from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
+    module_available=True
+except ImportError:
+    module_available=False
 
 
 def test_dbt_kubernetes_operator_add_global_flags() -> None:
@@ -110,18 +114,18 @@ def test_dbt_kubernetes_build_command():
 @pytest.mark.parametrize(
     "additional_kwargs,expected_results",
     [
-        ({"on_success_callback": None, "is_delete_operator_pod": True}, (1, 1, True, OnFinishAction.DELETE_POD)),
+        ({"on_success_callback": None, "is_delete_operator_pod": True}, (1, 1, True, "delete_pod")),
         (
             {"on_success_callback": (lambda **kwargs: None), "is_delete_operator_pod": False},
-            (2, 1, False, OnFinishAction.KEEP_POD),
+            (2, 1, False, "keep_pod"),
         ),
         (
             {"on_success_callback": [(lambda **kwargs: None), (lambda **kwargs: None)], "is_delete_operator_pod": None},
-            (3, 1, True, OnFinishAction.DELETE_POD),
+            (3, 1, True, "delete_pod"),
         ),
         (
             {"on_failure_callback": None, "is_delete_operator_pod": True, "on_finish_action": "keep_pod"},
-            (1, 1, True, OnFinishAction.DELETE_POD),
+            (1, 1, True, "delete_pod"),
         ),
         (
             {
@@ -129,7 +133,7 @@ def test_dbt_kubernetes_build_command():
                 "is_delete_operator_pod": None,
                 "on_finish_action": "delete_pod",
             },
-            (1, 2, True, OnFinishAction.DELETE_POD),
+            (1, 2, True, "delete_pod"),
         ),
         (
             {
@@ -137,12 +141,13 @@ def test_dbt_kubernetes_build_command():
                 "is_delete_operator_pod": None,
                 "on_finish_action": "delete_succeeded_pod",
             },
-            (1, 3, False, OnFinishAction.DELETE_SUCCEEDED_POD),
+            (1, 3, False, "delete_succeeded_pod"),
         ),
-        ({"is_delete_operator_pod": None, "on_finish_action": "keep_pod"}, (1, 1, False, OnFinishAction.KEEP_POD)),
-        ({}, (1, 1, True, OnFinishAction.DELETE_POD)),
+        ({"is_delete_operator_pod": None, "on_finish_action": "keep_pod"}, (1, 1, False, "keep_pod")),
+        ({}, (1, 1, True, "delete_pod")),
     ],
 )
+@pytest.mark.skipif(not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available")
 def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_results):
     test_operator = DbtTestKubernetesOperator(
         on_warning_callback=(lambda **kwargs: None), **additional_kwargs, **base_kwargs
@@ -157,7 +162,7 @@ def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_re
     assert len(test_operator.on_success_callback) == expected_results[0]
     assert len(test_operator.on_failure_callback) == expected_results[1]
     assert test_operator.is_delete_operator_pod_original == expected_results[2]
-    assert test_operator.on_finish_action_original == expected_results[3]
+    assert test_operator.on_finish_action_original == OnFinishAction(expected_results[3])
 
 
 class FakePodManager:
@@ -186,6 +191,7 @@ class FakePodManager:
         return (log.encode("utf-8") for log in log_string.split("\n"))
 
 
+@pytest.mark.skipif(not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available")
 def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     def on_warning_callback(context: Context):
         assert context["test_names"] == ["dbt_utils_accepted_range_table_col__12__0"]

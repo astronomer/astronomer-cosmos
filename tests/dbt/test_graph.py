@@ -343,7 +343,8 @@ def test_load_via_dbt_ls_without_profile(mock_validate_dbt_command):
     assert err_info.value.args[0] == expected
 
 
-def test_load_via_dbt_ls_with_invalid_dbt_path():
+@patch("cosmos.dbt.executable.shutil.which", return_value=None)
+def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(

@@ -35,6 +35,19 @@ def test_validate_arguments_tags(argument_key):
     assert err.value.args[0] == expected
 
 
+def test_validate_arguments_schema_in_task_args():
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    task_args = {"schema": "abcd"}
+    validate_arguments(
+        select=[], exclude=[], profile_config=profile_config, task_args=task_args, execution_mode=ExecutionMode.LOCAL
+    )
+    assert profile_config.profile_mapping.profile_args["schema"] == "abcd"
+
+
 parent_seed = DbtNode(
     name="seed_parent",
     unique_id="seed_parent",

@@ -133,6 +133,14 @@ def test_profile_config_validate_both():
     )
 
 
+def test_profile_config_validate_profiles_yml():
+    profile_config = ProfileConfig(profile_name="test", target_name="test", profiles_yml_filepath="/tmp/no-exists")
+    with pytest.raises(CosmosValueError) as err_info:
+        profile_config.validate_profiles_yml()
+
+    assert err_info.value.args[0] == "The file /tmp/no-exists does not exist."
+
+
 @patch("cosmos.config.shutil.which", return_value=None)
 def test_render_config_without_dbt_cmd(mock_which):
     render_config = RenderConfig()

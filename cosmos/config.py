@@ -258,7 +258,7 @@ class ExecutionConfig:
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
-    dbt_executable_path: str | Path = get_system_dbt()
+    dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
     dbt_project_path: InitVar[str | Path | None] = None
 

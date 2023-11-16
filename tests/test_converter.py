@@ -203,12 +203,14 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
         # (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
 def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualenv_dir, operator_args, caplog):
     """
     This test will raise a warning if we are trying to pass ExecutionMode != `VirtualEnv`
     and still pass a defined `virtualenv_dir`
     """
-    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     execution_config = ExecutionConfig(execution_mode=execution_mode, virtualenv_dir=virtualenv_dir)
     render_config = RenderConfig(emit_datasets=True)
     profile_config = ProfileConfig(
@@ -225,8 +227,6 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
         render_config=render_config,
         operator_args=operator_args,
     )
-
-    assert converter
 
     assert "`ExecutionConfig.virtualenv_dir` is only supported when \
                 ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text

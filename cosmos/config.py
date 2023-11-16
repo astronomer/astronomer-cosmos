@@ -258,7 +258,7 @@ class ExecutionConfig:
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
-    dbt_executable_path: str | Path | None = None
+    dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
     dbt_project_path: InitVar[str | Path | None] = None
 
@@ -266,5 +266,3 @@ class ExecutionConfig:
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
-        if not self.dbt_executable_path:
-            self.dbt_executable_path = get_system_dbt()

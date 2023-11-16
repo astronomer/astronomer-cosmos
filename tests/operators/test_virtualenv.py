@@ -86,15 +86,18 @@ def test_virtualenv_operator_append_env_is_true_by_default():
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
 @patch("airflow.hooks.base.BaseHook.get_connection")
 def test_supply_virtualenv_dir_flag(
     mock_get_connection,
+    mock_lock_available,
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
     mock_calculate_openlineage_events_completes,
     mock_execute,
 ):
+    mock_lock_available.return_value = True
     mock_get_connection.return_value = Connection(
         conn_id="fake_conn",
         conn_type="postgres",

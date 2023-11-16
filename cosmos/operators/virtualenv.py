@@ -136,7 +136,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             )
 
         self.log.info(f"Checking if {str(self.__lock_file)} exists")
-        while not self.__is_lock_available():
+        while not self._is_lock_available():
             self.log.info("Waiting for lock to release")
             time.sleep(1)
 
@@ -166,7 +166,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         return os.getpid()
     
     @depends_on_virtualenv_dir
-    def __is_lock_available(self) -> bool:
+    def _is_lock_available(self) -> bool:
         if self.__lock_file.is_file():
             with open(self.__lock_file, "r") as lf:
                 pid = int(lf.read())

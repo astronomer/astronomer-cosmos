@@ -21,7 +21,6 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         "user",
         "password",
         "dbname",
-
     ]
     secret_fields = [
         "password",

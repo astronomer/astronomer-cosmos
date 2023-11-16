@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
+from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 
 import pytest
 from airflow.models import DAG
@@ -22,10 +23,14 @@ def test_validate_arguments_tags(argument_key):
     selector_name = argument_key[:-1]
     select = [f"{selector_name}:a,{selector_name}:b"]
     exclude = [f"{selector_name}:b,{selector_name}:c"]
-    profile_args = {}
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
     task_args = {}
     with pytest.raises(CosmosValueError) as err:
-        validate_arguments(select, exclude, profile_args, task_args)
+        validate_arguments(select, exclude, profile_config, task_args, execution_mode=ExecutionMode.LOCAL)
     expected = f"Can't specify the same {selector_name} in `select` and `exclude`: {{'b'}}"
     assert err.value.args[0] == expected
 

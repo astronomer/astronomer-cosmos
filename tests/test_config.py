@@ -1,5 +1,6 @@
 from pathlib import Path
 from unittest.mock import patch
+from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 
 import pytest
 
@@ -8,6 +9,7 @@ from cosmos.exceptions import CosmosValueError
 
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
+SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 PIPELINE_FOLDER = "jaffle_shop"
 
 
@@ -111,17 +113,24 @@ def test_project_name():
     assert dbt_project.project_name == "sample"
 
 
-def test_profile_config_post_init():
+def test_profile_config_validate_none():
     with pytest.raises(CosmosValueError) as err_info:
-        ProfileConfig(profiles_yml_filepath="/tmp/some-profile", profile_name="test", target_name="test")
-    assert err_info.value.args[0] == "The file /tmp/some-profile does not exist."
-
-
-def test_profile_config_validate():
-    with pytest.raises(CosmosValueError) as err_info:
-        profile_config = ProfileConfig(profile_name="test", target_name="test")
-        assert profile_config.validate_profile() is None
+        ProfileConfig(profile_name="test", target_name="test")
     assert err_info.value.args[0] == "Either profiles_yml_filepath or profile_mapping must be set to render a profile"
+
+
+def test_profile_config_validate_both():
+    with pytest.raises(CosmosValueError) as err_info:
+        ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profiles_yml_filepath=SAMPLE_PROFILE_YML,
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        )
+    assert (
+        err_info.value.args[0]
+        == "Both profiles_yml_filepath and profile_mapping are defined and are mutually exclusive. Ensure only one of these is defined."
+    )
 
 
 @patch("cosmos.config.shutil.which", return_value=None)

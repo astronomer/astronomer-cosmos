@@ -83,11 +83,11 @@ def create_test_task_metadata(
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
         if node.resource_type == DbtResourceType.MODEL:
-            task_args["models"] = node.name
+            task_args["models"] = node.resource_name
         elif node.resource_type == DbtResourceType.SOURCE:
-            task_args["select"] = f"source:{node.unique_id[len('source.'):]}"
+            task_args["select"] = f"source:{node.resource_name}"
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
-            task_args["select"] = node.name
+            task_args["select"] = node.resource_name
     return TaskMetadata(
         id=test_task_name,
         operator_class=calculate_operator_class(
@@ -108,8 +108,8 @@ def create_task_metadata(
     :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
          Default is ExecutionMode.LOCAL.
     :param args: Arguments to be used to instantiate an Airflow Task
-    :param use_name_as_task_id_prefix: If resource_type is DbtResourceType.MODEL, it determines whether
-         using name as task id prefix or not. If it is True task_id = <node.name>_run, else task_id=run.
+    :param use_task_group: It determines whether to use the name as a prefix for the task id or not.
+        If it is False, then use the name as a prefix for the task id, otherwise do not.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = {
@@ -118,7 +118,7 @@ def create_task_metadata(
         DbtResourceType.SEED: "DbtSeed",
         DbtResourceType.TEST: "DbtTest",
     }
-    args = {**args, **{"models": node.name}}
+    args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         if node.resource_type == DbtResourceType.MODEL:

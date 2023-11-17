@@ -39,8 +39,7 @@ def test_is_empty_config(selector_config, paths, tags, config, other, expected):
 
 
 grandparent_node = DbtNode(
-    name="grandparent",
-    unique_id="grandparent",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandparent",
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/grandparent.sql",
@@ -48,8 +47,7 @@ grandparent_node = DbtNode(
     config={"materialized": "view", "tags": ["has_child"]},
 )
 parent_node = DbtNode(
-    name="parent",
-    unique_id="parent",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent",
     resource_type=DbtResourceType.MODEL,
     depends_on=["grandparent"],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
@@ -57,8 +55,7 @@ parent_node = DbtNode(
     config={"materialized": "view", "tags": ["has_child", "is_child"]},
 )
 child_node = DbtNode(
-    name="child",
-    unique_id="child",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
@@ -67,8 +64,7 @@ child_node = DbtNode(
 )
 
 grandchild_1_test_node = DbtNode(
-    name="grandchild_1",
-    unique_id="grandchild_1",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandchild_1",
     resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/grandchild_1.sql",
@@ -77,8 +73,7 @@ grandchild_1_test_node = DbtNode(
 )
 
 grandchild_2_test_node = DbtNode(
-    name="grandchild_2",
-    unique_id="grandchild_2",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandchild_2",
     resource_type=DbtResourceType.MODEL,
     depends_on=["parent"],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/grandchild_2.sql",

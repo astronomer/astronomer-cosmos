@@ -5,7 +5,7 @@ import psutil
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from airflow.compat.functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
@@ -32,8 +32,8 @@ logger = get_logger(__name__)
 
 PY_INTERPRETER = "python3"
 
-def depends_on_virtualenv_dir(method):
-    def wrapper(operator: DbtVirtualenvBaseOperator, *args):
+def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
+    def wrapper(operator: DbtVirtualenvBaseOperator, *args: Any) -> None:
         if operator.virtualenv_dir is None:
             raise CosmosValueError(f"Method relies on value of parameter `virtualenv_dir` which is None.")
         
@@ -169,7 +169,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     @depends_on_virtualenv_dir
     def __acquire_venv_lock(self) -> None:
-        if not self.virtualenv_dir.is_dir():
+        if not self.virtualenv_dir.is_dir(): # type: ignore
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self.__lock_file, "w") as lf:

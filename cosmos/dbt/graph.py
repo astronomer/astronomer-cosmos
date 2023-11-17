@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import json
 import os
+import shutil
 import tempfile
 import yaml
 from dataclasses import dataclass, field
@@ -68,14 +69,6 @@ class DbtNode:
         Replace period (.) with underscore (_) due to versioned models.
         """
         return self.resource_name.replace(".", "_")
-
-
-def create_symlinks(project_path: Path, tmp_dir: Path) -> None:
-    """Helper function to create symlinks to the dbt project files."""
-    ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
-    for child_name in os.listdir(project_path):
-        if child_name not in ignore_paths:
-            os.symlink(project_path / child_name, tmp_dir / child_name)
 
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
@@ -205,7 +198,7 @@ class DbtGraph:
 
     def run_dbt_ls(self, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [dbt_cmd, "ls", "--output", "json"]
+        ls_command = [self.dbt_cmd, "ls", "--output", "json"]
 
         if self.render_config.exclude:
             ls_command.extend(["--exclude", *self.render_config.exclude])
@@ -252,8 +245,8 @@ class DbtGraph:
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
-        if not self.profile_config:
-            raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
+        if not shutil.which(self.dbt_cmd):
+            raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.info(

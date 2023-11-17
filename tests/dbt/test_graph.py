@@ -12,8 +12,8 @@ from cosmos.dbt.graph import (
     DbtGraph,
     DbtNode,
     LoadMode,
-    run_command,
     parse_dbt_ls_output,
+    run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -40,6 +40,20 @@ def tmp_dbt_project_dir():
     yield tmp_dir
 
     shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
+
+
+@pytest.mark.parametrize(
+    "unique_id,expected_name, expected_select",
+    [
+        ("model.my_project.customers", "customers", "customers"),
+        ("model.my_project.customers.v1", "customers_v1", "customers.v1"),
+        ("model.my_project.orders.v2", "orders_v2", "orders.v2"),
+    ],
+)
+def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
+    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    assert node.name == expected_name
+    assert node.resource_name == expected_select
 
 
 @pytest.mark.parametrize(
@@ -692,7 +706,6 @@ def test_parse_dbt_ls_output():
 
     expected_nodes = {
         "fake-unique-id": DbtNode(
-            name="fake-name",
             unique_id="fake-unique-id",
             resource_type=DbtResourceType.MODEL,
             file_path=Path("fake-project/fake-file-path.sql"),

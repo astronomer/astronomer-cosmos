@@ -37,7 +37,11 @@ models:
           - include: all
             exclude:
               - full_name
+        config:
+          alias: '{{ "customers_" ~ var("division", "USA") ~ "_v1" }}'
       - v: 2
+        config:
+          alias: '{{ "customers_" ~ var("division", "USA") ~ "_v2" }}'
 
   - name: orders
     description: This table has basic information about orders, as well as some derived facts based on payments

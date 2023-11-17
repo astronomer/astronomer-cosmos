@@ -49,8 +49,7 @@ def test_validate_arguments_schema_in_task_args():
 
 
 parent_seed = DbtNode(
-    name="seed_parent",
-    unique_id="seed_parent",
+    unique_id=f"{DbtResourceType.SEED}.{SAMPLE_DBT_PROJECT.stem}.seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",

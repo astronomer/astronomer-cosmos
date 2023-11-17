@@ -17,43 +17,57 @@ from cosmos.airflow.graph import (
     generate_task_or_group,
 )
 from cosmos.config import ProfileConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, TestBehavior, TestIndirectSelection
+from cosmos.constants import (
+    DbtResourceType,
+    ExecutionMode,
+    TestBehavior,
+    TestIndirectSelection,
+)
 from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 
 parent_seed = DbtNode(
-    name="seed_parent",
-    unique_id="seed_parent",
+    unique_id=f"{DbtResourceType.SEED.value}.{SAMPLE_PROJ_PATH.stem}.seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
 )
 parent_node = DbtNode(
-    name="parent",
-    unique_id="parent",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent",
     resource_type=DbtResourceType.MODEL,
-    depends_on=["seed_parent"],
+    depends_on=[parent_seed.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view"},
     has_test=True,
 )
 test_parent_node = DbtNode(
-    name="test_parent", unique_id="test_parent", resource_type=DbtResourceType.TEST, depends_on=["parent"], file_path=""
+    unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test_parent",
+    resource_type=DbtResourceType.TEST,
+    depends_on=[parent_node.unique_id],
+    file_path="",
 )
 child_node = DbtNode(
-    name="child",
-    unique_id="child",
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
-    depends_on=["parent"],
+    depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
     tags=["nightly"],
     config={"materialized": "table"},
 )
 
-sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node]
+child2_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child2.v2",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[parent_node.unique_id],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
+    tags=["nightly"],
+    config={"materialized": "table"},
+)
+
+sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node]
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
 
 
@@ -91,6 +105,7 @@ def test_build_airflow_graph_with_after_each():
         "parent.run",
         "parent.test",
         "child_run",
+        "child2_v2_run",
     ]
 
     assert topological_sort == expected_sort
@@ -100,15 +115,16 @@ def test_build_airflow_graph_with_after_each():
     assert task_groups["parent"].upstream_task_ids == {"seed_parent_seed"}
     assert list(task_groups["parent"].children.keys()) == ["parent.run", "parent.test"]
 
-    assert len(dag.leaves) == 1
+    assert len(dag.leaves) == 2
     assert dag.leaves[0].task_id == "child_run"
+    assert dag.leaves[1].task_id == "child2_v2_run"
 
 
 @pytest.mark.parametrize(
     "node_type,task_suffix",
     [(DbtResourceType.MODEL, "run"), (DbtResourceType.SEED, "seed"), (DbtResourceType.SNAPSHOT, "snapshot")],
 )
-def test_create_task_group_for_after_each_supported_nodes(node_type, task_suffix):
+def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResourceType, task_suffix):
     """
     dbt test runs tests defined on models, sources, snapshots, and seeds.
     It expects that you have already created those resources through the appropriate commands.
@@ -116,8 +132,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type, task_suffix
     """
     with DAG("test-task-group-after-each", start_date=datetime(2022, 1, 1)) as dag:
         node = DbtNode(
-            name="dbt_node",
-            unique_id="dbt_node",
+            unique_id=f"{node_type.value}.{SAMPLE_PROJ_PATH.stem}.dbt_node",
             resource_type=node_type,
             file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
             tags=["has_child"],
@@ -178,7 +193,7 @@ def test_build_airflow_graph_with_after_all():
             dbt_project_name="astro_shop",
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed", "parent_run", "child_run", "astro_shop_test"]
+    expected_sort = ["seed_parent_seed", "parent_run", "child_run", "child2_v2_run", "astro_shop_test"]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
@@ -195,8 +210,7 @@ def test_calculate_operator_class():
 
 def test_calculate_leaves():
     grandparent_node = DbtNode(
-        name="grandparent",
-        unique_id="grandparent",
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandparent",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
@@ -204,28 +218,25 @@ def test_calculate_leaves():
         config={},
     )
     parent1_node = DbtNode(
-        name="parent1",
-        unique_id="parent1",
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent1",
         resource_type=DbtResourceType.MODEL,
-        depends_on=["grandparent"],
+        depends_on=[grandparent_node.unique_id],
         file_path="",
         tags=[],
         config={},
     )
     parent2_node = DbtNode(
-        name="parent2",
-        unique_id="parent2",
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent2",
         resource_type=DbtResourceType.MODEL,
-        depends_on=["grandparent"],
+        depends_on=[parent1_node.unique_id],
         file_path="",
         tags=[],
         config={},
     )
     child_node = DbtNode(
-        name="child",
-        unique_id="child",
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
         resource_type=DbtResourceType.MODEL,
-        depends_on=["parent1", "parent2"],
+        depends_on=[parent1_node.unique_id, parent2_node.unique_id],
         file_path="",
         tags=[],
         config={},
@@ -235,14 +246,13 @@ def test_calculate_leaves():
     nodes = {node.unique_id: node for node in nodes_list}
 
     leaves = calculate_leaves(nodes.keys(), nodes)
-    assert leaves == ["child"]
+    assert leaves == [f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child"]
 
 
 @patch("cosmos.airflow.graph.logger.propagate", True)
 def test_create_task_metadata_unsupported(caplog):
     child_node = DbtNode(
-        name="unsupported",
-        unique_id="unsupported",
+        unique_id=f"unsupported.{SAMPLE_PROJ_PATH.stem}.unsupported",
         resource_type="unsupported",
         depends_on=[],
         file_path="",
@@ -252,7 +262,7 @@ def test_create_task_metadata_unsupported(caplog):
     response = create_task_metadata(child_node, execution_mode="", args={})
     assert response is None
     expected_msg = (
-        "Unavailable conversion function for <unsupported> (node <unsupported>). "
+        "Unavailable conversion function for <unsupported> (node <unsupported.dbt-proj.unsupported>). "
         "Define a converter function using render_config.node_converters."
     )
     assert caplog.messages[0] == expected_msg
@@ -260,8 +270,7 @@ def test_create_task_metadata_unsupported(caplog):
 
 def test_create_task_metadata_model(caplog):
     child_node = DbtNode(
-        name="my_model",
-        unique_id="my_folder.my_model",
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
@@ -274,10 +283,24 @@ def test_create_task_metadata_model(caplog):
     assert metadata.arguments == {"models": "my_model"}
 
 
+def test_create_task_metadata_model_with_versions(caplog):
+    child_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model.v1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        tags=[],
+        config={},
+    )
+    metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})
+    assert metadata.id == "my_model_v1_run"
+    assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
+    assert metadata.arguments == {"models": "my_model.v1"}
+
+
 def test_create_task_metadata_model_use_task_group(caplog):
     child_node = DbtNode(
-        name="my_model",
-        unique_id="my_folder.my_model",
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path=Path(""),
@@ -291,8 +314,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
 @pytest.mark.parametrize("use_task_group", (None, True, False))
 def test_create_task_metadata_seed(caplog, use_task_group):
     sample_node = DbtNode(
-        name="my_seed",
-        unique_id="my_folder.my_seed",
+        unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
         resource_type=DbtResourceType.SEED,
         depends_on=[],
         file_path="",
@@ -320,8 +342,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
 
 def test_create_task_metadata_snapshot(caplog):
     sample_node = DbtNode(
-        name="my_snapshot",
-        unique_id="my_folder.my_snapshot",
+        unique_id=f"{DbtResourceType.SNAPSHOT.value}.my_folder.my_snapshot",
         resource_type=DbtResourceType.SNAPSHOT,
         depends_on=[],
         file_path="",
@@ -337,22 +358,33 @@ def test_create_task_metadata_snapshot(caplog):
 @pytest.mark.parametrize(
     "node_type,node_unique_id,test_indirect_selection,additional_arguments",
     [
-        (DbtResourceType.MODEL, "node_name", TestIndirectSelection.EAGER, {"models": "node_name"}),
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+            TestIndirectSelection.EAGER,
+            {"models": "node_name"},
+        ),
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.node_name.v1",
+            TestIndirectSelection.EAGER,
+            {"models": "node_name.v1"},
+        ),
         (
             DbtResourceType.SEED,
-            "node_name",
+            f"{DbtResourceType.SEED.value}.my_folder.node_name",
             TestIndirectSelection.CAUTIOUS,
             {"select": "node_name", "indirect_selection": "cautious"},
         ),
         (
             DbtResourceType.SOURCE,
-            "source.node_name",
+            f"{DbtResourceType.SOURCE.value}.my_folder.node_name",
             TestIndirectSelection.BUILDABLE,
             {"select": "source:node_name", "indirect_selection": "buildable"},
         ),
         (
             DbtResourceType.SNAPSHOT,
-            "node_name",
+            f"{DbtResourceType.SNAPSHOT.value}.my_folder.node_name",
             TestIndirectSelection.EMPTY,
             {"select": "node_name", "indirect_selection": "empty"},
         ),
@@ -360,7 +392,6 @@ def test_create_task_metadata_snapshot(caplog):
 )
 def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_selection, additional_arguments):
     sample_node = DbtNode(
-        name="node_name",
         unique_id=node_unique_id,
         resource_type=node_type,
         depends_on=[],

@@ -42,7 +42,6 @@ class DbtNode:
     Metadata related to a dbt node (e.g. model, seed, snapshot, source).
     """
 
-    name: str
     unique_id: str
     resource_type: DbtResourceType
     depends_on: list[str]
@@ -51,6 +50,23 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+
+    @property
+    def resource_name(self) -> str:
+        """
+        Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
+        The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
+        For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
+        """
+        return self.unique_id.split(".", 2)[2]
+
+    @property
+    def name(self) -> str:
+        """
+        Use this property as the task name or task group name.
+        Replace period (.) with underscore (_) due to versioned models.
+        """
+        return self.resource_name.replace(".", "_")
 
 
 def is_freshness_effective(freshness: dict[str, Any]) -> bool:
@@ -116,7 +132,6 @@ def parse_dbt_ls_output(project_path: Path, ls_stdout: str) -> dict[str, DbtNode
             logger.debug("Skipped dbt ls line: %s", line)
         else:
             node = DbtNode(
-                name=node_dict.get("alias", node_dict["name"]),
                 unique_id=node_dict["unique_id"],
                 resource_type=DbtResourceType(node_dict["resource_type"]),
                 depends_on=node_dict.get("depends_on", {}).get("nodes", []),
@@ -232,9 +247,6 @@ class DbtGraph:
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
 
-        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
-        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
-
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -328,8 +340,7 @@ class DbtGraph:
         for model_name, model in models:
             config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
             node = DbtNode(
-                name=model_name,
-                unique_id=model_name,
+                unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
                 resource_type=DbtResourceType(model.type.value),
                 depends_on=list(model.config.upstream_models),
                 file_path=Path(
@@ -362,9 +373,6 @@ class DbtGraph:
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).
 
-        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
-        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
-
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -384,7 +392,6 @@ class DbtGraph:
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
                 node = DbtNode(
-                    name=node_dict.get("alias", node_dict["name"]),
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),

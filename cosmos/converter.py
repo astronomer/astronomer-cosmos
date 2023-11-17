@@ -75,8 +75,9 @@ def validate_arguments(
 
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:
-        profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
         logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
+        if profile_config.profile_mapping:
+            profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
 
     if execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
         profile_config.validate_profiles_yml()

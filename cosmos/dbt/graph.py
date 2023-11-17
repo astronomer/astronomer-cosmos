@@ -7,6 +7,7 @@ import itertools
 import json
 import os
 import platform
+import shutil
 import tempfile
 import zlib
 from dataclasses import dataclass, field
@@ -98,14 +99,6 @@ class DbtNode:
             "resource_name": self.resource_name,
             "name": self.name,
         }
-
-
-def create_symlinks(project_path: Path, tmp_dir: Path) -> None:
-    """Helper function to create symlinks to the dbt project files."""
-    ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
-    for child_name in os.listdir(project_path):
-        if child_name not in ignore_paths:
-            os.symlink(project_path / child_name, tmp_dir / child_name)
 
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
@@ -371,7 +364,7 @@ class DbtGraph:
     ) -> dict[str, DbtNode]:
 
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [dbt_cmd, "ls", "--output", "json"]
+        ls_command = [self.dbt_cmd, "ls", "--output", "json"]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
@@ -469,8 +462,8 @@ class DbtGraph:
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
-        if not self.profile_config:
-            raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
+        if not shutil.which(self.dbt_cmd):
+            raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")

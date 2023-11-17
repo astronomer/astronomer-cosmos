@@ -83,9 +83,9 @@ def test_connection_claiming() -> None:
             assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
-    conn = Connection(**potential_values)  # type: ignore
+    conn = Connection(**{k: v for k, v in potential_values.items() if k != 'schema'})
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = PostgresUserPasswordProfileMapping(conn, {})
+        profile_mapping = PostgresUserPasswordProfileMapping(conn, {"schema": None})
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim

@@ -17,19 +17,19 @@ def test_create_symlinks(tmp_path):
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
 
 
-@patch.dict(os.environ, {"ORIGINAL_VAR": "value"})
+@patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2"})
 def test_environ_context_manager():
     # Define the expected environment variables
-    expected_env_vars = {"DBT_PROJECTS_ROOT_DIR": "/path/to/dbt/projects", "DBT_LOG_LEVEL": "debug"}
+    expected_env_vars = {"VAR2": "new_value2", "VAR3": "value3"}
     # Use the environ context manager
     with environ(expected_env_vars):
         # Check if the environment variables are set correctly
         for key, value in expected_env_vars.items():
             assert value == os.environ.get(key)
-        # Check if the original environment variables are still set
-        assert "value" == os.environ.get("ORIGINAL_VAR")
+        # Check if the original non-overlapping environment variable is still set
+        assert "value1" == os.environ.get("VAR1")
     # Check if the environment variables are unset after exiting the context manager
-    for key in expected_env_vars.keys():
-        assert os.environ.get(key) is None
+    assert os.environ.get("VAR3") is None
     # Check if the original environment variables are still set
-    assert "value" == os.environ.get("ORIGINAL_VAR")
+    assert "value1" == os.environ.get("VAR1")
+    assert "value2" == os.environ.get("VAR2")

@@ -42,6 +42,7 @@ class RenderConfig:
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param env_vars: A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
     :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
     """
 
@@ -53,6 +54,7 @@ class RenderConfig:
     dbt_deps: bool = True
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
     dbt_executable_path: str | Path = get_system_dbt()
+    env_vars: dict[str, str] = field(default_factory=dict)
     dbt_project_path: InitVar[str | Path | None] = None
 
     project_path: Path | None = field(init=False)

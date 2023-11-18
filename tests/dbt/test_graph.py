@@ -392,7 +392,11 @@ def test_load_via_dbt_ls_with_sources(load_method):
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
         ),
-        render_config=RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name, dbt_deps=False),
+        render_config=RenderConfig(
+            dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
+            dbt_deps=False,
+            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
+        ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
             profile_name="simple",

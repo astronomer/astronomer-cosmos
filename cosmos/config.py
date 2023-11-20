@@ -41,9 +41,9 @@ class RenderConfig:
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
-    :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
     :param env_vars: A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
-    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
+    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
     """
 
     emit_datasets: bool = True
@@ -197,15 +197,21 @@ class ProfileConfig:
     profile_mapping: BaseProfileMapping | None = None
 
     def __post_init__(self) -> None:
-        "Validates that we have enough information to render a profile."
-        # if using a user-supplied profiles.yml, validate that it exists
-        if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
-            raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
+        self.validate_profile()
 
     def validate_profile(self) -> None:
         "Validates that we have enough information to render a profile."
         if not self.profiles_yml_filepath and not self.profile_mapping:
             raise CosmosValueError("Either profiles_yml_filepath or profile_mapping must be set to render a profile")
+        if self.profiles_yml_filepath and self.profile_mapping:
+            raise CosmosValueError(
+                "Both profiles_yml_filepath and profile_mapping are defined and are mutually exclusive. Ensure only one of these is defined."
+            )
+
+    def validate_profiles_yml(self) -> None:
+        "Validates a user-supplied profiles.yml is present"
+        if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
+            raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
     @contextlib.contextmanager
     def ensure_profile(

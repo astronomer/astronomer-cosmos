@@ -236,5 +236,7 @@ class DbtBaseOperator(BaseOperator):
         return dbt_cmd, env
 
     def pre_execute(self, context: Any):
-        context["model_config"] = self.extra_context
+        if self.extra_context:
+            logger.info("Extra context passed to operator, injecting into TaskInstance")
+            context["model_config"] = self.extra_context
         return super().pre_execute(context)

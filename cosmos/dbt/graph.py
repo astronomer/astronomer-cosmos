@@ -88,7 +88,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
             "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
         )
 
-    if returncode or "Error" in stdout:
+    if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
         details = stderr or stdout
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
 

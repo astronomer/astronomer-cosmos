@@ -6,12 +6,14 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos.core.graph.entities import Task
 from cosmos.log import get_logger
-
+from typing import Any
 
 logger = get_logger(__name__)
 
 
-def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None) -> BaseOperator:
+def get_airflow_task(
+    task: Task, dag: DAG, task_group: "TaskGroup | None" = None, extra_context: dict[str, Any] = {}
+) -> BaseOperator:
     """
     Get the Airflow Operator class for a Task.
 
@@ -30,6 +32,7 @@ def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None
         task_id=task.id,
         dag=dag,
         task_group=task_group,
+        extra_context=extra_context,
         **task.arguments,
     )
 

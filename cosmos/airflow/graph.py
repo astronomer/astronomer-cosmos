@@ -99,7 +99,10 @@ def create_test_task_metadata(
 
 
 def create_task_metadata(
-    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_task_group: bool = False
+    node: DbtNode,
+    execution_mode: ExecutionMode,
+    args: dict[str, Any],
+    use_task_group: bool = False,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -156,6 +159,7 @@ def generate_task_or_group(
     test_behavior: TestBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
+    node_config: dict[str, Any],
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -176,7 +180,7 @@ def generate_task_or_group(
     if task_meta and node.resource_type != DbtResourceType.TEST:
         if use_task_group:
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                task = create_airflow_task(task_meta, dag, task_group=model_task_group, extra_context=node_config)
                 test_meta = create_test_task_metadata(
                     "test",
                     execution_mode,
@@ -184,12 +188,14 @@ def generate_task_or_group(
                     task_args=task_args,
                     node=node,
                     on_warning_callback=on_warning_callback,
+                    node_config=node_config,
                 )
-                test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
+                test_task = create_airflow_task(test_meta, dag, task_group=model_task_group, extra_context=node_config)
                 task >> test_task
                 task_or_group = model_task_group
         else:
             task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+
     return task_or_group
 
 
@@ -251,6 +257,7 @@ def build_airflow_graph(
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             node=node,
+            node_config=node.config,
         )
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")

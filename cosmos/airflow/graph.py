@@ -188,7 +188,6 @@ def generate_task_or_group(
                     task_args=task_args,
                     node=node,
                     on_warning_callback=on_warning_callback,
-                    node_config=node_config,
                 )
                 test_task = create_airflow_task(test_meta, dag, task_group=model_task_group, extra_context=node_config)
                 task >> test_task

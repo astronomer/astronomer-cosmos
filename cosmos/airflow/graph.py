@@ -159,7 +159,7 @@ def generate_task_or_group(
     test_behavior: TestBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
-    node_config: dict[str, Any],
+    node_config: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None

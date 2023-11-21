@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 
 def get_airflow_task(
-    task: Task, dag: DAG, task_group: "TaskGroup | None" = None, extra_context: dict[str, Any] = {}
+    task: Task, dag: DAG, task_group: "TaskGroup | None" = None, extra_context: dict[str, Any] | None = None
 ) -> BaseOperator:
     """
     Get the Airflow Operator class for a Task.

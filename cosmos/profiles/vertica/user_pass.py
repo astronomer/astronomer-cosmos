@@ -1,4 +1,4 @@
-"Maps Airflow Vertica connections using user + password authentication to dbt profiles."
+"Maps Airflow Vertica connections using username + password authentication to dbt profiles."
 from __future__ import annotations
 
 from typing import Any
@@ -8,7 +8,7 @@ from ..base import BaseProfileMapping
 
 class VerticaUserPasswordProfileMapping(BaseProfileMapping):
     """
-    Maps Airflow Vertica connections using user + password authentication to dbt profiles.
+    Maps Airflow Vertica connections using username + password authentication to dbt profiles.
     https://docs.getdbt.com/reference/warehouse-setups/vertica-setup
     https://airflow.apache.org/docs/apache-airflow-providers-vertica/stable/connections/vertica.html
     """
@@ -18,7 +18,7 @@ class VerticaUserPasswordProfileMapping(BaseProfileMapping):
 
     required_fields = [
         "host",
-        "user",
+        "username",
         "password",
         "database",
         "schema",
@@ -28,7 +28,7 @@ class VerticaUserPasswordProfileMapping(BaseProfileMapping):
     ]
     airflow_param_mapping = {
         "host": "host",
-        "user": "login",
+        "username": "login",
         "password": "password",
         "port": "port",
         "schema": "schema",

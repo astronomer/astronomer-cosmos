@@ -59,7 +59,7 @@ def test_connection_claiming() -> None:
     # - conn_type == vertica
     # and the following exist:
     # - host
-    # - user
+    # - username
     # - password
     # - port
     # - database or database
@@ -142,7 +142,7 @@ def test_profile_args(
     assert profile_mapping.profile == {
         "type": mock_vertica_conn.conn_type,
         "host": mock_vertica_conn.host,
-        "user": mock_vertica_conn.login,
+        "username": mock_vertica_conn.login,
         "password": "{{ env_var('COSMOS_CONN_VERTICA_PASSWORD') }}",
         "port": mock_vertica_conn.port,
         "schema": "my_schema",
@@ -168,7 +168,7 @@ def test_profile_args_overrides(
     assert profile_mapping.profile == {
         "type": mock_vertica_conn.conn_type,
         "host": mock_vertica_conn.host,
-        "user": mock_vertica_conn.login,
+        "username": mock_vertica_conn.login,
         "password": "{{ env_var('COSMOS_CONN_VERTICA_PASSWORD') }}",
         "port": mock_vertica_conn.port,
         "database": "my_db_override",

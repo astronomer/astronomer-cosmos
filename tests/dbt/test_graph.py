@@ -683,6 +683,7 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
     "stdout,returncode",
     [
         ("all good", None),
+        ("WarnErrorOptions", None),
         pytest.param("fail", 599, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
         pytest.param("Error", None, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
     ],

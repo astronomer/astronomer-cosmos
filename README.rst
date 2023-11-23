@@ -31,56 +31,28 @@ Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DA
 Quickstart
 __________
 
-Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_.
+Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ and at the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
 
 Example Usage
 ___________________
 
-You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_:
+You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an example with the `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_:
 
+..
+   This renders on Github but not Sphinx:
 
-.. code-block:: python
+https://github.com/astronomer/astronomer-cosmos/blob/24aa38e528e299ef51ca6baf32f5a6185887d432/dev/dags/basic_cosmos_dag.py#L1-L42
 
-    from pendulum import datetime
+This will generate an Airflow DAG that looks like this:
 
-    from airflow import DAG
-    from airflow.operators.empty import EmptyOperator
-    from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
-    from cosmos.profiles import PostgresUserPasswordProfileMapping
+.. figure:: /docs/_static/jaffle_shop_dag.png
 
-    profile_config = ProfileConfig(
-        profile_name="default",
-        target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="airflow_db",
-            profile_args={"schema": "public"},
-        ),
-    )
-
-    with DAG(
-        dag_id="extract_dag",
-        start_date=datetime(2022, 11, 27),
-        schedule_interval="@daily",
-    ):
-        e1 = EmptyOperator(task_id="pre_dbt")
-
-        dbt_tg = DbtTaskGroup(
-            project_config=ProjectConfig("jaffle_shop"),
-            profile_config=profile_config,
-        )
-
-        e2 = EmptyOperator(task_id="post_dbt")
-
-        e1 >> dbt_tg >> e2
-
-This will generate an Airflow Task Group that looks like this:
-
-.. figure:: /docs/_static/jaffle_shop_task_group.png
 
 Community
 _________
 - Join us on the Airflow `Slack <https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q>`_ at #airflow-dbt
+
 
 Changelog
 _________
@@ -88,6 +60,7 @@ _________
 We follow `Semantic Versioning <https://semver.org/>`_ for releases.
 Check `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
 for the latest changes.
+
 
 Contributing Guide
 __________________

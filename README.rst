@@ -44,14 +44,7 @@ You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an exampl
 
 https://github.com/astronomer/astronomer-cosmos/blob/24aa38e528e299ef51ca6baf32f5a6185887d432/dev/dags/basic_cosmos_dag.py#L1-L42
 
-..
-   The following renders in Sphinx but not Github:
-
-.. literalinclude:: ./dev/dags/basic_cosmos_dag.py
-
-
-This will generate an Airflow Task Group that looks like this:
-
+This will generate an Airflow DAG that looks like this:
 
 .. figure:: /docs/_static/jaffle_shop_dag.png
 

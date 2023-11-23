@@ -1,14 +1,34 @@
 Changelog
 =========
 
-1.3.0a1 (2023-10-26)
+1.3.0a2 (2023-11-23)
 --------------------
 
 Features
 
-* Add ``ProfileMapping`` for Vertica by @perttus in #540
+* Add ``ProfileMapping`` for Vertica by @perttus in #540 and #688
 * Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608
+* Add support for Snowflake encrypted private key environment variable by @DanMawdsleyBA in #649
 * Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616
+
+
+1.2.5 (2023-11-23)
+------------------
+
+Bug fixes
+
+* Fix running models that use alias while supporting dbt versions by @binhnq94 in #662
+* Make ``profiles_yml_path`` optional for ``ExecutionMode.DOCKER`` and ``KUBERNETES`` by @MrBones757 in #681
+* Prevent overriding dbt profile fields with profile args of type or method by @jbandoro in #702
+* Fix ``LoadMode.DBT_LS`` fail when dbt outputs ``WarnErrorOptions`` by @adammarples in #692
+* Add support for env vars in ``RenderConfig`` for dbt ls parsing by @jbandoro in #690
+* Add support for ``Kubernetes on_warning_callback`` by @david-mag in #673
+* Fix ``ExecutionConfig.dbt_executable_path`` to use ``default_factory`` by @jbandoro in #678
+
+Others
+
+* Docs fix: example DAG in the README and docs/index by @tatiana in #705
+* Docs improvement: highlight DAG examples in README by @iancmoritz and @jlaneve in #695
 
 
 1.2.4 (2023-11-14)

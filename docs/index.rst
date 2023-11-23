@@ -40,48 +40,20 @@ Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DA
 Example Usage
 ___________________
 
-You can render an Airflow Task Group using the ``DbtTaskGroup`` class. Here's an example with the jaffle_shop project:
+You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an example with the `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_:
 
-.. code-block:: python
+..
+   The following renders in Sphinx but not Github:
 
-    from pendulum import datetime
-
-    from airflow import DAG
-    from airflow.operators.empty import EmptyOperator
-    from cosmos import DbtTaskGroup
-
-
-    profile_config = ProfileConfig(
-        profile_name="default",
-        target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="airflow_db",
-            profile_args={"schema": "public"},
-        ),
-    )
-
-    with DAG(
-        dag_id="extract_dag",
-        start_date=datetime(2022, 11, 27),
-        schedule_interval="@daily",
-    ):
-        e1 = EmptyOperator(task_id="pre_dbt")
-
-        dbt_tg = DbtTaskGroup(
-            project_config=ProjectConfig("jaffle_shop"),
-            profile_config=profile_config,
-            default_args={"retries": 2},
-        )
-
-        e2 = EmptyOperator(task_id="post_dbt")
-
-        e1 >> dbt_tg >> e2
+.. literalinclude:: ./dev/dags/basic_cosmos_dag.py
+    :language: python
+    :start-after: [START local_example]
+    :end-before: [END local_example]
 
 
-This will generate an Airflow Task Group that looks like this:
+This will generate an Airflow DAG that looks like this:
 
-.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_task_group.png
-
+.. figure:: /docs/_static/jaffle_shop_dag.png
 
 Getting Started
 _______________

@@ -96,7 +96,8 @@ docs =[
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-autoapi"
+    "sphinx-autoapi",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 tests = [
     "packaging",
@@ -227,6 +228,7 @@ dependencies = [
     "sphinx-autobuild",
     "sphinx-autoapi",
     "openlineage-airflow",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 
 [tool.hatch.envs.docs.scripts]

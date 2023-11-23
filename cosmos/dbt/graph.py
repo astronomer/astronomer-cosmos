@@ -21,7 +21,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks
+from cosmos.dbt.project import create_symlinks, environ
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -234,7 +234,9 @@ class DbtGraph:
             tmpdir_path = Path(tmpdir)
             create_symlinks(self.render_config.project_path, tmpdir_path)
 
-            with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
+            with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
+                self.render_config.env_vars
+            ):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)

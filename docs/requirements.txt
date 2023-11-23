@@ -4,4 +4,5 @@ pydata-sphinx-theme
 sphinx-autobuild
 sphinx-autoapi
 apache-airflow
+apache-airflow-providers-cncf-kubernetes>=5.1.1
 openlineage-airflow

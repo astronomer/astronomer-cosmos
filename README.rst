@@ -40,7 +40,10 @@ ___________________
 You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an example with the `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_:
 
 
-https://github.com/astronomer/astronomer-cosmos/blob/24aa38e528e299ef51ca6baf32f5a6185887d432/dev/dags/basic_cosmos_dag.py#L1-L37
+.. literalinclude:: ./dev/dags/basic_cosmos_dag.py
+    :language: python
+    :start-after: [START local_example]
+    :end-before: [END local_example]
 
 
 This will generate an Airflow Task Group that looks like this:

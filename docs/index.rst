@@ -53,7 +53,7 @@ You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an exampl
 
 This will generate an Airflow DAG that looks like this:
 
-.. figure:: /docs/_static/jaffle_shop_dag.png
+.. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_dag.png
 
 Getting Started
 _______________

@@ -41,9 +41,6 @@ You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an exampl
 
 
 .. literalinclude:: ./dev/dags/basic_cosmos_dag.py
-    :language: python
-    :start-after: [START local_example]
-    :end-before: [END local_example]
 
 
 This will generate an Airflow Task Group that looks like this:

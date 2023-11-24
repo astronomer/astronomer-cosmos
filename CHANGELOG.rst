@@ -19,10 +19,10 @@ Bug fixes
 
 * Fix running models that use alias while supporting dbt versions by @binhnq94 in #662
 * Make ``profiles_yml_path`` optional for ``ExecutionMode.DOCKER`` and ``KUBERNETES`` by @MrBones757 in #681
-* Prevent overriding dbt profile fields with profile args of type or method by @jbandoro in #702
+* Prevent overriding dbt profile fields with profile args of "type" or "method" by @jbandoro in #702
 * Fix ``LoadMode.DBT_LS`` fail when dbt outputs ``WarnErrorOptions`` by @adammarples in #692
 * Add support for env vars in ``RenderConfig`` for dbt ls parsing by @jbandoro in #690
-* Add support for ``Kubernetes on_warning_callback`` by @david-mag in #673
+* Add support for Kubernetes ``on_warning_callback`` by @david-mag in #673
 * Fix ``ExecutionConfig.dbt_executable_path`` to use ``default_factory`` by @jbandoro in #678
 
 Others
@@ -43,8 +43,8 @@ Bug fixes
 
 Others
 
-* Docs fix: add execution config to MWAA code example by @ugmuka in #674
-
+* Docs: add execution config to MWAA code example by @ugmuka in #674
+* Docs: highlight DAG examples in docs by @iancmoritz and @jlaneve in #695
 
 1.2.3 (2023-11-09)
 ------------------

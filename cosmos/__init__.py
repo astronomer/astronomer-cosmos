@@ -7,6 +7,7 @@ Contains dags, task groups, and operators.
 """
 __version__ = "1.3.0a2"
 
+
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.config import (

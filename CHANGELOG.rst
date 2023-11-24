@@ -1,13 +1,14 @@
 Changelog
 =========
 
-1.3.0a1 (2023-10-26)
+1.3.0a2 (2023-11-23)
 --------------------
 
 Features
 
-* Add ``ProfileMapping`` for Vertica by @perttus in #540
+* Add ``ProfileMapping`` for Vertica by @perttus in #540 and #688
 * Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608
+* Add support for Snowflake encrypted private key environment variable by @DanMawdsleyBA in #649
 * Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616
 
 

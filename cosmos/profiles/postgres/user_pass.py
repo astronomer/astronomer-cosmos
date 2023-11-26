@@ -47,7 +47,7 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         }
 
         if "schema" in self.profile_args:
-            profile["schema"] = self.get_env_var_format("schema")
+            profile["schema"] = self.profile_args["schema"]
 
         return self.filter_null(profile)
 

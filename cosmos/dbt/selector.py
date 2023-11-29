@@ -49,9 +49,11 @@ class GraphSelector:
 
     @staticmethod
     def parse(text: str) -> GraphSelector | None:
-        precursors, node_name, descendants = re.search(GRAPH_SELECTOR_REGEX, text).groups()
-        if node_name:
+        regex_match = re.search(GRAPH_SELECTOR_REGEX, text)
+        if regex_match:
+            precursors, node_name, descendants = regex_match.groups()
             return GraphSelector(node_name, precursors, descendants)
+        return None
 
 
 class SelectorConfig:
@@ -235,17 +237,24 @@ class NodeSelector:
             if graph_selector.node_name in node_by_name:
                 root_id = node_by_name[graph_selector.node_name]
             else:
-                logger.warn("Model in selector not found in DBT graph")
+                logger.warn(f"Selector {graph_selector.node_name} not found.")
                 break
 
             selected_nodes.add(root_id)
 
             if graph_selector.precursors:
-                precursors = {root_id}
-                while precursors:
-                    precursor_id = precursors.pop()
-                    selected_nodes.add(precursor_id)
-                    precursors = precursors.union(set(self.nodes[precursor_id].depends_on))
+                depth = graph_selector.precursors_depth
+                previous_generation = {root_id}
+                processed_nodes = set()
+                while depth and previous_generation:
+                    new_generation: set[str] = set()
+                    for node_id in previous_generation:
+                        if node_id not in processed_nodes:
+                            new_generation = new_generation.union(set(self.nodes[node_id].depends_on))
+                            processed_nodes.add(node_id)
+                    selected_nodes = selected_nodes.union(new_generation)
+                    previous_generation = new_generation
+                    depth -= 1
 
         return selected_nodes
 

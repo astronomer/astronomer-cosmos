@@ -297,6 +297,26 @@ def test_select_node_by_precursors_with_orphaned_node():
     assert list(selected.keys()) == expected
 
 
+def test_select_nodes_by_child_and_first_degree_precursors():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["1+child"])
+    expected = [
+        child_node.unique_id,
+        parent_node.unique_id,
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_child_and_second_degree_precursors():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["2+child"])
+    expected = [
+        another_grandparent_node.unique_id,
+        child_node.unique_id,
+        grandparent_node.unique_id,
+        parent_node.unique_id,
+    ]
+    assert sorted(selected.keys()) == expected
+
+
 def test_select_node_by_exact_node_name():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["child"])
     expected = [child_node.unique_id]
@@ -307,3 +327,9 @@ def test_select_node_by_child_and_precursors_no_node():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+modelDoesntExist"])
     expected = []
     assert list(selected.keys()) == expected
+
+
+# TODO: precursors depth
+# TODO: successors logic
+# TODO: intersection of graph selector
+# TODO: union of graph selector

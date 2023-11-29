@@ -304,14 +304,11 @@ def select_nodes(
                 filter_parameter.startswith(PATH_SELECTOR)
                 or filter_parameter.startswith(TAG_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
+                or any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG])
             ):
-                continue
-            elif any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG]):
                 continue
             elif ":" in filter_parameter:
                 raise CosmosValueError(f"Invalid {filter_type} filter: {filter_parameter}")
-            else:
-                logger.warn(f"Best effort in processing filter {filter}")
 
     subset_ids: set[str] = set()
 

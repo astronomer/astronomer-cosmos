@@ -275,38 +275,35 @@ def test_select_nodes_by_child_and_precursors_exclude_tags():
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"], exclude=["tag:has_child"]
     )
-    expected = {
-        another_grandparent_node.unique_id: another_grandparent_node,
-        child_node.unique_id: child_node,
-    }
-    assert selected == expected
+    expected = [another_grandparent_node.unique_id, child_node.unique_id]
+    assert sorted(selected.keys()) == expected
 
 
 def test_select_nodes_by_path_file():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/parent.sql"])
-    expected = {
-        parent_node.unique_id: parent_node,
-    }
-    assert selected == expected
+    expected = [parent_node.unique_id]
+    assert list(selected.keys()) == expected
 
 
 def test_select_node_by_child_and_precursors_partial_tree():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+parent"])
-    expected = {
-        grandparent_node.unique_id: grandparent_node,
-        another_grandparent_node.unique_id: another_grandparent_node,
-        parent_node.unique_id: parent_node,
-    }
-    assert selected == expected
+    expected = [another_grandparent_node.unique_id, grandparent_node.unique_id, parent_node.unique_id]
+    assert sorted(selected.keys()) == expected
 
 
-def test_select_node_by_dfs_leaf():
+def test_select_node_by_precursors_with_orphaned_node():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+orphaned"])
-    expected = {orphaned_node.unique_id: orphaned_node}
-    assert selected == expected
+    expected = [orphaned_node.unique_id]
+    assert list(selected.keys()) == expected
 
 
-def test_select_node_by_dfs_no_node():
+def test_select_node_by_exact_node_name():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["child"])
+    expected = [child_node.unique_id]
+    assert list(selected.keys()) == expected
+
+
+def test_select_node_by_child_and_precursors_no_node():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+modelDoesntExist"])
-    expected = {}
-    assert selected == expected
+    expected = []
+    assert list(selected.keys()) == expected

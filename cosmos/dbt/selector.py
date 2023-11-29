@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy
-from collections import defaultdict
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,9 +17,41 @@ SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
-MODEL_UPSTREAM_SELECTOR = "+"
+PLUS_SELECTOR = "+"
+GRAPH_SELECTOR_REGEX = r"^([0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class GraphSelector:
+    node_name: str
+    precursors: str | None
+    descendants: str | None
+
+    @property
+    def precursors_depth(self) -> int:
+        if not self.precursors:
+            return 0
+        if self.precursors == "+":
+            return -1
+        else:
+            return int(self.precursors[:-1])
+
+    @property
+    def descendants_depth(self) -> int:
+        if not self.descendants:
+            return 0
+        if self.descendants == "+":
+            return -1
+        else:
+            return int(self.descendants[1:])
+
+    @staticmethod
+    def parse(text: str) -> GraphSelector | None:
+        precursors, node_name, descendants = re.search(GRAPH_SELECTOR_REGEX, text).groups()
+        if node_name:
+            return GraphSelector(node_name, precursors, descendants)
 
 
 class SelectorConfig:
@@ -42,8 +75,8 @@ class SelectorConfig:
         self.paths: list[Path] = []
         self.tags: list[str] = []
         self.config: dict[str, str] = {}
-        self.model_upstream: str = ""
         self.other: list[str] = []
+        self.graph_selectors: list[GraphSelector] = []
         self.load_from_statement(statement)
 
     @property
@@ -62,6 +95,7 @@ class SelectorConfig:
         https://docs.getdbt.com/reference/node-selection/yaml-selectors
         """
         items = statement.split(",")
+
         for item in items:
             if item.startswith(PATH_SELECTOR):
                 index = len(PATH_SELECTOR)
@@ -77,12 +111,13 @@ class SelectorConfig:
                 key, value = item[index:].split(":")
                 if key in SUPPORTED_CONFIG:
                     self.config[key] = value
-            elif item.startswith(MODEL_UPSTREAM_SELECTOR):
-                index = len(MODEL_UPSTREAM_SELECTOR)
-                self.model_upstream = item[index:]
             else:
-                self.other.append(item)
-                logger.warning("Unsupported select statement: %s", item)
+                graph_selector = GraphSelector.parse(item)
+                if graph_selector is not None:
+                    self.graph_selectors.append(graph_selector)
+                else:
+                    self.other.append(item)
+                    logger.warning("Unsupported select statement: %s", item)
 
     def __repr__(self) -> str:
         return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other})"
@@ -179,7 +214,7 @@ class NodeSelector:
                     return self._should_include_node(node.depends_on[0], model_node)
         return False
 
-    def select_nodes_by_precursor(self) -> set[str]:
+    def select_node_precursors(self) -> set[str]:
         """
         Return a list of node ids which match the configuration defined in the config.
 
@@ -189,21 +224,28 @@ class NodeSelector:
         https://docs.getdbt.com/reference/node-selection/syntax
         https://docs.getdbt.com/reference/node-selection/yaml-selectors
         """
-        root_id, root = None, None
-        for node_id, node in self.nodes.items():
-            if node.name == self.config.model_upstream:
-                root_id, root = node_id, node
-
-        if not root:
-            logger.warn("Model in selector not found in DBT graph")
-            return set()
-
         selected_nodes = set()
-        precursors = set([root_id])
-        while precursors:
-            precursor_id = precursors.pop()
-            selected_nodes.add(precursor_id)
-            precursors = precursors.union(set(self.nodes[precursor_id].depends_on))
+
+        # Index nodes by name
+        node_by_name = {}
+        for node_id, node in self.nodes.items():
+            node_by_name[node.name] = node_id
+
+        for graph_selector in self.config.graph_selectors:
+            if graph_selector.node_name in node_by_name:
+                root_id = node_by_name[graph_selector.node_name]
+            else:
+                logger.warn("Model in selector not found in DBT graph")
+                break
+
+            selected_nodes.add(root_id)
+
+            if graph_selector.precursors:
+                precursors = {root_id}
+                while precursors:
+                    precursor_id = precursors.pop()
+                    selected_nodes.add(precursor_id)
+                    precursors = precursors.union(set(self.nodes[precursor_id].depends_on))
 
         return selected_nodes
 
@@ -249,23 +291,27 @@ def select_nodes(
     filters = [["select", select], ["exclude", exclude]]
     for filter_type, filter in filters:
         for filter_parameter in filter:
-            if (filter_parameter.startswith(PATH_SELECTOR) or
-                filter_parameter.startswith(TAG_SELECTOR) or
-                filter_parameter.startswith(MODEL_UPSTREAM_SELECTOR)
+            if (
+                filter_parameter.startswith(PATH_SELECTOR)
+                or filter_parameter.startswith(TAG_SELECTOR)
+                or PLUS_SELECTOR in filter_parameter
             ):
                 continue
             elif any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG]):
                 continue
-            else:
+            elif ":" in filter_parameter:
                 raise CosmosValueError(f"Invalid {filter_type} filter: {filter_parameter}")
+            else:
+                logger.warn(f"Best effort in processing filter {filter}")
 
     subset_ids: set[str] = set()
 
     for statement in select:
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
-        if config.model_upstream:
-            select_ids = node_selector.select_nodes_by_precursor()
+        # TODO: Fix this
+        if config.graph_selectors:
+            select_ids = node_selector.select_node_precursors()
             subset_ids = subset_ids.union(set(select_ids))
         else:
             select_ids = node_selector.select_nodes_ids_by_intersection()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import shutil
 import tempfile
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
@@ -19,6 +20,14 @@ logger = get_logger(__name__)
 DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 
 
+class CosmosConfigException(Exception):
+    """
+    Exceptions related to user misconfiguration.
+    """
+
+    pass
+
+
 @dataclass
 class RenderConfig:
     """
@@ -32,8 +41,9 @@ class RenderConfig:
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
-    :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path. Mutually Exclusive with ProjectConfig.dbt_project_path
-    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
+    :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
+    :param env_vars: A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
+    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
     """
 
     emit_datasets: bool = True
@@ -44,12 +54,34 @@ class RenderConfig:
     dbt_deps: bool = True
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
     dbt_executable_path: str | Path = get_system_dbt()
+    env_vars: dict[str, str] = field(default_factory=dict)
     dbt_project_path: InitVar[str | Path | None] = None
 
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
+
+    def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
+        """
+        When using LoadMode.DBT_LS, the dbt executable path is necessary for rendering.
+
+        Validates that the original dbt command works, if not, attempt to use the fallback_dbt_cmd.
+        If neither works, raise an exception.
+
+        The fallback behaviour is necessary for Cosmos < 1.2.2 backwards compatibility.
+        """
+        if not shutil.which(self.dbt_executable_path):
+            if isinstance(fallback_cmd, Path):
+                fallback_cmd = fallback_cmd.as_posix()
+
+            if fallback_cmd and shutil.which(fallback_cmd):
+                self.dbt_executable_path = fallback_cmd
+            else:
+                raise CosmosConfigException(
+                    "Unable to find the dbt executable, attempted: "
+                    f"<{self.dbt_executable_path}>" + (f" and <{fallback_cmd}>." if fallback_cmd else ".")
+                )
 
 
 class ProjectConfig:
@@ -165,15 +197,21 @@ class ProfileConfig:
     profile_mapping: BaseProfileMapping | None = None
 
     def __post_init__(self) -> None:
-        "Validates that we have enough information to render a profile."
-        # if using a user-supplied profiles.yml, validate that it exists
-        if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
-            raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
+        self.validate_profile()
 
     def validate_profile(self) -> None:
         "Validates that we have enough information to render a profile."
         if not self.profiles_yml_filepath and not self.profile_mapping:
             raise CosmosValueError("Either profiles_yml_filepath or profile_mapping must be set to render a profile")
+        if self.profiles_yml_filepath and self.profile_mapping:
+            raise CosmosValueError(
+                "Both profiles_yml_filepath and profile_mapping are defined and are mutually exclusive. Ensure only one of these is defined."
+            )
+
+    def validate_profiles_yml(self) -> None:
+        "Validates a user-supplied profiles.yml is present"
+        if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
+            raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
     @contextlib.contextmanager
     def ensure_profile(
@@ -228,7 +266,7 @@ class ExecutionConfig:
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
-    dbt_executable_path: str | Path = get_system_dbt()
+    dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
     dbt_project_path: InitVar[str | Path | None] = None
 

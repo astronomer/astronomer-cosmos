@@ -16,7 +16,8 @@ from .postgres.user_pass import PostgresUserPasswordProfileMapping
 from .redshift.user_pass import RedshiftUserPasswordProfileMapping
 from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
-from .snowflake.user_encrypted_privatekey import SnowflakeEncryptedPrivateKeyPemProfileMapping
+from .snowflake.user_encrypted_privatekey_file import SnowflakeEncryptedPrivateKeyFilePemProfileMapping
+from .snowflake.user_encrypted_privatekey_env_variable import SnowflakeEncryptedPrivateKeyPemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
@@ -32,6 +33,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
     SnowflakeUserPasswordProfileMapping,
+    SnowflakeEncryptedPrivateKeyFilePemProfileMapping,
     SnowflakeEncryptedPrivateKeyPemProfileMapping,
     SnowflakePrivateKeyPemProfileMapping,
     SparkThriftProfileMapping,
@@ -62,6 +64,7 @@ def get_automatic_profile_mapping(
 
 
 __all__ = [
+    "AthenaAccessKeyProfileMapping",
     "BaseProfileMapping",
     "GoogleCloudServiceAccountFileProfileMapping",
     "GoogleCloudServiceAccountDictProfileMapping",
@@ -71,6 +74,7 @@ __all__ = [
     "RedshiftUserPasswordProfileMapping",
     "SnowflakeUserPasswordProfileMapping",
     "SnowflakePrivateKeyPemProfileMapping",
+    "SnowflakeEncryptedPrivateKeyFilePemProfileMapping",
     "SparkThriftProfileMapping",
     "ExasolUserPasswordProfileMapping",
     "TrinoLDAPProfileMapping",

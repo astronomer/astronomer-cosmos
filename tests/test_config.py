@@ -1,12 +1,15 @@
 from pathlib import Path
+from unittest.mock import patch
+from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 
 import pytest
 
-from cosmos.config import ProfileConfig, ProjectConfig
+from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
 from cosmos.exceptions import CosmosValueError
 
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
+SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 PIPELINE_FOLDER = "jaffle_shop"
 
 
@@ -110,14 +113,64 @@ def test_project_name():
     assert dbt_project.project_name == "sample"
 
 
-def test_profile_config_post_init():
+def test_profile_config_validate_none():
     with pytest.raises(CosmosValueError) as err_info:
-        ProfileConfig(profiles_yml_filepath="/tmp/some-profile", profile_name="test", target_name="test")
-    assert err_info.value.args[0] == "The file /tmp/some-profile does not exist."
-
-
-def test_profile_config_validate():
-    with pytest.raises(CosmosValueError) as err_info:
-        profile_config = ProfileConfig(profile_name="test", target_name="test")
-        assert profile_config.validate_profile() is None
+        ProfileConfig(profile_name="test", target_name="test")
     assert err_info.value.args[0] == "Either profiles_yml_filepath or profile_mapping must be set to render a profile"
+
+
+def test_profile_config_validate_both():
+    with pytest.raises(CosmosValueError) as err_info:
+        ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profiles_yml_filepath=SAMPLE_PROFILE_YML,
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        )
+    assert (
+        err_info.value.args[0]
+        == "Both profiles_yml_filepath and profile_mapping are defined and are mutually exclusive. Ensure only one of these is defined."
+    )
+
+
+def test_profile_config_validate_profiles_yml():
+    profile_config = ProfileConfig(profile_name="test", target_name="test", profiles_yml_filepath="/tmp/no-exists")
+    with pytest.raises(CosmosValueError) as err_info:
+        profile_config.validate_profiles_yml()
+
+    assert err_info.value.args[0] == "The file /tmp/no-exists does not exist."
+
+
+@patch("cosmos.config.shutil.which", return_value=None)
+def test_render_config_without_dbt_cmd(mock_which):
+    render_config = RenderConfig()
+    with pytest.raises(CosmosConfigException) as err_info:
+        render_config.validate_dbt_command("inexistent-dbt")
+
+    error_msg = err_info.value.args[0]
+    assert error_msg.startswith("Unable to find the dbt executable, attempted: <")
+    assert error_msg.endswith("dbt> and <inexistent-dbt>.")
+
+
+@patch("cosmos.config.shutil.which", return_value=None)
+def test_render_config_with_invalid_dbt_commands(mock_which):
+    render_config = RenderConfig(dbt_executable_path="invalid-dbt")
+    with pytest.raises(CosmosConfigException) as err_info:
+        render_config.validate_dbt_command()
+
+    error_msg = err_info.value.args[0]
+    assert error_msg == "Unable to find the dbt executable, attempted: <invalid-dbt>."
+
+
+@patch("cosmos.config.shutil.which", side_effect=(None, "fallback-dbt-path"))
+def test_render_config_uses_fallback_if_default_not_found(mock_which):
+    render_config = RenderConfig()
+    render_config.validate_dbt_command(Path("/tmp/fallback-dbt-path"))
+    assert render_config.dbt_executable_path == "/tmp/fallback-dbt-path"
+
+
+@patch("cosmos.config.shutil.which", side_effect=("user-dbt", "fallback-dbt-path"))
+def test_render_config_uses_default_if_exists(mock_which):
+    render_config = RenderConfig(dbt_executable_path="user-dbt")
+    render_config.validate_dbt_command("fallback-dbt-path")
+    assert render_config.dbt_executable_path == "user-dbt"

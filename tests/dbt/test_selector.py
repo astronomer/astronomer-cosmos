@@ -362,6 +362,15 @@ def test_select_node_by_descendants_union():
     assert sorted(selected.keys()) == expected
 
 
-# TODO: intersection of graph selector
+def test_select_node_by_descendants_intersection():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["grandparent+1,parent+1"])
+    expected = [
+        "model.dbt-proj.parent",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
 # TODO: intersection of select - one of which with graph selector
 # TODO: union of select - one of which with graph selector
+# TODO: exclude graph
+# TODO: exclude graph with include non-graph

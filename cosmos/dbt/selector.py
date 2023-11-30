@@ -299,12 +299,11 @@ class NodeSelector:
         https://docs.getdbt.com/reference/node-selection/syntax
         https://docs.getdbt.com/reference/node-selection/yaml-selectors
         """
-        selected_nodes = set()
+        selected_nodes_by_selector: list[set[str]] = []
 
         for graph_selector in self.config.graph_selectors:
-            selected_nodes.update(graph_selector.filter_nodes(self.nodes))
-
-        return selected_nodes
+            selected_nodes_by_selector.append(graph_selector.filter_nodes(self.nodes))
+        return set.intersection(*selected_nodes_by_selector)
 
 
 def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
@@ -363,7 +362,7 @@ def select_nodes(
     for statement in select:
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
-        # TODO: Fix this
+
         if config.graph_selectors:
             select_ids = node_selector.select_by_graph_operator()
             subset_ids.update(set(select_ids))

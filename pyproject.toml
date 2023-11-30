@@ -94,7 +94,8 @@ docs =[
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
-    "sphinx-autoapi"
+    "sphinx-autoapi",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 tests = [
     "packaging",
@@ -120,6 +121,9 @@ pydantic = [
         "pydantic>=1.10.0,<2.0.0",
 ]
 
+
+[project.entry-points.cosmos]
+provider_info = "cosmos:get_provider_info"
 
 [project.urls]
 Homepage = "https://github.com/astronomer/astronomer-cosmos"
@@ -225,6 +229,7 @@ dependencies = [
     "sphinx-autobuild",
     "sphinx-autoapi",
     "openlineage-airflow",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
 ]
 
 [tool.hatch.envs.docs.scripts]

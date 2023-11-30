@@ -1,4 +1,4 @@
-"Tests for the Snowflake user/private key profile."
+"Tests for the Snowflake user/private key environmentvariable profile."
 
 import json
 from unittest.mock import patch
@@ -29,7 +29,7 @@ def mock_snowflake_conn():  # type: ignore
                 "region": "my_region",
                 "database": "my_database",
                 "warehouse": "my_warehouse",
-                "private_key_file": "path/to/private_key.p8",
+                "private_key_content": "my_private_key",
             }
         ),
     )
@@ -52,7 +52,7 @@ def test_connection_claiming() -> None:
                 "account": "my_account",
                 "database": "my_database",
                 "warehouse": "my_warehouse",
-                "private_key_file": "path/to/private_key.p8",
+                "private_key_content": "my_private_key",
             }
         ),
     }
@@ -130,8 +130,8 @@ def test_profile_args(
     assert profile_mapping.profile == {
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
+        "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
         "private_key_passphrase": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}",
-        "private_key_path": mock_snowflake_conn.extra_dejson.get("private_key_file"),
         "schema": mock_snowflake_conn.schema,
         "account": f"{mock_account}.{mock_region}",
         "database": mock_snowflake_conn.extra_dejson.get("database"),
@@ -160,7 +160,7 @@ def test_profile_args_overrides(
         "type": mock_snowflake_conn.conn_type,
         "user": mock_snowflake_conn.login,
         "private_key_passphrase": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}",
-        "private_key_path": mock_snowflake_conn.extra_dejson.get("private_key_file"),
+        "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
         "schema": mock_snowflake_conn.schema,
         "account": f"{mock_account}.{mock_region}",
         "database": "my_db_override",
@@ -178,6 +178,7 @@ def test_profile_env_vars(
         mock_snowflake_conn.conn_id,
     )
     assert profile_mapping.env_vars == {
+        "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY": mock_snowflake_conn.extra_dejson.get("private_key_content"),
         "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE": mock_snowflake_conn.password,
     }
 
@@ -197,7 +198,7 @@ def test_old_snowflake_format() -> None:
                 "extra__snowflake__account": "my_account",
                 "extra__snowflake__database": "my_database",
                 "extra__snowflake__warehouse": "my_warehouse",
-                "extra__snowflake__private_key_file": "path/to/private_key.p8",
+                "extra__snowflake__private_key_content": "my_private_key",
             }
         ),
     )
@@ -207,8 +208,8 @@ def test_old_snowflake_format() -> None:
         assert profile_mapping.profile == {
             "type": conn.conn_type,
             "user": conn.login,
+            "private_key": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY') }}",
             "private_key_passphrase": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}",
-            "private_key_path": conn.extra_dejson.get("private_key_file"),
             "schema": conn.schema,
             "account": conn.extra_dejson.get("account"),
             "database": conn.extra_dejson.get("database"),

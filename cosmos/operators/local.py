@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import signal
 import tempfile
 from attr import define
@@ -45,6 +44,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
+from cosmos.dbt.project import create_symlinks
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -192,31 +192,20 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_project_dir:
             logger.info(
                 "Cloning project to writable temp directory %s from %s",
-                tmp_dir,
-                self.project_dir,
-            )
-
-            # need a subfolder because shutil.copytree will fail if the destination dir already exists
-            tmp_project_dir = os.path.join(tmp_dir, "dbt_project")
-            shutil.copytree(
-                self.project_dir,
                 tmp_project_dir,
+                self.project_dir,
             )
 
-            # if we need to install deps, do so
-            if self.install_deps:
-                self.run_subprocess(
-                    command=[self.dbt_executable_path, "deps"],
-                    env=env,
-                    output_encoding=self.output_encoding,
-                    cwd=tmp_project_dir,
-                )
-            with self.profile_config.ensure_profile() as (profile_path, env_vars):
+            create_symlinks(Path(self.project_dir), Path(tmp_project_dir))
+
+            with self.profile_config.ensure_profile() as profile_values:
+                (profile_path, env_vars) = profile_values
                 env.update(env_vars)
-                full_cmd = cmd + [
+
+                flags = [
                     "--profiles-dir",
                     str(profile_path.parent),
                     "--profile",
@@ -224,6 +213,18 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     "--target",
                     self.profile_config.target_name,
                 ]
+
+                if self.install_deps:
+                    deps_command = [self.dbt_executable_path, "deps"]
+                    deps_command.extend(flags)
+                    self.run_subprocess(
+                        command=deps_command,
+                        env=env,
+                        output_encoding=self.output_encoding,
+                        cwd=tmp_project_dir,
+                    )
+
+                full_cmd = cmd + flags
 
                 logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
                 logger.info("Using environment variables keys: %s", env.keys())
@@ -246,8 +247,8 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                     logger.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
 
-                self.exception_handling(result)
                 self.store_compiled_sql(tmp_project_dir, context)
+                self.exception_handling(result)
                 if self.callback:
                     self.callback(tmp_project_dir)
 
@@ -397,6 +398,8 @@ class DbtSeedLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#F58D7E"
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
+
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
@@ -434,6 +437,7 @@ class DbtRunLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#7352BA"
     ui_fgcolor = "#F4F2FC"
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
 
     def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh

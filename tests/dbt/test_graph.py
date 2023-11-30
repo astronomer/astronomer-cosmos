@@ -5,16 +5,15 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
     DbtGraph,
     DbtNode,
     LoadMode,
-    create_symlinks,
-    run_command,
     parse_dbt_ls_output,
+    run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -41,6 +40,20 @@ def tmp_dbt_project_dir():
     yield tmp_dir
 
     shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
+
+
+@pytest.mark.parametrize(
+    "unique_id,expected_name, expected_select",
+    [
+        ("model.my_project.customers", "customers", "customers"),
+        ("model.my_project.customers.v1", "customers_v1", "customers.v1"),
+        ("model.my_project.orders.v2", "orders_v2", "orders.v2"),
+    ],
+)
+def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
+    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    assert node.name == expected_name
+    assert node.resource_name == expected_select
 
 
 @pytest.mark.parametrize(
@@ -312,9 +325,8 @@ def test_load_via_dbt_ls_without_exclude(project_name):
 def test_load_via_custom_without_project_path():
     project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="test")
     execution_config = ExecutionConfig()
-    render_config = RenderConfig()
+    render_config = RenderConfig(dbt_executable_path="/inexistent/dbt")
     dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,
@@ -326,12 +338,14 @@ def test_load_via_custom_without_project_path():
     assert err_info.value.args[0] == expected
 
 
-def test_load_via_dbt_ls_without_profile():
+@patch("cosmos.config.RenderConfig.validate_dbt_command", return_value=None)
+def test_load_via_dbt_ls_without_profile(mock_validate_dbt_command):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_executable_path="existing-dbt-cmd", dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    )
     dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,
@@ -343,13 +357,15 @@ def test_load_via_dbt_ls_without_profile():
     assert err_info.value.args[0] == expected
 
 
-def test_load_via_dbt_ls_with_invalid_dbt_path():
+@patch("cosmos.dbt.executable.shutil.which", return_value=None)
+def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_executable_path="/inexistent/dbt"
+    )
     with patch("pathlib.Path.exists", return_value=True):
         dbt_graph = DbtGraph(
-            dbt_cmd="/inexistent/dbt",
             project=project_config,
             execution_config=execution_config,
             render_config=render_config,
@@ -359,10 +375,10 @@ def test_load_via_dbt_ls_with_invalid_dbt_path():
                 profiles_yml_filepath=Path(__file__).parent.parent / "sample/profiles.yml",
             ),
         )
-        with pytest.raises(CosmosLoadDbtException) as err_info:
+        with pytest.raises(CosmosConfigException) as err_info:
             dbt_graph.load_via_dbt_ls()
 
-    expected = "Unable to find the dbt executable: /inexistent/dbt"
+    expected = "Unable to find the dbt executable, attempted: </inexistent/dbt> and <dbt>."
     assert err_info.value.args[0] == expected
 
 
@@ -376,7 +392,11 @@ def test_load_via_dbt_ls_with_sources(load_method):
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
         ),
-        render_config=RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name, dbt_deps=False),
+        render_config=RenderConfig(
+            dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
+            dbt_deps=False,
+            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
+        ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
             profile_name="simple",
@@ -386,7 +406,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     )
     getattr(dbt_graph, load_method)()
     assert len(dbt_graph.nodes) == 4
-    assert "source.simple.imdb.movies_ratings" in dbt_graph.nodes
+    assert "source.simple.main.movies_ratings" in dbt_graph.nodes
     assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
 
 
@@ -659,21 +679,11 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
     } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)
 
 
-def test_create_symlinks(tmp_path):
-    """Tests that symlinks are created for expected files in the dbt project directory."""
-    tmp_dir = tmp_path / "dbt-project"
-    tmp_dir.mkdir()
-
-    create_symlinks(DBT_PROJECTS_ROOT_DIR / "jaffle_shop", tmp_dir)
-    for child in tmp_dir.iterdir():
-        assert child.is_symlink()
-        assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
-
-
 @pytest.mark.parametrize(
     "stdout,returncode",
     [
         ("all good", None),
+        ("WarnErrorOptions", None),
         pytest.param("fail", 599, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
         pytest.param("Error", None, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
     ],
@@ -701,7 +711,6 @@ def test_parse_dbt_ls_output():
 
     expected_nodes = {
         "fake-unique-id": DbtNode(
-            name="fake-name",
             unique_id="fake-unique-id",
             resource_type=DbtResourceType.MODEL,
             file_path=Path("fake-project/fake-file-path.sql"),

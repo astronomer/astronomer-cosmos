@@ -350,7 +350,18 @@ def test_select_node_by_descendants_depth_first_degree():
     assert sorted(selected.keys()) == expected
 
 
+def test_select_node_by_descendants_union():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["grandparent+1", "parent+1"])
+    expected = [
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
 # TODO: intersection of graph selector
-# TODO: union of graph selector
 # TODO: intersection of select - one of which with graph selector
 # TODO: union of select - one of which with graph selector

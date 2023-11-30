@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -54,6 +55,58 @@ class GraphSelector:
             precursors, node_name, descendants = regex_match.groups()
             return GraphSelector(node_name, precursors, descendants)
         return None
+
+    def select_node_precursors(self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[DbtNode]):
+        """
+        Parse original nodes and add the precursor nodes related to this config to the selected_nodes set.
+
+        :param nodes: Original dbt nodes list
+        :param root_id: Unique identifier of self.node_name
+        :param selected_nodes: Set where precursor nodes will be added to.
+        """
+        if self.precursors:
+            depth = self.precursors_depth
+            previous_generation = {root_id}
+            processed_nodes = set()
+            while depth and previous_generation:
+                new_generation: set[str] = set()
+                for node_id in previous_generation:
+                    if node_id not in processed_nodes:
+                        new_generation.update(set(nodes[node_id].depends_on))
+                        processed_nodes.add(node_id)
+                selected_nodes.update(new_generation)
+                previous_generation = new_generation
+                depth -= 1
+
+    def select_node_descendants(
+        self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[DbtNode]
+    ) -> set[DbtNode]:
+        """
+        Parse original nodes and add the descendant nodes related to this config to the selected_nodes set.
+
+        :param nodes: Original dbt nodes list
+        :param root_id: Unique identifier of self.node_name
+        :param selected_nodes: Set where precursor nodes will be added to.
+        """
+        if self.descendants:
+            children_by_node = defaultdict(set)
+            for node_id, node in nodes.items():
+                for parent_id in node.depends_on:
+                    children_by_node[parent_id].add(node_id)
+
+            depth = self.descendants_depth
+            previous_generation = {root_id}
+            processed_nodes = set()
+            while depth and previous_generation:
+                new_generation: set[str] = set()
+                for node_id in previous_generation:
+                    if node_id not in processed_nodes:
+                        new_generation.update(set(children_by_node[node_id]))
+                        processed_nodes.add(node_id)
+                selected_nodes.update(new_generation)
+                previous_generation = new_generation
+                depth -= 1
+        return selected_nodes
 
 
 class SelectorConfig:
@@ -216,7 +269,7 @@ class NodeSelector:
                     return self._should_include_node(node.depends_on[0], model_node)
         return False
 
-    def select_node_precursors(self) -> set[str]:
+    def select_by_graph_operator(self) -> set[str]:
         """
         Return a list of node ids which match the configuration defined in the config.
 
@@ -233,6 +286,7 @@ class NodeSelector:
         for node_id, node in self.nodes.items():
             node_by_name[node.name] = node_id
 
+        # TODO: refactor
         for graph_selector in self.config.graph_selectors:
             if graph_selector.node_name in node_by_name:
                 root_id = node_by_name[graph_selector.node_name]
@@ -241,20 +295,8 @@ class NodeSelector:
                 break
 
             selected_nodes.add(root_id)
-
-            if graph_selector.precursors:
-                depth = graph_selector.precursors_depth
-                previous_generation = {root_id}
-                processed_nodes = set()
-                while depth and previous_generation:
-                    new_generation: set[str] = set()
-                    for node_id in previous_generation:
-                        if node_id not in processed_nodes:
-                            new_generation = new_generation.union(set(self.nodes[node_id].depends_on))
-                            processed_nodes.add(node_id)
-                    selected_nodes = selected_nodes.union(new_generation)
-                    previous_generation = new_generation
-                    depth -= 1
+            graph_selector.select_node_precursors(self.nodes, root_id, selected_nodes)
+            graph_selector.select_node_descendants(self.nodes, root_id, selected_nodes)
 
         return selected_nodes
 
@@ -272,7 +314,7 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     for statement in statement_list:
         config = SelectorConfig(Path(), statement)
         item_values = getattr(config, label)
-        label_values = label_values.union(item_values)
+        label_values.update(item_values)
 
     return label_values
 
@@ -317,11 +359,11 @@ def select_nodes(
         node_selector = NodeSelector(nodes, config)
         # TODO: Fix this
         if config.graph_selectors:
-            select_ids = node_selector.select_node_precursors()
-            subset_ids = subset_ids.union(set(select_ids))
+            select_ids = node_selector.select_by_graph_operator()
+            subset_ids.update(set(select_ids))
         else:
             select_ids = node_selector.select_nodes_ids_by_intersection()
-            subset_ids = subset_ids.union(set(select_ids))
+            subset_ids.update(set(select_ids))
 
     if select:
         nodes = {id_: nodes[id_] for id_ in subset_ids}
@@ -332,7 +374,7 @@ def select_nodes(
     for statement in exclude:
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
-        exclude_ids = exclude_ids.union(set(node_selector.select_nodes_ids_by_intersection()))
+        exclude_ids.update(set(node_selector.select_nodes_ids_by_intersection()))
         subset_ids = set(nodes_ids) - set(exclude_ids)
 
     return {id_: nodes[id_] for id_ in subset_ids}

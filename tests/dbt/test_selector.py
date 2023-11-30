@@ -249,17 +249,6 @@ def test_select_nodes_by_exclude_union_config_test_tags():
     assert selected == expected
 
 
-def test_select_nodes_by_child_and_precursors():
-    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"])
-    expected = [
-        another_grandparent_node.unique_id,
-        child_node.unique_id,
-        grandparent_node.unique_id,
-        parent_node.unique_id,
-    ]
-    assert sorted(selected.keys()) == expected
-
-
 def test_select_nodes_by_path_dir():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen3/models"])
     expected = {
@@ -271,18 +260,29 @@ def test_select_nodes_by_path_dir():
     assert selected == expected
 
 
+def test_select_nodes_by_path_file():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/parent.sql"])
+    expected = [parent_node.unique_id]
+    assert list(selected.keys()) == expected
+
+
+def test_select_nodes_by_child_and_precursors():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"])
+    expected = [
+        another_grandparent_node.unique_id,
+        child_node.unique_id,
+        grandparent_node.unique_id,
+        parent_node.unique_id,
+    ]
+    assert sorted(selected.keys()) == expected
+
+
 def test_select_nodes_by_child_and_precursors_exclude_tags():
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"], exclude=["tag:has_child"]
     )
     expected = [another_grandparent_node.unique_id, child_node.unique_id]
     assert sorted(selected.keys()) == expected
-
-
-def test_select_nodes_by_path_file():
-    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/parent.sql"])
-    expected = [parent_node.unique_id]
-    assert list(selected.keys()) == expected
 
 
 def test_select_node_by_child_and_precursors_partial_tree():
@@ -329,7 +329,28 @@ def test_select_node_by_child_and_precursors_no_node():
     assert list(selected.keys()) == expected
 
 
-# TODO: precursors depth
-# TODO: successors logic
+def test_select_node_by_descendants():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["grandparent+"])
+    expected = [
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_node_by_descendants_depth_first_degree():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["grandparent+1"])
+    expected = [
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
 # TODO: intersection of graph selector
 # TODO: union of graph selector
+# TODO: intersection of select - one of which with graph selector
+# TODO: union of select - one of which with graph selector

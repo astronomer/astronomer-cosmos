@@ -26,12 +26,31 @@ logger = get_logger(__name__)
 
 @dataclass
 class GraphSelector:
+    """
+    Implements dbt graph operator selectors:
+        model_a
+        +model_b
+        model_c+
+        +model_d+
+        2+model_e
+        model_f+3
+
+    https://docs.getdbt.com/reference/node-selection/graph-operators
+    """
+
     node_name: str
     precursors: str | None
     descendants: str | None
 
     @property
     def precursors_depth(self) -> int:
+        """
+        Calculates the depth/degrees/generations of precursors (parents).
+        Return:
+            -1: if it should return all the generations of precursors
+            0: if it shouldn't return any precursors
+            >0: upperbound number of parent generations
+        """
         if not self.precursors:
             return 0
         if self.precursors == "+":
@@ -41,6 +60,13 @@ class GraphSelector:
 
     @property
     def descendants_depth(self) -> int:
+        """
+        Calculates the depth/degrees/generations of descendants (children).
+        Return:
+            -1: if it should return all the generations of children
+            0: if it shouldn't return any children
+            >0: upperbound of children generations
+        """
         if not self.descendants:
             return 0
         if self.descendants == "+":
@@ -50,6 +76,10 @@ class GraphSelector:
 
     @staticmethod
     def parse(text: str) -> GraphSelector | None:
+        """
+        Parse a string and identify if there are graph selectors, including the desired node name, descendants and
+        precursors. Return a GraphSelector instance if the pattern matches.
+        """
         regex_match = re.search(GRAPH_SELECTOR_REGEX, text)
         if regex_match:
             precursors, node_name, descendants = regex_match.groups()
@@ -109,6 +139,13 @@ class GraphSelector:
                 depth -= 1
 
     def filter_nodes(self, nodes: dict[str, DbtNode]) -> set[str]:
+        """
+        Given a dictionary with the original dbt project nodes, applies the current graph selector to
+        identify the subset of nodes that matches the selection criteria.
+
+        :param nodes: dbt project nodes
+        :return: set of node ids that matches current graph selector
+        """
         selected_nodes: set[str] = set()
 
         # Index nodes by name, we can improve performance by doing this once

@@ -156,7 +156,7 @@ class SelectorConfig:
 
     @property
     def is_empty(self) -> bool:
-        return not (self.paths or self.tags or self.config or self.other)
+        return not (self.paths or self.tags or self.config or self.graph_selectors or self.other)
 
     def load_from_statement(self, statement: str) -> None:
         """
@@ -187,15 +187,16 @@ class SelectorConfig:
                 if key in SUPPORTED_CONFIG:
                     self.config[key] = value
             else:
-                graph_selector = GraphSelector.parse(item)
-                if graph_selector is not None:
-                    self.graph_selectors.append(graph_selector)
-                else:
-                    self.other.append(item)
-                    logger.warning("Unsupported select statement: %s", item)
+                if item:
+                    graph_selector = GraphSelector.parse(item)
+                    if graph_selector is not None:
+                        self.graph_selectors.append(graph_selector)
+                    else:
+                        self.other.append(item)
+                        logger.warning("Unsupported select statement: %s", item)
 
     def __repr__(self) -> str:
-        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other})"
+        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other}, graph_selectors={self.graph_selectors})"
 
 
 class NodeSelector:
@@ -209,7 +210,9 @@ class NodeSelector:
     def __init__(self, nodes: dict[str, DbtNode], config: SelectorConfig) -> None:
         self.nodes = nodes
         self.config = config
+        self.selected_nodes: set[str] = set()
 
+    @property
     def select_nodes_ids_by_intersection(self) -> set[str]:
         """
         Return a list of node ids which matches the configuration defined in config.
@@ -221,14 +224,19 @@ class NodeSelector:
         if self.config.is_empty:
             return set(self.nodes.keys())
 
-        self.selected_nodes: set[str] = set()
+        selected_nodes: set[str] = set()
         self.visited_nodes: set[str] = set()
 
         for node_id, node in self.nodes.items():
             if self._should_include_node(node_id, node):
-                self.selected_nodes.add(node_id)
+                selected_nodes.add(node_id)
 
-        return self.selected_nodes
+        if self.config.graph_selectors:
+            nodes_by_graph_selector = self.select_by_graph_operator()
+            selected_nodes = selected_nodes.intersection(nodes_by_graph_selector)
+
+        self.selected_nodes = selected_nodes
+        return selected_nodes
 
     def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
         "Checks if a single node should be included. Only runs once per node with caching."
@@ -363,12 +371,8 @@ def select_nodes(
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
 
-        if config.graph_selectors:
-            select_ids = node_selector.select_by_graph_operator()
-            subset_ids.update(set(select_ids))
-        else:
-            select_ids = node_selector.select_nodes_ids_by_intersection()
-            subset_ids.update(set(select_ids))
+        select_ids = node_selector.select_nodes_ids_by_intersection
+        subset_ids.update(set(select_ids))
 
     if select:
         nodes = {id_: nodes[id_] for id_ in subset_ids}
@@ -379,7 +383,7 @@ def select_nodes(
     for statement in exclude:
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
-        exclude_ids.update(set(node_selector.select_nodes_ids_by_intersection()))
+        exclude_ids.update(set(node_selector.select_nodes_ids_by_intersection))
         subset_ids = set(nodes_ids) - set(exclude_ids)
 
     return {id_: nodes[id_] for id_ in subset_ids}

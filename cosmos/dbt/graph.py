@@ -161,6 +161,7 @@ class DbtGraph:
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
+            LoadMode.DBT_LS_FILE: self.load_via_dbt_ls_file,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
 
@@ -271,6 +272,31 @@ class DbtGraph:
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
+
+    def load_via_dbt_ls_file(self) -> None:
+        """
+        This is between dbt ls and full manifest. It allows to use the output of the dbt ls as a file stored in the image
+        you run Cosmos on. The advantage is that you can use the parser from LoadMode.DBT_LS without actually running dbt ls
+        every time.
+
+        This technically should increase performance and also removes the necessity to have your whole dbt project copied
+        to the airflow image.
+        """
+        logger.info("Trying to parse the dbt project `%s` using a dbt ls output file...", self.project.project_name)
+
+        if not self.execution_config.is_dbt_ls_file_available():
+            raise CosmosLoadDbtException(f"Unable to load dbt ls file using {self.execution_config.dbt_ls_path}")
+
+        if not self.execution_config.project_path:
+            raise CosmosLoadDbtException("Unable to load dbt ls file without ExecutionConfig.dbt_project_path")
+
+        with open(self.execution_config.dbt_ls_path) as fp:  # type: ignore[arg-type]
+            dbt_ls_output = fp.read()
+            project_path = self.execution_config.project_path
+            nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_output)
+    
+        self.nodes = nodes
+        self.filtered_nodes = nodes
 
     def load_via_custom_parser(self) -> None:
         """

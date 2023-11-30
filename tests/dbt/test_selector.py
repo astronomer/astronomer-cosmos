@@ -378,7 +378,31 @@ def test_select_node_by_descendants_intersection_with_tag():
     assert sorted(selected.keys()) == expected
 
 
-# TODO: intersection of select - one of which with graph selector
-# TODO: union of select - one of which with graph selector
-# TODO: exclude graph
-# TODO: exclude graph with include non-graph
+def test_select_node_by_descendants_and_tag_union():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["child", "tag:has_child"])
+    expected = [
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_exclude_by_graph_selector():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["+parent"])
+    expected = [
+        "model.dbt-proj.child",
+        "model.dbt-proj.orphaned",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_exclude_by_union_graph_selector_and_tag():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["+parent", "tag:deprecated"])
+    expected = [
+        "model.dbt-proj.child",
+        "model.dbt-proj.orphaned",
+    ]
+    assert sorted(selected.keys()) == expected

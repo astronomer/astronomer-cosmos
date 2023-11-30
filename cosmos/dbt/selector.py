@@ -56,7 +56,7 @@ class GraphSelector:
             return GraphSelector(node_name, precursors, descendants)
         return None
 
-    def select_node_precursors(self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[DbtNode]):
+    def select_node_precursors(self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[str]) -> None:
         """
         Parse original nodes and add the precursor nodes related to this config to the selected_nodes set.
 
@@ -78,9 +78,7 @@ class GraphSelector:
                 previous_generation = new_generation
                 depth -= 1
 
-    def select_node_descendants(
-        self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[DbtNode]
-    ) -> set[DbtNode]:
+    def select_node_descendants(self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[str]) -> None:
         """
         Parse original nodes and add the descendant nodes related to this config to the selected_nodes set.
 
@@ -90,6 +88,9 @@ class GraphSelector:
         """
         if self.descendants:
             children_by_node = defaultdict(set)
+            # Index nodes by parent id
+            # We could optimize by doing this only once for the dbt project and giving it
+            # as a parameter to the GraphSelector
             for node_id, node in nodes.items():
                 for parent_id in node.depends_on:
                     children_by_node[parent_id].add(node_id)
@@ -101,11 +102,30 @@ class GraphSelector:
                 new_generation: set[str] = set()
                 for node_id in previous_generation:
                     if node_id not in processed_nodes:
-                        new_generation.update(set(children_by_node[node_id]))
+                        new_generation.update(children_by_node[node_id])
                         processed_nodes.add(node_id)
                 selected_nodes.update(new_generation)
                 previous_generation = new_generation
                 depth -= 1
+
+    def filter_nodes(self, nodes: dict[str, DbtNode]) -> set[str]:
+        selected_nodes: set[str] = set()
+
+        # Index nodes by name, we can improve performance by doing this once
+        # for multiple GraphSelectors
+        node_by_name = {}
+        for node_id, node in nodes.items():
+            node_by_name[node.name] = node_id
+
+        if self.node_name in node_by_name:
+            root_id = node_by_name[self.node_name]
+        else:
+            logger.warn(f"Selector {self.node_name} not found.")
+            return selected_nodes
+
+        selected_nodes.add(root_id)
+        self.select_node_precursors(nodes, root_id, selected_nodes)
+        self.select_node_descendants(nodes, root_id, selected_nodes)
         return selected_nodes
 
 
@@ -281,22 +301,8 @@ class NodeSelector:
         """
         selected_nodes = set()
 
-        # Index nodes by name
-        node_by_name = {}
-        for node_id, node in self.nodes.items():
-            node_by_name[node.name] = node_id
-
-        # TODO: refactor
         for graph_selector in self.config.graph_selectors:
-            if graph_selector.node_name in node_by_name:
-                root_id = node_by_name[graph_selector.node_name]
-            else:
-                logger.warn(f"Selector {graph_selector.node_name} not found.")
-                break
-
-            selected_nodes.add(root_id)
-            graph_selector.select_node_precursors(self.nodes, root_id, selected_nodes)
-            graph_selector.select_node_descendants(self.nodes, root_id, selected_nodes)
+            selected_nodes.update(graph_selector.filter_nodes(self.nodes))
 
         return selected_nodes
 

@@ -17,7 +17,7 @@ Inactive Committers/Maintainers
 -------------------------------
 
 * Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
-* Ian Moritz (`@iancmoritz <https://github.com/iancmoritz> `_)
+* Ian Moritz (`@iancmoritz <https://github.com/iancmoritz>`_)
 
 Contributors
 ------------

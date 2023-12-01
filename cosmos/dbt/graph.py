@@ -285,7 +285,7 @@ class DbtGraph:
         logger.info("Trying to parse the dbt project `%s` using a dbt ls output file...", self.project.project_name)
 
         if not self.render_config.is_dbt_ls_file_available():
-            raise CosmosLoadDbtException(f"Unable to load dbt ls file using {self.execution_config.dbt_ls_path}")
+            raise CosmosLoadDbtException(f"Unable to load dbt ls file using {self.render_config.dbt_ls_path}")
 
         if not self.execution_config.project_path:
             raise CosmosLoadDbtException("Unable to load dbt ls file without ExecutionConfig.dbt_project_path")

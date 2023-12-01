@@ -130,7 +130,7 @@ class DbtModel:
     name: str
     type: DbtModelType
     path: Path
-    operator_args: Dict[str, Any] = field(default_factory=dict)
+    dbt_vars: Dict[str, str] = field(default_factory=dict)
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
     def __post_init__(self) -> None:
@@ -141,7 +141,6 @@ class DbtModel:
             return
 
         config = DbtModelConfig()
-        self.var_args: Dict[str, Any] = self.operator_args.get("vars", {})
         code = self.path.read_text()
 
         if self.type == DbtModelType.DBT_SNAPSHOT:
@@ -203,7 +202,7 @@ class DbtModel:
                     and isinstance(node.args[0], jinja2.nodes.Const)
                     and node.node.name == "var"
                 ):
-                    value += self.var_args[node.args[0].value]
+                    value += self.dbt_vars[node.args[0].value]  # type: ignore
         elif isinstance(first_arg, jinja2.nodes.Const):
             # and add it to the config
             value = first_arg.value
@@ -272,7 +271,7 @@ class LegacyDbtProject:
     snapshots_dir: Path = field(init=False)
     seeds_dir: Path = field(init=False)
 
-    operator_args: Dict[str, Any] = field(default_factory=dict)
+    dbt_vars: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """
@@ -325,7 +324,7 @@ class LegacyDbtProject:
             name=model_name,
             type=DbtModelType.DBT_SEED,
             path=path,
-            operator_args=self.operator_args,
+            dbt_vars=self.dbt_vars,
         )
         # add the model to the project
         self.seeds[model_name] = model
@@ -343,7 +342,7 @@ class LegacyDbtProject:
                 name=model_name,
                 type=DbtModelType.DBT_MODEL,
                 path=path,
-                operator_args=self.operator_args,
+                dbt_vars=self.dbt_vars,
             )
             # add the model to the project
             self.models[model.name] = model
@@ -353,7 +352,7 @@ class LegacyDbtProject:
                 name=model_name,
                 type=DbtModelType.DBT_SNAPSHOT,
                 path=path,
-                operator_args=self.operator_args,
+                dbt_vars=self.dbt_vars,
             )
             # add the snapshot to the project
             self.snapshots[model.name] = model
@@ -414,7 +413,7 @@ class LegacyDbtProject:
                     name=f"{test}_{column['name']}_{model_name}",
                     type=DbtModelType.DBT_TEST,
                     path=path,
-                    operator_args=self.operator_args,
+                    dbt_vars=self.dbt_vars,
                     config=DbtModelConfig(upstream_models=set({model_name})),
                 )
                 tests[test_model.name] = test_model

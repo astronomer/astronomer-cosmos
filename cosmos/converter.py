@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import inspect
 from typing import Any, Callable
+from warnings import warn
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
@@ -83,6 +84,31 @@ def validate_arguments(
         profile_config.validate_profiles_yml()
 
 
+def check_variable_args(project_config: ProjectConfig, operator_args: dict[str, Any]) -> None:
+    """
+    Cosmos 2.0 will remove the ability to pass in operator_args with 'env' and 'vars' in place of ProjectConfig.env_vars and
+    ProjectConfig.dbt_vars.
+    """
+    if "env" in operator_args:
+        warn(
+            "operator_args with 'env' is deprecated and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
+            DeprecationWarning,
+        )
+        if project_config.env_vars:
+            raise CosmosValueError(
+                "ProjectConfig.env_vars and operator_args with 'env' are mutually exclusive and only one can be used."
+            )
+    if "vars" in operator_args:
+        warn(
+            "operator_args with 'vars' is deprecated and will be removed in Cosmos 2.0. Use ProjectConfig.vars instead.",
+            DeprecationWarning,
+        )
+        if project_config.dbt_vars:
+            raise CosmosValueError(
+                "ProjectConfig.dbt_vars and operator_args with 'vars' are mutually exclusive and only one can be used."
+            )
+
+
 class DbtToAirflowConverter:
     """
     Logic common to build an Airflow DbtDag and DbtTaskGroup from a DBT project.
@@ -152,6 +178,10 @@ class DbtToAirflowConverter:
         if not operator_args:
             operator_args = {}
 
+        check_variable_args(project_config, operator_args)
+        env_vars = project_config.env_vars or operator_args.pop("env", None)
+        dbt_vars = project_config.dbt_vars or operator_args.pop("vars", None)
+
         # Previously, we were creating a cosmos.dbt.project.DbtProject
         # DbtProject has now been replaced with ProjectConfig directly
         #   since the interface of the two classes were effectively the same
@@ -167,7 +197,7 @@ class DbtToAirflowConverter:
             render_config=render_config,
             execution_config=execution_config,
             profile_config=profile_config,
-            operator_args=operator_args,
+            dbt_vars=dbt_vars,
         )
         dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
@@ -176,6 +206,8 @@ class DbtToAirflowConverter:
             "project_dir": execution_config.project_path,
             "profile_config": profile_config,
             "emit_datasets": render_config.emit_datasets,
+            "env": env_vars,
+            "vars": dbt_vars,
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path

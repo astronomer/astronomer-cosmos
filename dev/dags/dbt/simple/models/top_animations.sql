@@ -1,4 +1,8 @@
-{{ config(materialized='table') }}
+{{ config(
+    materialized='table',
+    alias=var('animation_alias', 'top_animations')
+   )
+}}
 
 SELECT Title, Rating
 FROM {{ ref('movies_ratings_simplified') }}

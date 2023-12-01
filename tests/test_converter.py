@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 
 import pytest
@@ -302,3 +302,62 @@ def test_converter_fails_no_manifest_no_render_config(mock_load_dbt_graph, execu
         err_info.value.args[0]
         == "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
     )
+
+
+@pytest.mark.parametrize("operator_args", [{"env": {"key": "value"}}, {"vars": {"key": "value"}}])
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.DbtGraph")
+@patch("cosmos.converter.build_airflow_graph")
+def test_converter_operator_args_deprecated(
+    mock_validate_project, mock_dbt_graph, mock_build_airflow_graph, operator_args
+):
+    """Deprecating warnings should be raised when using operator_args with "vars" or "env"."""
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig()
+    profile_config = MagicMock()
+
+    with pytest.deprecated_call():
+        with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+            DbtToAirflowConverter(
+                dag=dag,
+                nodes=nodes,
+                project_config=project_config,
+                profile_config=profile_config,
+                execution_config=execution_config,
+                render_config=render_config,
+                operator_args=operator_args,
+            )
+
+
+@pytest.mark.parametrize("project_config_arg, operator_arg", [("dbt_vars", "vars"), ("env_vars", "env")])
+@patch("cosmos.config.ProjectConfig.validate_project")
+def test_converter_fails_project_config_and_operator_args_conflict(
+    mock_validate_project, project_config_arg, operator_arg
+):
+    """
+    The converter should fail if a user specifies both a ProjectConfig and operator_args with dbt_vars/vars or env_vars/env
+    that overlap.
+    """
+    project_config = ProjectConfig(
+        project_name="fake-project",
+        dbt_project_path="/some/project/path",
+        **{project_config_arg: {"key": "value"}},  # type: ignore
+    )
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig()
+    profile_config = MagicMock()
+    operator_args = {operator_arg: {"key": "value"}}
+
+    expected_error_msg = f"ProjectConfig.{project_config_arg} and operator_args with '{operator_arg}' are mutually exclusive and only one can be used."
+    with pytest.raises(CosmosValueError, match=expected_error_msg):
+        with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+            DbtToAirflowConverter(
+                dag=dag,
+                nodes=nodes,
+                project_config=project_config,
+                profile_config=profile_config,
+                execution_config=execution_config,
+                render_config=render_config,
+                operator_args=operator_args,
+            )

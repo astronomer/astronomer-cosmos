@@ -23,7 +23,7 @@ SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
-
+SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 
 @pytest.fixture
 def tmp_dbt_project_dir():
@@ -108,6 +108,28 @@ def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
     dbt_graph.load(execution_mode=ExecutionMode.LOCAL)
     assert mock_load_from_dbt_manifest.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_file", return_value=None)
+def test_load_automatic_dbt_ls_file_is_available(mock_load_via_dbt_ls_file):
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        dbt_ls_path=SAMPLE_DBT_LS_OUTPUT
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config
+    )
+    dbt_graph.load(method=LoadMode.DBT_LS_FILE,execution_mode=ExecutionMode.LOCAL)
+    assert mock_load_via_dbt_ls_file.called
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
@@ -200,8 +222,9 @@ def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", return_value=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_file", return_value=None)
 def test_load(
-    mock_load_from_dbt_manifest, mock_load_via_dbt_ls, mock_load_via_custom_parser, exec_mode, method, expected_function
+    mock_load_from_dbt_manifest, mock_load_via_dbt_ls_file, mock_load_via_dbt_ls, mock_load_via_custom_parser, exec_mode, method, expected_function
 ):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
@@ -678,6 +701,48 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
         "model.jaffle_shop.stg_payments",
     } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)
 
+@pytest.mark.integration
+def test_load_via_dbt_ls_file():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    )
+    render_config = RenderConfig(
+        dbt_ls_path=SAMPLE_DBT_LS_OUTPUT
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config
+    )
+    dbt_graph.load(method=LoadMode.DBT_LS_FILE, execution_mode=ExecutionMode.LOCAL)
+
+    expected_dbt_nodes = {
+        "model.jaffle_shop.stg_customers": "stg_customers",
+        "model.jaffle_shop.stg_orders": "stg_orders",
+        "model.jaffle_shop.stg_payments": "stg_payments",
+    }
+    for unique_id, name in expected_dbt_nodes.items():
+        assert unique_id in dbt_graph.nodes
+        assert name == dbt_graph.nodes[unique_id].name
+    # Test dependencies
+    assert {
+        "seed.jaffle_shop.raw_customers"
+    } == set(dbt_graph.nodes["model.jaffle_shop.stg_customers"].depends_on)
+    assert {
+        "seed.jaffle_shop.raw_orders"
+    } == set(dbt_graph.nodes["model.jaffle_shop.stg_orders"].depends_on)
+    assert {
+        "seed.jaffle_shop.raw_payments"
+    } == set(dbt_graph.nodes["model.jaffle_shop.stg_payments"].depends_on)
 
 @pytest.mark.parametrize(
     "stdout,returncode",

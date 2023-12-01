@@ -56,6 +56,7 @@ class RenderConfig:
     dbt_executable_path: str | Path = get_system_dbt()
     env_vars: dict[str, str] = field(default_factory=dict)
     dbt_project_path: InitVar[str | Path | None] = None
+    dbt_ls_path: Path | None = None
 
     project_path: Path | None = field(init=False)
 
@@ -83,6 +84,14 @@ class RenderConfig:
                     f"<{self.dbt_executable_path}>" + (f" and <{fallback_cmd}>." if fallback_cmd else ".")
                 )
 
+    def is_dbt_ls_file_available(self) -> bool:
+        """
+        Check if the `dbt ls` output is set and if the file exists.
+        """
+        if not self.dbt_ls_path:
+            return False
+
+        return self.dbt_ls_path.exists()
 
 class ProjectConfig:
     """
@@ -269,18 +278,9 @@ class ExecutionConfig:
     dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
     dbt_project_path: InitVar[str | Path | None] = None
-    dbt_ls_path: Path | None = None
-
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
     
-    def is_dbt_ls_file_available(self) -> bool:
-        """
-        Check if the `dbt ls` output is set and if the file exists.
-        """
-        if not self.dbt_ls_path:
-            return False
 
-        return self.dbt_ls_path.exists()

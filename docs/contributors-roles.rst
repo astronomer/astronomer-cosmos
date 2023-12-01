@@ -6,7 +6,7 @@ Contributors roles
 Contributors are welcome and are greatly appreciated! Every little bit helps, and we give credit to them.
 
 This document aims to explain the current roles in the Astronomer Cosmos project.
-Please check :ref:`contributing` to see our contributing guidelines.
+For more information, check :ref:`contributing` and :ref:`contributors`.
 
 
 Contributors

@@ -388,7 +388,44 @@ def select_nodes(
     if not select and not exclude:
         return nodes
 
-    # validates select and exclude filters
+    validate_filters(exclude, select)
+    subset_ids = apply_select_filter(nodes, project_dir, select)
+    if select:
+        nodes = get_nodes_from_subset(nodes, subset_ids)
+    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
+    subset_ids = set(nodes.keys()) - exclude_ids
+
+    return get_nodes_from_subset(nodes, subset_ids)
+
+
+def get_nodes_from_subset(nodes: dict[str, DbtNode], subset_ids: set[str]) -> dict[str, DbtNode]:
+    nodes = {id_: nodes[id_] for id_ in subset_ids}
+    return nodes
+
+
+def apply_exclude_filter(nodes: dict[str, DbtNode], project_dir: Path | None, exclude: list[str]) -> set[str]:
+    exclude_ids: set[str] = set()
+    for statement in exclude:
+        config = SelectorConfig(project_dir, statement)
+        node_selector = NodeSelector(nodes, config)
+        exclude_ids.update(node_selector.select_nodes_ids_by_intersection)
+    return exclude_ids
+
+
+def apply_select_filter(nodes: dict[str, DbtNode], project_dir: Path | None, select: list[str]) -> set[str]:
+    subset_ids: set[str] = set()
+    for statement in select:
+        config = SelectorConfig(project_dir, statement)
+        node_selector = NodeSelector(nodes, config)
+        select_ids = node_selector.select_nodes_ids_by_intersection
+        subset_ids.update(select_ids)
+    return subset_ids
+
+
+def validate_filters(exclude: list[str], select: list[str]) -> None:
+    """
+    Validate select and exclude filters.
+    """
     filters = [["select", select], ["exclude", exclude]]
     for filter_type, filter in filters:
         for filter_parameter in filter:
@@ -401,26 +438,3 @@ def select_nodes(
                 continue
             elif ":" in filter_parameter:
                 raise CosmosValueError(f"Invalid {filter_type} filter: {filter_parameter}")
-
-    subset_ids: set[str] = set()
-
-    for statement in select:
-        config = SelectorConfig(project_dir, statement)
-        node_selector = NodeSelector(nodes, config)
-
-        select_ids = node_selector.select_nodes_ids_by_intersection
-        subset_ids.update(set(select_ids))
-
-    if select:
-        nodes = {id_: nodes[id_] for id_ in subset_ids}
-
-    nodes_ids = set(nodes.keys())
-
-    exclude_ids: set[str] = set()
-    for statement in exclude:
-        config = SelectorConfig(project_dir, statement)
-        node_selector = NodeSelector(nodes, config)
-        exclude_ids.update(set(node_selector.select_nodes_ids_by_intersection))
-        subset_ids = set(nodes_ids) - set(exclude_ids)
-
-    return {id_: nodes[id_] for id_ in subset_ids}

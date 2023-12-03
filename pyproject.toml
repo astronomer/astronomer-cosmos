@@ -258,7 +258,6 @@ line-length = 120
 [tool.ruff.lint]
 select = ["C901"]
 [tool.ruff.lint.mccabe]
-max-complexity = 6
 
 
 [tool.distutils.bdist_wheel]

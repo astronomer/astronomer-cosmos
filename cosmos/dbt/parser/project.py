@@ -274,7 +274,7 @@ class LegacyDbtProject:
 
     operator_args: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self) -> None:  # noqa: C901
         """
         Initializes the parser.
         """

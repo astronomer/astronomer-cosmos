@@ -14,11 +14,10 @@ Committers/Maintainers
 * Tatiana Al-Chueyr (`@tatiana <https://github.com/tatiana>`_)
 
 
-Inactive Committers/Maintainers
+Emeritus Committers/Maintainers
 -------------------------------
 
-* Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
-* Ian Moritz (`@iancmoritz <https://github.com/iancmoritz>`_)
+(none at the moment)
 
 Contributors
 ------------

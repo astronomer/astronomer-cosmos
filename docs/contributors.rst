@@ -14,7 +14,7 @@ Committers
 * Tatiana Al-Chueyr (`@tatiana <https://github.com/tatiana>`_)
 
 
-Emeritus Committers/Maintainers
+Emeritus Committers
 -------------------------------
 
 (none at the moment)

@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache as cache
+
+
 import airflow
 import pytest
 from airflow.models.dagbag import DagBag
@@ -37,6 +43,7 @@ def session():
     return get_session()
 
 
+@cache
 def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:

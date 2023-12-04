@@ -4,7 +4,7 @@ Airflow and DBT dependencies conflicts
 ======================================
 
 When using the `Local Execution Mode <execution-modes.html#local>`__, users may face dependency conflicts between
-Apache Airflow and DBT. The amount of conflicts may increase depending on the Airflow providers and DBT plugins being used.
+Apache Airflow and DBT. The conflicts may increase depending on the Airflow providers and DBT plugins being used.
 
 If you find errors, we recommend users look into using `alternative execution modes <execution-modes.html>`__.
 
@@ -13,9 +13,9 @@ In the following table, ``x`` represents combinations that lead to conflicts (va
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
 | Airflow / DBT | 1.0 | 1.1 | 1.2 | 1.3 | 1.4 | 1.5 | 1.6 | 1.7 |
 +===============+=====+=====+=====+=====+=====+=====+=====+=====+
-| 2.2           |     |     |     | x   | x   | x   | x   | X   |
+| 2.2           |     |     |     | x   | x   | x   | x   | x   |
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.3           | x   | x   |     | x   | x   | x   | x   | X   |
+| 2.3           | x   | x   |     | x   | x   | x   | x   | x   |
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
 | 2.4           | x   | x   | x   |     |     |     |     |     |
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
@@ -23,7 +23,7 @@ In the following table, ``x`` represents combinations that lead to conflicts (va
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
 | 2.6           | x   | x   | x   | x   | x   |     |     |     |
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.7           | X   | X   | X   | x   | X   |     |     |     |
+| 2.7           | x   | x   | x   | x   | x   |     |     |     |
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
 
 Examples of errors

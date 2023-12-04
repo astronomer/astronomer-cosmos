@@ -8,6 +8,7 @@ Learn more about the project contributors roles in :ref:`contributors-roles`.
 Committers/Maintainers
 ----------------------
 
+* Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
 * Harel Shein (`@harels <https://github.com/harels>`_)
 * Julian LaNeve (`@jlaneve <https://github.com/jlaneve>`_)
 * Tatiana Al-Chueyr (`@tatiana <https://github.com/tatiana>`_)

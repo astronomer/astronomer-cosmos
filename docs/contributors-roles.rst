@@ -19,6 +19,8 @@ Cosmos contributors can be found in the Astronomer Cosmos Github `insights page 
 Contributors are responsible for:
 
 * Fixing bugs
+* Refactoring code
+* Improving processes and tooling
 * Adding features
 * Improving the documentation
 * Making/answering questions in the #airflow-dbt Slack channel
@@ -36,13 +38,10 @@ Committers have the same responsibilities as standard contributors and also perf
 
 * Reviewing & merging pull-requests
 * Scanning and responding to GitHub issues, helping triaging them
-* Releasing new versions of Cosmos in `PyPI <https://pypi.org/project/astronomer-cosmos/>`_, following the `milestones <https://github.com/astronomer/astronomer-cosmos/milestones>`_.
-* Refactoring code
-* Improving processes and tooling
 
-If you know you are not going to be able to contribute for a long time (for instance, due to a change of job or circumstances), you should inform other maintainers and we will mark you as "inactive".
-Inactive committers will no longer have write access to the repo.
-As merit earned never expires, once an inactive committer become active again, they can simply email another maintainer and ask to be reinstated.
+If you know you are not going to be able to contribute for a long time (for instance, due to a change of job or circumstances), you should inform other maintainers, and we will mark you as "emeritus".
+Emeritus committers will no longer have write access to the repo.
+As merit earned never expires, once an emeritus committer becomes active again, they can simply email another maintainer from Astronomer and ask to be reinstated.
 
 Pre-requisites to becoming a committer
 .......................................
@@ -53,3 +52,5 @@ General prerequisites that we look for in all candidates:
 2. Visibility on discussions on the Slack channel or GitHub issues/discussions
 3. Contributions to community health and project's sustainability for the long-term
 4. Understands the project's contributors guidelines :ref:`contributing`.
+
+Astronomer has the right to grant and revoke write access permissions to the project's official repository for any reason it sees fit.

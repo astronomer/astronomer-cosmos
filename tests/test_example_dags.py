@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from functools import cache
+
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache as cache
+
 
 import airflow
 import pytest

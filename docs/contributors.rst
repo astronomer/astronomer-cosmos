@@ -5,7 +5,7 @@ Contributors
 There are different ways people can contribute to Astronomer Cosmos.
 Learn more about the project contributors roles in :ref:`contributors-roles`.
 
-Committers/Maintainers
+Committers
 ----------------------
 
 * Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)

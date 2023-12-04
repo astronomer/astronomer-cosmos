@@ -1,6 +1,6 @@
 .. _contributors-roles:
 
-Contributors roles
+Contributor roles
 ==================
 
 Contributors are welcome and are greatly appreciated! Every little bit helps, and we give credit to them.
@@ -26,7 +26,7 @@ Contributors are responsible for:
 * Making/answering questions in the #airflow-dbt Slack channel
 
 
-Committers/Maintainers
+Committers
 ----------------------
 
 Committers are community members with write access to the `Astronomer Cosmos Github repository <https://github.com/astronomer/astronomer-cosmos>`_.

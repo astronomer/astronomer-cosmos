@@ -1,3 +1,5 @@
+.. _contributing:
+
 Cosmos Contributing Guide
 =========================
 
@@ -5,6 +7,8 @@ All contributions, bug reports, bug fixes, documentation improvements, enhanceme
 
 As contributors and maintainers to this project, you are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
+
+Learn more about the contributors roles in :ref:`contributors-roles`.
 
 Overview
 ________

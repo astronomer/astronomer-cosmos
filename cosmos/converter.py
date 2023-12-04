@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from typing import Any, Callable
 
@@ -10,6 +11,7 @@ from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
+from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
@@ -48,7 +50,11 @@ def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_arguments(
-    select: list[str], exclude: list[str], profile_args: dict[str, Any], task_args: dict[str, Any]
+    select: list[str],
+    exclude: list[str],
+    profile_config: ProfileConfig,
+    task_args: dict[str, Any],
+    execution_mode: ExecutionMode,
 ) -> None:
     """
     Validate that mutually exclusive selectors filters have not been given.
@@ -56,8 +62,9 @@ def validate_arguments(
 
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param profile_args: Arguments to pass to the dbt profile
+    :param profile_config: ProfileConfig Object
     :param task_args: Arguments to be used to instantiate an Airflow Task
+    :param execution_mode: the current execution mode
     """
     for field in ("tags", "paths"):
         select_items = retrieve_by_label(select, field)
@@ -68,8 +75,12 @@ def validate_arguments(
 
     # if task_args has a schema, add it to the profile args and add a deprecated warning
     if "schema" in task_args:
-        profile_args["schema"] = task_args["schema"]
         logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
+        if profile_config.profile_mapping:
+            profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
+
+    if execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
+        profile_config.validate_profiles_yml()
 
 
 class DbtToAirflowConverter:
@@ -118,6 +129,10 @@ class DbtToAirflowConverter:
         # If we are using the old interface, we should migrate it to the new interface
         # This is safe to do now since we have validated which config interface we're using
         if project_config.dbt_project_path:
+            # We copy the configuration so the change does not affect other DAGs or TaskGroups
+            # that may reuse the same original configuration
+            render_config = copy.deepcopy(render_config)
+            execution_config = copy.deepcopy(execution_config)
             render_config.project_path = project_config.dbt_project_path
             execution_config.project_path = project_config.dbt_project_path
 
@@ -133,10 +148,6 @@ class DbtToAirflowConverter:
             raise CosmosValueError(
                 "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
             )
-
-        profile_args = {}
-        if profile_config.profile_mapping:
-            profile_args = profile_config.profile_mapping.profile_args
 
         if not operator_args:
             operator_args = {}
@@ -155,7 +166,6 @@ class DbtToAirflowConverter:
             project=project_config,
             render_config=render_config,
             execution_config=execution_config,
-            dbt_cmd=render_config.dbt_executable_path,
             profile_config=profile_config,
             operator_args=operator_args,
         )
@@ -170,7 +180,13 @@ class DbtToAirflowConverter:
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path
 
-        validate_arguments(render_config.select, render_config.exclude, profile_args, task_args)
+        validate_arguments(
+            render_config.select,
+            render_config.exclude,
+            profile_config,
+            task_args,
+            execution_mode=execution_config.execution_mode,
+        )
 
         build_airflow_graph(
             nodes=dbt_graph.filtered_nodes,

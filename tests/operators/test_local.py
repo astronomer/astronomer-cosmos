@@ -420,6 +420,19 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     assert err_msg in caplog.text
 
 
+@pytest.mark.parametrize(
+    "operator_class,expected_template",
+    [
+        (DbtSeedLocalOperator, ("env", "vars", "compiled_sql", "full_refresh")),
+        (DbtRunLocalOperator, ("env", "vars", "compiled_sql", "full_refresh")),
+    ],
+)
+def test_dbt_base_operator_template_fields(operator_class, expected_template):
+    # Check if value of template fields is what we expect for the operators we're validating
+    dbt_base_operator = operator_class(profile_config=profile_config, task_id="my-task", project_dir="my/dir")
+    assert dbt_base_operator.template_fields == expected_template
+
+
 @patch.object(DbtDocsGCSLocalOperator, "required_files", ["file1", "file2"])
 def test_dbt_docs_gcs_local_operator():
     mock_gcs = MagicMock()
@@ -445,3 +458,33 @@ def test_dbt_docs_gcs_local_operator():
             call(filename="fake-dir/target/file2", bucket_name="fake-bucket", object_name="fake-folder/file2"),
         ]
         mock_hook.upload.assert_has_calls(expected_upload_calls)
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator.store_compiled_sql")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.exception_handling")
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.run_subprocess")
+def test_operator_execute_deps_parameters(
+    mock_build_and_run_cmd, mock_ensure_profile, mock_exception_handling, mock_store_compiled_sql
+):
+    expected_call_kwargs = [
+        "/usr/local/bin/dbt",
+        "deps",
+        "--profiles-dir",
+        "/path/to",
+        "--profile",
+        "default",
+        "--target",
+        "dev",
+    ]
+    task = DbtRunLocalOperator(
+        profile_config=real_profile_config,
+        task_id="my-task",
+        project_dir=DBT_PROJ_DIR,
+        install_deps=True,
+        emit_datasets=False,
+        dbt_executable_path="/usr/local/bin/dbt",
+    )
+    mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
+    task.execute(context={"task_instance": MagicMock()})
+    assert mock_build_and_run_cmd.call_args_list[0].kwargs["command"] == expected_call_kwargs

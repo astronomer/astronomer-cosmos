@@ -3,7 +3,6 @@ from __future__ import annotations
 import itertools
 import json
 import os
-import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,8 +20,8 @@ from cosmos.constants import (
     ExecutionMode,
     LoadMode,
 )
-from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import LegacyDbtProject
+from cosmos.dbt.project import create_symlinks, environ
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -43,7 +42,6 @@ class DbtNode:
     Metadata related to a dbt node (e.g. model, seed, snapshot).
     """
 
-    name: str
     unique_id: str
     resource_type: DbtResourceType
     depends_on: list[str]
@@ -52,13 +50,22 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_test: bool = False
 
+    @property
+    def resource_name(self) -> str:
+        """
+        Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
+        The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
+        For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
+        """
+        return self.unique_id.split(".", 2)[2]
 
-def create_symlinks(project_path: Path, tmp_dir: Path) -> None:
-    """Helper function to create symlinks to the dbt project files."""
-    ignore_paths = (DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "dbt_packages", "profiles.yml")
-    for child_name in os.listdir(project_path):
-        if child_name not in ignore_paths:
-            os.symlink(project_path / child_name, tmp_dir / child_name)
+    @property
+    def name(self) -> str:
+        """
+        Use this property as the task name or task group name.
+        Replace period (.) with underscore (_) due to versioned models.
+        """
+        return self.resource_name.replace(".", "_")
 
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
@@ -81,7 +88,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
             "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
         )
 
-    if returncode or "Error" in stdout:
+    if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
         details = stderr or stdout
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
 
@@ -98,7 +105,6 @@ def parse_dbt_ls_output(project_path: Path, ls_stdout: str) -> dict[str, DbtNode
             logger.debug("Skipped dbt ls line: %s", line)
         else:
             node = DbtNode(
-                name=node_dict.get("alias", node_dict["name"]),
                 unique_id=node_dict["unique_id"],
                 resource_type=DbtResourceType(node_dict["resource_type"]),
                 depends_on=node_dict.get("depends_on", {}).get("nodes", []),
@@ -117,15 +123,6 @@ class DbtGraph:
     Supports different ways of loading the `dbt` project into this representation.
 
     Different loading methods can result in different `nodes` and `filtered_nodes`.
-
-    Example of how to use:
-
-        dbt_graph = DbtGraph(
-            project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
-            render_config=RenderConfig(exclude=["*orders*"], select=[]),
-            dbt_cmd="/usr/local/bin/dbt"
-        )
-        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """
 
     nodes: dict[str, DbtNode] = dict()
@@ -137,7 +134,6 @@ class DbtGraph:
         render_config: RenderConfig = RenderConfig(),
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
-        dbt_cmd: str = get_system_dbt(),
         operator_args: dict[str, Any] | None = None,
     ):
         self.project = project
@@ -145,7 +141,6 @@ class DbtGraph:
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.operator_args = operator_args or {}
-        self.dbt_cmd = dbt_cmd
 
     def load(
         self,
@@ -183,9 +178,11 @@ class DbtGraph:
         else:
             load_method[method]()
 
-    def run_dbt_ls(self, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]) -> dict[str, DbtNode]:
+    def run_dbt_ls(
+        self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
+    ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [self.dbt_cmd, "ls", "--output", "json"]
+        ls_command = [dbt_cmd, "ls", "--output", "json"]
 
         if self.render_config.exclude:
             ls_command.extend(["--exclude", *self.render_config.exclude])
@@ -213,13 +210,14 @@ class DbtGraph:
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
 
-        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
-        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
-
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
         """
+        self.render_config.validate_dbt_command(fallback_cmd=self.execution_config.dbt_executable_path)
+        dbt_cmd = self.render_config.dbt_executable_path
+        dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
+
         logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
         if not self.render_config.project_path or not self.execution_config.project_path:
             raise CosmosLoadDbtException(
@@ -229,9 +227,6 @@ class DbtGraph:
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
-        if not shutil.which(self.dbt_cmd):
-            raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
-
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.info(
                 f"Content of the dbt project dir {self.render_config.project_path}: `{os.listdir(self.render_config.project_path)}`"
@@ -239,7 +234,9 @@ class DbtGraph:
             tmpdir_path = Path(tmpdir)
             create_symlinks(self.render_config.project_path, tmpdir_path)
 
-            with self.profile_config.ensure_profile(use_mock_values=True) as profile_values:
+            with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
+                self.render_config.env_vars
+            ):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)
@@ -260,12 +257,12 @@ class DbtGraph:
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps:
-                    deps_command = [self.dbt_cmd, "deps"]
+                    deps_command = [dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)
                     logger.debug("dbt deps output: %s", stdout)
 
-                nodes = self.run_dbt_ls(self.execution_config.project_path, tmpdir_path, env)
+                nodes = self.run_dbt_ls(dbt_cmd, self.execution_config.project_path, tmpdir_path, env)
 
                 self.nodes = nodes
                 self.filtered_nodes = nodes
@@ -308,8 +305,7 @@ class DbtGraph:
         for model_name, model in models:
             config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
             node = DbtNode(
-                name=model_name,
-                unique_id=model_name,
+                unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
                 resource_type=DbtResourceType(model.type.value),
                 depends_on=list(model.config.upstream_models),
                 file_path=Path(
@@ -342,9 +338,6 @@ class DbtGraph:
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).
 
-        Noted that if dbt project contains versioned models, need to use dbt>=1.6.0 instead. Because, as dbt<1.6.0,
-        dbt cli doesn't support select a specific versioned models as stg_customers_v1, customers_v1, ...
-
         Updates in-place:
         * self.nodes
         * self.filtered_nodes
@@ -364,7 +357,6 @@ class DbtGraph:
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
                 node = DbtNode(
-                    name=node_dict.get("alias", node_dict["name"]),
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),

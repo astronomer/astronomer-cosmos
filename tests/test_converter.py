@@ -1,11 +1,14 @@
+from datetime import datetime
 from pathlib import Path
-
 from unittest.mock import patch
+from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
+
 import pytest
+from airflow.models import DAG
 
 from cosmos.converter import DbtToAirflowConverter, validate_arguments
 from cosmos.constants import DbtResourceType, ExecutionMode
-from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig
+from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig, CosmosConfigException
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 
@@ -20,17 +23,33 @@ def test_validate_arguments_tags(argument_key):
     selector_name = argument_key[:-1]
     select = [f"{selector_name}:a,{selector_name}:b"]
     exclude = [f"{selector_name}:b,{selector_name}:c"]
-    profile_args = {}
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
     task_args = {}
     with pytest.raises(CosmosValueError) as err:
-        validate_arguments(select, exclude, profile_args, task_args)
+        validate_arguments(select, exclude, profile_config, task_args, execution_mode=ExecutionMode.LOCAL)
     expected = f"Can't specify the same {selector_name} in `select` and `exclude`: {{'b'}}"
     assert err.value.args[0] == expected
 
 
+def test_validate_arguments_schema_in_task_args():
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    task_args = {"schema": "abcd"}
+    validate_arguments(
+        select=[], exclude=[], profile_config=profile_config, task_args=task_args, execution_mode=ExecutionMode.LOCAL
+    )
+    assert profile_config.profile_mapping.profile_args["schema"] == "abcd"
+
+
 parent_seed = DbtNode(
-    name="seed_parent",
-    unique_id="seed_parent",
+    unique_id=f"{DbtResourceType.SEED}.{SAMPLE_DBT_PROJECT.stem}.seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
@@ -139,6 +158,74 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
         err_info.value.args[0]
         == "ExecutionConfig.dbt_project_path is required for the execution of dbt tasks in all execution modes."
     )
+
+
+def test_converter_fails_render_config_invalid_dbt_path_with_dbt_ls():
+    """
+    Validate that a dbt project fails to be rendered to Airflow with DBT_LS if
+    the dbt command is invalid.
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix(), project_name="sample")
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL,
+        dbt_executable_path="invalid-execution-dbt",
+    )
+    render_config = RenderConfig(
+        emit_datasets=True,
+        dbt_executable_path="invalid-render-dbt",
+    )
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    with pytest.raises(CosmosConfigException) as err_info:
+        with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+            DbtToAirflowConverter(
+                dag=dag,
+                nodes=nodes,
+                project_config=project_config,
+                profile_config=profile_config,
+                execution_config=execution_config,
+                render_config=render_config,
+            )
+    assert (
+        err_info.value.args[0]
+        == "Unable to find the dbt executable, attempted: <invalid-render-dbt> and <invalid-execution-dbt>."
+    )
+
+
+def test_converter_fails_render_config_invalid_dbt_path_with_manifest():
+    """
+    Validate that a dbt project succeeds to be rendered to Airflow with DBT_MANIFEST even when
+    the dbt command is invalid.
+    """
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST.as_posix(), project_name="sample")
+
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL,
+        dbt_executable_path="invalid-execution-dbt",
+        dbt_project_path=SAMPLE_DBT_PROJECT.as_posix(),
+    )
+    render_config = RenderConfig(
+        emit_datasets=True,
+        dbt_executable_path="invalid-render-dbt",
+    )
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        converter = DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+    assert converter
 
 
 @pytest.mark.parametrize(

@@ -26,7 +26,7 @@ from cosmos.dbt.graph import DbtNode
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-os.environ["DBT_SQLITE_PATH"] = str(DEFAULT_DBT_ROOT_PATH / "simple")
+DBT_SQLITE_PATH = str(DEFAULT_DBT_ROOT_PATH / "data")
 
 
 profile_config = ProfileConfig(
@@ -62,7 +62,8 @@ render_config = RenderConfig(
     node_converters={
         DbtResourceType("source"): convert_source,  # known dbt node type to Cosmos (part of DbtResourceType)
         DbtResourceType("exposure"): convert_exposure,  # dbt node type new to Cosmos (will be added to DbtResourceType)
-    }
+    },
+    env_vars={"DBT_SQLITE_PATH": DBT_SQLITE_PATH},
 )
 
 
@@ -73,7 +74,7 @@ example_cosmos_sources = DbtDag(
     ),
     profile_config=profile_config,
     render_config=render_config,
-    operator_args={"append_env": True},
+    operator_args={"env": {"DBT_SQLITE_PATH": DBT_SQLITE_PATH}},
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

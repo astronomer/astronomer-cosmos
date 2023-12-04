@@ -165,10 +165,8 @@ matrix.airflow.dependencies = [
     { value = "apache-airflow==2.4", if = ["2.4"] },
     { value = "apache-airflow==2.5", if = ["2.5"] },
     { value = "apache-airflow==2.6", if = ["2.6"] },
-    { value = "apache-airflow==2.7", if = ["2.7"] },
-]
-matrix.pydantic.dependencies = [
     { value = "pydantic>=1.10.0,<2.0.0", if = ["2.6"]},
+    { value = "apache-airflow==2.7", if = ["2.7"] },
 ]
 
 [tool.hatch.envs.tests.scripts]

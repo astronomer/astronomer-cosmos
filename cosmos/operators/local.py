@@ -199,7 +199,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 self.project_dir,
             )
 
-            create_symlinks(Path(self.project_dir), Path(tmp_project_dir))
+            create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values

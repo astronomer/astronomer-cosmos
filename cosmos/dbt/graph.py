@@ -269,7 +269,7 @@ class DbtGraph:
                 f"Content of the dbt project dir {self.render_config.project_path}: `{os.listdir(self.render_config.project_path)}`"
             )
             tmpdir_path = Path(tmpdir)
-            create_symlinks(self.render_config.project_path, tmpdir_path)
+            create_symlinks(self.render_config.project_path, tmpdir_path, self.render_config.dbt_deps)
 
             with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
                 self.render_config.env_vars

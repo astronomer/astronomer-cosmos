@@ -93,6 +93,7 @@ class RenderConfig:
 
         return self.dbt_ls_path.exists()
 
+
 class ProjectConfig:
     """
     Class for setting project config.
@@ -282,5 +283,3 @@ class ExecutionConfig:
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
-    
-

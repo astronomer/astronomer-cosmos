@@ -275,8 +275,8 @@ class DbtGraph:
 
     def load_via_dbt_ls_file(self) -> None:
         """
-        This is between dbt ls and full manifest. It allows to use the output (needs to be json output) of the dbt ls as a 
-        file stored in the image you run Cosmos on. The advantage is that you can use the parser from LoadMode.DBT_LS without 
+        This is between dbt ls and full manifest. It allows to use the output (needs to be json output) of the dbt ls as a
+        file stored in the image you run Cosmos on. The advantage is that you can use the parser from LoadMode.DBT_LS without
         actually running dbt ls every time. BUT you will need one dbt ls file for each separate group.
 
         This technically should increase performance and also removes the necessity to have your whole dbt project copied
@@ -294,7 +294,7 @@ class DbtGraph:
             dbt_ls_output = fp.read()
             project_path = self.execution_config.project_path
             nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_output)
-    
+
         self.nodes = nodes
         self.filtered_nodes = nodes
 

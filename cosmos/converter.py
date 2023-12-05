@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-import copy
 import inspect
 from typing import Any, Callable
+import copy
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
@@ -19,6 +19,18 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+
+def migrate_to_new_interface(
+    execution_config: ExecutionConfig, project_config: ProjectConfig, render_config: RenderConfig
+):
+    # We copy the configuration so the change does not affect other DAGs or TaskGroups
+    # that may reuse the same original configuration
+    render_config = copy.deepcopy(render_config)
+    execution_config = copy.deepcopy(execution_config)
+    render_config.project_path = project_config.dbt_project_path
+    execution_config.project_path = project_config.dbt_project_path
+    return execution_config, render_config
 
 
 def specific_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -166,22 +178,16 @@ class DbtToAirflowConverter:
     ) -> None:
         project_config.validate_project()
 
-        if not execution_config:
-            execution_config = ExecutionConfig()
-        if not render_config:
-            render_config = RenderConfig()
+        execution_config = execution_config or ExecutionConfig()
+        render_config = render_config or RenderConfig()
+        operator_args = operator_args or {}
 
         validate_initial_user_config(execution_config, profile_config, project_config, render_config)
 
         # If we are using the old interface, we should migrate it to the new interface
         # This is safe to do now since we have validated which config interface we're using
         if project_config.dbt_project_path:
-            # We copy the configuration so the change does not affect other DAGs or TaskGroups
-            # that may reuse the same original configuration
-            render_config = copy.deepcopy(render_config)
-            execution_config = copy.deepcopy(execution_config)
-            render_config.project_path = project_config.dbt_project_path
-            execution_config.project_path = project_config.dbt_project_path
+            execution_config, render_config = migrate_to_new_interface(execution_config, project_config, render_config)
 
         validate_adapted_user_config(execution_config, project_config, render_config)
 

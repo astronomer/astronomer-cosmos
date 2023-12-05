@@ -255,10 +255,10 @@ no_warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 120
+[tool.ruff.lint]
+select = ["C901"]
+[tool.ruff.lint.mccabe]
+max-complexity = 8
 
 [tool.distutils.bdist_wheel]
 universal = true
-
-[tool.flake8]
-max-complexity = 10
-select = "C"

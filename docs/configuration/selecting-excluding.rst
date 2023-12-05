@@ -10,7 +10,9 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``tag:my_tag``: include/exclude models with the tag ``my_tag``
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
 - ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory
-
+- ``+node_name+1`` (graph operators): include/exclude the node with name ``node_name``, all its parents, and its first generation of children (`dbt graph selector docs <https://docs.getdbt.com/reference/node-selection/graph-operators>`_)
+- ``tag:my_tag,+node_name`` (intersection): include/exclude ``node_name`` and its parents if they have the tag ``my_tag`` (`dbt set operator docs <https://docs.getdbt.com/reference/node-selection/set-operators>`_)
+- ``['tag:first_tag', 'tag:second_tag']`` (union): include/exclude nodes that have either ``tag:first_tag`` or ``tag:second_tag``
 
 .. note::
 
@@ -49,5 +51,36 @@ Examples:
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
             select=["path:analytics/tables"],
+        )
+    )
+
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            select=["tag:include_tag1", "tag:include_tag2"],  # union
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            select=["tag:include_tag1,tag:include_tag2"],  # intersection
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            exclude=["node_name+"],  # node_name and its children
         )
     )

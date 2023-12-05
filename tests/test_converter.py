@@ -6,7 +6,7 @@ from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 import pytest
 from airflow.models import DAG
 
-from cosmos.converter import DbtToAirflowConverter, validate_arguments
+from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig, CosmosConfigException
 from cosmos.dbt.graph import DbtNode
@@ -33,6 +33,31 @@ def test_validate_arguments_tags(argument_key):
         validate_arguments(select, exclude, profile_config, task_args, execution_mode=ExecutionMode.LOCAL)
     expected = f"Can't specify the same {selector_name} in `select` and `exclude`: {{'b'}}"
     assert err.value.args[0] == expected
+
+
+@pytest.mark.parametrize(
+    "execution_mode",
+    (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV),
+)
+def test_validate_initial_user_config_no_profile(execution_mode):
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    profile_config = None
+    project_config = ProjectConfig()
+    with pytest.raises(CosmosValueError) as err_info:
+        validate_initial_user_config(execution_config, profile_config, project_config, None)
+    err_msg = f"The profile_config is mandatory when using {execution_mode}"
+    assert err_info.value.args[0] == err_msg
+
+
+@pytest.mark.parametrize(
+    "execution_mode",
+    (ExecutionMode.DOCKER, ExecutionMode.KUBERNETES),
+)
+def test_validate_initial_user_config_expects_profile(execution_mode):
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    profile_config = None
+    project_config = ProjectConfig()
+    assert validate_initial_user_config(execution_config, profile_config, project_config, None) is None
 
 
 def test_validate_arguments_schema_in_task_args():

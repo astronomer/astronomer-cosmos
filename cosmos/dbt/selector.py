@@ -210,27 +210,39 @@ class SelectorConfig:
 
         for item in items:
             if item.startswith(PATH_SELECTOR):
-                index = len(PATH_SELECTOR)
-                if self.project_dir:
-                    self.paths.append(self.project_dir / Path(item[index:]))
-                else:
-                    self.paths.append(Path(item[index:]))
+                self._parse_path_selector(item)
             elif item.startswith(TAG_SELECTOR):
-                index = len(TAG_SELECTOR)
-                self.tags.append(item[index:])
+                self._parse_tag_selector(item)
             elif item.startswith(CONFIG_SELECTOR):
-                index = len(CONFIG_SELECTOR)
-                key, value = item[index:].split(":")
-                if key in SUPPORTED_CONFIG:
-                    self.config[key] = value
+                self._parse_config_selector(item)
             else:
-                if item:
-                    graph_selector = GraphSelector.parse(item)
-                    if graph_selector is not None:
-                        self.graph_selectors.append(graph_selector)
-                    else:
-                        self.other.append(item)
-                        logger.warning("Unsupported select statement: %s", item)
+                self._parse_unknown_selector(item)
+
+    def _parse_unknown_selector(self, item: str) -> None:
+        if item:
+            graph_selector = GraphSelector.parse(item)
+            if graph_selector is not None:
+                self.graph_selectors.append(graph_selector)
+            else:
+                self.other.append(item)
+                logger.warning("Unsupported select statement: %s", item)
+
+    def _parse_config_selector(self, item: str) -> None:
+        index = len(CONFIG_SELECTOR)
+        key, value = item[index:].split(":")
+        if key in SUPPORTED_CONFIG:
+            self.config[key] = value
+
+    def _parse_tag_selector(self, item: str) -> None:
+        index = len(TAG_SELECTOR)
+        self.tags.append(item[index:])
+
+    def _parse_path_selector(self, item: str) -> None:
+        index = len(PATH_SELECTOR)
+        if self.project_dir:
+            self.paths.append(self.project_dir / Path(item[index:]))
+        else:
+            self.paths.append(Path(item[index:]))
 
     def __repr__(self) -> str:
         return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other}, graph_selectors={self.graph_selectors})"

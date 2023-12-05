@@ -210,27 +210,39 @@ class SelectorConfig:
 
         for item in items:
             if item.startswith(PATH_SELECTOR):
-                index = len(PATH_SELECTOR)
-                if self.project_dir:
-                    self.paths.append(self.project_dir / Path(item[index:]))
-                else:
-                    self.paths.append(Path(item[index:]))
+                self._parse_path_selector(item)
             elif item.startswith(TAG_SELECTOR):
-                index = len(TAG_SELECTOR)
-                self.tags.append(item[index:])
+                self._parse_tag_selector(item)
             elif item.startswith(CONFIG_SELECTOR):
-                index = len(CONFIG_SELECTOR)
-                key, value = item[index:].split(":")
-                if key in SUPPORTED_CONFIG:
-                    self.config[key] = value
+                self._parse_config_selector(item)
             else:
-                if item:
-                    graph_selector = GraphSelector.parse(item)
-                    if graph_selector is not None:
-                        self.graph_selectors.append(graph_selector)
-                    else:
-                        self.other.append(item)
-                        logger.warning("Unsupported select statement: %s", item)
+                self._parse_unknown_selector(item)
+
+    def _parse_unknown_selector(self, item: str) -> None:
+        if item:
+            graph_selector = GraphSelector.parse(item)
+            if graph_selector is not None:
+                self.graph_selectors.append(graph_selector)
+            else:
+                self.other.append(item)
+                logger.warning("Unsupported select statement: %s", item)
+
+    def _parse_config_selector(self, item: str) -> None:
+        index = len(CONFIG_SELECTOR)
+        key, value = item[index:].split(":")
+        if key in SUPPORTED_CONFIG:
+            self.config[key] = value
+
+    def _parse_tag_selector(self, item: str) -> None:
+        index = len(TAG_SELECTOR)
+        self.tags.append(item[index:])
+
+    def _parse_path_selector(self, item: str) -> None:
+        index = len(PATH_SELECTOR)
+        if self.project_dir:
+            self.paths.append(self.project_dir / Path(item[index:]))
+        else:
+            self.paths.append(Path(item[index:]))
 
     def __repr__(self) -> str:
         return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other}, graph_selectors={self.graph_selectors})"
@@ -388,7 +400,44 @@ def select_nodes(
     if not select and not exclude:
         return nodes
 
-    # validates select and exclude filters
+    validate_filters(exclude, select)
+    subset_ids = apply_select_filter(nodes, project_dir, select)
+    if select:
+        nodes = get_nodes_from_subset(nodes, subset_ids)
+    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
+    subset_ids = set(nodes.keys()) - exclude_ids
+
+    return get_nodes_from_subset(nodes, subset_ids)
+
+
+def get_nodes_from_subset(nodes: dict[str, DbtNode], subset_ids: set[str]) -> dict[str, DbtNode]:
+    nodes = {id_: nodes[id_] for id_ in subset_ids}
+    return nodes
+
+
+def apply_exclude_filter(nodes: dict[str, DbtNode], project_dir: Path | None, exclude: list[str]) -> set[str]:
+    exclude_ids: set[str] = set()
+    for statement in exclude:
+        config = SelectorConfig(project_dir, statement)
+        node_selector = NodeSelector(nodes, config)
+        exclude_ids.update(node_selector.select_nodes_ids_by_intersection)
+    return exclude_ids
+
+
+def apply_select_filter(nodes: dict[str, DbtNode], project_dir: Path | None, select: list[str]) -> set[str]:
+    subset_ids: set[str] = set()
+    for statement in select:
+        config = SelectorConfig(project_dir, statement)
+        node_selector = NodeSelector(nodes, config)
+        select_ids = node_selector.select_nodes_ids_by_intersection
+        subset_ids.update(select_ids)
+    return subset_ids
+
+
+def validate_filters(exclude: list[str], select: list[str]) -> None:
+    """
+    Validate select and exclude filters.
+    """
     filters = [["select", select], ["exclude", exclude]]
     for filter_type, filter in filters:
         for filter_parameter in filter:
@@ -401,26 +450,3 @@ def select_nodes(
                 continue
             elif ":" in filter_parameter:
                 raise CosmosValueError(f"Invalid {filter_type} filter: {filter_parameter}")
-
-    subset_ids: set[str] = set()
-
-    for statement in select:
-        config = SelectorConfig(project_dir, statement)
-        node_selector = NodeSelector(nodes, config)
-
-        select_ids = node_selector.select_nodes_ids_by_intersection
-        subset_ids.update(set(select_ids))
-
-    if select:
-        nodes = {id_: nodes[id_] for id_ in subset_ids}
-
-    nodes_ids = set(nodes.keys())
-
-    exclude_ids: set[str] = set()
-    for statement in exclude:
-        config = SelectorConfig(project_dir, statement)
-        node_selector = NodeSelector(nodes, config)
-        exclude_ids.update(set(node_selector.select_nodes_ids_by_intersection))
-        subset_ids = set(nodes_ids) - set(exclude_ids)
-
-    return {id_: nodes[id_] for id_ in subset_ids}

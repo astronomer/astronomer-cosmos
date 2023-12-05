@@ -18,6 +18,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
+from typing import Union
 
 
 logger = get_logger(__name__)
@@ -271,7 +272,17 @@ def build_airflow_graph(
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
 
-    # Create the Airflow task dependencies between non-test nodes
+    create_airflow_task_dependencies(nodes, tasks_map)
+
+
+def create_airflow_task_dependencies(
+    nodes: dict[str, DbtNode], tasks_map: dict[str, Union[TaskGroup, BaseOperator]]
+) -> None:
+    """
+    Create the Airflow task dependencies between non-test nodes.
+    :param nodes: Dictionary mapping dbt nodes (node.unique_id to node)
+    :param tasks_map: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
+    """
     for node_id, node in nodes.items():
         for parent_node_id in node.depends_on:
             # depending on the node type, it will not have mapped 1:1 to tasks_map

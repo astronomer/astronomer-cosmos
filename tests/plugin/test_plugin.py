@@ -1,3 +1,19 @@
+# dbt-core relies on Jinja2>3, whereas Flask<2 relies on an incompatible version of Jinja2.
+#
+# This discrepancy causes the automated integration tests to fail, as dbt-core is installed in the same
+# environment as apache-airflow.
+#
+# We can get around this by patching the jinja2 namespace to include the deprecated objects:
+try:
+    import flask  # noqa: F401
+except ImportError:
+    import markupsafe
+    import jinja2
+
+    jinja2.Markup = markupsafe.Markup
+    jinja2.escape = markupsafe.escape
+
+
 from unittest.mock import patch
 
 import pytest

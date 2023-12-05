@@ -114,7 +114,7 @@ class GraphSelector:
 
         :param nodes: Original dbt nodes list
         :param root_id: Unique identifier of self.node_name
-        :param selected_nodes: Set where precursor nodes will be added to.
+        :param selected_nodes: Set where descendant nodes will be added to.
         """
         if self.descendants:
             children_by_node = defaultdict(set)

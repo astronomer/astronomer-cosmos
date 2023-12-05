@@ -16,6 +16,7 @@ from cosmos.dbt.graph import (
     run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from subprocess import Popen, PIPE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
@@ -434,6 +435,50 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
     expected = "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
     assert err_info.value.args[0] == expected
+
+
+@pytest.mark.integration
+def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages():
+    local_flags = [
+        "--project-dir",
+        DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        "--profiles-dir",
+        DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        "--profile",
+        "default",
+        "--target",
+        "dev",
+    ]
+
+    deps_command = ["dbt", "deps"]
+    deps_command.extend(local_flags)
+    process = Popen(
+        deps_command,
+        stdout=PIPE,
+        stderr=PIPE,
+        cwd=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        universal_newlines=True,
+    )
+    stdout, stderr = process.communicate()
+
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_deps=False)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+
+    dbt_graph.load_via_dbt_ls()  # does not raise exception
 
 
 @pytest.mark.integration

@@ -260,5 +260,5 @@ line-length = 120
 universal = true
 
 [tool.flake8]
-max-complexity = 10
+max-complexity = 8
 select = "C"

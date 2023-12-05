@@ -441,9 +441,9 @@ def test_load_via_dbt_ls_without_dbt_deps():
 def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir):
     local_flags = [
         "--project-dir",
-        str(tmp_dbt_project_dir / DBT_PROJECT_NAME),
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
         "--profiles-dir",
-        str(tmp_dbt_project_dir / DBT_PROJECT_NAME),
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
         "--profile",
         "default",
         "--target",

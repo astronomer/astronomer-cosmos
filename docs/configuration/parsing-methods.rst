@@ -89,8 +89,7 @@ To use this:
 
     DbtDag(
         render_config=RenderConfig(
-            load_method=LoadMode.DBT_MANIFEST,
-            dbt_ls_path="/path/to/dbt_ls_file.txt"
+            load_method=LoadMode.DBT_MANIFEST, dbt_ls_path="/path/to/dbt_ls_file.txt"
         )
         # ...,
     )

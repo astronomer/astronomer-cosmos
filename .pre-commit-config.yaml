@@ -34,6 +34,7 @@ repos:
         args:
           - --exclude-file=tests/sample/manifest_model_version.json
           - --skip=**/manifest.json,**.min.js
+          - -L connexion
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:

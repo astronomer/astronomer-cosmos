@@ -22,7 +22,7 @@ repos:
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: pretty-format-json
-        args: ['--autofix']
+        args: ["--autofix"]
       - id: trailing-whitespace
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.6
@@ -63,7 +63,7 @@ repos:
     rev: 23.11.0
     hooks:
       - id: black
-        args: [ "--config", "./pyproject.toml" ]
+        args: ["--config", "./pyproject.toml"]
   - repo: https://github.com/asottile/blacken-docs
     rev: 1.16.0
     hooks:
@@ -71,22 +71,25 @@ repos:
         alias: black
         additional_dependencies: [black>=22.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.7.1'
+    rev: "v1.7.1"
+
     hooks:
       - id: mypy
         name: mypy-python
-        additional_dependencies: [types-PyYAML, types-attrs, attrs, types-requests, types-python-dateutil, apache-airflow]
+        additional_dependencies:
+          [
+            types-PyYAML,
+            types-attrs,
+            attrs,
+            types-requests,
+            types-python-dateutil,
+            apache-airflow,
+          ]
         files: ^cosmos
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-      - id: flake8
-        entry: pflake8
-        additional_dependencies: [pyproject-flake8]
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
   autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate
   skip:
-    - mypy  # build of https://github.com/pre-commit/mirrors-mypy:types-PyYAML,types-attrs,attrs,types-requests,
+    - mypy # build of https://github.com/pre-commit/mirrors-mypy:types-PyYAML,types-attrs,attrs,types-requests,
     #types-python-dateutil,apache-airflow@v1.5.0 for python@python3 exceeds tier max size 250MiB: 262.6MiB

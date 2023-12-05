@@ -73,7 +73,8 @@ __________________
 
 All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
 
-A detailed overview an how to contribute can be found in the `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/contributing>`_.
+A detailed overview on how to contribute can be found in the `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/contributing>`_.
+Find out more about `our contributors <https://astronomer.github.io/astronomer-cosmos/contributors>`_.
 
 As contributors and maintainers to this project, you are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.

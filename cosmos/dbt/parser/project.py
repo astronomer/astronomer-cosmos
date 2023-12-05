@@ -278,14 +278,10 @@ class LegacyDbtProject:
         """
         Initializes the parser.
         """
-        if self.dbt_root_path is None:
-            self.dbt_root_path = "/usr/local/airflow/dags/dbt"
-        if self.dbt_models_dir is None:
-            self.dbt_models_dir = "models"
-        if self.dbt_snapshots_dir is None:
-            self.dbt_snapshots_dir = "snapshots"
-        if self.dbt_seeds_dir is None:
-            self.dbt_seeds_dir = "seeds"
+        self.dbt_root_path = self.dbt_root_path or "/usr/local/airflow/dags/dbt"
+        self.dbt_models_dir = self.dbt_models_dir or "models"
+        self.dbt_snapshots_dir = self.dbt_snapshots_dir or "snapshots"
+        self.dbt_seeds_dir = self.dbt_seeds_dir or "seeds"
 
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))

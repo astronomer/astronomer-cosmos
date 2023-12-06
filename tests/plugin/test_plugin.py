@@ -190,5 +190,5 @@ def test_open_http_file():
         res = open_http_file(conn_id="mock_conn_id", path="http://mock-path/to/docs")
 
         mock_module.HttpHook.assert_called_once_with(method="GET", http_conn_id="mock_conn_id")
-        mock_hook.get.assert_called_once_with(endpoint=path)
+        mock_hook.get.assert_called_once_with(endpoint="http://mock-path/to/docs")
         assert res == "mock file contents"

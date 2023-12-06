@@ -13,9 +13,9 @@ except ImportError:
     jinja2.Markup = markupsafe.Markup
     jinja2.escape = markupsafe.escape
 
+from unittest.mock import patch, MagicMock
 
-from unittest.mock import patch
-
+import sys
 import pytest
 from airflow.configuration import conf
 from airflow.exceptions import AirflowConfigException
@@ -24,7 +24,17 @@ from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
 from flask.testing import FlaskClient
 
-from cosmos.plugin import dbt_docs_view, iframe_script
+import cosmos.plugin
+
+from cosmos.plugin import (
+    dbt_docs_view,
+    iframe_script,
+    open_gcs_file,
+    open_azure_file,
+    open_http_file,
+    open_s3_file,
+    open_file,
+)
 
 
 original_conf_get = conf.get
@@ -48,7 +58,7 @@ def app() -> FlaskClient:
     resetdb(skip_init=True)
 
 
-@patch("cosmos.plugin.open_file")
+@patch.object(cosmos.plugin, "open_file")
 def test_dbt_docs(mock_open_file, monkeypatch, app):
     def conf_get(section, key, *args, **kwargs):
         if section == "cosmos" and key == "dbt_docs_dir":
@@ -57,10 +67,11 @@ def test_dbt_docs(mock_open_file, monkeypatch, app):
             return original_conf_get(section, key, *args, **kwargs)
 
     response = app.get("/cosmos/dbt_docs")
+
     assert response.status_code == 200
 
 
-@patch("cosmos.plugin.open_file")
+@patch.object(cosmos.plugin, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
     def conf_get(section, key, *args, **kwargs):
@@ -100,3 +111,68 @@ def test_dbt_docs_artifact_missing(app, artifact, monkeypatch):
 
     response = app.get(f"/cosmos/{artifact}")
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path,open_file_callback",
+    [
+        ("s3://my-bucket/my/path/", "open_s3_file"),
+        ("gs://my-bucket/my/path/", "open_gcs_file"),
+        ("wasb://my-bucket/my/path/", "open_azure_file"),
+        ("https://my-bucket/my/path/", "open_http_file"),
+    ],
+)
+def test_open_file_calls(path, open_file_callback, monkeypatch):
+    def conf_get(section, key, *args, **kwargs):
+        if section == "cosmos" and key == "dbt_docs_conn_id":
+            return "mock_conn_id"
+        else:
+            return original_conf_get(section, key, *args, **kwargs)
+
+    monkeypatch.setattr(conf, "get", conf_get)
+
+    with patch.object(cosmos.plugin, open_file_callback) as mock_callback:
+        mock_callback.return_value = "mock file contents"
+        res = open_file(path)
+
+    mock_callback.assert_called_with(conn_id="mock_conn_id", path=path)
+    assert res == "mock file contents"
+
+
+def test_open_s3_file():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_module}):
+        mock_hook = mock_module.S3Hook.return_value = MagicMock()
+        mock_hook.read_key.return_value = "mock file contents"
+
+        res = open_s3_file(conn_id="mock_conn_id", path="s3://mock-path/to/docs")
+
+        mock_module.S3Hook.assert_called_once_with(aws_conn_id="mock_conn_id")
+        mock_hook.read_key.assert_called_once_with(bucket_name="mock-path", key="to/docs")
+        assert res == "mock file contents"
+
+
+def test_open_gcs_file():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_module}):
+        mock_hook = mock_module.GCSHook.return_value = MagicMock()
+        mock_hook.download.return_value = b"mock file contents"
+
+        res = open_gcs_file(conn_id="mock_conn_id", path="gs://mock-path/to/docs")
+
+        mock_module.GCSHook.assert_called_once_with(gcp_conn_id="mock_conn_id")
+        mock_hook.download.assert_called_once_with(bucket_name="mock-path", object_name="to/docs")
+        assert res == "mock file contents"
+
+
+def test_open_azure_file():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
+        mock_hook = mock_module.WasbHook.return_value = MagicMock()
+        mock_hook.read_file.return_value = "mock file contents"
+
+        res = open_azure_file(conn_id="mock_conn_id", path="wasb://mock-path/to/docs")
+
+        mock_module.WasbHook.assert_called_once_with(wasb_conn_id="mock_conn_id")
+        mock_hook.read_file.assert_called_once_with(container_name="mock-path", blob_name="to/docs")
+        assert res == "mock file contents"

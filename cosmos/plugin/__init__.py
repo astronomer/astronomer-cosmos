@@ -19,7 +19,61 @@ def bucket_and_key(path: str) -> Tuple[str, str]:
     return bucket, key
 
 
-def open_file(path: str) -> str:  # noqa: C901
+def open_s3_file(conn_id: Optional[str], path: str) -> str:
+    from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+    if conn_id is None:
+        conn_id = S3Hook.default_conn_name
+
+    hook = S3Hook(aws_conn_id=conn_id)
+    bucket, key = bucket_and_key(path)
+    content = hook.read_key(key=key, bucket_name=bucket)
+    return content  # type: ignore[no-any-return]
+
+
+def open_gcs_file(conn_id: Optional[str], path: str) -> str:
+    from airflow.providers.google.cloud.hooks.gcs import GCSHook
+
+    if conn_id is None:
+        conn_id = GCSHook.default_conn_name
+
+    hook = GCSHook(gcp_conn_id=conn_id)
+    bucket, blob = bucket_and_key(path)
+    content = hook.download(bucket_name=bucket, object_name=blob)
+    return content.decode("utf-8")  # type: ignore[no-any-return]
+
+
+def open_azure_file(conn_id: Optional[str], path: str) -> str:
+    from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
+
+    if conn_id is None:
+        conn_id = WasbHook.default_conn_name
+
+    hook = WasbHook(wasb_conn_id=conn_id)
+
+    container, blob = bucket_and_key(path)
+    content = hook.read_file(container_name=container, blob_name=blob)
+    return content  # type: ignore[no-any-return]
+
+
+def open_http_file(conn_id: Optional[str], path: str) -> str:
+    from airflow.providers.http.hooks.http import HttpHook
+
+    if conn_id is None:
+        try:
+            HttpHook.get_connection(conn_id=HttpHook.default_conn_name)
+        except AirflowNotFoundException:
+            hook = HttpHook(method="GET", http_conn_id="")
+        else:
+            hook = HttpHook(method="GET")
+    else:
+        hook = HttpHook(method="GET", http_conn_id=conn_id)
+    res = hook.run(endpoint=path)
+    hook.check_response(res)
+    return res.text  # type: ignore[no-any-return]
+
+
+def open_file(path: str) -> str:
     """Retrieve a file from http, https, gs, s3, or wasb."""
     try:
         conn_id: Optional[str] = conf.get("cosmos", "dbt_docs_conn_id")
@@ -27,55 +81,13 @@ def open_file(path: str) -> str:  # noqa: C901
         conn_id = None
 
     if path.strip().startswith("s3://"):
-        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-
-        if conn_id is None:
-            hook = S3Hook()
-        else:
-            hook = S3Hook(aws_conn_id=conn_id)
-        bucket, key = hook.parse_s3_url(path)
-        content = hook.read_key(key=key, bucket_name=bucket)
-
-        return content  # type: ignore[no-any-return]
+        return open_s3_file(conn_id=conn_id, path=path)
     elif path.strip().startswith("gs://"):
-        from airflow.providers.google.cloud.hooks.gcs import GCSHook
-
-        if conn_id is None:
-            hook = GCSHook()
-        else:
-            hook = GCSHook(gcp_conn_id=conn_id)
-
-        bucket, blob = bucket_and_key(path)
-        content = hook.download(bucket_name=bucket, object_name=blob)
-        return content.decode("utf-8")  # type: ignore[no-any-return]
-
+        return open_gcs_file(conn_id=conn_id, path=path)
     elif path.strip().startswith("wasb://"):
-        from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
-
-        if conn_id is None:
-            hook = WasbHook()
-        else:
-            hook = WasbHook(wasb_conn_id=conn_id)
-
-        container, blob = bucket_and_key(path)
-        content = hook.read_file(container_name=container, blob_name=blob)
-        return content  # type: ignore[no-any-return]
-
+        return open_azure_file(conn_id=conn_id, path=path)
     elif path.strip().startswith("http://") or path.strip().startswith("https://"):
-        from airflow.providers.http.hooks.http import HttpHook
-
-        if conn_id is None:
-            try:
-                HttpHook.get_connection(conn_id=HttpHook.default_conn_name)
-                hook = HttpHook(method="GET")
-            except AirflowNotFoundException:
-                hook = HttpHook(method="GET", http_conn_id="")
-        else:
-            hook = HttpHook(method="GET", http_conn_id=conn_id)
-        res = hook.run(endpoint=path)
-        hook.check_response(res)
-        return res.text  # type: ignore[no-any-return]
-
+        return open_http_file(conn_id=conn_id, path=path)
     else:
         with open(path) as f:
             content = f.read()
@@ -170,11 +182,10 @@ class DbtDocsView(AirflowBaseView):
             html = open_file(op.join(docs_dir, "index.html"))
         except (FileNotFoundError, AirflowConfigException):
             abort(404)
-        else:
-            # Hack the dbt docs to render properly in an iframe
-            iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
-            html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
-            return html
+        # Hack the dbt docs to render properly in an iframe
+        iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
+        html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
+        return html
 
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
@@ -184,8 +195,7 @@ class DbtDocsView(AirflowBaseView):
             data = open_file(op.join(docs_dir, "catalog.json"))
         except (FileNotFoundError, AirflowConfigException):
             abort(404)
-        else:
-            return data, 200, {"Content-Type": "application/json"}
+        return data, 200, {"Content-Type": "application/json"}
 
     @expose("/manifest.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
@@ -195,8 +205,7 @@ class DbtDocsView(AirflowBaseView):
             data = open_file(op.join(docs_dir, "manifest.json"))
         except (FileNotFoundError, AirflowConfigException):
             abort(404)
-        else:
-            return data, 200, {"Content-Type": "application/json"}
+        return data, 200, {"Content-Type": "application/json"}
 
 
 dbt_docs_view = DbtDocsView()

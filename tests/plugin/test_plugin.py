@@ -13,7 +13,7 @@ except ImportError:
     jinja2.Markup = markupsafe.Markup
     jinja2.escape = markupsafe.escape
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import mock_open, patch, MagicMock
 
 import sys
 import pytest
@@ -192,3 +192,10 @@ def test_open_http_file():
         mock_module.HttpHook.assert_called_once_with(method="GET", http_conn_id="mock_conn_id")
         mock_hook.run.assert_called_once_with(endpoint="http://mock-path/to/docs")
         assert res == "mock file contents"
+
+
+@patch("builtins.open", mock_open(read_data="mock file contents"))
+def test_open_file_local(mock_file):
+    res = open_file("/my/path")
+    mock_file.assert_called_with("/my/path")
+    assert res == "mock file contents"

@@ -119,6 +119,7 @@ def test_dbt_docs_artifact_missing(app, artifact, monkeypatch):
         ("s3://my-bucket/my/path/", "open_s3_file"),
         ("gs://my-bucket/my/path/", "open_gcs_file"),
         ("wasb://my-bucket/my/path/", "open_azure_file"),
+        ("http://my-bucket/my/path/", "open_http_file"),
         ("https://my-bucket/my/path/", "open_http_file"),
     ],
 )
@@ -175,4 +176,19 @@ def test_open_azure_file():
 
         mock_module.WasbHook.assert_called_once_with(wasb_conn_id="mock_conn_id")
         mock_hook.read_file.assert_called_once_with(container_name="mock-path", blob_name="to/docs")
+        assert res == "mock file contents"
+
+
+def test_open_http_file():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.http.hooks.http": mock_module}):
+        mock_hook = mock_module.HttpHook.return_value = MagicMock()
+        mock_response = mock_hook.run.return_value = MagicMock()
+        mock_hook.check_response.return_value = mock_response
+        mock_response.text = "mock file contents"
+
+        res = open_http_file(conn_id="mock_conn_id", path="http://mock-path/to/docs")
+
+        mock_module.HttpHook.assert_called_once_with(http_conn_id="mock_conn_id")
+        mock_hook.get.assert_called_once_with(endpoint=path)
         assert res == "mock file contents"

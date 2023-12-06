@@ -295,11 +295,12 @@ class NodeSelector:
         self.visited_nodes.add(node_id)
 
         if node.resource_type == DbtResourceType.TEST:
-            dependency_ids = [node_id for node_id in node.depends_on if node_id.startswith('model.')]
+            dependency_ids = [node_id for node_id in node.depends_on if node_id.startswith("model.")]
             parent_id = dependency_ids[-1]
             if len(dependency_ids) > 1:
                 logger.warning(
-                    f'Test node {node.name} has more than one model dependency {dependency_ids}, selected tags from parent assumed to be {parent_id}.')
+                    f"Test node {node.name} has more than one model dependency {dependency_ids}, selected tags from parent assumed to be {parent_id}."
+                )
             parent_tags = getattr(self.nodes.get(parent_id), "tags", [])
             node.tags = list(set(node.tags + parent_tags))
 

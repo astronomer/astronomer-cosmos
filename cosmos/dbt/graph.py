@@ -138,11 +138,6 @@ class DbtGraph:
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
-        if project.env_vars and render_config.env_vars:
-            raise CosmosLoadDbtException(
-                "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided. RenderConfig.env_vars is deprecated, "
-                "please use ProjectConfig.env_vars instead."
-            )
         self.project = project
         self.render_config = render_config
         self.profile_config = profile_config

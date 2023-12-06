@@ -97,10 +97,10 @@ def validate_arguments(
 
 
 def validate_initial_user_config(
-    execution_config: ExecutionConfig | None,
+    execution_config: ExecutionConfig,
     profile_config: ProfileConfig | None,
     project_config: ProjectConfig,
-    render_config: RenderConfig | None,
+    render_config: RenderConfig,
     operator_args: dict[str, Any],
 ):
     """
@@ -146,6 +146,12 @@ def validate_initial_user_config(
             raise CosmosValueError(
                 "ProjectConfig.dbt_vars and operator_args with 'vars' are mutually exclusive and only one can be used."
             )
+    # Cosmos 2.0 will remove the ability to pass RenderConfig.env_vars in place of ProjectConfig.env_vars, check that both are not set.
+    if project_config.env_vars and render_config.env_vars:
+        raise CosmosValueError(
+            "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided. RenderConfig.env_vars is deprecated, "
+            "please use ProjectConfig.env_vars instead."
+        )
 
 
 def validate_adapted_user_config(

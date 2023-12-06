@@ -93,6 +93,21 @@ def test_validate_user_config_fails_project_config_and_operator_args_overlap(pro
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
 
+def test_validate_user_config_fails_project_config_render_config_env_vars():
+    """
+    The validation should fail if a user specifies both ProjectConfig.env_vars and RenderConfig.env_vars.
+    """
+    project_config = ProjectConfig(env_vars={"key": "value"})
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(env_vars={"key": "value"})
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided.*"
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
 def test_validate_arguments_schema_in_task_args():
     profile_config = ProfileConfig(
         profile_name="test",

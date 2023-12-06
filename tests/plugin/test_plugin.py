@@ -194,7 +194,7 @@ def test_open_http_file():
         assert res == "mock file contents"
 
 
-@patch("builtins.open", mock_open(read_data="mock file contents"))
+@patch("builtins.open", new_callable=mock_open, read_data="mock file contents")
 def test_open_file_local(mock_file):
     res = open_file("/my/path")
     mock_file.assert_called_with("/my/path")

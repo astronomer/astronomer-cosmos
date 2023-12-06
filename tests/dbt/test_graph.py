@@ -688,7 +688,10 @@ def test_selects_relationship_test_from_depends_on():
         render_config=render_config,
     )
     dbt_graph.load_from_dbt_manifest()
-    assert "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2" in dbt_graph.filtered_nodes, "test was deselected"
+    assert (
+        "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2"
+        in dbt_graph.filtered_nodes
+    ), "test was deselected"
 
 
 @pytest.mark.integration

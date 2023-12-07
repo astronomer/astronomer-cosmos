@@ -1,15 +1,31 @@
 Changelog
 =========
 
-1.3.0a2 (2023-11-23)
+1.3.0a3 (2023-12-07)
 --------------------
 
 Features
 
 * Add ``ProfileMapping`` for Vertica by @perttus in #540 and #688
-* Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608
 * Add support for Snowflake encrypted private key environment variable by @DanMawdsleyBA in #649
-* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616
+* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728
+* Add cosmos/propagate_logs Airflow config support for disabling log pr… by @agreenburg in #648
+* Add operator_args ``full_refresh`` as a templated field by @joppevos in #623
+* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735
+
+Enhancements
+
+* Make Pydantic an optional dependency by @pixie79 in #736
+* Create a symbolic link to ``dbt_packages`` when ``dbt_deps`` is False when using ``LoadMode.DBT_LS`` by @DanMawdsleyBA in #730
+* Support no ``profile_config`` for ``ExecutionMode.KUBERNETES`` and ``ExecutionMode.DOCKER`` by @MrBones757 and @tatiana in #681 and #731
+* Add ``aws_session_token`` for Athena mapping by @benjamin-awd in #663
+
+Others
+
+* Replace flake8 for Ruff by @joppevos in #743
+* Reduce code complexity to 8 by @joppevos in #738
+* Update conflict matrix between Airflow and dbt versions by @tatiana in #731
+* Speed up integration tests by @jbandoro in #732
 
 
 1.2.5 (2023-11-23)

@@ -130,7 +130,7 @@ def validate_initial_user_config(
     # ProjectConfig.dbt_vars.
     if "env" in operator_args:
         warn(
-            "operator_args with 'env' is deprecated and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
+            "operator_args with 'env' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
             DeprecationWarning,
         )
         if project_config.env_vars:
@@ -139,7 +139,7 @@ def validate_initial_user_config(
             )
     if "vars" in operator_args:
         warn(
-            "operator_args with 'vars' is deprecated and will be removed in Cosmos 2.0. Use ProjectConfig.vars instead.",
+            "operator_args with 'vars' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.vars instead.",
             DeprecationWarning,
         )
         if project_config.dbt_vars:
@@ -149,7 +149,7 @@ def validate_initial_user_config(
     # Cosmos 2.0 will remove the ability to pass RenderConfig.env_vars in place of ProjectConfig.env_vars, check that both are not set.
     if project_config.env_vars and render_config.env_vars:
         raise CosmosValueError(
-            "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided. RenderConfig.env_vars is deprecated, "
+            "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided. RenderConfig.env_vars is deprecated since Cosmos 1.3, "
             "please use ProjectConfig.env_vars instead."
         )
 

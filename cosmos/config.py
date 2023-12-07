@@ -106,7 +106,7 @@ class ProjectConfig:
         env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
     :param dbt_vars: Dictionary of dbt variables for the project. This argument overrides variables defined in your dbt_project.yml
         file. The dictionary is dumped to a yaml string and passed to dbt commands as the --vars argument. Variables are only
-        supported for rendering when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
+        supported for rendering when using ``RenderConfig.LoadMode.DBT_LS`` and ``RenderConfig.LoadMode.CUSTOM`` load mode.
     """
 
     dbt_project_path: Path | None = None

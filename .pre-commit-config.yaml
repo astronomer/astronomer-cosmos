@@ -76,6 +76,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy-python
+        args: [--config-file, "./pyproject.toml"]
         additional_dependencies:
           [
             types-PyYAML,
@@ -84,7 +85,6 @@ repos:
             types-requests,
             types-python-dateutil,
             apache-airflow,
-            jinja2>=3.0.0,
           ]
         files: ^cosmos
 

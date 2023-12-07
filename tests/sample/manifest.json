@@ -7757,8 +7757,8 @@
       "schema": "public",
       "sources": [],
       "tags": [
-        "orders",
-        "test_tag"
+        "test_tag",
+        "orders"
       ],
       "unique_id": "model.jaffle_shop.orders",
       "unrendered_config": {

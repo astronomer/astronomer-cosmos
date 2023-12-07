@@ -82,7 +82,7 @@ To use this:
 
 If you provide the output of ``dbt ls --output json`` as a file, you can use this to parse similar to  ``dbt_ls``.
 You can supply a ``dbt_ls_path`` parameter on the DbtDag / DbtTaskGroup with a path to a ``dbt_ls_output.txt`` file.
-Check [this Dag](https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/user_defined_profile.py) for an example.
+Check `this Dag https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/user_defined_profile.py`_ for an example.
 
 To use this:
 

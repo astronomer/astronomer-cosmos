@@ -174,3 +174,18 @@ def test_render_config_uses_default_if_exists(mock_which):
     render_config = RenderConfig(dbt_executable_path="user-dbt")
     render_config.validate_dbt_command("fallback-dbt-path")
     assert render_config.dbt_executable_path == "user-dbt"
+
+
+def test_is_dbt_ls_file_available_is_true():
+
+    render_config = RenderConfig(
+        dbt_ls_path=DBT_PROJECTS_ROOT_DIR / "sample_dbt_ls.txt"
+    )
+    assert render_config.is_manifest_available()
+
+
+def test_is_dbt_ls_file_available_is_false():
+    render_config = RenderConfig(
+        dbt_ls_path=None
+    )    
+    assert not render_config.is_manifest_available()

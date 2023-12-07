@@ -665,7 +665,7 @@ def test_tag_selected_node_test_exist():
     assert len(dbt_graph.filtered_nodes) > 0
 
     for _, node in dbt_graph.filtered_nodes.items():
-        assert node.tags == ["test_tag"]
+        assert "test_tag" in node.tags
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
 

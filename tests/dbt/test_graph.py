@@ -439,12 +439,12 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages():
+def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir):
     local_flags = [
         "--project-dir",
-        DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
         "--profiles-dir",
-        DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
         "--profile",
         "default",
         "--target",
@@ -457,14 +457,14 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages():
         deps_command,
         stdout=PIPE,
         stderr=PIPE,
-        cwd=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        cwd=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         universal_newlines=True,
     )
     stdout, stderr = process.communicate()
 
-    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_deps=False)
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
         render_config=render_config,

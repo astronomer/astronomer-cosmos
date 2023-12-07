@@ -124,6 +124,7 @@ def test_load_automatic_dbt_ls_file_is_available(mock_load_via_dbt_ls_file):
     dbt_graph.load(method=LoadMode.DBT_LS_FILE, execution_mode=ExecutionMode.LOCAL)
     assert mock_load_via_dbt_ls_file.called
 
+
 def test_load_dbt_ls_file_without_file(mock_load_via_dbt_ls_file):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
@@ -137,6 +138,7 @@ def test_load_dbt_ls_file_without_file(mock_load_via_dbt_ls_file):
         dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_LS_FILE)
     assert err_info.value.args[0] == "Unable to load dbt ls file using None"
 
+
 def test_load_dbt_ls_file_without_project_path(mock_load_via_dbt_ls_file):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
@@ -145,11 +147,17 @@ def test_load_dbt_ls_file_without_project_path(mock_load_via_dbt_ls_file):
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(dbt_ls_path=SAMPLE_DBT_LS_OUTPUT)
-    execution_config =ExecutionConfig(dbt_project_path=None)
-    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config, execution_config=execution_config)
+    execution_config = ExecutionConfig(dbt_project_path=None)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_LS_FILE)
     assert err_info.value.args[0] == "Unable to load dbt ls file without ExecutionConfig.dbt_project_path"
+
 
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)

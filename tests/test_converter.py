@@ -7,7 +7,7 @@ import pytest
 from airflow.models import DAG
 
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
-from cosmos.constants import DbtResourceType, ExecutionMode
+from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig, CosmosConfigException
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
@@ -375,3 +375,33 @@ def test_converter_fails_no_manifest_no_render_config(mock_load_dbt_graph, execu
         err_info.value.args[0]
         == "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
     )
+
+
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.build_airflow_graph")
+@patch("cosmos.dbt.graph.LegacyDbtProject")
+def test_converter_project_config_dbt_vars_with_custom_load_mode(
+    mock_legacy_dbt_project, mock_validate_project, mock_build_airflow_graph
+):
+    """Tests that if ProjectConfig.dbt_vars are used with RenderConfig.load_method of "custom" that the
+    expected dbt_vars are passed to LegacyDbtProject.
+    """
+    project_config = ProjectConfig(
+        project_name="fake-project", dbt_project_path="/some/project/path", dbt_vars={"key": "value"}
+    )
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(load_method=LoadMode.CUSTOM)
+    profile_config = MagicMock()
+
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args={},
+        )
+    _, kwargs = mock_legacy_dbt_project.call_args
+    assert kwargs["dbt_vars"] == {"key": "value"}

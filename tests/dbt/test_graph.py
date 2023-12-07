@@ -125,7 +125,7 @@ def test_load_automatic_dbt_ls_file_is_available(mock_load_via_dbt_ls_file):
     assert mock_load_via_dbt_ls_file.called
 
 
-def test_load_dbt_ls_file_without_file(mock_load_via_dbt_ls_file):
+def test_load_dbt_ls_file_without_file():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
         profile_name="test",
@@ -139,7 +139,7 @@ def test_load_dbt_ls_file_without_file(mock_load_via_dbt_ls_file):
     assert err_info.value.args[0] == "Unable to load dbt ls file using None"
 
 
-def test_load_dbt_ls_file_without_project_path(mock_load_via_dbt_ls_file):
+def test_load_dbt_ls_file_without_project_path():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     profile_config = ProfileConfig(
         profile_name="test",

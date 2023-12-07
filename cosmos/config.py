@@ -63,7 +63,7 @@ class RenderConfig:
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:
             warnings.warn(
-                "RenderConfig.env_vars is deprecated and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
+                "RenderConfig.env_vars is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
                 DeprecationWarning,
             )
         self.project_path = Path(dbt_project_path) if dbt_project_path else None

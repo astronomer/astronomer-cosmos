@@ -780,7 +780,7 @@ def test_load_via_dbt_ls_project_config_env_vars(mock_validate, mock_update_node
     env_vars = {"MY_ENV_VAR": "my_value"}
     project_config = ProjectConfig(env_vars=env_vars)
     render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
-    profile_config = profile_config = ProfileConfig(
+    profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
@@ -808,7 +808,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_node
     dbt_vars = {"my_var1": "my_value1", "my_var2": "my_value2"}
     project_config = ProjectConfig(dbt_vars=dbt_vars)
     render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
-    profile_config = profile_config = ProfileConfig(
+    profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",

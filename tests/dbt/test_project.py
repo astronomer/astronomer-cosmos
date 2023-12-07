@@ -11,7 +11,7 @@ def test_create_symlinks(tmp_path):
     tmp_dir = tmp_path / "dbt-project"
     tmp_dir.mkdir()
 
-    create_symlinks(DBT_PROJECTS_ROOT_DIR / "jaffle_shop", tmp_dir)
+    create_symlinks(DBT_PROJECTS_ROOT_DIR / "jaffle_shop", tmp_dir, False)
     for child in tmp_dir.iterdir():
         assert child.is_symlink()
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")

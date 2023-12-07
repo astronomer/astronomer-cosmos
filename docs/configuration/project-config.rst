@@ -16,12 +16,12 @@ variables that should be used for rendering and execution. It takes the followin
 - ``project_name`` : The name of the project. If ``dbt_project_path`` is provided, the ``project_name`` defaults to the
   folder name containing ``dbt_project.yml``. If ``dbt_project_path`` is not provided, and ``manifest_path`` is provided,
   ``project_name`` is required as the name can not be inferred from ``dbt_project_path``
-- ``dbt_vars``: A dictionary of dbt variables for the project rendering and execution. This argument overrides variables
+- ``dbt_vars``: (new in v1.3) A dictionary of dbt variables for the project rendering and execution. This argument overrides variables
   defined in the dbt_project.yml file. The dictionary of variables is dumped to a yaml string and passed to dbt commands
   as the --vars argument. Variables are only supported for rendering when using ``RenderConfig.LoadMode.DBT_LS`` and
   ``RenderConfig.LoadMode.CUSTOM`` load mode. Variables using `Airflow templating <https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html#templates-reference>`_
   will only be rendered at execution time, not at render time.
-- ``env_vars``: A dictionary of environment variables that are used for both rendering and execution. Rendering with
+- ``env_vars``: (new in v1.3) A dictionary of environment variables used for rendering and execution. Rendering with
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
 
 Project Config Example

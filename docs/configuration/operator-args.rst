@@ -47,12 +47,12 @@ dbt-related
 - ``dbt_cmd_flags``: List of command flags to pass to ``dbt`` command, added after dbt subcommand
 - ``dbt_cmd_global_flags``: List of ``dbt`` `global flags <https://docs.getdbt.com/reference/global-configs/about-global-configs>`_ to be passed to the ``dbt`` command, before the subcommand
 - ``dbt_executable_path``: Path to dbt executable.
-- ``env``: Declare, using a Python dictionary, values to be set as environment variables when running ``dbt`` commands.
+- ``env``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.env_vars`` instead) Declare, using a Python dictionary, values to be set as environment variables when running ``dbt`` commands.
 - ``fail_fast``: ``dbt`` exits immediately if ``dbt`` fails to process a resource.
 - ``models``: Specifies which nodes to include.
 - ``no_version_check``: If set, skip ensuring ``dbt``'s version matches the one specified in the ``dbt_project.yml``.
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
-- ``vars``: Supply variables to the project. This argument overrides variables defined in the ``dbt_project.yml``.
+- ``vars``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.dbt_vars`` instead) Supply variables to the project. This argument overrides variables defined in the ``dbt_project.yml``.
 - ``warn_error``: convert ``dbt`` warnings into errors.
 
 Airflow-related

@@ -174,3 +174,9 @@ def test_render_config_uses_default_if_exists(mock_which):
     render_config = RenderConfig(dbt_executable_path="user-dbt")
     render_config.validate_dbt_command("fallback-dbt-path")
     assert render_config.dbt_executable_path == "user-dbt"
+
+
+def test_render_config_env_vars_deprecated():
+    """RenderConfig.env_vars is deprecated since Cosmos 1.3, should warn user."""
+    with pytest.deprecated_call():
+        RenderConfig(env_vars={"VAR": "value"})

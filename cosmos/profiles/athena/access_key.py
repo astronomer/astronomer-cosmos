@@ -50,7 +50,7 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
 
-        credentials = self.get_temporary_credentials()
+        credentials = self.get_temporary_credentials()  # type: ignore
 
         profile = {
             **self.mapped_params,

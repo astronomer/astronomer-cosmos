@@ -1,7 +1,7 @@
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import yaml
 
 import pytest
@@ -826,6 +826,40 @@ def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_node
     assert ls_command[ls_command.index("--vars") + 1] == yaml.dump(dbt_vars)
 
 
+@patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
+@patch("cosmos.config.RenderConfig.validate_dbt_command")
+def test_load_via_dbt_ls_render_config_selector_arg_is_used(
+    mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
+):
+    """Tests that the dbt ls command in the subprocess has "--selector" with the RenderConfig.selector."""
+    mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
+    selector = "my_selector"
+    project_config = ProjectConfig()
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        load_method=LoadMode.DBT_LS,
+        selector=selector,
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = MagicMock()
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load_via_dbt_ls()
+    ls_command = mock_popen.call_args.args[0]
+    assert "--selector" in ls_command
+    assert ls_command[ls_command.index("--selector") + 1] == selector
+
+
 @pytest.mark.sqlite
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_project_config_vars():
@@ -853,3 +887,52 @@ def test_load_via_dbt_ls_with_project_config_vars():
     )
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes["model.simple.top_animations"].config["alias"] == "top_5_animated_movies"
+
+
+@pytest.mark.integration
+def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir):
+    """
+    Tests that the dbt ls load method is successful if a selector arg is used with RenderConfig
+    and that the filtered nodes are expected.
+    """
+    # Add a selectors yaml file to the project that will select the stg_customers model and all
+    # parents (raw_customers)
+    selectors_yaml = """
+    selectors:
+      - name: stage_customers
+        definition:
+          method: fqn
+          value: stg_customers
+          parents: true
+    """
+    with open(tmp_dbt_project_dir / DBT_PROJECT_NAME / "selectors.yml", "w") as f:
+        f.write(selectors_yaml)
+
+    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        selector="stage_customers",
+    )
+
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="airflow_db",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+    dbt_graph.load_via_dbt_ls()
+
+    filtered_nodes = dbt_graph.filtered_nodes.keys()
+    assert len(filtered_nodes) == 4
+    assert "model.jaffle_shop.stg_customers" in filtered_nodes
+    assert "seed.jaffle_shop.raw_customers" in filtered_nodes
+    # Two tests should be filtered
+    assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 2

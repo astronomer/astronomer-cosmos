@@ -1,14 +1,4 @@
-"""
-Maps Airflow Vertica connections using username + password authentication to dbt profiles.
-
-NOTE: Use Airflow connection `schema` for vertica `database` to keep it consistent with other connection types and profiles.
-Also Vertica Airflow provider hook assumes this:
-https://github.com/apache/airflow/blob/395ac463494dba1478a05a32900218988495889c/airflow/providers/vertica/hooks/vertica.py#L72
-This seems to be a common approach also for Postgres, Redshift and Exasol since there is no `database` field in Airflow connection
-and `schema` is not required for the database connection.
-Posgres Hook:
-https://github.com/apache/airflow/blob/0953e0f844fa5db81c2b461ec2433de1935260b3/airflow/providers/postgres/hooks/postgres.py#L138
-"""
+"Maps Airflow Vertica connections using username + password authentication to dbt profiles."
 from __future__ import annotations
 
 from typing import Any

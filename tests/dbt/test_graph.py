@@ -44,6 +44,18 @@ def tmp_dbt_project_dir():
     shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
 
 
+@pytest.fixture
+def postgres_profile_config() -> ProfileConfig:
+    return ProfileConfig(
+        profile_name="default",
+        target_name="default",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="airflow_db",
+            profile_args={"schema": "public"},
+        ),
+    )
+
+
 @pytest.mark.parametrize(
     "unique_id,expected_name, expected_select",
     [
@@ -220,7 +232,9 @@ def test_load(
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
-def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_popen, tmp_dbt_project_dir):
+def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
+    mock_popen, tmp_dbt_project_dir, postgres_profile_config
+):
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
     assert not (tmp_dbt_project_dir / "target").exists()
@@ -233,14 +247,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_pop
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
     dbt_graph.load_via_dbt_ls()
     assert not (tmp_dbt_project_dir / "target").exists()
@@ -252,7 +259,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(mock_pop
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_with_exclude():
+def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, select=["*customers*"], exclude=["*orders*"]
@@ -262,14 +269,7 @@ def test_load_via_dbt_ls_with_exclude():
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
 
     dbt_graph.load_via_dbt_ls()
@@ -301,7 +301,7 @@ def test_load_via_dbt_ls_with_exclude():
 
 @pytest.mark.integration
 @pytest.mark.parametrize("project_name", ("jaffle_shop", "jaffle_shop_python"))
-def test_load_via_dbt_ls_without_exclude(project_name):
+def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
     render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -309,14 +309,7 @@ def test_load_via_dbt_ls_without_exclude(project_name):
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
     dbt_graph.load_via_dbt_ls()
 
@@ -413,7 +406,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps():
+def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_deps=False)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -421,14 +414,7 @@ def test_load_via_dbt_ls_without_dbt_deps():
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
 
     with pytest.raises(CosmosLoadDbtException) as err_info:
@@ -439,7 +425,7 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir):
+def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir, postgres_profile_config):
     local_flags = [
         "--project-dir",
         tmp_dbt_project_dir / DBT_PROJECT_NAME,
@@ -469,14 +455,7 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
 
     dbt_graph.load_via_dbt_ls()  # does not raise exception
@@ -484,7 +463,9 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
-def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(mock_popen, tmp_dbt_project_dir):
+def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(
+    mock_popen, tmp_dbt_project_dir, postgres_profile_config
+):
     mock_popen().communicate.return_value = ("", "Some stderr warnings")
     mock_popen().returncode = 0
 
@@ -495,14 +476,7 @@ def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(mock_popen, t
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
 
     dbt_graph.load_via_dbt_ls()  # does not raise exception
@@ -510,7 +484,7 @@ def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(mock_popen, t
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
-def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
+def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_config):
     mock_popen().communicate.return_value = ("", "Some stderr message")
     mock_popen().returncode = 1
 
@@ -521,14 +495,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
     expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome stderr message"
     with pytest.raises(CosmosLoadDbtException, match=expected):
@@ -537,7 +504,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen):
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
-def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
+def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, postgres_profile_config):
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -546,14 +513,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate):
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
     expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome Runtime Error"
     with pytest.raises(CosmosLoadDbtException, match=expected):
@@ -673,7 +633,7 @@ def test_tag_selected_node_test_exist():
 
 @pytest.mark.integration
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
-def test_load_dbt_ls_and_manifest_with_model_version(load_method):
+def test_load_dbt_ls_and_manifest_with_model_version(load_method, postgres_profile_config):
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version",
@@ -681,14 +641,7 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method):
         ),
         render_config=RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version"),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version"),
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
     getattr(dbt_graph, load_method)()
     expected_dbt_nodes = {
@@ -890,7 +843,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir):
+def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile_config):
     """
     Tests that the dbt ls load method is successful if a selector arg is used with RenderConfig
     and that the filtered nodes are expected.
@@ -919,14 +872,7 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir):
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="default",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="airflow_db",
-                profile_args={"schema": "public"},
-            ),
-        ),
+        profile_config=postgres_profile_config,
     )
     dbt_graph.load_via_dbt_ls()
 

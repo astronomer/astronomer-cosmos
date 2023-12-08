@@ -2,6 +2,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+import yaml
 
 import pytest
 
@@ -438,12 +439,12 @@ def test_load_via_dbt_ls_without_dbt_deps():
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages():
+def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir):
     local_flags = [
         "--project-dir",
-        DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
         "--profiles-dir",
-        DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
         "--profile",
         "default",
         "--target",
@@ -456,14 +457,14 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages():
         deps_command,
         stdout=PIPE,
         stderr=PIPE,
-        cwd=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        cwd=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         universal_newlines=True,
     )
     stdout, stderr = process.communicate()
 
-    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_deps=False)
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
         render_config=render_config,
@@ -767,3 +768,88 @@ def test_parse_dbt_ls_output():
     nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
 
     assert expected_nodes == nodes
+
+
+@patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
+@patch("cosmos.config.RenderConfig.validate_dbt_command")
+def test_load_via_dbt_ls_project_config_env_vars(mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir):
+    """Tests that the dbt ls command in the subprocess has the project config env vars set."""
+    mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
+    env_vars = {"MY_ENV_VAR": "my_value"}
+    project_config = ProjectConfig(env_vars=env_vars)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load_via_dbt_ls()
+
+    assert "MY_ENV_VAR" in mock_popen.call_args.kwargs["env"]
+    assert mock_popen.call_args.kwargs["env"]["MY_ENV_VAR"] == "my_value"
+
+
+@patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
+@patch("cosmos.config.RenderConfig.validate_dbt_command")
+def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir):
+    """Tests that the dbt ls command in the subprocess has "--vars" with the project config dbt_vars."""
+    mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
+    dbt_vars = {"my_var1": "my_value1", "my_var2": "my_value2"}
+    project_config = ProjectConfig(dbt_vars=dbt_vars)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load_via_dbt_ls()
+    ls_command = mock_popen.call_args.args[0]
+    assert "--vars" in ls_command
+    assert ls_command[ls_command.index("--vars") + 1] == yaml.dump(dbt_vars)
+
+
+@pytest.mark.sqlite
+@pytest.mark.integration
+def test_load_via_dbt_ls_with_project_config_vars():
+    """
+    Integration that tests that the dbt ls command is successful and that the node affected by the dbt_vars is
+    rendered correctly.
+    """
+    project_name = "simple"
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
+            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
+            dbt_vars={"animation_alias": "top_5_animated_movies"},
+        ),
+        render_config=RenderConfig(
+            dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
+            dbt_deps=False,
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
+        profile_config=ProfileConfig(
+            profile_name="simple",
+            target_name="dev",
+            profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
+        ),
+    )
+    dbt_graph.load_via_dbt_ls()
+    assert dbt_graph.nodes["model.simple.top_animations"].config["alias"] == "top_5_animated_movies"

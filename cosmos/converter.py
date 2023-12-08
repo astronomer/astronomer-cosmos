@@ -6,6 +6,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable
 import copy
+from warnings import warn
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
@@ -96,10 +97,11 @@ def validate_arguments(
 
 
 def validate_initial_user_config(
-    execution_config: ExecutionConfig | None,
+    execution_config: ExecutionConfig,
     profile_config: ProfileConfig | None,
     project_config: ProjectConfig,
-    render_config: RenderConfig | None,
+    render_config: RenderConfig,
+    operator_args: dict[str, Any],
 ):
     """
     Validates if the user set the fields as expected.
@@ -108,6 +110,7 @@ def validate_initial_user_config(
     :param profile_config: Configuration related to dbt database configuration (profile)
     :param project_config: Configuration related to the overall dbt project
     :param render_config: Configuration related to how to convert the dbt workflow into an Airflow DAG
+    :param operator_args: Arguments to pass to the underlying operators.
     """
     if profile_config is None and execution_config.execution_mode not in (
         ExecutionMode.KUBERNETES,
@@ -121,6 +124,33 @@ def validate_initial_user_config(
         raise CosmosValueError(
             "ProjectConfig.dbt_project_path is mutually exclusive with RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path."
             + "If using RenderConfig.dbt_project_path or ExecutionConfig.dbt_project_path, ProjectConfig.dbt_project_path should be None"
+        )
+
+    # Cosmos 2.0 will remove the ability to pass in operator_args with 'env' and 'vars' in place of ProjectConfig.env_vars and
+    # ProjectConfig.dbt_vars.
+    if "env" in operator_args:
+        warn(
+            "operator_args with 'env' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
+            DeprecationWarning,
+        )
+        if project_config.env_vars:
+            raise CosmosValueError(
+                "ProjectConfig.env_vars and operator_args with 'env' are mutually exclusive and only one can be used."
+            )
+    if "vars" in operator_args:
+        warn(
+            "operator_args with 'vars' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.vars instead.",
+            DeprecationWarning,
+        )
+        if project_config.dbt_vars:
+            raise CosmosValueError(
+                "ProjectConfig.dbt_vars and operator_args with 'vars' are mutually exclusive and only one can be used."
+            )
+    # Cosmos 2.0 will remove the ability to pass RenderConfig.env_vars in place of ProjectConfig.env_vars, check that both are not set.
+    if project_config.env_vars and render_config.env_vars:
+        raise CosmosValueError(
+            "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided. RenderConfig.env_vars is deprecated since Cosmos 1.3, "
+            "please use ProjectConfig.env_vars instead."
         )
 
 
@@ -182,7 +212,7 @@ class DbtToAirflowConverter:
         render_config = render_config or RenderConfig()
         operator_args = operator_args or {}
 
-        validate_initial_user_config(execution_config, profile_config, project_config, render_config)
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
         # If we are using the old interface, we should migrate it to the new interface
         # This is safe to do now since we have validated which config interface we're using
@@ -191,8 +221,8 @@ class DbtToAirflowConverter:
 
         validate_adapted_user_config(execution_config, project_config, render_config)
 
-        if not operator_args:
-            operator_args = {}
+        env_vars = project_config.env_vars or operator_args.pop("env", None)
+        dbt_vars = project_config.dbt_vars or operator_args.pop("vars", None)
 
         # Previously, we were creating a cosmos.dbt.project.DbtProject
         # DbtProject has now been replaced with ProjectConfig directly
@@ -209,7 +239,7 @@ class DbtToAirflowConverter:
             render_config=render_config,
             execution_config=execution_config,
             profile_config=profile_config,
-            operator_args=operator_args,
+            dbt_vars=dbt_vars,
         )
         dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
@@ -218,6 +248,8 @@ class DbtToAirflowConverter:
             "project_dir": execution_config.project_path,
             "profile_config": profile_config,
             "emit_datasets": render_config.emit_datasets,
+            "env": env_vars,
+            "vars": dbt_vars,
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path

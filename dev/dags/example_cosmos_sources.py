@@ -62,19 +62,24 @@ render_config = RenderConfig(
     node_converters={
         DbtResourceType("source"): convert_source,  # known dbt node type to Cosmos (part of DbtResourceType)
         DbtResourceType("exposure"): convert_exposure,  # dbt node type new to Cosmos (will be added to DbtResourceType)
-    },
+    }
+)
+
+# `ProjectConfig` can pass dbt variables and environment variables to dbt commands. Below is an example of
+# passing a required env var for the profiles.yml file and a dbt variable that is used for rendering and
+# executing dbt models.
+project_config = ProjectConfig(
+    DBT_ROOT_PATH / "simple",
     env_vars={"DBT_SQLITE_PATH": DBT_SQLITE_PATH},
+    dbt_vars={"animation_alias": "top_5_animated_movies"},
 )
 
 
 example_cosmos_sources = DbtDag(
     # dbt/cosmos-specific parameters
-    project_config=ProjectConfig(
-        DBT_ROOT_PATH / "simple",
-    ),
+    project_config=project_config,
     profile_config=profile_config,
     render_config=render_config,
-    operator_args={"env": {"DBT_SQLITE_PATH": DBT_SQLITE_PATH}},
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),

@@ -49,11 +49,27 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
     @property
     def profile(self) -> dict[str, Any | None]:
         "Gets profile. The password is stored in an environment variable."
+
+        credentials = self.get_temporary_credentials()
+
         profile = {
             **self.mapped_params,
             **self.profile_args,
-            # aws_secret_access_key and aws_session_token should always get set as env var
-            "aws_secret_access_key": self.get_env_var_format("aws_secret_access_key"),
-            "aws_session_token": self.get_env_var_format("aws_session_token"),
+            "aws_secret_access_key": credentials.access_key,
+            "aws_session_token": credentials.token,
+            "aws_access_key_id": credentials.secret_key,
         }
+
         return self.filter_null(profile)
+
+    def get_temporary_credentials(self):  # type: ignore
+        """
+        Helper function to retrieve temporary short lived credentials
+        Returns an object including access_key, secret_key and token
+        """
+        from airflow.providers.amazon.aws.hooks.base_aws import AwsGenericHook
+
+        # Generic hook takes care of secret obsufication
+        hook = AwsGenericHook(self.conn_id)  # type: ignore
+        credentials = hook.get_credentials()
+        return credentials

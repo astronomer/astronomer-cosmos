@@ -110,7 +110,6 @@ tests = [
     "mypy",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
 ]
-
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]

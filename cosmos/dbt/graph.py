@@ -195,6 +195,9 @@ class DbtGraph:
         if self.project.dbt_vars:
             ls_command.extend(["--vars", yaml.dump(self.project.dbt_vars)])
 
+        if self.render_config.selector:
+            ls_command.extend(["--selector", self.render_config.selector])
+
         ls_command.extend(self.local_flags)
 
         stdout = run_command(ls_command, tmp_dir, env_vars)

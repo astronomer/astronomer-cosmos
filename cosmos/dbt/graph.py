@@ -4,6 +4,7 @@ import itertools
 import json
 import os
 import tempfile
+import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -134,13 +135,14 @@ class DbtGraph:
         render_config: RenderConfig = RenderConfig(),
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
-        operator_args: dict[str, Any] | None = None,
+        # dbt_vars only supported for LegacyDbtProject
+        dbt_vars: dict[str, str] | None = None,
     ):
         self.project = project
         self.render_config = render_config
         self.profile_config = profile_config
         self.execution_config = execution_config
-        self.operator_args = operator_args or {}
+        self.dbt_vars = dbt_vars or {}
 
     def load(
         self,
@@ -190,6 +192,9 @@ class DbtGraph:
         if self.render_config.select:
             ls_command.extend(["--select", *self.render_config.select])
 
+        if self.project.dbt_vars:
+            ls_command.extend(["--vars", yaml.dump(self.project.dbt_vars)])
+
         ls_command.extend(self.local_flags)
 
         stdout = run_command(ls_command, tmp_dir, env_vars)
@@ -235,7 +240,7 @@ class DbtGraph:
             create_symlinks(self.render_config.project_path, tmpdir_path, self.render_config.dbt_deps)
 
             with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
-                self.render_config.env_vars
+                self.project.env_vars or self.render_config.env_vars or {}
             ):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
@@ -296,7 +301,7 @@ class DbtGraph:
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
             dbt_models_dir=self.project.models_path.stem if self.project.models_path else "models",
             dbt_seeds_dir=self.project.seeds_path.stem if self.project.seeds_path else "seeds",
-            operator_args=self.operator_args,
+            dbt_vars=self.dbt_vars,
         )
         nodes = {}
         models = itertools.chain(

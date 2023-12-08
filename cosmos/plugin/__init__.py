@@ -60,14 +60,9 @@ def open_http_file(conn_id: Optional[str], path: str) -> str:
     from airflow.providers.http.hooks.http import HttpHook
 
     if conn_id is None:
-        try:
-            HttpHook.get_connection(conn_id=HttpHook.default_conn_name)
-        except AirflowNotFoundException:
-            hook = HttpHook(method="GET", http_conn_id="")
-        else:
-            hook = HttpHook(method="GET")
-    else:
-        hook = HttpHook(method="GET", http_conn_id=conn_id)
+        conn_id = ""
+
+    hook = HttpHook(method="GET", http_conn_id=conn_id)
     res = hook.run(endpoint=path)
     hook.check_response(res)
     return res.text  # type: ignore[no-any-return]

@@ -33,7 +33,7 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
     my_cosmos_dag = DbtDag(
         project_config=ProjectConfig(
             dbt_project_path="/usr/local/airflow/dags/my_dbt_project",
-            manifest_path="/usr/local/airflow/dags/my_dbt_project/target/manifest.json"
+            manifest_path="/usr/local/airflow/dags/my_dbt_project/target/manifest.json",
         ),
         # ...,
     )

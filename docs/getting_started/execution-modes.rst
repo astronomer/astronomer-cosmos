@@ -72,7 +72,10 @@ In this case, users are responsible for declaring which version of ``dbt`` they 
 
 Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating a ``dbt`` profile file (``profiles.yml``).
 
-A drawback with this approach is that it is slower than ``local`` because it creates a new Python virtual environment for each Cosmos dbt task run.
+Some drawbacks of this approach:
+
+- It is slower than ``local`` because it creates a new Python virtual environment for each Cosmos dbt task run.
+- The ``dbt_ls`` load method is not supported with this execution mode. See `Parsing Methods <parsing-methods.html>`_ for more information.
 
 Example of how to use:
 
@@ -91,6 +94,7 @@ The user has better environment isolation than when using ``local`` or ``virtual
 The other challenge with the ``docker`` approach is if the Airflow worker is already running in Docker, which sometimes can lead to challenges running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
 
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container, which is slower than creating a Virtualenv with ``dbt-core``.
+Additionally, this execution mode does not support the ``dbt_ls`` load method (see `Parsing Methods <parsing-methods.html>`_ for more information).
 
 Check the step-by-step guide on using the ``docker`` execution mode at :ref:`docker`.
 

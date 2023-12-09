@@ -53,6 +53,9 @@ To use this:
         # ...,
     )
 
+A common pattern when using the ``dbt_manifest`` load mode is to run the ``dbt deps`` and ``dbt compile`` commands as part of the Airflow deployment.
+Essentially: the ``manifest.json`` is excluded from version control, then ``dbt deps && dbt compile`` is run during deployment to generate the ``manifest.json``, then the ``manifest.json`` is pushed to the Airflow instance.
+
 ``dbt_ls``
 ----------
 

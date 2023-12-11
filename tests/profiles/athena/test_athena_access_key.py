@@ -17,6 +17,7 @@ mock_assumed_credentials = Credentials(
     token="my_aws_assumed_token",
 )
 
+
 @pytest.fixture()
 def mock_athena_assume_role_conn():  # type: ignore
     """
@@ -83,8 +84,8 @@ def test_athena_connection_claiming() -> None:
     # - s3_staging_dir
     # - schema
     with patch(
-    "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
-    return_value=mock_assumed_credentials,
+        "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
+        return_value=mock_assumed_credentials,
     ):
         yield
 
@@ -124,14 +125,13 @@ def test_athena_connection_claiming() -> None:
 
 def test_athena_profile_mapping_selected(
     mock_athena_conn: Connection,
-    
 ) -> None:
     """
     Tests that the correct profile mapping is selected for Athena.
     """
     with patch(
-    "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
-    return_value=mock_assumed_credentials,
+        "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
+        return_value=mock_assumed_credentials,
     ):
         yield
     profile_mapping = get_automatic_profile_mapping(
@@ -147,8 +147,8 @@ def test_athena_profile_args(
     Tests that the profile values get set correctly for Athena.
     """
     with patch(
-    "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
-    return_value=mock_assumed_credentials,
+        "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
+        return_value=mock_assumed_credentials,
     ):
         yield
     profile_mapping = get_automatic_profile_mapping(
@@ -174,8 +174,8 @@ def test_athena_profile_args_overrides(
     Tests that you can override the profile values for Athena.
     """
     with patch(
-    "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
-    return_value=mock_assumed_credentials,
+        "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
+        return_value=mock_assumed_credentials,
     ):
         yield
 
@@ -213,8 +213,8 @@ def test_athena_profile_env_vars(
     Tests that the environment variables get set correctly for Athena.
     """
     with patch(
-    "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
-    return_value=mock_assumed_credentials,
+        "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
+        return_value=mock_assumed_credentials,
     ):
         yield
 
@@ -234,8 +234,8 @@ def test_athena_profile_assume_role(mock_athena_assume_role_conn: Connection) ->
     """
 
     with patch(
-    "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
-    return_value=mock_assumed_credentials,
+        "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_temporary_credentials",
+        return_value=mock_assumed_credentials,
     ):
         yield
 

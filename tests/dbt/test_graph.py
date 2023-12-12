@@ -148,8 +148,7 @@ def test_load_dbt_ls_file_without_project_path():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    render_config = RenderConfig(dbt_ls_path=SAMPLE_DBT_LS_OUTPUT)
-    execution_config = ExecutionConfig(dbt_project_path=None)
+    render_config = RenderConfig(dbt_ls_path=SAMPLE_DBT_LS_OUTPUT, dbt_project_path= None)
     dbt_graph = DbtGraph(
         project=project_config,
         profile_config=profile_config,
@@ -158,7 +157,7 @@ def test_load_dbt_ls_file_without_project_path():
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_LS_FILE)
-    assert err_info.value.args[0] == "Unable to load dbt ls file without ExecutionConfig.dbt_project_path"
+    assert err_info.value.args[0] == "Unable to load dbt ls file without RenderConfig.dbt_project_path"
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)

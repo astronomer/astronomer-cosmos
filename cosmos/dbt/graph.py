@@ -292,12 +292,11 @@ class DbtGraph:
         if not self.render_config.is_dbt_ls_file_available():
             raise CosmosLoadDbtException(f"Unable to load dbt ls file using {self.render_config.dbt_ls_path}")
 
-        if not self.execution_config.project_path:
-            raise CosmosLoadDbtException("Unable to load dbt ls file without ExecutionConfig.dbt_project_path")
-
+        project_path = self.render_config.dbt_project_path
+        if not project_path:
+            raise CosmosLoadDbtException("Unable to load dbt ls file without RenderConfig.dbt_project_path")
         with open(self.render_config.dbt_ls_path) as fp:  # type: ignore[arg-type]
             dbt_ls_output = fp.read()
-            project_path = self.execution_config.project_path
             nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_output)
 
         self.nodes = nodes

@@ -157,7 +157,7 @@ def test_load_dbt_ls_file_without_project_path():
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_LS_FILE)
-    assert err_info.value.args[0] == "Unable to load dbt ls file without RenderConfig.dbt_project_path"
+    assert err_info.value.args[0] == "Unable to load dbt ls file without RenderConfig.project_path"
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)

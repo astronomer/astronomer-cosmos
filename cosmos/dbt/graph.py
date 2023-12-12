@@ -294,6 +294,11 @@ class DbtGraph:
         """
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
+        if self.render_config.selector:
+            raise CosmosLoadDbtException(
+                "RenderConfig.selector is not yet supported when loading dbt projects using the LoadMode.CUSTOM parser."
+            )
+
         if not self.render_config.project_path or not self.execution_config.project_path:
             raise CosmosLoadDbtException(
                 "Unable to load dbt project without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
@@ -351,6 +356,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
+
+        if self.render_config.selector:
+            raise CosmosLoadDbtException(
+                "RenderConfig.selector is not yet supported when loading dbt projects using the LoadMode.DBT_MANIFEST parser."
+            )
 
         if not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")

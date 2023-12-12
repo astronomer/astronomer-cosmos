@@ -813,6 +813,21 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     assert ls_command[ls_command.index("--selector") + 1] == selector
 
 
+@pytest.mark.parametrize("load_method", [LoadMode.DBT_MANIFEST, LoadMode.CUSTOM])
+def test_load_method_with_unsupported_render_config_selector_arg(load_method):
+    """Tests that error is raised when RenderConfig.selector is used with LoadMode.DBT_MANIFEST or LoadMode.CUSTOM."""
+
+    expected_error_msg = (
+        f"RenderConfig.selector is not yet supported when loading dbt projects using the {load_method} parser."
+    )
+    dbt_graph = DbtGraph(
+        render_config=RenderConfig(load_method=load_method, selector="my_selector"),
+        project=MagicMock(),
+    )
+    with pytest.raises(CosmosLoadDbtException, match=expected_error_msg):
+        dbt_graph.load(method=load_method)
+
+
 @pytest.mark.sqlite
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_project_config_vars():

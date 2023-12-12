@@ -93,13 +93,11 @@ Examples:
 
 Using ``selector``
 --------------------------------
+.. note::
+    Only currently supported using the ``dbt_ls`` parsing method since Cosmos 1.3 where the selector is passed directly to the dbt CLI command. \
+    If  ``select`` and/or ``exclude`` are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
 
 The ``selector`` parameter is a string that references a `dbt YAML selector <https://docs.getdbt.com/reference/node-selection/yaml-selectors>`_ already defined in a dbt project.
-
-.. note::
-
-    Only currently supported using the ``dbt_ls`` parsing method where the selector is passed directly to the dbt CLI command. If  ``select`` and/or ``exclude`` \
-    are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
 
 Examples:
 

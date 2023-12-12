@@ -7,6 +7,7 @@ import shutil
 import tempfile
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
+import warnings
 from typing import Any, Iterator, Callable
 
 from cosmos.constants import DbtResourceType, TestBehavior, ExecutionMode, LoadMode, TestIndirectSelection
@@ -42,7 +43,7 @@ class RenderConfig:
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
-    :param env_vars: A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
+    :param env_vars: (Deprecated since Cosmos 1.3 use ProjectConfig.env_vars) A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
     :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
     """
 
@@ -54,13 +55,18 @@ class RenderConfig:
     dbt_deps: bool = True
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
     dbt_executable_path: str | Path = get_system_dbt()
-    env_vars: dict[str, str] = field(default_factory=dict)
+    env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
     dbt_ls_path: Path | None = None
 
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+        if self.env_vars:
+            warnings.warn(
+                "RenderConfig.env_vars is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
+                DeprecationWarning,
+            )
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
 
     def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
@@ -106,6 +112,11 @@ class ProjectConfig:
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     :param project_name: Allows the user to define the project name.
     Required if dbt_project_path is not defined. Defaults to the folder name of dbt_project_path.
+    :param env_vars: Dictionary of environment variables that are used for both rendering and execution. Rendering with
+        env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
+    :param dbt_vars: Dictionary of dbt variables for the project. This argument overrides variables defined in your dbt_project.yml
+        file. The dictionary is dumped to a yaml string and passed to dbt commands as the --vars argument. Variables are only
+        supported for rendering when using ``RenderConfig.LoadMode.DBT_LS`` and ``RenderConfig.LoadMode.CUSTOM`` load mode.
     """
 
     dbt_project_path: Path | None = None
@@ -123,6 +134,8 @@ class ProjectConfig:
         snapshots_relative_path: str | Path = "snapshots",
         manifest_path: str | Path | None = None,
         project_name: str | None = None,
+        env_vars: dict[str, str] | None = None,
+        dbt_vars: dict[str, str] | None = None,
     ):
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
@@ -145,6 +158,9 @@ class ProjectConfig:
 
         if manifest_path:
             self.manifest_path = Path(manifest_path)
+
+        self.env_vars = env_vars
+        self.dbt_vars = dbt_vars
 
     def validate_project(self) -> None:
         """

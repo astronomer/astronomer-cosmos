@@ -76,6 +76,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy-python
+        args: [--config-file, "./pyproject.toml"]
         additional_dependencies:
           [
             types-PyYAML,

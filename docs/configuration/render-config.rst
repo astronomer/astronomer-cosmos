@@ -14,7 +14,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``dbt_deps``: A Boolean to run dbt deps when using dbt ls for dag parsing. Default True
 - ``node_converters``: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``. Find more information below.
 - ``dbt_executable_path``: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
-- ``env_vars``: A dictionary of environment variables for rendering. Only supported when using ``load_method=LoadMode.DBT_LS``.
+- ``env_vars``: (available in v1.2.5, use``ProjectConfig.env_vars`` for v1.3.0 onwards) A dictionary of environment variables for rendering. Only supported when using ``load_method=LoadMode.DBT_LS``.
 - ``dbt_project_path``: Configures the DBT project location accessible on their airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
 
 Customizing how nodes are rendered (experimental)

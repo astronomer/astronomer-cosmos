@@ -184,3 +184,9 @@ def test_is_dbt_ls_file_available_is_true():
 def test_is_dbt_ls_file_available_is_false():
     render_config = RenderConfig(dbt_ls_path=None)
     assert not render_config.is_dbt_ls_file_available()
+
+
+def test_render_config_env_vars_deprecated():
+    """RenderConfig.env_vars is deprecated since Cosmos 1.3, should warn user."""
+    with pytest.deprecated_call():
+        RenderConfig(env_vars={"VAR": "value"})

@@ -787,12 +787,12 @@ def test_load_via_dbt_ls_file():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_ls_path=SAMPLE_DBT_LS_OUTPUT)
+    render_config = RenderConfig(
+        dbt_ls_path=SAMPLE_DBT_LS_OUTPUT, dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    )
     dbt_graph = DbtGraph(
         project=project_config,
         profile_config=profile_config,
-        execution_config=execution_config,
         render_config=render_config,
     )
     dbt_graph.load(method=LoadMode.DBT_LS_FILE, execution_mode=ExecutionMode.LOCAL)

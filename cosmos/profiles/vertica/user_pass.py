@@ -9,8 +9,14 @@ from ..base import BaseProfileMapping
 class VerticaUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Vertica connections using username + password authentication to dbt profiles.
-    https://docs.getdbt.com/reference/warehouse-setups/vertica-setup
-    https://airflow.apache.org/docs/apache-airflow-providers-vertica/stable/connections/vertica.html
+    .. note::
+       Use Airflow connection ``schema`` for vertica ``database`` to keep it consistent with other connection types and profiles. \
+       The Vertica Airflow provider hook `assumes this <https://github.com/apache/airflow/blob/395ac463494dba1478a05a32900218988495889c/airflow/providers/vertica/hooks/vertica.py#L72>`_.
+       This seems to be a common approach also for `Postgres <https://github.com/apache/airflow/blob/0953e0f844fa5db81c2b461ec2433de1935260b3/airflow/providers/postgres/hooks/postgres.py#L138>`_, \
+       Redshift and Exasol since there is no ``database`` field in Airflow connection and ``schema`` is not required for the database connection.
+    .. seealso::
+       https://docs.getdbt.com/reference/warehouse-setups/vertica-setup
+       https://airflow.apache.org/docs/apache-airflow-providers-vertica/stable/connections/vertica.html
     """
 
     airflow_connection_type: str = "vertica"
@@ -31,8 +37,7 @@ class VerticaUserPasswordProfileMapping(BaseProfileMapping):
         "username": "login",
         "password": "password",
         "port": "port",
-        "schema": "schema",
-        "database": "extra.database",
+        "database": "schema",
         "autocommit": "extra.autocommit",
         "backup_server_node": "extra.backup_server_node",
         "binary_transfer": "extra.binary_transfer",

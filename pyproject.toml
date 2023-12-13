@@ -141,6 +141,9 @@ include = [
     "/cosmos",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["cosmos"]
+
 ######################################
 # TESTING
 ######################################

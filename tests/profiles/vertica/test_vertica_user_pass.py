@@ -23,8 +23,7 @@ def mock_vertica_conn():  # type: ignore
         login="my_user",
         password="my_password",
         port=5433,
-        schema="my_schema",
-        extra='{"database": "my_database"}',
+        schema="my_database",
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -43,8 +42,7 @@ def mock_vertica_conn_custom_port():  # type: ignore
         login="my_user",
         password="my_password",
         port=7472,
-        schema="my_schema",
-        extra='{"database": "my_database"}',
+        schema="my_database",
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -69,8 +67,7 @@ def test_connection_claiming() -> None:
         "host": "my_host",
         "login": "my_user",
         "password": "my_password",
-        "schema": "my_schema",
-        "extra": '{"database": "my_database"}',
+        "schema": "my_database",
     }
 
     # if we're missing any of the values, it shouldn't claim
@@ -82,20 +79,20 @@ def test_connection_claiming() -> None:
         print("testing with", values)
 
         with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-            profile_mapping = VerticaUserPasswordProfileMapping(conn)
+            profile_mapping = VerticaUserPasswordProfileMapping(conn, {"schema": "my_schema"})
             assert not profile_mapping.can_claim_connection()
 
-    # also test when there's no database
+    # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = ""
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = VerticaUserPasswordProfileMapping(conn)
+        profile_mapping = VerticaUserPasswordProfileMapping(conn, {})
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = VerticaUserPasswordProfileMapping(conn)
+        profile_mapping = VerticaUserPasswordProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
 
 
@@ -107,7 +104,7 @@ def test_profile_mapping_selected(
     """
     profile_mapping = get_automatic_profile_mapping(
         mock_vertica_conn.conn_id,
-        {"schema": "my_schema"},
+        {"schema": "my_database"},
     )
     assert isinstance(profile_mapping, VerticaUserPasswordProfileMapping)
 
@@ -145,8 +142,8 @@ def test_profile_args(
         "username": mock_vertica_conn.login,
         "password": "{{ env_var('COSMOS_CONN_VERTICA_PASSWORD') }}",
         "port": mock_vertica_conn.port,
+        "database": mock_vertica_conn.schema,
         "schema": "my_schema",
-        "database": mock_vertica_conn.extra_dejson.get("database"),
     }
 
 

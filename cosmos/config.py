@@ -40,6 +40,7 @@ class RenderConfig:
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
+    :param selector: Name of a dbt YAML selector to use for parsing. Only supported when using ``load_method=LoadMode.DBT_LS``.
     :param dbt_deps: Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
@@ -52,6 +53,7 @@ class RenderConfig:
     load_method: LoadMode = LoadMode.AUTOMATIC
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
+    selector: str | None = None
     dbt_deps: bool = True
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
     dbt_executable_path: str | Path = get_system_dbt()

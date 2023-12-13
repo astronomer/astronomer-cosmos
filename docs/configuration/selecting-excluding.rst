@@ -3,7 +3,13 @@
 Selecting & Excluding
 =======================
 
-Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select`` and ``exclude`` parameters in the ``RenderConfig`` class.
+Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select `` and ``exclude`` parameters in the ``RenderConfig`` class.
+
+ Since Cosmos 1.3, the ``selector`` parameter is also available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
+
+
+Using ``select`` and ``exclude``
+--------------------------------
 
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
@@ -82,5 +88,26 @@ Examples:
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
             exclude=["node_name+"],  # node_name and its children
+        )
+    )
+
+Using ``selector``
+--------------------------------
+.. note::
+    Only currently supported using the ``dbt_ls`` parsing method since Cosmos 1.3 where the selector is passed directly to the dbt CLI command. \
+    If  ``select`` and/or ``exclude`` are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
+
+The ``selector`` parameter is a string that references a `dbt YAML selector <https://docs.getdbt.com/reference/node-selection/yaml-selectors>`_ already defined in a dbt project.
+
+Examples:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig, LoadMode
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            selector="my_selector",  # this selector must be defined in your dbt project
+            load_method=LoadMode.DBT_LS,
         )
     )

@@ -56,10 +56,12 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
         env_vars_dict: dict[str, str] = dict()
 
+        for env_var_key, env_var_value in env.items():
+            env_vars_dict[env_var_key] = str(env_var_value)
         for env_var in self.env_vars:
             env_vars_dict[env_var.name] = env_var.value
 
-        self.env_vars: list[Any] = convert_env_vars({**env, **env_vars_dict})
+        self.env_vars: list[Any] = convert_env_vars(env_vars_dict)
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_kube_args(context, cmd_flags)

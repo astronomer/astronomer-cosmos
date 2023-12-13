@@ -548,6 +548,15 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         super().__init__(**kwargs)
         self.base_cmd = ["docs", "generate"]
 
+        self.check_static_flag()
+
+    def check_static_flag(self) -> None:
+        flag = "--static"
+        if self.dbt_cmd_flags:
+            if flag in self.dbt_cmd_flags:
+                # For the --static flag we only upload the generated static_index.html file
+                self.required_files = ["static_index.html"]
+
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
     """
@@ -578,7 +587,7 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
 
 class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
     """
-    Executes `dbt docs generate` command and upload to S3 storage. Returns the S3 path to the generated documentation.
+    Executes `dbt docs generate` command and upload to S3 storage.
 
     :param connection_id: S3's Airflow connection ID
     :param bucket_name: S3's bucket name

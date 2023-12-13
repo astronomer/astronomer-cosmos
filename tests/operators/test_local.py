@@ -488,3 +488,14 @@ def test_operator_execute_deps_parameters(
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
     task.execute(context={"task_instance": MagicMock()})
     assert mock_build_and_run_cmd.call_args_list[0].kwargs["command"] == expected_call_kwargs
+
+
+def test_dbt_docs_local_operator_with_static_flag():
+    # Check when static flag is passed, the required files are correctly adjusted to a single file
+    operator = DbtDocsLocalOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=["--static"],
+    )
+    assert operator.required_files == ["static_index.html"]

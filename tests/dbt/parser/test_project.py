@@ -219,6 +219,6 @@ def test_dbtmodelconfig_with_vars(tmp_path):
         name="some_name",
         type=DbtModelType.DBT_MODEL,
         path=path_with_sources,
-        operator_args={"vars": {"country_code": "us"}},
+        dbt_vars={"country_code": "us"},
     )
     assert "stg_customers_us" in dbt_model.config.upstream_models

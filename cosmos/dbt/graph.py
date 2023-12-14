@@ -4,6 +4,7 @@ import itertools
 import json
 import os
 import tempfile
+import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -134,13 +135,14 @@ class DbtGraph:
         render_config: RenderConfig = RenderConfig(),
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
-        operator_args: dict[str, Any] | None = None,
+        # dbt_vars only supported for LegacyDbtProject
+        dbt_vars: dict[str, str] | None = None,
     ):
         self.project = project
         self.render_config = render_config
         self.profile_config = profile_config
         self.execution_config = execution_config
-        self.operator_args = operator_args or {}
+        self.dbt_vars = dbt_vars or {}
 
     def load(
         self,
@@ -161,6 +163,7 @@ class DbtGraph:
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
+            LoadMode.DBT_LS_FILE: self.load_via_dbt_ls_file,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
 
@@ -189,6 +192,12 @@ class DbtGraph:
 
         if self.render_config.select:
             ls_command.extend(["--select", *self.render_config.select])
+
+        if self.project.dbt_vars:
+            ls_command.extend(["--vars", yaml.dump(self.project.dbt_vars)])
+
+        if self.render_config.selector:
+            ls_command.extend(["--selector", self.render_config.selector])
 
         ls_command.extend(self.local_flags)
 
@@ -235,7 +244,7 @@ class DbtGraph:
             create_symlinks(self.render_config.project_path, tmpdir_path, self.render_config.dbt_deps)
 
             with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
-                self.render_config.env_vars
+                self.project.env_vars or self.render_config.env_vars or {}
             ):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
@@ -272,6 +281,30 @@ class DbtGraph:
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
+    def load_via_dbt_ls_file(self) -> None:
+        """
+        This is between dbt ls and full manifest. It allows to use the output (needs to be json output) of the dbt ls as a
+        file stored in the image you run Cosmos on. The advantage is that you can use the parser from LoadMode.DBT_LS without
+        actually running dbt ls every time. BUT you will need one dbt ls file for each separate group.
+
+        This technically should increase performance and also removes the necessity to have your whole dbt project copied
+        to the airflow image.
+        """
+        logger.info("Trying to parse the dbt project `%s` using a dbt ls output file...", self.project.project_name)
+
+        if not self.render_config.is_dbt_ls_file_available():
+            raise CosmosLoadDbtException(f"Unable to load dbt ls file using {self.render_config.dbt_ls_path}")
+
+        project_path = self.render_config.project_path
+        if not project_path:
+            raise CosmosLoadDbtException("Unable to load dbt ls file without RenderConfig.project_path")
+        with open(self.render_config.dbt_ls_path) as fp:  # type: ignore[arg-type]
+            dbt_ls_output = fp.read()
+            nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_output)
+
+        self.nodes = nodes
+        self.filtered_nodes = nodes
+
     def load_via_custom_parser(self) -> None:
         """
         This is the least accurate way of loading `dbt` projects and filtering them out, since it uses custom Cosmos
@@ -286,6 +319,11 @@ class DbtGraph:
         """
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
+        if self.render_config.selector:
+            raise CosmosLoadDbtException(
+                "RenderConfig.selector is not yet supported when loading dbt projects using the LoadMode.CUSTOM parser."
+            )
+
         if not self.render_config.project_path or not self.execution_config.project_path:
             raise CosmosLoadDbtException(
                 "Unable to load dbt project without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
@@ -296,7 +334,7 @@ class DbtGraph:
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
             dbt_models_dir=self.project.models_path.stem if self.project.models_path else "models",
             dbt_seeds_dir=self.project.seeds_path.stem if self.project.seeds_path else "seeds",
-            operator_args=self.operator_args,
+            dbt_vars=self.dbt_vars,
         )
         nodes = {}
         models = itertools.chain(
@@ -343,6 +381,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
+
+        if self.render_config.selector:
+            raise CosmosLoadDbtException(
+                "RenderConfig.selector is not yet supported when loading dbt projects using the LoadMode.DBT_MANIFEST parser."
+            )
 
         if not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")

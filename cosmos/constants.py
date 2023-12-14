@@ -27,6 +27,7 @@ class LoadMode(Enum):
     AUTOMATIC = "automatic"
     CUSTOM = "custom"
     DBT_LS = "dbt_ls"
+    DBT_LS_FILE = "dbt_ls_file"
     DBT_MANIFEST = "dbt_manifest"
 
 

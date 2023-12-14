@@ -85,6 +85,34 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
         bucket_name="test_bucket",
     )
 
+Static Flag
+~~~~~~~~~~~~~~~~~~~~~~~
+
+All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the static flag, check out the `original PR on dbt-core <https://github.com/dbt-labs/dbt-docs/pull/465>`_.
+The static flag is used to generate a single doc file that can be hosted directly from cloud storage.
+By having a single documentation file, you can make use of Access control can be configured through Identity-Aware Proxy (IAP), and making it easy to host.
+
+.. note::
+    The static flag is only available from dbt-core >=1.7
+
+The following code snippet shows how to provide this flag with the default jaffle_shop project:
+
+
+.. code-block:: python
+
+    from cosmos.operators import DbtDocsGCSOperator
+
+    # then, in your DAG code:
+    generate_dbt_docs_aws = DbtDocsGCSOperator(
+        task_id="generate_dbt_docs_gcs",
+        project_dir="path/to/jaffle_shop",
+        profile_config=profile_config,
+        # docs-specific arguments
+        connection_id="test_gcs",
+        bucket_name="test_bucket",
+        dbt_cmd_flags=["--static"],
+    )
+
 Custom Callback
 ~~~~~~~~~~~~~~~~~~~~~~~
 

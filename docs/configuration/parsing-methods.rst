@@ -8,12 +8,14 @@ Cosmos offers several options to parse your dbt project:
 - ``automatic``. Tries to find a user-supplied ``manifest.json`` file. If it can't find one, it will run ``dbt ls`` to generate one. If that fails, it will use Cosmos' dbt parser.
 - ``dbt_manifest``. Parses a user-supplied ``manifest.json`` file. This can be generated manually with dbt commands or via a CI/CD process.
 - ``dbt_ls``. Parses a dbt project directory using the ``dbt ls`` command.
+- ``dbt_ls_file``. Parses a dbt project directory using the output of ``dbt ls`` command from a file.
 - ``custom``. Uses Cosmos' custom dbt parser, which extracts dependencies from your dbt's model code.
 
 There are benefits and drawbacks to each method:
 
 - ``dbt_manifest``: You have to generate the manifest file on your own. When using the manifest, Cosmos gets a complete set of metadata about your models. However, Cosmos uses its own selecting & excluding logic to determine which models to run, which may not be as robust as dbt's.
 - ``dbt_ls``: Cosmos will generate the manifest file for you. This method uses dbt's metadata AND dbt's selecting/excluding logic. This is the most robust method. However, this requires the dbt executable to be installed on your machine (either on the host directly or in a virtual environment).
+- ``dbt_ls_file`` (new in 1.3): Path to a file containing the ``dbt ls`` output. To use this method, run ``dbt ls`` using ``--output json`` and store the output in a file. ``RenderConfig.select`` and ``RenderConfig.exclude`` will not work using this method.
 - ``custom``: Cosmos will parse your project and model files for you. This means that Cosmos will not have access to dbt's metadata. However, this method does not require the dbt executable to be installed on your machine.
 
 If you're using the ``local`` mode, you should use the ``dbt_ls`` method.
@@ -75,6 +77,26 @@ To use this:
         # ...,
     )
 
+``dbt_ls_file``
+----------------
+
+.. note::
+   New in Cosmos 1.3.
+
+If you provide the output of ``dbt ls --output json`` as a file, you can use this to parse similar to  ``dbt_ls``.
+You can supply a ``dbt_ls_path`` parameter on the DbtDag / DbtTaskGroup with a path to a ``dbt_ls_output.txt`` file.
+Check `this Dag <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/user_defined_profile.py>`_ for an example.
+
+To use this:
+
+.. code-block:: python
+
+    DbtDag(
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_MANIFEST, dbt_ls_path="/path/to/dbt_ls_file.txt"
+        )
+        # ...,
+    )
 
 ``custom``
 ----------

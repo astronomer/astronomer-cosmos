@@ -57,6 +57,7 @@ dbt-all = [
 ]
 dbt-athena = [
     "dbt-athena-community",
+    "apache-airflow-providers-amazon>=8.0.0",
 ]
 dbt-bigquery = [
     "dbt-bigquery",
@@ -110,7 +111,6 @@ tests = [
     "mypy",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
 ]
-
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
@@ -120,7 +120,6 @@ kubernetes = [
 pydantic = [
         "pydantic>=1.10.0,<2.0.0",
 ]
-
 
 [project.entry-points.cosmos]
 provider_info = "cosmos:get_provider_info"

@@ -41,10 +41,11 @@ class BaseProfileMapping(ABC):
 
     _conn: Connection | None = None
 
-    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None):
+    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None, disable_event_tracking: bool = False):
         self.conn_id = conn_id
         self.profile_args = profile_args or {}
         self._validate_profile_args()
+        self.disable_event_tracking = disable_event_tracking
 
     def _validate_profile_args(self) -> None:
         """
@@ -161,7 +162,7 @@ class BaseProfileMapping(ABC):
         profile_name: str,
         target_name: str = "cosmos_target",
         use_mock_values: bool = False,
-        dbt_config_vars: dict[str, Any] | None = None
+        dbt_config_vars: dict[str, Any] | None = None,
     ) -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.

@@ -1,4 +1,6 @@
 import pytest
+import yaml
+
 from cosmos.profiles.base import BaseProfileMapping
 from cosmos.exceptions import CosmosValueError
 
@@ -7,8 +9,9 @@ class TestProfileMapping(BaseProfileMapping):
     dbt_profile_method: str = "fake-method"
     dbt_profile_type: str = "fake-type"
 
-    def profile(self):
-        raise NotImplementedError
+    @property
+    def profile(self) -> dict[str, str]:
+        return {"some-profile-key": "some-profile-value"}
 
 
 @pytest.mark.parametrize("profile_arg", ["type", "method"])
@@ -29,3 +32,19 @@ def test_validate_profile_args(profile_arg: str):
             conn_id="fake_conn_id",
             profile_args=profile_args,
         )
+
+
+@pytest.mark.parametrize("disable_event_tracking", [True, False])
+def test_disable_event_tracking(disable_event_tracking: str):
+    """
+    Tests the config block in the profile is set correctly if disable_event_tracking is set.
+    """
+    test_profile = TestProfileMapping(
+        conn_id="fake_conn_id",
+        disable_event_tracking=disable_event_tracking,
+    )
+    profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
+
+    assert ("config" in profile_contents) == disable_event_tracking
+    if disable_event_tracking:
+        assert profile_contents["config"]["send_anonymous_usage_stats"] == "False"

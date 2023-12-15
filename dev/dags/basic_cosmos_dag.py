@@ -19,7 +19,7 @@ profile_config = ProfileConfig(
         conn_id="airflow_db",
         profile_args={"schema": "public"},
     ),
-    dbt_config_vars={"send_anonymous_usage_stats": False},
+    dbt_config_vars={'send_anonymous_usage_stats': False},
 )
 
 # [START local_example]

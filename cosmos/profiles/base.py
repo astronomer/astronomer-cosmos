@@ -41,11 +41,10 @@ class BaseProfileMapping(ABC):
 
     _conn: Connection | None = None
 
-    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None, disable_event_tracking: bool = False):
+    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None):
         self.conn_id = conn_id
         self.profile_args = profile_args or {}
         self._validate_profile_args()
-        self.disable_event_tracking = disable_event_tracking
 
     def _validate_profile_args(self) -> None:
         """
@@ -179,6 +178,10 @@ class BaseProfileMapping(ABC):
                 "outputs": {target_name: profile_vars},
             }
         }
+
+        if not dbt_config_vars is None:
+            profile_contents["config"] = dbt_config_vars
+
 
         if self.disable_event_tracking:
             profile_contents["config"] = {"send_anonymous_usage_stats": "False"}

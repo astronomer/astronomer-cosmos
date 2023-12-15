@@ -212,6 +212,8 @@ class ProfileConfig:
     :param target_name: The name of the dbt target to use.
     :param profiles_yml_filepath: The path to a profiles.yml file to use.
     :param profile_mapping: A mapping of Airflow connections to dbt profiles.
+    :param dbt_config_vars: Dictionary of dbt configs for the project. This argument overrides configs defined in your profiles.yml
+        file. The dictionary is dumped to a yaml string. Details https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml
     """
 
     # should always be set to be explicit
@@ -223,9 +225,11 @@ class ProfileConfig:
 
     # should be set if using cosmos to map Airflow connections to dbt profiles
     profile_mapping: BaseProfileMapping | None = None
+    dbt_config_vars: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.validate_profile()
+        self.validate_dbt_config_vars()
 
     def validate_profile(self) -> None:
         "Validates that we have enough information to render a profile."
@@ -235,6 +239,44 @@ class ProfileConfig:
             raise CosmosValueError(
                 "Both profiles_yml_filepath and profile_mapping are defined and are mutually exclusive. Ensure only one of these is defined."
             )
+
+    def validate_dbt_config_vars(self) -> None:
+        "Validates config vars for profile."
+
+        vars_checks = {
+            "send_anonymous_usage_stats": {'var_type': bool},
+            "use_colors": {'var_type': bool},
+            "partial_parse": {'var_type': bool},
+            "printer_width": {'var_type': int},
+            "write_json": {'var_type': bool},
+            "warn_error": {'var_type': str},
+            "log_format": {'var_type': str, 'accepted_values': {"text", "json", "default"}},
+            "debug": {'var_type': bool},
+            "version_check": {'var_type': bool},
+            "fail_fast": {'var_type': bool},
+            "use_experimental_parser": {'var_type': bool},
+            "static_parser": {'var_type': bool},
+        }
+
+        if self.dbt_config_vars:
+            for var_key, var_value in self.dbt_config_vars.items():
+
+                vars_check = vars_checks.get(var_key)
+                if vars_check:
+
+                    var_type = vars_check.get('var_type')
+                    if var_type:
+                        if not isinstance(var_value, var_type):
+                            raise CosmosValueError(f"dbt config var {var_key}: {var_value} must be a {var_type}")
+
+                    accepted_values = vars_check.get('accepted_values')
+                    if accepted_values:
+                        if var_value not in accepted_values:
+                            raise CosmosValueError(
+                                f"dbt config var {var_key}: {var_value} must be one of {accepted_values}"
+                            )
+                else:
+                    warnings.warn(f"dbt config var {var_key}: {var_value} is not supported")
 
     def validate_profiles_yml(self) -> None:
         "Validates a user-supplied profiles.yml is present"
@@ -252,7 +294,10 @@ class ProfileConfig:
 
         elif self.profile_mapping:
             profile_contents = self.profile_mapping.get_profile_file_contents(
-                profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
+                profile_name=self.profile_name,
+                target_name=self.target_name,
+                use_mock_values=use_mock_values,
+                dbt_config_vars=self.dbt_config_vars,
             )
 
             if use_mock_values:

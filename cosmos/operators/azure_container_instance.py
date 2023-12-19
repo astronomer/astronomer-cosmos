@@ -16,8 +16,8 @@ try:
     from airflow.providers.microsoft.azure.operators.container_instances import AzureContainerInstancesOperator
 except ImportError:
     raise ImportError(
-        "Could not import AzureContainerInstancesOperator. Ensure you've installed the Microsoft Azure provider separately or "
-        "with `pip install astronomer-cosmos[...,azure-container-instance]`."
+        "Could not import AzureContainerInstancesOperator. Ensure you've installed the Microsoft Azure provider "
+        "separately or with `pip install astronomer-cosmos[...,azure-container-instance]`."
     )
 
 
@@ -32,7 +32,6 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
 
     intercept_flag = False
 
-    # ACI params
     def __init__(
         self,
         ci_conn_id: str,
@@ -41,6 +40,8 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         image: str,
         region: str,
         profile_config: ProfileConfig | None = None,
+        remove_on_error: bool = False,
+        fail_if_exists: bool = False,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -50,8 +51,8 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
             name=name,
             image=image,
             region=region,
-            remove_on_error=False,
-            fail_if_exists=False,
+            remove_on_error=remove_on_error,
+            fail_if_exists=fail_if_exists,
             **kwargs,
         )
 
@@ -67,9 +68,6 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
-        # set env vars
-        # self.environment: dict[str, Any] = {**env_vars, **self.environment}
-
         self.command: list[str] = dbt_cmd
 
     def execute(self, context: Context) -> None:

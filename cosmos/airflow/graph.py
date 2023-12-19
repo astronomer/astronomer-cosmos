@@ -36,7 +36,8 @@ def calculate_operator_class(
     :returns: path string to the correspondent Cosmos Airflow operator
     (e.g. cosmos.operators.localDbtSnapshotLocalOperator)
     """
-    return f"cosmos.operators.{execution_mode.value}.{dbt_class}{execution_mode.value.capitalize()}Operator"
+    operator_name = "".join(x.capitalize() for x in execution_mode.value.lower().split("_"))
+    return f"cosmos.operators.{execution_mode.value}.{dbt_class}{operator_name}Operator"
 
 
 def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:

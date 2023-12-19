@@ -120,6 +120,9 @@ kubernetes = [
 pydantic = [
         "pydantic>=1.10.0",
 ]
+azure-container-instance = [
+    "apache-airflow-providers-microsoft-azure==8.4.0",
+]
 
 [project.entry-points.cosmos]
 provider_info = "cosmos:get_provider_info"

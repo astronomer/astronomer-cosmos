@@ -56,11 +56,12 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
             **kwargs,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> int:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
-        result = super().execute(context)
+        result = int(super().execute(context))
         logger.info(result)
+        return result
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt

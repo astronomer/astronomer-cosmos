@@ -42,6 +42,7 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         profile_config: ProfileConfig | None = None,
         remove_on_error: bool = False,
         fail_if_exists: bool = False,
+        registry_conn_id: str | None = None,  # need to add a default in order for Airflow 2.3 support
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -53,6 +54,7 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
             region=region,
             remove_on_error=remove_on_error,
             fail_if_exists=fail_if_exists,
+            registry_conn_id=registry_conn_id,
             **kwargs,
         )
 

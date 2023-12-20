@@ -73,8 +73,8 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.command: list[str] = dbt_cmd
 
-    def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context)
+    def execute(self, context: Context) -> int:
+        return self.build_and_run_cmd(context=context)
 
 
 class DbtLSAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
@@ -110,9 +110,9 @@ class DbtSeedAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperato
 
         return flags
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> int:
         cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtSnapshotAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
@@ -180,6 +180,6 @@ class DbtRunOperationAzureContainerInstanceOperator(DbtAzureContainerInstanceBas
             flags.append(yaml.dump(self.args))
         return flags
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> int:
         cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)

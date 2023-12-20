@@ -3,18 +3,19 @@
 Execution Modes
 ===============
 
-Cosmos can run ``dbt`` commands using four different approaches, called ``execution modes``:
+Cosmos can run ``dbt`` commands using five different approaches, called ``execution modes``:
 
 1. **local**: Run ``dbt`` commands using a local ``dbt`` installation (default)
 2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
 3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
+5. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
 
 .. list-table:: Execution Modes Comparison
-   :widths: 25 25 25 25
+   :widths: 20 20 20 20 20
    :header-rows: 1
 
    * - Execution Mode
@@ -34,6 +35,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - Medium
      - No
    * - Kubernetes
+     - Slow
+     - High
+     - No
+   * - Azure Container Instance
      - Slow
      - High
      - No
@@ -117,7 +122,7 @@ Example DAG:
 Kubernetes
 ----------
 
-Lastly, the ``kubernetes`` approach is the most isolated way of running ``dbt`` since the ``dbt`` run commands from within a Kubernetes Pod, usually in a separate host.
+The ``kubernetes`` approach is a very isolated way of running ``dbt`` since the ``dbt`` run commands from within a Kubernetes Pod, usually in a separate host.
 
 It assumes the user has a Kubernetes cluster. It also expects the user to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading the user to declare secrets in two places (Airflow and Docker container).
 
@@ -146,5 +151,31 @@ Example DAG:
             "get_logs": True,
             "is_delete_operator_pod": False,
             "secrets": [postgres_password_secret],
+        },
+    )
+
+Azure Container Instance
+------------------------
+Similar to the ``kubernetes`` approach, using ``Azure Container Instances`` as the execution mode gives a very isolated way of running ``dbt``, since the ``dbt`` run itself is run within a container running in an Azure Container Instance.
+
+This execution mode requires the user has an Azure environment that can be used to run Azure Container Groups in (see :ref:`azure-container-instance` for more details on the exact requirements). Similarly to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+
+Each task will create a new container on Azure, giving full isolation. This, however, comes at the cost of speed, as this separation of tasks introduces some overhead. Please checkout the step-by-step guide for using Azure Container Instance as the execution mode
+
+
+.. code-block:: python
+
+    docker_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.AZURE_CONTAINER_INSTANCE
+        ),
+        operator_args={
+            "ci_conn_id": "aci",
+            "registry_conn_id": "acr",
+            "resource_group": "my-rg",
+            "name": "my-aci-{{ ti.task_id.replace('.','-').replace('_','-') }}",
+            "region": "West Europe",
+            "image": "dbt-jaffle-shop:1.0.0",
         },
     )

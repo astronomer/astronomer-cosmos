@@ -235,7 +235,7 @@ class DbtToAirflowConverter:
             raise CosmosValueError(
                 "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
             )
-        
+
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             logger.warning(
                 "`ExecutionConfig.virtualenv_dir` is only supported when \

@@ -169,7 +169,7 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-    ]
+    ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
@@ -195,6 +195,7 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
         operator_args=operator_args,
     )
     assert converter
+
 
 @pytest.mark.parametrize(
     "execution_mode,virtualenv_dir,operator_args",
@@ -228,9 +229,11 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
         operator_args=operator_args,
     )
 
-    assert "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text
-
+    assert (
+        "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
+        in caplog.text
+    )
 
 
 @pytest.mark.parametrize(

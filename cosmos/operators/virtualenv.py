@@ -32,13 +32,16 @@ logger = get_logger(__name__)
 
 PY_INTERPRETER = "python3"
 
+
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
     def wrapper(operator: DbtVirtualenvBaseOperator, *args: Any) -> None:
         if operator.virtualenv_dir is None:
             raise CosmosValueError(f"Method relies on value of parameter `virtualenv_dir` which is None.")
 
         method(operator, *args)
+
     return wrapper
+
 
 class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     """
@@ -51,7 +54,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the dbt job requires it.
     """
-    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir",) # type: ignore[operator]
+
+    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir",)  # type: ignore[operator]
 
     def __init__(
         self,
@@ -107,7 +111,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         logger.info(output)
 
     def _get_or_create_venv_py_interpreter(self) -> str:
-        """Helper method that parses virtual env configuration 
+        """Helper method that parses virtual env configuration
         and returns a DBT binary within the resulting virtualenv"""
 
         # No virtualenv_dir set, so revert to making a temporary virtualenv
@@ -142,19 +146,19 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.__release_venv_lock()
 
         return py_bin
-    
+
     @property
     def __lock_file(self) -> Path:
         return Path(f"{self.virtualenv_dir}/LOCK")
-    
+
     @property
     def _pid(self) -> int:
         return os.getpid()
-    
-    #@depends_on_virtualenv_dir
+
+    # @depends_on_virtualenv_dir
     def _is_lock_available(self) -> bool:
         if self.__lock_file.is_file():
-            with open(self.__lock_file, "r") as lf:
+            with open(self.__lock_file) as lf:
                 pid = int(lf.read())
 
                 self.log.info(f"Checking for running process with PID {pid}")
@@ -170,13 +174,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     @depends_on_virtualenv_dir
     def __acquire_venv_lock(self) -> None:
-        if not self.virtualenv_dir.is_dir(): # type: ignore
+        if not self.virtualenv_dir.is_dir():  # type: ignore
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self.__lock_file, "w") as lf:
             self.log.info(f"Acquiring lock at {self.__lock_file} with pid {str(self._pid)}")
             lf.write(str(self._pid))
-        
+
     @depends_on_virtualenv_dir
     def __release_venv_lock(self) -> None:
         if not self.__lock_file.is_file():
@@ -184,7 +188,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
             return
 
-        with open(self.__lock_file, "r") as lf:
+        with open(self.__lock_file) as lf:
             lock_file_pid = int(lf.read())
 
             if lock_file_pid == self._pid:
@@ -240,4 +244,3 @@ class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator)
     Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
-

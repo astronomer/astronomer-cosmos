@@ -15,6 +15,7 @@ from cosmos.airflow.graph import (
     create_task_metadata,
     create_test_task_metadata,
     generate_task_or_group,
+    _snake_case_to_camelcase,
 )
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
@@ -416,3 +417,10 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         },
         **additional_arguments,
     }
+
+
+@pytest.mark.parametrize(
+    "input,expected", [("snake_case", "SnakeCase"), ("snake_case_with_underscores", "SnakeCaseWithUnderscores")]
+)
+def test_snake_case_to_camelcase(input, expected):
+    assert _snake_case_to_camelcase(input) == expected

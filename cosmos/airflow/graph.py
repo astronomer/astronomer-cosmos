@@ -24,6 +24,17 @@ from typing import Union
 logger = get_logger(__name__)
 
 
+def _snake_case_to_camelcase(value: str) -> str:
+    """Convert snake_case to CamelCase
+
+    Example: foo_bar_baz -> FooBarBaz
+
+    :param value: Value to convert to CamelCase
+    :return: Converted value
+    """
+    return "".join(x.capitalize() for x in value.lower().split("_"))
+
+
 def calculate_operator_class(
     execution_mode: ExecutionMode,
     dbt_class: str,
@@ -36,8 +47,9 @@ def calculate_operator_class(
     :returns: path string to the correspondent Cosmos Airflow operator
     (e.g. cosmos.operators.localDbtSnapshotLocalOperator)
     """
-    operator_name = "".join(x.capitalize() for x in execution_mode.value.lower().split("_"))
-    return f"cosmos.operators.{execution_mode.value}.{dbt_class}{operator_name}Operator"
+    return (
+        f"cosmos.operators.{execution_mode.value}.{dbt_class}{_snake_case_to_camelcase(execution_mode.value)}Operator"
+    )
 
 
 def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:

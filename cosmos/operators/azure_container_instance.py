@@ -69,6 +69,7 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
+        self.environment_variables: dict[str, Any] = {**env_vars, **self.environment_variables}
         self.command: list[str] = dbt_cmd
 
     def execute(self, context: Context) -> int:

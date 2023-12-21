@@ -39,7 +39,7 @@ def test_dbt_azure_container_instance_operator_add_global_flags() -> None:
 @patch("cosmos.operators.base.context_to_airflow_vars")
 def test_dbt_azure_container_instance_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
     """
-    If an end user passes in a
+    If an end user passes in a variable via the context that is also a global flag, validate that the both are kept
     """
     dbt_base_operator = DbtAzureContainerInstanceBaseOperator(
         ci_conn_id="my_airflow_connection",
@@ -68,6 +68,37 @@ def test_dbt_azure_container_instance_operator_get_env(p_context_to_airflow_vars
         "START_DATE": "2023-02-15 12:30:00",
     }
     assert env == expected_env
+
+
+@patch("cosmos.operators.base.context_to_airflow_vars")
+def test_dbt_azure_container_instance_operator_check_environment_variables(
+    p_context_to_airflow_vars: MagicMock,
+) -> None:
+    """
+    If an end user passes in a variable via the context that is also a global flag, validate that the both are kept
+    """
+    dbt_base_operator = DbtAzureContainerInstanceBaseOperator(
+        ci_conn_id="my_airflow_connection",
+        task_id="my-task",
+        image="my_image",
+        region="Mordor",
+        name="my-aci",
+        resource_group="my-rg",
+        project_dir="my/dir",
+        environment_variables={"FOO": "BAR"},
+    )
+    dbt_base_operator.env = {
+        "start_date": "20220101",
+        "end_date": "20220102",
+        "some_path": Path(__file__),
+        "retries": 3,
+        "FOO": "foo",
+        ("tuple", "key"): "some_value",
+    }
+    expected_env = {"start_date": "20220101", "end_date": "20220102", "some_path": Path(__file__), "FOO": "BAR"}
+    dbt_base_operator.build_command(context=MagicMock())
+
+    assert dbt_base_operator.environment_variables == expected_env
 
 
 base_kwargs = {

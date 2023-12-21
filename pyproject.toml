@@ -121,7 +121,7 @@ pydantic = [
         "pydantic>=1.10.0",
 ]
 azure-container-instance = [
-    "apache-airflow-providers-microsoft-azure==8.4.0",
+    "apache-airflow-providers-microsoft-azure>=8.4.0",
 ]
 
 [project.entry-points.cosmos]

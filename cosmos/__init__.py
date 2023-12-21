@@ -87,6 +87,37 @@ except ImportError:
         "kubernetes",
     )
 
+try:
+    from cosmos.operators.azure_container_instance import (
+        DbtLSAzureContainerInstanceOperator,
+        DbtRunAzureContainerInstanceOperator,
+        DbtRunOperationAzureContainerInstanceOperator,
+        DbtSeedAzureContainerInstanceOperator,
+        DbtSnapshotAzureContainerInstanceOperator,
+        DbtTestAzureContainerInstanceOperator,
+    )
+except ImportError:
+    DbtLSAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtLSAzureContainerInstanceOperator", "azure-container-instance"
+    )
+    DbtRunAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtRunAzureContainerInstanceOperator", "azure-container-instance"
+    )
+    DbtRunOperationAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtRunOperationAzureContainerInstanceOperator",
+        "azure-container-instance",
+    )
+    DbtSeedAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtSeedAzureContainerInstanceOperator", "azure-container-instance"
+    )
+    DbtSnapshotAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtSnapshotAzureContainerInstanceOperator",
+        "azure-container-instance",
+    )
+    DbtTestAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator", "azure-container-instance"
+    )
+
 __all__ = [
     "ProjectConfig",
     "ProfileConfig",
@@ -113,6 +144,12 @@ __all__ = [
     "DbtSeedKubernetesOperator",
     "DbtTestKubernetesOperator",
     "DbtSnapshotKubernetesOperator",
+    "DbtLSAzureContainerInstanceOperator",
+    "DbtRunOperationAzureContainerInstanceOperator",
+    "DbtRunAzureContainerInstanceOperator",
+    "DbtSeedAzureContainerInstanceOperator",
+    "DbtTestAzureContainerInstanceOperator",
+    "DbtSnapshotAzureContainerInstanceOperator",
     "ExecutionMode",
     "LoadMode",
     "TestBehavior",

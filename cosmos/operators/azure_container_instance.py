@@ -23,14 +23,12 @@ except ImportError:
 
 class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, DbtBaseOperator):  # type: ignore
     """
-    Executes a dbt core cli command in a Docker container.
+    Executes a dbt core cli command in an Azure Container Instance
     """
 
     template_fields: Sequence[str] = tuple(
         list(DbtBaseOperator.template_fields) + list(AzureContainerInstancesOperator.template_fields)
     )
-
-    intercept_flag = False
 
     def __init__(
         self,
@@ -42,7 +40,7 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         profile_config: ProfileConfig | None = None,
         remove_on_error: bool = False,
         fail_if_exists: bool = False,
-        registry_conn_id: str | None = None,  # need to add a default in order for Airflow 2.3 support
+        registry_conn_id: str | None = None,  # need to add a default for Airflow 2.3 support
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -148,11 +146,9 @@ class DbtTestAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperato
 
     ui_color = "#8194E0"
 
-    def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["test"]
-        # as of now, on_warning_callback in docker executor does nothing
-        self.on_warning_callback = on_warning_callback
 
 
 class DbtRunOperationAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):

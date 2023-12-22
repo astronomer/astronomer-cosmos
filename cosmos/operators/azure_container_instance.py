@@ -147,9 +147,11 @@ class DbtTestAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperato
 
     ui_color = "#8194E0"
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, on_warning_callback: Callable[..., Any], **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.base_cmd = ["test"]
+        # as of now, on_warning_callback in azure container instance executor does nothing
+        self.on_warning_callback = on_warning_callback
 
 
 class DbtRunOperationAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):

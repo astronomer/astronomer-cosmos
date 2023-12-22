@@ -4,7 +4,7 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, PropertyMock, patch, call
 
 import pytest
 from airflow import DAG
@@ -68,8 +68,12 @@ def failing_test_dbt_project(tmp_path):
     tmp_dir.cleanup()
 
 
+class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
+    base_cmd = ["cmd"]
+
+
 def test_dbt_base_operator_add_global_flags() -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -88,27 +92,25 @@ def test_dbt_base_operator_add_global_flags() -> None:
 
 
 def test_dbt_base_operator_add_user_supplied_flags() -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
-        base_cmd=["run"],
         dbt_cmd_flags=["--full-refresh"],
     )
 
     cmd, _ = dbt_base_operator.build_cmd(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    assert cmd[-2] == "run"
+    assert cmd[-2] == "cmd"
     assert cmd[-1] == "--full-refresh"
 
 
 def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
-        base_cmd=["run"],
         dbt_cmd_global_flags=["--cache-selected-only"],
     )
 
@@ -116,7 +118,7 @@ def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
     assert cmd[-2] == "--cache-selected-only"
-    assert cmd[-1] == "run"
+    assert cmd[-1] == "cmd"
 
 
 @pytest.mark.parametrize(
@@ -124,11 +126,10 @@ def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
     [None, "cautious", "buildable", "empty"],
 )
 def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
-        base_cmd=["run"],
         indirect_selection=indirect_selection_type,
     )
 
@@ -140,7 +141,7 @@ def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> No
         assert cmd[-1] == indirect_selection_type
     else:
         assert cmd[0].endswith("dbt")
-        assert cmd[1] == "run"
+        assert cmd[1] == "cmd"
 
 
 @pytest.mark.parametrize(
@@ -157,7 +158,7 @@ def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> No
     ],
 )
 def test_dbt_base_operator_exception_handling(skip_exception, exception_code_returned, expected_exception) -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -174,7 +175,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
     """
     If an end user passes in a
     """
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -307,7 +308,7 @@ def test_run_operator_emits_events():
 
 
 def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = DbtCmdLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -324,7 +325,7 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
 
 
 def test_store_compiled_sql() -> None:
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -337,7 +338,7 @@ def test_store_compiled_sql() -> None:
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
 
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -399,7 +400,10 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
         **operator_class_kwargs.get(operator_class, {}),
     )
     task.execute(context={})
-    mock_build_and_run_cmd.assert_called_once_with(context={})
+    if operator_class == DbtTestLocalOperator:
+        mock_build_and_run_cmd.assert_called_once_with(context={})
+    else:
+        mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
 
 
 @patch("cosmos.operators.local.DbtLocalArtifactProcessor")
@@ -407,7 +411,7 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     instance = mock_processor.return_value
     instance.parse = MagicMock(side_effect=KeyError)
     caplog.set_level(logging.DEBUG)
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = DbtCmdLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir=DBT_PROJ_DIR,

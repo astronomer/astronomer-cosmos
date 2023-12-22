@@ -7,7 +7,15 @@ from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 
 from cosmos.log import get_logger
-from cosmos.operators.base import DbtBaseOperator
+from cosmos.operators.base import (
+    AbstractDbtBaseOperator,
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
+    DbtLSMixin,
+    DbtRunOperationMixin,
+)
 
 logger = get_logger(__name__)
 
@@ -21,13 +29,13 @@ except ImportError:
     )
 
 
-class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, DbtBaseOperator):  # type: ignore
+class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, AbstractDbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in an Azure Container Instance
     """
 
     template_fields: Sequence[str] = tuple(
-        list(DbtBaseOperator.template_fields) + list(AzureContainerInstancesOperator.template_fields)
+        list(AbstractDbtBaseOperator.template_fields) + list(AzureContainerInstancesOperator.template_fields)
     )
 
     def __init__(
@@ -76,85 +84,49 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Dbt
         return self.build_and_run_cmd(context=context)
 
 
-class DbtLSAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core ls command.
     """
 
-    ui_color = "#DBCDF6"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["ls"]
-
-
-class DbtSeedAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core seed command.
 
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    ui_color = "#F58D7E"
-
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
-        self.full_refresh = full_refresh
-        super().__init__(**kwargs)
-        self.base_cmd = ["seed"]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.full_refresh is True:
-            flags.append("--full-refresh")
-
-        return flags
-
-    def execute(self, context: Context) -> int:
-        cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
 
-class DbtSnapshotAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core snapshot command.
 
     """
 
-    ui_color = "#964B00"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["snapshot"]
-
-
-class DbtRunAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core run command.
     """
 
-    ui_color = "#7352BA"
-    ui_fgcolor = "#F4F2FC"
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["run"]
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
 
-class DbtTestAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core test command.
     """
 
-    ui_color = "#8194E0"
-
-    def __init__(self, on_warning_callback: Callable[..., Any], **kwargs: Any) -> None:
+    def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = ["test"]
         # as of now, on_warning_callback in azure container instance executor does nothing
         self.on_warning_callback = on_warning_callback
 
 
-class DbtRunOperationAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class DbtRunOperationAzureContainerInstanceOperator(DbtRunOperationMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core run-operation command.
 
@@ -163,22 +135,4 @@ class DbtRunOperationAzureContainerInstanceOperator(DbtAzureContainerInstanceBas
         selected macro.
     """
 
-    ui_color = "#8194E0"
-    template_fields: Sequence[str] = ("args",)
-
-    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
-        self.macro_name = macro_name
-        self.args = args
-        super().__init__(**kwargs)
-        self.base_cmd = ["run-operation", macro_name]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.args is not None:
-            flags.append("--args")
-            flags.append(yaml.dump(self.args))
-        return flags
-
-    def execute(self, context: Context) -> int:
-        cmd_flags = self.add_cmd_flags()
-        return self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]

@@ -13,8 +13,12 @@ from cosmos.operators.azure_container_instance import (
 )
 
 
+class ConcreteDbtAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+    base_cmd = ["cmd"]
+
+
 def test_dbt_azure_container_instance_operator_add_global_flags() -> None:
-    dbt_base_operator = DbtAzureContainerInstanceBaseOperator(
+    dbt_base_operator = ConcreteDbtAzureContainerInstanceOperator(
         ci_conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -41,7 +45,7 @@ def test_dbt_azure_container_instance_operator_get_env(p_context_to_airflow_vars
     """
     If an end user passes in a variable via the context that is also a global flag, validate that the both are kept
     """
-    dbt_base_operator = DbtAzureContainerInstanceBaseOperator(
+    dbt_base_operator = ConcreteDbtAzureContainerInstanceOperator(
         ci_conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -77,7 +81,7 @@ def test_dbt_azure_container_instance_operator_check_environment_variables(
     """
     If an end user passes in a variable via the context that is also a global flag, validate that the both are kept
     """
-    dbt_base_operator = DbtAzureContainerInstanceBaseOperator(
+    dbt_base_operator = ConcreteDbtAzureContainerInstanceOperator(
         ci_conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",

@@ -81,7 +81,7 @@ class DbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     @property
     @abstractmethod
     def base_cmd(self) -> list[str]:
-        """Override this property to set the base command for the operator"""
+        """Override this property to set the dbt sub-command (i.e ls, seed, run, test, etc.) for the operator"""
 
     def __init__(
         self,
@@ -248,6 +248,12 @@ class DbtLSMixin:
 
 
 class DbtSeedMixin:
+    """
+    Mixin for dbt seed operation command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt seed command
+    """
+
     base_cmd = ["seed"]
     ui_color = "#F58D7E"
 
@@ -266,16 +272,18 @@ class DbtSeedMixin:
 
 
 class DbtSnapshotMixin:
-    """
-    Executes a dbt core snapshot command.
-    """
+    """Mixin for a dbt snapshot command."""
 
     base_cmd = ["snapshot"]
     ui_color = "#964B00"
 
 
 class DbtRunMixin:
-    """Mixin for dbt run command."""
+    """
+    Mixin for dbt run command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt seed command
+    """
 
     base_cmd = ["run"]
     ui_color = "#7352BA"

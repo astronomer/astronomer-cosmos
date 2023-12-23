@@ -4,7 +4,7 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch, call
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 from airflow import DAG
@@ -293,7 +293,7 @@ def test_run_operator_emits_events():
         run = MockRun()
         job = MockJob()
 
-    dbt_base_operator = DbtLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
@@ -308,7 +308,7 @@ def test_run_operator_emits_events():
 
 
 def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
-    dbt_base_operator = DbtCmdLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",

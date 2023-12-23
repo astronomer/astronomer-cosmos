@@ -18,7 +18,7 @@ profile_config = ProfileConfig(
 )
 
 
-class DbtCmdVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
+class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
     base_cmd = ["cmd"]
 
 
@@ -45,7 +45,7 @@ def test_run_command(
         password="fake_password",
         schema="fake_schema",
     )
-    venv_operator = DbtCmdVirtualenvBaseOperator(
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
         profile_config=profile_config,
         task_id="fake_task",
         install_deps=True,

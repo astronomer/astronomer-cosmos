@@ -411,7 +411,7 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     instance = mock_processor.return_value
     instance.parse = MagicMock(side_effect=KeyError)
     caplog.set_level(logging.DEBUG)
-    dbt_base_operator = DbtCmdLocalBaseOperator(
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir=DBT_PROJ_DIR,

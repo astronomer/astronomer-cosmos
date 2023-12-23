@@ -245,6 +245,7 @@ class DbtLSMixin:
     """
 
     base_cmd = ["ls"]
+    ui_color = "#DBCDF6"
 
 
 class DbtSeedMixin:

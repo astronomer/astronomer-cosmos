@@ -8,11 +8,12 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
+from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, RenderConfig, LoadMode
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 PROFILES_FILE_PATH = Path(DBT_ROOT_PATH, "jaffle_shop", "profiles.yml")
+DBT_LS_PATH = Path(DBT_ROOT_PATH, "jaffle_shop", "dbt_ls_models_staging.txt")
 
 
 @dag(
@@ -34,6 +35,10 @@ def user_defined_profile() -> None:
             profile_name="default",
             target_name="dev",
             profiles_yml_filepath=PROFILES_FILE_PATH,
+        ),
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_LS_FILE,
+            dbt_ls_path=DBT_LS_PATH,
         ),
         operator_args={"append_env": True, "install_deps": True},
         default_args={"retries": 2},

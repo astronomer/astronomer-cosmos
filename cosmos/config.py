@@ -245,17 +245,16 @@ class ProfileConfig:
 
         vars_checks: dict[str, dict[str, Any]] = {
             "send_anonymous_usage_stats": {"var_type": bool},
-            "use_colors": {"var_type": bool},
             "partial_parse": {"var_type": bool},
+            "use_experimental_parser": {"var_type": bool},
+            "static_parser": {"var_type": bool},
             "printer_width": {"var_type": int},
             "write_json": {"var_type": bool},
             "warn_error": {"var_type": str},
+            "warn_error_options": {"var_type": dict, "accepted_values": {"include", "exclude"}},
             "log_format": {"var_type": str, "accepted_values": {"text", "json", "default"}},
             "debug": {"var_type": bool},
             "version_check": {"var_type": bool},
-            "fail_fast": {"var_type": bool},
-            "use_experimental_parser": {"var_type": bool},
-            "static_parser": {"var_type": bool},
         }
 
         if self.dbt_config_vars:
@@ -265,7 +264,7 @@ class ProfileConfig:
 
             for var_key, var_value in self.dbt_config_vars.items():
                 if var_key not in list(vars_checks):
-                    warnings.warn(f"dbt config var {var_key}: {var_value} is not supported")
+                    CosmosValueError(f"dbt config var {var_key}: {var_value} is not supported")
                     continue
 
                 vars_check = vars_checks.get(var_key, {})

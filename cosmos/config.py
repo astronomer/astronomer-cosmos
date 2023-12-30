@@ -212,7 +212,7 @@ class ProfileConfig:
     :param target_name: The name of the dbt target to use.
     :param profiles_yml_filepath: The path to a profiles.yml file to use.
     :param profile_mapping: A mapping of Airflow connections to dbt profiles.
-    :param dbt_config_vars: Dictionary of dbt configs for the project. This argument overrides configs defined in your profiles.yml
+    :param dbt_config_vars: Dictionary of dbt configs for the project for profile mapping. Not active if you use profiles_yml_filepath. This argument overrides configs defined in your profiles.yml
         file. The dictionary is dumped to a yaml string. Details https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml
     """
 
@@ -259,22 +259,27 @@ class ProfileConfig:
         }
 
         if self.dbt_config_vars:
-            for var_key, var_value in self.dbt_config_vars.items():
-                vars_check = vars_checks.get(var_key)
-                if vars_check:
-                    var_type = vars_check.get("var_type")
-                    if var_type:
-                        if not isinstance(var_value, var_type):
-                            raise CosmosValueError(f"dbt config var {var_key}: {var_value} must be a {var_type}")
+            if self.profiles_yml_filepath:
+                warnings.warn("dbt config vars are not supported when using profiles_yml_filepath")
+                return
 
-                    accepted_values = vars_check.get("accepted_values")
-                    if accepted_values:
-                        if var_value not in accepted_values:
-                            raise CosmosValueError(
-                                f"dbt config var {var_key}: {var_value} must be one of {accepted_values}"
-                            )
-                else:
+            for var_key, var_value in self.dbt_config_vars.items():
+                if var_key not in list(vars_checks):
                     warnings.warn(f"dbt config var {var_key}: {var_value} is not supported")
+                    continue
+
+                vars_check = vars_checks.get(var_key, {})
+
+                var_type = vars_check.get("var_type", Any)
+                if not isinstance(var_value, var_type):
+                    raise CosmosValueError(f"dbt config var {var_key}: {var_value} must be a {var_type}")
+
+                accepted_values = vars_check.get("accepted_values")
+                if accepted_values:
+                    if var_value not in accepted_values:
+                        raise CosmosValueError(
+                            f"dbt config var {var_key}: {var_value} must be one of {accepted_values}"
+                        )
 
     def validate_profiles_yml(self) -> None:
         "Validates a user-supplied profiles.yml is present"

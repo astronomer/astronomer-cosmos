@@ -243,33 +243,31 @@ class ProfileConfig:
     def validate_dbt_config_vars(self) -> None:
         "Validates config vars for profile."
 
-        vars_checks = {
-            "send_anonymous_usage_stats": {'var_type': bool},
-            "use_colors": {'var_type': bool},
-            "partial_parse": {'var_type': bool},
-            "printer_width": {'var_type': int},
-            "write_json": {'var_type': bool},
-            "warn_error": {'var_type': str},
-            "log_format": {'var_type': str, 'accepted_values': {"text", "json", "default"}},
-            "debug": {'var_type': bool},
-            "version_check": {'var_type': bool},
-            "fail_fast": {'var_type': bool},
-            "use_experimental_parser": {'var_type': bool},
-            "static_parser": {'var_type': bool},
+        vars_checks: dict[str, dict[str, Any]] = {
+            "send_anonymous_usage_stats": {"var_type": bool},
+            "use_colors": {"var_type": bool},
+            "partial_parse": {"var_type": bool},
+            "printer_width": {"var_type": int},
+            "write_json": {"var_type": bool},
+            "warn_error": {"var_type": str},
+            "log_format": {"var_type": str, "accepted_values": {"text", "json", "default"}},
+            "debug": {"var_type": bool},
+            "version_check": {"var_type": bool},
+            "fail_fast": {"var_type": bool},
+            "use_experimental_parser": {"var_type": bool},
+            "static_parser": {"var_type": bool},
         }
 
         if self.dbt_config_vars:
             for var_key, var_value in self.dbt_config_vars.items():
-
                 vars_check = vars_checks.get(var_key)
                 if vars_check:
-
-                    var_type = vars_check.get('var_type')
+                    var_type = vars_check.get("var_type")
                     if var_type:
                         if not isinstance(var_value, var_type):
                             raise CosmosValueError(f"dbt config var {var_key}: {var_value} must be a {var_type}")
 
-                    accepted_values = vars_check.get('accepted_values')
+                    accepted_values = vars_check.get("accepted_values")
                     if accepted_values:
                         if var_value not in accepted_values:
                             raise CosmosValueError(

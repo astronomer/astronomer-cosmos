@@ -176,6 +176,16 @@ def test_render_config_uses_default_if_exists(mock_which):
     assert render_config.dbt_executable_path == "user-dbt"
 
 
+def test_is_dbt_ls_file_available_is_true():
+    render_config = RenderConfig(dbt_ls_path=DBT_PROJECTS_ROOT_DIR / "sample_dbt_ls.txt")
+    assert render_config.is_dbt_ls_file_available()
+
+
+def test_is_dbt_ls_file_available_is_false():
+    render_config = RenderConfig(dbt_ls_path=None)
+    assert not render_config.is_dbt_ls_file_available()
+
+
 def test_render_config_env_vars_deprecated():
     """RenderConfig.env_vars is deprecated since Cosmos 1.3, should warn user."""
     with pytest.deprecated_call():

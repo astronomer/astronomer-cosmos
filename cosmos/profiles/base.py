@@ -157,7 +157,11 @@ class BaseProfileMapping(ABC):
         return env_vars
 
     def get_profile_file_contents(
-        self, profile_name: str, target_name: str = "cosmos_target", use_mock_values: bool = False
+        self,
+        profile_name: str,
+        target_name: str = "cosmos_target",
+        use_mock_values: bool = False,
+        dbt_config_vars: dict[str, Any] | None = None
     ) -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.
@@ -181,7 +185,6 @@ class BaseProfileMapping(ABC):
 
         if not dbt_config_vars is None:
             profile_contents["config"] = dbt_config_vars
-
 
         if self.disable_event_tracking:
             profile_contents["config"] = {"send_anonymous_usage_stats": "False"}

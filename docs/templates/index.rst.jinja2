@@ -38,6 +38,9 @@ is set in the ``cosmos.config.ProfileConfig`` object, like so:
         # choose one of the following
         profile_mapping=...,
         profiles_yml_filepath=...,
+
+        # if profile_mapping is used, you can also pass dbt config vars
+        dbt_config_vars=...,
     )
 
     dag = DbtDag(profile_config=profile_config, ...)
@@ -113,6 +116,32 @@ the example below:
     dag = DbtDag(profile_config=profile_config, ...)
 
 
+Dbt config vars
+--------------------------------
+.. versionadded:: 1.3
+
+The parts of ``profiles.yml``, which aren't specific to a particular data platform `dbt docs <https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml>`_
+
+.. code-block:: python
+
+    from cosmos.profiles import SnowflakeUserPasswordProfileMapping
+
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profile_mapping=SnowflakeUserPasswordProfileMapping(
+            conn_id="my_snowflake_conn_id",
+            profile_args={
+                "database": "my_snowflake_database",
+                "schema": "my_snowflake_schema",
+            },
+        ),
+        dbt_config_vars={
+            "debug": True,
+        },
+    )
+
+    dag = DbtDag(profile_config=profile_config, ...)
 
 
 Using your own profiles.yml file

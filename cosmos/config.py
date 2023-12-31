@@ -212,7 +212,7 @@ class ProfileConfig:
     :param target_name: The name of the dbt target to use.
     :param profiles_yml_filepath: The path to a profiles.yml file to use.
     :param profile_mapping: A mapping of Airflow connections to dbt profiles.
-    :param dbt_config_vars: Dictionary of dbt configs for the project for profile mapping. Not active if you use profiles_yml_filepath. This argument overrides configs defined in your profiles.yml
+    :param dbt_config_vars: Dictionary of dbt configs for the project with profile mapping. Not active if you use profiles_yml_filepath. This argument overrides configs defined in your profiles.yml
         file. The dictionary is dumped to a yaml string. Details https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml
     """
 
@@ -259,13 +259,13 @@ class ProfileConfig:
 
         if self.dbt_config_vars:
             if self.profiles_yml_filepath:
-                warnings.warn("dbt config vars are not supported when using profiles_yml_filepath")
-                return
+                raise CosmosValueError(
+                    "Both profiles_yml_filepath and dbt_config_vars are defined and are mutually exclusive. Ensure only one of these is defined."
+                )
 
             for var_key, var_value in self.dbt_config_vars.items():
                 if var_key not in list(vars_checks):
-                    CosmosValueError(f"dbt config var {var_key}: {var_value} is not supported")
-                    continue
+                    raise CosmosValueError(f"dbt config var {var_key}: {var_value} is not supported")
 
                 vars_check = vars_checks.get(var_key, {})
 

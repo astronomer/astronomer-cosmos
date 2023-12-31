@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 import yaml
 
@@ -37,7 +39,7 @@ def test_validate_profile_args(profile_arg: str):
 
 
 @pytest.mark.parametrize("disable_event_tracking", [True, False])
-def test_disable_event_tracking(disable_event_tracking: str):
+def test_disable_event_tracking(disable_event_tracking: bool):
     """
     Tests the config block in the profile is set correctly if disable_event_tracking is set.
     """
@@ -50,3 +52,19 @@ def test_disable_event_tracking(disable_event_tracking: str):
     assert ("config" in profile_contents) == disable_event_tracking
     if disable_event_tracking:
         assert profile_contents["config"]["send_anonymous_usage_stats"] == "False"
+
+
+@pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("debug", True), ("debug", False)])
+def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
+    """
+    Tests the config block in the profile is set correctly.
+    """
+    test_profile = TestProfileMapping(conn_id="fake_conn_id")
+    profile_contents = yaml.safe_load(
+        test_profile.get_profile_file_contents(
+            profile_name="fake-profile-name", dbt_config_vars={dbt_config_var: dbt_config_value}
+        )
+    )
+
+    assert "config" in profile_contents
+    assert profile_contents["config"] == {dbt_config_var: dbt_config_value}

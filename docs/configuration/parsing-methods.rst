@@ -60,7 +60,7 @@ To use this:
 
 .. note::
 
-    This only works for the ``local`` execution mode.
+    This only works if a dbt command / executable is available to the scheduler.
 
 If you don't have a ``manifest.json`` file, Cosmos will attempt to generate one from your dbt project. It does this by running ``dbt ls`` and parsing the output.
 

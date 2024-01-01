@@ -16,7 +16,7 @@ There are benefits and drawbacks to each method:
 - ``dbt_manifest``: You have to generate the manifest file on your own. When using the manifest, Cosmos gets a complete set of metadata about your models. However, Cosmos uses its own selecting & excluding logic to determine which models to run, which may not be as robust as dbt's.
 - ``dbt_ls``: Cosmos will generate the manifest file for you. This method uses dbt's metadata AND dbt's selecting/excluding logic. This is the most robust method. However, this requires the dbt executable to be installed on your machine (either on the host directly or in a virtual environment).
 - ``dbt_ls_file`` (new in 1.3): Path to a file containing the ``dbt ls`` output. To use this method, run ``dbt ls`` using ``--output json`` and store the output in a file. ``RenderConfig.select`` and ``RenderConfig.exclude`` will not work using this method.
-- ``custom``: Cosmos will parse your project and model files for you. This means that Cosmos will not have access to dbt's metadata. However, this method does not require the dbt executable to be installed on your machine.
+- ``custom``: Cosmos will parse your project and model files for you. This means that Cosmos will not have access to dbt's metadata. However, this method does not require the dbt executable to be installed on your machine, and does not require the user to provide any dbt artifacts.
 
 If you're using the ``local`` mode, you should use the ``dbt_ls`` method.
 

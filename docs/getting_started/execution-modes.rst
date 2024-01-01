@@ -75,7 +75,7 @@ Similar to the ``local`` execution mode, Cosmos converts Airflow Connections int
 Some drawbacks of this approach:
 
 - It is slower than ``local`` because it creates a new Python virtual environment for each Cosmos dbt task run.
-- The ``dbt_ls`` load method is not supported with this execution mode. See `Parsing Methods <parsing-methods.html>`_ for more information.
+- If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, users must use a `parsing method <parsing-methods.html>`_  that does not rely on dbt, such as ``LoadMode.MANIFEST``.
 
 Example of how to use:
 

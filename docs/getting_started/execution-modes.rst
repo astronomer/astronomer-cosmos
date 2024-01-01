@@ -94,7 +94,7 @@ The user has better environment isolation than when using ``local`` or ``virtual
 The other challenge with the ``docker`` approach is if the Airflow worker is already running in Docker, which sometimes can lead to challenges running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
 
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container, which is slower than creating a Virtualenv with ``dbt-core``.
-Additionally, this execution mode does not support the ``dbt_ls`` load method (see `Parsing Methods <parsing-methods.html>`_ for more information).
+If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, users must use a `parsing method <parsing-methods.html>`_  that does not rely on dbt, such as ``LoadMode.MANIFEST``.
 
 Check the step-by-step guide on using the ``docker`` execution mode at :ref:`docker`.
 

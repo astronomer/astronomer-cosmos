@@ -12,6 +12,7 @@ To get started, you should have:
 
 - The Astro CLI installed. You can find installation instructions `here <https://docs.astronomer.io/astro/cli/install-cli>`_.
 - An Astro CLI project. You can initialize a new project with ``astro dev init``.
+- A dbt project. The [jaffle shop example](https://github.com/dbt-labs/jaffle_shop) is a great first step. To use the jaffle shop example to demo Cosmos, clone the jaffle shop project using ``git clone`` into the ``/dags`` directory created by ``astro dev init``.
 
 Create a virtual environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

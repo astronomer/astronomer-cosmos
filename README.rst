@@ -31,7 +31,7 @@ Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DA
 Quickstart
 __________
 
-Check out the Getting Started guide on our `docs <https://astronomer.github.io/astronomer-cosmos/getting_started/astro.html>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ and at the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
+Check out the Getting Started guide on our `docs <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ and at the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
 
 Example Usage

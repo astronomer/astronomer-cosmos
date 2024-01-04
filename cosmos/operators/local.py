@@ -504,6 +504,17 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
                 self._handle_warnings(result, context)
 
 
+class DbtBuildLocalOperator(DbtLocalBaseOperator):
+    """
+    Executes a dbt core build command.
+
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.base_cmd = ["build"]
+
+
 class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core run-operation command.

@@ -1,22 +1,22 @@
 Changelog
 =========
 
-1.3.0a4 (2023-01-04)
---------------------
+1.3.0 (2023-01-04)
+------------------
 
 Features
 
-* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733, as `documented here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls-file>`_.
-* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728
-* Add support for dbt ``selector`` arg for DAG parsing by @jbandoro in #755, `more info here <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#render-config>`_.
-* Add ``ProfileMapping`` for Vertica by @perttus in #540, #688 and #741, as `documented here <https://astronomer.github.io/astronomer-cosmos/profiles/VerticaUserPassword.html>`_.
-* Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608, as `documented here <https://astronomer.github.io/astronomer-cosmos/profiles/SnowflakeEncryptedPrivateKeyFilePem.html>`_.
+* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls-file>`_).
+* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/selecting-excluding.html#using-select-and-exclude>`_)
+* Add support for dbt ``selector`` arg for DAG parsing by @jbandoro in #755 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#render-config>`_).
+* Add ``ProfileMapping`` for Vertica by @perttus in #540, #688 and #741 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/VerticaUserPassword.html>`_).
+* Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/SnowflakeEncryptedPrivateKeyFilePem.html>`_).
 * Add support for Snowflake encrypted private key environment variable by @DanMawdsleyBA in #649
-* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616, `more info here <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html#upload-to-gcs>`_.
-* Add cosmos/propagate_logs Airflow config support for disabling log propagation by @agreenburg in #648, `as described in the documentation <https://astronomer.github.io/astronomer-cosmos/configuration/logging.html>`_.
+* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616, (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html#upload-to-gcs>`_).
+* Add cosmos/propagate_logs Airflow config support for disabling log propagation by @agreenburg in #648 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/logging.html>`_).
 * Add operator_args ``full_refresh`` as a templated field by @joppevos in #623
-* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735, `as illustrated in the documentation <https://astronomer.github.io/astronomer-cosmos/configuration/project-config.html#project-config-example>`_.
-* Support disabling event tracking when using Cosmos profile mapping by @jbandoro in #768, `documented here <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#disabling-dbt-event-tracking>`_.
+* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/project-config.html#project-config-example>`_).
+* Support disabling event tracking when using Cosmos profile mapping by @jbandoro in #768 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#disabling-dbt-event-tracking>`_).
 
 Enhancements
 

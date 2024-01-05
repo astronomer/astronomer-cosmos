@@ -20,6 +20,7 @@ from cosmos import ProfileConfig
 from cosmos.operators import (
     DbtDocsAzureStorageOperator,
     DbtDocsS3Operator,
+    DbtFreshnessS3Operator,
     DbtDocsGCSOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -77,6 +78,14 @@ with DAG(
 ) as dag:
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
+        profile_config=profile_config,
+        connection_id=S3_CONN_ID,
+        bucket_name="cosmos-docs",
+    )
+
+    generate_dbt_freshness_aws = DbtFreshnessS3Operator(
+        task_id="generate_dbt_freshness_aws",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
         connection_id=S3_CONN_ID,

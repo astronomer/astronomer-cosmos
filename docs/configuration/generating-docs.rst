@@ -10,6 +10,7 @@ Many users choose to generate and serve these docs on a static website. This is 
 Cosmos offers two pre-built ways of generating and uploading dbt docs and a fallback option to run custom code after the docs are generated:
 
 - :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
+- :class:`~cosmos.operators.DbtFreshnessS3Operator`: generates and uploads `sources.json <https://docs.getdbt.com/reference/artifacts/sources-json>`_ doc to an S3 bucket
 - :class:`~cosmos.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
 - :class:`~cosmos.operators.DbtDocsGCSOperator`: generates and uploads docs to a GCS bucket.
 - :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
@@ -34,6 +35,15 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
     # then, in your DAG code:
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
+        project_dir="path/to/jaffle_shop",
+        profile_config=profile_config,
+        # docs-specific arguments
+        connection_id="test_aws",
+        bucket_name="test_bucket",
+    )
+
+    generate_dbt_freshness_aws = DbtFreshnessS3Operator(
+        task_id="generate_dbt_freshness_aws",
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,
         # docs-specific arguments

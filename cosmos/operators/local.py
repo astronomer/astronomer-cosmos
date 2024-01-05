@@ -542,7 +542,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
 
     ui_color = "#8194E0"
 
-    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json", "run_results.json"]
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -556,6 +556,78 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
             if flag in self.dbt_cmd_flags:
                 # For the --static flag we only upload the generated static_index.html file
                 self.required_files = ["static_index.html"]
+
+
+class DbtFreshnessLocalOperator(DbtLocalBaseOperator):
+    """
+    Executes `dbt source freshness` command.
+    Use the `callback parameter to specify a callback function to run after the command completes.
+    """
+
+    ui_color = "#8194E0"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.base_cmd = ["source", "freshness"]
+
+
+class DbtFreshnessS3LocalOperator(DbtFreshnessLocalOperator):
+    """
+    Executes `dbt source freshness` command and upload to S3 storage. Returns the S3 path to the generated documentation.
+
+    :param aws_conn_id: S3's Airflow connection ID
+    :param bucket_name: S3's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
+        uploaded.
+    """
+
+    ui_color = "#FF9900"
+
+    def __init__(
+        self,
+        connection_id: str,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs: str,
+    ) -> None:
+        "Initializes the operator."
+        self.connection_id = connection_id
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+
+        super().__init__(**kwargs)
+
+        # override the callback with our own
+        self.callback = self.upload_to_s3
+
+    def upload_to_s3(self, project_dir: str) -> None:
+        "Uploads the generated documentation to S3."
+        logger.info(
+            'Attempting to upload generated docs to S3 using S3Hook("%s")',
+            self.connection_id,
+        )
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+        target_dir = f"{project_dir}/target"
+
+        hook = S3Hook(
+            self.connection_id,
+            extra_args={
+                "ContentType": "text/html",
+            },
+        )
+
+        logger.info("Uploading %s to %s", "sources.json", f"s3://{self.bucket_name}/sources.json")
+
+        key = f"{self.folder_dir}/sources.json" if self.folder_dir else "sources.json"
+
+        hook.load_file(
+            filename=f"{target_dir}/sources.json",
+            bucket_name=self.bucket_name,
+            key=key,
+            replace=True,
+        )
 
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):

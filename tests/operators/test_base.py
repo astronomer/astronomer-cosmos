@@ -13,7 +13,7 @@ from cosmos.operators.base import (
 
 def test_dbt_base_operator_is_abstract():
     """Tests that the abstract base operator cannot be instantiated since the base_cmd is not defined."""
-    expected_error = "Can't instantiate abstract class AbstractDbtBaseOperator with abstract method base_cmd"
+    expected_error = "Can't instantiate abstract class AbstractDbtBaseOperator with abstract methods? base_cmd"
     with pytest.raises(TypeError, match=expected_error):
         AbstractDbtBaseOperator()
 

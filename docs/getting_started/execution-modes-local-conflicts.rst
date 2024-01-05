@@ -1,10 +1,10 @@
 .. _execution-modes-local-conflicts:
 
-Airflow and DBT dependencies conflicts
+Airflow and dbt dependencies conflicts
 ======================================
 
 When using the `Local Execution Mode <execution-modes.html#local>`__, users may face dependency conflicts between
-Apache Airflow and DBT. The conflicts may increase depending on the Airflow providers and DBT plugins being used.
+Apache Airflow and dbt. The conflicts may increase depending on the Airflow providers and dbt adapters being used.
 
 If you find errors, we recommend users look into using `alternative execution modes <execution-modes.html>`__.
 
@@ -25,9 +25,25 @@ In the following table, ``x`` represents combinations that lead to conflicts (va
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
 | 2.7           | x   | x   | x   | x   | x   |     |     |     |
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+
+| 2.8           | x   | x   | x   | x   | x   |     |  x  |  x  |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+
+
 
 Examples of errors
 -----------------------------------
+
+.. code-block:: bash
+
+  The conflict is caused by:
+    apache-airflow 2.8.0 depends on pydantic>=2.3.0
+    dbt-semantic-interfaces 0.4.2 depends on pydantic~=1.10
+    apache-airflow 2.8.0 depends on pydantic>=2.3.0
+    dbt-semantic-interfaces 0.4.2.dev0 depends on pydantic~=1.10
+    apache-airflow 2.8.0 depends on pydantic>=2.3.0
+    dbt-semantic-interfaces 0.4.1 depends on pydantic~=1.10
+    apache-airflow 2.8.0 depends on pydantic>=2.3.0
+    dbt-semantic-interfaces 0.4.0 depends on pydantic~=1.10
+
 
 .. code-block:: bash
 
@@ -78,7 +94,7 @@ The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ wi
   @nox.parametrize(
       "dbt_version", ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7"]
   )
-  @nox.parametrize("airflow_version", ["2.2.4", "2.3", "2.4", "2.5", "2.6", "2.7"])
+  @nox.parametrize("airflow_version", ["2.2.4", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8"])
   def compatibility(session: nox.Session, airflow_version, dbt_version) -> None:
       """Run both unit and integration tests."""
       session.run(

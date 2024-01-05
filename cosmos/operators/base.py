@@ -16,7 +16,7 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
-class DbtBaseOperator(BaseOperator, metaclass=ABCMeta):
+class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
 

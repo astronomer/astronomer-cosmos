@@ -38,7 +38,7 @@ from cosmos.constants import DEFAULT_OPENLINEAGE_NAMESPACE, OPENLINEAGE_PRODUCER
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
-    DbtBaseOperator,
+    AbstractDbtBaseOperator,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -87,7 +87,7 @@ except airflow.exceptions.AirflowConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 
-class DbtLocalBaseOperator(DbtBaseOperator):
+class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
@@ -103,7 +103,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
     }

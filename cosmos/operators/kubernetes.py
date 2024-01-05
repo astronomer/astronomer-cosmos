@@ -8,7 +8,7 @@ from airflow.utils.context import Context, context_merge
 from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
-    DbtBaseOperator,
+    AbstractDbtBaseOperator,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -44,14 +44,14 @@ except ImportError:
         )
 
 
-class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore
+class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 
     """
 
     template_fields: Sequence[str] = tuple(
-        list(DbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
+        list(AbstractDbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
     )
 
     intercept_flag = False

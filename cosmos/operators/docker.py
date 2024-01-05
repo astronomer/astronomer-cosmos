@@ -6,7 +6,7 @@ from airflow.utils.context import Context
 
 from cosmos.log import get_logger
 from cosmos.operators.base import (
-    DbtBaseOperator,
+    AbstractDbtBaseOperator,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -27,13 +27,15 @@ except ImportError:
     )
 
 
-class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore
+class DbtDockerBaseOperator(DockerOperator, AbstractDbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Docker container.
 
     """
 
-    template_fields: Sequence[str] = tuple(list(DbtBaseOperator.template_fields) + list(DockerOperator.template_fields))
+    template_fields: Sequence[str] = tuple(
+        list(AbstractDbtBaseOperator.template_fields) + list(DockerOperator.template_fields)
+    )
 
     intercept_flag = False
 

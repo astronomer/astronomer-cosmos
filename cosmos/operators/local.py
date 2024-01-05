@@ -236,9 +236,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
                 )
                 if is_openlineage_available:
                     self.calculate_openlineage_events_completes(env, Path(tmp_project_dir))
-                    context[
-                        "task_instance"
-                    ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
+                    context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
 
                 if self.emit_datasets:
                     inlets = self.get_datasets("inputs")

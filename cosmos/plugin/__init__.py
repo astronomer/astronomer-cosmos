@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlsplit
 
 from airflow.configuration import conf
-from airflow.exceptions import AirflowConfigException, AirflowNotFoundException
 from airflow.plugins_manager import AirflowPlugin
 from airflow.security import permissions
 from airflow.www.auth import has_access
@@ -70,10 +69,7 @@ def open_http_file(conn_id: Optional[str], path: str) -> str:
 
 def open_file(path: str) -> str:
     """Retrieve a file from http, https, gs, s3, or wasb."""
-    try:
-        conn_id: Optional[str] = conf.get("cosmos", "dbt_docs_conn_id")
-    except AirflowConfigException:
-        conn_id = None
+    conn_id: Optional[str] = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
 
     if path.strip().startswith("s3://"):
         return open_s3_file(conn_id=conn_id, path=path)
@@ -163,20 +159,17 @@ class DbtDocsView(AirflowBaseView):
     @expose("/dbt_docs")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def dbt_docs(self) -> str:
-        try:
-            conf.get("cosmos", "dbt_docs_dir")
-        except AirflowConfigException:
+        if conf.get("cosmos", "dbt_docs_dir", fallback=None) is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def dbt_docs_index(self) -> str:
-        try:
-            docs_dir = conf.get("cosmos", "dbt_docs_dir")
-            html = open_file(op.join(docs_dir, "index.html"))
-        except (FileNotFoundError, AirflowConfigException):
+        docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
+        if docs_dir is None:
             abort(404)
+        html = open_file(op.join(docs_dir, "index.html"))
         # Hack the dbt docs to render properly in an iframe
         iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
         html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
@@ -185,21 +178,19 @@ class DbtDocsView(AirflowBaseView):
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
-        try:
-            docs_dir = conf.get("cosmos", "dbt_docs_dir")
-            data = open_file(op.join(docs_dir, "catalog.json"))
-        except (FileNotFoundError, AirflowConfigException):
+        docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
+        if docs_dir is None:
             abort(404)
+        data = open_file(op.join(docs_dir, "catalog.json"))
         return data, 200, {"Content-Type": "application/json"}
 
     @expose("/manifest.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
-        try:
-            docs_dir = conf.get("cosmos", "dbt_docs_dir")
-            data = open_file(op.join(docs_dir, "manifest.json"))
-        except (FileNotFoundError, AirflowConfigException):
+        docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
+        if docs_dir is None:
             abort(404)
+        data = open_file(op.join(docs_dir, "manifest.json"))
         return data, 200, {"Content-Type": "application/json"}
 
 

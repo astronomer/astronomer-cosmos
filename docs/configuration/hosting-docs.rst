@@ -88,7 +88,7 @@ Azure Blob Storage Example
 Host from Local Storage
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, Cosmos will not generate docs on the fly. Local storage only works if you are pre-compiling your dbt project before deployment. (For example, you are setting the
+By default, Cosmos will not generate docs on the fly. Local storage only works if you are pre-compiling your dbt project before deployment.
 
 If your Airflow deployment process involves running ``dbt compile``, you will also want to add ``dbt docs generate`` to your deployment process as well to generate all the artifacts necessary to run the dbt docs from local storage.
 
@@ -109,3 +109,19 @@ Using docs out of local storage has the downside that some values in the dbt doc
 
 - Counts of the numbers of rows.
 - The compiled SQL for incremental models before and after the first run.
+
+Host from HTTP/HTTPS
+~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: cfg
+
+    [cosmos]
+    dbt_docs_dir = https://my-site.com/path/to/docs
+
+.. code-block:: shell
+
+    AIRFLOW__COSMOS__DBT_DOCS_DIR="https://my-site.com/path/to/docs"
+
+
+You do not need to set a ``dbt_docs_conn_id`` when using HTTP/HTTPS.
+If you do set the ``dbt_docs_conn_id``, then the ``HttpHook`` will be used.

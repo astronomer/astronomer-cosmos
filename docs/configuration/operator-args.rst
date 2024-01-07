@@ -54,6 +54,7 @@ dbt-related
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
 - ``vars``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.dbt_vars`` instead) Supply variables to the project. This argument overrides variables defined in the ``dbt_project.yml``.
 - ``warn_error``: convert ``dbt`` warnings into errors.
+- ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
 
 Airflow-related
 ...............

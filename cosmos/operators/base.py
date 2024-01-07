@@ -59,7 +59,7 @@ class DbtBaseOperator(BaseOperator):
     :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
     """
 
-    template_fields: Sequence[str] = ("env", "vars")
+    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models")
     global_flags = (
         "project_dir",
         "select",

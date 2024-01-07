@@ -423,8 +423,14 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
 @pytest.mark.parametrize(
     "operator_class,expected_template",
     [
-        (DbtSeedLocalOperator, ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh")),
-        (DbtRunLocalOperator, ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh")),
+        (
+            DbtSeedLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+        ),
+        (
+            DbtRunLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+        ),
     ],
 )
 def test_dbt_base_operator_template_fields(operator_class, expected_template):

@@ -114,15 +114,7 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
 
 
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
-def test_dbt_docs_artifact_missing(app, artifact, monkeypatch):
-    def conf_get(section, key, *args, **kwargs):
-        if section == "cosmos":
-            raise AirflowConfigException
-        else:
-            return original_conf_get(section, key, *args, **kwargs)
-
-    monkeypatch.setattr(conf, "get", conf_get)
-
+def test_dbt_docs_artifact_missing(app, artifact):
     response = app.get(f"/cosmos/{artifact}")
     assert response.status_code == 404
 

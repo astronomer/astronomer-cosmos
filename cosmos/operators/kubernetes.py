@@ -3,12 +3,19 @@ from __future__ import annotations
 from os import PathLike
 from typing import Any, Callable, Sequence
 
-import yaml
 from airflow.utils.context import Context, context_merge
 
 from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
-from cosmos.operators.base import DbtBaseOperator
+from cosmos.operators.base import (
+    AbstractDbtBaseOperator,
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
+    DbtLSMixin,
+    DbtRunOperationMixin,
+)
 
 from airflow.models import TaskInstance
 from cosmos.dbt.parser.output import extract_log_issues
@@ -37,14 +44,14 @@ except ImportError:
         )
 
 
-class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type: ignore
+class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 
     """
 
     template_fields: Sequence[str] = tuple(
-        list(DbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
+        list(AbstractDbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
     )
 
     intercept_flag = False
@@ -94,76 +101,38 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, DbtBaseOperator):  # type
         self.build_and_run_cmd(context=context)
 
 
-class DbtLSKubernetesOperator(DbtKubernetesBaseOperator):
+class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core ls command.
     """
 
-    ui_color = "#DBCDF6"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["ls"]
-
-
-class DbtSeedKubernetesOperator(DbtKubernetesBaseOperator):
+class DbtSeedKubernetesOperator(DbtSeedMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core seed command.
-
-    :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    ui_color = "#F58D7E"
-
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
-        self.full_refresh = full_refresh
-        super().__init__(**kwargs)
-        self.base_cmd = ["seed"]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.full_refresh is True:
-            flags.append("--full-refresh")
-
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
 
-class DbtSnapshotKubernetesOperator(DbtKubernetesBaseOperator):
+class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core snapshot command.
-
     """
 
-    ui_color = "#964B00"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["snapshot"]
-
-
-class DbtRunKubernetesOperator(DbtKubernetesBaseOperator):
+class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core run command.
     """
 
-    ui_color = "#7352BA"
-    ui_fgcolor = "#F4F2FC"
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["run"]
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
 
-class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
+class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core test command.
     """
-
-    ui_color = "#8194E0"
 
     def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         if not on_warning_callback:
@@ -202,8 +171,6 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
             kwargs["on_failure_callback"] = self.on_failure_callback
 
             super().__init__(**kwargs)
-
-        self.base_cmd = ["test"]
 
     def _handle_warnings(self, context: Context) -> None:
         """
@@ -258,31 +225,9 @@ class DbtTestKubernetesOperator(DbtKubernetesBaseOperator):
             task.cleanup(pod=task.pod, remote_pod=task.remote_pod)
 
 
-class DbtRunOperationKubernetesOperator(DbtKubernetesBaseOperator):
+class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core run-operation command.
-
-    :param macro_name: name of macro to execute
-    :param args: Supply arguments to the macro. This dictionary will be mapped to the keyword arguments defined in the
-        selected macro.
     """
 
-    ui_color = "#8194E0"
-    template_fields: Sequence[str] = ("args",)
-
-    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
-        self.macro_name = macro_name
-        self.args = args
-        super().__init__(**kwargs)
-        self.base_cmd = ["run-operation", macro_name]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.args is not None:
-            flags.append("--args")
-            flags.append(yaml.dump(self.args))
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]

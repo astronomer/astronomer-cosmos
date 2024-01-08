@@ -23,8 +23,12 @@ except ImportError:
     module_available = False
 
 
+class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
+    base_cmd = ["cmd"]
+
+
 def test_dbt_kubernetes_operator_add_global_flags() -> None:
-    dbt_kube_operator = DbtKubernetesBaseOperator(
+    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -48,7 +52,7 @@ def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -
     """
     If an end user passes in a
     """
-    dbt_kube_operator = DbtKubernetesBaseOperator(
+    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",

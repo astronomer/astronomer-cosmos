@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from typing import Any, Sequence, Tuple
+from abc import ABCMeta, abstractmethod
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
@@ -15,14 +16,13 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
-class DbtBaseOperator(BaseOperator):
+class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
 
     :param project_dir: Which directory to look in for the dbt_project.yml file. Default is the current working
     directory and its parents.
     :param conn_id: The airflow connection to use as the target
-    :param base_cmd: dbt sub-command to run (i.e ls, seed, run, test, etc.)
     :param select: dbt optional argument that specifies which nodes to include.
     :param exclude: dbt optional argument that specifies which models to exclude.
     :param selector: dbt optional argument - the selector name to use, as defined in selectors.yml
@@ -78,11 +78,15 @@ class DbtBaseOperator(BaseOperator):
 
     intercept_flag = True
 
+    @property
+    @abstractmethod
+    def base_cmd(self) -> list[str]:
+        """Override this property to set the dbt sub-command (i.e ls, seed, run, test, etc.) for the operator"""
+
     def __init__(
         self,
         project_dir: str,
         conn_id: str | None = None,
-        base_cmd: list[str] | None = None,
         select: str | None = None,
         exclude: str | None = None,
         selector: str | None = None,
@@ -109,7 +113,6 @@ class DbtBaseOperator(BaseOperator):
     ) -> None:
         self.project_dir = project_dir
         self.conn_id = conn_id
-        self.base_cmd = base_cmd
         self.select = select
         self.exclude = exclude
         self.selector = selector
@@ -203,6 +206,10 @@ class DbtBaseOperator(BaseOperator):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
 
+    def add_cmd_flags(self) -> list[str]:
+        """Allows subclasses to override to add flags for their dbt command"""
+        return []
+
     def build_cmd(
         self,
         context: Context,
@@ -212,8 +219,7 @@ class DbtBaseOperator(BaseOperator):
 
         dbt_cmd.extend(self.dbt_cmd_global_flags)
 
-        if self.base_cmd:
-            dbt_cmd.extend(self.base_cmd)
+        dbt_cmd.extend(self.base_cmd)
 
         if self.indirect_selection:
             dbt_cmd += ["--indirect-selection", self.indirect_selection]
@@ -231,3 +237,104 @@ class DbtBaseOperator(BaseOperator):
         env = self.get_env(context)
 
         return dbt_cmd, env
+
+
+class DbtLSMixin:
+    """
+    Executes a dbt core ls command.
+    """
+
+    base_cmd = ["ls"]
+    ui_color = "#DBCDF6"
+
+
+class DbtSeedMixin:
+    """
+    Mixin for dbt seed operation command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt seed command
+    """
+
+    base_cmd = ["seed"]
+    ui_color = "#F58D7E"
+
+    template_fields: Sequence[str] = ("full_refresh",)
+
+    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+        self.full_refresh = full_refresh
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+        if self.full_refresh is True:
+            flags.append("--full-refresh")
+
+        return flags
+
+
+class DbtSnapshotMixin:
+    """Mixin for a dbt snapshot command."""
+
+    base_cmd = ["snapshot"]
+    ui_color = "#964B00"
+
+
+class DbtRunMixin:
+    """
+    Mixin for dbt run command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt seed command
+    """
+
+    base_cmd = ["run"]
+    ui_color = "#7352BA"
+    ui_fgcolor = "#F4F2FC"
+
+    template_fields: Sequence[str] = ("full_refresh",)
+
+    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+        self.full_refresh = full_refresh
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+        if self.full_refresh is True:
+            flags.append("--full-refresh")
+
+        return flags
+
+
+class DbtTestMixin:
+    """Mixin for dbt test command."""
+
+    base_cmd = ["test"]
+    ui_color = "#8194E0"
+
+
+class DbtRunOperationMixin:
+    """
+    Mixin for dbt run operation command.
+
+    :param macro_name: name of macro to execute
+    :param args: Supply arguments to the macro. This dictionary will be mapped to the keyword arguments defined in the
+        selected macro.
+    """
+
+    ui_color = "#8194E0"
+    template_fields: Sequence[str] = ("args",)
+
+    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
+        self.macro_name = macro_name
+        self.args = args
+        super().__init__(**kwargs)
+
+    @property
+    def base_cmd(self) -> list[str]:
+        return ["run-operation", self.macro_name]
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+        if self.args is not None:
+            flags.append("--args")
+            flags.append(yaml.dump(self.args))
+        return flags

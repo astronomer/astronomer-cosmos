@@ -60,11 +60,11 @@ class RenderConfig:
     dbt_executable_path: str | Path = get_system_dbt()
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
-    dbt_ls_path: InitVar[str | Path | None] = None
+    dbt_ls_path: str | Path | None = None
 
     project_path: Path | None = field(init=False)
 
-    def __post_init__(self, dbt_project_path: str | Path | None, dbt_ls_path: str | Path | None) -> None:
+    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:
             warnings.warn(
                 "RenderConfig.env_vars is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",

@@ -106,7 +106,7 @@ class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
     """
 
 
-class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):
+class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core seed command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -120,7 +120,7 @@ class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalO
     """
 
 
-class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):
+class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -134,7 +134,7 @@ class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator)
     """
 
 
-class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):
+class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core run-operation command within a Python Virtual Environment, that is created before running the
     dbt command and deleted just after.

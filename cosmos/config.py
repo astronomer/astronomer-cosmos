@@ -72,7 +72,7 @@ class RenderConfig:
             )
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
         # allows us to initiate this attribute from Path objects and str
-        self.dbt_ls_path = Path(dbt_ls_path) if dbt_ls_path else None
+        self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None
 
     def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
         """

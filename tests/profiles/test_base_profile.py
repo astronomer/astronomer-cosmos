@@ -49,4 +49,4 @@ def test_disable_event_tracking(disable_event_tracking: str):
 
     assert ("config" in profile_contents) == disable_event_tracking
     if disable_event_tracking:
-        assert profile_contents["config"]["send_anonymous_usage_stats"] == "False"
+        assert profile_contents["config"]["send_anonymous_usage_stats"] is False

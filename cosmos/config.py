@@ -60,7 +60,7 @@ class RenderConfig:
     dbt_executable_path: str | Path = get_system_dbt()
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
-    dbt_ls_path: str | Path | None = None
+    dbt_ls_path: Path | None = None
 
     project_path: Path | None = field(init=False)
 
@@ -70,8 +70,8 @@ class RenderConfig:
                 "RenderConfig.env_vars is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
                 DeprecationWarning,
             )
-        # we can initiate a path both from Path objects and str
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
+        # allows us to initiate this attribute from Path objects and str
         self.dbt_ls_path = Path(dbt_ls_path) if dbt_ls_path else None
 
     def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:

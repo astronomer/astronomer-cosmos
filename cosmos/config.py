@@ -45,7 +45,8 @@ class RenderConfig:
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
     :param env_vars: (Deprecated since Cosmos 1.3 use ProjectConfig.env_vars) A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
-    :param dbt_project_path Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
+    :param dbt_project_path: Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
+    :param dbt_ls_path: Configures the location of an output of ``dbt ls``. Required when using ``load_method=LoadMode.DBT_LS_FILE``.
     """
 
     emit_datasets: bool = True
@@ -70,6 +71,8 @@ class RenderConfig:
                 DeprecationWarning,
             )
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
+        # allows us to initiate this attribute from Path objects and str
+        self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None
 
     def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
         """

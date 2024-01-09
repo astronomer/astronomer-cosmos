@@ -181,6 +181,11 @@ def test_is_dbt_ls_file_available_is_true():
     assert render_config.is_dbt_ls_file_available()
 
 
+def test_is_dbt_ls_file_available_is_true_for_str_path():
+    render_config = RenderConfig(dbt_ls_path=str(DBT_PROJECTS_ROOT_DIR / "sample_dbt_ls.txt"))
+    assert render_config.is_dbt_ls_file_available()
+
+
 def test_is_dbt_ls_file_available_is_false():
     render_config = RenderConfig(dbt_ls_path=None)
     assert not render_config.is_dbt_ls_file_available()

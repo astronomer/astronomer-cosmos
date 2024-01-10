@@ -87,6 +87,8 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 
 .. code-block:: python
 
+    import os
+    from datetime import datetime
     from cosmos import DbtDag, ProjectConfig, ProfileConfig, ExecutionConfig
     from cosmos.profiles import PostgresUserPasswordProfileMapping
     from cosmos.constants import ExecutionMode

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from cosmos.profiles.base import BaseProfileMapping
+from cosmos.profiles.base import BaseProfileMapping, DbtConfigVars
 from cosmos.exceptions import CosmosValueError
 
 
@@ -36,17 +36,58 @@ def test_validate_profile_args(profile_arg: str):
         )
 
 
-@pytest.mark.parametrize("disable_event_tracking", [True, False])
-def test_disable_event_tracking(disable_event_tracking: str):
+@pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("debug", True), ("debug", False)])
+def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
     """
-    Tests the config block in the profile is set correctly if disable_event_tracking is set.
+    Tests the config block in the profile is set correctly.
     """
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
     test_profile = TestProfileMapping(
         conn_id="fake_conn_id",
-        disable_event_tracking=disable_event_tracking,
+        dbt_config_vars=DbtConfigVars(**dbt_config_vars),
     )
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
-    assert ("config" in profile_contents) == disable_event_tracking
-    if disable_event_tracking:
-        assert profile_contents["config"]["send_anonymous_usage_stats"] == "False"
+    assert "config" in profile_contents
+    assert profile_contents["config"][dbt_config_var] == dbt_config_value
+
+
+@pytest.mark.parametrize(
+    "dbt_config_var,dbt_config_value",
+    [("send_anonymous_usage_stats", 2), ("send_anonymous_usage_stats", "aaa")],
+)
+def test_profile_config_validate_dbt_config_vars_check_unexpected_types(dbt_config_var: str, dbt_config_value: Any):
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+
+    with pytest.raises(CosmosValueError) as err_info:
+        TestProfileMapping(
+            conn_id="fake_conn_id",
+            dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+        )
+    assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be a ")
+
+
+@pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("send_anonymous_usage_stats", True)])
+def test_profile_config_validate_dbt_config_vars_check_expected_types(dbt_config_var: str, dbt_config_value: Any):
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+
+    profile_config = TestProfileMapping(
+        conn_id="fake_conn_id",
+        dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+    )
+    assert profile_config.dbt_config_vars.as_dict() == dbt_config_vars
+
+
+@pytest.mark.parametrize(
+    "dbt_config_var,dbt_config_value",
+    [("log_format", "text2")],
+)
+def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: str, dbt_config_value: Any):
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+
+    with pytest.raises(CosmosValueError) as err_info:
+        TestProfileMapping(
+            conn_id="fake_conn_id",
+            dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+        )
+    assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be one of ")

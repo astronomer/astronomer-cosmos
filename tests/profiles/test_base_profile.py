@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from cosmos.profiles.base import BaseProfileMapping, DbtConfigVars
+from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
 from cosmos.exceptions import CosmosValueError
 
 
@@ -44,7 +44,7 @@ def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
     dbt_config_vars = {dbt_config_var: dbt_config_value}
     test_profile = TestProfileMapping(
         conn_id="fake_conn_id",
-        dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+        dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
     )
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
@@ -62,7 +62,7 @@ def test_profile_config_validate_dbt_config_vars_check_unexpected_types(dbt_conf
     with pytest.raises(CosmosValueError) as err_info:
         TestProfileMapping(
             conn_id="fake_conn_id",
-            dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+            dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
         )
     assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be a ")
 
@@ -73,7 +73,7 @@ def test_profile_config_validate_dbt_config_vars_check_expected_types(dbt_config
 
     profile_config = TestProfileMapping(
         conn_id="fake_conn_id",
-        dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+        dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
     )
     assert profile_config.dbt_config_vars.as_dict() == dbt_config_vars
 
@@ -88,6 +88,6 @@ def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: st
     with pytest.raises(CosmosValueError) as err_info:
         TestProfileMapping(
             conn_id="fake_conn_id",
-            dbt_config_vars=DbtConfigVars(**dbt_config_vars),
+            dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
         )
     assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be one of ")

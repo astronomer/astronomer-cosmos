@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 
 @dataclasses.dataclass
-class DbtConfigVars:
+class DbtProfileConfigVars:
     send_anonymous_usage_stats: Optional[bool] = False
     partial_parse: Optional[bool] = None
     use_experimental_parser: Optional[bool] = None
@@ -103,12 +103,15 @@ class BaseProfileMapping(ABC):
     _conn: Connection | None = None
 
     def __init__(
-        self, conn_id: str, profile_args: dict[str, Any] | None = None, dbt_config_vars: DbtConfigVars | None = None
+        self,
+        conn_id: str,
+        profile_args: dict[str, Any] | None = None,
+        dbt_config_vars: DbtProfileConfigVars | None = None,
     ):
         self.conn_id = conn_id
         self.profile_args = profile_args or {}
         self._validate_profile_args()
-        self.dbt_config_vars = dbt_config_vars or DbtConfigVars()
+        self.dbt_config_vars = dbt_config_vars or DbtProfileConfigVars()
 
     def _validate_profile_args(self) -> None:
         """

@@ -91,7 +91,7 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
 
 .. code-block:: python
 
-    from cosmos.profiles import SnowflakeUserPasswordProfileMapping, DbtConfigVars
+    from cosmos.profiles import SnowflakeUserPasswordProfileMapping, DbtProfileConfigVars
 
     profile_config = ProfileConfig(
         profile_name="my_profile_name",
@@ -102,7 +102,7 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
                 "database": "my_snowflake_database",
                 "schema": "my_snowflake_schema",
             },
-            dbt_config_vars=DbtConfigVars(send_anonymous_usage_stats=True),
+            dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=True),
         ),
     )
 

@@ -6,7 +6,7 @@ from typing import Any, Type
 
 
 from .athena import AthenaAccessKeyProfileMapping
-from .base import BaseProfileMapping, DbtConfigVars
+from .base import BaseProfileMapping, DbtProfileConfigVars
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 from .bigquery.oauth import GoogleCloudOauthProfileMapping
@@ -70,7 +70,7 @@ __all__ = [
     "GoogleCloudServiceAccountDictProfileMapping",
     "GoogleCloudOauthProfileMapping",
     "DatabricksTokenProfileMapping",
-    "DbtConfigVars",
+    "DbtProfileConfigVars",
     "PostgresUserPasswordProfileMapping",
     "RedshiftUserPasswordProfileMapping",
     "SnowflakeUserPasswordProfileMapping",

@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ProjectConfig, ProfileConfig
-from cosmos.profiles import PostgresUserPasswordProfileMapping, DbtConfigVars
+from cosmos.profiles import PostgresUserPasswordProfileMapping, DbtProfileConfigVars
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -18,7 +18,7 @@ profile_config = ProfileConfig(
     profile_mapping=PostgresUserPasswordProfileMapping(
         conn_id="airflow_db",
         profile_args={"schema": "public"},
-        dbt_config_vars=DbtConfigVars(send_anonymous_usage_stats=True),
+        dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=True),
     ),
 )
 

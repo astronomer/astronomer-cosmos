@@ -1,6 +1,23 @@
 Changelog
 =========
 
+1.3.1 (2023-01-10)
+------------------
+
+Bug fixes
+
+* Fix disable event tracking throwing error by @jbandoro in #784
+* Fix support for string path for ``LoadMode.DBT_LS_FILE`` and docs by @flinz in #788
+* Remove stack trace to disable unnecessary K8s error by @tatiana in #790
+
+Others
+
+* Update examples to use the astro-runtime 10.0.0 by @RNHTTR in #777
+* Docs: add missing imports for mwaa getting started by @Benjamin0313 in #792
+* Refactor common executor constructors with test coverage by @jbandoro in #774
+* pre-commit updates in #789
+
+
 1.3.0 (2023-01-04)
 ------------------
 

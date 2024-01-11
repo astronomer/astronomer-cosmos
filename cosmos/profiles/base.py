@@ -33,7 +33,7 @@ class DbtProfileConfigVars:
     static_parser: Optional[bool] = None
     printer_width: Optional[int] = None
     write_json: Optional[bool] = None
-    warn_error: Optional[str] = None
+    warn_error: Optional[bool] = None
     warn_error_options: Optional[dict[str, Any]] = None
     log_format: Optional[str] = None
     debug: Optional[bool] = None
@@ -47,7 +47,7 @@ class DbtProfileConfigVars:
             "static_parser": {"var_type": bool},
             "printer_width": {"var_type": int},
             "write_json": {"var_type": bool},
-            "warn_error": {"var_type": str},
+            "warn_error": {"var_type": bool},
             "warn_error_options": {"var_type": dict, "accepted_values": {"include", "exclude"}},
             "log_format": {"var_type": str, "accepted_values": {"text", "json", "default"}},
             "debug": {"var_type": bool},

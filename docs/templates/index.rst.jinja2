@@ -85,6 +85,8 @@ you specify in ``ProfileConfig``.
 
 Disabling dbt event tracking
 --------------------------------
+
+    Note: deprecated and will be removed in 2.0.0. Use dbt_config_vars instead.
 .. versionadded:: 1.3
 
 By default `dbt will track events <https://docs.getdbt.com/reference/global-configs/usage-stats>`_ by sending anonymous usage data
@@ -131,7 +133,19 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
                 "database": "my_snowflake_database",
                 "schema": "my_snowflake_schema",
             },
-            dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=True),
+            dbt_config_vars=DbtProfileConfigVars(
+                send_anonymous_usage_stats=False,
+                partial_parse=True,
+                use_experimental_parse=True,
+                static_parser=True,
+                printer_width=120,
+                write_json=True,
+                warn_error=True,
+                warn_error_options={"include": "all"},
+                log_format='text',
+                debug=True,
+                version_check=True,
+            ),
         ),
     )
 

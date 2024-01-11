@@ -18,6 +18,7 @@ profile_config = ProfileConfig(
     profile_mapping=PostgresUserPasswordProfileMapping(
         conn_id="airflow_db",
         profile_args={"schema": "public"},
+        disable_event_tracking=True,
         dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=True),
     ),
 )

@@ -1,46 +1,33 @@
 Changelog
 =========
 
-1.3.0 (2023-01-04)
-------------------
+1.3.0a3 (2023-12-07)
+--------------------
 
 Features
 
-* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls-file>`_).
-* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/selecting-excluding.html#using-select-and-exclude>`_)
-* Add support for dbt ``selector`` arg for DAG parsing by @jbandoro in #755 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#render-config>`_).
-* Add ``ProfileMapping`` for Vertica by @perttus in #540, #688 and #741 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/VerticaUserPassword.html>`_).
-* Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/SnowflakeEncryptedPrivateKeyFilePem.html>`_).
+* Add ``ProfileMapping`` for Vertica by @perttus in #540 and #688
+* Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608
 * Add support for Snowflake encrypted private key environment variable by @DanMawdsleyBA in #649
-* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616, (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html#upload-to-gcs>`_).
-* Add cosmos/propagate_logs Airflow config support for disabling log propagation by @agreenburg in #648 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/logging.html>`_).
+* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616
+* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728
+* Add cosmos/propagate_logs Airflow config support for disabling log pr… by @agreenburg in #648
 * Add operator_args ``full_refresh`` as a templated field by @joppevos in #623
-* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/project-config.html#project-config-example>`_).
-* Support disabling event tracking when using Cosmos profile mapping by @jbandoro in #768 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#disabling-dbt-event-tracking>`_).
+* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735
 
 Enhancements
 
 * Make Pydantic an optional dependency by @pixie79 in #736
 * Create a symbolic link to ``dbt_packages`` when ``dbt_deps`` is False when using ``LoadMode.DBT_LS`` by @DanMawdsleyBA in #730
+* Support no ``profile_config`` for ``ExecutionMode.KUBERNETES`` and ``ExecutionMode.DOCKER`` by @MrBones757 and @tatiana in #681 and #731
 * Add ``aws_session_token`` for Athena mapping by @benjamin-awd in #663
-* Retrieve temporary credentials from ``conn_id`` for Athena by @octiva in #758
-* Extend ``DbtDocsLocalOperator`` with static flag by @joppevos  in #759
-
-Bug fixes
-
-* Remove Pydantic upper version restriction so Cosmos can be used with Airflow 2.8 by @jlaneve in #772
 
 Others
 
 * Replace flake8 for Ruff by @joppevos in #743
 * Reduce code complexity to 8 by @joppevos in #738
+* Update conflict matrix between Airflow and dbt versions by @tatiana in #731
 * Speed up integration tests by @jbandoro in #732
-* Fix README quickstart link in by @RNHTTR in #776
-* Add package location to work with hatchling 1.19.0 by @jbandoro in #761
-* Fix type check error in ``DbtKubernetesBaseOperator.build_env_args`` by @jbandoro in #766
-* Improve ``DBT_MANIFEST`` documentation by @dwreeves in #757
-* Update conflict matrix between Airflow and dbt versions by @tatiana in #731 and #779
-* pre-commit updates in #775, #770, #762
 
 
 1.2.5 (2023-11-23)

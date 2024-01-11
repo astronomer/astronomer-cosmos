@@ -248,12 +248,13 @@ class BaseProfileMapping(ABC):
             }
         }
 
-        config_vars = self.dbt_config_vars.as_dict()
-        if config_vars:
-            profile_contents["config"] = config_vars
+        if self.dbt_config_vars:
+            profile_contents["config"] = self.dbt_config_vars.as_dict()
 
         if self.disable_event_tracking:
-            logger.warning("disable_event_tracking we be deleted in 2.0. You can Use instead dbt_config_vars")
+            logger.warning(
+                "disable_event_tracking is deprecated and will be removed in 2.0. You can use instead dbt_config_vars"
+            )
             profile_contents["config"] = {"send_anonymous_usage_stats": "False"}
 
         return str(yaml.dump(profile_contents, indent=4))

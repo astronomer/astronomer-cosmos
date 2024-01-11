@@ -242,9 +242,9 @@ class BaseProfileMapping(ABC):
             }
         }
 
-        congig_vars = self.dbt_config_vars.as_dict()
-        if congig_vars:
-            profile_contents["config"] = congig_vars
+        config_vars = self.dbt_config_vars.as_dict()
+        if config_vars:
+            profile_contents["config"] = config_vars
 
         return str(yaml.dump(profile_contents, indent=4))
 

@@ -2,11 +2,18 @@ from __future__ import annotations
 
 from typing import Any, Callable, Sequence
 
-import yaml
 from airflow.utils.context import Context
 
 from cosmos.log import get_logger
-from cosmos.operators.base import DbtBaseOperator
+from cosmos.operators.base import (
+    AbstractDbtBaseOperator,
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
+    DbtLSMixin,
+    DbtRunOperationMixin,
+)
 
 logger = get_logger(__name__)
 
@@ -20,13 +27,15 @@ except ImportError:
     )
 
 
-class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore
+class DbtDockerBaseOperator(DockerOperator, AbstractDbtBaseOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Docker container.
 
     """
 
-    template_fields: Sequence[str] = tuple(list(DbtBaseOperator.template_fields) + list(DockerOperator.template_fields))
+    template_fields: Sequence[str] = tuple(
+        list(AbstractDbtBaseOperator.template_fields) + list(DockerOperator.template_fields)
+    )
 
     intercept_flag = False
 
@@ -57,85 +66,48 @@ class DbtDockerBaseOperator(DockerOperator, DbtBaseOperator):  # type: ignore
         self.build_and_run_cmd(context=context)
 
 
-class DbtLSDockerOperator(DbtDockerBaseOperator):
+class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core ls command.
     """
 
-    ui_color = "#DBCDF6"
 
-    def __init__(self, **kwargs: str) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["ls"]
-
-
-class DbtSeedDockerOperator(DbtDockerBaseOperator):
+class DbtSeedDockerOperator(DbtSeedMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core seed command.
 
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    ui_color = "#F58D7E"
-
-    def __init__(self, full_refresh: bool = False, **kwargs: str) -> None:
-        self.full_refresh = full_refresh
-        super().__init__(**kwargs)
-        self.base_cmd = ["seed"]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.full_refresh is True:
-            flags.append("--full-refresh")
-
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
 
-class DbtSnapshotDockerOperator(DbtDockerBaseOperator):
+class DbtSnapshotDockerOperator(DbtSnapshotMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core snapshot command.
-
     """
 
-    ui_color = "#964B00"
 
-    def __init__(self, **kwargs: str) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["snapshot"]
-
-
-class DbtRunDockerOperator(DbtDockerBaseOperator):
+class DbtRunDockerOperator(DbtRunMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core run command.
     """
 
-    ui_color = "#7352BA"
-    ui_fgcolor = "#F4F2FC"
-
-    def __init__(self, **kwargs: str) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["run"]
+    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
 
-class DbtTestDockerOperator(DbtDockerBaseOperator):
+class DbtTestDockerOperator(DbtTestMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core test command.
     """
 
-    ui_color = "#8194E0"
-
     def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: str) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = ["test"]
         # as of now, on_warning_callback in docker executor does nothing
         self.on_warning_callback = on_warning_callback
 
 
-class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
+class DbtRunOperationDockerOperator(DbtRunOperationMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core run-operation command.
 
@@ -144,22 +116,4 @@ class DbtRunOperationDockerOperator(DbtDockerBaseOperator):
         selected macro.
     """
 
-    ui_color = "#8194E0"
-    template_fields: Sequence[str] = ("args",)
-
-    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: str) -> None:
-        self.macro_name = macro_name
-        self.args = args
-        super().__init__(**kwargs)
-        self.base_cmd = ["run-operation", macro_name]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.args is not None:
-            flags.append("--args")
-            flags.append(yaml.dump(self.args))
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]

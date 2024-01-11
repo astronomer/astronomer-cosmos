@@ -91,3 +91,4 @@ def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: st
             dbt_config_vars=DbtConfigVars(**dbt_config_vars),
         )
     assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be one of ")
+    

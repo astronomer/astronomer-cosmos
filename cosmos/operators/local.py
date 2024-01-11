@@ -11,7 +11,6 @@ import warnings
 
 import airflow
 import jinja2
-import yaml
 from airflow import DAG
 from airflow.compat.functools import cached_property
 from airflow.configuration import conf
@@ -38,7 +37,15 @@ from sqlalchemy.orm import Session
 from cosmos.constants import DEFAULT_OPENLINEAGE_NAMESPACE, OPENLINEAGE_PRODUCER
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
-from cosmos.operators.base import DbtBaseOperator
+from cosmos.operators.base import (
+    AbstractDbtBaseOperator,
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
+    DbtLSMixin,
+    DbtRunOperationMixin,
+)
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
@@ -80,7 +87,7 @@ except airflow.exceptions.AirflowConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 
-class DbtLocalBaseOperator(DbtBaseOperator):
+class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     """
     Executes a dbt core cli command locally.
 
@@ -96,7 +103,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
     """
 
-    template_fields: Sequence[str] = DbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -366,7 +373,7 @@ class DbtLocalBaseOperator(DbtBaseOperator):
         return result
 
     def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context)
+        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
@@ -377,92 +384,40 @@ class DbtLocalBaseOperator(DbtBaseOperator):
             self.subprocess_hook.send_sigterm()
 
 
-class DbtLSLocalOperator(DbtLocalBaseOperator):
+class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core ls command.
     """
 
-    ui_color = "#DBCDF6"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["ls"]
-
-
-class DbtSeedLocalOperator(DbtLocalBaseOperator):
+class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core seed command.
-
-    :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    ui_color = "#F58D7E"
-
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
-
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
-        self.full_refresh = full_refresh
-        super().__init__(**kwargs)
-        self.base_cmd = ["seed"]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.full_refresh is True:
-            flags.append("--full-refresh")
-
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
 
-class DbtSnapshotLocalOperator(DbtLocalBaseOperator):
+class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core snapshot command.
-
     """
 
-    ui_color = "#964B00"
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.base_cmd = ["snapshot"]
-
-
-class DbtRunLocalOperator(DbtLocalBaseOperator):
+class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core run command.
     """
 
-    ui_color = "#7352BA"
-    ui_fgcolor = "#F4F2FC"
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + ("full_refresh",)  # type: ignore[operator]
-
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
-        self.full_refresh = full_refresh
-        super().__init__(**kwargs)
-        self.base_cmd = ["run"]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.full_refresh is True:
-            flags.append("--full-refresh")
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
 
-class DbtTestLocalOperator(DbtLocalBaseOperator):
+class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core test command.
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
-
-    ui_color = "#8194E0"
 
     def __init__(
         self,
@@ -470,7 +425,6 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = ["test"]
         self.on_warning_callback = on_warning_callback
 
     def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
@@ -504,7 +458,7 @@ class DbtTestLocalOperator(DbtLocalBaseOperator):
                 self._handle_warnings(result, context)
 
 
-class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
+class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core run-operation command.
 
@@ -513,25 +467,7 @@ class DbtRunOperationLocalOperator(DbtLocalBaseOperator):
         selected macro.
     """
 
-    ui_color = "#8194E0"
-    template_fields: Sequence[str] = ("args",)
-
-    def __init__(self, macro_name: str, args: dict[str, Any] | None = None, **kwargs: Any) -> None:
-        self.macro_name = macro_name
-        self.args = args
-        super().__init__(**kwargs)
-        self.base_cmd = ["run-operation", macro_name]
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.args is not None:
-            flags.append("--args")
-            flags.append(yaml.dump(self.args))
-        return flags
-
-    def execute(self, context: Context) -> None:
-        cmd_flags = self.add_cmd_flags()
-        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
@@ -541,13 +477,11 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-
     required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+    base_cmd = ["docs", "generate"]
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.base_cmd = ["docs", "generate"]
-
         self.check_static_flag()
 
     def check_static_flag(self) -> None:

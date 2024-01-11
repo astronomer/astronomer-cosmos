@@ -53,6 +53,7 @@ class DbtConfigVars:
             "debug": {"var_type": bool},
             "version_check": {"var_type": bool},
         }
+
         for field_name, field_def in self.__dataclass_fields__.items():
             field_value = getattr(self, field_name)
 

@@ -53,6 +53,21 @@ def test_disable_event_tracking(disable_event_tracking: bool):
         assert profile_contents["config"]["send_anonymous_usage_stats"] == "False"
 
 
+def test_disable_event_tracking_and_send_anonymous_usage_stats():
+    expected_cosmos_error = (
+        "Cannot set both disable_event_tracking and "
+        "dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats ..."
+    )
+
+    with pytest.raises(CosmosValueError):
+        test_profile = TestProfileMapping(
+            conn_id="fake_conn_id",
+            dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False),
+            disable_event_tracking=True,
+        )
+        test_profile.get_profile_file_contents(profile_name="fake-profile-name")
+
+
 @pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("debug", True), ("debug", False)])
 def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
     """

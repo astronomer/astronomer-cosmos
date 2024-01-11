@@ -7,6 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Literal
 from pydantic import BaseModel
+import warnings
 
 from typing import TYPE_CHECKING
 import yaml
@@ -26,7 +27,7 @@ logger = get_logger(__name__)
 
 
 class DbtProfileConfigVars(BaseModel):
-    send_anonymous_usage_stats: Optional[bool] = False
+    send_anonymous_usage_stats: Optional[bool] = None
     partial_parse: Optional[bool] = None
     use_experimental_parser: Optional[bool] = None
     static_parser: Optional[bool] = None
@@ -39,14 +40,13 @@ class DbtProfileConfigVars(BaseModel):
     version_check: Optional[bool] = None
 
     def as_dict(self) -> Optional[dict[str, Any]]:
-        try:
-            result = self.dict()
-        except AttributeError:
-            result = self.model_dump()
+        full_dict = self.dict()
 
-        result = {field_name: result[field_name] for field_name in result if result[field_name] is not None}
-        if result != {}:
-            return result
+        clean_result = {
+            field_name: full_dict[field_name] for field_name in full_dict if full_dict[field_name] is not None
+        }
+        if clean_result != {}:
+            return clean_result
         return None
 
 
@@ -78,7 +78,7 @@ class BaseProfileMapping(ABC):
         self.profile_args = profile_args or {}
         self._validate_profile_args()
         self.disable_event_tracking = disable_event_tracking
-        self.dbt_config_vars = dbt_config_vars or DbtProfileConfigVars()
+        self.dbt_config_vars = dbt_config_vars
 
     def _validate_profile_args(self) -> None:
         """
@@ -217,9 +217,16 @@ class BaseProfileMapping(ABC):
             profile_contents["config"] = self.dbt_config_vars.as_dict()
 
         if self.disable_event_tracking:
-            logger.warning(
-                "disable_event_tracking is deprecated and will be removed in 2.0. You can use instead dbt_config_vars"
+            warnings.warn(
+                "Disabling dbt event tracking is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. "
+                "Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.",
+                DeprecationWarning,
             )
+            if self.dbt_config_vars is not None and self.dbt_config_vars.send_anonymous_usage_stats is not None:
+                raise CosmosValueError(
+                    "Cannot set both disable_event_tracking and "
+                    "dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats ..."
+                )
             profile_contents["config"] = {"send_anonymous_usage_stats": "False"}
 
         return str(yaml.dump(profile_contents, indent=4))

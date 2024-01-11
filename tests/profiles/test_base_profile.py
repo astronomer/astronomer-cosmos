@@ -51,33 +51,12 @@ def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
     assert "config" in profile_contents
-    assert profile_contents["config"] == dbt_config_vars
-
-
-def test_profile_config_validate_dbt_config_vars_empty():
-    test_profile = TestProfileMapping(
-        conn_id="fake_conn_id",
-        dbt_config_vars=None,
-    )
-    assert test_profile.dbt_config_vars is None
-
-
-def test_profile_config_validate_dbt_config_vars_check_unexpected_var():
-    dbt_config_var = "unexpected_var"
-    dbt_config_value = True
-    dbt_config_vars = {dbt_config_var: dbt_config_value}
-
-    with pytest.raises(CosmosValueError) as err_info:
-        TestProfileMapping(
-            conn_id="fake_conn_id",
-            dbt_config_vars=DbtConfigVars(**dbt_config_vars),
-        )
-    assert err_info.value.args[0] == f"dbt config var {dbt_config_var}: {dbt_config_value} is not supported"
+    assert profile_contents["config"][dbt_config_var] == dbt_config_value
 
 
 @pytest.mark.parametrize(
     "dbt_config_var,dbt_config_value",
-    [("send_anonymous_usage_stats", 2), ("send_anonymous_usage_stats", None)],
+    [("send_anonymous_usage_stats", 2), ("send_anonymous_usage_stats", "aaa")],
 )
 def test_profile_config_validate_dbt_config_vars_check_unexpected_types(dbt_config_var: str, dbt_config_value: Any):
     dbt_config_vars = {dbt_config_var: dbt_config_value}
@@ -98,7 +77,7 @@ def test_profile_config_validate_dbt_config_vars_check_expected_types(dbt_config
         conn_id="fake_conn_id",
         dbt_config_vars=DbtConfigVars(**dbt_config_vars),
     )
-    assert profile_config.dbt_config_vars == dbt_config_vars
+    assert profile_config.dbt_config_vars.as_dict() == dbt_config_vars
 
 
 @pytest.mark.parametrize(

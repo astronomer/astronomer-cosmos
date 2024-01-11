@@ -5,7 +5,8 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
+import dataclasses
 
 from typing import TYPE_CHECKING
 import yaml
@@ -22,6 +23,65 @@ DBT_PROFILE_TYPE_FIELD = "type"
 DBT_PROFILE_METHOD_FIELD = "method"
 
 logger = get_logger(__name__)
+
+
+@dataclasses.dataclass
+class DbtConfigVars:
+    send_anonymous_usage_stats: Optional[bool] = False
+    partial_parse: Optional[bool] = None
+    use_experimental_parser: Optional[bool] = None
+    static_parser: Optional[bool] = None
+    printer_width: Optional[int] = None
+    write_json: Optional[bool] = None
+    warn_error: Optional[str] = None
+    warn_error_options: Optional[dict[str, Any]] = None
+    log_format: Optional[str] = None
+    debug: Optional[bool] = None
+    version_check: Optional[bool] = None
+
+    def _validate_data(self) -> None:
+        checks: dict[str, dict[str, Any]] = {
+            "send_anonymous_usage_stats": {"var_type": bool},
+            "partial_parse": {"var_type": bool},
+            "use_experimental_parser": {"var_type": bool},
+            "static_parser": {"var_type": bool},
+            "printer_width": {"var_type": int},
+            "write_json": {"var_type": bool},
+            "warn_error": {"var_type": str},
+            "warn_error_options": {"var_type": dict, "accepted_values": {"include", "exclude"}},
+            "log_format": {"var_type": str, "accepted_values": {"text", "json", "default"}},
+            "debug": {"var_type": bool},
+            "version_check": {"var_type": bool},
+        }
+        for field_name, field_def in self.__dataclass_fields__.items():
+            field_value = getattr(self, field_name)
+
+            if not field_value is None:
+                vars_check = checks.get(field_name, {})
+                accepted_values = vars_check.get("accepted_values")
+                var_type = vars_check.get("var_type", Any)
+
+                if not isinstance(field_value, var_type):
+                    raise CosmosValueError(f"dbt config var {field_name}: {field_value} must be a {var_type}")
+
+                if accepted_values:
+                    if field_value not in accepted_values:
+                        raise CosmosValueError(
+                            f"dbt config var {field_name}: {field_value} must be one of {accepted_values}"
+                        )
+
+    def __post_init__(self) -> None:
+        self._validate_data()
+
+    def as_dict(self) -> Optional[dict[str, Any]]:
+        result = {
+            field.name: getattr(self, field.name)
+            for field in dataclasses.fields(self)
+            if getattr(self, field.name) is not None
+        }
+        if result != {}:
+            return result
+        return None
 
 
 class BaseProfileMapping(ABC):
@@ -41,11 +101,13 @@ class BaseProfileMapping(ABC):
 
     _conn: Connection | None = None
 
-    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None, disable_event_tracking: bool = False):
+    def __init__(
+        self, conn_id: str, profile_args: dict[str, Any] | None = None, dbt_config_vars: DbtConfigVars | None = None
+    ):
         self.conn_id = conn_id
         self.profile_args = profile_args or {}
         self._validate_profile_args()
-        self.disable_event_tracking = disable_event_tracking
+        self.dbt_config_vars = dbt_config_vars or DbtConfigVars()
 
     def _validate_profile_args(self) -> None:
         """
@@ -158,11 +220,7 @@ class BaseProfileMapping(ABC):
         return env_vars
 
     def get_profile_file_contents(
-        self,
-        profile_name: str,
-        target_name: str = "cosmos_target",
-        use_mock_values: bool = False,
-        dbt_config_vars: dict[str, Any] | None = None,
+        self, profile_name: str, target_name: str = "cosmos_target", use_mock_values: bool = False
     ) -> str:
         """
         Translates the profile into a string that can be written to a profiles.yml file.
@@ -184,11 +242,9 @@ class BaseProfileMapping(ABC):
             }
         }
 
-        if not dbt_config_vars is None:
-            profile_contents["config"] = dbt_config_vars
-
-        if self.disable_event_tracking:
-            profile_contents["config"] = {"send_anonymous_usage_stats": "False"}
+        congig_vars = self.dbt_config_vars.as_dict()
+        if congig_vars:
+            profile_contents["config"] = congig_vars
 
         return str(yaml.dump(profile_contents, indent=4))
 

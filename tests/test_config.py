@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 
@@ -132,108 +131,6 @@ def test_profile_config_validate_both():
         err_info.value.args[0]
         == "Both profiles_yml_filepath and profile_mapping are defined and are mutually exclusive. Ensure only one of these is defined."
     )
-
-
-def test_profile_config_validate_dbt_config_vars_with_profiles_yml_filepath():
-    dbt_config_vars = dict(send_anonymous_usage_stats=True)
-
-    with pytest.raises(CosmosValueError) as err_info:
-        ProfileConfig(
-            profile_name="test",
-            target_name="test",
-            profiles_yml_filepath=SAMPLE_PROFILE_YML,
-            dbt_config_vars=dbt_config_vars,
-        )
-    assert (
-        err_info.value.args[0]
-        == "Both profiles_yml_filepath and dbt_config_vars are defined and are mutually exclusive. Ensure only one of these is defined."
-    )
-
-
-def test_profile_config_validate_dbt_config_vars_empty():
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-        dbt_config_vars=None,
-    )
-    assert profile_config.dbt_config_vars is None
-
-
-def test_profile_config_validate_dbt_config_vars_check_unexpected_var():
-    dbt_config_var = "unexpected_var"
-    dbt_config_value = True
-    dbt_config_vars = {dbt_config_var: dbt_config_value}
-
-    with pytest.raises(CosmosValueError) as err_info:
-        ProfileConfig(
-            profile_name="test",
-            target_name="test",
-            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-            dbt_config_vars=dbt_config_vars,
-        )
-    assert err_info.value.args[0] == f"dbt config var {dbt_config_var}: {dbt_config_value} is not supported"
-
-
-def test_profile_config_validate_dbt_config_vars_check_expected_var():
-    dbt_config_var = "send_anonymous_usage_stats"
-    dbt_config_value = True
-    dbt_config_vars = {dbt_config_var: dbt_config_value}
-
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-        dbt_config_vars=dbt_config_vars,
-    )
-    assert profile_config.dbt_config_vars == dbt_config_vars
-
-
-@pytest.mark.parametrize(
-    "dbt_config_var,dbt_config_value",
-    [("send_anonymous_usage_stats", 2), ("send_anonymous_usage_stats", None)],
-)
-def test_profile_config_validate_dbt_config_vars_check_unexpected_types(dbt_config_var: str, dbt_config_value: Any):
-    dbt_config_vars = {dbt_config_var: dbt_config_value}
-
-    with pytest.raises(CosmosValueError) as err_info:
-        ProfileConfig(
-            profile_name="test",
-            target_name="test",
-            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-            dbt_config_vars=dbt_config_vars,
-        )
-    assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be a ")
-
-
-@pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("send_anonymous_usage_stats", True)])
-def test_profile_config_validate_dbt_config_vars_check_expected_types(dbt_config_var: str, dbt_config_value: Any):
-    dbt_config_vars = {dbt_config_var: dbt_config_value}
-
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-        dbt_config_vars=dbt_config_vars,
-    )
-    assert profile_config.dbt_config_vars == dbt_config_vars
-
-
-@pytest.mark.parametrize(
-    "dbt_config_var,dbt_config_value",
-    [("log_format", "text2")],
-)
-def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: str, dbt_config_value: Any):
-    dbt_config_vars = {dbt_config_var: dbt_config_value}
-
-    with pytest.raises(CosmosValueError) as err_info:
-        ProfileConfig(
-            profile_name="test",
-            target_name="test",
-            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-            dbt_config_vars=dbt_config_vars,
-        )
-    assert err_info.value.args[0].startswith(f"dbt config var {dbt_config_var}: {dbt_config_value} must be one of ")
 
 
 def test_profile_config_validate_profiles_yml():

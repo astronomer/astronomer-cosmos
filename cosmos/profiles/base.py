@@ -5,13 +5,12 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
-import dataclasses
-
-from typing import TYPE_CHECKING
-import yaml
+from typing import Any, Optional, Literal, Dict, TYPE_CHECKING
+import warnings
 
 from airflow.hooks.base import BaseHook
+from pydantic import dataclasses
+import yaml
 
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -26,58 +25,23 @@ logger = get_logger(__name__)
 
 
 @dataclasses.dataclass
-class DbtConfigVars:
+class DbtProfileConfigVars:
     send_anonymous_usage_stats: Optional[bool] = False
     partial_parse: Optional[bool] = None
     use_experimental_parser: Optional[bool] = None
     static_parser: Optional[bool] = None
-    printer_width: Optional[int] = None
+    printer_width: Optional[bool] = None
     write_json: Optional[bool] = None
-    warn_error: Optional[str] = None
-    warn_error_options: Optional[dict[str, Any]] = None
-    log_format: Optional[str] = None
+    warn_error: Optional[bool] = None
+    warn_error_options: Optional[Dict[Literal["include", "exclude"], Any]] = None
+    log_format: Optional[Literal["text", "json", "default"]] = None
     debug: Optional[bool] = None
     version_check: Optional[bool] = None
 
-    def _validate_data(self) -> None:
-        checks: dict[str, dict[str, Any]] = {
-            "send_anonymous_usage_stats": {"var_type": bool},
-            "partial_parse": {"var_type": bool},
-            "use_experimental_parser": {"var_type": bool},
-            "static_parser": {"var_type": bool},
-            "printer_width": {"var_type": int},
-            "write_json": {"var_type": bool},
-            "warn_error": {"var_type": str},
-            "warn_error_options": {"var_type": dict, "accepted_values": {"include", "exclude"}},
-            "log_format": {"var_type": str, "accepted_values": {"text", "json", "default"}},
-            "debug": {"var_type": bool},
-            "version_check": {"var_type": bool},
-        }
-
-        for field_name, field_def in self.__dataclass_fields__.items():
-            field_value = getattr(self, field_name)
-
-            if not field_value is None:
-                vars_check = checks.get(field_name, {})
-                accepted_values = vars_check.get("accepted_values")
-                var_type = vars_check.get("var_type", Any)
-
-                if not isinstance(field_value, var_type):
-                    raise CosmosValueError(f"dbt config var {field_name}: {field_value} must be a {var_type}")
-
-                if accepted_values:
-                    if field_value not in accepted_values:
-                        raise CosmosValueError(
-                            f"dbt config var {field_name}: {field_value} must be one of {accepted_values}"
-                        )
-
-    def __post_init__(self) -> None:
-        self._validate_data()
-
-    def as_dict(self) -> Optional[dict[str, Any]]:
+    def as_dict(self) -> dict[str, Any] | None:
         result = {
             field.name: getattr(self, field.name)
-            for field in dataclasses.fields(self)
+            for field in self.__dataclass_fields__.values()
             if getattr(self, field.name) is not None
         }
         if result != {}:
@@ -103,12 +67,18 @@ class BaseProfileMapping(ABC):
     _conn: Connection | None = None
 
     def __init__(
-        self, conn_id: str, profile_args: dict[str, Any] | None = None, dbt_config_vars: DbtConfigVars | None = None
+        self,
+        conn_id: str,
+        profile_args: dict[str, Any] | None = None,
+        disable_event_tracking: bool | None = None,
+        dbt_config_vars: DbtProfileConfigVars | None = None,
     ):
         self.conn_id = conn_id
         self.profile_args = profile_args or {}
         self._validate_profile_args()
-        self.dbt_config_vars = dbt_config_vars or DbtConfigVars()
+        self.disable_event_tracking = disable_event_tracking
+        self.dbt_config_vars = dbt_config_vars
+        self._validate_disable_event_tracking()
 
     def _validate_profile_args(self) -> None:
         """
@@ -127,6 +97,25 @@ class BaseProfileMapping(ABC):
                         self.profile_args.get(profile_field),
                         getattr(self, f"dbt_profile_{profile_field}"),
                     )
+                )
+
+    def _validate_disable_event_tracking(self) -> None:
+        """
+        Check if disable_event_tracking is set and warn that it is deprecated.
+        """
+        if self.disable_event_tracking:
+            warnings.warn(
+                "Disabling dbt event tracking is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. "
+                "Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.",
+                DeprecationWarning,
+            )
+            if (
+                isinstance(self.dbt_config_vars, DbtProfileConfigVars)
+                and self.dbt_config_vars.send_anonymous_usage_stats is not None
+            ):
+                raise CosmosValueError(
+                    "Cannot set both disable_event_tracking and "
+                    "dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats ..."
                 )
 
     @property
@@ -243,9 +232,9 @@ class BaseProfileMapping(ABC):
             }
         }
 
-        config_vars = self.dbt_config_vars.as_dict()
-        if config_vars:
-            profile_contents["config"] = config_vars
+        if self.dbt_config_vars:
+            profile_contents["config"] = self.dbt_config_vars.as_dict()
+
         if self.disable_event_tracking:
             profile_contents["config"] = {"send_anonymous_usage_stats": False}
 

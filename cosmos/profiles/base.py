@@ -106,7 +106,7 @@ class BaseProfileMapping(ABC):
         self,
         conn_id: str,
         profile_args: dict[str, Any] | None = None,
-        disable_event_tracking: bool | None = False,
+        disable_event_tracking: bool | None = None,
         dbt_config_vars: DbtProfileConfigVars | None = None,
     ):
         self.conn_id = conn_id

@@ -246,8 +246,6 @@ class BaseProfileMapping(ABC):
         config_vars = self.dbt_config_vars.as_dict()
         if config_vars:
             profile_contents["config"] = config_vars
-        if self.disable_event_tracking:
-            profile_contents["config"] = {"send_anonymous_usage_stats": False}
 
         return str(yaml.dump(profile_contents, indent=4))
 

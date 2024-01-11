@@ -20,7 +20,6 @@ profile_config = ProfileConfig(
         profile_args={"schema": "public"},
         dbt_config_vars=DbtConfigVars(send_anonymous_usage_stats=True),
     ),
-    dbt_config_vars={"send_anonymous_usage_stats": False},
 )
 
 # [START local_example]

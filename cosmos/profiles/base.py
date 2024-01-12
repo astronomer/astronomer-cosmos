@@ -222,7 +222,10 @@ class BaseProfileMapping(ABC):
                 "Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.",
                 DeprecationWarning,
             )
-            if self.dbt_config_vars is not None and self.dbt_config_vars.send_anonymous_usage_stats is not None:
+            if (
+                isinstance(self.dbt_config_vars, DbtProfileConfigVars)
+                and self.dbt_config_vars.send_anonymous_usage_stats is not None
+            ):
                 raise CosmosValueError(
                     "Cannot set both disable_event_tracking and "
                     "dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats ..."

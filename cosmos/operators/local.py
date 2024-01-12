@@ -96,7 +96,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     :param profile_name: A name to use for the dbt profile. If not provided, and no profile target is found
         in your project's dbt_project.yml, "cosmos_profile" is used.
     :param install_deps: If true, install dependencies before running the command
-    :param install_deps: If true, the operator will set inlets and outlets
+    :param emit_datasets: If true, the operator will set inlets and outlets
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -112,12 +112,14 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self,
         profile_config: ProfileConfig,
         install_deps: bool = False,
+        emit_datasets: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
         self.install_deps = install_deps
+        self.emit_datasets = emit_datasets
         self.callback = callback
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql

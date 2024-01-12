@@ -69,6 +69,25 @@ def test_disable_event_tracking_and_send_anonymous_usage_stats():
     assert err_info.value.args[0] == expected_cosmos_error
 
 
+@pytest.mark.parametrize("config", [True, False])
+def test_dbt_config_vars_config(config: bool):
+    """
+    Tests the config block in the profile is set correctly.
+    """
+
+    dbt_config_vars = None
+    if config:
+        dbt_config_vars = DbtProfileConfigVars(debug=False)
+
+    test_profile = TestProfileMapping(
+        conn_id="fake_conn_id",
+        dbt_config_vars=dbt_config_vars,
+    )
+    profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
+
+    assert ("config" in profile_contents) == config
+
+
 @pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("debug", True), ("debug", False)])
 def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
     """

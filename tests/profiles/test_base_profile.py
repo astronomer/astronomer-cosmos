@@ -49,6 +49,7 @@ def test_disable_event_tracking(disable_event_tracking: bool):
     )
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
+    assert ("config" in profile_contents) == disable_event_tracking
     if disable_event_tracking:
         assert profile_contents["config"]["send_anonymous_usage_stats"] is False
 

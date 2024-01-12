@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 import yaml
+from pydantic.error_wrappers import ValidationError
 
 from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
 from cosmos.exceptions import CosmosValueError
@@ -90,7 +91,7 @@ def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
 def test_profile_config_validate_dbt_config_vars_check_unexpected_types(dbt_config_var: str, dbt_config_value: Any):
     dbt_config_vars = {dbt_config_var: dbt_config_value}
 
-    with pytest.raises(CosmosValueError):
+    with pytest.raises(ValidationError):
         TestProfileMapping(
             conn_id="fake_conn_id",
             dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
@@ -115,7 +116,7 @@ def test_profile_config_validate_dbt_config_vars_check_expected_types(dbt_config
 def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: str, dbt_config_value: Any):
     dbt_config_vars = {dbt_config_var: dbt_config_value}
 
-    with pytest.raises(CosmosValueError):
+    with pytest.raises(ValidationError):
         TestProfileMapping(
             conn_id="fake_conn_id",
             dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),

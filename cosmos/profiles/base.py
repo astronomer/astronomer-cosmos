@@ -5,14 +5,12 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Literal
-import dataclasses
+from typing import Any, Optional, Literal, Dict, TYPE_CHECKING
 import warnings
 
-from typing import TYPE_CHECKING
-import yaml
-
 from airflow.hooks.base import BaseHook
+from pydantic import dataclasses
+import yaml
 
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -32,53 +30,18 @@ class DbtProfileConfigVars:
     partial_parse: Optional[bool] = None
     use_experimental_parser: Optional[bool] = None
     static_parser: Optional[bool] = None
-    printer_width: Optional[int] = None
+    printer_width: Optional[bool] = None
     write_json: Optional[bool] = None
     warn_error: Optional[bool] = None
-    warn_error_options: Optional[dict[str, Any]] = None
-    log_format: Optional[str] = None
+    warn_error_options: Optional[Dict[Literal["include", "exclude"], Any]] = None
+    log_format: Optional[Literal["text", "json", "default"]] = None
     debug: Optional[bool] = None
     version_check: Optional[bool] = None
 
-    def _validate_data(self) -> None:
-        checks: dict[str, dict[str, Any]] = {
-            "send_anonymous_usage_stats": {"var_type": bool},
-            "partial_parse": {"var_type": bool},
-            "use_experimental_parser": {"var_type": bool},
-            "static_parser": {"var_type": bool},
-            "printer_width": {"var_type": int},
-            "write_json": {"var_type": bool},
-            "warn_error": {"var_type": bool},
-            "warn_error_options": {"var_type": dict, "accepted_values": {"include", "exclude"}},
-            "log_format": {"var_type": str, "accepted_values": {"text", "json", "default"}},
-            "debug": {"var_type": bool},
-            "version_check": {"var_type": bool},
-        }
-
-        for field_name, field_def in self.__dataclass_fields__.items():
-            field_value = getattr(self, field_name)
-
-            if not field_value is None:
-                vars_check = checks.get(field_name, {})
-                accepted_values = vars_check.get("accepted_values")
-                var_type = vars_check.get("var_type", Any)
-
-                if not isinstance(field_value, var_type):
-                    raise CosmosValueError(f"dbt config var {field_name}: {field_value} must be a {var_type}")
-
-                if accepted_values:
-                    if field_value not in accepted_values:
-                        raise CosmosValueError(
-                            f"dbt config var {field_name}: {field_value} must be one of {accepted_values}"
-                        )
-
-    def __post_init__(self) -> None:
-        self._validate_data()
-
-    def as_dict(self) -> Optional[dict[str, Any]]:
+    def as_dict(self) -> dict[str, Any] | None:
         result = {
             field.name: getattr(self, field.name)
-            for field in dataclasses.fields(self)
+            for field in self.__dataclass_fields__.values()
             if getattr(self, field.name) is not None
         }
         if result != {}:

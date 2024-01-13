@@ -69,6 +69,26 @@ def test_disable_event_tracking_and_send_anonymous_usage_stats():
     assert err_info.value.args[0] == expected_cosmos_error
 
 
+def test_dbt_profile_config_vars_none():
+    """
+    Tests the DbtProfileConfigVars return None.
+    """
+    dbt_config_vars = DbtProfileConfigVars(
+        send_anonymous_usage_stats=None,
+        partial_parse=None,
+        use_experimental_parser=None,
+        static_parser=None,
+        printer_width=None,
+        write_json=None,
+        warn_error=None,
+        warn_error_options=None,
+        log_format=None,
+        debug=None,
+        version_check=None,
+    )
+    assert dbt_config_vars.as_dict() is None
+
+
 @pytest.mark.parametrize("config", [True, False])
 def test_dbt_config_vars_config(config: bool):
     """

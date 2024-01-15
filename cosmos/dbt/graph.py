@@ -22,7 +22,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks, environ
+from cosmos.dbt.project import create_symlinks, copy_manifest_for_partial_parse, environ
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -199,6 +199,9 @@ class DbtGraph:
         if self.render_config.selector:
             ls_command.extend(["--selector", self.render_config.selector])
 
+        if not self.render_config.partial_parse:
+            ls_command.append("--no-partial-parse")
+
         ls_command.extend(self.local_flags)
 
         stdout = run_command(ls_command, tmp_dir, env_vars)
@@ -242,6 +245,9 @@ class DbtGraph:
             )
             tmpdir_path = Path(tmpdir)
             create_symlinks(self.render_config.project_path, tmpdir_path, self.render_config.dbt_deps)
+
+            if self.render_config.partial_parse:
+                copy_manifest_for_partial_parse(self.render_config.project_path, tmpdir_path)
 
             with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
                 self.project.env_vars or self.render_config.env_vars or {}

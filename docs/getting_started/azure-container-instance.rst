@@ -2,7 +2,7 @@
 
 Azure Container Instance Execution Mode
 =======================================
-
+.. versionadded:: 1.4
 This tutorial will guide you through the steps required to use Azure Container Instance as the Execution Mode for your dbt code with Astronomer Cosmos. Schematically, the guide will walk you through the steps required to build the following architecture:
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_aci_schematic.png

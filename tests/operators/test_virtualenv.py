@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-
+from pathlib import Path
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 
 from airflow.models.connection import Connection
@@ -69,3 +69,42 @@ def test_run_command(
     assert dbt_deps[0][0][0] == dbt_cmd[0][0][0]
     assert dbt_cmd[0][0][1] == "do-something"
     assert mock_execute.call_count == 2
+
+
+@patch("airflow.utils.python_virtualenv.execute_in_subprocess")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
+@patch("airflow.hooks.base.BaseHook.get_connection")
+def test_supply_virtualenv_dir_flag(
+    mock_get_connection,
+    mock_lock_available,
+    mock_subprocess_hook,
+    mock_exception_handling,
+    mock_store_compiled_sql,
+    mock_calculate_openlineage_events_completes,
+    mock_execute,
+):
+    mock_lock_available.return_value = True
+    mock_get_connection.return_value = Connection(
+        conn_id="fake_conn",
+        conn_type="postgres",
+        host="fake_host",
+        port=5432,
+        login="fake_login",
+        password="fake_password",
+        schema="fake_schema",
+    )
+    venv_operator = DbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        task_id="fake_task",
+        install_deps=True,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        py_system_site_packages=False,
+        py_requirements=["dbt-postgres==1.6.0b1"],
+        emit_datasets=False,
+        virtualenv_dir=Path("mock-venv"),
+    )
+    assert venv_operator.venv_dbt_path == "mock-venv/bin/dbt"

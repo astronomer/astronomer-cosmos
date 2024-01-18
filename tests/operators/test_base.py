@@ -2,6 +2,7 @@ import pytest
 
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtBuildMixin,
     DbtLSMixin,
     DbtSeedMixin,
     DbtRunOperationMixin,
@@ -26,6 +27,7 @@ def test_dbt_base_operator_is_abstract():
         ("ls", DbtLSMixin),
         ("seed", DbtSeedMixin),
         ("run", DbtRunMixin),
+        ("build", DbtBuildMixin),
     ],
 )
 def test_dbt_mixin_base_cmd(dbt_command, dbt_operator_class):

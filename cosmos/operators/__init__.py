@@ -1,3 +1,4 @@
+from .local import DbtBuildLocalOperator as DbtBuildOperator
 from .local import DbtDepsLocalOperator as DbtDepsOperator
 from .local import DbtDocsAzureStorageLocalOperator as DbtDocsAzureStorageOperator
 from .local import DbtDocsLocalOperator as DbtDocsOperator
@@ -16,6 +17,7 @@ __all__ = [
     "DbtSnapshotOperator",
     "DbtRunOperator",
     "DbtTestOperator",
+    "DbtBuildOperator",
     "DbtRunOperationOperator",
     "DbtDepsOperator",
     "DbtDocsOperator",

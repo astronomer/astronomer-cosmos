@@ -181,6 +181,11 @@ class DbtGraph:
         else:
             load_method[method]()
 
+        self.update_node_dependency()
+
+        logger.info("Total nodes: %i", len(self.nodes))
+        logger.info("Total filtered nodes: %i", len(self.nodes))
+
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
@@ -276,11 +281,6 @@ class DbtGraph:
                 self.nodes = nodes
                 self.filtered_nodes = nodes
 
-        self.update_node_dependency()
-
-        logger.info("Total nodes: %i", len(self.nodes))
-        logger.info("Total filtered nodes: %i", len(self.nodes))
-
     def load_via_dbt_ls_file(self) -> None:
         """
         This is between dbt ls and full manifest. It allows to use the output (needs to be json output) of the dbt ls as a
@@ -364,11 +364,6 @@ class DbtGraph:
             exclude=self.render_config.exclude,
         )
 
-        self.update_node_dependency()
-
-        logger.info("Total nodes: %i", len(self.nodes))
-        logger.info("Total filtered nodes: %i", len(self.nodes))
-
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.yml` file.
@@ -417,11 +412,6 @@ class DbtGraph:
                 select=self.render_config.select,
                 exclude=self.render_config.exclude,
             )
-
-            self.update_node_dependency()
-
-        logger.info("Total nodes: %i", len(self.nodes))
-        logger.info("Total filtered nodes: %i", len(self.nodes))
 
     def update_node_dependency(self) -> None:
         """

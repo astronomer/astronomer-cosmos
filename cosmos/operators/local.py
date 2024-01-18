@@ -44,6 +44,7 @@ from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -388,6 +389,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self.subprocess_hook.send_sigint()
         else:
             self.subprocess_hook.send_sigterm()
+
+
+class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt core build command.
+    """
 
 
 class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):

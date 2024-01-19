@@ -242,7 +242,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str]) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> Any | None:  # type: ignore
         self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
 
 

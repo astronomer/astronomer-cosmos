@@ -170,6 +170,7 @@ matrix.airflow.dependencies = [
     { value = "pydantic>=1.10.0,<2.0.0", if = ["2.6"]},
     { value = "apache-airflow==2.7", if = ["2.7"] },
     { value = "apache-airflow==2.8", if = ["2.8"] },
+    { value = "pendulum<3.0.0", if = ["2.3", "2.4", "2.5", "2.6", "2.7"] },
 ]
 
 [tool.hatch.envs.tests.scripts]

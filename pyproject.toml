@@ -155,6 +155,7 @@ dependencies = [
     "types-python-dateutil",
     "apache-airflow",
     "Werkzeug<3.0.0",
+    "apache-airflow-providers-common-sql",
 ]
 
 [[tool.hatch.envs.tests.matrix]]

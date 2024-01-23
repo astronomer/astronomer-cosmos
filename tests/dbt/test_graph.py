@@ -258,6 +258,7 @@ def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
         (ExecutionMode.LOCAL, LoadMode.CUSTOM, "mock_load_via_custom_parser"),
     ],
 )
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", return_value=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
@@ -267,6 +268,7 @@ def test_load(
     mock_load_via_dbt_ls_file,
     mock_load_via_dbt_ls,
     mock_load_via_custom_parser,
+    mock_update_node_dependency,
     exec_mode,
     method,
     expected_function,
@@ -282,6 +284,7 @@ def test_load(
     dbt_graph.load(method=method, execution_mode=exec_mode)
     load_function = locals()[expected_function]
     assert load_function.called
+    assert mock_update_node_dependency.called
 
 
 @pytest.mark.integration
@@ -675,8 +678,7 @@ def test_tag_selected_node_test_exist():
         profile_config=profile_config,
         render_config=render_config,
     )
-    dbt_graph.load_from_dbt_manifest()
-
+    dbt_graph.load()
     assert len(dbt_graph.filtered_nodes) > 0
 
     for _, node in dbt_graph.filtered_nodes.items():

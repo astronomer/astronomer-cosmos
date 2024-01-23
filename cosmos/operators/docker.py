@@ -7,6 +7,7 @@ from airflow.utils.context import Context
 from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -64,6 +65,12 @@ class DbtDockerBaseOperator(DockerOperator, AbstractDbtBaseOperator):  # type: i
 
     def execute(self, context: Context) -> None:
         self.build_and_run_cmd(context=context)
+
+
+class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBaseOperator):
+    """
+    Executes a dbt core build command.
+    """
 
 
 class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):

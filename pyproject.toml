@@ -193,7 +193,6 @@ airflow db init; \
 pip install  'dbt-core'  'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'"""
 test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
-tests/operators/test_local.py::test_run_test_operator_with_callback \
 --cov=cosmos \
 --cov-report=term-missing \
 --cov-report=xml \

@@ -45,10 +45,12 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def __init__(
         self,
         py_requirements: list[str] | None = None,
+        pip_install_options: list[str] | None = None,
         py_system_site_packages: bool = False,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
+        self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
         self._venv_tmp_dir: None | TemporaryDirectory[str] = None
@@ -72,6 +74,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,
             requirements=self.py_requirements,
+            pip_install_options=self.pip_install_options,
         )
         dbt_binary = Path(py_interpreter).parent / "dbt"
         cmd_output = self.subprocess_hook.run_command(

@@ -5,6 +5,7 @@ import pytest
 from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
+    DbtBuildKubernetesOperator,
     DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
@@ -94,6 +95,7 @@ result_map = {
     "ls": DbtLSKubernetesOperator(**base_kwargs),
     "run": DbtRunKubernetesOperator(**base_kwargs),
     "test": DbtTestKubernetesOperator(**base_kwargs),
+    "build": DbtBuildKubernetesOperator(**base_kwargs),
     "seed": DbtSeedKubernetesOperator(**base_kwargs),
 }
 

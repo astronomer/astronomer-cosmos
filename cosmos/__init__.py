@@ -20,6 +20,7 @@ from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
 from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (
+    DbtBuildLocalOperator,
     DbtDepsLocalOperator,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
@@ -128,6 +129,7 @@ __all__ = [
     "DbtRunLocalOperator",
     "DbtSeedLocalOperator",
     "DbtTestLocalOperator",
+    "DbtBuildLocalOperator",
     "DbtDepsLocalOperator",
     "DbtSnapshotLocalOperator",
     "DbtDag",
@@ -137,12 +139,14 @@ __all__ = [
     "DbtRunDockerOperator",
     "DbtSeedDockerOperator",
     "DbtTestDockerOperator",
+    "DbtBuildDockerOperator",
     "DbtSnapshotDockerOperator",
     "DbtLSKubernetesOperator",
     "DbtRunOperationKubernetesOperator",
     "DbtRunKubernetesOperator",
     "DbtSeedKubernetesOperator",
     "DbtTestKubernetesOperator",
+    "DbtBuildKubernetesOperator",
     "DbtSnapshotKubernetesOperator",
     "DbtLSAzureContainerInstanceOperator",
     "DbtRunOperationAzureContainerInstanceOperator",

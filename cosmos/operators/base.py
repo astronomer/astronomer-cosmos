@@ -239,6 +239,13 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         return dbt_cmd, env
 
 
+class DbtBuildMixin:
+    """Mixin for dbt build command."""
+
+    base_cmd = ["build"]
+    ui_color = "#8194E0"
+
+
 class DbtLSMixin:
     """
     Executes a dbt core ls command.

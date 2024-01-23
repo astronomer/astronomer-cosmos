@@ -155,6 +155,7 @@ dependencies = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-docker>=3.5.0",
 ]
+# Airflow install with constraint file, Airflow versions < 2.7 require a workaround for PyYAML
 pre-install-commands = ["""
     AIRFLOW_MINOR_VERSION=$(echo "{matrix:airflow}" | cut -c-3)
     AIRFLOW_LESS_THAN_2_7=$(echo "$AIRFLOW_MINOR_VERSION < 2.7" | bc)

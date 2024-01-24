@@ -682,9 +682,33 @@ def test_tag_selected_node_test_exist():
     assert len(dbt_graph.filtered_nodes) > 0
 
     for _, node in dbt_graph.filtered_nodes.items():
-        assert node.tags == ["test_tag"]
+        assert "test_tag" in node.tags
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
+
+
+def test_selects_relationship_test_from_depends_on():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(select=["tag:orders"])
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert (
+        "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2"
+        in dbt_graph.filtered_nodes
+    ), "test was deselected"
 
 
 @pytest.mark.integration

@@ -157,18 +157,16 @@ dependencies = [
 ]
 # Airflow install with constraint file, Airflow versions < 2.7 require a workaround for PyYAML
 pre-install-commands = ["""
-    AIRFLOW_MINOR_VERSION=$(echo "{matrix:airflow}" | cut -c-3)
-    AIRFLOW_LESS_THAN_2_7=$(echo "$AIRFLOW_MINOR_VERSION < 2.7" | bc)
-    if [ "$AIRFLOW_LESS_THAN_2_7" -eq 1 ]; then
+    if [[ "2.3 2.4 2.5 2.6" =~ "{matrix:airflow}" ]]; then
         echo "Cython < 3" >> /tmp/constraint.txt
         pip wheel "PyYAML==6.0.0" -c /tmp/constraint.txt
     fi
-    pip install 'apache-airflow=={matrix:airflow}' --constraint 'https://raw.githubusercontent.com/apache/airflow/constraints-{matrix:airflow}/constraints-{matrix:python}.txt'
+    pip install 'apache-airflow=={matrix:airflow}' --constraint 'https://raw.githubusercontent.com/apache/airflow/constraints-{matrix:airflow}.0/constraints-{matrix:python}.txt'
     """
 ]
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.8", "3.9", "3.10"]
-airflow = ["2.3.4", "2.4.3", "2.5.3", "2.6.3", "2.7.3", "2.8.1"]
+airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
 
 
 [tool.hatch.envs.tests.scripts]

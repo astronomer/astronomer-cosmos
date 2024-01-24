@@ -34,14 +34,14 @@ jobs:
           architecture: 'x64'
 
       - run: pip3 install hatch
-      - run: hatch run tests.py3.9-2.7.3:type-check
+      - run: hatch run tests.py3.9-2.7:type-check
 
   Run-Unit-Tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
-        airflow-version: ["2.3.4", "2.4.3", "2.5.3", "2.6.3", "2.7.3", "2.8.1"]
+        airflow-version: ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -80,7 +80,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
-        airflow-version: ["2.3.4", "2.4.3", "2.5.3", "2.6.3", "2.7.3", "2.8.1"]
+        airflow-version: ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
     services:
       postgres:
         image: postgres
@@ -148,7 +148,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10"]
-        airflow-version: ["2.6.3"]
+        airflow-version: ["2.6"]
 
     services:
       postgres:
@@ -228,7 +228,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10"]
-        airflow-version: ["2.7.3"]
+        airflow-version: ["2.7"]
 
     steps:
       - uses: actions/checkout@v3

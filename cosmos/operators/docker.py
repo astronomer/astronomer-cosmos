@@ -50,7 +50,7 @@ class DbtDockerBaseOperator(DockerOperator, AbstractDbtBaseOperator):  # type: i
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
-        result = super(DockerOperator, self).execute(context)
+        result = super().execute(context)
         logger.info(result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:

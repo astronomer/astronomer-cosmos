@@ -73,7 +73,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
-        result = super(KubernetesPodOperator, self).execute(context)
+        result = super().execute(context)
         logger.info(result)
 
     def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None:

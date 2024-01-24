@@ -294,7 +294,7 @@ class NodeSelector:
 
         self.visited_nodes.add(node_id)
 
-        if node.resource_type == DbtResourceType.TEST:
+        if node.resource_type == DbtResourceType.TEST and node.depends_on:
             node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
 
         if not self._is_tags_subset(node):

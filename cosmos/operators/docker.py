@@ -63,9 +63,6 @@ class DbtDockerBaseOperator(DockerOperator, AbstractDbtBaseOperator):  # type: i
         self.environment: dict[str, Any] = {**env_vars, **self.environment}
         self.command: list[str] = dbt_cmd
 
-    def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context)
-
 
 class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBaseOperator):
     """

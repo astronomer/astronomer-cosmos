@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
@@ -13,9 +14,24 @@ from cosmos.operators.base import (
 
 def test_dbt_base_operator_is_abstract():
     """Tests that the abstract base operator cannot be instantiated since the base_cmd is not defined."""
-    expected_error = "Can't instantiate abstract class AbstractDbtBaseOperator with abstract methods? base_cmd"
+    expected_error = (
+        "Can't instantiate abstract class AbstractDbtBaseOperator with abstract methods base_cmd, build_and_run_cmd"
+    )
     with pytest.raises(TypeError, match=expected_error):
         AbstractDbtBaseOperator()
+
+
+@pytest.mark.parametrize("cmd_flags", [["--some-flag"], []])
+@patch("cosmos.operators.base.AbstractDbtBaseOperator.build_and_run_cmd")
+def test_dbt_base_operator_execute(mock_build_and_run_cmd, cmd_flags, monkeypatch):
+    """Tests that the base operator execute method calls the build_and_run_cmd method with the expected arguments."""
+    monkeypatch.setattr(AbstractDbtBaseOperator, "add_cmd_flags", lambda _: cmd_flags)
+    AbstractDbtBaseOperator.__abstractmethods__ = set()
+
+    base_operator = AbstractDbtBaseOperator(task_id="fake_task", project_dir="fake_dir")
+
+    base_operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=cmd_flags)
 
 
 @pytest.mark.parametrize(

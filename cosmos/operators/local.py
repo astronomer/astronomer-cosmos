@@ -371,9 +371,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         logger.info(result.output)
         return result
 
-    def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
-
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
             self.subprocess_hook.log.info("Sending SIGINT signal to process group")

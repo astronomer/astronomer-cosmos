@@ -96,9 +96,6 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd
 
-    def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context)
-
 
 class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):
     """

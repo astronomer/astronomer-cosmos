@@ -289,6 +289,7 @@ class NodeSelector:
 
     def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
         "Checks if a single node should be included. Only runs once per node with caching."
+        logger.debug("Inspecting if the node <%s> should be included.", node_id)
         if node_id in self.visited_nodes:
             return node_id in self.selected_nodes
 
@@ -296,8 +297,15 @@ class NodeSelector:
 
         if node.resource_type == DbtResourceType.TEST:
             node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
+            logger.debug(
+                "The test node <%s> inherited these tags from the parent node <%s>: %s",
+                node_id,
+                node.depends_on[0],
+                node.tags,
+            )
 
         if not self._is_tags_subset(node):
+            logger.debug("Excluding node <%s>", node_id)
             return False
 
         node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}

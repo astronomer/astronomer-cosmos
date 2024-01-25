@@ -326,16 +326,15 @@ class DbtTestMixin:
 
     def __init__(
         self,
-        select: str | None = None,
         exclude: str | None = None,
+        select: str | None = None,
         selector: str | None = None,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
         self.select = select
         self.exclude = exclude
         self.selector = selector
-        super().__init__(*args, **kwargs)
+        super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
 
     def add_cmd_flags(self) -> list[str]:
         flags = []

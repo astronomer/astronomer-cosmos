@@ -362,8 +362,13 @@ def test_store_compiled_sql() -> None:
         (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (
             DbtTestLocalOperator,
-            {"full_refresh": True, "select": ["tag:daily"]},
-            {"context": {}, "cmd_flags": ["--select", "tag:daily"]},
+            {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
+            {"context": {}, "cmd_flags": ["--exclude", "tag:disabled", "--select", "tag:daily"]},
+        ),
+        (
+            DbtTestLocalOperator,
+            {"full_refresh": True, "selector": "nightly_snowplow"},
+            {"context": {}, "cmd_flags": ["--selector", "nightly_snowplow"]},
         ),
         (
             DbtRunOperationLocalOperator,

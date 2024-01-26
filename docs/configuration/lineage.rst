@@ -9,7 +9,7 @@ and virtualenv execution methods (read `execution modes <../getting_started/exec
 
 To emit lineage events, Cosmos can use one of the following:
 
-1. Airflow 2.7 `built-in support to OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_, or
+1. Airflow `official OpenLineage provider <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_, or
 2. `Additional libraries <https://openlineage.io/docs/integrations/airflow/>`_.
 
 No change to the user DAG files is required to use OpenLineage.
@@ -18,7 +18,7 @@ No change to the user DAG files is required to use OpenLineage.
 Installation
 ------------
 
-If using Airflow 2.7, no other dependency is required.
+If using Airflow 2.7 or higher, install ``apache-airflow-providers-openlineage``.
 
 Otherwise, install Cosmos using ``astronomer-cosmos[openlineage]``.
 

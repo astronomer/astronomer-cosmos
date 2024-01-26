@@ -324,6 +324,30 @@ class DbtTestMixin:
     base_cmd = ["test"]
     ui_color = "#8194E0"
 
+    def __init__(
+        self,
+        exclude: str | None = None,
+        select: str | None = None,
+        selector: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.select = select
+        self.exclude = exclude
+        self.selector = selector
+        super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+        if self.exclude:
+            flags.extend(["--exclude", *self.exclude])
+
+        if self.select:
+            flags.extend(["--select", *self.select])
+
+        if self.selector:
+            flags.extend(["--selector", self.selector])
+        return flags
+
 
 class DbtRunOperationMixin:
     """

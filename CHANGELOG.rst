@@ -1,6 +1,26 @@
 Changelog
 =========
 
+1.3.2 (2023-01-26)
+------------------
+
+Bug fixes
+
+* Fix: ensure ``DbtGraph.update_node_dependency`` is called for all load methods by @jbandoro in #803
+* Fix: ensure operator ``execute`` method is consistent across all execution base subclasses by @jbandoro in #805
+* Fix custom selector when ``test`` node has no ``depends_on`` values by @tatiana in #814
+* Fix forwarding selectors to test task when using ``TestBehavior.AFTER_ALL`` by @tatiana in #816
+
+Others
+
+* Docs: Remove incorrect docstring from ``DbtLocalBaseOperator`` by @jakob-hvitnov-telia in #797
+* Add more logs to troubleshoot custom selector by @tatiana in #809
+* Fix OpenLineage integration documentation by @tatiana in #810
+* Fix test dependencies after Airflow 2.8 release by @jbandoro and @tatiana in #806
+* Use Airflow constraint file for test environment setup by @jbandoro in #812
+* pre-commit updates in #799, #807
+
+
 1.3.1 (2023-01-10)
 ------------------
 

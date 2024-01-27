@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtBuildMixin,
     DbtLSMixin,
     DbtSeedMixin,
     DbtRunOperationMixin,
@@ -42,6 +43,7 @@ def test_dbt_base_operator_execute(mock_build_and_run_cmd, cmd_flags, monkeypatc
         ("ls", DbtLSMixin),
         ("seed", DbtSeedMixin),
         ("run", DbtRunMixin),
+        ("build", DbtBuildMixin),
     ],
 )
 def test_dbt_mixin_base_cmd(dbt_command, dbt_operator_class):

@@ -246,6 +246,13 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
 
 
+class DbtBuildMixin:
+    """Mixin for dbt build command."""
+
+    base_cmd = ["build"]
+    ui_color = "#8194E0"
+
+
 class DbtLSMixin:
     """
     Executes a dbt core ls command.

@@ -1,9 +1,11 @@
 from __future__ import annotations
+from typing import Any
 
 import pytest
 import yaml
+from pydantic.error_wrappers import ValidationError
 
-from cosmos.profiles.base import BaseProfileMapping
+from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
 from cosmos.exceptions import CosmosValueError
 
 
@@ -37,7 +39,7 @@ def test_validate_profile_args(profile_arg: str):
 
 
 @pytest.mark.parametrize("disable_event_tracking", [True, False])
-def test_disable_event_tracking(disable_event_tracking: str):
+def test_disable_event_tracking(disable_event_tracking: bool):
     """
     Tests the config block in the profile is set correctly if disable_event_tracking is set.
     """
@@ -50,3 +52,112 @@ def test_disable_event_tracking(disable_event_tracking: str):
     assert ("config" in profile_contents) == disable_event_tracking
     if disable_event_tracking:
         assert profile_contents["config"]["send_anonymous_usage_stats"] is False
+
+
+def test_disable_event_tracking_and_send_anonymous_usage_stats():
+    expected_cosmos_error = (
+        "Cannot set both disable_event_tracking and "
+        "dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats ..."
+    )
+
+    with pytest.raises(CosmosValueError) as err_info:
+        TestProfileMapping(
+            conn_id="fake_conn_id",
+            dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False),
+            disable_event_tracking=True,
+        )
+    assert err_info.value.args[0] == expected_cosmos_error
+
+
+def test_dbt_profile_config_vars_none():
+    """
+    Tests the DbtProfileConfigVars return None.
+    """
+    dbt_config_vars = DbtProfileConfigVars(
+        send_anonymous_usage_stats=None,
+        partial_parse=None,
+        use_experimental_parser=None,
+        static_parser=None,
+        printer_width=None,
+        write_json=None,
+        warn_error=None,
+        warn_error_options=None,
+        log_format=None,
+        debug=None,
+        version_check=None,
+    )
+    assert dbt_config_vars.as_dict() is None
+
+
+@pytest.mark.parametrize("config", [True, False])
+def test_dbt_config_vars_config(config: bool):
+    """
+    Tests the config block in the profile is set correctly.
+    """
+
+    dbt_config_vars = None
+    if config:
+        dbt_config_vars = DbtProfileConfigVars(debug=False)
+
+    test_profile = TestProfileMapping(
+        conn_id="fake_conn_id",
+        dbt_config_vars=dbt_config_vars,
+    )
+    profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
+
+    assert ("config" in profile_contents) == config
+
+
+@pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("debug", True), ("debug", False)])
+def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
+    """
+    Tests the config block in the profile is set correctly.
+    """
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+    test_profile = TestProfileMapping(
+        conn_id="fake_conn_id",
+        dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
+    )
+    profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
+
+    assert "config" in profile_contents
+    assert profile_contents["config"][dbt_config_var] == dbt_config_value
+
+
+@pytest.mark.parametrize(
+    "dbt_config_var,dbt_config_value",
+    [("send_anonymous_usage_stats", 2), ("send_anonymous_usage_stats", "aaa")],
+)
+def test_profile_config_validate_dbt_config_vars_check_unexpected_types(dbt_config_var: str, dbt_config_value: Any):
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+
+    with pytest.raises(ValidationError):
+        TestProfileMapping(
+            conn_id="fake_conn_id",
+            dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
+        )
+
+
+@pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("send_anonymous_usage_stats", True)])
+def test_profile_config_validate_dbt_config_vars_check_expected_types(dbt_config_var: str, dbt_config_value: Any):
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+
+    profile_config = TestProfileMapping(
+        conn_id="fake_conn_id",
+        dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
+    )
+    assert profile_config.dbt_config_vars.as_dict() == dbt_config_vars
+
+
+@pytest.mark.parametrize(
+    "dbt_config_var,dbt_config_value",
+    [("log_format", "text2")],
+)
+def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: str, dbt_config_value: Any):
+    dbt_config_vars = {dbt_config_var: dbt_config_value}
+
+    with pytest.raises(ValidationError):
+        TestProfileMapping(
+            conn_id="fake_conn_id",
+            dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
+        )

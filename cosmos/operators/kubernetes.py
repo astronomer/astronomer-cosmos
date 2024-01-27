@@ -9,6 +9,7 @@ from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -95,6 +96,12 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):
         # set env vars
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd
+
+
+class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBaseOperator):
+    """
+    Executes a dbt core build command.
+    """
 
 
 class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):

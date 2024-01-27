@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "astronomer-cosmos"
 dynamic = ["version"]
-description = "Render dbt projects in Airflow"
+description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.8"

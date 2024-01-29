@@ -14,6 +14,7 @@ from cosmos.constants import (
     TESTABLE_DBT_RESOURCES,
     DEFAULT_DBT_RESOURCES,
 )
+from cosmos.config import RenderConfig
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
@@ -79,6 +80,7 @@ def create_test_task_metadata(
     task_args: dict[str, Any],
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
+    render_config: RenderConfig | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -102,6 +104,11 @@ def create_test_task_metadata(
             task_args["select"] = f"source:{node.resource_name}"
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
+    elif render_config is not None:  # TestBehavior.AFTER_ALL
+        task_args["select"] = render_config.select
+        task_args["selector"] = render_config.selector
+        task_args["exclude"] = render_config.exclude
+
     return TaskMetadata(
         id=test_task_name,
         operator_class=calculate_operator_class(
@@ -212,12 +219,11 @@ def build_airflow_graph(
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
     task_args: dict[str, Any],  # Cosmos/DBT - used to instantiate tasks
-    test_behavior: TestBehavior,  # Cosmos-specific: how to inject tests to Airflow DAG
     test_indirect_selection: TestIndirectSelection,  # Cosmos/DBT - used to set test indirect selection mode
     dbt_project_name: str,  # DBT / Cosmos - used to name test task if mode is after_all,
+    render_config: RenderConfig,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-    node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None,
 ) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -237,13 +243,13 @@ def build_airflow_graph(
     :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
         Default is ExecutionMode.LOCAL.
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param test_behavior: When to run `dbt` tests. Default is TestBehavior.AFTER_EACH, that runs tests after each model.
     :param dbt_project_name: Name of the dbt pipeline of interest
     :param task_group: Airflow Task Group instance
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     """
-    node_converters = node_converters or {}
+    node_converters = render_config.node_converters or {}
+    test_behavior = render_config.test_behavior
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -279,6 +285,7 @@ def build_airflow_graph(
             test_indirect_selection,
             task_args=task_args,
             on_warning_callback=on_warning_callback,
+            render_config=render_config,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

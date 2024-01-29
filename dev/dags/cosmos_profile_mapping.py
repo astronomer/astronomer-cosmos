@@ -3,6 +3,7 @@ An example DAG that uses Cosmos to render a dbt project as a TaskGroup.
 
 It uses the automatic profile rendering from an Airflow connection.
 """
+
 import os
 from datetime import datetime
 from pathlib import Path

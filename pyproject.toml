@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "astronomer-cosmos"
 dynamic = ["version"]
-description = "Render 3rd party workflows in Airflow"
+description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.8"
@@ -158,30 +158,19 @@ dependencies = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-docker>=3.5.0",
 ]
-post-install-commands = [
-  "pip uninstall -y apache-airflow-providers-common-io"
+# Airflow install with constraint file, Airflow versions < 2.7 require a workaround for PyYAML
+pre-install-commands = ["""
+    if [[ "2.3 2.4 2.5 2.6" =~ "{matrix:airflow}" ]]; then
+        echo "Cython < 3" >> /tmp/constraint.txt
+        pip wheel "PyYAML==6.0.0" -c /tmp/constraint.txt
+    fi
+    pip install 'apache-airflow=={matrix:airflow}' --constraint 'https://raw.githubusercontent.com/apache/airflow/constraints-{matrix:airflow}.0/constraints-{matrix:python}.txt'
+    """
 ]
-
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.8", "3.9", "3.10"]
 airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
 
-[tool.hatch.envs.tests.overrides]
-matrix.airflow.dependencies = [
-    { value = "apache-airflow==2.3", if = ["2.3"] },
-    { value = "pendulum<3.0.0", if = ["2.3"] },
-    { value = "apache-airflow==2.4", if = ["2.4"] },
-    { value = "pendulum<3.0.0", if = ["2.4"] },
-    { value = "apache-airflow==2.5", if = ["2.5"] },
-    { value = "pendulum<3.0.0", if = ["2.5"] },
-    { value = "apache-airflow==2.6", if = ["2.6"] },
-    { value = "pendulum<3.0.0", if = ["2.6"] },
-    { value = "pydantic>=1.10.0,<2.0.0", if = ["2.6"]},
-    { value = "apache-airflow==2.7", if = ["2.7"] },
-    { value = "pendulum<3.0.0", if = ["2.7"] },
-    { value = "apache-airflow==2.8", if = ["2.8"] },
-    { value = "apache-airflow-providers-common-io", if = ["2.8"] },
-]
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"

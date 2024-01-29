@@ -1,6 +1,7 @@
 """
 An example DAG that uses Cosmos to render a dbt project as a TaskGroup.
 """
+
 import os
 
 from datetime import datetime

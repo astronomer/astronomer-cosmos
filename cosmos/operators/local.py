@@ -372,9 +372,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         logger.info(result.output)
         return result
 
-    def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
-
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
             self.subprocess_hook.log.info("Sending SIGINT signal to process group")
@@ -450,7 +447,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
     def execute(self, context: Context) -> None:
-        result = self.build_and_run_cmd(context=context)
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         should_trigger_callback = all(
             [
                 self.on_warning_callback,

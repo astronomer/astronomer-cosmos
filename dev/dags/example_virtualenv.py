@@ -1,6 +1,7 @@
 """
 An example DAG that uses Cosmos to render a dbt project.
 """
+
 import os
 from datetime import datetime
 from pathlib import Path

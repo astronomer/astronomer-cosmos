@@ -2,6 +2,7 @@
 This module contains a base class that other profile mappings should
 inherit from to ensure consistency.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

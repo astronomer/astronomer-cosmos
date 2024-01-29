@@ -1,6 +1,7 @@
 """
 A DAG that uses Cosmos with a custom profile.
 """
+
 import os
 from datetime import datetime
 from pathlib import Path

@@ -4,4 +4,4 @@ pytest -vv \
     --cov-report=xml \
     --durations=0 \
     -m integration  \
-    -k 'example_cosmos_sources or sqlite'"""
+    -k 'example_cosmos_sources or sqlite'

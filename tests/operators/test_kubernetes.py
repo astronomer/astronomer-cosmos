@@ -226,7 +226,7 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     test_operator._handle_warnings(context)
 
 
-@patch("airflow.providers.cncf.kubernetes.hooks.kubernetes.KubernetesHook")
+@patch("airflow.providers.cncf.kubernetes.hooks.kubernetes")
 @patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
 def test_created_pod(test_hook1, test_hook2):
     test_hook1.is_in_cluster = False

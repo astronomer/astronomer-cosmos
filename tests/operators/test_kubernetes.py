@@ -226,18 +226,18 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     test_operator._handle_warnings(context)
 
 
-@patch("airflow.providers.cncf.kubernetes.hooks.kubernetes.config.load_incluster_config")
-@patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook._get_default_client")
 @patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
-@patch("cosmos.operators.kubernetes.KubernetesPodOperator.hook")
-def test_created_pod(test_hook1, test_hook2, test_client, load_cluster_config):
-    test_hook1.is_in_cluster = False
-    test_hook2.is_in_cluster = False
-    test_hook1._get_namespace.return_value.to_dict.return_value = "foo"
-    test_hook2._get_namespace.return_value.to_dict.return_value = "foo"
+def test_created_pod(test_hook):
+    test_hook.is_in_cluster = False
+    test_hook._get_namespace.return_value.to_dict.return_value = "foo"
     ls_kwargs = {"env_vars": {"FOO": "BAR"}}
     ls_kwargs.update(base_kwargs)
     ls_operator = DbtLSKubernetesOperator(**ls_kwargs)
+    from unittest.mock import MagicMock
+
+    ls_operator.hook = MagicMock()
+    ls_operator.hook.is_in_cluster = False
+    ls_operator.hook._get_namespace.return_value.to_dict.return_value = "foo"
     ls_operator.build_kube_args(context={}, cmd_flags=MagicMock())
     pod_obj = ls_operator.build_pod_request_obj()
     expected_result = {

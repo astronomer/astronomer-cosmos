@@ -133,8 +133,8 @@ airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
 type-check = "mypy cosmos"
-test-unit = 'sh scripts/test/unit.sh'
-test-unit-cov = 'sh scripts/test/unit-cov.sh'
+test = 'sh scripts/test/unit.sh'
+test-cov = 'sh scripts/test/unit-cov.sh'
 test-integration-setup = 'sh scripts/test/integration-setup.sh'
 test-integration = 'sh scripts/test/integration.sh'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'

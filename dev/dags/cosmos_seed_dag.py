@@ -9,6 +9,7 @@ We're using the dbt seed command here to populate the database for the purpose o
 would be ingesting data from various sources (i.e. sftp, blob like s3 or gcs, http endpoint, database, etc.)
 
 """
+
 import os
 from pathlib import Path
 

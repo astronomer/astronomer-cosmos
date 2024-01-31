@@ -226,7 +226,9 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     test_operator._handle_warnings(context)
 
 
-@patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
+# @patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
+@pytest.mark.integration
+@patch("airflow.providers.cncf.kubernetes.hooks.kubernetes.KubernetesHook")
 def test_created_pod(test_hook):
     test_hook.is_in_cluster = False
     test_hook._get_namespace.return_value.to_dict.return_value = "foo"

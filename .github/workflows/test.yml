@@ -11,10 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   Authorize:
-    environment:
-      ${{ github.event_name == 'pull_request_target' &&
+    environment: ${{ github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
     runs-on: ubuntu-latest
@@ -30,8 +28,8 @@ jobs:
 
       - uses: actions/setup-python@v3
         with:
-          python-version: '3.9'
-          architecture: 'x64'
+          python-version: "3.9"
+          architecture: "x64"
 
       - run: pip3 install hatch
       - run: hatch run tests.py3.9-2.7:type-check
@@ -66,7 +64,7 @@ jobs:
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
         run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-cov
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-unit-cov
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v2
@@ -284,7 +282,6 @@ jobs:
       AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
-
   Code-Coverage:
     if: github.event.action != 'labeled'
     needs:
@@ -299,7 +296,7 @@ jobs:
       - name: Set up Python 3.10
         uses: actions/setup-python@v3
         with:
-          python-version: '3.10'
+          python-version: "3.10"
       - name: Install coverage
         run: |
           pip3 install coverage

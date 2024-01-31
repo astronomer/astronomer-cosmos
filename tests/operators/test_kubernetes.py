@@ -226,10 +226,11 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     test_operator._handle_warnings(context)
 
 
+@patch("airflow.providers.cncf.kubernetes.hooks.kubernetes.config.load_incluster_config")
 @patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook._get_default_client")
 @patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
 @patch("cosmos.operators.kubernetes.KubernetesPodOperator.hook")
-def test_created_pod(test_hook1, test_hook2, test_client):
+def test_created_pod(test_hook1, test_hook2, test_client, load_cluster_config):
     test_hook1.is_in_cluster = False
     test_hook2.is_in_cluster = False
     test_hook1._get_namespace.return_value.to_dict.return_value = "foo"

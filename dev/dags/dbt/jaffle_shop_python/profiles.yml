@@ -8,5 +8,4 @@ jaffle_shop:
      threads: 1
      token: "{{ env_var('DATABRICKS_TOKEN') }}"
      type: databricks
-     connect_retries: 3
  target: dev

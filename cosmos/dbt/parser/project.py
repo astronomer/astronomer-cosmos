@@ -1,6 +1,7 @@
 """
 Used to parse and extract information from dbt projects.
 """
+
 from __future__ import annotations
 
 import os

@@ -20,6 +20,7 @@ DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
+    "3.0": ["performance_dag.py"],
 }
 
 # Sort descending based on Versions and convert string to an actual version

@@ -149,6 +149,9 @@ dmypy.json
 logs/
 *.user.yml
 
+# integration tests
+dev/dags/.airflowignore
+
 # Local Airflow standalone
 airflow.cfg
 airflow.db

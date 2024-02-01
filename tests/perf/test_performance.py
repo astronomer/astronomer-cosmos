@@ -86,8 +86,6 @@ def generate_project(
             model.unlink()
 
 
-
-
 @pytest.mark.perf
 def test_perf_dag():
     num_models = os.environ.get("MODEL_COUNT", 10)

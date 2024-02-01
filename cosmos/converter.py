@@ -269,9 +269,8 @@ class DbtToAirflowConverter:
             task_group=task_group,
             execution_mode=execution_config.execution_mode,
             task_args=task_args,
-            test_behavior=render_config.test_behavior,
             test_indirect_selection=execution_config.test_indirect_selection,
             dbt_project_name=project_config.project_name,
             on_warning_callback=on_warning_callback,
-            node_converters=render_config.node_converters,
+            render_config=render_config,
         )

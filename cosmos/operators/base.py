@@ -240,6 +240,20 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
 
         return dbt_cmd, env
 
+    @abstractmethod
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str]) -> Any:
+        """Override this method for the operator to execute the dbt command"""
+
+    def execute(self, context: Context) -> Any | None:  # type: ignore
+        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+
+
+class DbtBuildMixin:
+    """Mixin for dbt build command."""
+
+    base_cmd = ["build"]
+    ui_color = "#8194E0"
+
 
 class DbtLSMixin:
     """
@@ -311,6 +325,30 @@ class DbtTestMixin:
 
     base_cmd = ["test"]
     ui_color = "#8194E0"
+
+    def __init__(
+        self,
+        exclude: str | None = None,
+        select: str | None = None,
+        selector: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.select = select
+        self.exclude = exclude
+        self.selector = selector
+        super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+        if self.exclude:
+            flags.extend(["--exclude", *self.exclude])
+
+        if self.select:
+            flags.extend(["--select", *self.select])
+
+        if self.selector:
+            flags.extend(["--selector", self.selector])
+        return flags
 
 
 class DbtRunOperationMixin:

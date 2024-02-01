@@ -22,6 +22,7 @@ from cosmos.operators.local import (
     DbtSnapshotLocalOperator,
     DbtRunLocalOperator,
     DbtTestLocalOperator,
+    DbtBuildLocalOperator,
     DbtDocsLocalOperator,
     DbtDocsS3LocalOperator,
     DbtDocsAzureStorageLocalOperator,
@@ -375,7 +376,16 @@ def test_store_compiled_sql() -> None:
     [
         (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
-        (DbtTestLocalOperator, {"full_refresh": True}, {"context": {}}),
+        (
+            DbtTestLocalOperator,
+            {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
+            {"context": {}, "cmd_flags": ["--exclude", "tag:disabled", "--select", "tag:daily"]},
+        ),
+        (
+            DbtTestLocalOperator,
+            {"full_refresh": True, "selector": "nightly_snowplow"},
+            {"context": {}, "cmd_flags": ["--selector", "nightly_snowplow"]},
+        ),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
@@ -396,6 +406,7 @@ def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwa
         DbtLSLocalOperator,
         DbtSnapshotLocalOperator,
         DbtTestLocalOperator,
+        DbtBuildLocalOperator,
         DbtDocsLocalOperator,
         DbtDocsS3LocalOperator,
         DbtDocsAzureStorageLocalOperator,
@@ -416,10 +427,7 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
         **operator_class_kwargs.get(operator_class, {}),
     )
     task.execute(context={})
-    if operator_class == DbtTestLocalOperator:
-        mock_build_and_run_cmd.assert_called_once_with(context={})
-    else:
-        mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
+    mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
 
 
 @patch("cosmos.operators.local.DbtLocalArtifactProcessor")

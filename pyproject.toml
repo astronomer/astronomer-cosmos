@@ -160,15 +160,8 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
 ]
-# Airflow install with constraint file, Airflow versions < 2.7 require a workaround for PyYAML
-pre-install-commands = ["""
-    if [[ "2.3 2.4 2.5 2.6" =~ "{matrix:airflow}" ]]; then
-        echo "Cython < 3" >> /tmp/constraint.txt
-        pip wheel "PyYAML==6.0.0" -c /tmp/constraint.txt
-    fi
-    pip install 'apache-airflow=={matrix:airflow}' --constraint 'https://raw.githubusercontent.com/apache/airflow/constraints-{matrix:airflow}.0/constraints-{matrix:python}.txt'
-    """
-]
+pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
+
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11"]
 airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]

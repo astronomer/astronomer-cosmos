@@ -140,11 +140,13 @@ test-integration = 'sh scripts/test/integration.sh'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
 test-integration-sqlite = 'sh scripts/test/integration-sqlite.sh'
+test-performance-setup = 'sh scripts/test/performance-setup.sh'
+test-performance = 'sh scripts/test/performance.sh'
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "sqlite"]
+markers = ["integration", "sqlite", "perf"]
 
 ######################################
 # DOCS

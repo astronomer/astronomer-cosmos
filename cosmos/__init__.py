@@ -5,7 +5,7 @@ Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
 Contains dags, task groups, and operators.
 """
-__version__ = "1.3.0"
+__version__ = "1.3.2"
 
 
 from cosmos.airflow.dag import DbtDag
@@ -20,6 +20,7 @@ from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
 from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (
+    DbtBuildLocalOperator,
     DbtDepsLocalOperator,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
@@ -97,6 +98,7 @@ __all__ = [
     "DbtRunLocalOperator",
     "DbtSeedLocalOperator",
     "DbtTestLocalOperator",
+    "DbtBuildLocalOperator",
     "DbtDepsLocalOperator",
     "DbtSnapshotLocalOperator",
     "DbtDag",
@@ -106,12 +108,14 @@ __all__ = [
     "DbtRunDockerOperator",
     "DbtSeedDockerOperator",
     "DbtTestDockerOperator",
+    "DbtBuildDockerOperator",
     "DbtSnapshotDockerOperator",
     "DbtLSKubernetesOperator",
     "DbtRunOperationKubernetesOperator",
     "DbtRunKubernetesOperator",
     "DbtSeedKubernetesOperator",
     "DbtTestKubernetesOperator",
+    "DbtBuildKubernetesOperator",
     "DbtSnapshotKubernetesOperator",
     "ExecutionMode",
     "LoadMode",

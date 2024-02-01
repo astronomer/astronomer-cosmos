@@ -51,7 +51,7 @@ To use this:
         ),
         render_config=RenderConfig(
             load_method=LoadMode.DBT_MANIFEST,
-        )
+        ),
         # ...,
     )
 
@@ -93,7 +93,7 @@ To use this:
 
     DbtDag(
         render_config=RenderConfig(
-            load_method=LoadMode.DBT_MANIFEST, dbt_ls_path="/path/to/dbt_ls_file.txt"
+            load_method=LoadMode.DBT_LS_FILE, dbt_ls_path="/path/to/dbt_ls_file.txt"
         )
         # ...,
     )

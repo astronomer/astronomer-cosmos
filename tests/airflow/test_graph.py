@@ -16,7 +16,7 @@ from cosmos.airflow.graph import (
     create_test_task_metadata,
     generate_task_or_group,
 )
-from cosmos.config import ProfileConfig
+from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
     DbtResourceType,
     ExecutionMode,
@@ -96,7 +96,9 @@ def test_build_airflow_graph_with_after_each():
             execution_mode=ExecutionMode.LOCAL,
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
-            test_behavior=TestBehavior.AFTER_EACH,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.AFTER_EACH,
+            ),
             dbt_project_name="astro_shop",
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
@@ -183,14 +185,18 @@ def test_build_airflow_graph_with_after_all():
                 ),
             ),
         }
+        render_config = RenderConfig(
+            select=["tag:some"],
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
         build_airflow_graph(
             nodes=sample_nodes,
             dag=dag,
             execution_mode=ExecutionMode.LOCAL,
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
-            test_behavior=TestBehavior.AFTER_ALL,
             dbt_project_name="astro_shop",
+            render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = ["seed_parent_seed", "parent_run", "child_run", "child2_v2_run", "astro_shop_test"]
@@ -201,6 +207,7 @@ def test_build_airflow_graph_with_after_all():
 
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
+    assert dag.leaves[0].select == ["tag:some"]
 
 
 def test_calculate_operator_class():

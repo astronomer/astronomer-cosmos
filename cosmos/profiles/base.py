@@ -2,15 +2,16 @@
 This module contains a base class that other profile mappings should
 inherit from to ensure consistency.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
-
-from typing import TYPE_CHECKING
-import yaml
+from typing import Any, Optional, Literal, Dict, TYPE_CHECKING
+import warnings
 
 from airflow.hooks.base import BaseHook
+from pydantic import dataclasses
+import yaml
 
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -22,6 +23,31 @@ DBT_PROFILE_TYPE_FIELD = "type"
 DBT_PROFILE_METHOD_FIELD = "method"
 
 logger = get_logger(__name__)
+
+
+@dataclasses.dataclass
+class DbtProfileConfigVars:
+    send_anonymous_usage_stats: Optional[bool] = False
+    partial_parse: Optional[bool] = None
+    use_experimental_parser: Optional[bool] = None
+    static_parser: Optional[bool] = None
+    printer_width: Optional[bool] = None
+    write_json: Optional[bool] = None
+    warn_error: Optional[bool] = None
+    warn_error_options: Optional[Dict[Literal["include", "exclude"], Any]] = None
+    log_format: Optional[Literal["text", "json", "default"]] = None
+    debug: Optional[bool] = None
+    version_check: Optional[bool] = None
+
+    def as_dict(self) -> dict[str, Any] | None:
+        result = {
+            field.name: getattr(self, field.name)
+            for field in self.__dataclass_fields__.values()
+            if getattr(self, field.name) is not None
+        }
+        if result != {}:
+            return result
+        return None
 
 
 class BaseProfileMapping(ABC):
@@ -41,11 +67,19 @@ class BaseProfileMapping(ABC):
 
     _conn: Connection | None = None
 
-    def __init__(self, conn_id: str, profile_args: dict[str, Any] | None = None, disable_event_tracking: bool = False):
+    def __init__(
+        self,
+        conn_id: str,
+        profile_args: dict[str, Any] | None = None,
+        disable_event_tracking: bool | None = None,
+        dbt_config_vars: DbtProfileConfigVars | None = None,
+    ):
         self.conn_id = conn_id
         self.profile_args = profile_args or {}
         self._validate_profile_args()
         self.disable_event_tracking = disable_event_tracking
+        self.dbt_config_vars = dbt_config_vars
+        self._validate_disable_event_tracking()
 
     def _validate_profile_args(self) -> None:
         """
@@ -64,6 +98,25 @@ class BaseProfileMapping(ABC):
                         self.profile_args.get(profile_field),
                         getattr(self, f"dbt_profile_{profile_field}"),
                     )
+                )
+
+    def _validate_disable_event_tracking(self) -> None:
+        """
+        Check if disable_event_tracking is set and warn that it is deprecated.
+        """
+        if self.disable_event_tracking:
+            warnings.warn(
+                "Disabling dbt event tracking is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. "
+                "Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.",
+                DeprecationWarning,
+            )
+            if (
+                isinstance(self.dbt_config_vars, DbtProfileConfigVars)
+                and self.dbt_config_vars.send_anonymous_usage_stats is not None
+            ):
+                raise CosmosValueError(
+                    "Cannot set both disable_event_tracking and "
+                    "dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats ..."
                 )
 
     @property
@@ -173,15 +226,18 @@ class BaseProfileMapping(ABC):
         # filter out any null values
         profile_vars = {k: v for k, v in profile_vars.items() if v is not None}
 
-        profile_contents = {
+        profile_contents: dict[str, Any] = {
             profile_name: {
                 "target": target_name,
                 "outputs": {target_name: profile_vars},
             }
         }
 
+        if self.dbt_config_vars:
+            profile_contents["config"] = self.dbt_config_vars.as_dict()
+
         if self.disable_event_tracking:
-            profile_contents["config"] = {"send_anonymous_usage_stats": "False"}
+            profile_contents["config"] = {"send_anonymous_usage_stats": False}
 
         return str(yaml.dump(profile_contents, indent=4))
 

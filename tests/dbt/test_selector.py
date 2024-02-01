@@ -406,3 +406,16 @@ def test_exclude_by_union_graph_selector_and_tag():
         "model.dbt-proj.orphaned",
     ]
     assert sorted(selected.keys()) == expected
+
+
+def test_node_without_depends_on_with_tag_selector_should_not_raise_exception():
+    standalone_test_node = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.standalone",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[],
+        tags=[],
+        config={},
+        file_path=SAMPLE_PROJ_PATH / "tests/generic/builtin.sql",
+    )
+    nodes = {standalone_test_node.unique_id: standalone_test_node}
+    assert not select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["tag:some-tag"])

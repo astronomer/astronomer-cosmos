@@ -11,6 +11,7 @@ users should use the syntax ``DbtResourceType("new-node-type")`` as opposed to `
 It will dynamically add the new type to the enumeration ``DbtResourceType`` so that Cosmos can parse these dbt nodes and
 convert them into the Airflow DAG.
 """
+
 import os
 from datetime import datetime
 from pathlib import Path

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "astronomer-cosmos"
 dynamic = ["version"]
-description = "Render 3rd party workflows in Airflow"
+description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.8"
@@ -32,6 +32,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
     "aenum",
@@ -147,30 +148,27 @@ packages = ["cosmos"]
 [tool.hatch.envs.tests]
 dependencies = [
     "astronomer-cosmos[tests]",
-    "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "types-PyYAML",
     "types-attrs",
     "types-requests",
     "types-python-dateutil",
-    "apache-airflow",
     "Werkzeug<3.0.0",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-docker>=3.5.0",
 ]
-
+# Airflow install with constraint file, Airflow versions < 2.7 require a workaround for PyYAML
+pre-install-commands = ["""
+    if [[ "2.3 2.4 2.5 2.6" =~ "{matrix:airflow}" ]]; then
+        echo "Cython < 3" >> /tmp/constraint.txt
+        pip wheel "PyYAML==6.0.0" -c /tmp/constraint.txt
+    fi
+    pip install 'apache-airflow=={matrix:airflow}' --constraint 'https://raw.githubusercontent.com/apache/airflow/constraints-{matrix:airflow}.0/constraints-{matrix:python}.txt'
+    """
+]
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.8", "3.9", "3.10"]
+python = ["3.8", "3.9", "3.10", "3.11"]
 airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
 
-[tool.hatch.envs.tests.overrides]
-matrix.airflow.dependencies = [
-    { value = "apache-airflow==2.3", if = ["2.3"] },
-    { value = "apache-airflow==2.4", if = ["2.4"] },
-    { value = "apache-airflow==2.5", if = ["2.5"] },
-    { value = "apache-airflow==2.6", if = ["2.6"] },
-    { value = "pydantic>=1.10.0,<2.0.0", if = ["2.6"]},
-    { value = "apache-airflow==2.7", if = ["2.7"] },
-    { value = "apache-airflow==2.8", if = ["2.8"] },
-]
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
@@ -179,7 +177,7 @@ test = 'pytest -vv --durations=0 . -m "not integration" --ignore=tests/test_exam
 test-cov = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py"""
 # we install using the following workaround to overcome installation conflicts, such as:
 # apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
-test-integration-setup = """pip uninstall dbt-postgres dbt-databricks dbt-vertica; \
+test-integration-setup = """pip uninstall -y dbt-postgres dbt-databricks dbt-vertica; \
 rm -rf airflow.*; \
 airflow db init; \
 pip install  'dbt-core'  'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'"""

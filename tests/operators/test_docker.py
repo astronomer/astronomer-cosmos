@@ -5,6 +5,7 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.operators.docker import (
+    DbtBuildDockerOperator,
     DbtDockerBaseOperator,
     DbtLSDockerOperator,
     DbtRunDockerOperator,
@@ -13,8 +14,12 @@ from cosmos.operators.docker import (
 )
 
 
+class ConcreteDbtDockerBaseOperator(DbtDockerBaseOperator):
+    base_cmd = ["cmd"]
+
+
 def test_dbt_docker_operator_add_global_flags() -> None:
-    dbt_base_operator = DbtDockerBaseOperator(
+    dbt_base_operator = ConcreteDbtDockerBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -38,7 +43,7 @@ def test_dbt_docker_operator_get_env(p_context_to_airflow_vars: MagicMock) -> No
     """
     If an end user passes in a
     """
-    dbt_base_operator = DbtDockerBaseOperator(
+    dbt_base_operator = ConcreteDbtDockerBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -80,6 +85,7 @@ result_map = {
     "ls": DbtLSDockerOperator(**base_kwargs),
     "run": DbtRunDockerOperator(**base_kwargs),
     "test": DbtTestDockerOperator(**base_kwargs),
+    "build": DbtBuildDockerOperator(**base_kwargs),
     "seed": DbtSeedDockerOperator(**base_kwargs),
 }
 

@@ -5,6 +5,7 @@ import pytest
 from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
+    DbtBuildKubernetesOperator,
     DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
@@ -23,8 +24,12 @@ except ImportError:
     module_available = False
 
 
+class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
+    base_cmd = ["cmd"]
+
+
 def test_dbt_kubernetes_operator_add_global_flags() -> None:
-    dbt_kube_operator = DbtKubernetesBaseOperator(
+    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -48,7 +53,7 @@ def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -
     """
     If an end user passes in a
     """
-    dbt_kube_operator = DbtKubernetesBaseOperator(
+    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -90,6 +95,7 @@ result_map = {
     "ls": DbtLSKubernetesOperator(**base_kwargs),
     "run": DbtRunKubernetesOperator(**base_kwargs),
     "test": DbtTestKubernetesOperator(**base_kwargs),
+    "build": DbtBuildKubernetesOperator(**base_kwargs),
     "seed": DbtSeedKubernetesOperator(**base_kwargs),
 }
 
@@ -220,13 +226,13 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     test_operator._handle_warnings(context)
 
 
-@patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook")
-def test_created_pod(test_hook):
-    test_hook.is_in_cluster = False
-    test_hook._get_namespace.return_value.to_dict.return_value = "foo"
+def test_created_pod():
     ls_kwargs = {"env_vars": {"FOO": "BAR"}}
     ls_kwargs.update(base_kwargs)
     ls_operator = DbtLSKubernetesOperator(**ls_kwargs)
+    ls_operator.hook = MagicMock()
+    ls_operator.hook.is_in_cluster = False
+    ls_operator.hook._get_namespace.return_value.to_dict.return_value = "foo"
     ls_operator.build_kube_args(context={}, cmd_flags=MagicMock())
     pod_obj = ls_operator.build_pod_request_obj()
     expected_result = {

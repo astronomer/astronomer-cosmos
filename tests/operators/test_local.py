@@ -533,10 +533,7 @@ def test_dbt_docs_local_operator_with_static_flag():
 def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="my-task",
-        project_dir="my/dir",
-        cancel_query_on_kill=True
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir", cancel_query_on_kill=True
     )
 
     dbt_base_operator.on_kill()
@@ -548,10 +545,7 @@ def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
 def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="my-task",
-        project_dir="my/dir",
-        cancel_query_on_kill=False
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir", cancel_query_on_kill=False
     )
 
     dbt_base_operator.on_kill()

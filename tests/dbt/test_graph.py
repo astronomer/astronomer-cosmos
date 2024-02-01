@@ -912,9 +912,7 @@ def test_load_via_dbt_ls_render_config_no_partial_parse(
     mock_popen().returncode = 0
     project_config = ProjectConfig()
     render_config = RenderConfig(
-        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        load_method=LoadMode.DBT_LS,
-        partial_parse=False
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, load_method=LoadMode.DBT_LS, partial_parse=False
     )
     profile_config = ProfileConfig(
         profile_name="test",

@@ -233,6 +233,22 @@ def test_run_operator_dataset_inlets_and_outlets():
     assert test_operator.outlets == []
 
 
+def test_dbt_base_operator_no_partial_parse() -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        partial_parse=False,
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+
+    assert "--no-partial-parse" in cmd
+
+
 @pytest.mark.integration
 def test_run_test_operator_with_callback(failing_test_dbt_project):
     on_warning_callback = MagicMock()
@@ -503,3 +519,33 @@ def test_dbt_docs_local_operator_with_static_flag():
         dbt_cmd_flags=["--static"],
     )
     assert operator.required_files == ["static_index.html"]
+
+
+@patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
+def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        cancel_query_on_kill=True
+    )
+
+    dbt_base_operator.on_kill()
+
+    mock_send_sigint.assert_called_once()
+
+
+@patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigterm")
+def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        cancel_query_on_kill=False
+    )
+
+    dbt_base_operator.on_kill()
+
+    mock_send_sigterm.assert_called_once()

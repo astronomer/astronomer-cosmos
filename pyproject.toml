@@ -159,6 +159,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
+    "typing-extensions<4.6.0",  # to support python 3.8 and 3.9
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

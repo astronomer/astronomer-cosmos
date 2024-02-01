@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "astronomer-cosmos"
 dynamic = ["version"]
-description = "Render 3rd party workflows in Airflow"
+description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.8"
@@ -32,6 +32,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
     "aenum",
@@ -165,7 +166,7 @@ pre-install-commands = ["""
     """
 ]
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.8", "3.9", "3.10"]
+python = ["3.8", "3.9", "3.10", "3.11"]
 airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
 
 

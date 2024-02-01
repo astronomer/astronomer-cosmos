@@ -1,6 +1,7 @@
 """
 Script to generate a dedicated docs page per profile mapping.
 """
+
 from __future__ import annotations
 
 import os

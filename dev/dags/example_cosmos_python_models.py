@@ -29,7 +29,7 @@ profile_config = ProfileConfig(
     target_name="dev",
     profile_mapping=DatabricksTokenProfileMapping(
         conn_id="databricks_default",
-        profile_args={"schema": SCHEMA},
+        profile_args={"schema": SCHEMA, "connect_retries": 3},
     ),
 )
 

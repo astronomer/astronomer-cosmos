@@ -11,10 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   Authorize:
-    environment:
-      ${{ github.event_name == 'pull_request_target' &&
+    environment: ${{ github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
     runs-on: ubuntu-latest
@@ -30,8 +28,8 @@ jobs:
 
       - uses: actions/setup-python@v3
         with:
-          python-version: '3.9'
-          architecture: 'x64'
+          python-version: "3.9"
+          architecture: "x64"
 
       - run: pip3 install hatch
       - run: hatch run tests.py3.9-2.7:type-check
@@ -293,38 +291,3 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-
-
-  Code-Coverage:
-    if: github.event.action != 'labeled'
-    needs:
-      - Run-Unit-Tests
-      - Run-Integration-Tests
-      - Run-Integration-Tests-Expensive
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.11'
-      - name: Install coverage
-        run: |
-          pip3 install coverage
-      - name: Download all coverage artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: ./coverage
-      - name: Combine coverage
-        run: |
-          coverage combine ./coverage/coverage*/.coverage
-          coverage report
-          coverage xml
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml

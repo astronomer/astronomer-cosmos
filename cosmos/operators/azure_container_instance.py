@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Callable, Sequence
 
-import yaml
 from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 
@@ -64,12 +63,11 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Abs
             **kwargs,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> int:
+    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
-        result = int(super().execute(context))
+        result = super().execute(context)
         logger.info(result)
-        return result
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt
@@ -79,9 +77,6 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Abs
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.environment_variables: dict[str, Any] = {**env_vars, **self.environment_variables}
         self.command: list[str] = dbt_cmd
-
-    def execute(self, context: Context) -> int:
-        return self.build_and_run_cmd(context=context)
 
 
 class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):

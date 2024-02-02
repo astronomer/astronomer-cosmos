@@ -121,6 +121,9 @@ kubernetes = [
 pydantic = [
         "pydantic>=1.10.0",
 ]
+azure-container-instance = [
+    "apache-airflow-providers-microsoft-azure>=8.4.0",
+]
 
 [project.entry-points.cosmos]
 provider_info = "cosmos:get_provider_info"
@@ -148,27 +151,26 @@ packages = ["cosmos"]
 [tool.hatch.envs.tests]
 dependencies = [
     "astronomer-cosmos[tests]",
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-docker>=3.5.0",
+    "apache-airflow-providers-microsoft-azure",
     "types-PyYAML",
     "types-attrs",
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
-    "apache-airflow-providers-docker>=3.5.0",
+    "apache-airflow=={matrix:airflow}.0",
 ]
-# Airflow install with constraint file, Airflow versions < 2.7 require a workaround for PyYAML
-pre-install-commands = ["""
-    if [[ "2.3 2.4 2.5 2.6" =~ "{matrix:airflow}" ]]; then
-        echo "Cython < 3" >> /tmp/constraint.txt
-        pip wheel "PyYAML==6.0.0" -c /tmp/constraint.txt
-    fi
-    pip install 'apache-airflow=={matrix:airflow}' --constraint 'https://raw.githubusercontent.com/apache/airflow/constraints-{matrix:airflow}.0/constraints-{matrix:python}.txt'
-    """
-]
+pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
+
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11"]
 airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8"]
 
+[tool.hatch.envs.tests.overrides]
+matrix.airflow.dependencies = [
+    { value = "typing_extensions<4.6", if = ["2.6"] }
+]
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"

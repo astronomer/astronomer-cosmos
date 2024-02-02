@@ -12,7 +12,7 @@ import warnings
 import airflow
 import jinja2
 from airflow import DAG
-from airflow.compat.functools import cached_property
+from functools import cached_property
 from airflow.configuration import conf
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance

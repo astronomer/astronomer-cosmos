@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
-from airflow.compat.functools import cached_property
+from functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 

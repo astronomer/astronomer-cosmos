@@ -1,10 +1,12 @@
 from pathlib import Path
 from unittest.mock import patch
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
+from contextlib import nullcontext as does_not_raise
 
 import pytest
 
-from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
+from cosmos.constants import ExecutionMode, InvocationMode
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
 from cosmos.exceptions import CosmosValueError
 
 
@@ -195,3 +197,18 @@ def test_render_config_env_vars_deprecated():
     """RenderConfig.env_vars is deprecated since Cosmos 1.3, should warn user."""
     with pytest.deprecated_call():
         RenderConfig(env_vars={"VAR": "value"})
+
+
+@pytest.mark.parametrize(
+    "execution_mode, expectation",
+    [
+        (ExecutionMode.LOCAL, does_not_raise()),
+        (ExecutionMode.VIRTUALENV, does_not_raise()),
+        (ExecutionMode.KUBERNETES, pytest.raises(CosmosValueError)),
+        (ExecutionMode.DOCKER, pytest.raises(CosmosValueError)),
+        (ExecutionMode.AZURE_CONTAINER_INSTANCE, pytest.raises(CosmosValueError)),
+    ],
+)
+def test_execution_config_with_invocation_option(execution_mode, expectation):
+    with expectation:
+        ExecutionConfig(execution_mode=execution_mode, invocation_mode=InvocationMode.DBT_RUNNER)

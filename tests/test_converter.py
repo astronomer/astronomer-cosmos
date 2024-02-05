@@ -7,7 +7,7 @@ import pytest
 from airflow.models import DAG
 
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
-from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode, InvocationMode
 from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig, CosmosConfigException
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
@@ -405,3 +405,32 @@ def test_converter_project_config_dbt_vars_with_custom_load_mode(
         )
     _, kwargs = mock_legacy_dbt_project.call_args
     assert kwargs["dbt_vars"] == {"key": "value"}
+
+
+@pytest.mark.parametrize("invocation_mode", [None, InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.build_airflow_graph")
+def test_converter_invocation_mode_added_to_task_args(mock_build_airflow_graph, mock_validate_project, invocation_mode):
+    """Tests that the `task_args` passed to build_airflow_graph has invocation_mode if
+    it is not None.
+    """
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    execution_config = ExecutionConfig(invocation_mode=invocation_mode)
+    render_config = RenderConfig()
+    profile_config = MagicMock()
+
+    with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args={},
+        )
+    _, kwargs = mock_build_airflow_graph.call_args
+    if invocation_mode:
+        assert kwargs["task_args"]["invocation_mode"] == invocation_mode
+    else:
+        assert "invocation_mode" not in kwargs["task_args"]

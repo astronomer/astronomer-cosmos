@@ -130,9 +130,15 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.should_store_compiled_sql = should_store_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
-        self.invoke_dbt = getattr(self, f"run_{invocation_mode.value}")
-        self.handle_exception = getattr(self, f"handle_exception_{invocation_mode.value}")
-        self._dbt_runner: dbtRunner | None = None
+        self.invoke_dbt: Callable[..., FullOutputSubprocessResult | dbtRunnerResult]
+        self.handle_exception: Callable[..., None]
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.invoke_dbt = self.run_subprocess
+            self.handle_exception = self.handle_exception_subprocess
+        elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+            self.invoke_dbt = self.run_dbt_runner
+            self.handle_exception = self.handle_exception_dbt_runner
+            self._dbt_runner: dbtRunner | None = None
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
         super().__init__(**kwargs)
 
@@ -202,12 +208,18 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         else:
             logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
-    def run_subprocess(self, *args: Any, **kwargs: Any) -> FullOutputSubprocessResult:
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
+    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+        logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+            command=command,
+            env=env,
+            cwd=cwd,
+            output_encoding=self.output_encoding,
+        )
         logger.info(subprocess_result.output)
         return subprocess_result
 
-    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
+    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         try:
             from dbt.cli.main import dbtRunner
@@ -221,7 +233,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         # The dbt runner will cd into the project directory and restore the cwd when completed
         cli_args = command[1:] + ["--project-dir", cwd]
-        with environ(env):
+        logger.info("Trying to run dbtRunner with:\n %s", cli_args)
+        with environ({k: str(v) for k, v in env.items()}):
             result = self._dbt_runner.invoke(cli_args)
         return result
 
@@ -240,7 +253,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 tmp_project_dir,
                 self.project_dir,
             )
-
+            env = {k: str(v) for k, v in env.items()}
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
 
             with self.profile_config.ensure_profile() as profile_values:
@@ -262,18 +275,15 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     self.invoke_dbt(
                         command=deps_command,
                         env=env,
-                        output_encoding=self.output_encoding,
                         cwd=tmp_project_dir,
                     )
 
                 full_cmd = cmd + flags
 
-                logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
                 logger.info("Using environment variables keys: %s", env.keys())
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
-                    output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
                 if is_openlineage_available:
@@ -294,7 +304,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 if self.callback:
                     self.callback(tmp_project_dir)
 
-                return result  # type: ignore
+                return result
 
     def calculate_openlineage_events_completes(
         self, env: dict[str, str | os.PathLike[Any] | bytes], project_dir: Path
@@ -465,14 +475,14 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     ) -> None:
         super().__init__(**kwargs)
         self.on_warning_callback = on_warning_callback
-        self.extract_issues = {
-            InvocationMode.SUBPROCESS: lambda result: extract_log_issues(result.full_output),
-            InvocationMode.DBT_RUNNER: extract_dbt_runner_issues,
-        }[self.invocation_mode]
-        self.parse_number_of_warnings = {
-            InvocationMode.SUBPROCESS: parse_number_of_warnings_subprocess,
-            InvocationMode.DBT_RUNNER: parse_number_of_warnings_dbt_runner,
-        }[self.invocation_mode]
+        self.extract_issues: Callable[..., tuple[list[str], list[str]]]
+        self.parse_number_of_warnings: Callable[..., int]
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.extract_issues = lambda result: extract_log_issues(result.full_output)
+            self.parse_number_of_warnings = parse_number_of_warnings_subprocess
+        elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+            self.extract_issues = extract_dbt_runner_issues
+            self.parse_number_of_warnings = parse_number_of_warnings_dbt_runner
 
     def _handle_warnings(self, result: FullOutputSubprocessResult | dbtRunnerResult, context: Context) -> None:
         """

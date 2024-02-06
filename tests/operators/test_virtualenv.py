@@ -60,12 +60,12 @@ def test_run_command(
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 3
     python_cmd = run_command_args[0]
-    dbt_deps = run_command_args[1]
-    dbt_cmd = run_command_args[2]
+    dbt_deps = run_command_args[1].kwargs
+    dbt_cmd = run_command_args[2].kwargs
     assert python_cmd[0][0][0].endswith("/bin/python")
     assert python_cmd[0][-1][-1] == "from importlib.metadata import version; print(version('dbt-core'))"
-    assert dbt_deps[0][0][1] == "deps"
-    assert dbt_deps[0][0][0].endswith("/bin/dbt")
-    assert dbt_deps[0][0][0] == dbt_cmd[0][0][0]
-    assert dbt_cmd[0][0][1] == "do-something"
+    assert dbt_deps["command"][1] == "deps"
+    assert dbt_deps["command"][0].endswith("/bin/dbt")
+    assert dbt_deps["command"][0] == dbt_cmd["command"][0]
+    assert dbt_cmd["command"][1] == "do-something"
     assert mock_execute.call_count == 2

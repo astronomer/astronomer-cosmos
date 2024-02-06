@@ -409,14 +409,16 @@ def test_converter_project_config_dbt_vars_with_custom_load_mode(
 
 @pytest.mark.parametrize("invocation_mode", [None, InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 @patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.validate_initial_user_config")
+@patch("cosmos.converter.DbtGraph")
 @patch("cosmos.converter.build_airflow_graph")
-def test_converter_invocation_mode_added_to_task_args(mock_build_airflow_graph, mock_validate_project, invocation_mode):
-    """Tests that the `task_args` passed to build_airflow_graph has invocation_mode if
-    it is not None.
-    """
+def test_converter_invocation_mode_added_to_task_args(
+    mock_build_airflow_graph, mock_user_config, mock_dbt_graph, mock_validate_project, invocation_mode
+):
+    """Tests that the `task_args` passed to build_airflow_graph has invocation_mode if it is not None."""
     project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
     execution_config = ExecutionConfig(invocation_mode=invocation_mode)
-    render_config = RenderConfig()
+    render_config = MagicMock()
     profile_config = MagicMock()
 
     with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:

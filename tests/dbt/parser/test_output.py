@@ -1,4 +1,5 @@
 import pytest
+import logging
 from unittest.mock import MagicMock
 from airflow.hooks.subprocess import SubprocessResult
 
@@ -19,10 +20,21 @@ from cosmos.dbt.parser.output import (
         ("Nothing to do. Exiting without running tests.", 0),
     ],
 )
-def test_parse_number_of_warnings_subprocess(output_str: str, expected_warnings) -> None:
+def test_parse_number_of_warnings_subprocess(output_str: str, expected_warnings):
     result = SubprocessResult(exit_code=0, output=output_str)
     num_warns = parse_number_of_warnings_subprocess(result)
     assert num_warns == expected_warnings
+
+
+def test_parse_number_of_warnings_subprocess_error_logged(caplog):
+    output_str = "WARN= should log an error."
+    with caplog.at_level(logging.ERROR):
+        result = SubprocessResult(exit_code=0, output=output_str)
+        parse_number_of_warnings_subprocess(result)
+    expected_error_log = (
+        "Could not parse number of WARNs. Check your dbt/airflow version or if --quiet is not being used"
+    )
+    assert expected_error_log in caplog.text
 
 
 def test_parse_number_of_warnings_dbt_runner_with_warnings():

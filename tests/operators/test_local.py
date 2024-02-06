@@ -182,7 +182,8 @@ def test_dbt_base_operator_run_dbt_runner_cannot_import():
             dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")
 
 
-def test_dbt_base_operator_run_dbt_runner():
+@patch("cosmos.dbt.project.os.chdir")
+def test_dbt_base_operator_run_dbt_runner(mock_chdir):
     """Tests that dbtRunner.invoke() is called with the expected cli args."""
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
@@ -197,13 +198,16 @@ def test_dbt_base_operator_run_dbt_runner():
         dbt_base_operator.run_dbt_runner(command=full_dbt_cmd, env={}, cwd="some-dir")
 
     mock_dbt_runner = mock_dbt.dbtRunner.return_value
-    expected_cli_args = ["run", "some_model", "--project-dir", "some-dir"]
+    expected_cli_args = ["run", "some_model"]
 
     assert mock_dbt_runner.invoke.call_count == 1
     assert mock_dbt_runner.invoke.call_args[0][0] == expected_cli_args
+    assert mock_chdir.call_count == 2
+    assert mock_chdir.call_args_list[0][0][0] == "some-dir"
 
 
-def test_dbt_base_operator_run_dbt_runner_is_cached():
+@patch("cosmos.dbt.project.os.chdir")
+def test_dbt_base_operator_run_dbt_runner_is_cached(mock_chdir):
     """Tests that if run_dbt_runner is called multiple times a cached runner is used."""
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
@@ -375,7 +379,8 @@ def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_proje
 
 
 @pytest.mark.integration
-def test_run_test_operator_without_callback():
+@pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
+def test_run_test_operator_without_callback(invocation_mode):
     on_warning_callback = MagicMock()
 
     with DAG("test-id-3", start_date=datetime(2022, 1, 1)) as dag:
@@ -384,6 +389,7 @@ def test_run_test_operator_without_callback():
             project_dir=MINI_DBT_PROJ_DIR,
             task_id="run",
             append_env=True,
+            invocation_mode=invocation_mode,
         )
         test_operator = DbtTestLocalOperator(
             profile_config=mini_profile_config,
@@ -391,6 +397,7 @@ def test_run_test_operator_without_callback():
             task_id="test",
             append_env=True,
             on_warning_callback=on_warning_callback,
+            invocation_mode=invocation_mode,
         )
         run_operator >> test_operator
     run_test_dag(dag)

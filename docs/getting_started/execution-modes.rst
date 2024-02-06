@@ -180,3 +180,30 @@ Each task will create a new container on Azure, giving full isolation. This, how
             "image": "dbt-jaffle-shop:1.0.0",
         },
     )
+
+
+.. _invocation_modes:
+Invocation Modes
+================
+.. versionadded:: 1.4
+
+For ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV`` execution modes, Cosmos supports two invocation modes for running dbt:
+
+1. ``InvocationMode.SUBPROCESS``: This is currently the default mode and does not need to be specified. In this mode, Cosmos runs dbt cli commands using the Python ``subprocess`` module and parses the output to capture logs and to raise exceptions.
+
+2. ``InvocationMode.DBT_RUNNER``: In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
+   In order to use this mode, dbt must be installed in the same environment, either local or virtualenv for the worker. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and can be expected to be faster than ``InvocationMode.SUBPROCESS``.
+
+The invocation mode can be set in the ``ExecutionConfig`` as shown below:
+
+.. code-block:: python
+
+    from cosmos.constants import InvocationMode
+
+    dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.LOCAL,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+        ),
+    )

@@ -182,9 +182,11 @@ def test_dbt_base_operator_run_dbt_runner_cannot_import():
             dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")
 
 
+@patch("cosmos.dbt.project.os.environ")
 @patch("cosmos.dbt.project.os.chdir")
-def test_dbt_base_operator_run_dbt_runner(mock_chdir):
-    """Tests that dbtRunner.invoke() is called with the expected cli args."""
+def test_dbt_base_operator_run_dbt_runner(mock_chdir, mock_environ):
+    """Tests that dbtRunner.invoke() is called with the expected cli args, that the
+    cwd is changed to the expected directory, and env variables are set."""
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -192,18 +194,23 @@ def test_dbt_base_operator_run_dbt_runner(mock_chdir):
         invocation_mode=InvocationMode.DBT_RUNNER,
     )
     full_dbt_cmd = ["dbt", "run", "some_model"]
+    env_vars = {"VAR1": "value1", "VAR2": "value2"}
 
     mock_dbt = MagicMock()
     with patch.dict(sys.modules, {"dbt.cli.main": mock_dbt}):
-        dbt_base_operator.run_dbt_runner(command=full_dbt_cmd, env={}, cwd="some-dir")
+        dbt_base_operator.run_dbt_runner(command=full_dbt_cmd, env=env_vars, cwd="some-dir")
 
     mock_dbt_runner = mock_dbt.dbtRunner.return_value
     expected_cli_args = ["run", "some_model"]
-
+    # Assert dbtRunner.invoke was called with the expected cli args
     assert mock_dbt_runner.invoke.call_count == 1
     assert mock_dbt_runner.invoke.call_args[0][0] == expected_cli_args
+    # Assert cwd was changed to the expected directory
     assert mock_chdir.call_count == 2
     assert mock_chdir.call_args_list[0][0][0] == "some-dir"
+    # Assert env variables were updated
+    assert mock_environ.update.call_count == 1
+    assert mock_environ.update.call_args[0][0] == env_vars
 
 
 @patch("cosmos.dbt.project.os.chdir")

@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from airflow.datasets import Dataset  # noqa: F811
     from openlineage.client.run import RunEvent
     from dbt.cli.main import dbtRunner, dbtRunnerResult
-    from typing import Callable
 
 from sqlalchemy.orm import Session
 

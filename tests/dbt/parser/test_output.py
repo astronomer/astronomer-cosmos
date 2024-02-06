@@ -1,18 +1,40 @@
+import pytest
+from unittest.mock import MagicMock
 from airflow.hooks.subprocess import SubprocessResult
 
 from cosmos.dbt.parser.output import (
+    extract_dbt_runner_issues,
     extract_log_issues,
-    parse_output,
+    parse_number_of_warnings_subprocess,
+    parse_number_of_warnings_dbt_runner,
 )
 
 
-def test_parse_output() -> None:
-    for warnings in range(0, 3):
-        output_str = f"Done. PASS=15 WARN={warnings} ERROR=0 SKIP=0 TOTAL=16"
-        keyword = "WARN"
-        result = SubprocessResult(exit_code=0, output=output_str)
-        num_warns = parse_output(result, keyword)
-        assert num_warns == warnings
+@pytest.mark.parametrize(
+    "output_str, expected_warnings",
+    [
+        ("Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16", 1),
+        ("Done. PASS=15 WARN=0 ERROR=0 SKIP=0 TOTAL=16", 0),
+        ("Done. PASS=15 WARN=2 ERROR=0 SKIP=0 TOTAL=16", 2),
+        ("Nothing to do. Exiting without running tests.", 0),
+    ],
+)
+def test_parse_number_of_warnings_subprocess(output_str: str, expected_warnings) -> None:
+    result = SubprocessResult(exit_code=0, output=output_str)
+    num_warns = parse_number_of_warnings_subprocess(result)
+    assert num_warns == expected_warnings
+
+
+def test_parse_number_of_warnings_dbt_runner_with_warnings():
+    runner_result = MagicMock()
+    runner_result.result.results = [
+        MagicMock(status="pass"),
+        MagicMock(status="warn"),
+        MagicMock(status="pass"),
+        MagicMock(status="warn"),
+    ]
+    num_warns = parse_number_of_warnings_dbt_runner(runner_result)
+    assert num_warns == 2
 
 
 def test_extract_log_issues() -> None:
@@ -37,3 +59,23 @@ def test_extract_log_issues() -> None:
     test_names_no_warns, test_results_no_warns = extract_log_issues(log_list_no_warning)
     assert test_names_no_warns == []
     assert test_results_no_warns == []
+
+
+def test_extract_dbt_runner_issues():
+    """Tests that the function extracts the correct test names and results from a dbt runner result
+    for only warnings.
+    """
+    runner_result = MagicMock()
+    runner_result.result.results = [
+        MagicMock(status="pass"),
+        MagicMock(status="warn", message="A warning message", node=MagicMock()),
+        MagicMock(status="pass"),
+        MagicMock(status="warn", message="A different warning message", node=MagicMock()),
+    ]
+    runner_result.result.results[1].node.name = "a_test"
+    runner_result.result.results[3].node.name = "another_test"
+
+    test_names, test_results = extract_dbt_runner_issues(runner_result)
+
+    assert test_names == ["a_test", "another_test"]
+    assert test_results == ["A warning message", "A different warning message"]

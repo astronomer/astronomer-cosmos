@@ -76,6 +76,7 @@ def test_profile_without_dataset(mock_bigquery_conn_with_dict: Connection):
     mock_bigquery_conn_with_dict.extra = json.dumps(
         {
             "project": "my_project",
+            "dataset": None,
             "keyfile_dict": json.dumps(sample_keyfile_dict),
         }
     )
@@ -107,7 +108,6 @@ def test_mock_profile(mock_bigquery_conn_with_dict: Connection):
         "type": "bigquery",
         "method": "service-account-json",
         "project": "mock_value",
-        "dataset": "mock_value",
         "threads": 1,
         "keyfile_json": None,
     }

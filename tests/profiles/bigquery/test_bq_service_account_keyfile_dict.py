@@ -49,8 +49,8 @@ def test_connection_claiming_succeeds(mock_bigquery_conn_with_dict: Connection):
 
 
 def test_connection_claiming_fails(mock_bigquery_conn_with_dict: Connection):
-    # Remove the `dataset` key, which is mandatory
-    mock_bigquery_conn_with_dict.extra = json.dumps({"project": "my_project", "keyfile_dict": sample_keyfile_dict})
+    # Remove the `project` key, which is mandatory
+    mock_bigquery_conn_with_dict.extra = json.dumps({"keyfile_dict": sample_keyfile_dict})
     profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
     assert not profile_mapping.can_claim_connection()
 
@@ -71,6 +71,28 @@ def test_profile(mock_bigquery_conn_with_dict: Connection):
     }
     assert profile_mapping.profile == expected
 
+def test_profile_without_dataset(mock_bigquery_conn_with_dict: Connection):
+    mock_bigquery_conn_with_dict.extra = json.dumps({
+        "project": "my_project",
+        "keyfile_dict": json.dumps(sample_keyfile_dict),
+    })
+    
+    profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
+    
+    # Expected profile does not include 'dataset'
+    expected = {
+        "type": "bigquery",
+        "method": "service-account-json",
+        "project": "my_project",
+        "threads": 1,
+        "keyfile_json": {
+            "type": "service_account",
+            "private_key_id": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY_ID') }}",
+            "private_key": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY') }}",
+        },
+    }
+    
+    assert profile_mapping.profile == expected
 
 def test_mock_profile(mock_bigquery_conn_with_dict: Connection):
     """

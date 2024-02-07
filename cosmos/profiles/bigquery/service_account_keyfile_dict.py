@@ -49,7 +49,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
             "threads": 1,
             **self.profile_args,
         }
-        if self.mapped_params.get("dataset"):
+        if self.mapped_params.get("dataset") is not None:
             profile_data["dataset"] = self.mapped_params["dataset"]
 
         return profile_data

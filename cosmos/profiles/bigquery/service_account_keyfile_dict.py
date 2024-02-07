@@ -51,7 +51,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         }
         if self.mapped_params.get("dataset"):
             profile_data["dataset"] = self.mapped_params["dataset"]
-        
+
         return profile_data
 
     @property

@@ -71,14 +71,17 @@ def test_profile(mock_bigquery_conn_with_dict: Connection):
     }
     assert profile_mapping.profile == expected
 
+
 def test_profile_without_dataset(mock_bigquery_conn_with_dict: Connection):
-    mock_bigquery_conn_with_dict.extra = json.dumps({
-        "project": "my_project",
-        "keyfile_dict": json.dumps(sample_keyfile_dict),
-    })
-    
+    mock_bigquery_conn_with_dict.extra = json.dumps(
+        {
+            "project": "my_project",
+            "keyfile_dict": json.dumps(sample_keyfile_dict),
+        }
+    )
+
     profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
-    
+
     # Expected profile does not include 'dataset'
     expected = {
         "type": "bigquery",
@@ -91,8 +94,9 @@ def test_profile_without_dataset(mock_bigquery_conn_with_dict: Connection):
             "private_key": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY') }}",
         },
     }
-    
+
     assert profile_mapping.profile == expected
+
 
 def test_mock_profile(mock_bigquery_conn_with_dict: Connection):
     """

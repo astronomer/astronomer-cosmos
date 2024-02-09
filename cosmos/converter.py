@@ -210,7 +210,7 @@ class DbtToAirflowConverter:
 
         execution_config = execution_config or ExecutionConfig()
         render_config = render_config or RenderConfig()
-        operator_args = operator_args or {}
+        operator_args = operator_args.copy() if operator_args else {}
 
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 

@@ -421,12 +421,13 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         return result
 
     def on_kill(self) -> None:
-        if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
-            if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
-                os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
-        else:
-            self.subprocess_hook.send_sigterm()
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            if self.cancel_query_on_kill:
+                self.subprocess_hook.log.info("Sending SIGINT signal to process group")
+                if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
+                    os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
+            else:
+                self.subprocess_hook.send_sigterm()
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

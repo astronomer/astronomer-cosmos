@@ -39,9 +39,9 @@ def get_dag_bag() -> DagBag:
                 print(f"Adding {files} to .airflowignore")
                 file.writelines([f"{file_name}\n" for file_name in files])
 
-        for file in IGNORED_DAG_FILES:
-            print(f"Adding {file} to .airflowignore")
-            file.writelines([f"{file}\n"])
+        for dagfile in IGNORED_DAG_FILES:
+            print(f"Adding {dagfile} to .airflowignore")
+            file.writelines([f"{dagfile}\n"])
 
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])

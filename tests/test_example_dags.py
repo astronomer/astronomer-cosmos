@@ -54,9 +54,9 @@ def get_dag_bag() -> DagBag:
                 print(f"Adding {files} to .airflowignore")
                 file.writelines([f"{file}\n" for file in files])
 
-        for file in IGNORED_DAG_FILES:
-            print(f"Adding {file} to .airflowignore")
-            file.writelines([f"{file}\n"])
+        for dagfile in IGNORED_DAG_FILES:
+            print(f"Adding {dagfile} to .airflowignore")
+            file.writelines([f"{dagfile}\n"])
 
         # The dbt sqlite adapter is only available until dbt 1.4
         if DBT_VERSION >= Version("1.5.0"):

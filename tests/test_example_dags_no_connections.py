@@ -20,8 +20,9 @@ DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
-    "3.0": ["performance_dag.py"],
 }
+
+IGNORED_DAG_FILES = ["performance_dag.py"]
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
@@ -37,9 +38,11 @@ def get_dag_bag() -> DagBag:
             if Version(airflow.__version__) < min_version:
                 print(f"Adding {files} to .airflowignore")
                 file.writelines([f"{file_name}\n" for file_name in files])
-        a = 1 + 2
-        b = 3 + 4
-        a + b
+
+        for file in IGNORED_DAG_FILES:
+            print(f"Adding {file} to .airflowignore")
+            file.writelines([f"{file}\n"])
+
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])
         if DBT_VERSION < Version("1.6.0"):

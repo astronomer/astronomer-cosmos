@@ -4,6 +4,7 @@ import time
 import os
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Generator
 
 try:
     from functools import cache
@@ -64,7 +65,7 @@ def generate_model_code(model_number: int) -> str:
 def generate_project(
     project_path: Path,
     num_models: int,
-) -> str:
+) -> Generator[Path, None, None]:
     """
     Generate dbt models in the project directory.
     """

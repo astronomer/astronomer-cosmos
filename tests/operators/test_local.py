@@ -337,6 +337,14 @@ def test_run_operator_dataset_inlets_and_outlets():
     from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
@@ -353,7 +361,7 @@ def test_run_operator_dataset_inlets_and_outlets():
             install_deps=True,
             append_env=True,
         )
-        run_operator
+        seed_operator >> run_operator >> test_operator
     run_test_dag(dag)
     assert run_operator.inlets == []
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]

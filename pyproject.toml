@@ -9,16 +9,8 @@ description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.8"
-authors = [
-    { name = "Astronomer", email = "humans@astronomer.io" },
-]
-keywords = [
-    "airflow",
-    "apache-airflow",
-    "astronomer",
-    "dags",
-    "dbt",
-]
+authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
+keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Web Environment",
@@ -56,48 +48,23 @@ dbt-all = [
     "dbt-spark",
     "dbt-vertica",
 ]
-dbt-athena = [
-    "dbt-athena-community",
-    "apache-airflow-providers-amazon>=8.0.0",
-]
-dbt-bigquery = [
-    "dbt-bigquery",
-]
-dbt-databricks = [
-    "dbt-databricks",
-]
-dbt-exasol = [
-    "dbt-exasol",
-]
-dbt-postgres = [
-    "dbt-postgres",
-]
-dbt-redshift = [
-    "dbt-redshift",
-]
-dbt-snowflake = [
-    "dbt-snowflake",
-]
-dbt-spark = [
-    "dbt-spark",
-]
-dbt-vertica = [
-    "dbt-vertica<=1.5.4",
-]
-openlineage = [
-    "openlineage-integration-common",
-    "openlineage-airflow",
-]
-all = [
-    "astronomer-cosmos[dbt-all]",
-    "astronomer-cosmos[openlineage]"
-]
-docs =[
+dbt-athena = ["dbt-athena-community", "apache-airflow-providers-amazon>=8.0.0"]
+dbt-bigquery = ["dbt-bigquery"]
+dbt-databricks = ["dbt-databricks"]
+dbt-exasol = ["dbt-exasol"]
+dbt-postgres = ["dbt-postgres"]
+dbt-redshift = ["dbt-redshift"]
+dbt-snowflake = ["dbt-snowflake"]
+dbt-spark = ["dbt-spark"]
+dbt-vertica = ["dbt-vertica<=1.5.4"]
+openlineage = ["openlineage-integration-common", "openlineage-airflow"]
+all = ["astronomer-cosmos[dbt-all]", "astronomer-cosmos[openlineage]"]
+docs = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
 tests = [
     "packaging",
@@ -137,9 +104,7 @@ Documentation = "https://astronomer.github.io/astronomer-cosmos"
 path = "cosmos/__init__.py"
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "/cosmos",
-]
+include = ["/cosmos"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["cosmos"]
@@ -175,51 +140,20 @@ matrix.airflow.dependencies = [
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
 type-check = "mypy cosmos"
-test = 'pytest -vv --durations=0 . -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py'
-test-cov = """pytest -vv --cov=cosmos --cov-report=term-missing --cov-report=xml --durations=0 -m "not integration" --ignore=tests/test_example_dags.py --ignore=tests/test_example_dags_no_connections.py"""
-# we install using the following workaround to overcome installation conflicts, such as:
-# apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
-test-integration-setup = """pip uninstall -y dbt-postgres dbt-databricks dbt-vertica; \
-rm -rf airflow.*; \
-airflow db init; \
-pip install  'dbt-core'  'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'"""
-test-integration = """rm -rf dbt/jaffle_shop/dbt_packages;
-pytest -vv \
---cov=cosmos \
---cov-report=term-missing \
---cov-report=xml \
---durations=0 \
--m integration  \
--k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv)'"""
-test-integration-expensive = """pytest -vv \
---cov=cosmos \
---cov-report=term-missing \
---cov-report=xml \
---durations=0 \
--m integration  \
--k 'example_cosmos_python_models or example_virtualenv'"""
-test-integration-sqlite-setup = """pip uninstall -y dbt-core dbt-sqlite openlineage-airflow openlineage-integration-common; \
-rm -rf airflow.*; \
-airflow db init; \
-pip install 'dbt-core==1.4' 'dbt-sqlite<=1.4' 'dbt-databricks<=1.4' 'dbt-postgres<=1.4' """
-test-integration-sqlite = """
-pytest -vv \
---cov=cosmos \
---cov-report=term-missing \
---cov-report=xml \
---durations=0 \
--m integration  \
--k 'example_cosmos_sources or sqlite'"""
+test = 'sh scripts/test/unit.sh'
+test-cov = 'sh scripts/test/unit-cov.sh'
+test-integration-setup = 'sh scripts/test/integration-setup.sh'
+test-integration = 'sh scripts/test/integration.sh'
+test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
+test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
+test-integration-sqlite = 'sh scripts/test/integration-sqlite.sh'
+test-performance-setup = 'sh scripts/test/performance-setup.sh'
+test-performance = 'sh scripts/test/performance.sh'
 
 [tool.pytest.ini_options]
-filterwarnings = [
-    "ignore::DeprecationWarning",
-]
+filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = [
-    "integration",
-    "sqlite"
-]
+markers = ["integration", "sqlite", "perf"]
 
 ######################################
 # DOCS
@@ -233,7 +167,7 @@ dependencies = [
     "sphinx-autobuild",
     "sphinx-autoapi",
     "openlineage-airflow",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1"
+    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
 
 [tool.hatch.envs.docs.scripts]

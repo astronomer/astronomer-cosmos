@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main, performance-int-tests] # TODO: remove me before merging
+    branches: [main]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -356,7 +356,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: Install coverage
         run: |
           pip3 install coverage

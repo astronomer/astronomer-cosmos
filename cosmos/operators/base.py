@@ -51,7 +51,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
-    :param partial_parse: If True, then the operator will use the
+    :param partial_parse: If True (default), then the operator will use the
         ``partial_parse.msgpack`` during execution if it exists. If False, then
         a flag will be explicitly set to turn off partial parsing.
     :param cancel_query_on_kill: If true, then cancel any running queries when the task's on_kill() is executed.

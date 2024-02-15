@@ -192,7 +192,8 @@ For ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV`` execution modes, Co
 1. ``InvocationMode.SUBPROCESS``: This is currently the default mode and does not need to be specified. In this mode, Cosmos runs dbt cli commands using the Python ``subprocess`` module and parses the output to capture logs and to raise exceptions.
 
 2. ``InvocationMode.DBT_RUNNER``: In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
-   In order to use this mode, dbt must be installed in the same environment, either local or virtualenv for the worker. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and can be expected to be faster than ``InvocationMode.SUBPROCESS``.
+   In order to use this mode, dbt must be installed in the same environment, either local or virtualenv for the worker. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and can be expected to be faster than ``InvocationMode.SUBPROCESS``. \
+   This mode requires dbt version 1.5.0 or higher.
 
 The invocation mode can be set in the ``ExecutionConfig`` as shown below:
 

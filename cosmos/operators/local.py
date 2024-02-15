@@ -224,7 +224,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             from dbt.cli.main import dbtRunner
         except ImportError:
             raise ImportError(
-                "Could not import dbt core. Ensure that dbt is installed and available in the environment where the operator is running."
+                "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
         if self._dbt_runner is None:

@@ -177,7 +177,7 @@ def test_dbt_base_operator_run_dbt_runner_cannot_import():
         project_dir="my/dir",
         invocation_mode=InvocationMode.DBT_RUNNER,
     )
-    expected_error_message = "Could not import dbt core. Ensure that dbt is installed and available in the environment where the operator is running."
+    expected_error_message = "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
     with patch.dict(sys.modules, {"dbt.cli.main": None}):
         with pytest.raises(ImportError, match=expected_error_message):
             dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")

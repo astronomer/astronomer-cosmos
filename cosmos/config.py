@@ -47,7 +47,7 @@ class RenderConfig:
     :param env_vars: (Deprecated since Cosmos 1.3 use ProjectConfig.env_vars) A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
     :param dbt_project_path: Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
     :param dbt_ls_path: Configures the location of an output of ``dbt ls``. Required when using ``load_method=LoadMode.DBT_LS_FILE``.
-    :param partial_parse: If True, then when ``load_method=LoadMode.DBT_LS``, attempt to use the ``partial_parse.msgpack`` file if it exists.
+    :param partial_parse: If True (default), then when ``load_method=LoadMode.DBT_LS``, attempt to use the ``partial_parse.msgpack`` file if it exists.
     """
 
     emit_datasets: bool = True

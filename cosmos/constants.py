@@ -51,6 +51,7 @@ class ExecutionMode(Enum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     VIRTUALENV = "virtualenv"
+    AZURE_CONTAINER_INSTANCE = "azure_container_instance"
 
 
 class TestIndirectSelection(Enum):

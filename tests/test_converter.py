@@ -407,6 +407,39 @@ def test_converter_project_config_dbt_vars_with_custom_load_mode(
     assert kwargs["dbt_vars"] == {"key": "value"}
 
 
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.build_airflow_graph")
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_multiple_calls_same_operator_args(
+    mock_dbt_graph_load, mock_validate_project, mock_build_airflow_graph
+):
+    """Tests if the DbttoAirflowConverter is called more than once with the same operator_args, the
+    operator_args are not modified.
+    """
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig()
+    profile_config = MagicMock()
+    operator_args = {
+        "install_deps": True,
+        "vars": {"key": "value"},
+        "env": {"key": "value"},
+    }
+    original_operator_args = operator_args.copy()
+    for _ in range(2):
+        with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+            DbtToAirflowConverter(
+                dag=dag,
+                nodes=nodes,
+                project_config=project_config,
+                profile_config=profile_config,
+                execution_config=execution_config,
+                render_config=render_config,
+                operator_args=operator_args,
+            )
+    assert operator_args == original_operator_args
+
+
 @pytest.mark.parametrize("invocation_mode", [None, InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 @patch("cosmos.config.ProjectConfig.validate_project")
 @patch("cosmos.converter.validate_initial_user_config")

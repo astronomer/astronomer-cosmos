@@ -6,7 +6,6 @@ from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
-    DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
     DbtSeedKubernetesOperator,
@@ -24,12 +23,24 @@ except ImportError:
     module_available = False
 
 
-class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
-    base_cmd = ["cmd"]
+@pytest.fixture()
+def mock_kubernetes_execute():
+    with patch("cosmos.operators.kubernetes.KubernetesPodOperator.execute") as mock_execute:
+        yield mock_execute
 
 
-def test_dbt_kubernetes_operator_add_global_flags() -> None:
-    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
+@pytest.fixture()
+def base_operator(mock_kubernetes_execute):
+    from cosmos.operators.kubernetes import DbtKubernetesBaseOperator
+
+    class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
+        base_cmd = ["cmd"]
+
+    return ConcreteDbtKubernetesBaseOperator
+
+
+def test_dbt_kubernetes_operator_add_global_flags(base_operator) -> None:
+    dbt_kube_operator = base_operator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -48,12 +59,29 @@ def test_dbt_kubernetes_operator_add_global_flags() -> None:
     ]
 
 
+@patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
+def test_dbt_kubernetes_operator_execute(mock_build_kube_args, base_operator, mock_kubernetes_execute):
+    """Tests that the execute method call results in both the build_kube_args method and the kubernetes execute method being called."""
+    operator = base_operator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        image="my_image",
+        project_dir="my/dir",
+    )
+    operator.execute(context={})
+    # Assert that the build_kube_args method was called in the execution
+    mock_build_kube_args.assert_called_once()
+    # Assert that the kubernetes execute method was called in the execution
+    mock_kubernetes_execute.assert_called_once()
+    assert mock_kubernetes_execute.call_args.args[-1] == {}
+
+
 @patch("cosmos.operators.base.context_to_airflow_vars")
-def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
+def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock, base_operator) -> None:
     """
     If an end user passes in a
     """
-    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
+    dbt_kube_operator = base_operator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",

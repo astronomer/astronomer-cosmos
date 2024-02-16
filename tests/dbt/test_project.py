@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.dbt.project import create_symlinks, copy_manifest_for_partial_parse, environ
+from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
@@ -34,7 +34,7 @@ def test_copy_manifest_for_partial_parse(tmp_path, exists):
     tmp_dir = tmp_path / "tmp_dir"
     tmp_dir.mkdir()
 
-    copy_manifest_for_partial_parse(project_path, tmp_dir)
+    copy_msgpack_for_partial_parse(project_path, tmp_dir)
 
     tmp_partial_parse_file = tmp_dir / "target" / "partial_parse.msgpack"
 

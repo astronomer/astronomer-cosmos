@@ -57,7 +57,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
-from cosmos.dbt.project import create_symlinks, copy_manifest_for_partial_parse
+from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -214,7 +214,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
 
             if self.partial_parse:
-                copy_manifest_for_partial_parse(Path(self.project_dir), Path(tmp_project_dir))
+                copy_msgpack_for_partial_parse(Path(self.project_dir), Path(tmp_project_dir))
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values

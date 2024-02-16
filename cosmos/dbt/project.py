@@ -19,7 +19,7 @@ def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool
             os.symlink(project_path / child_name, tmp_dir / child_name)
 
 
-def copy_manifest_for_partial_parse(project_path: Path, tmp_dir: Path) -> None:
+def copy_msgpack_for_partial_parse(project_path: Path, tmp_dir: Path) -> None:
     partial_parse_file = Path(project_path) / DBT_TARGET_DIR_NAME / DBT_PARTIAL_PARSE_FILE_NAME
 
     if partial_parse_file.exists():

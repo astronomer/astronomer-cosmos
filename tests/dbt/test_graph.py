@@ -907,7 +907,7 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
 def test_load_via_dbt_ls_render_config_no_partial_parse(
     mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
 ):
-    """Tests that the dbt ls command in the subprocess has "--selector" with the RenderConfig.selector."""
+    """Tests that --no-partial-parse appears when partial_parse=False."""
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
     project_config = ProjectConfig()

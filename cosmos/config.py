@@ -62,7 +62,6 @@ class RenderConfig:
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
     dbt_ls_path: Path | None = None
-    partial_parse: bool = True
 
     project_path: Path | None = field(init=False)
 
@@ -297,7 +296,6 @@ class ExecutionConfig:
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
-    :param partial_parse: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
@@ -306,7 +304,6 @@ class ExecutionConfig:
 
     dbt_project_path: InitVar[str | Path | None] = None
     project_path: Path | None = field(init=False)
-    partial_parse: bool = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         self.project_path = Path(dbt_project_path) if dbt_project_path else None

@@ -123,6 +123,9 @@ class ProjectConfig:
     :param dbt_vars: Dictionary of dbt variables for the project. This argument overrides variables defined in your dbt_project.yml
         file. The dictionary is dumped to a yaml string and passed to dbt commands as the --vars argument. Variables are only
         supported for rendering when using ``RenderConfig.LoadMode.DBT_LS`` and ``RenderConfig.LoadMode.CUSTOM`` load mode.
+    :param partial_parse: If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
+        for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
+        execution modes.
     """
 
     dbt_project_path: Path | None = None

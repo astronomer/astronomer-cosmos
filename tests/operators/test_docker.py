@@ -1,12 +1,12 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import pytest
 
 from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.operators.docker import (
     DbtBuildDockerOperator,
-    DbtDockerBaseOperator,
     DbtLSDockerOperator,
     DbtRunDockerOperator,
     DbtSeedDockerOperator,
@@ -14,12 +14,24 @@ from cosmos.operators.docker import (
 )
 
 
-class ConcreteDbtDockerBaseOperator(DbtDockerBaseOperator):
-    base_cmd = ["cmd"]
+@pytest.fixture()
+def mock_docker_execute():
+    with patch("cosmos.operators.docker.DockerOperator.execute") as mock_execute:
+        yield mock_execute
 
 
-def test_dbt_docker_operator_add_global_flags() -> None:
-    dbt_base_operator = ConcreteDbtDockerBaseOperator(
+@pytest.fixture()
+def base_operator(mock_docker_execute):
+    from cosmos.operators.docker import DbtDockerBaseOperator
+
+    class ConcreteDbtDockerBaseOperator(DbtDockerBaseOperator):
+        base_cmd = ["cmd"]
+
+    return ConcreteDbtDockerBaseOperator
+
+
+def test_dbt_docker_operator_add_global_flags(base_operator) -> None:
+    dbt_base_operator = base_operator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -38,12 +50,29 @@ def test_dbt_docker_operator_add_global_flags() -> None:
     ]
 
 
+@patch("cosmos.operators.docker.DbtDockerBaseOperator.build_command")
+def test_dbt_docker_operator_execute(mock_build_command, base_operator, mock_docker_execute):
+    """Tests that the execute method call results in both the build_command method and the docker execute method being called."""
+    operator = base_operator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        image="my_image",
+        project_dir="my/dir",
+    )
+    operator.execute(context={})
+    # Assert that the build_command method was called in the execution
+    mock_build_command.assert_called_once()
+    # Assert that the docker execute method was called in the execution
+    mock_docker_execute.assert_called_once()
+    assert mock_docker_execute.call_args.args[-1] == {}
+
+
 @patch("cosmos.operators.base.context_to_airflow_vars")
-def test_dbt_docker_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
+def test_dbt_docker_operator_get_env(p_context_to_airflow_vars: MagicMock, base_operator) -> None:
     """
     If an end user passes in a
     """
-    dbt_base_operator = ConcreteDbtDockerBaseOperator(
+    dbt_base_operator = base_operator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",

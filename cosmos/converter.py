@@ -221,8 +221,8 @@ class DbtToAirflowConverter:
 
         validate_adapted_user_config(execution_config, project_config, render_config)
 
-        env_vars = project_config.env_vars or operator_args.pop("env", None)
-        dbt_vars = project_config.dbt_vars or operator_args.pop("vars", None)
+        env_vars = project_config.env_vars or operator_args.get("env")
+        dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
         # Previously, we were creating a cosmos.dbt.project.DbtProject
         # DbtProject has now been replaced with ProjectConfig directly

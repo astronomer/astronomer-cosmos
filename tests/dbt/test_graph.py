@@ -910,9 +910,9 @@ def test_load_via_dbt_ls_render_config_no_partial_parse(
     """Tests that --no-partial-parse appears when partial_parse=False."""
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
-    project_config = ProjectConfig()
+    project_config = ProjectConfig(partial_parse=False)
     render_config = RenderConfig(
-        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, load_method=LoadMode.DBT_LS, partial_parse=False
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, load_method=LoadMode.DBT_LS
     )
     profile_config = ProfileConfig(
         profile_name="test",

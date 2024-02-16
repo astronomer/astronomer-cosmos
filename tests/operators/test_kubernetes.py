@@ -69,9 +69,9 @@ def test_dbt_kubernetes_operator_execute(mock_build_kube_args, base_operator, mo
         project_dir="my/dir",
     )
     operator.execute(context={})
-    # Assert that the build_command method was called in the execution
+    # Assert that the build_kube_args method was called in the execution
     mock_build_kube_args.assert_called_once()
-    # Assert that the docker execute method was called in the execution
+    # Assert that the kubernetes execute method was called in the execution
     mock_kubernetes_execute.assert_called_once()
     assert mock_kubernetes_execute.call_args.args[-1] == {}
 

@@ -297,8 +297,7 @@ class ExecutionConfig:
     Contains configuration about how to execute dbt.
 
     :param execution_mode: The execution mode for dbt. Defaults to local
-    :param invocation_mode: The invocation mode for the dbt command. This is only configurable for ExecutionMode.LOCAL or ExecutionMode.VIRTUALENV
-        execution modes.
+    :param invocation_mode: The invocation mode for the dbt command. This is only configurable for ExecutionMode.LOCAL.
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
     :param dbt_project_path Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
@@ -313,8 +312,6 @@ class ExecutionConfig:
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
-        if self.invocation_mode and self.execution_mode not in {ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV}:
-            raise CosmosValueError(
-                "ExecutionConfig.invocation_mode is only configurable for ExecutionMode.LOCAL or ExecutionMode.VIRTUALENV modes."
-            )
+        if self.invocation_mode and self.execution_mode != ExecutionMode.LOCAL:
+            raise CosmosValueError("ExecutionConfig.invocation_mode is only configurable for ExecutionMode.LOCAL.")
         self.project_path = Path(dbt_project_path) if dbt_project_path else None

@@ -7,6 +7,7 @@ from airflow.models.connection import Connection
 from cosmos.config import ProfileConfig
 
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.constants import InvocationMode
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -53,6 +54,7 @@ def test_run_command(
         py_system_site_packages=False,
         py_requirements=["dbt-postgres==1.6.0b1"],
         emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
     )
     assert venv_operator._venv_tmp_dir is None  # Otherwise we are creating empty directories during DAG parsing time
     # and not deleting them

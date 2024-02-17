@@ -203,7 +203,7 @@ def test_render_config_env_vars_deprecated():
     "execution_mode, expectation",
     [
         (ExecutionMode.LOCAL, does_not_raise()),
-        (ExecutionMode.VIRTUALENV, does_not_raise()),
+        (ExecutionMode.VIRTUALENV, pytest.raises(CosmosValueError)),
         (ExecutionMode.KUBERNETES, pytest.raises(CosmosValueError)),
         (ExecutionMode.DOCKER, pytest.raises(CosmosValueError)),
         (ExecutionMode.AZURE_CONTAINER_INSTANCE, pytest.raises(CosmosValueError)),

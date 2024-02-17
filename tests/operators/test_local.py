@@ -135,15 +135,42 @@ def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
         (InvocationMode.DBT_RUNNER, "run_dbt_runner", "handle_exception_dbt_runner"),
     ],
 )
-def test_dbt_base_operator_invocation_methods_set(invocation_mode, invoke_dbt_method, handle_exception_method):
+def test_dbt_base_operator_set_invocation_methods(invocation_mode, invoke_dbt_method, handle_exception_method):
     """Tests that the right methods are mapped to DbtLocalBaseOperator.invoke_dbt and
-    DbtLocalBaseOperator.handle_exception based on the invocation mode passed.
+    DbtLocalBaseOperator.handle_exception when a known invocation mode passed.
     """
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config, task_id="my-task", project_dir="my/dir", invocation_mode=invocation_mode
     )
+    dbt_base_operator._set_invocation_methods()
     assert dbt_base_operator.invoke_dbt.__name__ == invoke_dbt_method
     assert dbt_base_operator.handle_exception.__name__ == handle_exception_method
+
+
+@pytest.mark.parametrize(
+    "can_import_dbt, invoke_dbt_method, handle_exception_method",
+    [
+        (False, "run_subprocess", "handle_exception_subprocess"),
+        (True, "run_dbt_runner", "handle_exception_dbt_runner"),
+    ],
+)
+def test_dbt_base_operator_discover_invocation_mode(can_import_dbt, invoke_dbt_method, handle_exception_method):
+    """Tests that the right methods are mapped to DbtLocalBaseOperator.invoke_dbt and
+    DbtLocalBaseOperator.handle_exception if dbt can be imported or not.
+    """
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir"
+    )
+    with patch.dict(sys.modules, {"dbt.cli.main": MagicMock()} if can_import_dbt else {"dbt.cli.main": None}):
+        dbt_base_operator = ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config, task_id="my-task", project_dir="my/dir"
+        )
+        dbt_base_operator._discover_invocation_mode()
+        assert dbt_base_operator.invocation_mode == (
+            InvocationMode.DBT_RUNNER if can_import_dbt else InvocationMode.SUBPROCESS
+        )
+        assert dbt_base_operator.invoke_dbt.__name__ == invoke_dbt_method
+        assert dbt_base_operator.handle_exception.__name__ == handle_exception_method
 
 
 @pytest.mark.parametrize(
@@ -245,11 +272,14 @@ def test_dbt_base_operator_run_dbt_runner_is_cached(mock_chdir):
         "No exception raised",
     ],
 )
-def test_dbt_base_operator_exception_handling(skip_exception, exception_code_returned, expected_exception) -> None:
+def test_dbt_base_operator_exception_handling_subprocess(
+    skip_exception, exception_code_returned, expected_exception
+) -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
+        invocation_mode=InvocationMode.SUBPROCESS,
     )
     if expected_exception:
         with pytest.raises(expected_exception):
@@ -304,7 +334,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
 
 
 @patch("cosmos.operators.local.extract_log_issues")
-def test_dbt_test_local_operator_invocation_mode_functions(mock_extract_log_issues):
+def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues):
     # test subprocess invocation mode
     operator = DbtTestLocalOperator(
         profile_config=profile_config,
@@ -312,6 +342,7 @@ def test_dbt_test_local_operator_invocation_mode_functions(mock_extract_log_issu
         task_id="my-task",
         project_dir="my/dir",
     )
+    operator._set_test_result_parsing_methods()
     assert operator.parse_number_of_warnings == parse_number_of_warnings_subprocess
     result = MagicMock(full_output="some output")
     operator.extract_issues(result)
@@ -324,6 +355,7 @@ def test_dbt_test_local_operator_invocation_mode_functions(mock_extract_log_issu
         task_id="my-task",
         project_dir="my/dir",
     )
+    operator._set_test_result_parsing_methods()
     assert operator.extract_issues == extract_dbt_runner_issues
     assert operator.parse_number_of_warnings == parse_number_of_warnings_dbt_runner
 
@@ -519,7 +551,13 @@ def test_store_compiled_sql() -> None:
 )
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
 def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwargs, expected_call_kwargs):
-    task = operator_class(profile_config=profile_config, task_id="my-task", project_dir="my/dir", **kwargs)
+    task = operator_class(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=InvocationMode.DBT_RUNNER,
+        **kwargs,
+    )
     task.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(**expected_call_kwargs)
 
@@ -548,6 +586,7 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
+        invocation_mode=InvocationMode.DBT_RUNNER,
         **operator_class_kwargs.get(operator_class, {}),
     )
     task.execute(context={})
@@ -616,8 +655,15 @@ def test_dbt_docs_gcs_local_operator():
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.run_subprocess")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner")
+@pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_operator_execute_deps_parameters(
-    mock_build_and_run_cmd, mock_ensure_profile, mock_exception_handling, mock_store_compiled_sql
+    mock_dbt_runner,
+    mock_subprocess,
+    mock_ensure_profile,
+    mock_exception_handling,
+    mock_store_compiled_sql,
+    invocation_mode,
 ):
     expected_call_kwargs = [
         "/usr/local/bin/dbt",
@@ -636,10 +682,14 @@ def test_operator_execute_deps_parameters(
         install_deps=True,
         emit_datasets=False,
         dbt_executable_path="/usr/local/bin/dbt",
+        invocation_mode=invocation_mode,
     )
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
     task.execute(context={"task_instance": MagicMock()})
-    assert mock_build_and_run_cmd.call_args_list[0].kwargs["command"] == expected_call_kwargs
+    if invocation_mode == InvocationMode.SUBPROCESS:
+        assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
+    elif invocation_mode == InvocationMode.DBT_RUNNER:
+        mock_dbt_runner.all_args_list[0].kwargs["command"] == expected_call_kwargs
 
 
 def test_dbt_docs_local_operator_with_static_flag():

@@ -143,9 +143,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         return FullOutputSubprocessHook()
 
     def _set_invocation_methods(self) -> None:
-        """Checks if the invocation mode is provided, then sets the associated run and exception handling methods.
-        If the invocation mode is not set, will try to import dbtRunner and fall back to subprocess.
-        """
+        """Sets the associated run and exception handling methods based on the invocation mode."""
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             self.invoke_dbt = self.run_subprocess
             self.handle_exception = self.handle_exception_subprocess

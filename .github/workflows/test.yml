@@ -293,6 +293,7 @@ jobs:
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
   Run-Performance-Tests:
+    needs: Authorize
     runs-on: ubuntu-latest
     strategy:
       matrix:

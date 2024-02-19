@@ -401,6 +401,22 @@ def test_run_operator_dataset_inlets_and_outlets():
     assert test_operator.outlets == []
 
 
+def test_dbt_base_operator_no_partial_parse() -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        partial_parse=False,
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+
+    assert "--no-partial-parse" in cmd
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_project):
@@ -703,37 +719,33 @@ def test_dbt_docs_local_operator_with_static_flag():
     assert operator.required_files == ["static_index.html"]
 
 
-@patch("cosmos.operators.local.os.killpg")
-@patch("cosmos.operators.local.os.getpgid", return_value=11111)
-def test_on_kill_subprocess_cancel_query_on_kill_true(mock_getpgid, mock_killpg):
-    operator = ConcreteDbtLocalBaseOperator(
-        task_id="my-task",
+@patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
+def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
+        task_id="my-task",
         project_dir="my/dir",
-        invocation_mode=InvocationMode.SUBPROCESS,
         cancel_query_on_kill=True,
-    )
-    operator.subprocess_hook = MagicMock()
-    operator.subprocess_hook.sub_process = MagicMock()
-    operator.subprocess_hook.sub_process.pid = 12345
-
-    operator.on_kill()
-
-    mock_getpgid.assert_called_once_with(12345)
-    mock_killpg.assert_called_once_with(11111, signal.SIGINT)
-
-
-def test_on_kill_subprocess_cancel_query_on_kill_false():
-    operator = ConcreteDbtLocalBaseOperator(
-        task_id="my-task",
-        profile_config=profile_config,
-        project_dir="my/dir",
         invocation_mode=InvocationMode.SUBPROCESS,
-        cancel_query_on_kill=False,
     )
-    operator.subprocess_hook = MagicMock()
 
-    with patch.object(operator.subprocess_hook, "send_sigterm") as mock_send_sigterm:
-        operator.on_kill()
+    dbt_base_operator.on_kill()
+
+    mock_send_sigint.assert_called_once()
+
+
+@patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigterm")
+def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        cancel_query_on_kill=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+
+    dbt_base_operator.on_kill()
 
     mock_send_sigterm.assert_called_once()

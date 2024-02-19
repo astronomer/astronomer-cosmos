@@ -56,6 +56,9 @@ The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Ai
 If ``dbt`` was not installed as part of the Cosmos packages,
 users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
 
+By default, if Cosmos sees a ``partial_parse.msgpack`` in the target directory of the dbt project directory when using ``local`` execution, it will use this for partial parsing to speed up task execution.
+This can be turned off by setting ``partial_parse=False`` in the ``ProjectConfig``.
+
 When using the ``local`` execution mode, Cosmos converts Airflow Connections into a native ``dbt`` profiles file (``profiles.yml``).
 
 Example of how to use, for instance, when ``dbt`` was installed together with Cosmos:
@@ -76,6 +79,7 @@ The ``virtualenv`` mode isolates the Airflow worker dependencies from ``dbt`` by
 In this case, users are responsible for declaring which version of ``dbt`` they want to use by giving the argument ``py_requirements``. This argument can be set directly in operator instances or when instantiating ``DbtDag`` and ``DbtTaskGroup`` as part of ``operator_args``.
 
 Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating a ``dbt`` profile file (``profiles.yml``).
+Also similar to the ``local`` execution mode, Cosmos will by default attempt to use a ``partial_parse.msgpack`` if one exists to speed up parsing.
 
 Some drawbacks of this approach:
 

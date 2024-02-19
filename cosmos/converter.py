@@ -246,6 +246,7 @@ class DbtToAirflowConverter:
         task_args = {
             **operator_args,
             "project_dir": execution_config.project_path,
+            "partial_parse": project_config.partial_parse,
             "profile_config": profile_config,
             "emit_datasets": render_config.emit_datasets,
             "env": env_vars,

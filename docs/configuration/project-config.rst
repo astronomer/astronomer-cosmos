@@ -23,6 +23,9 @@ variables that should be used for rendering and execution. It takes the followin
   will only be rendered at execution time, not at render time.
 - ``env_vars``: (new in v1.3) A dictionary of environment variables used for rendering and execution. Rendering with
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
+- ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
+  for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
+  execution modes.
 
 Project Config Example
 ----------------------

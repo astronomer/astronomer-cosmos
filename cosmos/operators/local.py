@@ -36,7 +36,12 @@ if TYPE_CHECKING:
 
 from sqlalchemy.orm import Session
 
-from cosmos.constants import DEFAULT_OPENLINEAGE_NAMESPACE, OPENLINEAGE_PRODUCER
+from cosmos.constants import (
+    DEFAULT_OPENLINEAGE_NAMESPACE,
+    OPENLINEAGE_PRODUCER,
+    DBT_TARGET_DIR_NAME,
+    DBT_PARTIAL_PARSE_FILE_NAME,
+)
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
@@ -59,7 +64,7 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.dbt.project import create_symlinks, environ, change_working_directory
+from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ, change_working_directory
 
 
 logger = get_logger(__name__)
@@ -281,6 +286,9 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             env = {k: str(v) for k, v in env.items()}
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
 
+            if self.partial_parse:
+                copy_msgpack_for_partial_parse(Path(self.project_dir), Path(tmp_project_dir))
+
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
                 env.update(env_vars)
@@ -446,9 +454,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     def on_kill(self) -> None:
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             if self.cancel_query_on_kill:
-                self.subprocess_hook.log.info("Sending SIGINT signal to process group")
-                if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
-                    os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
+                self.subprocess_hook.send_sigint()
             else:
                 self.subprocess_hook.send_sigterm()
 

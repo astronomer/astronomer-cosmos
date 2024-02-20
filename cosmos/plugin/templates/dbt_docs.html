@@ -1,0 +1,15 @@
+{% extends base_template %}
+{% block content %}
+    <script src="{{ url_for('.static', filename='iframeResizer.min.js') }}"></script>
+    <iframe id="dbtIframe" src="{{ url_for('.dbt_docs_index') }}" style="min-width: 100%; border: 0;"></iframe>
+    <script>
+        iFrameResize(
+            {
+                heightCalculationMethod: 'custom',
+                resizeFrom: 'child',
+                minHeight: 500
+            },
+            '#dbtIframe'
+        )
+    </script>
+{% endblock %}

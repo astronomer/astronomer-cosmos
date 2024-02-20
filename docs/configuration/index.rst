@@ -16,6 +16,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Parsing Methods <parsing-methods>
    Configuring Lineage <lineage>
    Generating Docs <generating-docs>
+   Hosting Docs <hosting-docs>
    Scheduling <scheduling>
    Testing Behavior <testing-behavior>
    Selecting & Excluding <selecting-excluding>

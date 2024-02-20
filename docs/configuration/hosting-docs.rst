@@ -68,7 +68,7 @@ Google Cloud Storage Example
 
 .. code-block:: shell
 
-    AIRFLOW__COSMOS__DBT_DOCS_DIR="s3://my-bucket/path/to/docs"
+    AIRFLOW__COSMOS__DBT_DOCS_DIR="gs://my-bucket/path/to/docs"
     AIRFLOW__COSMOS__DBT_DOCS_CONN_ID="google_cloud_default"
 
 Azure Blob Storage Example

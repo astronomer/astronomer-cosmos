@@ -2,9 +2,9 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main, 717-add-dbtrunner-local-executor-2] # # TODO:remove before merge
+    branches: [main, 717-add-dbtrunner-local-executor-2] # TODO:remove before merge
   pull_request_target: # Also run on pull requests originated from forks
-    branches: [main]
+    # branches: [main] # TODO: uncomment before merge
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

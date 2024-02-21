@@ -3,7 +3,7 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main, 717-add-dbtrunner-local-executor-2] # TODO:remove before merge
-  pull_request_target: # Also run on pull requests originated from forks
+  # pull_request_target: # Also run on pull requests originated from forks # TODO: uncomment before merge
     # branches: [main] # TODO: uncomment before merge
 
 concurrency:

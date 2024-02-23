@@ -74,8 +74,8 @@ def test_extract_log_issues() -> None:
 
 
 def test_extract_dbt_runner_issues():
-    """Tests that the function extracts the correct test names and results from a dbt runner result
-    for only warnings.
+    """Tests that the function extracts the correct node names and messages from a dbt runner result
+    for warnings by default.
     """
     runner_result = MagicMock()
     runner_result.result.results = [
@@ -87,7 +87,27 @@ def test_extract_dbt_runner_issues():
     runner_result.result.results[1].node.name = "a_test"
     runner_result.result.results[3].node.name = "another_test"
 
-    test_names, test_results = extract_dbt_runner_issues(runner_result)
+    node_names, node_results = extract_dbt_runner_issues(runner_result)
 
-    assert test_names == ["a_test", "another_test"]
-    assert test_results == ["A warning message", "A different warning message"]
+    assert node_names == ["a_test", "another_test"]
+    assert node_results == ["A warning message", "A different warning message"]
+
+
+def test_extract_dbt_runner_issues_with_status_levels():
+    """Tests that the function extracts the correct test names and results from a dbt runner result
+    for status levels.
+    """
+    runner_result = MagicMock()
+    runner_result.result.results = [
+        MagicMock(status="pass"),
+        MagicMock(status="error", message="An error message", node=MagicMock()),
+        MagicMock(status="warn"),
+        MagicMock(status="fail", message="A failure message", node=MagicMock()),
+    ]
+    runner_result.result.results[1].node.name = "node1"
+    runner_result.result.results[3].node.name = "node2"
+
+    node_names, node_results = extract_dbt_runner_issues(runner_result, status_levels=["error", "fail"])
+
+    assert node_names == ["node1", "node2"]
+    assert node_results == ["An error message", "A failure message"]

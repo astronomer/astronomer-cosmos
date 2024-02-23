@@ -288,8 +288,8 @@ def test_dbt_base_operator_exception_handling_subprocess(
         dbt_base_operator.handle_exception(SubprocessResult(exception_code_returned, None))
 
 
-def test_dbt_base_operator_handle_exception_dbt_runner():
-    """Tests that an AirflowException is raised if the dbtRunner result is not successful."""
+def test_dbt_base_operator_handle_exception_dbt_runner_unhandled_error():
+    """Tests that an AirflowException is raised if the dbtRunner result is not successful with an unhandled error."""
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=MagicMock(),
         task_id="my-task",
@@ -297,10 +297,31 @@ def test_dbt_base_operator_handle_exception_dbt_runner():
     )
     result = MagicMock()
     result.success = False
-    expected_error_message = "dbt command failed. See logs above for details."
+    result.exception = "some exception"
+    expected_error_message = "dbt invocation did not complete with unhandled error: some exception"
 
     with pytest.raises(AirflowException, match=expected_error_message):
         operator.handle_exception_dbt_runner(result)
+
+
+@patch("cosmos.operators.local.extract_dbt_runner_issues", return_value=(["node1", "node2"], ["error1", "error2"]))
+def test_dbt_base_operator_handle_exception_dbt_runner_handled_error(mock_extract_dbt_runner_issues):
+    """Tests that an AirflowException is raised if the dbtRunner result is not successful and with handled errors."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=MagicMock(),
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    result = MagicMock()
+    result.success = False
+    result.exception = None
+
+    expected_error_message = "dbt invocation completed with errors: node1: error1\nnode2: error2"
+
+    with pytest.raises(AirflowException, match=expected_error_message):
+        operator.handle_exception_dbt_runner(result)
+
+    mock_extract_dbt_runner_issues.assert_called_once()
 
 
 @patch("cosmos.operators.base.context_to_airflow_vars")

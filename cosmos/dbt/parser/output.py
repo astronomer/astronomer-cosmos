@@ -89,23 +89,26 @@ def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
     return test_names, test_results
 
 
-def extract_dbt_runner_issues(result: dbtRunnerResult) -> Tuple[List[str], List[str]]:
+def extract_dbt_runner_issues(
+    result: dbtRunnerResult, status_levels: list[str] = ["warn"]
+) -> Tuple[List[str], List[str]]:
     """
-    Extracts warning messages from the dbt runner result and returns them as a formatted string.
+    Extracts messages from the dbt runner result and returns them as a formatted string.
 
-    This function searches for warning messages in dbt run. It extracts and formats the relevant
-    information and appends it to a list of warnings.
+    This function iterates over dbtRunnerResult messages in dbt run. It extracts results that match the
+    status levels provided and appends them to a list of issues.
 
     :param result: dbtRunnerResult object containing the output to be parsed.
-    :return: two lists of strings, the first one containing the test names and the second one
-        containing the test results.
+    :param status_levels: List of strings, where each string is a result status level. Default is ["warn"].
+    :return: two lists of strings, the first one containing the node names and the second one
+        containing the node result message.
     """
-    test_names = []
-    test_results = []
+    node_names = []
+    node_results = []
 
-    for run_result in result.result.results:  # type: ignore
-        if run_result.status == "warn":
-            test_names.append(str(run_result.node.name))
-            test_results.append(str(run_result.message))
+    for node_result in result.result.results:  # type: ignore
+        if node_result.status in status_levels:
+            node_names.append(str(node_result.node.name))
+            node_results.append(str(node_result.message))
 
-    return test_names, test_results
+    return node_names, node_results

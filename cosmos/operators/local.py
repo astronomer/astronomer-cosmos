@@ -183,7 +183,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
         if not result.success:
-            raise AirflowException("dbt command failed. See logs above for details.")
+            if result.exception:
+                raise AirflowException(f"dbt invocation did not complete with unhandled error: {result.exception}")
+            else:
+                node_names, node_results = extract_dbt_runner_issues(result, ["error", "fail", "runtime error"])
+                error_message = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
+                raise AirflowException(f"dbt invocation completed with errors: {error_message}")
 
     @provide_session
     def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:

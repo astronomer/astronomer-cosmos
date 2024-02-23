@@ -574,9 +574,9 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
-
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
+            s3_path = f"s3://{self.bucket_name}/{key}"
+            logger.info("Uploading %s to %s", filename, s3_path)
 
             hook.load_file(
                 filename=f"{target_dir}/{filename}",

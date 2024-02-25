@@ -103,6 +103,8 @@ class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBaseOperator):
     Executes a dbt core build command.
     """
 
+    template_fields: Sequence[str] = DbtBuildKubernetesOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+
 
 class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):
     """

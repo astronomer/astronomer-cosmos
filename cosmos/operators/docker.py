@@ -69,6 +69,8 @@ class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBaseOperator):
     Executes a dbt core build command.
     """
 
+    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+
 
 class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):
     """

@@ -99,7 +99,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         logger.info(output)
 
 
-class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):
+class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core build command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.

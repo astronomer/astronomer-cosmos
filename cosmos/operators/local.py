@@ -392,6 +392,8 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
     Executes a dbt core build command.
     """
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+
 
 class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
     """

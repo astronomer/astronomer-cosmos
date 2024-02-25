@@ -210,6 +210,14 @@ def test_run_operator_dataset_inlets_and_outlets():
     from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
@@ -226,12 +234,28 @@ def test_run_operator_dataset_inlets_and_outlets():
             install_deps=True,
             append_env=True,
         )
-        run_operator
+        seed_operator >> run_operator >> test_operator
     run_test_dag(dag)
     assert run_operator.inlets == []
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+def test_dbt_base_operator_no_partial_parse() -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        partial_parse=False,
+    )
+
+    cmd, _ = dbt_base_operator.build_cmd(
+        Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+
+    assert "--no-partial-parse" in cmd
 
 
 @pytest.mark.integration
@@ -517,3 +541,27 @@ def test_dbt_docs_local_operator_with_static_flag():
         dbt_cmd_flags=["--static"],
     )
     assert operator.required_files == ["static_index.html"]
+
+
+@patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
+def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir", cancel_query_on_kill=True
+    )
+
+    dbt_base_operator.on_kill()
+
+    mock_send_sigint.assert_called_once()
+
+
+@patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigterm")
+def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir", cancel_query_on_kill=False
+    )
+
+    dbt_base_operator.on_kill()
+
+    mock_send_sigterm.assert_called_once()

@@ -122,6 +122,9 @@ class ProjectConfig:
     :param dbt_vars: Dictionary of dbt variables for the project. This argument overrides variables defined in your dbt_project.yml
         file. The dictionary is dumped to a yaml string and passed to dbt commands as the --vars argument. Variables are only
         supported for rendering when using ``RenderConfig.LoadMode.DBT_LS`` and ``RenderConfig.LoadMode.CUSTOM`` load mode.
+    :param partial_parse: If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
+        for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
+        execution modes.
     """
 
     dbt_project_path: Path | None = None
@@ -141,6 +144,7 @@ class ProjectConfig:
         project_name: str | None = None,
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
+        partial_parse: bool = True,
     ):
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
@@ -166,6 +170,7 @@ class ProjectConfig:
 
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars
+        self.partial_parse = partial_parse
 
     def validate_project(self) -> None:
         """
@@ -292,7 +297,7 @@ class ExecutionConfig:
     :param execution_mode: The execution mode for dbt. Defaults to local
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
-    :param dbt_project_path Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL

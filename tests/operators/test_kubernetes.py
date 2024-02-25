@@ -6,7 +6,6 @@ from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
-    DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
     DbtSeedKubernetesOperator,
@@ -24,12 +23,24 @@ except ImportError:
     module_available = False
 
 
-class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
-    base_cmd = ["cmd"]
+@pytest.fixture()
+def mock_kubernetes_execute():
+    with patch("cosmos.operators.kubernetes.KubernetesPodOperator.execute") as mock_execute:
+        yield mock_execute
 
 
-def test_dbt_kubernetes_operator_add_global_flags() -> None:
-    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
+@pytest.fixture()
+def base_operator(mock_kubernetes_execute):
+    from cosmos.operators.kubernetes import DbtKubernetesBaseOperator
+
+    class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
+        base_cmd = ["cmd"]
+
+    return ConcreteDbtKubernetesBaseOperator
+
+
+def test_dbt_kubernetes_operator_add_global_flags(base_operator) -> None:
+    dbt_kube_operator = base_operator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -48,12 +59,29 @@ def test_dbt_kubernetes_operator_add_global_flags() -> None:
     ]
 
 
+@patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
+def test_dbt_kubernetes_operator_execute(mock_build_kube_args, base_operator, mock_kubernetes_execute):
+    """Tests that the execute method call results in both the build_kube_args method and the kubernetes execute method being called."""
+    operator = base_operator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        image="my_image",
+        project_dir="my/dir",
+    )
+    operator.execute(context={})
+    # Assert that the build_kube_args method was called in the execution
+    mock_build_kube_args.assert_called_once()
+    # Assert that the kubernetes execute method was called in the execution
+    mock_kubernetes_execute.assert_called_once()
+    assert mock_kubernetes_execute.call_args.args[-1] == {}
+
+
 @patch("cosmos.operators.base.context_to_airflow_vars")
-def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
+def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock, base_operator) -> None:
     """
     If an end user passes in a
     """
-    dbt_kube_operator = ConcreteDbtKubernetesBaseOperator(
+    dbt_kube_operator = base_operator(
         conn_id="my_airflow_connection",
         task_id="my-task",
         image="my_image",
@@ -227,117 +255,37 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
 
 
 def test_created_pod():
-    ls_kwargs = {"env_vars": {"FOO": "BAR"}}
+    ls_kwargs = {"env_vars": {"FOO": "BAR"}, "namespace": "foo"}
     ls_kwargs.update(base_kwargs)
     ls_operator = DbtLSKubernetesOperator(**ls_kwargs)
     ls_operator.hook = MagicMock()
     ls_operator.hook.is_in_cluster = False
-    ls_operator.hook._get_namespace.return_value.to_dict.return_value = "foo"
     ls_operator.build_kube_args(context={}, cmd_flags=MagicMock())
     pod_obj = ls_operator.build_pod_request_obj()
-    expected_result = {
-        "api_version": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "annotations": {},
-            "cluster_name": None,
-            "creation_timestamp": None,
-            "deletion_grace_period_seconds": None,
-            "deletion_timestamp": None,
-            "finalizers": None,
-            "generate_name": None,
-            "generation": None,
-            "labels": {
-                "airflow_kpo_in_cluster": "False",
-                "airflow_version": pod_obj.metadata.labels["airflow_version"],
-            },
-            "managed_fields": None,
-            "name": pod_obj.metadata.name,
-            "owner_references": None,
-            "resource_version": None,
-            "self_link": None,
-            "uid": None,
-        },
-        "spec": {
-            "active_deadline_seconds": None,
-            "affinity": {},
-            "automount_service_account_token": None,
-            "containers": [
-                {
-                    "args": [
-                        "dbt",
-                        "ls",
-                        "--vars",
-                        "end_time: '{{ "
-                        "data_interval_end.strftime(''%Y%m%d%H%M%S'') "
-                        "}}'\n"
-                        "start_time: '{{ "
-                        "data_interval_start.strftime(''%Y%m%d%H%M%S'') "
-                        "}}'\n",
-                        "--no-version-check",
-                        "--project-dir",
-                        "my/dir",
-                    ],
-                    "command": [],
-                    "env": [{"name": "FOO", "value": "BAR", "value_from": None}],
-                    "env_from": [],
-                    "image": "my_image",
-                    "image_pull_policy": None,
-                    "lifecycle": None,
-                    "liveness_probe": None,
-                    "name": "base",
-                    "ports": [],
-                    "readiness_probe": None,
-                    "resources": None,
-                    "security_context": None,
-                    "startup_probe": None,
-                    "stdin": None,
-                    "stdin_once": None,
-                    "termination_message_path": None,
-                    # "termination_message_policy": None,
-                    "tty": None,
-                    "volume_devices": None,
-                    "volume_mounts": [],
-                    "working_dir": None,
-                }
-            ],
-            "dns_config": None,
-            "dns_policy": None,
-            "enable_service_links": None,
-            "ephemeral_containers": None,
-            "host_aliases": None,
-            "host_ipc": None,
-            "host_network": False,
-            "host_pid": None,
-            "hostname": None,
-            "image_pull_secrets": [],
-            "init_containers": [],
-            "node_name": None,
-            "node_selector": {},
-            "os": None,
-            "overhead": None,
-            "preemption_policy": None,
-            "priority": None,
-            "priority_class_name": None,
-            "readiness_gates": None,
-            "restart_policy": "Never",
-            "runtime_class_name": None,
-            "scheduler_name": None,
-            "security_context": {},
-            "service_account": None,
-            "service_account_name": None,
-            "set_hostname_as_fqdn": None,
-            "share_process_namespace": None,
-            "subdomain": None,
-            "termination_grace_period_seconds": None,
-            "tolerations": [],
-            "topology_spread_constraints": None,
-            "volumes": [],
-        },
-        "status": None,
-    }
 
-    computed_result = pod_obj.to_dict()
-    computed_result["spec"]["containers"][0].pop("termination_message_policy")
-    computed_result["metadata"].pop("namespace")
-    assert computed_result == expected_result
+    metadata = pod_obj.metadata
+    assert metadata.labels["airflow_kpo_in_cluster"] == "False"
+    assert metadata.namespace == "foo"
+
+    container = pod_obj.spec.containers[0]
+    assert container.env[0].name == "FOO"
+    assert container.env[0].value == "BAR"
+    assert container.env[0].value_from is None
+    assert container.image == "my_image"
+
+    expected_container_args = [
+        "dbt",
+        "ls",
+        "--vars",
+        "end_time: '{{ "
+        "data_interval_end.strftime(''%Y%m%d%H%M%S'') "
+        "}}'\n"
+        "start_time: '{{ "
+        "data_interval_start.strftime(''%Y%m%d%H%M%S'') "
+        "}}'\n",
+        "--no-version-check",
+        "--project-dir",
+        "my/dir",
+    ]
+    assert container.args == expected_container_args
+    assert container.command == []

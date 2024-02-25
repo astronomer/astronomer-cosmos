@@ -34,7 +34,12 @@ if TYPE_CHECKING:
 
 from sqlalchemy.orm import Session
 
-from cosmos.constants import DEFAULT_OPENLINEAGE_NAMESPACE, OPENLINEAGE_PRODUCER
+from cosmos.constants import (
+    DEFAULT_OPENLINEAGE_NAMESPACE,
+    OPENLINEAGE_PRODUCER,
+    DBT_TARGET_DIR_NAME,
+    DBT_PARTIAL_PARSE_FILE_NAME,
+)
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
@@ -52,7 +57,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.dbt.parser.output import extract_log_issues, parse_output
-from cosmos.dbt.project import create_symlinks
+from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -207,6 +212,9 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             )
 
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
+
+            if self.partial_parse:
+                copy_msgpack_for_partial_parse(Path(self.project_dir), Path(tmp_project_dir))
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
@@ -374,9 +382,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     def on_kill(self) -> None:
         if self.cancel_query_on_kill:
-            self.subprocess_hook.log.info("Sending SIGINT signal to process group")
-            if self.subprocess_hook.sub_process and hasattr(self.subprocess_hook.sub_process, "pid"):
-                os.killpg(os.getpgid(self.subprocess_hook.sub_process.pid), signal.SIGINT)
+            self.subprocess_hook.send_sigint()
         else:
             self.subprocess_hook.send_sigterm()
 
@@ -568,9 +574,9 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info("Uploading %s to %s", filename, f"s3://{self.bucket_name}/{filename}")
-
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
+            s3_path = f"s3://{self.bucket_name}/{key}"
+            logger.info("Uploading %s to %s", filename, s3_path)
 
             hook.load_file(
                 filename=f"{target_dir}/{filename}",

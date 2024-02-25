@@ -901,6 +901,34 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     assert ls_command[ls_command.index("--selector") + 1] == selector
 
 
+@patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
+@patch("cosmos.config.RenderConfig.validate_dbt_command")
+def test_load_via_dbt_ls_render_config_no_partial_parse(
+    mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
+):
+    """Tests that --no-partial-parse appears when partial_parse=False."""
+    mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
+    project_config = ProjectConfig(partial_parse=False)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, load_method=LoadMode.DBT_LS)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = MagicMock()
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load_via_dbt_ls()
+    ls_command = mock_popen.call_args.args[0]
+    assert "--no-partial-parse" in ls_command
+
+
 @pytest.mark.parametrize("load_method", [LoadMode.DBT_MANIFEST, LoadMode.CUSTOM])
 def test_load_method_with_unsupported_render_config_selector_arg(load_method):
     """Tests that error is raised when RenderConfig.selector is used with LoadMode.DBT_MANIFEST or LoadMode.CUSTOM."""

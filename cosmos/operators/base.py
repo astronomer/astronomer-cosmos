@@ -52,6 +52,9 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
+    :param partial_parse: If True (default), then the operator will use the
+        ``partial_parse.msgpack`` during execution if it exists. If False, then
+        a flag will be explicitly set to turn off partial parsing.
     :param cancel_query_on_kill: If true, then cancel any running queries when the task's on_kill() is executed.
         Otherwise, the query will keep running when the task is killed.
     :param dbt_executable_path: Path to dbt executable can be used with venv
@@ -69,13 +72,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         "vars",
         "models",
     )
-    global_boolean_flags = (
-        "no_version_check",
-        "cache_selected_only",
-        "fail_fast",
-        "quiet",
-        "warn_error",
-    )
+    global_boolean_flags = ("no_version_check", "cache_selected_only", "fail_fast", "quiet", "warn_error")
 
     intercept_flag = True
 
@@ -106,6 +103,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
+        partial_parse: bool = True,
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
@@ -132,6 +130,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.append_env = append_env
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
+        self.partial_parse = partial_parse
         self.cancel_query_on_kill = cancel_query_on_kill
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
@@ -219,6 +218,9 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         dbt_cmd = [self.dbt_executable_path]
 
         dbt_cmd.extend(self.dbt_cmd_global_flags)
+
+        if not self.partial_parse:
+            dbt_cmd.append("--no-partial-parse")
 
         dbt_cmd.extend(self.base_cmd)
 

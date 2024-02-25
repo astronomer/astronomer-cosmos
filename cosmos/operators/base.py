@@ -8,6 +8,7 @@ import yaml
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
+from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
@@ -252,6 +253,26 @@ class DbtBuildMixin:
     base_cmd = ["build"]
     ui_color = "#8194E0"
 
+    template_fields: Sequence[str] = ("full_refresh",)
+
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
+        self.full_refresh = full_refresh
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
+            flags.append("--full-refresh")
+
+        return flags
+
 
 class DbtLSMixin:
     """
@@ -274,13 +295,20 @@ class DbtSeedMixin:
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags = []
-        if self.full_refresh is True:
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
             flags.append("--full-refresh")
 
         return flags
@@ -306,13 +334,20 @@ class DbtRunMixin:
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags = []
-        if self.full_refresh is True:
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
             flags.append("--full-refresh")
 
         return flags

@@ -89,3 +89,34 @@ Sample usage
             "skip_exit_code": 1,
         }
     )
+
+
+Template fields
+---------------
+
+Some of the operator args are `template fields <https://airflow.apache.org/docs/apache-airflow/stable/howto/custom-operator.html#templating>`_ for your convenience.
+
+These template fields can be useful for hooking into Airflow `Params <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/params.html>`_, or for more advanced customization with `XComs <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html>`_.
+
+The following operator args support templating, and are accessible both through the  ``DbtDag`` and ``DbtTaskGroup`` constructors in addition to being accessible standalone:
+
+- ``env``
+- ``vars``
+- ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators.)
+
+.. note::
+    Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+
+The following template fields are only selectable when using the operators in a standalone context:
+
+- ``select``
+- ``exclude``
+- ``selector``
+- ``models``
+
+The aforementioned args are not available to be templated via ``DbtDag`` and ``DbtTaskGroup`` because they need to select dbt nodes to render the DAG's tasks.
+Since template fields are rendered on each ``DagRun``,
+
+Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
+This is provided for telemetry on task execution, and is not an operator arg.
+For more information about this, see the `Compiled SQL <compiled-sql.html>`_ docs.

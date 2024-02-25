@@ -34,7 +34,7 @@ repos:
         args:
           - --exclude-file=tests/sample/manifest_model_version.json
           - --skip=**/manifest.json
-          - -L connexion
+          - -L connexion,aci
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
@@ -54,7 +54,7 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.14
+    rev: v0.2.0
     hooks:
       - id: ruff
         args:

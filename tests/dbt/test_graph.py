@@ -811,6 +811,24 @@ def test_parse_dbt_ls_output():
     assert expected_nodes == nodes
 
 
+def test_parse_dbt_ls_output_with_json_without_tags_or_config():
+    some_ls_stdout = '{"resource_type": "model", "name": "some-name", "original_file_path": "some-file-path.sql", "unique_id": "some-unique-id", "config": {}}'
+
+    expected_nodes = {
+        "some-unique-id": DbtNode(
+            unique_id="some-unique-id",
+            resource_type=DbtResourceType.MODEL,
+            file_path=Path("some-project/some-file-path.sql"),
+            tags=[],
+            config={},
+            depends_on=[],
+        ),
+    }
+    nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)
+
+    assert expected_nodes == nodes
+
+
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")

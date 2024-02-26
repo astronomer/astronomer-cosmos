@@ -85,8 +85,6 @@ def is_freshness_effective(freshness: dict[str, Any]) -> bool:
                 "filter": null
             }
     should be considered as null, this function ensures that."""
-    if freshness is None:
-        return False
     for key, value in freshness.items():
         if isinstance(value, dict):
             if any(subvalue is not None for subvalue in value.values()):
@@ -137,9 +135,9 @@ def parse_dbt_ls_output(project_path: Path, ls_stdout: str) -> dict[str, DbtNode
                 resource_type=DbtResourceType(node_dict["resource_type"]),
                 depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                 file_path=project_path / node_dict["original_file_path"],
-                tags=node_dict["tags"],
-                config=node_dict["config"],
-                has_freshness=is_freshness_effective(node_dict.get("freshness"))
+                tags=node_dict.get("tags", []),
+                config=node_dict.get("config", {}),
+                has_freshness=is_freshness_effective(node_dict.get("freshness"), False)
                 if node_dict["resource_type"] == "source"
                 else False,
             )

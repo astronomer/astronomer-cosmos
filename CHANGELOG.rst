@@ -1,7 +1,47 @@
 Changelog
 =========
 
-1.3.2 (2023-01-26)
+1.4.0a1 (2024-02-27)
+--------------------
+
+Features
+
+* Add dbt docs natively in Airflow via plugin by @dwreeves in #737
+* Add support for ``InvocationMode.DBT_RUNNER`` for local execution mode by @jbandoro in #850
+* Support partial parsing to render DAGs faster when using ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and ``LoadMode.DBT_LS`` by @dwreeves in #800
+* Add Azure Container Instance as Execution Mode by @danielvdende in #771
+* Add dbt build operators by @dylanharper-qz in #795
+* Add dbt profile config variables to mapped profile by @ykuc in #794
+* Add more template fields to ``DbtBaseOperator`` by @dwreeves in #786
+
+Bug fixes
+
+* Make ``PostgresUserPasswordProfileMapping`` schema argument optional by @FouziaTariq in #683
+* Fix ``folder_dir`` not showing on logs for ``DbtDocsS3LocalOperator`` by @PrimOox in #856
+* Improve ``dbt ls`` parsing resilience to missing tags/config by @tatiana in #859
+* Fix ``operator_args`` modified in place in Airflow converter by @jbandoro in #835
+* Fix Docker and Kubernetes operators execute method resolution by @jbandoro in #849
+
+Docs
+
+* Fix docs homepage link by @jlaneve in #860
+* Fix docs ``ExecutionConfig.dbt_project_path`` by @jbandoro in #847
+* Fix typo in MWAA getting started guide by @jlaneve in #846
+
+Others
+
+* Add performance integration tests by @jlaneve in #827
+* Add ``connect_retries`` to databricks profile to fix expensive integration failures by @jbandoro in #826
+* Add import sorting (isort) to Cosmos by @jbandoro in #866
+* Add Python 3.11 to CI/tests by @tatiana and @jbandoro in #821, #824 and #825
+* Fix failing ``test_created_pod`` for ``apache-airflow-providers-cncf-kubernetes`` after v8.0.0 update by @jbandoro in #854
+* Extend ``DatabricksTokenProfileMapping`` test to include session properties by @tatiana in #858
+* Fix broken integration test uncovered from Pytest 8.0 update by @jbandoro in #845
+* Pre-commit hook updates in #834, #843 and #852
+
+
+
+1.3.2 (2024-01-26)
 ------------------
 
 Bug fixes

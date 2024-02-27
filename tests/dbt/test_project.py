@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ
+from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ, change_working_directory
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
@@ -60,3 +60,18 @@ def test_environ_context_manager():
     # Check if the original environment variables are still set
     assert "value1" == os.environ.get("VAR1")
     assert "value2" == os.environ.get("VAR2")
+
+
+@patch("os.chdir")
+def test_change_working_directory(mock_chdir):
+    """Tests that the working directory is changed and then restored correctly."""
+    # Define the path to change the working directory to
+    path = "/path/to/directory"
+
+    # Use the change_working_directory context manager
+    with change_working_directory(path):
+        # Check if os.chdir is called with the correct path
+        mock_chdir.assert_called_once_with(path)
+
+    # Check if os.chdir is called with the previous working directory
+    mock_chdir.assert_called_with(os.getcwd())

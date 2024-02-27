@@ -1,28 +1,31 @@
 """
-A DAG that uses Cosmos to render a dbt project for performance testing.
+An airflow DAG that uses Cosmos to render a dbt project for performance testing.
 """
 
-import airflow
 from datetime import datetime
 import os
 from pathlib import Path
 
 from cosmos import DbtDag, ProjectConfig, ProfileConfig, RenderConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-DBT_SQLITE_PATH = str(DEFAULT_DBT_ROOT_PATH / "data")
+
 
 profile_config = ProfileConfig(
-    profile_name="simple",
+    profile_name="default",
     target_name="dev",
-    profiles_yml_filepath=(DBT_ROOT_PATH / "simple/profiles.yml"),
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="airflow_db",
+        profile_args={"schema": "public"},
+    ),
 )
 
 cosmos_perf_dag = DbtDag(
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "perf",
-        env_vars={"DBT_SQLITE_PATH": DBT_SQLITE_PATH},
     ),
     profile_config=profile_config,
     render_config=RenderConfig(

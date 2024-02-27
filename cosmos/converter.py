@@ -254,6 +254,8 @@ class DbtToAirflowConverter:
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path
+        if execution_config.invocation_mode:
+            task_args["invocation_mode"] = execution_config.invocation_mode
 
         validate_arguments(
             render_config.select,

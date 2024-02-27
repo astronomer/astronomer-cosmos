@@ -198,6 +198,8 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
                 if isinstance(global_flag_value, dict):
                     yaml_string = yaml.dump(global_flag_value)
                     flags.extend([dbt_name, yaml_string])
+                elif isinstance(global_flag_value, list):
+                    flags.extend([i for j in global_flag_value for i in [dbt_name, j]])
                 else:
                     flags.extend([dbt_name, str(global_flag_value)])
         for global_boolean_flag in self.global_boolean_flags:

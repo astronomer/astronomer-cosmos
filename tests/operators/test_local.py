@@ -1,10 +1,10 @@
 import logging
 import os
-import sys
 import shutil
+import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from airflow import DAG
@@ -16,28 +16,28 @@ from packaging import version
 from pendulum import datetime
 
 from cosmos.config import ProfileConfig
-from cosmos.operators.local import (
-    DbtLocalBaseOperator,
-    DbtLSLocalOperator,
-    DbtSnapshotLocalOperator,
-    DbtRunLocalOperator,
-    DbtTestLocalOperator,
-    DbtBuildLocalOperator,
-    DbtDocsLocalOperator,
-    DbtDocsS3LocalOperator,
-    DbtDocsAzureStorageLocalOperator,
-    DbtDocsGCSLocalOperator,
-    DbtSeedLocalOperator,
-    DbtRunOperationLocalOperator,
-)
-from cosmos.profiles import PostgresUserPasswordProfileMapping
 from cosmos.constants import InvocationMode
-from tests.utils import test_dag as run_test_dag
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
-    parse_number_of_warnings_subprocess,
     parse_number_of_warnings_dbt_runner,
+    parse_number_of_warnings_subprocess,
 )
+from cosmos.operators.local import (
+    DbtBuildLocalOperator,
+    DbtDocsAzureStorageLocalOperator,
+    DbtDocsGCSLocalOperator,
+    DbtDocsLocalOperator,
+    DbtDocsS3LocalOperator,
+    DbtLocalBaseOperator,
+    DbtLSLocalOperator,
+    DbtRunLocalOperator,
+    DbtRunOperationLocalOperator,
+    DbtSeedLocalOperator,
+    DbtSnapshotLocalOperator,
+    DbtTestLocalOperator,
+)
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 MINI_DBT_PROJ_DIR = Path(__file__).parent.parent / "sample/mini"

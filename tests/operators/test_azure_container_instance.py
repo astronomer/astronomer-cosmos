@@ -8,8 +8,8 @@ from cosmos.operators.azure_container_instance import (
     DbtAzureContainerInstanceBaseOperator,
     DbtLSAzureContainerInstanceOperator,
     DbtRunAzureContainerInstanceOperator,
-    DbtTestAzureContainerInstanceOperator,
     DbtSeedAzureContainerInstanceOperator,
+    DbtTestAzureContainerInstanceOperator,
 )
 
 

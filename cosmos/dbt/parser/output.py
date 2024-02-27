@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import List, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple
 
 if TYPE_CHECKING:
     from dbt.cli.main import dbtRunnerResult
 
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"

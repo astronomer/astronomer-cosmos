@@ -2,10 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from cosmos.dbt.selector import SelectorConfig
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
-from cosmos.dbt.selector import select_nodes
+from cosmos.dbt.selector import SelectorConfig, select_nodes
 from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")

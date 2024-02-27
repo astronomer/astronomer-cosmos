@@ -11,12 +11,12 @@ __version__ = "1.3.2"
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.config import (
-    ProjectConfig,
-    ProfileConfig,
     ExecutionConfig,
+    ProfileConfig,
+    ProjectConfig,
     RenderConfig,
 )
-from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
 from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (

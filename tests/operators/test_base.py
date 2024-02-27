@@ -1,15 +1,16 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
     DbtLSMixin,
-    DbtSeedMixin,
-    DbtRunOperationMixin,
-    DbtTestMixin,
-    DbtSnapshotMixin,
     DbtRunMixin,
+    DbtRunOperationMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
 )
 
 

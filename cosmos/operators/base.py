@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Sequence, Tuple
 from abc import ABCMeta, abstractmethod
+from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
@@ -11,7 +11,6 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
-
 
 logger = get_logger(__name__)
 

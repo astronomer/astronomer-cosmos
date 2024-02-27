@@ -18,6 +18,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
+from cosmos.constants import InvocationMode
 
 try:
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
@@ -31,6 +32,7 @@ else:
 if TYPE_CHECKING:
     from airflow.datasets import Dataset  # noqa: F811
     from openlineage.client.run import RunEvent
+    from dbt.cli.main import dbtRunner, dbtRunnerResult
 
 from sqlalchemy.orm import Session
 
@@ -56,11 +58,14 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
-from cosmos.dbt.parser.output import extract_log_issues, parse_output
-from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse
+from cosmos.dbt.parser.output import (
+    extract_dbt_runner_issues,
+    extract_log_issues,
+    parse_number_of_warnings_dbt_runner,
+    parse_number_of_warnings_subprocess,
+)
+from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ, change_working_directory
 
-DBT_NO_TESTS_MSG = "Nothing to do"
-DBT_WARN_MSG = "WARN"
 
 logger = get_logger(__name__)
 
@@ -116,6 +121,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     def __init__(
         self,
         profile_config: ProfileConfig,
+        invocation_mode: InvocationMode | None = None,
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
@@ -127,6 +133,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
+        self.invocation_mode = invocation_mode
+        self.invoke_dbt: Callable[..., FullOutputSubprocessResult | dbtRunnerResult]
+        self.handle_exception: Callable[..., None]
+        self._dbt_runner: dbtRunner | None = None
+        if self.invocation_mode:
+            self._set_invocation_methods()
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
         super().__init__(**kwargs)
 
@@ -135,7 +147,31 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         """Returns hook for running the bash command."""
         return FullOutputSubprocessHook()
 
-    def exception_handling(self, result: FullOutputSubprocessResult) -> None:
+    def _set_invocation_methods(self) -> None:
+        """Sets the associated run and exception handling methods based on the invocation mode."""
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.invoke_dbt = self.run_subprocess
+            self.handle_exception = self.handle_exception_subprocess
+        elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+            self.invoke_dbt = self.run_dbt_runner
+            self.handle_exception = self.handle_exception_dbt_runner
+
+    def _discover_invocation_mode(self) -> None:
+        """Discovers the invocation mode based on the availability of dbtRunner for import. If dbtRunner is available, it will
+        be used since it is faster than subprocess. If dbtRunner is not available, it will fall back to subprocess.
+        This method is called at runtime to work in the environment where the operator is running.
+        """
+        try:
+            from dbt.cli.main import dbtRunner
+        except ImportError:
+            self.invocation_mode = InvocationMode.SUBPROCESS
+            logger.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
+        else:
+            self.invocation_mode = InvocationMode.DBT_RUNNER
+            logger.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
+        self._set_invocation_methods()
+
+    def handle_exception_subprocess(self, result: FullOutputSubprocessResult) -> None:
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
@@ -143,6 +179,16 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
                 *result.full_output,
             )
+
+    def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
+        """dbtRunnerResult has an attribute `success` that is False if the command failed."""
+        if not result.success:
+            if result.exception:
+                raise AirflowException(f"dbt invocation did not complete with unhandled error: {result.exception}")
+            else:
+                node_names, node_results = extract_dbt_runner_issues(result, ["error", "fail", "runtime error"])
+                error_message = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
+                raise AirflowException(f"dbt invocation completed with errors: {error_message}")
 
     @provide_session
     def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
@@ -191,26 +237,58 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         else:
             logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
-    def run_subprocess(self, *args: Any, **kwargs: Any) -> FullOutputSubprocessResult:
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(*args, **kwargs)
+    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+        logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+            command=command,
+            env=env,
+            cwd=cwd,
+            output_encoding=self.output_encoding,
+        )
+        logger.info(subprocess_result.output)
         return subprocess_result
+
+    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
+        """Invokes the dbt command programmatically."""
+        try:
+            from dbt.cli.main import dbtRunner
+        except ImportError:
+            raise ImportError(
+                "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+            )
+
+        if self._dbt_runner is None:
+            self._dbt_runner = dbtRunner()
+
+        # Exclude the dbt executable path from the command
+        cli_args = command[1:]
+
+        logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
+
+        with change_working_directory(cwd), environ(env):
+            result = self._dbt_runner.invoke(cli_args)
+
+        return result
 
     def run_command(
         self,
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
-    ) -> FullOutputSubprocessResult:
+    ) -> FullOutputSubprocessResult | dbtRunnerResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
+        if not self.invocation_mode:
+            self._discover_invocation_mode()
+
         with tempfile.TemporaryDirectory() as tmp_project_dir:
             logger.info(
                 "Cloning project to writable temp directory %s from %s",
                 tmp_project_dir,
                 self.project_dir,
             )
-
+            env = {k: str(v) for k, v in env.items()}
             create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
 
             if self.partial_parse:
@@ -232,21 +310,18 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 if self.install_deps:
                     deps_command = [self.dbt_executable_path, "deps"]
                     deps_command.extend(flags)
-                    self.run_subprocess(
+                    self.invoke_dbt(
                         command=deps_command,
                         env=env,
-                        output_encoding=self.output_encoding,
                         cwd=tmp_project_dir,
                     )
 
                 full_cmd = cmd + flags
 
-                logger.info("Trying to run the command:\n %s\nFrom %s", full_cmd, tmp_project_dir)
                 logger.info("Using environment variables keys: %s", env.keys())
-                result = self.run_subprocess(
+                result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
-                    output_encoding=self.output_encoding,
                     cwd=tmp_project_dir,
                 )
                 if is_openlineage_available:
@@ -263,7 +338,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     self.register_dataset(inlets, outlets)
 
                 self.store_compiled_sql(tmp_project_dir, context)
-                self.exception_handling(result)
+                self.handle_exception(result)
                 if self.callback:
                     self.callback(tmp_project_dir)
 
@@ -373,18 +448,20 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             job_facets=job_facets,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> FullOutputSubprocessResult:
+    def build_and_run_cmd(
+        self, context: Context, cmd_flags: list[str] | None = None
+    ) -> FullOutputSubprocessResult | dbtRunnerResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(cmd=dbt_cmd, env=env, context=context)
-        logger.info(result.output)
         return result
 
     def on_kill(self) -> None:
-        if self.cancel_query_on_kill:
-            self.subprocess_hook.send_sigint()
-        else:
-            self.subprocess_hook.send_sigterm()
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            if self.cancel_query_on_kill:
+                self.subprocess_hook.send_sigint()
+            else:
+                self.subprocess_hook.send_sigterm()
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -435,8 +512,10 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     ) -> None:
         super().__init__(**kwargs)
         self.on_warning_callback = on_warning_callback
+        self.extract_issues: Callable[..., tuple[list[str], list[str]]]
+        self.parse_number_of_warnings: Callable[..., int]
 
-    def _handle_warnings(self, result: FullOutputSubprocessResult, context: Context) -> None:
+    def _handle_warnings(self, result: FullOutputSubprocessResult | dbtRunnerResult, context: Context) -> None:
         """
          Handles warnings by extracting log issues, creating additional context, and calling the
          on_warning_callback with the updated context.
@@ -444,7 +523,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
         :param result: The result object from the build and run command.
         :param context: The original airflow context in which the build and run command was executed.
         """
-        test_names, test_results = extract_log_issues(result.full_output)
+        test_names, test_results = self.extract_issues(result)
 
         warning_context = dict(context)
         warning_context["test_names"] = test_names
@@ -452,19 +531,21 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
 
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
+    def _set_test_result_parsing_methods(self) -> None:
+        """Sets the extract_issues and parse_number_of_warnings methods based on the invocation mode."""
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.extract_issues = lambda result: extract_log_issues(result.full_output)
+            self.parse_number_of_warnings = parse_number_of_warnings_subprocess
+        elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+            self.extract_issues = extract_dbt_runner_issues
+            self.parse_number_of_warnings = parse_number_of_warnings_dbt_runner
+
     def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
-        should_trigger_callback = all(
-            [
-                self.on_warning_callback,
-                DBT_NO_TESTS_MSG not in result.output,
-                DBT_WARN_MSG in result.output,
-            ]
-        )
-        if should_trigger_callback:
-            warnings = parse_output(result, "WARN")
-            if warnings > 0:
-                self._handle_warnings(result, context)
+        self._set_test_result_parsing_methods()
+        number_of_warnings = self.parse_number_of_warnings(result)  # type: ignore
+        if self.on_warning_callback and number_of_warnings > 0:
+            self._handle_warnings(result, context)
 
 
 class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):

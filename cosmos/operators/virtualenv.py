@@ -85,11 +85,16 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
-    def run_subprocess(self, *args: Any, command: list[str], **kwargs: Any) -> FullOutputSubprocessResult:
+    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         if self.py_requirements:
             command[0] = self.venv_dbt_path
 
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(command, *args, **kwargs)
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+            command=command,
+            env=env,
+            cwd=cwd,
+            output_encoding=self.output_encoding,
+        )
         return subprocess_result
 
     def execute(self, context: Context) -> None:

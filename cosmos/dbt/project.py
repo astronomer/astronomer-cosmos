@@ -44,3 +44,16 @@ def environ(env_vars: dict[str, str]) -> Generator[None, None, None]:
                 del os.environ[key]
             else:
                 os.environ[key] = value
+
+
+@contextmanager
+def change_working_directory(path: str) -> Generator[None, None, None]:
+    """Temporarily changes the working directory to the given path, and then restores
+    back to the previous value on exit.
+    """
+    previous_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous_cwd)

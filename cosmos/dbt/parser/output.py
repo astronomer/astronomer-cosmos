@@ -1,33 +1,53 @@
+from __future__ import annotations
+
 import logging
 import re
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dbt.cli.main import dbtRunnerResult
 
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 
-def parse_output(result: FullOutputSubprocessResult, keyword: str) -> int:
+DBT_NO_TESTS_MSG = "Nothing to do"
+DBT_WARN_MSG = "WARN"
+
+
+def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
     """
-    Parses the dbt test output message and returns the number of errors or warnings.
+    Parses the dbt test output message and returns the number of warnings.
 
     :param result: String containing the output to be parsed.
-    :param keyword: String representing the keyword to search for in the output (WARN, ERROR).
     :return: An integer value associated with the keyword, or 0 if parsing fails.
 
     Usage:
     -----
     output_str = "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16"
-    keyword = "WARN"
-    num_warns = parse_output(output_str, keyword)
+    num_warns = parse_output(output_str)
     print(num_warns)
     # Output: 1
     """
     output = result.output
-    try:
-        num = int(output.split(f"{keyword}=")[1].split()[0])
-    except ValueError:
-        logging.error(
-            f"Could not parse number of {keyword}s. Check your dbt/airflow version or if --quiet is not being used"
-        )
+    num = 0
+    if DBT_NO_TESTS_MSG not in result.output and DBT_WARN_MSG in result.output:
+        try:
+            num = int(output.split(f"{DBT_WARN_MSG}=")[1].split()[0])
+        except ValueError:
+            logging.error(
+                f"Could not parse number of {DBT_WARN_MSG}s. Check your dbt/airflow version or if --quiet is not being used"
+            )
+    return num
+
+
+def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
+    """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
+    from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
+    """
+    num = 0
+    for run_result in result.result.results:  # type: ignore
+        if run_result.status == "warn":
+            num += 1
     return num
 
 
@@ -67,3 +87,28 @@ def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
             test_results.append(test_result)
 
     return test_names, test_results
+
+
+def extract_dbt_runner_issues(
+    result: dbtRunnerResult, status_levels: list[str] = ["warn"]
+) -> Tuple[List[str], List[str]]:
+    """
+    Extracts messages from the dbt runner result and returns them as a formatted string.
+
+    This function iterates over dbtRunnerResult messages in dbt run. It extracts results that match the
+    status levels provided and appends them to a list of issues.
+
+    :param result: dbtRunnerResult object containing the output to be parsed.
+    :param status_levels: List of strings, where each string is a result status level. Default is ["warn"].
+    :return: two lists of strings, the first one containing the node names and the second one
+        containing the node result message.
+    """
+    node_names = []
+    node_results = []
+
+    for node_result in result.result.results:  # type: ignore
+        if node_result.status in status_levels:
+            node_names.append(str(node_result.node.name))
+            node_results.append(str(node_result.message))
+
+    return node_names, node_results

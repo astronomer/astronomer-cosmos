@@ -12,6 +12,7 @@ from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, RenderConfig, ExecutionConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.constants import InvocationMode
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -25,7 +26,7 @@ profile_config = ProfileConfig(
     ),
 )
 
-shared_execution_config = ExecutionConfig()
+shared_execution_config = ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER)
 
 
 @dag(

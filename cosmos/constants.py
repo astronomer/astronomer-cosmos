@@ -54,6 +54,15 @@ class ExecutionMode(Enum):
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
 
 
+class InvocationMode(Enum):
+    """
+    How the dbt command should be invoked.
+    """
+
+    SUBPROCESS = "subprocess"
+    DBT_RUNNER = "dbt_runner"
+
+
 class TestIndirectSelection(Enum):
     """
     Modes to configure the test behavior when performing indirect selection.

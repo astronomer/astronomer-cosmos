@@ -7,6 +7,7 @@ from airflow.models.connection import Connection
 from cosmos.config import ProfileConfig
 
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.constants import InvocationMode
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -25,7 +26,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
 @patch("airflow.hooks.base.BaseHook.get_connection")
 def test_run_command(
@@ -53,6 +54,7 @@ def test_run_command(
         py_system_site_packages=False,
         py_requirements=["dbt-postgres==1.6.0b1"],
         emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
     )
     assert venv_operator._venv_tmp_dir is None  # Otherwise we are creating empty directories during DAG parsing time
     # and not deleting them
@@ -60,12 +62,12 @@ def test_run_command(
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 3
     python_cmd = run_command_args[0]
-    dbt_deps = run_command_args[1]
-    dbt_cmd = run_command_args[2]
+    dbt_deps = run_command_args[1].kwargs
+    dbt_cmd = run_command_args[2].kwargs
     assert python_cmd[0][0][0].endswith("/bin/python")
     assert python_cmd[0][-1][-1] == "from importlib.metadata import version; print(version('dbt-core'))"
-    assert dbt_deps[0][0][1] == "deps"
-    assert dbt_deps[0][0][0].endswith("/bin/dbt")
-    assert dbt_deps[0][0][0] == dbt_cmd[0][0][0]
-    assert dbt_cmd[0][0][1] == "do-something"
+    assert dbt_deps["command"][1] == "deps"
+    assert dbt_deps["command"][0].endswith("/bin/dbt")
+    assert dbt_deps["command"][0] == dbt_cmd["command"][0]
+    assert dbt_cmd["command"][1] == "do-something"
     assert mock_execute.call_count == 2

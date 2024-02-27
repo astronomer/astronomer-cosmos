@@ -3,17 +3,17 @@ from __future__ import annotations
 from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
-from cosmos.config import ProfileConfig
 
+from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtLSMixin,
     DbtRunMixin,
+    DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
     DbtTestMixin,
-    DbtLSMixin,
-    DbtRunOperationMixin,
 )
 
 logger = get_logger(__name__)

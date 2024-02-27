@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
 import os
-from pathlib import Path
+import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Generator
 
 try:

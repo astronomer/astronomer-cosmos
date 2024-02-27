@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
-from functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
-from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
+from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,

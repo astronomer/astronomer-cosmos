@@ -1,12 +1,13 @@
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import yaml
+from subprocess import PIPE, Popen
+from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
+from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
@@ -17,7 +18,6 @@ from cosmos.dbt.graph import (
     run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from subprocess import Popen, PIPE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"

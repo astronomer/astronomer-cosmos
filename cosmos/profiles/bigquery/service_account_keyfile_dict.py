@@ -1,10 +1,10 @@
 "Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account keyfile dict/json."
 from __future__ import annotations
 
-from typing import Any
 import json
-from cosmos.exceptions import CosmosValueError
+from typing import Any
 
+from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.base import BaseProfileMapping
 
 

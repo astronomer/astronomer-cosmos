@@ -1,13 +1,11 @@
-from unittest.mock import patch, MagicMock
-
-from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
+from unittest.mock import MagicMock, patch
 
 from airflow.models.connection import Connection
 
 from cosmos.config import ProfileConfig
-
-from cosmos.profiles import PostgresUserPasswordProfileMapping
 from cosmos.constants import InvocationMode
+from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 profile_config = ProfileConfig(
     profile_name="default",

@@ -2,13 +2,12 @@
 An airflow DAG that uses Cosmos to render a dbt project for performance testing.
 """
 
-from datetime import datetime
 import os
+from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig, RenderConfig
+from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))

@@ -3,7 +3,6 @@ import os
 import sys
 import shutil
 import tempfile
-import signal
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 

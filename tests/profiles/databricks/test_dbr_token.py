@@ -95,11 +95,15 @@ def test_profile_args(
         profile_args={
             "schema": "my_schema",
             "catalog": "my_catalog",
+            "session_properties": {"legacy_time_parser_policy": "corrected"},
+            "threads": 4,
         },
     )
     assert profile_mapping.profile_args == {
         "schema": "my_schema",
         "catalog": "my_catalog",
+        "session_properties": {"legacy_time_parser_policy": "corrected"},
+        "threads": 4,
     }
 
     assert profile_mapping.profile == {
@@ -109,7 +113,23 @@ def test_profile_args(
         "http_path": mock_databricks_conn.extra_dejson.get("http_path"),
         "schema": "my_schema",
         "catalog": "my_catalog",
+        "threads": 4,
+        "session_properties": {"legacy_time_parser_policy": "corrected"},
     }
+    expected_profile_yml = """example:
+    outputs:
+        cosmos_target:
+            catalog: my_catalog
+            host: my_host
+            http_path: my_http_path
+            schema: my_schema
+            session_properties:
+                legacy_time_parser_policy: corrected
+            threads: 4
+            token: '{{ env_var(''COSMOS_CONN_DATABRICKS_TOKEN'') }}'
+            type: databricks
+    target: cosmos_target\n"""
+    assert profile_mapping.get_profile_file_contents("example") == expected_profile_yml
 
 
 def test_profile_args_overrides(

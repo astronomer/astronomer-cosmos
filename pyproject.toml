@@ -171,6 +171,7 @@ dependencies = [
     "sphinx-autoapi",
     "openlineage-airflow",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "pydantic>=1.10.0",
 ]
 
 [tool.hatch.envs.docs.scripts]

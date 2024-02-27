@@ -1,13 +1,14 @@
-import pytest
 import logging
 from unittest.mock import MagicMock
+
+import pytest
 from airflow.hooks.subprocess import SubprocessResult
 
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
     extract_log_issues,
-    parse_number_of_warnings_subprocess,
     parse_number_of_warnings_dbt_runner,
+    parse_number_of_warnings_subprocess,
 )
 
 

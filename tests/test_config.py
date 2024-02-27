@@ -1,14 +1,13 @@
+from contextlib import nullcontext as does_not_raise
 from pathlib import Path
 from unittest.mock import patch
-from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
-from contextlib import nullcontext as does_not_raise
 
 import pytest
 
+from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
 from cosmos.exceptions import CosmosValueError
-
+from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"

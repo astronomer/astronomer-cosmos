@@ -4,7 +4,6 @@ from pathlib import Path
 
 import aenum
 
-
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
 DEFAULT_DBT_TARGET_NAME = "cosmos_target"

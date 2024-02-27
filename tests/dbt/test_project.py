@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ, change_working_directory
+from cosmos.dbt.project import change_working_directory, copy_msgpack_for_partial_parse, create_symlinks, environ
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 

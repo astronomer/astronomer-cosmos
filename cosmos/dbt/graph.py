@@ -4,11 +4,12 @@ import itertools
 import json
 import os
 import tempfile
-import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
+
+import yaml
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
@@ -22,7 +23,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ
+from cosmos.dbt.project import copy_msgpack_for_partial_parse, create_symlinks, environ
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 

@@ -1,28 +1,28 @@
 from __future__ import annotations
 
 import os
-import signal
 import tempfile
-from attr import define
-from pathlib import Path
-from typing import Any, Callable, Literal, Sequence, TYPE_CHECKING
-from abc import ABC, abstractmethod
 import warnings
+from abc import ABC, abstractmethod
+from functools import cached_property
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
 import airflow
 import jinja2
 from airflow import DAG
-from functools import cached_property
 from airflow.configuration import conf
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
+from attr import define
+
 from cosmos.constants import InvocationMode
 
 try:
-    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
     from airflow.datasets import Dataset
+    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
 except ModuleNotFoundError:
     is_openlineage_available = False
     DbtLocalArtifactProcessor = None
@@ -31,32 +31,17 @@ else:
 
 if TYPE_CHECKING:
     from airflow.datasets import Dataset  # noqa: F811
-    from openlineage.client.run import RunEvent
     from dbt.cli.main import dbtRunner, dbtRunnerResult
+    from openlineage.client.run import RunEvent
 
 from sqlalchemy.orm import Session
 
+from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    DBT_PARTIAL_PARSE_FILE_NAME,
+    DBT_TARGET_DIR_NAME,
     DEFAULT_OPENLINEAGE_NAMESPACE,
     OPENLINEAGE_PRODUCER,
-    DBT_TARGET_DIR_NAME,
-    DBT_PARTIAL_PARSE_FILE_NAME,
-)
-from cosmos.config import ProfileConfig
-from cosmos.log import get_logger
-from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
-    DbtBuildMixin,
-    DbtRunMixin,
-    DbtSeedMixin,
-    DbtSnapshotMixin,
-    DbtTestMixin,
-    DbtLSMixin,
-    DbtRunOperationMixin,
-)
-from cosmos.hooks.subprocess import (
-    FullOutputSubprocessHook,
-    FullOutputSubprocessResult,
 )
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
@@ -64,8 +49,22 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ, change_working_directory
-
+from cosmos.dbt.project import change_working_directory, copy_msgpack_for_partial_parse, create_symlinks, environ
+from cosmos.hooks.subprocess import (
+    FullOutputSubprocessHook,
+    FullOutputSubprocessResult,
+)
+from cosmos.log import get_logger
+from cosmos.operators.base import (
+    AbstractDbtBaseOperator,
+    DbtBuildMixin,
+    DbtLSMixin,
+    DbtRunMixin,
+    DbtRunOperationMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
+)
 
 logger = get_logger(__name__)
 

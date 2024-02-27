@@ -1,26 +1,24 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos.config import RenderConfig
 from cosmos.constants import (
+    DEFAULT_DBT_RESOURCES,
+    TESTABLE_DBT_RESOURCES,
     DbtResourceType,
+    ExecutionMode,
     TestBehavior,
     TestIndirectSelection,
-    ExecutionMode,
-    TESTABLE_DBT_RESOURCES,
-    DEFAULT_DBT_RESOURCES,
 )
-from cosmos.config import RenderConfig
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from typing import Union
-
 
 logger = get_logger(__name__)
 

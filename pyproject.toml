@@ -197,7 +197,7 @@ no_warn_unused_ignores = true
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
-select = ["C901"]
+select = ["C901", "I"]
 [tool.ruff.lint.mccabe]
 max-complexity = 8
 

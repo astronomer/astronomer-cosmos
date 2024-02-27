@@ -1,17 +1,16 @@
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
+from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.models import DAG
 
+from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
-from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode, InvocationMode
-from cosmos.config import ProjectConfig, ProfileConfig, ExecutionConfig, RenderConfig, CosmosConfigException
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
-
+from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"

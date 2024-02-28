@@ -340,18 +340,6 @@ class DbtTestMixin:
         self.selector = selector
         super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
 
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.exclude:
-            flags.extend(["--exclude", *self.exclude])
-
-        if self.select:
-            flags.extend(["--select", *self.select])
-
-        if self.selector:
-            flags.extend(["--selector", self.selector])
-        return flags
-
 
 class DbtRunOperationMixin:
     """

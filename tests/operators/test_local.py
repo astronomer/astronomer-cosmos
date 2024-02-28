@@ -382,30 +382,40 @@ def test_store_compiled_sql() -> None:
 @pytest.mark.parametrize(
     "operator_class,kwargs,expected_call_kwargs",
     [
-        (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
-        (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (
+            DbtSeedLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["seed", "--full-refresh"]},
+        ),
+        (
+            DbtRunLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["run", "--full-refresh"]},
+        ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
-            {"context": {}, "cmd_flags": ["--exclude", "tag:disabled", "--select", "tag:daily"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"]},
         ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "selector": "nightly_snowplow"},
-            {"context": {}, "cmd_flags": ["--selector", "nightly_snowplow"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test", "--selector", "nightly_snowplow"]},
         ),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
-            {"context": {}, "cmd_flags": ["--args", "days: 7\ndry_run: true\n"]},
+            {"context": {}, "env": {}, "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"]},
         ),
     ],
 )
-@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwargs, expected_call_kwargs):
+@patch("cosmos.operators.local.DbtLocalBaseOperator.run_command")
+def test_operator_execute_with_flags(mock_run_cmd, operator_class, kwargs, expected_call_kwargs):
     task = operator_class(profile_config=profile_config, task_id="my-task", project_dir="my/dir", **kwargs)
     task.execute(context={})
-    mock_build_and_run_cmd.assert_called_once_with(**expected_call_kwargs)
+    mock_run_cmd.assert_called_once_with(
+        cmd=[task.dbt_executable_path, *expected_call_kwargs.pop("cmd_flags")], **expected_call_kwargs
+    )
 
 
 @pytest.mark.parametrize(

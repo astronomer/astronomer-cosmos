@@ -383,6 +383,7 @@ def test_store_compiled_sql() -> None:
     "operator_class,kwargs,expected_call_kwargs",
     [
         (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (DbtBuildLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (
             DbtTestLocalOperator,

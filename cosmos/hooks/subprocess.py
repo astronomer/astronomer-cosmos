@@ -7,9 +7,9 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
-from typing import NamedTuple
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
+from typing import NamedTuple
 
 from airflow.hooks.base import BaseHook
 

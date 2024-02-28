@@ -7,7 +7,6 @@ from airflow.utils.task_group import TaskGroup
 from cosmos.core.graph.entities import Task
 from cosmos.log import get_logger
 
-
 logger = get_logger(__name__)
 
 

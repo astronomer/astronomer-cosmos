@@ -17,7 +17,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig
+from cosmos import DbtDag, ProfileConfig, ProjectConfig
 from cosmos.profiles import DatabricksTokenProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"

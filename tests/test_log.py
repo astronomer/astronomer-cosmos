@@ -1,8 +1,9 @@
 import logging
 
+from airflow.configuration import conf
+
 from cosmos import get_provider_info
 from cosmos.log import get_logger
-from airflow.configuration import conf
 
 
 def test_get_logger():

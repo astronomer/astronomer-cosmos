@@ -6,8 +6,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig, RenderConfig, LoadMode, ExecutionConfig
-from cosmos.profiles import PostgresUserPasswordProfileMapping, DbtProfileConfigVars
+from cosmos import DbtDag, ExecutionConfig, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.profiles import DbtProfileConfigVars, PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))

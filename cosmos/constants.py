@@ -4,7 +4,6 @@ from pathlib import Path
 
 import aenum
 
-
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
 DEFAULT_DBT_TARGET_NAME = "cosmos_target"
@@ -52,6 +51,15 @@ class ExecutionMode(Enum):
     KUBERNETES = "kubernetes"
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
+
+
+class InvocationMode(Enum):
+    """
+    How the dbt command should be invoked.
+    """
+
+    SUBPROCESS = "subprocess"
+    DBT_RUNNER = "dbt_runner"
 
 
 class TestIndirectSelection(Enum):

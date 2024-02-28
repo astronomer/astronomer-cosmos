@@ -8,12 +8,12 @@ from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtLSMixin,
     DbtRunMixin,
+    DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
     DbtTestMixin,
-    DbtLSMixin,
-    DbtRunOperationMixin,
 )
 
 logger = get_logger(__name__)

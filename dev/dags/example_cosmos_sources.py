@@ -16,11 +16,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.operators.dummy import DummyOperator
 from airflow.models.dag import DAG
+from airflow.operators.dummy import DummyOperator
 from airflow.utils.task_group import TaskGroup
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig, RenderConfig
+from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
 

@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 from airflow.models.connection import Connection
-from cosmos.exceptions import CosmosValueError
 
+from cosmos.exceptions import CosmosValueError
 from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 

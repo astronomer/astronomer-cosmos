@@ -2,6 +2,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow.models import TaskInstance
+from airflow.utils.context import Context, context_merge
 from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
@@ -11,9 +13,6 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtTestKubernetesOperator,
 )
-
-from airflow.utils.context import Context, context_merge
-from airflow.models import TaskInstance
 
 try:
     from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction

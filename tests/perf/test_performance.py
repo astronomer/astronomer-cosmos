@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
 import os
-from pathlib import Path
+import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Generator
 
 try:
@@ -109,14 +109,18 @@ def test_perf_dag():
         # measure the time before and after the dag is run
 
         start = time.time()
-        dag.test()
+        dag_run = dag.test()
         end = time.time()
 
-        print(f"Ran {num_models} models in {end - start} seconds")
-        print(f"NUM_MODELS={num_models}\nTIME={end - start}")
+        # assert the dag run was successful before writing the results
+        if dag_run.state == "success":
+            print(f"Ran {num_models} models in {end - start} seconds")
+            print(f"NUM_MODELS={num_models}\nTIME={end - start}")
 
-        # write the results to a file
-        with open("/tmp/performance_results.txt", "w") as f:
-            f.write(
-                f"NUM_MODELS={num_models}\nTIME={end - start}\nMODELS_PER_SECOND={num_models / (end - start)}\nDBT_VERSION={DBT_VERSION}"
-            )
+            # write the results to a file
+            with open("/tmp/performance_results.txt", "w") as f:
+                f.write(
+                    f"NUM_MODELS={num_models}\nTIME={end - start}\nMODELS_PER_SECOND={num_models / (end - start)}\nDBT_VERSION={DBT_VERSION}"
+                )
+        else:
+            raise Exception("Performance DAG run failed.")

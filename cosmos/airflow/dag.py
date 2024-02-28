@@ -8,7 +8,7 @@ from typing import Any
 
 from airflow.models.dag import DAG
 
-from cosmos.converter import airflow_kwargs, specific_kwargs, DbtToAirflowConverter
+from cosmos.converter import DbtToAirflowConverter, airflow_kwargs, specific_kwargs
 
 
 class DbtDag(DAG, DbtToAirflowConverter):

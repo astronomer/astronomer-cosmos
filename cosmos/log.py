@@ -1,9 +1,9 @@
 from __future__ import annotations
+
 import logging
 
 from airflow.configuration import conf
 from airflow.utils.log.colored_log import CustomTTYColoredFormatter
-
 
 LOG_FORMAT: str = (
     "[%(blue)s%(asctime)s%(reset)s] "

@@ -5,8 +5,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_automatic_profile_mapping
-from cosmos.profiles import TrinoLDAPProfileMapping
+from cosmos.profiles import TrinoLDAPProfileMapping, get_automatic_profile_mapping
 
 
 @pytest.fixture()

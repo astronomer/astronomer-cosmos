@@ -1,7 +1,7 @@
 "Tests for the Trino profile."
 
-from unittest.mock import patch
 import json
+from unittest.mock import patch
 
 from airflow.models.connection import Connection
 

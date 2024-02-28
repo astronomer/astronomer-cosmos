@@ -7,15 +7,15 @@
 try:
     import flask  # noqa: F401
 except ImportError:
-    import markupsafe
     import jinja2
+    import markupsafe
 
     jinja2.Markup = markupsafe.Markup
     jinja2.escape = markupsafe.escape
 
-from unittest.mock import mock_open, patch, MagicMock, PropertyMock
-
 import sys
+from unittest.mock import MagicMock, PropertyMock, mock_open, patch
+
 import pytest
 from airflow.configuration import conf
 from airflow.exceptions import AirflowConfigException
@@ -25,17 +25,15 @@ from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
 from flask.testing import FlaskClient
 
 import cosmos.plugin
-
 from cosmos.plugin import (
     dbt_docs_view,
     iframe_script,
-    open_gcs_file,
     open_azure_file,
+    open_file,
+    open_gcs_file,
     open_http_file,
     open_s3_file,
-    open_file,
 )
-
 
 original_conf_get = conf.get
 

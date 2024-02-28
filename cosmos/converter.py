@@ -3,19 +3,19 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from typing import Any, Callable
-import copy
 from warnings import warn
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
-from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
@@ -254,6 +254,8 @@ class DbtToAirflowConverter:
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path
+        if execution_config.invocation_mode:
+            task_args["invocation_mode"] = execution_config.invocation_mode
 
         validate_arguments(
             render_config.select,

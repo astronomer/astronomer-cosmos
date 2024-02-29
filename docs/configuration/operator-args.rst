@@ -107,7 +107,7 @@ The following operator args support templating, and are accessible both through 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
 
-The following template fields are only selectable when using the operators in a standalone context:
+The following template fields are only selectable when using the operators in a standalone context (starting in Cosmos 1.4):
 
 - ``select``
 - ``exclude``

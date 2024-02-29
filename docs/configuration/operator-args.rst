@@ -115,7 +115,6 @@ The following template fields are only selectable when using the operators in a 
 - ``models``
 
 Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing,  the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing. 
-Since template fields are rendered on each ``DagRun``,
 
 Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
 This is provided for telemetry on task execution, and is not an operator arg.

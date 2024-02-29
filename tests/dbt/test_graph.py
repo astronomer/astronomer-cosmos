@@ -457,7 +457,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
     )
     getattr(dbt_graph, load_method)()
-    assert len(dbt_graph.nodes) == 4
+    assert len(dbt_graph.nodes) == 5
     assert "source.simple.main.movies_ratings" in dbt_graph.nodes
     assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
 

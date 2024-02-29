@@ -567,6 +567,7 @@ def test_store_compiled_sql() -> None:
     "operator_class,kwargs,expected_call_kwargs",
     [
         (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (DbtBuildLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
         (
             DbtTestLocalOperator,
@@ -650,8 +651,18 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
 @pytest.mark.parametrize(
     "operator_class,expected_template",
     [
-        (DbtSeedLocalOperator, ("env", "vars", "compiled_sql", "full_refresh")),
-        (DbtRunLocalOperator, ("env", "vars", "compiled_sql", "full_refresh")),
+        (
+            DbtSeedLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+        ),
+        (
+            DbtRunLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+        ),
+        (
+            DbtBuildLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+        ),
     ],
 )
 def test_dbt_base_operator_template_fields(operator_class, expected_template):

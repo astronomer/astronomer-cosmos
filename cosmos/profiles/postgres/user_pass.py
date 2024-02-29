@@ -21,7 +21,6 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
         "user",
         "password",
         "dbname",
-        "schema",
     ]
     secret_fields = [
         "password",
@@ -47,14 +46,19 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
             "password": self.get_env_var_format("password"),
         }
 
+        if "schema" in self.profile_args:
+            profile["schema"] = self.profile_args["schema"]
+
         return self.filter_null(profile)
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
         "Gets mock profile. Defaults port to 5432."
-        parent_mock = super().mock_profile
-
-        return {
+        profile_dict = {
             "port": 5432,
-            **parent_mock,
+            **super().mock_profile,
         }
+        user_defined_schema = self.profile_args.get("schema")
+        if user_defined_schema:
+            profile_dict["schema"] = user_defined_schema
+        return profile_dict

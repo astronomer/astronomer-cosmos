@@ -102,7 +102,7 @@ The following operator args support templating, and are accessible both through 
 
 - ``env``
 - ``vars``
-- ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators.)
+- ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.

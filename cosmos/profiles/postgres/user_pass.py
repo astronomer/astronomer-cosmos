@@ -54,9 +54,11 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     @property
     def mock_profile(self) -> dict[str, Any | None]:
         "Gets mock profile. Defaults port to 5432."
-        parent_mock = super().mock_profile
-
-        return {
+        profile_dict = {
             "port": 5432,
-            **parent_mock,
+            **super().mock_profile,
         }
+        user_defined_schema = self.profile_args.get("schema")
+        if user_defined_schema:
+            profile_dict["schema"] = user_defined_schema
+        return profile_dict

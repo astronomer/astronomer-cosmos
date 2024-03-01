@@ -6,3 +6,4 @@ __pycache__/
 astro
 logs
 .mypy_cache/
+profiles.yml

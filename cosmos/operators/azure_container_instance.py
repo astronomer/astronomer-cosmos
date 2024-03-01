@@ -28,7 +28,7 @@ except ImportError:
     )
 
 
-class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, AbstractDbtBaseOperator):  # type: ignore
+class DbtAzureContainerInstanceBaseOperator(AbstractDbtBaseOperator, AzureContainerInstancesOperator):  # type: ignore
     """
     Executes a dbt core cli command in an Azure Container Instance
     """
@@ -66,7 +66,7 @@ class DbtAzureContainerInstanceBaseOperator(AzureContainerInstancesOperator, Abs
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
-        result = super().execute(context)
+        result = AzureContainerInstancesOperator.execute(self, context)
         logger.info(result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:

@@ -1,0 +1,117 @@
+---
+version: '3'
+x-airflow-common:
+  &airflow-common
+  image: cosmos
+  build:
+    context: ..
+    dockerfile: dev/Dockerfile
+  env_file: .env
+  environment:
+    &airflow-common-env
+    DB_BACKEND: postgres
+    AIRFLOW__COSMOS__DBT_DOCS_DIR: http://cosmos-docs.s3-website-us-east-1.amazonaws.com/
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:pg_password@postgres:5432/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "cosmos"
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "5"
+    ASTRONOMER_ENVIRONMENT: local
+    AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES: airflow\.* astro\.*
+    OPENLINEAGE_DISABLED: "True"
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    POSTGRES_USER: airflow
+    POSTGRES_PASSWORD: pg_password
+    POSTGRES_DB: airflow
+    POSTGRES_SCHEMA: public
+  volumes:
+    - ./dags:/usr/local/airflow/dags
+    - ./logs:/usr/local/airflow/logs
+    - ./plugins:/usr/local/airflow/plugins
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: pg_password
+      POSTGRES_DB: airflow
+    command: postgres -c 'idle_in_transaction_session_timeout=60000'   # 1 minute timeout
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: airflow webserver
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: airflow scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: airflow triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    # yamllint disable rule:line-length
+    command:
+      - -c
+      - |
+        exec /entrypoint bash -c "
+          airflow db upgrade && \
+          airflow users create -r Admin -u admin -e admin -f admin -l admin -p admin && \
+          airflow version"
+    # yamllint enable rule:line-length
+    environment:
+      <<: *airflow-common-env
+
+volumes:
+  postgres-db-volume:

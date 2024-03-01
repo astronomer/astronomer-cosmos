@@ -1,0 +1,11 @@
+jaffle_shop:
+ outputs:
+   dev:
+     catalog: null
+     host: "{{ env_var('DATABRICKS_HOST') }}"
+     http_path: /sql/1.0/warehouses/{{ env_var('DATABRICKS_WAREHOUSE_ID') }}
+     schema: cosmos
+     threads: 1
+     token: "{{ env_var('DATABRICKS_TOKEN') }}"
+     type: databricks
+ target: dev

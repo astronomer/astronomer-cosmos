@@ -7,3 +7,4 @@ astro
 logs
 .mypy_cache/
 profiles.yml
+dags/dbt/jaffle_shop/profiles.yml

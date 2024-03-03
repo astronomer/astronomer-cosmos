@@ -8,8 +8,10 @@
       "exposure.simple.weekly_metrics"
     ],
     "source.simple.main.movies_ratings": [
-      "model.simple.movies_ratings_simplified"
-    ]
+      "model.simple.movies_ratings_simplified",
+      "test.simple.source_not_null_imdb_movies_ratings_X.e684bf90f4"
+    ],
+    "test.simple.source_not_null_imdb_movies_ratings_X.e684bf90f4": []
   },
   "disabled": {},
   "docs": {
@@ -28,7 +30,7 @@
       "config": {
         "enabled": true
       },
-      "created_at": 1696859933.549042,
+      "created_at": 1697205180.995924,
       "depends_on": {
         "macros": [],
         "nodes": [
@@ -1016,7 +1018,7 @@
         "node_color": null,
         "show": true
       },
-      "macro_sql": "{% macro dates_in_range(start_date_str, end_date_str=none, in_fmt=\"%Y%m%d\", out_fmt=\"%Y%m%d\") %}\n    {% set end_date_str = start_date_str if end_date_str is none else end_date_str %}\n\n    {% set start_date = convert_datetime(start_date_str, in_fmt) %}\n    {% set end_date = convert_datetime(end_date_str, in_fmt) %}\n\n    {% set day_count = (end_date - start_date).days %}\n    {% if day_count < 0 %}\n        {% set msg -%}\n            Partition start date is after the end date ({{ start_date }}, {{ end_date }})\n        {%- endset %}\n\n        {{ exceptions.raise_compiler_error(msg, model) }}\n    {% endif %}\n\n    {% set date_list = [] %}\n    {% for i in range(0, day_count + 1) %}\n        {% set the_date = (modules.datetime.timedelta(days=i) + start_date) %}\n        {% if not out_fmt %}\n            {% set _ = date_list.append(the_date) %}\n        {% else %}\n            {% set _ = date_list.append(the_date.strftime(out_fmt)) %}\n        {% endif %}\n    {% endfor %}\n\n    {{ return(date_list) }}\n{% endmacro %}",
+      "macro_sql": "{% macro dates_in_range(start_date_str, end_date_str=none, in_fmt=\"%Y%m%d\", out_fmt=\"%Y%m%d\") %}\n    {% set end_date_str = start_date_str if end_date_str is none else end_date_str %}\n\n    {% set start_date = convert_datetime(start_date_str, in_fmt) %}\n    {% set end_date = convert_datetime(end_date_str, in_fmt) %}\n\n    {% set day_count = (end_date - start_date).days %}\n    {% if day_count < 0 %}\n        {% set msg -%}\n            Partiton start date is after the end date ({{ start_date }}, {{ end_date }})\n        {%- endset %}\n\n        {{ exceptions.raise_compiler_error(msg, model) }}\n    {% endif %}\n\n    {% set date_list = [] %}\n    {% for i in range(0, day_count + 1) %}\n        {% set the_date = (modules.datetime.timedelta(days=i) + start_date) %}\n        {% if not out_fmt %}\n            {% set _ = date_list.append(the_date) %}\n        {% else %}\n            {% set _ = date_list.append(the_date.strftime(out_fmt)) %}\n        {% endif %}\n    {% endfor %}\n\n    {{ return(date_list) }}\n{% endmacro %}",
       "meta": {},
       "name": "dates_in_range",
       "original_file_path": "macros/etc/datetime.sql",
@@ -6945,8 +6947,8 @@
     "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v8.json",
     "dbt_version": "1.4.0",
     "env": {},
-    "generated_at": "2023-10-09T13:58:53.320926Z",
-    "invocation_id": "1790dc18-1177-4ca0-b993-a8eeb59f0c4c",
+    "generated_at": "2023-10-13T13:58:46.591195Z",
+    "invocation_id": "4f4b6d15-b4ab-4683-bbe5-efd94824b1d9",
     "project_id": "8dbdda48fb8748d6746f1965824e966a",
     "send_anonymous_usage_stats": true,
     "user_id": "4bdc3972-5c9f-4f16-90bd-3769a225fbe6"
@@ -6986,7 +6988,7 @@
         "tags": [],
         "unique_key": null
       },
-      "created_at": 1696859933.5317938,
+      "created_at": 1697205180.9909241,
       "database": "database",
       "deferred": false,
       "depends_on": {
@@ -7062,7 +7064,7 @@
         "tags": [],
         "unique_key": null
       },
-      "created_at": 1696859933.537527,
+      "created_at": 1697205180.984051,
       "database": "database",
       "deferred": false,
       "depends_on": {
@@ -7103,6 +7105,84 @@
       "unrendered_config": {
         "materialized": "table"
       }
+    },
+    "test.simple.source_not_null_imdb_movies_ratings_X.e684bf90f4": {
+      "alias": "source_not_null_imdb_movies_ratings_X",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "X",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "store_failures": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "created_at": 1697205181.009168,
+      "database": "database",
+      "deferred": false,
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_not_null"
+        ],
+        "nodes": [
+          "source.simple.main.movies_ratings"
+        ]
+      },
+      "description": "",
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "sources.imdb",
+      "fqn": [
+        "simple",
+        "source_not_null_imdb_movies_ratings_X"
+      ],
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "source_not_null_imdb_movies_ratings_X",
+      "original_file_path": "models/source.yml",
+      "package_name": "simple",
+      "patch_path": null,
+      "path": "source_not_null_imdb_movies_ratings_X.sql",
+      "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
+      "refs": [],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "main_dbt_test__audit",
+      "sources": [
+        [
+          "imdb",
+          "movies_ratings"
+        ]
+      ],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "X",
+          "model": "{{ get_where_subquery(source('imdb', 'movies_ratings')) }}"
+        },
+        "name": "not_null",
+        "namespace": null
+      },
+      "unique_id": "test.simple.source_not_null_imdb_movies_ratings_X.e684bf90f4",
+      "unrendered_config": {}
     }
   },
   "parent_map": {
@@ -7115,18 +7195,30 @@
     "model.simple.top_animations": [
       "model.simple.movies_ratings_simplified"
     ],
-    "source.simple.main.movies_ratings": []
+    "source.simple.main.movies_ratings": [],
+    "test.simple.source_not_null_imdb_movies_ratings_X.e684bf90f4": [
+      "source.simple.main.movies_ratings"
+    ]
   },
   "selectors": {},
   "sources": {
     "source.simple.main.movies_ratings": {
-      "columns": {},
+      "columns": {
+        "X": {
+          "data_type": null,
+          "description": "",
+          "meta": {},
+          "name": "X",
+          "quote": null,
+          "tags": []
+        }
+      },
       "config": {
         "enabled": true
       },
-      "created_at": 1696859933.549542,
+      "created_at": 1697205181.0098429,
       "database": "database",
-      "description": "Ratings by movie",
+      "description": "Ratings by movie\n",
       "external": null,
       "fqn": [
         "simple",

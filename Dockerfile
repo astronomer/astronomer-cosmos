@@ -3,7 +3,7 @@ FROM quay.io/astronomer/astro-runtime:10.4.0-base
 #   astro dev upgrade-test --runtime-version 10.4.0
 #     results in: tests\upgrade-test-10.0.0--10.4.0\dag-test-report.html
 #       4 fails predictable, not sqlite etc, but 8 passes included various cosmos tests >> upgrade, modify Dockerfile and astro dev restart
-#       
+#
 #         before in UI Astronomer Runtime 10.0.0 based on Airflow 2.8.0+astro.1
 #         after  in UI Astronomer Runtime 10.4.0 based on Airflow 2.8.2+astro.1
 #         trigger basic_cosmos_dag SUCCESS

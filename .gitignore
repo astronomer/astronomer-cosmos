@@ -10,4 +10,4 @@ profiles.yml
 dags/dbt/jaffle_shop/profiles.yml
 token.txt
 
-upgrade-test* 
+upgrade-test*

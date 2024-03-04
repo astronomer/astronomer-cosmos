@@ -1,0 +1,29 @@
+name: Astronomer CI - Deploy code
+# https://docs.astronomer.io/astro/first-dag-github-actions
+# https://docs.astronomer.io/astro/set-up-ci-cd
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploymentId:
+        description: "Deployment ID"
+        required: true
+        type: string
+      apiToken:
+        description: "Astro API Token"
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+
+env:
+  ASTRO_API_TOKEN: ${{ inputs.apiToken || secrets.ASTRO_API_TOKEN }}
+  DEPLOYMENT_ID: ${{ inputs.deploymentId || vars.DEPLOYMENT_ID }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to Astro
+      uses: astronomer/deploy-action@v0.2

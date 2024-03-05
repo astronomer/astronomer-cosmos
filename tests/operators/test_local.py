@@ -713,7 +713,7 @@ def test_operator_execute_deps_parameters(
     mock_exception_handling,
     mock_store_compiled_sql,
     invocation_mode,
-    tmp_path
+    tmp_path,
 ):
     project_dir = tmp_path / "mock_project_tmp_dir"
     project_dir.mkdir()

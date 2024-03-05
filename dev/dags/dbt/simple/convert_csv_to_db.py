@@ -1,5 +1,6 @@
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 df = pd.read_csv("imdb.csv")
 conn = sqlite3.connect("imdb.db")

@@ -9,13 +9,13 @@ from airflow.utils.task_group import TaskGroup
 from packaging import version
 
 from cosmos.airflow.graph import (
+    _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_leaves,
     calculate_operator_class,
     create_task_metadata,
     create_test_task_metadata,
     generate_task_or_group,
-    _snake_case_to_camelcase,
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (

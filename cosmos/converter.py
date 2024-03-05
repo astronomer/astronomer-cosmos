@@ -3,19 +3,19 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from typing import Any, Callable
-import copy
 from warnings import warn
 
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
-from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
@@ -221,8 +221,8 @@ class DbtToAirflowConverter:
 
         validate_adapted_user_config(execution_config, project_config, render_config)
 
-        env_vars = project_config.env_vars or operator_args.pop("env", None)
-        dbt_vars = project_config.dbt_vars or operator_args.pop("vars", None)
+        env_vars = project_config.env_vars or operator_args.get("env")
+        dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
         # Previously, we were creating a cosmos.dbt.project.DbtProject
         # DbtProject has now been replaced with ProjectConfig directly
@@ -246,6 +246,7 @@ class DbtToAirflowConverter:
         task_args = {
             **operator_args,
             "project_dir": execution_config.project_path,
+            "partial_parse": project_config.partial_parse,
             "profile_config": profile_config,
             "emit_datasets": render_config.emit_datasets,
             "env": env_vars,
@@ -253,6 +254,8 @@ class DbtToAirflowConverter:
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path
+        if execution_config.invocation_mode:
+            task_args["invocation_mode"] = execution_config.invocation_mode
 
         validate_arguments(
             render_config.select,

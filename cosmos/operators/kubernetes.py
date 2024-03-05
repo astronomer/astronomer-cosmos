@@ -3,23 +3,22 @@ from __future__ import annotations
 from os import PathLike
 from typing import Any, Callable, Sequence
 
+from airflow.models import TaskInstance
 from airflow.utils.context import Context, context_merge
 
-from cosmos.log import get_logger
 from cosmos.config import ProfileConfig
+from cosmos.dbt.parser.output import extract_log_issues
+from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtLSMixin,
     DbtRunMixin,
+    DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
     DbtTestMixin,
-    DbtLSMixin,
-    DbtRunOperationMixin,
 )
-
-from airflow.models import TaskInstance
-from cosmos.dbt.parser.output import extract_log_issues
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -44,7 +43,7 @@ except ImportError:
         )
 
 
-class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):  # type: ignore
+class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 
@@ -73,7 +72,7 @@ class DbtKubernetesBaseOperator(KubernetesPodOperator, AbstractDbtBaseOperator):
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
-        result = super().execute(context)
+        result = KubernetesPodOperator.execute(self, context)
         logger.info(result)
 
     def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None:
@@ -102,6 +101,8 @@ class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core build command.
     """
+
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
 
 class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):

@@ -104,7 +104,6 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 
     execution_config = ExecutionConfig(
         dbt_executable_path=f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt",
-        execution_mode=ExecutionMode.VIRTUALENV,
     )
 
     my_cosmos_dag = DbtDag(

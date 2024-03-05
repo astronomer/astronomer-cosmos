@@ -11,16 +11,16 @@ import os
 from pathlib import Path
 
 from airflow import DAG
-from airflow.hooks.base import BaseHook
-from airflow.exceptions import AirflowNotFoundException
 from airflow.decorators import task
+from airflow.exceptions import AirflowNotFoundException
+from airflow.hooks.base import BaseHook
 from pendulum import datetime
 
 from cosmos import ProfileConfig
 from cosmos.operators import (
     DbtDocsAzureStorageOperator,
-    DbtDocsS3Operator,
     DbtDocsGCSOperator,
+    DbtDocsS3Operator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 

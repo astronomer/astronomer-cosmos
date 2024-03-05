@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
-from functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
-from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
+from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -85,11 +85,16 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
-    def run_subprocess(self, *args: Any, command: list[str], **kwargs: Any) -> FullOutputSubprocessResult:
+    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         if self.py_requirements:
             command[0] = self.venv_dbt_path
 
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(command, *args, **kwargs)
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+            command=command,
+            env=env,
+            cwd=cwd,
+            output_encoding=self.output_encoding,
+        )
         return subprocess_result
 
     def execute(self, context: Context) -> None:
@@ -99,7 +104,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         logger.info(output)
 
 
-class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):
+class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core build command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.

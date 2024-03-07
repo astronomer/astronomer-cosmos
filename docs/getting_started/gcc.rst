@@ -49,6 +49,8 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 
 Make sure to rename the ``<your-adapter>`` value below to your adapter's Python package (i.e. ``dbt-snowflake`` or ``dbt-bigquery``)
 
+If you need to modify the pip install options, you can do so by adding ``pip_install_options`` to the ``operator_args`` dictionary. For example, if you wanted to install packages from local wheels you could set it too: ``["--no-index", "--find-links=/path/to/wheels"]``. All options can be found here: <https://pip.pypa.io/en/stable/cli/pip_install/>
+
 .. code-block:: python
 
     from cosmos import DbtDag, ProjectConfig, ProfileConfig, ExecutionConfig

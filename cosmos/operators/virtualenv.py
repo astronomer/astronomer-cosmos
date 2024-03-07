@@ -38,6 +38,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     :param py_requirements: If defined, creates a virtual environment with the specified dependencies. Example:
            ["dbt-postgres==1.5.0"]
+    :param pip_install_options: Pip options to use when installing Python dependencies. Example: ["--upgrade", "--no-cache-dir"]
     :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the dbt job requires it.
@@ -46,10 +47,12 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def __init__(
         self,
         py_requirements: list[str] | None = None,
+        pip_install_options: list[str] | None = None,
         py_system_site_packages: bool = False,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
+        self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
         self._venv_tmp_dir: None | TemporaryDirectory[str] = None
@@ -62,7 +65,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         Path to the dbt binary within a Python virtualenv.
 
         The first time this property is called, it creates a virtualenv and installs the dependencies based on the
-        self.py_requirements and self.py_system_site_packages. This value is cached for future calls.
+        self.py_requirements, self.pip_install_options, and self.py_system_site_packages. This value is cached for future calls.
         """
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
         # For this reason, we are not using contexts at this point.
@@ -73,6 +76,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,
             requirements=self.py_requirements,
+            pip_install_options=self.pip_install_options,
         )
         dbt_binary = Path(py_interpreter).parent / "dbt"
         cmd_output = self.subprocess_hook.run_command(

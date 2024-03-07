@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 from typing import Any
 
 import pytest
 import yaml
 from pydantic.error_wrappers import ValidationError
 
-from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
 from cosmos.exceptions import CosmosValueError
+from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
 
 
 class TestProfileMapping(BaseProfileMapping):

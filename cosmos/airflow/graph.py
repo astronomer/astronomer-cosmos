@@ -1,28 +1,37 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos.config import RenderConfig
 from cosmos.constants import (
+    DEFAULT_DBT_RESOURCES,
+    TESTABLE_DBT_RESOURCES,
     DbtResourceType,
+    ExecutionMode,
     TestBehavior,
     TestIndirectSelection,
-    ExecutionMode,
-    TESTABLE_DBT_RESOURCES,
-    DEFAULT_DBT_RESOURCES,
 )
-from cosmos.config import RenderConfig
 from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from typing import Union
-
 
 logger = get_logger(__name__)
+
+
+def _snake_case_to_camelcase(value: str) -> str:
+    """Convert snake_case to CamelCase
+
+    Example: foo_bar_baz -> FooBarBaz
+
+    :param value: Value to convert to CamelCase
+    :return: Converted value
+    """
+    return "".join(x.capitalize() for x in value.lower().split("_"))
 
 
 def calculate_operator_class(
@@ -37,7 +46,9 @@ def calculate_operator_class(
     :returns: path string to the correspondent Cosmos Airflow operator
     (e.g. cosmos.operators.localDbtSnapshotLocalOperator)
     """
-    return f"cosmos.operators.{execution_mode.value}.{dbt_class}{execution_mode.value.capitalize()}Operator"
+    return (
+        f"cosmos.operators.{execution_mode.value}.{dbt_class}{_snake_case_to_camelcase(execution_mode.value)}Operator"
+    )
 
 
 def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:

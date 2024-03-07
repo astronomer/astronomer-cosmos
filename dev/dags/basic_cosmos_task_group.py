@@ -1,15 +1,16 @@
 """
 An example DAG that uses Cosmos to render a dbt project as a TaskGroup.
 """
-import os
 
+import os
 from datetime import datetime
 from pathlib import Path
 
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, RenderConfig, ExecutionConfig
+from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import InvocationMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -24,7 +25,7 @@ profile_config = ProfileConfig(
     ),
 )
 
-shared_execution_config = ExecutionConfig()
+shared_execution_config = ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER)
 
 
 @dag(

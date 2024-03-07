@@ -1,9 +1,10 @@
 "Tests for the Athena profile."
 
 import json
-from collections import namedtuple
 import sys
+from collections import namedtuple
 from unittest.mock import MagicMock, patch
+
 import pytest
 from airflow.models.connection import Connection
 

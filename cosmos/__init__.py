@@ -5,18 +5,18 @@ Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
 Contains dags, task groups, and operators.
 """
-__version__ = "1.3.1"
+__version__ = "1.4.0a1"
 
 
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.config import (
-    ProjectConfig,
-    ProfileConfig,
     ExecutionConfig,
+    ProfileConfig,
+    ProjectConfig,
     RenderConfig,
 )
-from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
 from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (
@@ -88,6 +88,37 @@ except ImportError:
         "kubernetes",
     )
 
+try:
+    from cosmos.operators.azure_container_instance import (
+        DbtLSAzureContainerInstanceOperator,
+        DbtRunAzureContainerInstanceOperator,
+        DbtRunOperationAzureContainerInstanceOperator,
+        DbtSeedAzureContainerInstanceOperator,
+        DbtSnapshotAzureContainerInstanceOperator,
+        DbtTestAzureContainerInstanceOperator,
+    )
+except ImportError:
+    DbtLSAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtLSAzureContainerInstanceOperator", "azure-container-instance"
+    )
+    DbtRunAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtRunAzureContainerInstanceOperator", "azure-container-instance"
+    )
+    DbtRunOperationAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtRunOperationAzureContainerInstanceOperator",
+        "azure-container-instance",
+    )
+    DbtSeedAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtSeedAzureContainerInstanceOperator", "azure-container-instance"
+    )
+    DbtSnapshotAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtSnapshotAzureContainerInstanceOperator",
+        "azure-container-instance",
+    )
+    DbtTestAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator", "azure-container-instance"
+    )
+
 __all__ = [
     "ProjectConfig",
     "ProfileConfig",
@@ -117,6 +148,12 @@ __all__ = [
     "DbtTestKubernetesOperator",
     "DbtBuildKubernetesOperator",
     "DbtSnapshotKubernetesOperator",
+    "DbtLSAzureContainerInstanceOperator",
+    "DbtRunOperationAzureContainerInstanceOperator",
+    "DbtRunAzureContainerInstanceOperator",
+    "DbtSeedAzureContainerInstanceOperator",
+    "DbtTestAzureContainerInstanceOperator",
+    "DbtSnapshotAzureContainerInstanceOperator",
     "ExecutionMode",
     "LoadMode",
     "TestBehavior",

@@ -2,15 +2,16 @@
 This module contains a base class that other profile mappings should
 inherit from to ensure consistency.
 """
+
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any, Optional, Literal, Dict, TYPE_CHECKING
 import warnings
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
+import yaml
 from airflow.hooks.base import BaseHook
 from pydantic import dataclasses
-import yaml
 
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger

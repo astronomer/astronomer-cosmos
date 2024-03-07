@@ -1,13 +1,14 @@
 """
 This module contains a function to render a dbt project as an Airflow DAG.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 from airflow.models.dag import DAG
 
-from cosmos.converter import airflow_kwargs, specific_kwargs, DbtToAirflowConverter
+from cosmos.converter import DbtToAirflowConverter, airflow_kwargs, specific_kwargs
 
 
 class DbtDag(DAG, DbtToAirflowConverter):

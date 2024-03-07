@@ -1,12 +1,14 @@
 """
 This module contains a function to render a dbt project as an Airflow Task Group.
 """
+
 from __future__ import annotations
+
 from typing import Any
 
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.converter import airflow_kwargs, specific_kwargs, DbtToAirflowConverter
+from cosmos.converter import DbtToAirflowConverter, airflow_kwargs, specific_kwargs
 
 
 class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):

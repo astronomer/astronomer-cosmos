@@ -1,6 +1,7 @@
 """
 Script to generate a dedicated docs page per profile mapping.
 """
+
 from __future__ import annotations
 
 import os
@@ -8,7 +9,8 @@ from dataclasses import dataclass
 from typing import Type
 
 from jinja2 import Environment, FileSystemLoader
-from cosmos.profiles import profile_mappings, BaseProfileMapping
+
+from cosmos.profiles import BaseProfileMapping, profile_mappings
 
 
 @dataclass

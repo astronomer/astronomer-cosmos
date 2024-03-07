@@ -5,7 +5,9 @@ Generating Docs
 
 dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-docs.s3-website-us-east-1.amazonaws.com/>`_.
 
-Many users choose to generate and serve these docs on a static website. This is a great way to share your data models with your team and other stakeholders.
+After generating the dbt docs, you can host them natively within Airflow via the Cosmos Airflow plugin; see `Hosting Docs <hosting-docs.html>`__ for more information.
+
+Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
 Cosmos offers two pre-built ways of generating and uploading dbt docs and a fallback option to run custom code after the docs are generated:
 

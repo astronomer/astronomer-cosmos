@@ -7,9 +7,9 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
-from typing import NamedTuple
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
+from typing import NamedTuple
 
 from airflow.hooks.base import BaseHook
 
@@ -105,3 +105,9 @@ class FullOutputSubprocessHook(BaseHook):
         logger.info("Sending SIGTERM signal to process group")
         if self.sub_process and hasattr(self.sub_process, "pid"):
             os.killpg(os.getpgid(self.sub_process.pid), signal.SIGTERM)
+
+    def send_sigint(self) -> None:
+        """Sends SIGINT signal to ``self.sub_process`` if one exists."""
+        logger.info("Sending SIGINT signal to process group")
+        if self.sub_process and hasattr(self.sub_process, "pid"):
+            os.killpg(os.getpgid(self.sub_process.pid), signal.SIGINT)

@@ -1,15 +1,16 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
     DbtLSMixin,
-    DbtSeedMixin,
-    DbtRunOperationMixin,
-    DbtTestMixin,
-    DbtSnapshotMixin,
     DbtRunMixin,
+    DbtRunOperationMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+    DbtTestMixin,
 )
 
 
@@ -50,8 +51,10 @@ def test_dbt_mixin_base_cmd(dbt_command, dbt_operator_class):
     assert [dbt_command] == dbt_operator_class.base_cmd
 
 
-@pytest.mark.parametrize("dbt_operator_class", [DbtSeedMixin, DbtRunMixin])
-@pytest.mark.parametrize("full_refresh, expected_flags", [(True, ["--full-refresh"]), (False, [])])
+@pytest.mark.parametrize("dbt_operator_class", [DbtSeedMixin, DbtRunMixin, DbtBuildMixin])
+@pytest.mark.parametrize(
+    "full_refresh, expected_flags", [("True", ["--full-refresh"]), (True, ["--full-refresh"]), (False, [])]
+)
 def test_dbt_mixin_add_cmd_flags_full_refresh(full_refresh, expected_flags, dbt_operator_class):
     dbt_mixin = dbt_operator_class(full_refresh=full_refresh)
     flags = dbt_mixin.add_cmd_flags()

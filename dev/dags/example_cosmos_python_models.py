@@ -17,7 +17,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig
+from cosmos import DbtDag, ProfileConfig, ProjectConfig
 from cosmos.profiles import DatabricksTokenProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -29,7 +29,7 @@ profile_config = ProfileConfig(
     target_name="dev",
     profile_mapping=DatabricksTokenProfileMapping(
         conn_id="databricks_default",
-        profile_args={"schema": SCHEMA},
+        profile_args={"schema": SCHEMA, "connect_retries": 3},
     ),
 )
 

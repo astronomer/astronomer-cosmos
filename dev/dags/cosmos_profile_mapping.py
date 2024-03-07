@@ -3,6 +3,7 @@ An example DAG that uses Cosmos to render a dbt project as a TaskGroup.
 
 It uses the automatic profile rendering from an Airflow connection.
 """
+
 import os
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +11,7 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig
+from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
 from cosmos.profiles import get_automatic_profile_mapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"

@@ -51,7 +51,7 @@ To use this:
         ),
         render_config=RenderConfig(
             load_method=LoadMode.DBT_MANIFEST,
-        )
+        ),
         # ...,
     )
 

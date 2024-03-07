@@ -1,9 +1,9 @@
 from .local import DbtBuildLocalOperator as DbtBuildOperator
 from .local import DbtDepsLocalOperator as DbtDepsOperator
 from .local import DbtDocsAzureStorageLocalOperator as DbtDocsAzureStorageOperator
+from .local import DbtDocsGCSLocalOperator as DbtDocsGCSOperator
 from .local import DbtDocsLocalOperator as DbtDocsOperator
 from .local import DbtDocsS3LocalOperator as DbtDocsS3Operator
-from .local import DbtDocsGCSLocalOperator as DbtDocsGCSOperator
 from .local import DbtLSLocalOperator as DbtLSOperator
 from .local import DbtRunLocalOperator as DbtRunOperator
 from .local import DbtRunOperationLocalOperator as DbtRunOperationOperator

@@ -9,6 +9,7 @@ from airflow.utils.task_group import TaskGroup
 from packaging import version
 
 from cosmos.airflow.graph import (
+    _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_leaves,
     calculate_operator_class,
@@ -423,3 +424,10 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         },
         **additional_arguments,
     }
+
+
+@pytest.mark.parametrize(
+    "input,expected", [("snake_case", "SnakeCase"), ("snake_case_with_underscores", "SnakeCaseWithUnderscores")]
+)
+def test_snake_case_to_camelcase(input, expected):
+    assert _snake_case_to_camelcase(input) == expected

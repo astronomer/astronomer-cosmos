@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Sequence, Tuple
 from abc import ABCMeta, abstractmethod
+from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
+from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -51,6 +51,9 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
         exit code will be treated as a failure.
+    :param partial_parse: If True (default), then the operator will use the
+        ``partial_parse.msgpack`` during execution if it exists. If False, then
+        a flag will be explicitly set to turn off partial parsing.
     :param cancel_query_on_kill: If true, then cancel any running queries when the task's on_kill() is executed.
         Otherwise, the query will keep running when the task is killed.
     :param dbt_executable_path: Path to dbt executable can be used with venv
@@ -59,7 +62,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
     """
 
-    template_fields: Sequence[str] = ("env", "vars")
+    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models")
     global_flags = (
         "project_dir",
         "select",
@@ -68,13 +71,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         "vars",
         "models",
     )
-    global_boolean_flags = (
-        "no_version_check",
-        "cache_selected_only",
-        "fail_fast",
-        "quiet",
-        "warn_error",
-    )
+    global_boolean_flags = ("no_version_check", "cache_selected_only", "fail_fast", "quiet", "warn_error")
 
     intercept_flag = True
 
@@ -105,6 +102,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         append_env: bool = False,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
+        partial_parse: bool = True,
         cancel_query_on_kill: bool = True,
         dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
@@ -131,6 +129,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.append_env = append_env
         self.output_encoding = output_encoding
         self.skip_exit_code = skip_exit_code
+        self.partial_parse = partial_parse
         self.cancel_query_on_kill = cancel_query_on_kill
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
@@ -219,6 +218,9 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
 
         dbt_cmd.extend(self.dbt_cmd_global_flags)
 
+        if not self.partial_parse:
+            dbt_cmd.append("--no-partial-parse")
+
         dbt_cmd.extend(self.base_cmd)
 
         if self.indirect_selection:
@@ -252,6 +254,26 @@ class DbtBuildMixin:
     base_cmd = ["build"]
     ui_color = "#8194E0"
 
+    template_fields: Sequence[str] = ("full_refresh",)
+
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
+        self.full_refresh = full_refresh
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
+            flags.append("--full-refresh")
+
+        return flags
+
 
 class DbtLSMixin:
     """
@@ -274,13 +296,20 @@ class DbtSeedMixin:
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags = []
-        if self.full_refresh is True:
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
             flags.append("--full-refresh")
 
         return flags
@@ -306,13 +335,20 @@ class DbtRunMixin:
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags = []
-        if self.full_refresh is True:
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
             flags.append("--full-refresh")
 
         return flags

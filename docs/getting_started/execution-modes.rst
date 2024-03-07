@@ -3,18 +3,19 @@
 Execution Modes
 ===============
 
-Cosmos can run ``dbt`` commands using four different approaches, called ``execution modes``:
+Cosmos can run ``dbt`` commands using five different approaches, called ``execution modes``:
 
 1. **local**: Run ``dbt`` commands using a local ``dbt`` installation (default)
 2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
 3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
+5. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
 
 .. list-table:: Execution Modes Comparison
-   :widths: 25 25 25 25
+   :widths: 20 20 20 20 20
    :header-rows: 1
 
    * - Execution Mode
@@ -37,6 +38,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - Slow
      - High
      - No
+   * - Azure Container Instance
+     - Slow
+     - High
+     - No
 
 Local
 -----
@@ -50,6 +55,9 @@ The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Ai
 
 If ``dbt`` was not installed as part of the Cosmos packages,
 users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
+
+By default, if Cosmos sees a ``partial_parse.msgpack`` in the target directory of the dbt project directory when using ``local`` execution, it will use this for partial parsing to speed up task execution.
+This can be turned off by setting ``partial_parse=False`` in the ``ProjectConfig``.
 
 When using the ``local`` execution mode, Cosmos converts Airflow Connections into a native ``dbt`` profiles file (``profiles.yml``).
 
@@ -71,6 +79,7 @@ The ``virtualenv`` mode isolates the Airflow worker dependencies from ``dbt`` by
 In this case, users are responsible for declaring which version of ``dbt`` they want to use by giving the argument ``py_requirements``. This argument can be set directly in operator instances or when instantiating ``DbtDag`` and ``DbtTaskGroup`` as part of ``operator_args``.
 
 Similar to the ``local`` execution mode, Cosmos converts Airflow Connections into a way ``dbt`` understands them by creating a ``dbt`` profile file (``profiles.yml``).
+Also similar to the ``local`` execution mode, Cosmos will by default attempt to use a ``partial_parse.msgpack`` if one exists to speed up parsing.
 
 Some drawbacks of this approach:
 
@@ -117,7 +126,7 @@ Example DAG:
 Kubernetes
 ----------
 
-Lastly, the ``kubernetes`` approach is the most isolated way of running ``dbt`` since the ``dbt`` run commands from within a Kubernetes Pod, usually in a separate host.
+The ``kubernetes`` approach is a very isolated way of running ``dbt`` since the ``dbt`` run commands from within a Kubernetes Pod, usually in a separate host.
 
 It assumes the user has a Kubernetes cluster. It also expects the user to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading the user to declare secrets in two places (Airflow and Docker container).
 
@@ -148,3 +157,60 @@ Example DAG:
             "secrets": [postgres_password_secret],
         },
     )
+
+Azure Container Instance
+------------------------
+.. versionadded:: 1.4
+Similar to the ``kubernetes`` approach, using ``Azure Container Instances`` as the execution mode gives a very isolated way of running ``dbt``, since the ``dbt`` run itself is run within a container running in an Azure Container Instance.
+
+This execution mode requires the user has an Azure environment that can be used to run Azure Container Groups in (see :ref:`azure-container-instance` for more details on the exact requirements). Similarly to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+
+Each task will create a new container on Azure, giving full isolation. This, however, comes at the cost of speed, as this separation of tasks introduces some overhead. Please checkout the step-by-step guide for using Azure Container Instance as the execution mode
+
+
+.. code-block:: python
+
+    docker_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.AZURE_CONTAINER_INSTANCE
+        ),
+        operator_args={
+            "ci_conn_id": "aci",
+            "registry_conn_id": "acr",
+            "resource_group": "my-rg",
+            "name": "my-aci-{{ ti.task_id.replace('.','-').replace('_','-') }}",
+            "region": "West Europe",
+            "image": "dbt-jaffle-shop:1.0.0",
+        },
+    )
+
+
+.. _invocation_modes:
+Invocation Modes
+================
+.. versionadded:: 1.4
+
+For ``ExecutionMode.LOCAL`` execution mode, Cosmos supports two invocation modes for running dbt:
+
+1. ``InvocationMode.SUBPROCESS``: In this mode, Cosmos runs dbt cli commands using the Python ``subprocess`` module and parses the output to capture logs and to raise exceptions.
+
+2. ``InvocationMode.DBT_RUNNER``: In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
+   In order to use this mode, dbt must be installed in the same local environment. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and is faster than ``InvocationMode.SUBPROCESS``. \
+   This mode requires dbt version 1.5.0 or higher. It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
+
+The invocation mode can be set in the ``ExecutionConfig`` as shown below:
+
+.. code-block:: python
+
+    from cosmos.constants import InvocationMode
+
+    dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.LOCAL,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+        ),
+    )
+
+If the invocation mode is not set, Cosmos will attempt to use ``InvocationMode.DBT_RUNNER`` if dbt is installed in the same environment as the worker, otherwise it will fall back to ``InvocationMode.SUBPROCESS``.

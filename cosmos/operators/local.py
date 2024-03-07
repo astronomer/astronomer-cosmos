@@ -298,6 +298,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 env.update(env_vars)
 
                 flags = [
+                    "--project-dir",
+                    str(tmp_project_dir),
                     "--profiles-dir",
                     str(profile_path.parent),
                     "--profile",

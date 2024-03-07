@@ -50,6 +50,7 @@ def test_run_command(
         install_deps=True,
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
+        pip_install_options=["--test-flag"],
         py_requirements=["dbt-postgres==1.6.0b1"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,

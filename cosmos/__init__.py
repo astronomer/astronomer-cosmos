@@ -5,18 +5,18 @@ Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
 Contains dags, task groups, and operators.
 """
-__version__ = "1.3.2"
+__version__ = "1.4.0a1"
 
 
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.config import (
-    ProjectConfig,
-    ProfileConfig,
     ExecutionConfig,
+    ProfileConfig,
+    ProjectConfig,
     RenderConfig,
 )
-from cosmos.constants import LoadMode, TestBehavior, ExecutionMode
+from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
 from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (

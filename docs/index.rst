@@ -58,7 +58,7 @@ This will generate an Airflow DAG that looks like this:
 Getting Started
 _______________
 
-Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/#quickstart>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ and at the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
+Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ and at the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
 
 Changelog

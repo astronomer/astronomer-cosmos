@@ -8,12 +8,12 @@ from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtLSMixin,
     DbtRunMixin,
+    DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
     DbtTestMixin,
-    DbtLSMixin,
-    DbtRunOperationMixin,
 )
 
 logger = get_logger(__name__)
@@ -68,6 +68,8 @@ class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBaseOperator):
     """
     Executes a dbt core build command.
     """
+
+    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
 
 class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):

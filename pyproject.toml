@@ -171,6 +171,7 @@ dependencies = [
     "sphinx-autoapi",
     "openlineage-airflow",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "pydantic>=1.10.0",
 ]
 
 [tool.hatch.envs.docs.scripts]
@@ -196,7 +197,7 @@ no_warn_unused_ignores = true
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
-select = ["C901"]
+select = ["C901", "I"]
 [tool.ruff.lint.mccabe]
 max-complexity = 8
 

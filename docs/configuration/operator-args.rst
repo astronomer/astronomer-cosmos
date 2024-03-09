@@ -54,6 +54,7 @@ dbt-related
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
 - ``vars``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.dbt_vars`` instead) Supply variables to the project. This argument overrides variables defined in the ``dbt_project.yml``.
 - ``warn_error``: convert ``dbt`` warnings into errors.
+- ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
 
 Airflow-related
 ...............
@@ -88,3 +89,33 @@ Sample usage
             "skip_exit_code": 1,
         }
     )
+
+
+Template fields
+---------------
+
+Some of the operator args are `template fields <https://airflow.apache.org/docs/apache-airflow/stable/howto/custom-operator.html#templating>`_ for your convenience.
+
+These template fields can be useful for hooking into Airflow `Params <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/params.html>`_, or for more advanced customization with `XComs <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html>`_.
+
+The following operator args support templating, and are accessible both through the  ``DbtDag`` and ``DbtTaskGroup`` constructors in addition to being accessible standalone:
+
+- ``env``
+- ``vars``
+- ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
+
+.. note::
+    Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+
+The following template fields are only selectable when using the operators in a standalone context (starting in Cosmos 1.4):
+
+- ``select``
+- ``exclude``
+- ``selector``
+- ``models``
+
+Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing,  the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
+
+Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
+This is provided for telemetry on task execution, and is not an operator arg.
+For more information about this, see the `Compiled SQL <compiled-sql.html>`_ docs.

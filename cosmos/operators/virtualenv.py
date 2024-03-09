@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
-from functools import cached_property
 from airflow.utils.python_virtualenv import prepare_virtualenv
-from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
+from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -37,6 +37,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     :param py_requirements: If defined, creates a virtual environment with the specified dependencies. Example:
            ["dbt-postgres==1.5.0"]
+    :param pip_install_options: Pip options to use when installing Python dependencies. Example: ["--upgrade", "--no-cache-dir"]
     :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the dbt job requires it.
@@ -45,10 +46,12 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def __init__(
         self,
         py_requirements: list[str] | None = None,
+        pip_install_options: list[str] | None = None,
         py_system_site_packages: bool = False,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
+        self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
         super().__init__(**kwargs)
         self._venv_tmp_dir: None | TemporaryDirectory[str] = None
@@ -61,7 +64,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         Path to the dbt binary within a Python virtualenv.
 
         The first time this property is called, it creates a virtualenv and installs the dependencies based on the
-        self.py_requirements and self.py_system_site_packages. This value is cached for future calls.
+        self.py_requirements, self.pip_install_options, and self.py_system_site_packages. This value is cached for future calls.
         """
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
         # For this reason, we are not using contexts at this point.
@@ -72,6 +75,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,
             requirements=self.py_requirements,
+            pip_install_options=self.pip_install_options,
         )
         dbt_binary = Path(py_interpreter).parent / "dbt"
         cmd_output = self.subprocess_hook.run_command(
@@ -85,11 +89,16 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
         return str(dbt_binary)
 
-    def run_subprocess(self, *args: Any, command: list[str], **kwargs: Any) -> FullOutputSubprocessResult:
+    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         if self.py_requirements:
             command[0] = self.venv_dbt_path
 
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(command, *args, **kwargs)
+        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+            command=command,
+            env=env,
+            cwd=cwd,
+            output_encoding=self.output_encoding,
+        )
         return subprocess_result
 
     def execute(self, context: Context) -> None:
@@ -99,7 +108,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         logger.info(output)
 
 
-class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):
+class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core build command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.

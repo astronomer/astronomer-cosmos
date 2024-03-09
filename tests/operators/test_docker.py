@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import pytest
 
+import pytest
 from airflow.utils.context import Context
 from pendulum import datetime
 

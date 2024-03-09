@@ -4,11 +4,12 @@ import itertools
 import json
 import os
 import tempfile
-import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
+
+import yaml
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
@@ -22,7 +23,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks, copy_msgpack_for_partial_parse, environ
+from cosmos.dbt.project import copy_msgpack_for_partial_parse, create_symlinks, environ
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -110,8 +111,8 @@ def parse_dbt_ls_output(project_path: Path, ls_stdout: str) -> dict[str, DbtNode
                 resource_type=DbtResourceType(node_dict["resource_type"]),
                 depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                 file_path=project_path / node_dict["original_file_path"],
-                tags=node_dict["tags"],
-                config=node_dict["config"],
+                tags=node_dict.get("tags", []),
+                config=node_dict.get("config", {}),
             )
             nodes[node.unique_id] = node
             logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)

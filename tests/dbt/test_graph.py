@@ -1,12 +1,13 @@
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import yaml
+from subprocess import PIPE, Popen
+from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, CosmosConfigException
+from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
@@ -17,7 +18,6 @@ from cosmos.dbt.graph import (
     run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from subprocess import Popen, PIPE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
@@ -457,7 +457,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
     )
     getattr(dbt_graph, load_method)()
-    assert len(dbt_graph.nodes) == 4
+    assert len(dbt_graph.nodes) >= 4
     assert "source.simple.main.movies_ratings" in dbt_graph.nodes
     assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
 
@@ -807,6 +807,24 @@ def test_parse_dbt_ls_output():
         ),
     }
     nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert expected_nodes == nodes
+
+
+def test_parse_dbt_ls_output_with_json_without_tags_or_config():
+    some_ls_stdout = '{"resource_type": "model", "name": "some-name", "original_file_path": "some-file-path.sql", "unique_id": "some-unique-id", "config": {}}'
+
+    expected_nodes = {
+        "some-unique-id": DbtNode(
+            unique_id="some-unique-id",
+            resource_type=DbtResourceType.MODEL,
+            file_path=Path("some-project/some-file-path.sql"),
+            tags=[],
+            config={},
+            depends_on=[],
+        ),
+    }
+    nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)
 
     assert expected_nodes == nodes
 

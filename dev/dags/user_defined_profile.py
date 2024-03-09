@@ -9,7 +9,7 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, RenderConfig, LoadMode
+from cosmos import DbtTaskGroup, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))

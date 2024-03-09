@@ -403,13 +403,12 @@ class DbtGraph:
             if not all(key in manifest for key in ["nodes", "sources", "exposures"]):
                 logger.error("Manifest file structure is not as expected.")
                 raise CosmosLoadDbtException("Invalid structure in manifest file")
-            
+
             # Further validation can be performed here, e.g., checking data types
             if not isinstance(manifest["nodes"], dict):
                 logger.error("Expected 'nodes' to be a dictionary.")
                 raise CosmosLoadDbtException("Invalid 'nodes' structure in manifest file")
 
-            
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
 
@@ -418,7 +417,6 @@ class DbtGraph:
                     logger.warning(f"Node {unique_id} missing one or more expected keys: {expected_keys}")
                     continue  # Skip this node or handle as needed
 
-                
                 node = DbtNode(
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),

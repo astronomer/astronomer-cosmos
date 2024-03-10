@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Union, Dict
+from typing import Any, Callable, Dict, Union
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG

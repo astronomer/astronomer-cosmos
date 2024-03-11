@@ -470,6 +470,12 @@ def test_converter_invocation_mode_added_to_task_args(
         assert "invocation_mode" not in kwargs["task_args"]
 
 
+@pytest.mark.parametrize(
+    "execution_mode,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, {}),
+    ],
+)
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
 def test_converter_contains_dbt_graph(mock_load_dbt_graph, execution_mode, operator_args):

@@ -222,7 +222,7 @@ def build_airflow_graph(
     render_config: RenderConfig,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-) -> Dict[str, Any]:
+) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
 
@@ -291,7 +291,6 @@ def build_airflow_graph(
             tasks_map[leaf_node_id] >> test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    return tasks_map
 
 
 def create_airflow_task_dependencies(

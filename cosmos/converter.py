@@ -265,7 +265,7 @@ class DbtToAirflowConverter:
             execution_mode=execution_config.execution_mode,
         )
 
-        self.tasks_map = build_airflow_graph(
+        build_airflow_graph(
             nodes=self.dbt_graph.filtered_nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,

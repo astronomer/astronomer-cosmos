@@ -234,14 +234,14 @@ class DbtToAirflowConverter:
         # To keep this logic working, if converter is given no ProfileConfig,
         #   we can create a default retaining this value to preserve this functionality.
         # We may want to consider defaulting this value in our actual ProjceConfig class?
-        dbt_graph = DbtGraph(
+        self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,
             execution_config=execution_config,
             profile_config=profile_config,
             dbt_vars=dbt_vars,
         )
-        dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
+        self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         task_args = {
             **operator_args,
@@ -266,7 +266,7 @@ class DbtToAirflowConverter:
         )
 
         build_airflow_graph(
-            nodes=dbt_graph.filtered_nodes,
+            nodes=self.dbt_graph.filtered_nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,
             execution_mode=execution_config.execution_mode,

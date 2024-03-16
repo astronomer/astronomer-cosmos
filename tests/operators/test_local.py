@@ -745,7 +745,7 @@ def test_operator_execute_deps_parameters(
     if invocation_mode == InvocationMode.SUBPROCESS:
         assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
     elif invocation_mode == InvocationMode.DBT_RUNNER:
-        mock_dbt_runner.all_args_list[0].kwargs["command"] == expected_call_kwargs
+        assert mock_dbt_runner.all_args_list[0].kwargs["command"] == expected_call_kwargs
 
 
 def test_dbt_docs_local_operator_with_static_flag():
@@ -757,17 +757,6 @@ def test_dbt_docs_local_operator_with_static_flag():
         dbt_cmd_flags=["--static"],
     )
     assert operator.required_files == ["static_index.html"]
-
-
-def test_dbt_docs_local_operator_with_no_write_json():
-    # Check when static flag is passed, the required files are correctly adjusted to a single file
-    operator = DbtDocsLocalOperator(
-        task_id="fake-task",
-        project_dir="fake-dir",
-        profile_config=profile_config,
-        dbt_cmd_global_flags=["--no-write-json"],
-    )
-    assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")

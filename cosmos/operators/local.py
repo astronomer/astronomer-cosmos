@@ -570,7 +570,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+    required_files = ["index.html", "manifest.json", "catalog.json"]
     base_cmd = ["docs", "generate"]
 
     def __init__(self, **kwargs: Any) -> None:

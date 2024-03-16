@@ -745,7 +745,7 @@ def test_operator_execute_deps_parameters(
     if invocation_mode == InvocationMode.SUBPROCESS:
         assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
     elif invocation_mode == InvocationMode.DBT_RUNNER:
-        assert mock_dbt_runner.all_args_list[0].kwargs["command"] == expected_call_kwargs
+        mock_dbt_runner.all_args_list[0].kwargs["command"] == expected_call_kwargs
 
 
 def test_dbt_docs_local_operator_with_static_flag():

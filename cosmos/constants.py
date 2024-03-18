@@ -14,7 +14,7 @@ DBT_TARGET_DIR_NAME = "target"
 DBT_PARTIAL_PARSE_FILE_NAME = "partial_parse.msgpack"
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
-DBT_PACKAGES_YML_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/packages.yml") 
+DBT_PACKAGES_YML_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/packages.yml")
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"

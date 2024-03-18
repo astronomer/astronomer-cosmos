@@ -13,11 +13,9 @@ def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool
     """Helper function to create symlinks to the dbt project files."""
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, "profiles.yml"]
 
-    if ignore_dbt_packages:
-        # Check for the presence of 'packages.yml' in the project directory:
-        if (project_path / "packages.yml").exists():
-            # This is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
-            ignore_paths.append("dbt_packages")
+    if ignore_dbt_packages && DBT_PACKAGES_CONFIG_PATH.exists():
+        # This is linked to dbt deps so if dbt deps is true and packages.yml exists, then ignore existing dbt_packages folder
+        ignore_paths.append("dbt_packages")
 
     for child_name in os.listdir(project_path):
         if child_name not in ignore_paths:

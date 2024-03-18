@@ -769,7 +769,7 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
         task_id="fake-task",
         project_dir="fake-dir",
         profile_config=profile_config,
-        dbt_cmd_flags=["--no-write-json"],
+        dbt_cmd_global_flags=["--no-write-json"],
     )
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 

@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-from cosmos.constants import DBT_LOG_DIR_NAME, DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
+from cosmos.constants import DBT_LOG_DIR_NAME, DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME, DBT_PACKAGES_CONFIG_PATH
 
 
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:

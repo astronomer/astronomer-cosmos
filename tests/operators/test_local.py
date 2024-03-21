@@ -332,6 +332,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
+        append_env=False
     )
     dbt_base_operator.env = {
         "start_date": "20220101",

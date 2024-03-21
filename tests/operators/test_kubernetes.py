@@ -85,6 +85,7 @@ def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock, b
         task_id="my-task",
         image="my_image",
         project_dir="my/dir",
+        append_env=False
     )
     dbt_kube_operator.env = {
         "start_date": "20220101",
@@ -254,7 +255,7 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
 
 
 def test_created_pod():
-    ls_kwargs = {"env_vars": {"FOO": "BAR"}, "namespace": "foo"}
+    ls_kwargs = {"env_vars": {"FOO": "BAR"}, "namespace": "foo", "append_env": False}
     ls_kwargs.update(base_kwargs)
     ls_operator = DbtLSKubernetesOperator(**ls_kwargs)
     ls_operator.hook = MagicMock()

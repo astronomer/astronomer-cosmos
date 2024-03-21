@@ -77,6 +77,7 @@ def test_dbt_docker_operator_get_env(p_context_to_airflow_vars: MagicMock, base_
         task_id="my-task",
         image="my_image",
         project_dir="my/dir",
+        append_env=False
     )
     dbt_base_operator.env = {
         "start_date": "20220101",

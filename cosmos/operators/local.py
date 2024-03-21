@@ -570,7 +570,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """
 
     ui_color = "#8194E0"
-    required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+    required_files = ["index.html", "manifest.json", "catalog.json"]
     base_cmd = ["docs", "generate"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -578,11 +578,13 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         self.check_static_flag()
 
     def check_static_flag(self) -> None:
-        flag = "--static"
         if self.dbt_cmd_flags:
-            if flag in self.dbt_cmd_flags:
+            if "--static" in self.dbt_cmd_flags:
                 # For the --static flag we only upload the generated static_index.html file
                 self.required_files = ["static_index.html"]
+        if self.dbt_cmd_global_flags:
+            if "--no-write-json" in self.dbt_cmd_global_flags and "graph.gpickle" in self.required_files:
+                self.required_files.remove("graph.gpickle")
 
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):

@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow.models.dag import DAG
+
 try:  # available since Airflow 2.4.0
     from airflow.operators.empty import EmptyOperator
 except ImportError:

@@ -81,11 +81,7 @@ def test_dbt_kubernetes_operator_get_env(p_context_to_airflow_vars: MagicMock, b
     If an end user passes in a
     """
     dbt_kube_operator = base_operator(
-        conn_id="my_airflow_connection",
-        task_id="my-task",
-        image="my_image",
-        project_dir="my/dir",
-        append_env=False
+        conn_id="my_airflow_connection", task_id="my-task", image="my_image", project_dir="my/dir", append_env=False
     )
     dbt_kube_operator.env = {
         "start_date": "20220101",

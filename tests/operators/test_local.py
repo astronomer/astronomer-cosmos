@@ -329,9 +329,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
     If an end user passes in a
     """
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="my-task",
-        project_dir="my/dir",
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir", append_env=False
     )
     dbt_base_operator.env = {
         "start_date": "20220101",
@@ -757,6 +755,21 @@ def test_dbt_docs_local_operator_with_static_flag():
         dbt_cmd_flags=["--static"],
     )
     assert operator.required_files == ["static_index.html"]
+
+
+def test_dbt_docs_local_operator_ignores_graph_gpickle():
+    # Check when --no-write-json is passed, graph.gpickle is removed.
+    # This is only currently relevant for subclasses, but will become more generally relevant in the future.
+    class CustomDbtDocsLocalOperator(DbtDocsLocalOperator):
+        required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+
+    operator = CustomDbtDocsLocalOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_global_flags=["--no-write-json"],
+    )
+    assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")

@@ -329,9 +329,7 @@ def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None
     If an end user passes in a
     """
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="my-task",
-        project_dir="my/dir",
+        profile_config=profile_config, task_id="my-task", project_dir="my/dir", append_env=False
     )
     dbt_base_operator.env = {
         "start_date": "20220101",
@@ -703,18 +701,26 @@ def test_dbt_docs_gcs_local_operator():
 @patch("cosmos.config.ProfileConfig.ensure_profile")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.run_subprocess")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_operator_execute_deps_parameters(
+    mock_temporary_directory,
     mock_dbt_runner,
     mock_subprocess,
     mock_ensure_profile,
     mock_exception_handling,
     mock_store_compiled_sql,
     invocation_mode,
+    tmp_path,
 ):
+    project_dir = tmp_path / "mock_project_tmp_dir"
+    project_dir.mkdir()
+
     expected_call_kwargs = [
         "/usr/local/bin/dbt",
         "deps",
+        "--project-dir",
+        project_dir.as_posix(),
         "--profiles-dir",
         "/path/to",
         "--profile",
@@ -732,6 +738,7 @@ def test_operator_execute_deps_parameters(
         invocation_mode=invocation_mode,
     )
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
+    mock_temporary_directory.return_value.__enter__.return_value = project_dir.as_posix()
     task.execute(context={"task_instance": MagicMock()})
     if invocation_mode == InvocationMode.SUBPROCESS:
         assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
@@ -748,6 +755,21 @@ def test_dbt_docs_local_operator_with_static_flag():
         dbt_cmd_flags=["--static"],
     )
     assert operator.required_files == ["static_index.html"]
+
+
+def test_dbt_docs_local_operator_ignores_graph_gpickle():
+    # Check when --no-write-json is passed, graph.gpickle is removed.
+    # This is only currently relevant for subclasses, but will become more generally relevant in the future.
+    class CustomDbtDocsLocalOperator(DbtDocsLocalOperator):
+        required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+
+    operator = CustomDbtDocsLocalOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_global_flags=["--no-write-json"],
+    )
+    assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")

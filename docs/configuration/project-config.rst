@@ -25,7 +25,7 @@ variables that should be used for rendering and execution. It takes the followin
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
-  execution modes.
+  execution modes. Due to the way that dbt `partial parsing works <https://docs.getdbt.com/reference/parsing#known-limitations>`_, it does not work with Cosmos profile mapping classes. To benefit from this feature, users have to set the ``profiles_yml_filepath`` argument in ``ProfileConfig``.
 
 Project Config Example
 ----------------------

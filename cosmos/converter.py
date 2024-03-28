@@ -11,6 +11,7 @@ from warnings import warn
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos import cache
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
@@ -234,11 +235,15 @@ class DbtToAirflowConverter:
         # To keep this logic working, if converter is given no ProfileConfig,
         #   we can create a default retaining this value to preserve this functionality.
         # We may want to consider defaulting this value in our actual ProjceConfig class?
+        cache_dir = dag and cache.obtain_cache_dir_path(
+            cache_identifier=cache.create_cache_identifier(dag.dag_id, task_group and task_group.group_id)
+        )
         self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,
             execution_config=execution_config,
             profile_config=profile_config,
+            cache_dir=cache_dir,
             dbt_vars=dbt_vars,
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)

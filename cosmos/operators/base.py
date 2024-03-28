@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
 from typing import Any, Sequence, Tuple
 
 import yaml

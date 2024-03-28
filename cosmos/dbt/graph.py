@@ -11,6 +11,7 @@ from typing import Any
 
 import yaml
 
+from cosmos import cache
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
@@ -23,7 +24,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import copy_msgpack_for_partial_parse, create_symlinks, environ
+from cosmos.dbt.project import copy_msgpack_for_partial_parse, create_symlinks, environ, get_partial_parse_path
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -136,6 +137,7 @@ class DbtGraph:
         render_config: RenderConfig = RenderConfig(),
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
+        cache_dir: Path | None = None,
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
@@ -143,6 +145,7 @@ class DbtGraph:
         self.render_config = render_config
         self.profile_config = profile_config
         self.execution_config = execution_config
+        self.cache_dir = cache_dir
         self.dbt_vars = dbt_vars or {}
 
     def load(
@@ -250,10 +253,15 @@ class DbtGraph:
                 f"Content of the dbt project dir {self.render_config.project_path}: `{os.listdir(self.render_config.project_path)}`"
             )
             tmpdir_path = Path(tmpdir)
-            create_symlinks(self.render_config.project_path, tmpdir_path, self.render_config.dbt_deps)
 
-            if self.project.partial_parse:
-                copy_msgpack_for_partial_parse(self.render_config.project_path, tmpdir_path)
+            abs_project_path = self.render_config.project_path.absolute()
+            create_symlinks(abs_project_path, tmpdir_path, self.render_config.dbt_deps)
+
+            if self.project.partial_parse and self.cache_dir:
+                latest_partial_parse = cache.get_latest_partial_parse(abs_project_path, self.cache_dir)
+                logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+                if latest_partial_parse is not None:
+                    cache.copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
             with self.profile_config.ensure_profile(use_mock_values=True) as profile_values, environ(
                 self.project.env_vars or self.render_config.env_vars or {}
@@ -287,6 +295,11 @@ class DbtGraph:
 
                 self.nodes = nodes
                 self.filtered_nodes = nodes
+
+            if self.project.partial_parse and self.cache_dir:
+                partial_parse_file = get_partial_parse_path(tmpdir_path)
+                if partial_parse_file.exists():
+                    cache.update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
     def load_via_dbt_ls_file(self) -> None:
         """

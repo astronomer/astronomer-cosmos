@@ -108,6 +108,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
         dbt_cmd_global_flags: list[str] | None = None,
+        cache_dir: Path | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -135,6 +136,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
+        self.cache_dir = cache_dir
         super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:

@@ -126,11 +126,9 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
-        cache_dir: Path | None = None,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
-        self.cache_dir = cache_dir
         self.install_deps = install_deps
         self.callback = callback
         self.compiled_sql = ""

@@ -68,8 +68,8 @@ class RenderConfig:
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
     dbt_ls_path: Path | None = None
-
     project_path: Path | None = field(init=False)
+    enable_mock_profile: bool = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

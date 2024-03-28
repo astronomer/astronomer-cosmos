@@ -44,10 +44,7 @@ def basic_cosmos_task_group() -> None:
         project_config=ProjectConfig(
             (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
         ),
-        render_config=RenderConfig(
-            select=["path:seeds/raw_customers.csv"],
-            enable_mock_profile=False
-        ),
+        render_config=RenderConfig(select=["path:seeds/raw_customers.csv"], enable_mock_profile=False),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,

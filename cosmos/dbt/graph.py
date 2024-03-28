@@ -263,9 +263,9 @@ class DbtGraph:
                 if latest_partial_parse is not None:
                     cache.copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
-            with self.profile_config.ensure_profile(use_mock_values=self.render_config.enable_mock_profile) as profile_values, environ(
-                self.project.env_vars or self.render_config.env_vars or {}
-            ):
+            with self.profile_config.ensure_profile(
+                use_mock_values=self.render_config.enable_mock_profile
+            ) as profile_values, environ(self.project.env_vars or self.render_config.env_vars or {}):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)

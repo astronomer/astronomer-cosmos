@@ -263,7 +263,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         # Exclude the dbt executable path from the command
         cli_args = command[1:]
-
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
 
         with change_working_directory(cwd), environ(env):

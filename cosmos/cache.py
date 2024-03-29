@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import shutil
-from enum import Enum
 from pathlib import Path
 
+from airflow.models.dag import DAG
+from airflow.utils.task_group import TaskGroup
+
 from cosmos import settings
-from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
+from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
 from cosmos.dbt.project import get_partial_parse_path
 
 
-def create_cache_identifier(dag_name: str, task_group_name: str = "") -> str:
+def create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     """
     Given a DAG name and a (optional) task_group_name, create the identifier for caching.
 
@@ -17,10 +19,18 @@ def create_cache_identifier(dag_name: str, task_group_name: str = "") -> str:
     :param task_group_name: (optional) Name of the Cosmos DbtTaskGroup being cached
     :return: Unique identifier representing the cache
     """
-    if task_group_name:
-        cache_identifier = "_".join([dag_name, task_group_name])
+    if task_group:
+        if task_group.dag_id is not None:
+            cache_identifiers_list = [task_group.dag_id]
+        if task_group.upstream_group_ids is not None:
+            group_ids: list[str] = [tg for tg in task_group.upstream_group_ids or [] if tg is not None]
+            cache_identifiers_list.extend(group_ids)
+        if task_group.group_id is not None:
+            cache_identifiers_list.extend(task_group.group_id)
+        cache_identifier = "_".join(cache_identifiers_list)
     else:
-        cache_identifier = dag_name
+        cache_identifier = dag.dag_id
+
     return cache_identifier
 
 
@@ -87,11 +97,25 @@ def update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: P
     :param cache_dir: Path to the Cosmos project cache directory
     """
     cache_path = get_partial_parse_path(cache_dir)
+    manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
+    latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
+
     shutil.copy(str(latest_partial_parse_filepath), str(cache_path))
+    shutil.copy(str(latest_manifest_filepath), str(manifest_path))
 
 
 def copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: Path) -> None:
+    """
+    Update target dbt project directory to have the latest partial parse file contents.
+
+    :param partial_parse_filepath: Path to the most up-to-date partial parse file
+    :param project_path: Path to the target dbt project directory
+    """
     target_partial_parse_file = get_partial_parse_path(project_path)
     tmp_target_dir = project_path / DBT_TARGET_DIR_NAME
     tmp_target_dir.mkdir(exist_ok=True)
+
+    source_manifest_filepath = partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
+    target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
     shutil.copy(str(partial_parse_filepath), str(target_partial_parse_file))
+    shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))

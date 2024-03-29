@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from abc import ABCMeta, abstractmethod
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
@@ -11,6 +12,7 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
+from cosmos import cache
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
@@ -109,7 +111,6 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
         dbt_cmd_global_flags: list[str] | None = None,
-        cache_dir: Path | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -137,8 +138,11 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
-        self.cache_dir = cache_dir
         super().__init__(**kwargs)
+
+    @cached_property
+    def cache_dir(self) -> Path:
+        return cache.obtain_cache_dir_path(cache_identifier=cache.create_cache_identifier(self.dag, self.task_group))
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """

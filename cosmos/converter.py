@@ -225,6 +225,8 @@ class DbtToAirflowConverter:
         env_vars = project_config.env_vars or operator_args.get("env")
         dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
+        cache_dir = cache.obtain_cache_dir_path(cache_identifier=cache.create_cache_identifier(dag, task_group))
+
         # Previously, we were creating a cosmos.dbt.project.DbtProject
         # DbtProject has now been replaced with ProjectConfig directly
         #   since the interface of the two classes were effectively the same
@@ -234,10 +236,7 @@ class DbtToAirflowConverter:
         #   To be root dir/profiles.yml
         # To keep this logic working, if converter is given no ProfileConfig,
         #   we can create a default retaining this value to preserve this functionality.
-        # We may want to consider defaulting this value in our actual ProjceConfig class?
-        cache_dir = dag and cache.obtain_cache_dir_path(
-            cache_identifier=cache.create_cache_identifier(dag.dag_id, task_group and task_group.group_id)
-        )
+        # We may want to consider defaulting this value in our actual ProjectConfig class?
         self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,
@@ -254,7 +253,6 @@ class DbtToAirflowConverter:
             "partial_parse": project_config.partial_parse,
             "profile_config": profile_config,
             "emit_datasets": render_config.emit_datasets,
-            "cache_dir": cache_dir,
             "env": env_vars,
             "vars": dbt_vars,
         }

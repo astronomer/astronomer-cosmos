@@ -584,6 +584,11 @@ def test_store_compiled_sql() -> None:
         ),
         (
             DbtTestLocalOperator,
+            {},
+            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+        ),
+        (
+            DbtTestLocalOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
             {"context": {}, "env": {}, "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"]},
         ),
@@ -608,6 +613,7 @@ def test_operator_execute_with_flags(mock_run_cmd, operator_class, kwargs, expec
         invocation_mode=InvocationMode.DBT_RUNNER,
         **kwargs,
     )
+    task.get_env = MagicMock(return_value={})
     task.execute(context={})
     mock_run_cmd.assert_called_once_with(
         cmd=[task.dbt_executable_path, *expected_call_kwargs.pop("cmd_flags")], **expected_call_kwargs

@@ -105,10 +105,28 @@ For example, if your dbt project directory is ``/usr/local/airflow/dags/my_dbt_p
 
     AIRFLOW__COSMOS__DBT_DOCS_DIR="/usr/local/airflow/dags/my_dbt_project/target"
 
-Using docs out of local storage has the downside that some values in the dbt docs can become stale unless the docs are periodically refreshed and redeployed:
+Using docs out of local storage has a couple downsides. First, some values in the dbt docs can become stale, unless the docs are periodically refreshed and redeployed:
 
 - Counts of the numbers of rows.
 - The compiled SQL for incremental models before and after the first run.
+
+Second, deployment from local storage may only be partially compatible with some managed Airflow systems.
+Compatibility will depend on the managed Airflow system, as each one works differently.
+
+For example, Astronomer does not update the resources available to the webserver instance when ``--dags`` is specified during deployment, meaning that the dbt dcs will not be updated when this flag is used.
+
+.. note::
+    Managed Airflow on Astronomer Cloud does not provide the webserver access to the DAGs folder.
+    If you want to host your docs in local storage with Astro, you should host them in a directory other than ``dags/``.
+    For example, you can set your ``AIRFLOW__COSMOS__DBT_DOCS_DIR`` to ``/usr/local/airflow/dbt_docs_dir`` with the following pre-deployment script:
+
+    .. code-block:: bash
+
+        dbt docs generate
+        mkdir dbt_docs_dir
+        cp dags/dbt/target/manifest.json dbt_docs_dir/manifest.json
+        cp dags/dbt/target/catalog.json dbt_docs_dir/catalog.json
+        cp dags/dbt/target/index.html dbt_docs_dir/index.html
 
 Host from HTTP/HTTPS
 ~~~~~~~~~~~~~~~~~~~~

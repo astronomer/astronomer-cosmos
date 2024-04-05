@@ -8,7 +8,7 @@ from airflow.models import DAG
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
-from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 
@@ -468,3 +468,34 @@ def test_converter_invocation_mode_added_to_task_args(
         assert kwargs["task_args"]["invocation_mode"] == invocation_mode
     else:
         assert "invocation_mode" not in kwargs["task_args"]
+
+
+@pytest.mark.parametrize(
+    "execution_mode,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, {}),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_contains_dbt_graph(mock_load_dbt_graph, execution_mode, operator_args):
+    """
+    This test validates that DbtToAirflowConverter contains and exposes a DbtGraph instance
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    converter = DbtToAirflowConverter(
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args=operator_args,
+    )
+    assert isinstance(converter.dbt_graph, DbtGraph)

@@ -136,7 +136,7 @@ iframe_script = """
         // Model page
         getMaxElement('bottom', 'section.section') + 75,
         // Search page
-        getMaxElement('bottom', 'div.result-body') + 110
+        getMaxElement('bottom', 'div.result-body') + 125
       )
     }
   }

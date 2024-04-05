@@ -53,6 +53,7 @@ def test_dbt_azure_container_instance_operator_get_env(p_context_to_airflow_vars
         name="my-aci",
         resource_group="my-rg",
         project_dir="my/dir",
+        append_env=False,
     )
     dbt_base_operator.env = {
         "start_date": "20220101",
@@ -90,6 +91,7 @@ def test_dbt_azure_container_instance_operator_check_environment_variables(
         resource_group="my-rg",
         project_dir="my/dir",
         environment_variables={"FOO": "BAR"},
+        append_env=False,
     )
     dbt_base_operator.env = {
         "start_date": "20220101",
@@ -143,3 +145,25 @@ def test_dbt_azure_container_instance_build_command():
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
             "--no-version-check",
         ]
+
+
+@patch("cosmos.operators.azure_container_instance.AzureContainerInstancesOperator.execute")
+def test_dbt_azure_container_instance_build_and_run_cmd(mock_execute):
+    dbt_base_operator = ConcreteDbtAzureContainerInstanceOperator(
+        ci_conn_id="my_airflow_connection",
+        task_id="my-task",
+        image="my_image",
+        region="Mordor",
+        name="my-aci",
+        resource_group="my-rg",
+        project_dir="my/dir",
+        environment_variables={"FOO": "BAR"},
+    )
+    mock_build_command = MagicMock()
+    dbt_base_operator.build_command = mock_build_command
+
+    mock_context = MagicMock()
+    dbt_base_operator.build_and_run_cmd(context=mock_context)
+
+    mock_build_command.assert_called_with(mock_context, None)
+    mock_execute.assert_called_once_with(dbt_base_operator, mock_context)

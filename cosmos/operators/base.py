@@ -43,10 +43,11 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         environment variables for the new process; these are used instead
         of inheriting the current process environment, which is the default
         behavior. (templated)
-    :param append_env: If False(default) uses the environment variables passed in env params
-        and does not inherit the current process environment. If True, inherits the environment variables
+    :param append_env: . If True (default), inherits the environment variables
         from current passes and then environment variable passed by the user will either update the existing
-        inherited environment variables or the new variables gets appended to it
+        inherited environment variables or the new variables gets appended to it.
+        If False, only uses the environment variables passed in env params
+        and does not inherit the current process environment.
     :param output_encoding: Output encoding of bash command
     :param skip_exit_code: If task exits with this exit code, leave the task
         in ``skipped`` state (default: 99). If set to ``None``, any non-zero
@@ -99,7 +100,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         db_name: str | None = None,
         schema: str | None = None,
         env: dict[str, Any] | None = None,
-        append_env: bool = False,
+        append_env: bool = True,
         output_encoding: str = "utf-8",
         skip_exit_code: int = 99,
         partial_parse: bool = True,

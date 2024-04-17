@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -757,6 +758,7 @@ def test_operator_execute_deps_parameters(
         "dev",
     ]
     task = DbtRunLocalOperator(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         profile_config=real_profile_config,
         task_id="my-task",
         project_dir=DBT_PROJ_DIR,

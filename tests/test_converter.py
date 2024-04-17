@@ -152,6 +152,7 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
         profiles_yml_filepath=SAMPLE_PROFILE_YML,
     )
     converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         nodes=nodes,
         project_config=project_config,
         profile_config=profile_config,
@@ -185,6 +186,7 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
         profiles_yml_filepath=SAMPLE_PROFILE_YML,
     )
     converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         nodes=nodes,
         project_config=project_config,
         profile_config=profile_config,
@@ -491,6 +493,7 @@ def test_converter_contains_dbt_graph(mock_load_dbt_graph, execution_mode, opera
         profiles_yml_filepath=SAMPLE_PROFILE_YML,
     )
     converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         nodes=nodes,
         project_config=project_config,
         profile_config=profile_config,

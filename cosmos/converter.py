@@ -57,7 +57,7 @@ def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
     new_kwargs = {}
     non_airflow_kwargs = specific_kwargs(**kwargs)
     for arg_key, arg_value in kwargs.items():
-        if arg_key not in non_airflow_kwargs or arg_key == 'dag':
+        if arg_key not in non_airflow_kwargs or arg_key == "dag":
             new_kwargs[arg_key] = arg_value
     return new_kwargs
 

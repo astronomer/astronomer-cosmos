@@ -288,7 +288,8 @@ class ProfileConfig:
                 with tempfile.TemporaryDirectory() as temp_dir:
                     temp_file = Path(temp_dir) / DEFAULT_PROFILES_FILE_NAME
                     logger.info(
-                        "Creating temporary profiles.yml at %s with the following contents:\n%s",
+                        "Creating temporary profiles.yml with use_mock_values=%s at %s with the following contents:\n%s",
+                        use_mock_values,
                         temp_file,
                         profile_contents,
                     )

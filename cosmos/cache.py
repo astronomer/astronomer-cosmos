@@ -11,6 +11,11 @@ from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
 from cosmos.dbt.project import get_partial_parse_path
 
 
+# It was considered to create a cache identifier based on the dbt project path, as opposed
+# to where it is used in Airflow. However, we could have concurrency issues if the same
+# dbt cached directory was being used by different dbt task groups or DAGs within the same
+# node. For this reason, as a starting point, the cache is identified by where it is used.
+# This can be reviewed in the future.
 def create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     """
     Given a DAG name and a (optional) task_group_name, create the identifier for caching.
@@ -22,11 +27,8 @@ def create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     if task_group:
         if task_group.dag_id is not None:
             cache_identifiers_list = [task_group.dag_id]
-        if task_group.upstream_group_ids is not None:
-            group_ids: list[str] = [tg for tg in task_group.upstream_group_ids or [] if tg is not None]
-            cache_identifiers_list.extend(group_ids)
         if task_group.group_id is not None:
-            cache_identifiers_list.extend(task_group.group_id)
+            cache_identifiers_list.extend([task_group.group_id.replace(".", "_")])
         cache_identifier = "_".join(cache_identifiers_list)
     else:
         cache_identifier = dag.dag_id

@@ -325,7 +325,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 full_cmd = cmd + flags
 
-                logger.info("Using environment variables keys: %s", env.keys())
+                logger.debug("Using environment variables keys: %s", env.keys())
 
                 result = self.invoke_dbt(
                     command=full_cmd,

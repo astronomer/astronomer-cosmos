@@ -1,0 +1,62 @@
+import os
+from datetime import datetime
+
+import pytest
+from airflow import DAG
+from airflow.utils.task_group import TaskGroup
+
+from cosmos.cache import create_cache_identifier, get_latest_partial_parse
+from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
+
+START_DATE = datetime(2024, 4, 16)
+example_dag = DAG("dag", start_date=START_DATE)
+
+
+@pytest.mark.parametrize(
+    "dag, task_group, result_identifier",
+    [
+        (example_dag, None, "dag"),
+        (None, TaskGroup(dag=example_dag, group_id="inner_tg"), "dag_inner_tg"),
+        (
+            None,
+            TaskGroup(
+                dag=example_dag, group_id="child_tg", parent_group=TaskGroup(dag=example_dag, group_id="parent_tg")
+            ),
+            "dag_parent_tg_child_tg",
+        ),
+        (
+            None,
+            TaskGroup(
+                dag=example_dag,
+                group_id="child_tg",
+                parent_group=TaskGroup(
+                    dag=example_dag, group_id="mum_tg", parent_group=TaskGroup(dag=example_dag, group_id="nana_tg")
+                ),
+            ),
+            "dag_nana_tg_mum_tg_child_tg",
+        ),
+    ],
+)
+def test_create_cache_identifier(dag, task_group, result_identifier):
+    assert create_cache_identifier(dag, task_group) == result_identifier
+
+
+def test_get_latest_partial_parse(tmp_path):
+    old_tmp_dir = tmp_path / "old"
+    old_tmp_target_dir = old_tmp_dir / DBT_TARGET_DIR_NAME
+    old_tmp_target_dir.mkdir(create_parents=True, exist_ok=True)
+    old_partial_parse_filepath = old_tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    open(old_partial_parse_filepath, "a").close()
+
+    new_tmp_dir = tmp_path / "new"
+    new_tmp_target_dir = new_tmp_dir / DBT_TARGET_DIR_NAME
+    new_tmp_target_dir.mkdir(create_parents=True, exist_ok=True)
+    new_partial_parse_filepath = new_tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    open(new_partial_parse_filepath, "a").close()
+
+    assert get_latest_partial_parse(old_tmp_dir, new_tmp_dir) == new_partial_parse_filepath
+    assert get_latest_partial_parse(new_tmp_dir, old_tmp_dir) == new_partial_parse_filepath
+    assert get_latest_partial_parse(old_tmp_dir, old_tmp_dir) == old_partial_parse_filepath
+    assert get_latest_partial_parse(old_tmp_dir, tmp_path) == old_partial_parse_filepath
+    assert get_latest_partial_parse(tmp_path, old_tmp_dir) == old_partial_parse_filepath
+    assert get_latest_partial_parse(tmp_path, tmp_path) is None

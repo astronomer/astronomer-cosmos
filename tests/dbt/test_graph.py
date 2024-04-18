@@ -482,7 +482,9 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir, postgres_profile_config):
+def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
+    tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path
+):
     local_flags = [
         "--project-dir",
         tmp_dbt_project_dir / DBT_PROJECT_NAME,
@@ -506,16 +508,28 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_
     stdout, stderr = process.communicate()
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
-    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False)
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False, enable_mock_profile=False
+    )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
         profile_config=postgres_profile_config,
+        cache_dir=tmp_path,
     )
 
+    from cosmos.constants import DBT_TARGET_DIR_NAME
+
+    (tmp_path / DBT_TARGET_DIR_NAME).mkdir(parents=True, exist_ok=True)
+
     dbt_graph.load_via_dbt_ls()  # does not raise exception
+
+    assert "Unable to do partial parsing" in caplog.text
+    # TODO: split the caching test into a separate test, and make the following assertion work
+    # dbt_graph.load_via_dbt_ls()  # does not raise exception
+    # assert not "Unable to do partial parsing" in caplog.text
 
 
 @pytest.mark.integration

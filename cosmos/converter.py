@@ -215,8 +215,6 @@ class DbtToAirflowConverter:
 
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
-        # If we are using the old interface, we should migrate it to the new interface
-        # This is safe to do now since we have validated which config interface we're using
         if project_config.dbt_project_path:
             execution_config, render_config = migrate_to_new_interface(execution_config, project_config, render_config)
 
@@ -227,16 +225,6 @@ class DbtToAirflowConverter:
 
         cache_dir = cache.obtain_cache_dir_path(cache_identifier=cache.create_cache_identifier(dag, task_group))
 
-        # Previously, we were creating a cosmos.dbt.project.DbtProject
-        # DbtProject has now been replaced with ProjectConfig directly
-        #   since the interface of the two classes were effectively the same
-        # Under this previous implementation, we were passing:
-        #  - name, root dir, models dir, snapshots dir and manifest path
-        # Internally in the dbtProject class, we were defaulting the profile_path
-        #   To be root dir/profiles.yml
-        # To keep this logic working, if converter is given no ProfileConfig,
-        #   we can create a default retaining this value to preserve this functionality.
-        # We may want to consider defaulting this value in our actual ProjectConfig class?
         self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,

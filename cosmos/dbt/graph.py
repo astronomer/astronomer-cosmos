@@ -74,7 +74,7 @@ class DbtNode:
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
     logger.info("Running command: `%s`", " ".join(command))
-    logger.info("Environment variable keys: %s", env_vars.keys())
+    logger.debug("Environment variable keys: %s", env_vars.keys())
     process = Popen(
         command,
         stdout=PIPE,
@@ -215,7 +215,7 @@ class DbtGraph:
 
         stdout = run_command(ls_command, tmp_dir, env_vars)
 
-        logger.debug("dbt ls output: %s", stdout)
+        logger.info("dbt ls output: %s", stdout)
         log_filepath = self.log_dir / DBT_LOG_FILENAME
         logger.debug("dbt logs available in: %s", log_filepath)
         if log_filepath.exists():

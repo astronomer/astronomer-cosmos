@@ -1,4 +1,4 @@
-import os
+import time
 from datetime import datetime
 
 import pytest
@@ -47,6 +47,8 @@ def test_get_latest_partial_parse(tmp_path):
     old_tmp_target_dir.mkdir(parents=True, exist_ok=True)
     old_partial_parse_filepath = old_tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
     open(old_partial_parse_filepath, "a").close()
+
+    time.sleep(1)
 
     new_tmp_dir = tmp_path / "new"
     new_tmp_target_dir = new_tmp_dir / DBT_TARGET_DIR_NAME

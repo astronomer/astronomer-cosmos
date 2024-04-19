@@ -215,7 +215,7 @@ class DbtGraph:
 
         stdout = run_command(ls_command, tmp_dir, env_vars)
 
-        logger.info("dbt ls output: %s", stdout)
+        logger.debug("dbt ls output: %s", stdout)
         log_filepath = self.log_dir / DBT_LOG_FILENAME
         logger.debug("dbt logs available in: %s", log_filepath)
         if log_filepath.exists():

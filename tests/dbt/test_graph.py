@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DbtResourceType, ExecutionMode
+from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
     DbtGraph,
@@ -483,7 +483,7 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
 
 @pytest.mark.integration
 def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
-    tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path
+    tmp_dbt_project_dir, postgres_profile_config, caplog
 ):
     local_flags = [
         "--project-dir",
@@ -508,8 +508,38 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
     stdout, stderr = process.communicate()
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=postgres_profile_config,
+    )
+
+    assert dbt_graph.load_via_dbt_ls() is None  # Doesn't raise any exceptions
+
+
+@pytest.mark.integration
+def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path):
+    """
+    When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
+    Cosmos should leverage dbt partial parsing.
+    """
+    local_flags = [
+        "--project-dir",
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        "--profiles-dir",
+        tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        "--profile",
+        "default",
+        "--target",
+        "dev",
+    ]
+
+    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     render_config = RenderConfig(
-        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=False, enable_mock_profile=False
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=True, enable_mock_profile=False
     )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -520,16 +550,16 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
         cache_dir=tmp_path,
     )
 
-    from cosmos.constants import DBT_TARGET_DIR_NAME
-
     (tmp_path / DBT_TARGET_DIR_NAME).mkdir(parents=True, exist_ok=True)
 
-    dbt_graph.load_via_dbt_ls()  # does not raise exception
-
+    # First time dbt ls is run, partial parsing was not cached, so we don't benefit from this
+    dbt_graph.load_via_dbt_ls()
     assert "Unable to do partial parsing" in caplog.text
-    # TODO: split the caching test into a separate test, and make the following assertion work
-    # dbt_graph.load_via_dbt_ls()  # does not raise exception
-    # assert not "Unable to do partial parsing" in caplog.text
+
+    # From the second time we run dbt ls onwards, we benefit from partial parsing
+    caplog.clear()
+    dbt_graph.load_via_dbt_ls()  # should not not raise exception
+    assert not "Unable to do partial parsing" in caplog.text
 
 
 @pytest.mark.integration

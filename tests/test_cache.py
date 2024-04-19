@@ -44,13 +44,13 @@ def test_create_cache_identifier(dag, task_group, result_identifier):
 def test_get_latest_partial_parse(tmp_path):
     old_tmp_dir = tmp_path / "old"
     old_tmp_target_dir = old_tmp_dir / DBT_TARGET_DIR_NAME
-    old_tmp_target_dir.mkdir(create_parents=True, exist_ok=True)
+    old_tmp_target_dir.mkdir(parents=True, exist_ok=True)
     old_partial_parse_filepath = old_tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
     open(old_partial_parse_filepath, "a").close()
 
     new_tmp_dir = tmp_path / "new"
     new_tmp_target_dir = new_tmp_dir / DBT_TARGET_DIR_NAME
-    new_tmp_target_dir.mkdir(create_parents=True, exist_ok=True)
+    new_tmp_target_dir.mkdir(parents=True, exist_ok=True)
     new_partial_parse_filepath = new_tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
     open(new_partial_parse_filepath, "a").close()
 

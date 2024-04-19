@@ -24,6 +24,7 @@ from cosmos.constants import (
     TestBehavior,
     TestIndirectSelection,
 )
+from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -431,3 +432,28 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
 )
 def test_snake_case_to_camelcase(input, expected):
     assert _snake_case_to_camelcase(input) == expected
+
+
+def test_airflow_kwargs_generation():
+    """
+    airflow_kwargs_generation should always contain dag.
+    """
+    task_args = {
+        "group_id": "fake_group_id",
+        "project_dir": SAMPLE_PROJ_PATH,
+        "conn_id": "fake_conn",
+        "render_config": RenderConfig(select=["fake-render"]),
+        "default_args": {"retries": 2},
+        "profile_config": ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="fake_conn",
+                profile_args={"schema": "public"},
+            ),
+        ),
+        "dag": DAG(dag_id="fake_dag_name"),
+    }
+    result = airflow_kwargs(**task_args)
+
+    assert "dag" in result

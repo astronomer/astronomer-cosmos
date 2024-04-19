@@ -526,16 +526,9 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
     When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
     Cosmos should leverage dbt partial parsing.
     """
-    local_flags = [
-        "--project-dir",
-        tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        "--profiles-dir",
-        tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        "--profile",
-        "default",
-        "--target",
-        "dev",
-    ]
+    import logging
+
+    caplog.set_level(logging.DEBUG)
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     render_config = RenderConfig(

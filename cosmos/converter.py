@@ -9,8 +9,8 @@ from typing import Any, Callable
 from warnings import warn
 
 from airflow.models.dag import DAG
-from airflow.utils.task_group import TaskGroup
 from airflow.utils.dag_parsing_context import get_parsing_context
+from airflow.utils.task_group import TaskGroup
 
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig

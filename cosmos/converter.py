@@ -217,7 +217,9 @@ class DbtToAirflowConverter:
             raise CosmosValueError("Either a dag or task_group must be provided.")
 
         if not parse_all_dags:
-            if dag.dag_id != get_parsing_context().dag_id:
+            current_dag_id = get_parsing_context().dag_id
+
+            if dag.dag_id != current_dag_id and current_dag_id is not None:
                 return
 
         # if the dag is not what we're trying to parse, we can skip for performance reasons

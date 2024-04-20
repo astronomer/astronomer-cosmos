@@ -422,7 +422,7 @@ class DbtGraph:
 
     def update_node_dependency(self) -> None:
         """
-        This will update the property `has_text` if node has `dbt` test
+        This will update the property `has_test` if node has `dbt` test
 
         Updates in-place:
         * self.filtered_nodes

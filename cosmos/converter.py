@@ -11,7 +11,7 @@ from warnings import warn
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos import cache
+from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
@@ -223,7 +223,9 @@ class DbtToAirflowConverter:
         env_vars = project_config.env_vars or operator_args.get("env")
         dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
-        cache_dir = cache.obtain_cache_dir_path(cache_identifier=cache.create_cache_identifier(dag, task_group))
+        cache_dir = None
+        if settings.enable_cache:
+            cache_dir = cache.obtain_cache_dir_path(cache_identifier=cache.create_cache_identifier(dag, task_group))
 
         self.dbt_graph = DbtGraph(
             project=project_config,
@@ -243,6 +245,7 @@ class DbtToAirflowConverter:
             "emit_datasets": render_config.emit_datasets,
             "env": env_vars,
             "vars": dbt_vars,
+            "cache_dir": cache_dir,
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path

@@ -36,15 +36,16 @@ def create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     return cache_identifier
 
 
-def obtain_cache_dir_path(cache_identifier: str) -> Path:
+def obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:
     """
     Return a directory used to cache a specific Cosmos DbtDag or DbtTaskGroup. If the directory
     does not exist, create it.
 
     :param cache_identifier: Unique key used as a cache identifier
+    :param base_dir: Root directory where cache will be stored
     :return: Path to directory used to cache this specific Cosmos DbtDag or DbtTaskGroup
     """
-    cache_dir_path = settings.cache_dir / cache_identifier
+    cache_dir_path = base_dir / cache_identifier
     tmp_target_dir = cache_dir_path / DBT_TARGET_DIR_NAME
     tmp_target_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir_path

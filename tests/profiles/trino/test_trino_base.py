@@ -40,6 +40,7 @@ def test_profile_args() -> None:
             "schema": "my_schema",
             "host": "my_host",
             "port": 8080,
+            "user": "my_login",
             "session_properties": {"my_property": "my_value"},
         }
 
@@ -80,5 +81,6 @@ def test_profile_args_overrides() -> None:
             "schema": "my_schema",
             "host": "my_host_override",
             "port": 8080,
+            "user": "my_login",
             "session_properties": {"my_property": "my_value_override"},
         }

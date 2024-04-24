@@ -15,7 +15,7 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
 
     dbt_profile_method: str = "certificate"
 
-    required_fields = TrinoBaseProfileMapping.required_fields + [
+    required_fields = TrinoBaseProfileMapping.base_fields + [
         "client_certificate",
         "client_private_key",
     ]

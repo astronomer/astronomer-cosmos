@@ -1,3 +1,4 @@
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -470,6 +471,75 @@ def test_converter_invocation_mode_added_to_task_args(
         assert kwargs["task_args"]["invocation_mode"] == invocation_mode
     else:
         assert "invocation_mode" not in kwargs["task_args"]
+
+
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.validate_initial_user_config")
+@patch("cosmos.converter.DbtGraph")
+@patch("cosmos.converter.build_airflow_graph")
+def test_converter_uses_cache_dir(
+    mock_build_airflow_graph,
+    mock_dbt_graph,
+    mock_user_config,
+    mock_validate_project,
+):
+    """Tests that DbtGraph and operator and Airflow task args contain expected cache dir ."""
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(enable_mock_profile=False)
+    profile_config = MagicMock()
+
+    with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args={},
+        )
+    task_args_cache_dir = mock_build_airflow_graph.call_args[1]["task_args"]["cache_dir"]
+    dbt_graph_cache_dir = mock_dbt_graph.call_args[1]["cache_dir"]
+
+    assert Path(tempfile.gettempdir()) in task_args_cache_dir.parents
+    assert task_args_cache_dir.parent.stem == "cosmos"
+    assert task_args_cache_dir.stem == "test-id"
+    assert task_args_cache_dir == dbt_graph_cache_dir
+
+
+@patch("cosmos.settings.enable_cache", False)
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.validate_initial_user_config")
+@patch("cosmos.converter.DbtGraph")
+@patch("cosmos.converter.build_airflow_graph")
+def test_converter_disable_cache_sets_cache_dir_to_none(
+    mock_build_airflow_graph,
+    mock_dbt_graph,
+    mock_user_config,
+    mock_validate_project,
+):
+    """Tests that DbtGraph and operator and Airflow task args contain expected cache dir."""
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(enable_mock_profile=False)
+    profile_config = MagicMock()
+
+    with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args={},
+        )
+    task_args_cache_dir = mock_build_airflow_graph.call_args[1]["task_args"]["cache_dir"]
+    dbt_graph_cache_dir = mock_dbt_graph.call_args[1]["cache_dir"]
+
+    assert dbt_graph_cache_dir is None
+    assert task_args_cache_dir == dbt_graph_cache_dir
 
 
 @pytest.mark.parametrize(

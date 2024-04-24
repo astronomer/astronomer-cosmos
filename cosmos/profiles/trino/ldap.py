@@ -16,7 +16,7 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
 
     dbt_profile_method: str = "ldap"
 
-    required_fields = TrinoBaseProfileMapping.required_fields + [
+    required_fields = TrinoBaseProfileMapping.base_fields + [
         "user",
         "password",
     ]

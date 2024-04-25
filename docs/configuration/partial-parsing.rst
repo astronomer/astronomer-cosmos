@@ -16,7 +16,7 @@ To respect the dbt requirement of having the same profile to benefit from partia
 * Declare their own ``profiles.yml`` file, via ``ProfileConfig(profiles_yml_filepath=...)``
 
 If users don't follow these guidelines, Cosmos will use different profiles to parse the dbt project and to run tasks, and the user won't leverage dbt partial parsing.
-Their logs will contain multiple ``INFO`` messages similar to the following, meaning that Cosmos are is not using partial parsing:
+Their logs will contain multiple ``INFO`` messages similar to the following, meaning that Cosmos is not using partial parsing:
 
 .. code-block::
 
@@ -45,9 +45,22 @@ There is a chance, however, that the file is stale or was generated in a way tha
 Therefore, Cosmos also caches the most up-to-date ``partial_parse.msgpack`` file after running a dbt command in the `system temporary directory <https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir>`_.
 With this, unless there are code changes, each Airflow node should only run the dbt command with a full dbt project parse once, and benefit from partial parsing from then onwards.
 
-It is possible to override the directory that Cosmos uses caching with the Airflow configuration ``[cosmos][cache_dir]`` or environment variable ``AIRFLOW__COSMOS__CACHE_DIR``.
 
-To turn off caching, set the Airflow configuration ``[cosmos][enable_cache]`` or the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE=0``.
+Caching is enabled by default.
+It is possible to disable caching or override the directory that Cosmos uses caching with the Airflow configuration:
+
+.. code-block:: cfg
+
+    [cosmos]
+    cache_dir = path/to/docs/here  # to override default caching directory (by default, uses the system temporary directory)
+    enable_cache = False  # to disable caching (enabled by default)
+
+Or environment variable:
+
+.. code-block:: cfg
+
+    AIRFLOW__COSMOS__CACHE_DIR="path/to/docs/here"  # to override default caching directory (by default, uses the system temporary directory)
+    AIRFLOW__COSMOS__ENABLE_CACHE="False"  # to disable caching (enabled by default)
 
 Disabling
 ---------

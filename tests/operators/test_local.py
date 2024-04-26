@@ -88,8 +88,11 @@ def test_dbt_base_operator_add_global_flags() -> None:
             "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
         },
         no_version_check=True,
+        select=["my_first_model", "my_second_model"],
     )
     assert dbt_base_operator.add_global_flags() == [
+        "--select",
+        "my_first_model my_second_model",
         "--vars",
         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
@@ -564,28 +567,50 @@ def test_store_compiled_sql() -> None:
 @pytest.mark.parametrize(
     "operator_class,kwargs,expected_call_kwargs",
     [
-        (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
-        (DbtBuildLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
-        (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (
+            DbtSeedLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["seed", "--full-refresh"]},
+        ),
+        (
+            DbtBuildLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["build", "--full-refresh"]},
+        ),
+        (
+            DbtRunLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["run", "--full-refresh"]},
+        ),
+        (
+            DbtTestLocalOperator,
+            {},
+            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+        ),
+        (
+            DbtTestLocalOperator,
+            {"select": []},
+            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+        ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
-            {"context": {}, "cmd_flags": ["--exclude", "tag:disabled", "--select", "tag:daily"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"]},
         ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "selector": "nightly_snowplow"},
-            {"context": {}, "cmd_flags": ["--selector", "nightly_snowplow"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test", "--selector", "nightly_snowplow"]},
         ),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
-            {"context": {}, "cmd_flags": ["--args", "days: 7\ndry_run: true\n"]},
+            {"context": {}, "env": {}, "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"]},
         ),
     ],
 )
-@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwargs, expected_call_kwargs):
+@patch("cosmos.operators.local.DbtLocalBaseOperator.run_command")
+def test_operator_execute_with_flags(mock_run_cmd, operator_class, kwargs, expected_call_kwargs):
     task = operator_class(
         profile_config=profile_config,
         task_id="my-task",
@@ -593,8 +618,11 @@ def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwa
         invocation_mode=InvocationMode.DBT_RUNNER,
         **kwargs,
     )
+    task.get_env = MagicMock(return_value={})
     task.execute(context={})
-    mock_build_and_run_cmd.assert_called_once_with(**expected_call_kwargs)
+    mock_run_cmd.assert_called_once_with(
+        cmd=[task.dbt_executable_path, *expected_call_kwargs.pop("cmd_flags")], **expected_call_kwargs
+    )
 
 
 @pytest.mark.parametrize(

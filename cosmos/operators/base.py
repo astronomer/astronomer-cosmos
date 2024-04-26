@@ -195,16 +195,27 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
 
             dbt_name = f"--{global_flag.replace('_', '-')}"
             global_flag_value = self.__getattribute__(global_flag)
-            if global_flag_value is not None:
-                if isinstance(global_flag_value, dict):
-                    yaml_string = yaml.dump(global_flag_value)
-                    flags.extend([dbt_name, yaml_string])
-                else:
-                    flags.extend([dbt_name, str(global_flag_value)])
+            flags.extend(self._process_global_flag(dbt_name, global_flag_value))
+
         for global_boolean_flag in self.global_boolean_flags:
             if self.__getattribute__(global_boolean_flag):
                 flags.append(f"--{global_boolean_flag.replace('_', '-')}")
         return flags
+
+    @staticmethod
+    def _process_global_flag(flag_name: str, flag_value: Any) -> list[str]:
+        """Helper method to process global flags and reduce complexity."""
+        if flag_value is None:
+            return []
+        elif isinstance(flag_value, dict):
+            yaml_string = yaml.dump(flag_value)
+            return [flag_name, yaml_string]
+        elif isinstance(flag_value, list) and flag_value:
+            return [flag_name, " ".join(flag_value)]
+        elif isinstance(flag_value, list):
+            return []
+        else:
+            return [flag_name, str(flag_value)]
 
     def add_cmd_flags(self) -> list[str]:
         """Allows subclasses to override to add flags for their dbt command"""
@@ -372,18 +383,6 @@ class DbtTestMixin:
         self.exclude = exclude
         self.selector = selector
         super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
-
-    def add_cmd_flags(self) -> list[str]:
-        flags = []
-        if self.exclude:
-            flags.extend(["--exclude", *self.exclude])
-
-        if self.select:
-            flags.extend(["--select", *self.select])
-
-        if self.selector:
-            flags.extend(["--selector", self.selector])
-        return flags
 
 
 class DbtRunOperationMixin:

@@ -69,7 +69,7 @@ Upload to GCS
 
 GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
 
-You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and upload docs to a S3 bucket. The following code snippet shows how to do this with the default jaffle_shop project:
+You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and upload docs to a GCS bucket. The following code snippet shows how to do this with the default jaffle_shop project:
 
 .. code-block:: python
 

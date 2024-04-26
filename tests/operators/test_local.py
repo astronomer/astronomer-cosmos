@@ -589,6 +589,11 @@ def test_store_compiled_sql() -> None:
         ),
         (
             DbtTestLocalOperator,
+            {"select": []},
+            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+        ),
+        (
+            DbtTestLocalOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
             {"context": {}, "env": {}, "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"]},
         ),

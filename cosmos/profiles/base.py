@@ -241,6 +241,18 @@ class BaseProfileMapping(ABC):
 
         return str(yaml.dump(profile_contents, indent=4))
 
+    def _get_airflow_conn_field(self, airflow_field: str) -> Any:
+        # make sure there's no "extra." prefix
+        if airflow_field.startswith("extra."):
+            airflow_field = airflow_field.replace("extra.", "", 1)
+            value = self.conn.extra_dejson.get(airflow_field)
+        elif airflow_field.startswith("extra__"):
+            value = self.conn.extra_dejson.get(airflow_field)
+        else:
+            value = getattr(self.conn, airflow_field, None)
+
+        return value
+
     def get_dbt_value(self, name: str) -> Any:
         """
         Gets values for the dbt profile based on the required_by_dbt and required_in_profile_args lists.
@@ -260,16 +272,9 @@ class BaseProfileMapping(ABC):
                 airflow_fields = [airflow_fields]
 
             for airflow_field in airflow_fields:
-                # make sure there's no "extra." prefix
-                if airflow_field.startswith("extra."):
-                    airflow_field = airflow_field.replace("extra.", "", 1)
-                    value = self.conn.extra_dejson.get(airflow_field)
-                else:
-                    value = getattr(self.conn, airflow_field, None)
-
+                value = self._get_airflow_conn_field(airflow_field)
                 if not value:
                     continue
-
                 # if there's a transform method, use it
                 if hasattr(self, f"transform_{name}"):
                     return getattr(self, f"transform_{name}")(value)

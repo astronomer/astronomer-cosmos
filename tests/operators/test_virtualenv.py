@@ -1,5 +1,7 @@
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+from airflow.models import DAG
 from airflow.models.connection import Connection
 
 from cosmos.config import ProfileConfig
@@ -45,6 +47,7 @@ def test_run_command(
         schema="fake_schema",
     )
     venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         profile_config=profile_config,
         task_id="fake_task",
         install_deps=True,

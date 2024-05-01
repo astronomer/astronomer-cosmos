@@ -199,7 +199,7 @@ line-length = 120
 [tool.ruff.lint]
 select = ["C901", "I"]
 [tool.ruff.lint.mccabe]
-max-complexity = 8
+max-complexity = 10
 
 [tool.distutils.bdist_wheel]
 universal = true

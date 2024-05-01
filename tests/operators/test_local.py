@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -15,6 +16,7 @@ from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
 
+from cosmos import cache
 from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
 from cosmos.dbt.parser.output import (
@@ -422,6 +424,33 @@ def test_run_operator_dataset_inlets_and_outlets():
     assert test_operator.outlets == []
 
 
+@pytest.mark.integration
+def test_run_operator_caches_partial_parsing(caplog, tmp_path):
+    caplog.set_level(logging.DEBUG)
+    with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+            cache_dir=cache._obtain_cache_dir_path("test-partial-parsing", tmp_path),
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        seed_operator
+
+    run_test_dag(dag)
+
+    # Unable to do partial parsing because saved manifest not found. Starting full parse.
+    assert "Unable to do partial parsing" in caplog.text
+
+    caplog.clear()
+    run_test_dag(dag)
+
+    assert not "Unable to do partial parsing" in caplog.text
+
+
 def test_dbt_base_operator_no_partial_parse() -> None:
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
@@ -757,6 +786,7 @@ def test_operator_execute_deps_parameters(
         "dev",
     ]
     task = DbtRunLocalOperator(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         profile_config=real_profile_config,
         task_id="my-task",
         project_dir=DBT_PROJ_DIR,

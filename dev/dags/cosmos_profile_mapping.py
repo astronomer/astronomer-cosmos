@@ -11,11 +11,14 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
+from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
+from cosmos.constants import InvocationMode
 from cosmos.profiles import get_automatic_profile_mapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+
+execution_config = ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER)
 
 
 @dag(
@@ -30,6 +33,7 @@ def cosmos_profile_mapping() -> None:
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
     jaffle_shop = DbtTaskGroup(
+        execution_config=execution_config,
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
         ),

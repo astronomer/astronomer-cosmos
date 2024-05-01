@@ -27,16 +27,6 @@ def get_partial_parse_path(project_dir_path: Path) -> Path:
     return project_dir_path / DBT_TARGET_DIR_NAME / DBT_PARTIAL_PARSE_FILE_NAME
 
 
-def copy_msgpack_for_partial_parse(project_path: Path, tmp_dir: Path) -> None:
-    partial_parse_file = get_partial_parse_path(project_path)
-
-    if partial_parse_file.exists():
-        tmp_target_dir = tmp_dir / DBT_TARGET_DIR_NAME
-        tmp_target_dir.mkdir(exist_ok=True)
-
-        shutil.copy(str(partial_parse_file), str(tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME))
-
-
 @contextmanager
 def environ(env_vars: dict[str, str]) -> Generator[None, None, None]:
     """Temporarily set environment variables inside the context manager and restore

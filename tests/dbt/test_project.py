@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.dbt.project import change_working_directory, copy_msgpack_for_partial_parse, create_symlinks, environ
+from cosmos.dbt.project import change_working_directory, create_symlinks, environ
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
@@ -18,30 +18,6 @@ def test_create_symlinks(tmp_path):
     for child in tmp_dir.iterdir():
         assert child.is_symlink()
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
-
-
-@pytest.mark.parametrize("exists", [True, False])
-def test_copy_manifest_for_partial_parse(tmp_path, exists):
-    project_path = tmp_path / "project"
-    target_path = project_path / "target"
-    partial_parse_file = target_path / "partial_parse.msgpack"
-
-    target_path.mkdir(parents=True)
-
-    if exists:
-        partial_parse_file.write_bytes(b"")
-
-    tmp_dir = tmp_path / "tmp_dir"
-    tmp_dir.mkdir()
-
-    copy_msgpack_for_partial_parse(project_path, tmp_dir)
-
-    tmp_partial_parse_file = tmp_dir / "target" / "partial_parse.msgpack"
-
-    if exists:
-        assert tmp_partial_parse_file.exists()
-    else:
-        assert not tmp_partial_parse_file.exists()
 
 
 @patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2"})

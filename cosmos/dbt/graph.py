@@ -24,7 +24,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import copy_msgpack_for_partial_parse, create_symlinks, environ, get_partial_parse_path
+from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 

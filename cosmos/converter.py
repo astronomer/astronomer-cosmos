@@ -225,7 +225,7 @@ class DbtToAirflowConverter:
 
         cache_dir = None
         if settings.enable_cache:
-            cache_dir = cache.obtain_cache_dir_path(cache_identifier=cache.create_cache_identifier(dag, task_group))
+            cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache._create_cache_identifier(dag, task_group))
 
         self.dbt_graph = DbtGraph(
             project=project_config,

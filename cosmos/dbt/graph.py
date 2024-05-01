@@ -258,10 +258,10 @@ class DbtGraph:
             create_symlinks(abs_project_path, tmpdir_path, self.render_config.dbt_deps)
 
             if self.project.partial_parse and self.cache_dir:
-                latest_partial_parse = cache.get_latest_partial_parse(abs_project_path, self.cache_dir)
+                latest_partial_parse = cache._get_latest_partial_parse(abs_project_path, self.cache_dir)
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 if latest_partial_parse is not None:
-                    cache.copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
+                    cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
             with self.profile_config.ensure_profile(
                 use_mock_values=self.render_config.enable_mock_profile
@@ -299,7 +299,7 @@ class DbtGraph:
             if self.project.partial_parse and self.cache_dir:
                 partial_parse_file = get_partial_parse_path(tmpdir_path)
                 if partial_parse_file.exists():
-                    cache.update_partial_parse_cache(partial_parse_file, self.cache_dir)
+                    cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
     def load_via_dbt_ls_file(self) -> None:
         """

@@ -435,7 +435,7 @@ def test_run_operator_caches_partial_parsing(caplog, tmp_path):
             dbt_cmd_flags=["--select", "raw_customers"],
             install_deps=True,
             append_env=True,
-            cache_dir=cache.obtain_cache_dir_path("test-partial-parsing", tmp_path),
+            cache_dir=cache._obtain_cache_dir_path("test-partial-parsing", tmp_path),
             invocation_mode=InvocationMode.SUBPROCESS,
         )
         seed_operator

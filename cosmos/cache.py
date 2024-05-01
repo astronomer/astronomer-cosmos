@@ -16,7 +16,7 @@ from cosmos.dbt.project import get_partial_parse_path
 # dbt cached directory was being used by different dbt task groups or DAGs within the same
 # node. For this reason, as a starting point, the cache is identified by where it is used.
 # This can be reviewed in the future.
-def create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
+def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     """
     Given a DAG name and a (optional) task_group_name, create the identifier for caching.
 
@@ -36,7 +36,7 @@ def create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     return cache_identifier
 
 
-def obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:
+def _obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:
     """
     Return a directory used to cache a specific Cosmos DbtDag or DbtTaskGroup. If the directory
     does not exist, create it.
@@ -51,7 +51,7 @@ def obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache
     return cache_dir_path
 
 
-def get_timestamp(path: Path) -> float:
+def _get_timestamp(path: Path) -> float:
     """
     Return the timestamp of a path or 0, if it does not exist.
 
@@ -65,7 +65,7 @@ def get_timestamp(path: Path) -> float:
     return timestamp
 
 
-def get_latest_partial_parse(dbt_project_path: Path, cache_dir: Path) -> Path | None:
+def _get_latest_partial_parse(dbt_project_path: Path, cache_dir: Path) -> Path | None:
     """
     Return the path to the latest partial parse file, if defined.
 
@@ -76,8 +76,8 @@ def get_latest_partial_parse(dbt_project_path: Path, cache_dir: Path) -> Path | 
     project_partial_parse_path = get_partial_parse_path(dbt_project_path)
     cosmos_cached_partial_parse_filepath = get_partial_parse_path(cache_dir)
 
-    age_project_partial_parse = get_timestamp(project_partial_parse_path)
-    age_cosmos_cached_partial_parse_filepath = get_timestamp(cosmos_cached_partial_parse_filepath)
+    age_project_partial_parse = _get_timestamp(project_partial_parse_path)
+    age_cosmos_cached_partial_parse_filepath = _get_timestamp(cosmos_cached_partial_parse_filepath)
 
     if age_project_partial_parse and age_cosmos_cached_partial_parse_filepath:
         if age_project_partial_parse > age_cosmos_cached_partial_parse_filepath:
@@ -92,7 +92,7 @@ def get_latest_partial_parse(dbt_project_path: Path, cache_dir: Path) -> Path | 
     return None
 
 
-def update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: Path) -> None:
+def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: Path) -> None:
     """
     Update the cache to have the latest partial parse file contents.
 
@@ -107,7 +107,7 @@ def update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: P
     shutil.copy(str(latest_manifest_filepath), str(manifest_path))
 
 
-def copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: Path) -> None:
+def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: Path) -> None:
     """
     Update target dbt project directory to have the latest partial parse file contents.
 

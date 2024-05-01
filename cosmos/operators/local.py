@@ -294,10 +294,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
 
             if self.partial_parse and self.cache_dir is not None:
-                latest_partial_parse = cache.get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
+                latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 if latest_partial_parse is not None:
-                    cache.copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+                    cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
@@ -348,7 +348,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 if self.partial_parse and self.cache_dir:
                     partial_parse_file = get_partial_parse_path(tmp_dir_path)
                     if partial_parse_file.exists():
-                        cache.update_partial_parse_cache(partial_parse_file, self.cache_dir)
+                        cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.handle_exception(result)

@@ -5,7 +5,7 @@ import pytest
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.cache import create_cache_identifier, get_latest_partial_parse
+from cosmos.cache import _create_cache_identifier, _get_latest_partial_parse
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
 
 START_DATE = datetime(2024, 4, 16)
@@ -38,7 +38,7 @@ example_dag = DAG("dag", start_date=START_DATE)
     ],
 )
 def test_create_cache_identifier(dag, task_group, result_identifier):
-    assert create_cache_identifier(dag, task_group) == result_identifier
+    assert _create_cache_identifier(dag, task_group) == result_identifier
 
 
 def test_get_latest_partial_parse(tmp_path):
@@ -58,9 +58,9 @@ def test_get_latest_partial_parse(tmp_path):
     new_partial_parse_filepath = new_tmp_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
     new_partial_parse_filepath.touch()
 
-    assert get_latest_partial_parse(old_tmp_dir, new_tmp_dir) == new_partial_parse_filepath
-    assert get_latest_partial_parse(new_tmp_dir, old_tmp_dir) == new_partial_parse_filepath
-    assert get_latest_partial_parse(old_tmp_dir, old_tmp_dir) == old_partial_parse_filepath
-    assert get_latest_partial_parse(old_tmp_dir, tmp_path) == old_partial_parse_filepath
-    assert get_latest_partial_parse(tmp_path, old_tmp_dir) == old_partial_parse_filepath
-    assert get_latest_partial_parse(tmp_path, tmp_path) is None
+    assert _get_latest_partial_parse(old_tmp_dir, new_tmp_dir) == new_partial_parse_filepath
+    assert _get_latest_partial_parse(new_tmp_dir, old_tmp_dir) == new_partial_parse_filepath
+    assert _get_latest_partial_parse(old_tmp_dir, old_tmp_dir) == old_partial_parse_filepath
+    assert _get_latest_partial_parse(old_tmp_dir, tmp_path) == old_partial_parse_filepath
+    assert _get_latest_partial_parse(tmp_path, old_tmp_dir) == old_partial_parse_filepath
+    assert _get_latest_partial_parse(tmp_path, tmp_path) is None

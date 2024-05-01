@@ -28,8 +28,8 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
         if task_group.dag_id is not None:
             cache_identifiers_list = [task_group.dag_id]
         if task_group.group_id is not None:
-            cache_identifiers_list.extend([task_group.group_id.replace(".", "_")])
-        cache_identifier = "_".join(cache_identifiers_list)
+            cache_identifiers_list.extend([task_group.group_id.replace(".", "__")])
+        cache_identifier = "__".join(cache_identifiers_list)
     else:
         cache_identifier = dag.dag_id
 

@@ -16,13 +16,13 @@ example_dag = DAG("dag", start_date=START_DATE)
     "dag, task_group, result_identifier",
     [
         (example_dag, None, "dag"),
-        (None, TaskGroup(dag=example_dag, group_id="inner_tg"), "dag_inner_tg"),
+        (None, TaskGroup(dag=example_dag, group_id="inner_tg"), "dag__inner_tg"),
         (
             None,
             TaskGroup(
                 dag=example_dag, group_id="child_tg", parent_group=TaskGroup(dag=example_dag, group_id="parent_tg")
             ),
-            "dag_parent_tg_child_tg",
+            "dag__parent_tg__child_tg",
         ),
         (
             None,
@@ -33,7 +33,7 @@ example_dag = DAG("dag", start_date=START_DATE)
                     dag=example_dag, group_id="mum_tg", parent_group=TaskGroup(dag=example_dag, group_id="nana_tg")
                 ),
             ),
-            "dag_nana_tg_mum_tg_child_tg",
+            "dag__nana_tg__mum_tg__child_tg",
         ),
     ],
 )

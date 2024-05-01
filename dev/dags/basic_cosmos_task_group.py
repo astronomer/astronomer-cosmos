@@ -27,7 +27,6 @@ profile_config = ProfileConfig(
 
 shared_execution_config = ExecutionConfig(
     invocation_mode=InvocationMode.SUBPROCESS,
-    # invocation_mode=InvocationMode.DBT_RUNNER
 )
 
 

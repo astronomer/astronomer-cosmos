@@ -18,7 +18,9 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
 from attr import define
 
+from cosmos import cache
 from cosmos.constants import InvocationMode
+from cosmos.dbt.project import get_partial_parse_path
 
 try:
     from airflow.datasets import Dataset
@@ -49,7 +51,7 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.dbt.project import change_working_directory, copy_msgpack_for_partial_parse, create_symlinks, environ
+from cosmos.dbt.project import change_working_directory, create_symlinks, environ
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
@@ -261,7 +263,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         # Exclude the dbt executable path from the command
         cli_args = command[1:]
-
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
 
         with change_working_directory(cwd), environ(env):
@@ -282,16 +283,21 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self._discover_invocation_mode()
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
+
             logger.info(
                 "Cloning project to writable temp directory %s from %s",
                 tmp_project_dir,
                 self.project_dir,
             )
+            tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
-            create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
+            create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
 
-            if self.partial_parse:
-                copy_msgpack_for_partial_parse(Path(self.project_dir), Path(tmp_project_dir))
+            if self.partial_parse and self.cache_dir is not None:
+                latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
+                logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+                if latest_partial_parse is not None:
+                    cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
@@ -319,14 +325,15 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 full_cmd = cmd + flags
 
-                logger.info("Using environment variables keys: %s", env.keys())
+                logger.debug("Using environment variables keys: %s", env.keys())
+
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
                     cwd=tmp_project_dir,
                 )
                 if is_openlineage_available:
-                    self.calculate_openlineage_events_completes(env, Path(tmp_project_dir))
+                    self.calculate_openlineage_events_completes(env, tmp_dir_path)
                     context[
                         "task_instance"
                     ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
@@ -337,6 +344,11 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     logger.info("Inlets: %s", inlets)
                     logger.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
+
+                if self.partial_parse and self.cache_dir:
+                    partial_parse_file = get_partial_parse_path(tmp_dir_path)
+                    if partial_parse_file.exists():
+                        cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.handle_exception(result)

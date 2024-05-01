@@ -7,11 +7,13 @@ import aenum
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
 DEFAULT_DBT_TARGET_NAME = "cosmos_target"
+DEFAULT_COSMOS_CACHE_DIR_NAME = "cosmos"
 DBT_LOG_PATH_ENVVAR = "DBT_LOG_PATH"
 DBT_LOG_DIR_NAME = "logs"
 DBT_TARGET_PATH_ENVVAR = "DBT_TARGET_PATH"
 DBT_TARGET_DIR_NAME = "target"
 DBT_PARTIAL_PARSE_FILE_NAME = "partial_parse.msgpack"
+DBT_MANIFEST_FILE_NAME = "manifest.json"
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
 

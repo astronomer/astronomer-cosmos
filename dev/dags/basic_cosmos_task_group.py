@@ -25,7 +25,9 @@ profile_config = ProfileConfig(
     ),
 )
 
-shared_execution_config = ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+shared_execution_config = ExecutionConfig(
+    invocation_mode=InvocationMode.SUBPROCESS,
+)
 
 
 @dag(
@@ -44,7 +46,7 @@ def basic_cosmos_task_group() -> None:
         project_config=ProjectConfig(
             (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
         ),
-        render_config=RenderConfig(select=["path:seeds/raw_customers.csv"]),
+        render_config=RenderConfig(select=["path:seeds/raw_customers.csv"], enable_mock_profile=False),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
@@ -56,7 +58,10 @@ def basic_cosmos_task_group() -> None:
         project_config=ProjectConfig(
             (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
         ),
-        render_config=RenderConfig(select=["path:seeds/raw_orders.csv"]),
+        render_config=RenderConfig(
+            select=["path:seeds/raw_orders.csv"],
+            enable_mock_profile=False,  # This is necessary to benefit from partial parsing when using ProfileMapping
+        ),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,

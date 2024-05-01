@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 from abc import ABCMeta, abstractmethod
+from functools import cached_property
+from pathlib import Path
 from typing import Any, Sequence, Tuple
 
 import yaml
@@ -10,6 +12,7 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
+from cosmos import cache
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
@@ -61,6 +64,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         (i.e. /home/astro/.pyenv/versions/dbt_venv/bin/dbt)
     :param dbt_cmd_flags: List of flags to pass to dbt command
     :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
+    :param cache_dir: Directory used to cache Cosmos/dbt artifacts in Airflow worker nodes
     """
 
     template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models")
@@ -108,6 +112,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         dbt_executable_path: str = get_system_dbt(),
         dbt_cmd_flags: list[str] | None = None,
         dbt_cmd_global_flags: list[str] | None = None,
+        cache_dir: Path | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -135,6 +140,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.dbt_executable_path = dbt_executable_path
         self.dbt_cmd_flags = dbt_cmd_flags
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
+        self.cache_dir = cache_dir
         super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:

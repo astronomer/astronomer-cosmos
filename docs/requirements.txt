@@ -1,3 +1,4 @@
+google-re2==1.1
 aenum
 sphinx
 pydata-sphinx-theme

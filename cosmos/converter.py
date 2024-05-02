@@ -115,6 +115,7 @@ def validate_initial_user_config(
     """
     if profile_config is None and execution_config.execution_mode not in (
         ExecutionMode.KUBERNETES,
+        ExecutionMode.EKS,
         ExecutionMode.DOCKER,
     ):
         raise CosmosValueError(f"The profile_config is mandatory when using {execution_config.execution_mode}")

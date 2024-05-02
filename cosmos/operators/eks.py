@@ -1,18 +1,16 @@
 import warnings
-from typing import Sequence, TYPE_CHECKING, Callable, Any
+from typing import Sequence, Callable, Any
 
+from airflow.exceptions import AirflowException, AirflowProviderDeprecationWarning
 from airflow.models import TaskInstance
 from airflow.providers.amazon.aws.hooks.eks import EksHook
+from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
+from airflow.utils.context import Context, context_merge
 
 from cosmos.dbt.parser.output import extract_log_issues, DBT_NO_TESTS_MSG, DBT_WARN_MSG
 from cosmos.operators.base import DbtBuildMixin, DbtRunOperationMixin, DbtTestMixin, DbtRunMixin, DbtSnapshotMixin, \
     DbtSeedMixin, DbtLSMixin
-from cosmos.operators.kubernetes import DbtKubernetesBaseOperator, DbtTestKubernetesOperator
-from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
-from airflow.exceptions import AirflowException, AirflowProviderDeprecationWarning
-
-if TYPE_CHECKING:
-    from airflow.utils.context import Context, context_merge
+from cosmos.operators.kubernetes import DbtKubernetesBaseOperator
 
 CHECK_INTERVAL_SECONDS = 15
 TIMEOUT_SECONDS = 25 * 60

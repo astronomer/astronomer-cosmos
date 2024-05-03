@@ -32,6 +32,11 @@ dependencies = [
     "apache-airflow>=2.3.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
+    # The issue regarding Airflow and Pydantic, documented in https://github.com/apache/airflow/issues/32311, was
+    # resolved through the pull request https://github.com/apache/airflow/pull/32366. This PR was included in the
+    # release of Airflow 2.7.0. Therefore, once we set here the minimum version of Airflow to 2.7.0, we can eliminate
+    # the upper bound constraint on the version of Pydantic.
+    "pydantic>=1.10.0,<2.0.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
 ]

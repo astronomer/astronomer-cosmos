@@ -32,6 +32,7 @@ dependencies = [
     "apache-airflow>=2.3.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
+    "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
 ]
@@ -84,9 +85,6 @@ docker = [
 ]
 kubernetes = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
-]
-pydantic = [
-        "pydantic>=1.10.0",
 ]
 azure-container-instance = [
     "apache-airflow-providers-microsoft-azure>=8.4.0",

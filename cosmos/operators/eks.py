@@ -55,7 +55,7 @@ class DbtEksBaseOperator(DbtKubernetesBaseOperator):
             return super().execute(context)
 
 
-class DbtBuildEksOperator(DbtBuildKubernetesOperator, DbtEksBaseOperator):
+class DbtBuildEksOperator(DbtEksBaseOperator, DbtBuildKubernetesOperator):
     """
     Executes a dbt core build command.
     """
@@ -64,13 +64,13 @@ class DbtBuildEksOperator(DbtBuildKubernetesOperator, DbtEksBaseOperator):
         str] = DbtEksBaseOperator.template_fields + DbtBuildKubernetesOperator.template_fields  # type: ignore[operator]
 
 
-class DbtLSEksOperator(DbtLSKubernetesOperator, DbtEksBaseOperator):
+class DbtLSEksOperator(DbtEksBaseOperator, DbtLSKubernetesOperator):
     """
     Executes a dbt core ls command.
     """
 
 
-class DbtSeedEksOperator(DbtSeedKubernetesOperator, DbtEksBaseOperator):
+class DbtSeedEksOperator(DbtEksBaseOperator, DbtSeedKubernetesOperator):
     """
     Executes a dbt core seed command.
     """
@@ -79,13 +79,13 @@ class DbtSeedEksOperator(DbtSeedKubernetesOperator, DbtEksBaseOperator):
         str] = DbtEksBaseOperator.template_fields + DbtSeedKubernetesOperator.template_fields  # type: ignore[operator]
 
 
-class DbtSnapshotEksOperator(DbtSnapshotKubernetesOperator, DbtEksBaseOperator):
+class DbtSnapshotEksOperator(DbtEksBaseOperator, DbtSnapshotKubernetesOperator):
     """
     Executes a dbt core snapshot command.
     """
 
 
-class DbtRunEksOperator(DbtRunKubernetesOperator, DbtEksBaseOperator):
+class DbtRunEksOperator(DbtEksBaseOperator, DbtRunKubernetesOperator):
     """
     Executes a dbt core run command.
     """
@@ -94,7 +94,7 @@ class DbtRunEksOperator(DbtRunKubernetesOperator, DbtEksBaseOperator):
         str] = DbtEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
 
 
-class DbtTestEksOperator(DbtTestKubernetesOperator, DbtEksBaseOperator):
+class DbtTestEksOperator(DbtEksBaseOperator, DbtTestKubernetesOperator):
     """
       Executes a dbt core test command.
       """
@@ -102,7 +102,7 @@ class DbtTestEksOperator(DbtTestKubernetesOperator, DbtEksBaseOperator):
         str] = DbtEksBaseOperator.template_fields + DbtTestKubernetesOperator.template_fields  # type: ignore[operator]
 
 
-class DbtRunOperationEksOperator(DbtRunOperationKubernetesOperator, DbtEksBaseOperator):
+class DbtRunOperationEksOperator(DbtEksBaseOperator, DbtRunOperationKubernetesOperator):
     """
     Executes a dbt core run-operation command.
     """

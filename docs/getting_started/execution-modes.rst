@@ -9,7 +9,8 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
 3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
-5. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
+5. **eks**: Run ``dbt`` commands from EKS Pods managed by Cosmos (requires a pre-existing Docker image)
+6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -35,6 +36,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - Medium
      - No
    * - Kubernetes
+     - Slow
+     - High
+     - No
+   * - EKS
      - Slow
      - High
      - No
@@ -154,6 +159,38 @@ Example DAG:
         ),
         operator_args={
             "image": "dbt-jaffle-shop:1.0.0",
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "secrets": [postgres_password_secret],
+        },
+    )
+EKS
+----------
+
+The ``eks`` approach is very similar to the ``kubernetes`` approach, but it is specifically designed to run on AWS EKS clusters.
+It uses the [EKSPodOperator](https://airflow.apache.org/docs/apache-airflow-providers-amazon/2.2.0/operators/eks.html#perform-a-task-on-an-amazon-eks-cluster)
+to run the dbt commands. You need to provide the ``cluster_name`` in your operator_args to connect to the EKS cluster.
+
+
+Example DAG:
+
+.. code-block:: python
+
+    postgres_password_secret = Secret(
+        deploy_type="env",
+        deploy_target="POSTGRES_PASSWORD",
+        secret="postgres-secrets",
+        key="password",
+    )
+
+    docker_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.EKS,
+        ),
+        operator_args={
+            "image": "dbt-jaffle-shop:1.0.0",
+            "cluster_name": CLUSTER_NAME,
             "get_logs": True,
             "is_delete_operator_pod": False,
             "secrets": [postgres_password_secret],

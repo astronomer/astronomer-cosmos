@@ -406,6 +406,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + output.name
                 uris.append(dataset_uri)
+        logger.debug("URIs to be converted to Dataset: %s", uris)
         return [Dataset(uri) for uri in uris]
 
     def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset]) -> None:

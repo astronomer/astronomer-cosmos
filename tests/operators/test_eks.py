@@ -2,8 +2,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cosmos.operators.eks import DbtLSEksOperator, DbtSeedEksOperator, DbtBuildEksOperator, DbtTestEksOperator, \
-    DbtRunEksOperator
+from cosmos.operators.eks import (
+    DbtBuildEksOperator,
+    DbtLSEksOperator,
+    DbtRunEksOperator,
+    DbtSeedEksOperator,
+    DbtTestEksOperator,
+)
 
 
 @pytest.fixture()
@@ -26,14 +31,17 @@ base_kwargs = {
 }
 
 
-@pytest.mark.parametrize("command_name,command_operator", [
-    ("ls", DbtLSEksOperator(**base_kwargs)),
-    ("run", DbtRunEksOperator(**base_kwargs)),
-    ("test", DbtTestEksOperator(**base_kwargs)),
-    ("build", DbtBuildEksOperator(**base_kwargs)),
-    ("seed", DbtSeedEksOperator(**base_kwargs)),
-])
-def test_dbt_kubernetes_build_command(command_name, command_operator ):
+@pytest.mark.parametrize(
+    "command_name,command_operator",
+    [
+        ("ls", DbtLSEksOperator(**base_kwargs)),
+        ("run", DbtRunEksOperator(**base_kwargs)),
+        ("test", DbtTestEksOperator(**base_kwargs)),
+        ("build", DbtBuildEksOperator(**base_kwargs)),
+        ("seed", DbtSeedEksOperator(**base_kwargs)),
+    ],
+)
+def test_dbt_kubernetes_build_command(command_name, command_operator):
     """
     Since we know that the KubernetesOperator is tested, we can just test that the
     command is built correctly and added to the "arguments" parameter.
@@ -67,7 +75,7 @@ def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_k
     mock_build_kube_args.assert_called_once()
 
     # Assert that the generate_config_file method was called in the execution to create the kubeconfig for eks
-    mock_generate_config_file.assert_called_once_with(eks_cluster_name='my-cluster', pod_namespace='default')
+    mock_generate_config_file.assert_called_once_with(eks_cluster_name="my-cluster", pod_namespace="default")
 
     # Assert that the kubernetes execute method was called in the execution
     mock_kubernetes_execute.assert_called_once()

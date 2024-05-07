@@ -88,6 +88,7 @@ kubernetes = [
 ]
 eks = [
     "apache-airflow-providers-amazon>=8.7.1",
+    "xmlsec<1.3.14"  # https://github.com/apache/airflow/issues/39103
 ]
 azure-container-instance = [
     "apache-airflow-providers-microsoft-azure>=8.4.0",
@@ -122,6 +123,7 @@ dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-amazon>=8.7.1",
+    "xmlsec<1.3.14",  # https://github.com/apache/airflow/issues/39103
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-microsoft-azure",
     "types-PyYAML",

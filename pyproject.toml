@@ -108,7 +108,7 @@ path = "cosmos/__init__.py"
 include = ["/cosmos"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["cosmos"]
+packages = ["/cosmos"]
 
 ######################################
 # TESTING

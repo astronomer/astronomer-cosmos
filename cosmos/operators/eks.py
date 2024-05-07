@@ -9,6 +9,7 @@ from cosmos.operators.kubernetes import DbtKubernetesBaseOperator, DbtTestKubern
     DbtSnapshotKubernetesOperator, DbtSeedKubernetesOperator, DbtLSKubernetesOperator
 
 DEFAULT_CONN_ID = "aws_default"
+DEFAULT_NAMESPACE = "default"
 
 
 class DbtEksBaseOperator(DbtKubernetesBaseOperator):
@@ -27,16 +28,19 @@ class DbtEksBaseOperator(DbtKubernetesBaseOperator):
             self,
             cluster_name: str,
             pod_name: str | None = None,
+            namespace: str | None = DEFAULT_NAMESPACE,
             aws_conn_id: str = DEFAULT_CONN_ID,
             region: str | None = None,
             **kwargs,
     ) -> None:
         self.cluster_name = cluster_name
         self.pod_name = pod_name
+        self.namespace = namespace
         self.aws_conn_id = aws_conn_id
         self.region = region
         super().__init__(
             name=self.pod_name,
+            namespace=self.namespace,
             **kwargs,
         )
         # There is no need to manage the kube_config file, as it will be generated automatically.

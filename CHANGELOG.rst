@@ -30,6 +30,7 @@ Bug fixes
 * Fix ACI integration (``DbtAzureContainerInstanceBaseOperator``) by @danielvdende in #872
 * Fix setting dbt project dir to the tmp dir by @dwreeves in #873
 * Fix dbt docs operator to not use ``graph.gpickle`` file when ``--no-write-json`` is passed by @dwreeves in #883
+* Make Pydantic a required dependency by @pankajkoti in #939
 
 Docs
 
@@ -54,8 +55,11 @@ Others
 * Fix failing ``test_created_pod`` for ``apache-airflow-providers-cncf-kubernetes`` after v8.0.0 update by @jbandoro in #854
 * Extend ``DatabricksTokenProfileMapping`` test to include session properties by @tatiana in #858
 * Fix broken integration test uncovered from Pytest 8.0 update by @jbandoro in #845
-* Pre-commit hook updates in #820, #834, #843 and #852, #890, #896, #901, #905, #908, #919, #931
+* Add Apache Airflow 2.9 to the test matrix by @tatiana in #940
 * Replace deprecated ``DummyOperator`` by ``EmptyOperator`` if Airflow >=2.4.0 by @tatiana in #900
+
+* Pre-commit hook updates in #820, #834, #843 and #852, #890, #896, #901, #905, #908, #919, #931, #941
+
 
 
 1.3.2 (2024-01-26)

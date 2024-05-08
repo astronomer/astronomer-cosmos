@@ -120,6 +120,7 @@ dependencies = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-microsoft-azure",
+    "apache-airflow-providers-postgres",
     "types-PyYAML",
     "types-attrs",
     "types-requests",

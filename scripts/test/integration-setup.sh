@@ -3,4 +3,4 @@
 pip uninstall -y dbt-postgres dbt-databricks dbt-vertica; \
 rm -rf airflow.*; \
 airflow db init; \
-pip install 'dbt-core' 'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'
+pip install 'dbt-core' 'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow' 'apache-airflow-providers-postgres'

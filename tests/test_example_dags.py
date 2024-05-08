@@ -16,6 +16,8 @@ from airflow.utils.session import provide_session
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
+from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+
 from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
@@ -27,6 +29,7 @@ MIN_VER_DAG_FILE: dict[str, list[str]] = {
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py"]
+
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
@@ -50,7 +53,10 @@ def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
         for min_version, files in MIN_VER_DAG_FILE_VER.items():
-            if Version(airflow.__version__) < min_version:
+            if (
+                Version(airflow.__version__) < min_version
+                or Version(airflow.__version__) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+            ):
                 print(f"Adding {files} to .airflowignore")
                 file.writelines([f"{file}\n" for file in files])
 

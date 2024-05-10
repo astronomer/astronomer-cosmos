@@ -166,13 +166,14 @@ markers = ["integration", "sqlite", "perf"]
 [tool.hatch.envs.docs]
 dependencies = [
     "aenum",
-    "sphinx",
-    "pydata-sphinx-theme",
-    "sphinx-autobuild",
-    "sphinx-autoapi",
-    "openlineage-airflow",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "msgpack",
+    "openlineage-airflow",
     "pydantic>=1.10.0",
+    "pydata-sphinx-theme",
+    "sphinx",
+    "sphinx-autoapi",
+    "sphinx-autobuild",
 ]
 
 [tool.hatch.envs.docs.scripts]

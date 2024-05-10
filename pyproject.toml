@@ -117,6 +117,7 @@ packages = ["/cosmos"]
 [tool.hatch.envs.tests]
 dependencies = [
     "astronomer-cosmos[tests]",
+    "apache-airflow-providers-postgres",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-microsoft-azure",
@@ -135,7 +136,7 @@ airflow = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
-    { value = "typing_extensions<4.6", if = ["2.6"] }
+    { value = "typing_extensions<4.6", if = ["2.6"] },
 ]
 
 [tool.hatch.envs.tests.scripts]

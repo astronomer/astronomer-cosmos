@@ -32,6 +32,7 @@ dependencies = [
     "apache-airflow>=2.3.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
+    "msgpack",
     "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
@@ -141,16 +142,17 @@ matrix.airflow.dependencies = [
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
-type-check = "mypy cosmos"
 test = 'sh scripts/test/unit.sh'
 test-cov = 'sh scripts/test/unit-cov.sh'
-test-integration-setup = 'sh scripts/test/integration-setup.sh'
 test-integration = 'sh scripts/test/integration.sh'
+test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
-test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
+test-integration-setup = 'sh scripts/test/integration-setup.sh'
 test-integration-sqlite = 'sh scripts/test/integration-sqlite.sh'
-test-performance-setup = 'sh scripts/test/performance-setup.sh'
+test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
 test-performance = 'sh scripts/test/performance.sh'
+test-performance-setup = 'sh scripts/test/performance-setup.sh'
+type-check = "mypy cosmos"
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
@@ -164,13 +166,14 @@ markers = ["integration", "sqlite", "perf"]
 [tool.hatch.envs.docs]
 dependencies = [
     "aenum",
-    "sphinx",
-    "pydata-sphinx-theme",
-    "sphinx-autobuild",
-    "sphinx-autoapi",
-    "openlineage-airflow",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "msgpack",
+    "openlineage-airflow",
     "pydantic>=1.10.0",
+    "pydata-sphinx-theme",
+    "sphinx",
+    "sphinx-autoapi",
+    "sphinx-autobuild",
 ]
 
 [tool.hatch.envs.docs.scripts]

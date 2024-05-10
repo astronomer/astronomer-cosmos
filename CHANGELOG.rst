@@ -31,6 +31,7 @@ Bug fixes
 * Fix setting dbt project dir to the tmp dir by @dwreeves in #873
 * Fix dbt docs operator to not use ``graph.gpickle`` file when ``--no-write-json`` is passed by @dwreeves in #883
 * Make Pydantic a required dependency by @pankajkoti in #939
+* Gracefully error if users try to ``emit_datasets`` with ``Airflow 2.9.0`` or ``2.9.1`` by @tatiana in #948
 
 Docs
 
@@ -57,6 +58,8 @@ Others
 * Fix broken integration test uncovered from Pytest 8.0 update by @jbandoro in #845
 * Add Apache Airflow 2.9 to the test matrix by @tatiana in #940
 * Replace deprecated ``DummyOperator`` by ``EmptyOperator`` if Airflow >=2.4.0 by @tatiana in #900
+* Improve logs to troubleshoot issue in 1.4.0a2 with astro-cli by @tatiana in #947
+* Fix issue when publishing a new release to PyPI by @tatiana in #946
 
 * Pre-commit hook updates in #820, #834, #843 and #852, #890, #896, #901, #905, #908, #919, #931, #941
 

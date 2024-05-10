@@ -5,7 +5,7 @@ Getting Started on Astro
 
 While it is possible to use Cosmos on Astro with all :ref:`Execution Modes <execution-modes>`, we recommend using the ``local`` execution mode. It's the simplest to set up and use.
 
-If you'd like to see a fully functional project to run in Astro (CLI or Cloud), `check out cosmos-demo <https://github.com/astronomer/cosmos-demo>`_.
+If you'd like to see a fully functional project to run in Astro (CLI or Cloud), check out `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_.
 
 Below you can find a step-by-step guide to run your own dbt project within Astro.
 

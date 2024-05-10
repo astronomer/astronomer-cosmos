@@ -5,6 +5,10 @@ Getting Started on Astro
 
 While it is possible to use Cosmos on Astro with all :ref:`Execution Modes <execution-modes>`, we recommend using the ``local`` execution mode. It's the simplest to set up and use.
 
+If you'd like to see a fully functional project to run in Astro (CLI or Cloud), check out `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_.
+
+Below you can find a step-by-step guide to run your own dbt project within Astro.
+
 Pre-requisites
 ~~~~~~~~~~~~~~
 
@@ -12,6 +16,7 @@ To get started, you should have:
 
 - The Astro CLI installed. You can find installation instructions `here <https://docs.astronomer.io/astro/cli/install-cli>`_.
 - An Astro CLI project. You can initialize a new project with ``astro dev init``.
+- A dbt project. The `jaffle shop example <https://github.com/dbt-labs/jaffle-shop-classic>`_ is a good example.
 
 Create a virtual environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,6 +31,7 @@ Create a virtual environment in your ``Dockerfile`` using the sample below. Be s
     RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \
         pip install --no-cache-dir <your-dbt-adapter> && deactivate
 
+An example of dbt adapter is ``dbt-postgres``.
 
 Install Cosmos
 ~~~~~~~~~~~~~~

@@ -16,17 +16,21 @@ from airflow.utils.session import provide_session
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
+from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+
 from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py"]
+
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
@@ -48,9 +52,12 @@ def session():
 @cache
 def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
+    if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
+        return DagBag(dag_folder=None, include_examples=False)
+
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
         for min_version, files in MIN_VER_DAG_FILE_VER.items():
-            if Version(airflow.__version__) < min_version:
+            if AIRFLOW_VERSION < min_version:
                 print(f"Adding {files} to .airflowignore")
                 file.writelines([f"{file}\n" for file in files])
 
@@ -77,6 +84,10 @@ def get_dag_ids() -> list[str]:
     return dag_bag.dag_ids
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
+)
 @pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):

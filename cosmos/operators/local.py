@@ -21,6 +21,7 @@ from attr import define
 from cosmos import cache
 from cosmos.constants import InvocationMode
 from cosmos.dbt.project import get_partial_parse_path
+from cosmos.exceptions import AirflowCompatibilityError
 
 try:
     from airflow.datasets import Dataset
@@ -406,7 +407,22 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + output.name
                 uris.append(dataset_uri)
-        return [Dataset(uri) for uri in uris]
+        logger.debug("URIs to be converted to Dataset: %s", uris)
+
+        datasets = []
+        try:
+            datasets = [Dataset(uri) for uri in uris]
+        except ValueError as e:
+            raise AirflowCompatibilityError(
+                """
+                Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions:
+                https://github.com/apache/airflow/issues/39486
+
+                If you want to use Cosmos with one of these Airflow versions, you will have to disable emission of Datasets:
+                By setting ``emit_datasets=False`` in ``RenderConfig``. For more information, see https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html.
+                """
+            )
+        return datasets
 
     def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset]) -> None:
         """

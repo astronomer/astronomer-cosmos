@@ -18,12 +18,13 @@ from pendulum import datetime
 
 from cosmos import cache
 from cosmos.config import ProfileConfig
-from cosmos.constants import InvocationMode
+from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
+from cosmos.exceptions import AirflowCompatibilityError
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtDocsAzureStorageLocalOperator,
@@ -384,11 +385,12 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have datasets until the 2.4 release",
+    version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets():
+def test_run_operator_dataset_inlets_and_outlets(caplog):
     from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
@@ -417,11 +419,93 @@ def test_run_operator_dataset_inlets_and_outlets():
             append_env=True,
         )
         seed_operator >> run_operator >> test_operator
+
     run_test_dag(dag)
+
     assert run_operator.inlets == []
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+    # https://github.com/apache/airflow/issues/39486
+)
+@pytest.mark.integration
+def test_run_operator_dataset_emission_fails(caplog):
+    from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+
+        seed_operator >> run_operator
+
+    with pytest.raises(AirflowCompatibilityError) as exc:
+        run_test_dag(dag)
+
+    err_msg = str(exc.value)
+    assert (
+        "Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions"
+        in err_msg
+    )
+    assert (
+        "If you want to use Cosmos with one of these Airflow versions, you will have to disable emission of Datasets"
+        in err_msg
+    )
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+    # https://github.com/apache/airflow/issues/39486
+)
+@pytest.mark.integration
+def test_run_operator_dataset_emission_is_skipped(caplog):
+    from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+            emit_datasets=False,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            emit_datasets=False,
+        )
+
+        seed_operator >> run_operator
+
+    run_test_dag(dag)
+
+    assert run_operator.inlets == []
+    assert run_operator.outlets == []
 
 
 @pytest.mark.integration

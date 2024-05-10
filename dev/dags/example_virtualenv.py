@@ -36,6 +36,7 @@ example_virtualenv = DbtDag(
         "py_system_site_packages": False,
         "py_requirements": ["dbt-postgres==1.6.0b1"],
         "install_deps": True,
+        "emit_datasets": False,  # Example of how to not set inlets and outlets
     },
     # normal dag parameters
     schedule_interval="@daily",

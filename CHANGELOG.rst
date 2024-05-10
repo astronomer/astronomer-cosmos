@@ -32,6 +32,8 @@ Bug fixes
 * Fix dbt docs operator to not use ``graph.gpickle`` file when ``--no-write-json`` is passed by @dwreeves in #883
 * Make Pydantic a required dependency by @pankajkoti in #939
 * Gracefully error if users try to ``emit_datasets`` with ``Airflow 2.9.0`` or ``2.9.1`` by @tatiana in #948
+* Fix running tests that don't have any dependencies by @jlneve in #933
+
 
 Docs
 
@@ -43,6 +45,7 @@ Docs
 * Improve docs for datasets for airflow >= 2.4 by @SiddiqueAhmad in #879
 * Improve test behaviour docs to highlight ``warning`` feature in the ``virtualenv`` mode by @mc51 in #910
 * Fix docs typo by @SiddiqueAhmad in #917
+* Improve Astro docs by @RNHTTR in #951
 
 Others
 

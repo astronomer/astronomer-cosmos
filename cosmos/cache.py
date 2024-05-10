@@ -125,7 +125,7 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     # Update root_path in partial parse file to point to the needed project directory. This is necessary because in some
     # earlier versions of dbt (e.g. 1.5.4), the root_path was hardcoded to a stale directory and is not updated to the
-    # needed target directory. This seems to have been resolved in later versions of dbt, but we still need to handle
+    # needed project directory. This seems to have been resolved in later versions of dbt, but we still need to handle
     # this for compatibility with older versions.
     with target_partial_parse_file.open("rb") as f:
         data = msgpack.unpack(f)

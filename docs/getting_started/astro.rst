@@ -7,7 +7,7 @@ While it is possible to use Cosmos on Astro with all :ref:`Execution Modes <exec
 
 If you'd like to see a fully functional project to run in Astro (CLI or Cloud), `check out cosmos-demo <https://github.com/astronomer/cosmos-demo>`_.
 
-Below you can find the step-by-step to run your own dbt project within Astro.
+Below you can find a step-by-step guide to run your own dbt project within Astro.
 
 Pre-requisites
 ~~~~~~~~~~~~~~

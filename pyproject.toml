@@ -32,6 +32,7 @@ dependencies = [
     "apache-airflow>=2.3.0",
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
+    "msgpack",
     "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",

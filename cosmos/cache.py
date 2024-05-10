@@ -123,7 +123,7 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
     shutil.copy(str(partial_parse_filepath), str(target_partial_parse_file))
 
-    # Update root_path in partial parse file to point to the target project directory. This is necessary because in some
+    # Update root_path in partial parse file to point to the needed project directory. This is necessary because in some
     # earlier versions of dbt (e.g. 1.5.4), the root_path was hardcoded to a stale directory and is not updated to the
     # needed target directory. This seems to have been resolved in later versions of dbt, but we still need to handle
     # this for compatibility with older versions.

@@ -113,6 +113,11 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
+    :param append_env: . If True(default), inherits the environment variables
+        from current process and then environment variable passed by the user will either update the existing
+        inherited environment variables or the new variables gets appended to it.
+        If False, only uses the environment variables passed in env params
+        and does not inherit the current process environment.
     """
 
     template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
@@ -127,6 +132,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
+        append_env: bool = True,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -143,6 +149,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self._set_invocation_methods()
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
         super().__init__(**kwargs)
+
+        # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
+        # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
+        # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
+        # as it can break existing DAGs.
+        self.append_env = append_env
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

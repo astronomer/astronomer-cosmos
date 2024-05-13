@@ -46,7 +46,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         environment variables for the new process; these are used instead
         of inheriting the current process environment, which is the default
         behavior. (templated)
-    :param append_env: . If True, inherits the environment variables
+    :param append_env: If True, inherits the environment variables
         from current process and then environment variable passed by the user will either update the existing
         inherited environment variables or the new variables gets appended to it.
         If False (default), only uses the environment variables passed in env params

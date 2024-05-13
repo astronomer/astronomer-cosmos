@@ -113,7 +113,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
-    :param append_env: . If True(default), inherits the environment variables
+    :param append_env: If True(default), inherits the environment variables
         from current process and then environment variable passed by the user will either update the existing
         inherited environment variables or the new variables gets appended to it.
         If False, only uses the environment variables passed in env params

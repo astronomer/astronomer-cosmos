@@ -73,3 +73,20 @@ def test_run_command(
     assert dbt_deps["command"][0] == dbt_cmd["command"][0]
     assert dbt_cmd["command"][1] == "do-something"
     assert mock_execute.call_count == 2
+
+
+def test_virtualenv_operator_append_env_is_true_by_default():
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        profile_config=profile_config,
+        task_id="fake_task",
+        install_deps=True,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        py_system_site_packages=False,
+        pip_install_options=["--test-flag"],
+        py_requirements=["dbt-postgres==1.6.0b1"],
+        emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+
+    assert venv_operator.append_env is True

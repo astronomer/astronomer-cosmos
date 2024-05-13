@@ -69,3 +69,9 @@ def test_dbt_mixin_add_cmd_flags_run_operator(args, expected_flags):
 
     flags = run_operation.add_cmd_flags()
     assert flags == expected_flags
+
+
+def test_abstract_dbt_base_operator_append_env_is_false_by_default():
+    """Tests that the append_env attribute is set to False by default."""
+    base_operator = AbstractDbtBaseOperator(task_id="fake_task", project_dir="fake_dir")
+    assert base_operator.append_env is False

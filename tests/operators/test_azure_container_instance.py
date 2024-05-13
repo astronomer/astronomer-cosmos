@@ -53,7 +53,6 @@ def test_dbt_azure_container_instance_operator_get_env(p_context_to_airflow_vars
         name="my-aci",
         resource_group="my-rg",
         project_dir="my/dir",
-        append_env=False,
     )
     dbt_base_operator.env = {
         "start_date": "20220101",
@@ -91,7 +90,6 @@ def test_dbt_azure_container_instance_operator_check_environment_variables(
         resource_group="my-rg",
         project_dir="my/dir",
         environment_variables={"FOO": "BAR"},
-        append_env=False,
     )
     dbt_base_operator.env = {
         "start_date": "20220101",

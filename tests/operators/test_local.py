@@ -103,6 +103,22 @@ def test_dbt_base_operator_add_global_flags() -> None:
     ]
 
 
+def test_dbt_local_operator_append_env_is_true_by_default() -> None:
+    dbt_local_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        vars={
+            "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
+            "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
+        },
+        no_version_check=True,
+        select=["my_first_model", "my_second_model"],
+    )
+
+    assert dbt_local_operator.append_env == True
+
+
 def test_dbt_base_operator_add_user_supplied_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

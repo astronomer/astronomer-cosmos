@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.4.0a1 (2024-02-29)
+1.4.0 (2024-05-13)
 --------------------
 
 Features
@@ -9,10 +9,12 @@ Features
 * Add dbt docs natively in Airflow via plugin by @dwreeves in #737
 * Add support for ``InvocationMode.DBT_RUNNER`` for local execution mode by @jbandoro in #850
 * Support partial parsing to render DAGs faster when using ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and ``LoadMode.DBT_LS`` by @dwreeves in #800
+* Improve performance by 22-35% or more by caching partial parse artefact by @tatiana in #904
 * Add Azure Container Instance as Execution Mode by @danielvdende in #771
 * Add dbt build operators by @dylanharper-qz in #795
 * Add dbt profile config variables to mapped profile by @ykuc in #794
 * Add more template fields to ``DbtBaseOperator`` by @dwreeves in #786
+* Add ``pip_install_options`` argument to operators by @octiva in #808
 
 Bug fixes
 
@@ -21,24 +23,48 @@ Bug fixes
 * Improve ``dbt ls`` parsing resilience to missing tags/config by @tatiana in #859
 * Fix ``operator_args`` modified in place in Airflow converter by @jbandoro in #835
 * Fix Docker and Kubernetes operators execute method resolution by @jbandoro in #849
+* Fix ``TrinoBaseProfileMapping`` required parameter for non method authentication by @AlexandrKhabarov in #921
+* Fix global flags for lists by @ms32035 in #863
+* Fix ``GoogleCloudServiceAccountDictProfileMapping`` when getting values from the Airflow connection ``extra__`` keys by @glebkrapivin in #923
+* Fix using the dag as a keyword argument as ``specific_args_keys`` in DbtTaskGroup by @tboutaour in #916
+* Fix ACI integration (``DbtAzureContainerInstanceBaseOperator``) by @danielvdende in #872
+* Fix setting dbt project dir to the tmp dir by @dwreeves in #873
+* Fix dbt docs operator to not use ``graph.gpickle`` file when ``--no-write-json`` is passed by @dwreeves in #883
+* Make Pydantic a required dependency by @pankajkoti in #939
+* Gracefully error if users try to ``emit_datasets`` with ``Airflow 2.9.0`` or ``2.9.1`` by @tatiana in #948
+* Fix parsing tests that have no parents in #933 by @jlaneve
+* Correct ``root_path`` in partial parse cache by @pankajkoti in #950
 
 Docs
 
 * Fix docs homepage link by @jlaneve in #860
 * Fix docs ``ExecutionConfig.dbt_project_path`` by @jbandoro in #847
 * Fix typo in MWAA getting started guide by @jlaneve in #846
+* Fix typo related to exporting docs to GCS by @tboutaour in #922
+* Improve partial parsing docs by @tatiana in #898
+* Improve docs for datasets for airflow >= 2.4 by @SiddiqueAhmad in #879
+* Improve test behaviour docs to highlight ``warning`` feature in the ``virtualenv`` mode by @mc51 in #910
+* Fix docs typo by @SiddiqueAhmad in #917
+* Improve Astro docs by @RNHTTR in #951
 
 Others
 
 * Add performance integration tests by @jlaneve in #827
+* Enable ``append_env`` in ``operator_args`` by default by @tatiana in #899
+* Change default ``append_env`` behaviour depending on Cosmos ``ExecutionMode`` by @pankajkoti and @pankajastro in #954
+* Expose the ``dbt`` graph in the ``DbtToAirflowConverter`` class by @tommyjxl in #886
+* Improve dbt docs plugin rendering padding by @dwreeves in #876
 * Add ``connect_retries`` to databricks profile to fix expensive integration failures by @jbandoro in #826
 * Add import sorting (isort) to Cosmos by @jbandoro in #866
 * Add Python 3.11 to CI/tests by @tatiana and @jbandoro in #821, #824 and #825
 * Fix failing ``test_created_pod`` for ``apache-airflow-providers-cncf-kubernetes`` after v8.0.0 update by @jbandoro in #854
 * Extend ``DatabricksTokenProfileMapping`` test to include session properties by @tatiana in #858
 * Fix broken integration test uncovered from Pytest 8.0 update by @jbandoro in #845
-* Pre-commit hook updates in #834, #843 and #852
-
+* Add Apache Airflow 2.9 to the test matrix by @tatiana in #940
+* Replace deprecated ``DummyOperator`` by ``EmptyOperator`` if Airflow >=2.4.0 by @tatiana in #900
+* Improve logs to troubleshoot issue in 1.4.0a2 with astro-cli by @tatiana in #947
+* Fix issue when publishing a new release to PyPI by @tatiana in #946
+* Pre-commit hook updates in #820, #834, #843 and #852, #890, #896, #901, #905, #908, #919, #931, #941
 
 
 1.3.2 (2024-01-26)

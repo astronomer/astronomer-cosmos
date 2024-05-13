@@ -32,8 +32,8 @@ Bug fixes
 * Fix dbt docs operator to not use ``graph.gpickle`` file when ``--no-write-json`` is passed by @dwreeves in #883
 * Make Pydantic a required dependency by @pankajkoti in #939
 * Gracefully error if users try to ``emit_datasets`` with ``Airflow 2.9.0`` or ``2.9.1`` by @tatiana in #948
-* Fix running tests that don't have any dependencies by @jlneve in #933
-
+* Fix parsing tests that have no parents in #933 by @jlaneve
+* Correct ``root_path`` in partial parse cache by @pankajkoti in #950
 
 Docs
 

@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.4.0a2 (2024-05-02)
+1.4.0 (2024-05-13)
 --------------------
 
 Features
@@ -51,6 +51,7 @@ Others
 
 * Add performance integration tests by @jlaneve in #827
 * Enable ``append_env`` in ``operator_args`` by default by @tatiana in #899
+* Change default ``append_env`` behaviour depending on Cosmos ``ExecutionMode`` by @pankajkoti in #954
 * Expose the ``dbt`` graph in the ``DbtToAirflowConverter`` class by @tommyjxl in #886
 * Improve dbt docs plugin rendering padding by @dwreeves in #876
 * Add ``connect_retries`` to databricks profile to fix expensive integration failures by @jbandoro in #826

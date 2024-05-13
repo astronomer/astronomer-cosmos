@@ -43,7 +43,7 @@ Summary of Cosmos-specific arguments
 dbt-related
 ...........
 
-- ``append_env``: Expose the operating system environment variables to the ``dbt`` command. The default is ``False``.
+- ``append_env``: Expose the operating system environment variables to the ``dbt`` command. For most execution modes, the default is ``False``, however, for execution modes ExecuteMode.LOCAL and ExecuteMode.VIRTUALENV, the default is True. This behavior is consistent with the LoadMode.DBT_LS command in forwarding the environment variables to the subprocess by default.
 - ``dbt_cmd_flags``: List of command flags to pass to ``dbt`` command, added after dbt subcommand
 - ``dbt_cmd_global_flags``: List of ``dbt`` `global flags <https://docs.getdbt.com/reference/global-configs/about-global-configs>`_ to be passed to the ``dbt`` command, before the subcommand
 - ``dbt_executable_path``: Path to dbt executable.

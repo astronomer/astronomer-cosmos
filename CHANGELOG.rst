@@ -63,9 +63,7 @@ Others
 * Replace deprecated ``DummyOperator`` by ``EmptyOperator`` if Airflow >=2.4.0 by @tatiana in #900
 * Improve logs to troubleshoot issue in 1.4.0a2 with astro-cli by @tatiana in #947
 * Fix issue when publishing a new release to PyPI by @tatiana in #946
-
 * Pre-commit hook updates in #820, #834, #843 and #852, #890, #896, #901, #905, #908, #919, #931, #941
-
 
 
 1.3.2 (2024-01-26)

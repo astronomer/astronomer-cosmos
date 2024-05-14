@@ -78,8 +78,8 @@ tests = [
     "pytest-describe",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
     "types-requests",
-    "mypy",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
+    "pre-commit",
 ]
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
@@ -152,7 +152,7 @@ test-integration-sqlite = 'sh scripts/test/integration-sqlite.sh'
 test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
 test-performance = 'sh scripts/test/performance.sh'
 test-performance-setup = 'sh scripts/test/performance-setup.sh'
-type-check = "mypy cosmos"
+type-check = " pre-commit run mypy --files cosmos/**/*"
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]

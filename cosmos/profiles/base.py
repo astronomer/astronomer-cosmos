@@ -42,7 +42,8 @@ class DbtProfileConfigVars:
     def as_dict(self) -> dict[str, Any] | None:
         result = {
             field.name: getattr(self, field.name)
-            for field in self.__dataclass_fields__.values()
+            # Look like the __dataclass_fields__ attribute is not recognized by mypy
+            for field in self.__dataclass_fields__.values()  # type: ignore[attr-defined]
             if getattr(self, field.name) is not None
         }
         if result != {}:

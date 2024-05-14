@@ -19,6 +19,7 @@ Emeritus Committers
 
 * Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
 
+
 Contributors
 ------------
 

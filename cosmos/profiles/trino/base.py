@@ -13,16 +13,19 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
     dbt_profile_type: str = "trino"
     is_community: bool = True
 
-    required_fields = [
+    base_fields = [
         "host",
         "database",
         "schema",
         "port",
     ]
 
+    required_fields = base_fields + ["user"]
+
     airflow_param_mapping = {
         "host": "host",
         "port": "port",
+        "user": "login",
         "session_properties": "extra.session_properties",
     }
 

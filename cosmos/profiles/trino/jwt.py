@@ -16,7 +16,7 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
 
     dbt_profile_method: str = "jwt"
 
-    required_fields = TrinoBaseProfileMapping.required_fields + [
+    required_fields = TrinoBaseProfileMapping.base_fields + [
         "jwt_token",
     ]
     secret_fields = [

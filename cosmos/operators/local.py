@@ -18,7 +18,10 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
 from attr import define
 
+from cosmos import cache
 from cosmos.constants import InvocationMode
+from cosmos.dbt.project import get_partial_parse_path
+from cosmos.exceptions import AirflowCompatibilityError
 
 try:
     from airflow.datasets import Dataset
@@ -49,7 +52,7 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.dbt.project import change_working_directory, copy_msgpack_for_partial_parse, create_symlinks, environ
+from cosmos.dbt.project import change_working_directory, create_symlinks, environ
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
@@ -110,6 +113,11 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
+    :param append_env: If True(default), inherits the environment variables
+        from current process and then environment variable passed by the user will either update the existing
+        inherited environment variables or the new variables gets appended to it.
+        If False, only uses the environment variables passed in env params
+        and does not inherit the current process environment.
     """
 
     template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
@@ -124,6 +132,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
+        append_env: bool = True,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -140,6 +149,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self._set_invocation_methods()
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
         super().__init__(**kwargs)
+
+        # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
+        # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
+        # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
+        # as it can break existing DAGs.
+        self.append_env = append_env
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -223,6 +238,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         ti = context["ti"]
 
         if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
+            if TYPE_CHECKING:
+                assert ti.task is not None
             ti.task.template_fields = self.template_fields
             rtif = RenderedTaskInstanceFields(ti, render_templates=False)
 
@@ -261,7 +278,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         # Exclude the dbt executable path from the command
         cli_args = command[1:]
-
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
 
         with change_working_directory(cwd), environ(env):
@@ -282,16 +298,21 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self._discover_invocation_mode()
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
+
             logger.info(
                 "Cloning project to writable temp directory %s from %s",
                 tmp_project_dir,
                 self.project_dir,
             )
+            tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
-            create_symlinks(Path(self.project_dir), Path(tmp_project_dir), self.install_deps)
+            create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
 
-            if self.partial_parse:
-                copy_msgpack_for_partial_parse(Path(self.project_dir), Path(tmp_project_dir))
+            if self.partial_parse and self.cache_dir is not None:
+                latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
+                logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+                if latest_partial_parse is not None:
+                    cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
@@ -319,14 +340,15 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 full_cmd = cmd + flags
 
-                logger.info("Using environment variables keys: %s", env.keys())
+                logger.debug("Using environment variables keys: %s", env.keys())
+
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
                     cwd=tmp_project_dir,
                 )
                 if is_openlineage_available:
-                    self.calculate_openlineage_events_completes(env, Path(tmp_project_dir))
+                    self.calculate_openlineage_events_completes(env, tmp_dir_path)
                     context[
                         "task_instance"
                     ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
@@ -337,6 +359,11 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     logger.info("Inlets: %s", inlets)
                     logger.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
+
+                if self.partial_parse and self.cache_dir:
+                    partial_parse_file = get_partial_parse_path(tmp_dir_path)
+                    if partial_parse_file.exists():
+                        cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.handle_exception(result)
@@ -394,7 +421,22 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + output.name
                 uris.append(dataset_uri)
-        return [Dataset(uri) for uri in uris]
+        logger.debug("URIs to be converted to Dataset: %s", uris)
+
+        datasets = []
+        try:
+            datasets = [Dataset(uri) for uri in uris]
+        except ValueError as e:
+            raise AirflowCompatibilityError(
+                """
+                Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions:
+                https://github.com/apache/airflow/issues/39486
+
+                If you want to use Cosmos with one of these Airflow versions, you will have to disable emission of Datasets:
+                By setting ``emit_datasets=False`` in ``RenderConfig``. For more information, see https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html.
+                """
+            )
+        return datasets
 
     def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset]) -> None:
         """

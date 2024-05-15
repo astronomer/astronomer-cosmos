@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, Sequence
 
 from airflow.exceptions import AirflowException
-from airflow.providers.amazon.aws.hooks.eks import EksHook
 from airflow.utils.context import Context
 
 from cosmos.operators.kubernetes import (
@@ -16,6 +16,14 @@ from cosmos.operators.kubernetes import (
     DbtSnapshotKubernetesOperator,
     DbtTestKubernetesOperator,
 )
+
+try:
+    from airflow.providers.amazon.aws.hooks.eks import EksHook
+except ImportError:
+    warnings.warn(
+        "EksOperator is not compatible with Airflow < 2.4.0",
+    )
+
 
 DEFAULT_CONN_ID = "aws_default"
 DEFAULT_NAMESPACE = "default"

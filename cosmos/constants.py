@@ -3,6 +3,7 @@ from enum import Enum
 from pathlib import Path
 
 import aenum
+from packaging.version import Version
 
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
@@ -19,6 +20,10 @@ DBT_BINARY_NAME = "dbt"
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
+
+# Cosmos will not emit datasets for the following Airflow versions, due to a breaking change that's fixed in later Airflow 2.x versions
+# https://github.com/apache/airflow/issues/39486
+PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1")]
 
 
 class LoadMode(Enum):

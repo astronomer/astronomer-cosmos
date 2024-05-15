@@ -110,6 +110,77 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
 
 
+@pytest.mark.parametrize(
+    "project_name,manifest_filepath,model_filepath",
+    [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
+)
+def test_load_via_manifest_with_select(project_name, manifest_filepath, model_filepath):
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name, manifest_path=manifest_filepath
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(select=["+customers"])
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    expected_keys = [
+        "model.jaffle_shop.customers",
+        "model.jaffle_shop.orders",
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+        "seed.jaffle_shop.raw_customers",
+        "seed.jaffle_shop.raw_orders",
+        "seed.jaffle_shop.raw_payments",
+        "test.jaffle_shop.accepted_values_orders_status__placed__shipped__completed__return_pending__returned.be6b5b5ec3",
+        "test.jaffle_shop.accepted_values_stg_orders_status__placed__shipped__completed__return_pending__returned.080fb20aad",
+        "test.jaffle_shop.accepted_values_stg_payments_payment_method__credit_card__coupon__bank_transfer__gift_card.3c3820f278",
+        "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
+        "test.jaffle_shop.not_null_orders_amount.106140f9fd",
+        "test.jaffle_shop.not_null_orders_bank_transfer_amount.7743500c49",
+        "test.jaffle_shop.not_null_orders_coupon_amount.ab90c90625",
+        "test.jaffle_shop.not_null_orders_credit_card_amount.d3ca593b59",
+        "test.jaffle_shop.not_null_orders_customer_id.c5f02694af",
+        "test.jaffle_shop.not_null_orders_gift_card_amount.413a0d2d7a",
+        "test.jaffle_shop.not_null_orders_order_id.cf6c17daed",
+        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.jaffle_shop.not_null_stg_orders_order_id.81cfe2fe64",
+        "test.jaffle_shop.not_null_stg_payments_payment_id.c19cc50075",
+        "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2",
+        "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
+        "test.jaffle_shop.unique_orders_order_id.fed79b3a6e",
+        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
+        "test.jaffle_shop.unique_stg_orders_order_id.e3b841c71a",
+        "test.jaffle_shop.unique_stg_payments_payment_id.3744510712",
+    ]
+    assert sorted(dbt_graph.nodes.keys()) == expected_keys
+
+    assert len(dbt_graph.nodes) == 28
+    assert len(dbt_graph.filtered_nodes) == 7
+    assert "model.jaffle_shop.orders" not in dbt_graph.filtered_nodes
+
+    sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
+    assert sample_node.name == "customers"
+    assert sample_node.unique_id == "model.jaffle_shop.customers"
+    assert sample_node.resource_type == DbtResourceType.MODEL
+    assert sample_node.depends_on == [
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+    ]
+    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
+
+
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
 def test_load_automatic_manifest_is_available(mock_load_from_dbt_manifest):
     project_config = ProjectConfig(

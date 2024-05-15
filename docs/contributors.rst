@@ -18,7 +18,6 @@ Emeritus Committers
 -------------------------------
 
 * Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
-* Harel Shein (`@harels <https://github.com/harels>`_)
 
 Contributors
 ------------

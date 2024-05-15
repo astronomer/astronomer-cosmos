@@ -478,8 +478,9 @@ class DbtGraph:
         Updates in-place:
         * self.filtered_nodes
         """
-        for _, node in self.filtered_nodes.items():
+        for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 for node_id in node.depends_on:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
+                        self.filtered_nodes[node.unique_id] = node

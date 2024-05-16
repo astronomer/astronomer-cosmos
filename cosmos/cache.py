@@ -126,23 +126,24 @@ def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path
     :param partial_parse_filepath: Path to the most up-to-date partial parse file
     :param project_path: Path to the target dbt project directory
     """
+    should_patch_partial_parse_content = False
 
-    should_patch_partial_parse_content = bool(partial_parse_filepath) and partial_parse_filepath.exists()
     try:
         with partial_parse_filepath.open("rb") as f:
             # Issue reported: https://github.com/astronomer/astronomer-cosmos/issues/971
             # it may be due a race condition of multiple processes trying to read/write this file
             data = msgpack.unpack(f)
     except ValueError as e:
-        should_patch_partial_parse_content = False
         logger.info("Unable to patch the partial_parse.msgpack file due to %s" % repr(e))
     else:
         for node in data["nodes"].values():
             expected_filepath = node.get("root_path")
-            if not Path(expected_filepath).exists():
+            if expected_filepath is None:
+                continue
+            elif expected_filepath and not Path(expected_filepath).exists():
                 node["root_path"] = str(project_path)
+                should_patch_partial_parse_content = True
             else:
-                should_patch_partial_parse_content = False
                 break
         if should_patch_partial_parse_content:
             with partial_parse_filepath.open("wb") as f:

@@ -262,6 +262,7 @@ jobs:
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
+          DATABRICKS_CLUSTER_ID: mock
           DATABRICKS_HOST: mock
           DATABRICKS_WAREHOUSE_ID: mock
           DATABRICKS_TOKEN: mock
@@ -333,6 +334,7 @@ jobs:
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
+          DATABRICKS_CLUSTER_ID: mock
           DATABRICKS_HOST: mock
           DATABRICKS_WAREHOUSE_ID: mock
           DATABRICKS_TOKEN: mock

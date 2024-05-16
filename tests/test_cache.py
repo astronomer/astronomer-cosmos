@@ -1,3 +1,4 @@
+import logging
 import shutil
 import tempfile
 import time
@@ -74,6 +75,7 @@ def test_get_latest_partial_parse(tmp_path):
 @patch("cosmos.cache.msgpack.unpack", side_effect=ValueError)
 def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path, caplog):
     # setup
+    caplog.set_level(logging.INFO)
     source_dir = tmp_path / DBT_TARGET_DIR_NAME
     source_dir.mkdir()
     partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME

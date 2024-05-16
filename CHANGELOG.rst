@@ -1,6 +1,24 @@
 Changelog
 =========
 
+1.4.1rc1 (2024-05-16)
+--------------------
+
+Bug fixes
+
+* Fix manifest testing behavior in #955 by @chris-okorodudu
+* Handle ValueError when unpacking partial_parse.msgpack in #972 by @tatiana
+
+Others
+
+* Enable pre-commit run and fix type-check job by @pankajastro in #957
+* Clean databricks credentials in test/CI in #969 by @tatiana
+* Update CODEOWNERS in #969 by @tatiana
+* Update emeritus contributors list in #961 by @tatiana
+* Promote @dwreeves to committer in #960 by @tatiana
+* Pre-commit hook updates in #956
+
+
 1.4.0 (2024-05-13)
 --------------------
 

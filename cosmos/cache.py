@@ -10,6 +10,9 @@ from airflow.utils.task_group import TaskGroup
 from cosmos import settings
 from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
 from cosmos.dbt.project import get_partial_parse_path
+from cosmos.log import get_logger
+
+logger = get_logger()
 
 
 # It was considered to create a cache identifier based on the dbt project path, as opposed
@@ -108,6 +111,46 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     shutil.copy(str(latest_manifest_filepath), str(manifest_path))
 
 
+def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path) -> bool:
+    """
+    Update, if needed, the root_path references in partial_parse.msgpack to an existing project directory.
+    This is necessary because an issue is observed where on specific earlier versions of dbt-core like 1.5.4 and 1.6.5,
+    the commands fail to locate project files as they are pointed to a stale directory by the root_path in the partial
+    parse file.
+
+    This issue was not observed on recent versions of dbt-core 1.5.8, 1.6.6, 1.7.0 and 1.8.0 as tested on.
+    It is suspected that PR dbt-labs/dbt-core#8762 is likely the fix and the fix appears to be backported to later
+    version releases of 1.5.x and 1.6.x. However, the below modification is applied to ensure that the root_path is
+    correctly set to the needed project directory and the feature is compatible across all dbt-core versions.
+
+    :param partial_parse_filepath: Path to the most up-to-date partial parse file
+    :param project_path: Path to the target dbt project directory
+    """
+
+    should_patch_partial_parse_content = True
+    try:
+        with partial_parse_filepath.open("rb") as f:
+            # Issue reported: https://github.com/astronomer/astronomer-cosmos/issues/971
+            # it may be due a race condition of multiple processes trying to read/write this file
+            data = msgpack.unpack(f)
+    except ValueError as e:
+        should_patch_partial_parse_content = False
+        logger.info("Unable to patch the partial_parse.msgpack file due to %s" % repr(e))
+    else:
+        for node in data["nodes"].values():
+            expected_filepath = node.get("root_path")
+            if not Path(expected_filepath).exists():
+                node["root_path"] = str(project_path)
+            else:
+                should_patch_partial_parse_content = False
+                break
+        if should_patch_partial_parse_content:
+            with partial_parse_filepath.open("wb") as f:
+                packed = msgpack.packb(data)
+                f.write(packed)
+    return should_patch_partial_parse_content
+
+
 def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: Path) -> None:
     """
     Update target dbt project directory to have the latest partial parse file contents.
@@ -123,20 +166,7 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
     shutil.copy(str(partial_parse_filepath), str(target_partial_parse_file))
 
-    # Update root_path in partial parse file to point to the needed project directory. This is necessary because
-    # an issue is observed where on specific earlier versions of dbt-core like 1.5.4 and 1.6.5, the commands fail to
-    # locate project files as they are pointed to a stale directory by the root_path in the partial parse file.
-    # This issue was not observed on recent versions of dbt-core 1.5.8, 1.6.6, 1.7.0 and 1.8.0 as tested on.
-    # It is suspected that PR dbt-labs/dbt-core#8762 is likely the fix and the fix appears to be backported to later
-    # version releases of 1.5.x and 1.6.x. However, the below modification is applied to ensure that the root_path is
-    # correctly set to the needed project directory and the feature is compatible across all dbt-core versions.
-    with target_partial_parse_file.open("rb") as f:
-        data = msgpack.unpack(f)
-    for node in data["nodes"].values():
-        if node.get("root_path"):
-            node["root_path"] = str(project_path)
-    with target_partial_parse_file.open("wb") as f:
-        packed = msgpack.packb(data)
-        f.write(packed)
+    patch_partial_parse_content(target_partial_parse_file, project_path)
 
-    shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
+    if source_manifest_filepath.exists():
+        shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))

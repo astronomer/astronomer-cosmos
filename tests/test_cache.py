@@ -1,15 +1,20 @@
+import shutil
+import tempfile
 import time
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.cache import _create_cache_identifier, _get_latest_partial_parse
+from cosmos.cache import _copy_partial_parse_to_project, _create_cache_identifier, _get_latest_partial_parse
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
+SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.msgpack"
 
 
 @pytest.mark.parametrize(
@@ -64,3 +69,18 @@ def test_get_latest_partial_parse(tmp_path):
     assert _get_latest_partial_parse(old_tmp_dir, tmp_path) == old_partial_parse_filepath
     assert _get_latest_partial_parse(tmp_path, old_tmp_dir) == old_partial_parse_filepath
     assert _get_latest_partial_parse(tmp_path, tmp_path) is None
+
+
+@patch("cosmos.cache.msgpack.unpack", side_effect=ValueError)
+def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path, caplog):
+    # setup
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    shutil.copy(str(SAMPLE_PARTIAL_PARSE_FILEPATH), str(partial_parse_filepath))
+
+    # actual test
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
+
+    assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text

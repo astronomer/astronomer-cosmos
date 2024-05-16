@@ -127,7 +127,7 @@ def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path
     :param project_path: Path to the target dbt project directory
     """
 
-    should_patch_partial_parse_content = True
+    should_patch_partial_parse_content = bool(partial_parse_filepath) and partial_parse_filepath.exists()
     try:
         with partial_parse_filepath.open("rb") as f:
             # Issue reported: https://github.com/astronomer/astronomer-cosmos/issues/971

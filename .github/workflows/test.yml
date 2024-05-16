@@ -132,6 +132,7 @@ jobs:
           DATABRICKS_HOST: mock
           DATABRICKS_WAREHOUSE_ID: mock
           DATABRICKS_TOKEN: mock
+          DATABRICKS_CLUSTER_ID: mock
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}

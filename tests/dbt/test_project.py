@@ -2,8 +2,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from cosmos.dbt.project import change_working_directory, create_symlinks, environ
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"

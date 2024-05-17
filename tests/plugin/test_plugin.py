@@ -18,7 +18,6 @@ from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 
 import pytest
 from airflow.configuration import conf
-from airflow.exceptions import AirflowConfigException
 from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder

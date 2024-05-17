@@ -10,9 +10,11 @@ try:
         DbtSeedEksOperator,
         DbtTestEksOperator,
     )
+
     module_available = True
 except ImportError:
     module_available = False
+
 
 @pytest.fixture()
 def mock_kubernetes_execute():
@@ -34,9 +36,7 @@ base_kwargs = {
 }
 
 
-@pytest.mark.skipif(
-    not module_available, reason="EKS Operator not available"
-)
+@pytest.mark.skipif(not module_available, reason="EKS Operator not available")
 @pytest.mark.parametrize(
     "command_name,command_operator",
     [
@@ -65,10 +65,7 @@ def test_dbt_kubernetes_build_command(command_name, command_operator):
     ]
 
 
-
-@pytest.mark.skipif(
-    not module_available, reason="EKS Operator not available"
-)
+@pytest.mark.skipif(not module_available, reason="EKS Operator not available")
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
 @patch("cosmos.operators.eks.EksHook.generate_config_file")
 def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_kube_args, mock_kubernetes_execute):

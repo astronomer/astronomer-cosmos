@@ -20,7 +20,6 @@ from cosmos.operators.kubernetes import (
 try:
     from airflow.providers.amazon.aws.hooks.eks import EksHook
 except ImportError as e:
-    breakpoint()
     raise ImportError("EksOperator is not compatible with airflow < 2.4") from e
 
 DEFAULT_CONN_ID = "aws_default"
@@ -41,13 +40,13 @@ class DbtEksBaseOperator(DbtKubernetesBaseOperator):
     )
 
     def __init__(
-            self,
-            cluster_name: str,
-            pod_name: str | None = None,
-            namespace: str | None = DEFAULT_NAMESPACE,
-            aws_conn_id: str = DEFAULT_CONN_ID,
-            region: str | None = None,
-            **kwargs: Any,
+        self,
+        cluster_name: str,
+        pod_name: str | None = None,
+        namespace: str | None = DEFAULT_NAMESPACE,
+        aws_conn_id: str = DEFAULT_CONN_ID,
+        region: str | None = None,
+        **kwargs: Any,
     ) -> None:
         self.cluster_name = cluster_name
         self.pod_name = pod_name
@@ -70,7 +69,7 @@ class DbtEksBaseOperator(DbtKubernetesBaseOperator):
             region_name=self.region,
         )
         with eks_hook.generate_config_file(
-                eks_cluster_name=self.cluster_name, pod_namespace=self.namespace
+            eks_cluster_name=self.cluster_name, pod_namespace=self.namespace
         ) as self.config_file:
             return super().execute(context)
 
@@ -81,7 +80,7 @@ class DbtBuildEksOperator(DbtEksBaseOperator, DbtBuildKubernetesOperator):
     """
 
     template_fields: Sequence[str] = (
-            DbtEksBaseOperator.template_fields + DbtBuildKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtEksBaseOperator.template_fields + DbtBuildKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
@@ -97,7 +96,7 @@ class DbtSeedEksOperator(DbtEksBaseOperator, DbtSeedKubernetesOperator):
     """
 
     template_fields: Sequence[str] = (
-            DbtEksBaseOperator.template_fields + DbtSeedKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtEksBaseOperator.template_fields + DbtSeedKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
@@ -113,7 +112,7 @@ class DbtRunEksOperator(DbtEksBaseOperator, DbtRunKubernetesOperator):
     """
 
     template_fields: Sequence[str] = (
-            DbtEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
@@ -123,7 +122,7 @@ class DbtTestEksOperator(DbtEksBaseOperator, DbtTestKubernetesOperator):
     """
 
     template_fields: Sequence[str] = (
-            DbtEksBaseOperator.template_fields + DbtTestKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtEksBaseOperator.template_fields + DbtTestKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
@@ -133,6 +132,5 @@ class DbtRunOperationEksOperator(DbtEksBaseOperator, DbtRunOperationKubernetesOp
     """
 
     template_fields: Sequence[str] = (
-            DbtEksBaseOperator.template_fields + DbtRunOperationKubernetesOperator.template_fields
-    # type: ignore[operator]
+        DbtEksBaseOperator.template_fields + DbtRunOperationKubernetesOperator.template_fields  # type: ignore[operator]
     )

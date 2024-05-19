@@ -3,7 +3,6 @@ import os
 import shutil
 import sys
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -451,7 +450,6 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_emission_fails(caplog):
-    from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -494,7 +492,6 @@ def test_run_operator_dataset_emission_fails(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_emission_is_skipped(caplog):
-    from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(

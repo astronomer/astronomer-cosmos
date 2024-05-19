@@ -41,8 +41,6 @@ from sqlalchemy.orm import Session
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
-    DBT_PARTIAL_PARSE_FILE_NAME,
-    DBT_TARGET_DIR_NAME,
     DEFAULT_OPENLINEAGE_NAMESPACE,
     OPENLINEAGE_PRODUCER,
 )
@@ -176,7 +174,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         This method is called at runtime to work in the environment where the operator is running.
         """
         try:
-            from dbt.cli.main import dbtRunner
+            from dbt.cli.main import dbtRunner  # noqa
         except ImportError:
             self.invocation_mode = InvocationMode.SUBPROCESS
             logger.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
@@ -426,7 +424,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         datasets = []
         try:
             datasets = [Dataset(uri) for uri in uris]
-        except ValueError as e:
+        except ValueError:
             raise AirflowCompatibilityError(
                 """
                 Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions:

@@ -14,6 +14,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Render Config <render-config>
 
    Parsing Methods <parsing-methods>
+   Configuring in Airflow <cosmos-conf>
    Configuring Lineage <lineage>
    Generating Docs <generating-docs>
    Hosting Docs <hosting-docs>

@@ -8,10 +8,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
-import airflow
 import jinja2
 from airflow import DAG
-from airflow.configuration import conf
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
@@ -22,6 +20,7 @@ from cosmos import cache
 from cosmos.constants import InvocationMode
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.exceptions import AirflowCompatibilityError
+from cosmos.settings import LINEAGE_NAMESPACE
 
 try:
     from airflow.datasets import Dataset
@@ -41,7 +40,6 @@ from sqlalchemy.orm import Session
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
-    DEFAULT_OPENLINEAGE_NAMESPACE,
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
@@ -90,12 +88,6 @@ except (ImportError, ModuleNotFoundError):
             outputs: list[str] = list()
             run_facets: dict[str, str] = dict()
             job_facets: dict[str, str] = dict()
-
-
-try:
-    LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
-except airflow.exceptions.AirflowConfigException:
-    LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 
 class DbtLocalBaseOperator(AbstractDbtBaseOperator):

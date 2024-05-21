@@ -37,32 +37,32 @@ base_kwargs = {
 
 
 @pytest.mark.skipif(not module_available, reason="EKS Operator not available")
-@pytest.mark.parametrize(
-    "command_name,command_operator",
-    [
-        ("ls", DbtLSEksOperator(**base_kwargs)),
-        ("run", DbtRunEksOperator(**base_kwargs)),
-        ("test", DbtTestEksOperator(**base_kwargs)),
-        ("build", DbtBuildEksOperator(**base_kwargs)),
-        ("seed", DbtSeedEksOperator(**base_kwargs)),
-    ],
-)
-def test_dbt_kubernetes_build_command(command_name, command_operator):
+def test_dbt_kubernetes_build_command():
     """
     Since we know that the KubernetesOperator is tested, we can just test that the
     command is built correctly and added to the "arguments" parameter.
     """
-    command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
-    assert command_operator.arguments == [
-        "dbt",
-        command_name,
-        "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
-        "--no-version-check",
-        "--project-dir",
-        "my/dir",
-    ]
+
+    result_map = {
+        "ls": DbtLSEksOperator(**base_kwargs),
+        "run": DbtRunEksOperator(**base_kwargs),
+        "test": DbtTestEksOperator(**base_kwargs),
+        "build": DbtBuildEksOperator(**base_kwargs),
+        "seed": DbtSeedEksOperator(**base_kwargs),
+    }
+
+    for command_name, command_operator in result_map.items():
+        command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+        assert command_operator.arguments == [
+            "dbt",
+            command_name,
+            "--vars",
+            "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+            "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+            "--no-version-check",
+            "--project-dir",
+            "my/dir",
+        ]
 
 
 @pytest.mark.skipif(not module_available, reason="EKS Operator not available")

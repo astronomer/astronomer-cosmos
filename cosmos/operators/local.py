@@ -8,10 +8,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
-import airflow
 import jinja2
 from airflow import DAG
-from airflow.configuration import conf
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
@@ -22,6 +20,7 @@ from cosmos import cache
 from cosmos.constants import InvocationMode
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.exceptions import AirflowCompatibilityError
+from cosmos.settings import LINEAGE_NAMESPACE
 
 try:
     from airflow.datasets import Dataset
@@ -41,9 +40,6 @@ from sqlalchemy.orm import Session
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
-    DBT_PARTIAL_PARSE_FILE_NAME,
-    DBT_TARGET_DIR_NAME,
-    DEFAULT_OPENLINEAGE_NAMESPACE,
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
@@ -92,12 +88,6 @@ except (ImportError, ModuleNotFoundError):
             outputs: list[str] = list()
             run_facets: dict[str, str] = dict()
             job_facets: dict[str, str] = dict()
-
-
-try:
-    LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
-except airflow.exceptions.AirflowConfigException:
-    LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 
 class DbtLocalBaseOperator(AbstractDbtBaseOperator):
@@ -176,7 +166,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         This method is called at runtime to work in the environment where the operator is running.
         """
         try:
-            from dbt.cli.main import dbtRunner
+            from dbt.cli.main import dbtRunner  # noqa
         except ImportError:
             self.invocation_mode = InvocationMode.SUBPROCESS
             logger.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
@@ -426,7 +416,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         datasets = []
         try:
             datasets = [Dataset(uri) for uri in uris]
-        except ValueError as e:
+        except ValueError:
             raise AirflowCompatibilityError(
                 """
                 Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions:

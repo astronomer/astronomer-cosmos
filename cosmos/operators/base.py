@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from abc import ABCMeta, abstractmethod
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
@@ -12,7 +11,6 @@ from airflow.utils.context import Context
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
-from cosmos import cache
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 

@@ -2,13 +2,14 @@ import os.path as op
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlsplit
 
-from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
 from airflow.security import permissions
 from airflow.www.auth import has_access
 from airflow.www.views import AirflowBaseView
 from flask import abort, url_for
 from flask_appbuilder import AppBuilder, expose
+
+from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir
 
 
 def bucket_and_key(path: str) -> Tuple[str, str]:
@@ -69,16 +70,14 @@ def open_http_file(conn_id: Optional[str], path: str) -> str:
 
 def open_file(path: str) -> str:
     """Retrieve a file from http, https, gs, s3, or wasb."""
-    conn_id: Optional[str] = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
-
     if path.strip().startswith("s3://"):
-        return open_s3_file(conn_id=conn_id, path=path)
+        return open_s3_file(conn_id=dbt_docs_conn_id, path=path)
     elif path.strip().startswith("gs://"):
-        return open_gcs_file(conn_id=conn_id, path=path)
+        return open_gcs_file(conn_id=dbt_docs_conn_id, path=path)
     elif path.strip().startswith("wasb://"):
-        return open_azure_file(conn_id=conn_id, path=path)
+        return open_azure_file(conn_id=dbt_docs_conn_id, path=path)
     elif path.strip().startswith("http://") or path.strip().startswith("https://"):
-        return open_http_file(conn_id=conn_id, path=path)
+        return open_http_file(conn_id=dbt_docs_conn_id, path=path)
     else:
         with open(path) as f:
             content = f.read()
@@ -159,17 +158,16 @@ class DbtDocsView(AirflowBaseView):
     @expose("/dbt_docs")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def dbt_docs(self) -> str:
-        if conf.get("cosmos", "dbt_docs_dir", fallback=None) is None:
+        if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def dbt_docs_index(self) -> str:
-        docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
-        if docs_dir is None:
+        if dbt_docs_dir is None:
             abort(404)
-        html = open_file(op.join(docs_dir, "index.html"))
+        html = open_file(op.join(dbt_docs_dir, "index.html"))
         # Hack the dbt docs to render properly in an iframe
         iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
         html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
@@ -178,19 +176,17 @@ class DbtDocsView(AirflowBaseView):
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
-        docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
-        if docs_dir is None:
+        if dbt_docs_dir is None:
             abort(404)
-        data = open_file(op.join(docs_dir, "catalog.json"))
+        data = open_file(op.join(dbt_docs_dir, "catalog.json"))
         return data, 200, {"Content-Type": "application/json"}
 
     @expose("/manifest.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
-        docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
-        if docs_dir is None:
+        if dbt_docs_dir is None:
             abort(404)
-        data = open_file(op.join(docs_dir, "manifest.json"))
+        data = open_file(op.join(dbt_docs_dir, "manifest.json"))
         return data, 200, {"Content-Type": "application/json"}
 
 

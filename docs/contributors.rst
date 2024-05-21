@@ -8,8 +8,7 @@ Learn more about the project contributors roles in :ref:`contributors-roles`.
 Committers
 ----------------------
 
-* Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
-* Harel Shein (`@harels <https://github.com/harels>`_)
+* Daniel Reeves (`@dwreeves <https://github.com/dwreeves>`_)
 * Julian LaNeve (`@jlaneve <https://github.com/jlaneve>`_)
 * Justin Bandoro (`@jbandoro <https://github.com/jbandoro>`_)
 * Tatiana Al-Chueyr (`@tatiana <https://github.com/tatiana>`_)
@@ -18,7 +17,8 @@ Committers
 Emeritus Committers
 -------------------------------
 
-(none at the moment)
+* Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)
+
 
 Contributors
 ------------

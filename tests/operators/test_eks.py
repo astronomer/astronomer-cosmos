@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow.exceptions import AirflowException
 
 try:
     from cosmos.operators.eks import (
@@ -87,3 +88,18 @@ def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_k
     # Assert that the kubernetes execute method was called in the execution
     mock_kubernetes_execute.assert_called_once()
     assert mock_kubernetes_execute.call_args.args[-1] == {}
+
+
+@pytest.mark.skipif(not module_available, reason="EKS Operator not available")
+def test_provided_config_file_fails():
+    """Tests that the constructor fails if it is called with a config_file."""
+    with pytest.raises(AirflowException) as err_context:
+        DbtLSEksOperator(
+            conn_id="my_airflow_connection",
+            cluster_name="my-cluster",
+            task_id="my-task",
+            image="my_image",
+            project_dir="my/dir",
+            config_file="my/config",
+        )
+    assert "The config_file is not an allowed parameter for the EksPodOperator." in str(err_context.value)

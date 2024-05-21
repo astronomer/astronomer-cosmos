@@ -25,7 +25,7 @@ Create a virtual environment in your ``Dockerfile`` using the sample below. Be s
 
 .. code-block:: docker
 
-    FROM quay.io/astronomer/astro-runtime:10.0.0
+    FROM quay.io/astronomer/astro-runtime:11.3.0
 
     # install dbt into a virtual environment
     RUN python -m venv dbt_venv && source dbt_venv/bin/activate && \

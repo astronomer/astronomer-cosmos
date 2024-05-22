@@ -21,7 +21,7 @@ DEFAULT_CONN_ID = "aws_default"
 DEFAULT_NAMESPACE = "default"
 
 
-class DbtEksBaseOperator(DbtKubernetesBaseOperator):
+class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
     template_fields: Sequence[str] = tuple(
         {
             "cluster_name",
@@ -69,63 +69,63 @@ class DbtEksBaseOperator(DbtKubernetesBaseOperator):
             return super().execute(context)
 
 
-class DbtBuildEksOperator(DbtEksBaseOperator, DbtBuildKubernetesOperator):
+class DbtBuildAwsEksOperator(DbtAwsEksBaseOperator, DbtBuildKubernetesOperator):
     """
     Executes a dbt core build command.
     """
 
     template_fields: Sequence[str] = (
-        DbtEksBaseOperator.template_fields + DbtBuildKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtAwsEksBaseOperator.template_fields + DbtBuildKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
-class DbtLSEksOperator(DbtEksBaseOperator, DbtLSKubernetesOperator):
+class DbtLSAwsEksOperator(DbtAwsEksBaseOperator, DbtLSKubernetesOperator):
     """
     Executes a dbt core ls command.
     """
 
 
-class DbtSeedEksOperator(DbtEksBaseOperator, DbtSeedKubernetesOperator):
+class DbtSeedAwsEksOperator(DbtAwsEksBaseOperator, DbtSeedKubernetesOperator):
     """
     Executes a dbt core seed command.
     """
 
     template_fields: Sequence[str] = (
-        DbtEksBaseOperator.template_fields + DbtSeedKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtAwsEksBaseOperator.template_fields + DbtSeedKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
-class DbtSnapshotEksOperator(DbtEksBaseOperator, DbtSnapshotKubernetesOperator):
+class DbtSnapshotAwsEksOperator(DbtAwsEksBaseOperator, DbtSnapshotKubernetesOperator):
     """
     Executes a dbt core snapshot command.
     """
 
 
-class DbtRunEksOperator(DbtEksBaseOperator, DbtRunKubernetesOperator):
+class DbtRunAwsEksOperator(DbtAwsEksBaseOperator, DbtRunKubernetesOperator):
     """
     Executes a dbt core run command.
     """
 
     template_fields: Sequence[str] = (
-        DbtEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtAwsEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
-class DbtTestEksOperator(DbtEksBaseOperator, DbtTestKubernetesOperator):
+class DbtTestAwsEksOperator(DbtAwsEksBaseOperator, DbtTestKubernetesOperator):
     """
     Executes a dbt core test command.
     """
 
     template_fields: Sequence[str] = (
-        DbtEksBaseOperator.template_fields + DbtTestKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtAwsEksBaseOperator.template_fields + DbtTestKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
 
-class DbtRunOperationEksOperator(DbtEksBaseOperator, DbtRunOperationKubernetesOperator):
+class DbtRunOperationAwsEksOperator(DbtAwsEksBaseOperator, DbtRunOperationKubernetesOperator):
     """
     Executes a dbt core run-operation command.
     """
 
     template_fields: Sequence[str] = (
-        DbtEksBaseOperator.template_fields + DbtRunOperationKubernetesOperator.template_fields  # type: ignore[operator]
+        DbtAwsEksBaseOperator.template_fields + DbtRunOperationKubernetesOperator.template_fields  # type: ignore[operator]
     )

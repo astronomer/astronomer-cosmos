@@ -4,11 +4,11 @@ import pytest
 from airflow.exceptions import AirflowException
 
 from cosmos.operators.aws_eks import (
-    DbtBuildEksOperator,
-    DbtLSEksOperator,
-    DbtRunEksOperator,
-    DbtSeedEksOperator,
-    DbtTestEksOperator,
+    DbtBuildAwsEksOperator,
+    DbtLSAwsEksOperator,
+    DbtRunAwsEksOperator,
+    DbtSeedAwsEksOperator,
+    DbtTestAwsEksOperator,
 )
 
 
@@ -39,11 +39,11 @@ def test_dbt_kubernetes_build_command():
     """
 
     result_map = {
-        "ls": DbtLSEksOperator(**base_kwargs),
-        "run": DbtRunEksOperator(**base_kwargs),
-        "test": DbtTestEksOperator(**base_kwargs),
-        "build": DbtBuildEksOperator(**base_kwargs),
-        "seed": DbtSeedEksOperator(**base_kwargs),
+        "ls": DbtLSAwsEksOperator(**base_kwargs),
+        "run": DbtRunAwsEksOperator(**base_kwargs),
+        "test": DbtTestAwsEksOperator(**base_kwargs),
+        "build": DbtBuildAwsEksOperator(**base_kwargs),
+        "seed": DbtSeedAwsEksOperator(**base_kwargs),
     }
 
     for command_name, command_operator in result_map.items():
@@ -64,7 +64,7 @@ def test_dbt_kubernetes_build_command():
 @patch("cosmos.operators.aws_eks.EksHook.generate_config_file")
 def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_kube_args, mock_kubernetes_execute):
     """Tests that the execute method call results in both the build_kube_args method and the kubernetes execute method being called."""
-    operator = DbtLSEksOperator(
+    operator = DbtLSAwsEksOperator(
         conn_id="my_airflow_connection",
         cluster_name="my-cluster",
         task_id="my-task",
@@ -86,7 +86,7 @@ def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_k
 def test_provided_config_file_fails():
     """Tests that the constructor fails if it is called with a config_file."""
     with pytest.raises(AirflowException) as err_context:
-        DbtLSEksOperator(
+        DbtLSAwsEksOperator(
             conn_id="my_airflow_connection",
             cluster_name="my-cluster",
             task_id="my-task",

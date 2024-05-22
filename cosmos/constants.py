@@ -56,7 +56,7 @@ class ExecutionMode(Enum):
     LOCAL = "local"
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
-    EKS = "eks"
+    AWS_EKS = "aws_eks"
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
 

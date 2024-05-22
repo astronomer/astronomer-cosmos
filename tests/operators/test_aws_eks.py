@@ -3,18 +3,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.exceptions import AirflowException
 
-try:
-    from cosmos.operators.eks import (
-        DbtBuildEksOperator,
-        DbtLSEksOperator,
-        DbtRunEksOperator,
-        DbtSeedEksOperator,
-        DbtTestEksOperator,
-    )
-
-    module_available = True
-except ImportError:
-    module_available = False
+from cosmos.operators.aws_eks import (
+    DbtBuildEksOperator,
+    DbtLSEksOperator,
+    DbtRunEksOperator,
+    DbtSeedEksOperator,
+    DbtTestEksOperator,
+)
 
 
 @pytest.fixture()
@@ -37,7 +32,6 @@ base_kwargs = {
 }
 
 
-@pytest.mark.skipif(not module_available, reason="EKS Operator not available")
 def test_dbt_kubernetes_build_command():
     """
     Since we know that the KubernetesOperator is tested, we can just test that the
@@ -66,9 +60,8 @@ def test_dbt_kubernetes_build_command():
         ]
 
 
-@pytest.mark.skipif(not module_available, reason="EKS Operator not available")
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
-@patch("cosmos.operators.eks.EksHook.generate_config_file")
+@patch("cosmos.operators.aws_eks.EksHook.generate_config_file")
 def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_kube_args, mock_kubernetes_execute):
     """Tests that the execute method call results in both the build_kube_args method and the kubernetes execute method being called."""
     operator = DbtLSEksOperator(
@@ -90,7 +83,6 @@ def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_k
     assert mock_kubernetes_execute.call_args.args[-1] == {}
 
 
-@pytest.mark.skipif(not module_available, reason="EKS Operator not available")
 def test_provided_config_file_fails():
     """Tests that the constructor fails if it is called with a config_file."""
     with pytest.raises(AirflowException) as err_context:

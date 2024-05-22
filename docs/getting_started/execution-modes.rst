@@ -168,7 +168,7 @@ AWS_EKS
 ----------
 
 The ``aws_eks`` approach is very similar to the ``kubernetes`` approach, but it is specifically designed to run on AWS EKS clusters.
-It uses the `EKSPodOperator <https://airflow.apache.org/docs/apache-airflow-providers-amazon/2.2.0/operators/eks.html#perform-a-task-on-an-amazon-eks-cluster>`_
+It uses the `EKSPodOperator <https://airflow.apache.org/docs/apache-airflow-providers-amazon/8.19.0/operators/eks.html#perform-a-task-on-an-amazon-eks-cluster>`_
 to run the dbt commands. You need to provide the ``cluster_name`` in your operator_args to connect to the AWS EKS cluster.
 
 

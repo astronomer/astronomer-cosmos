@@ -87,6 +87,9 @@ docker = [
 kubernetes = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
+aws_eks = [
+    "apache-airflow-providers-amazon>=8.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
+]
 azure-container-instance = [
     "apache-airflow-providers-microsoft-azure>=8.4.0",
 ]
@@ -120,6 +123,7 @@ dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-postgres",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-amazon>=3.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-microsoft-azure",
     "types-PyYAML",
@@ -137,7 +141,7 @@ airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
-    { value = "typing_extensions<4.6", if = ["2.6"] },
+    { value = "typing_extensions<4.6", if = ["2.6"] }
 ]
 
 [tool.hatch.envs.tests.scripts]

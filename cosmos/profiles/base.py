@@ -188,12 +188,11 @@ class BaseProfileMapping(ABC):
             # if someone has passed in a value for this field, use it
             if self.profile_args.get(field):
                 mock_profile[field] = self.profile_args[field]
-
-            # otherwise, use the default value
+            # otherwise, use the mock value from env
             else:
-                mock_profile[field] = "mock_value"
+                mock_profile[field] = self.get_env_var_format(field)
 
-        return mock_profile
+        return self.filter_null(mock_profile)
 
     @property
     def env_vars(self) -> dict[str, str]:

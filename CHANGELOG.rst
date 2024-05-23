@@ -1,13 +1,14 @@
 Changelog
 =========
 
-1.5.0a1 (2024-05-23)
+1.5.0a2 (2024-05-23)
 --------------------
 
 New Features
 
 * Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
 * Support caching at a DbtDag and DbtTaskGroupLevel in #992 by @tatiana (WIP)
+   - difference from 1.5.0a1: Include timestamp of the DAG in the cache version
 
 Others
 

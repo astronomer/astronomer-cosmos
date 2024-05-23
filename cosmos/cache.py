@@ -228,7 +228,7 @@ def calculate_current_version(dag_id: str, project_dir: Path) -> str:
     start_time = time.process_time()
 
     # When DAG file was last changed - this is very slow (e.g. 0.6s)
-    caller_dag_frame = inspect.stack()[1]
+    caller_dag_frame = inspect.stack()[2]
     caller_dag_filepath = Path(caller_dag_frame.filename)
     logger.info(f"The {dag_id} DAG is located in: {caller_dag_filepath}")
     dag_last_modified = caller_dag_filepath.stat().st_mtime

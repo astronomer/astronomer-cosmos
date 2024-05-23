@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import shutil
 import time
 from pathlib import Path
@@ -227,12 +228,12 @@ def calculate_current_version(dag_id: str, project_dir: Path) -> str:
     start_time = time.process_time()
 
     # When DAG file was last changed - this is very slow (e.g. 0.6s)
-    # caller_dag_frame = inspect.stack()[1]
-    # caller_dag_filepath = Path(caller_dag_frame.filename)
-    # logger.info("The %s DAG is located in: %s" % (dag_id, caller_dag_filepath))
-    # dag_last_modified = caller_dag_filepath.stat().st_mtime
-    # mid_time = time.process_time() - start_time
-    # logger.info(f"It took {mid_time:.3}s to calculate the first part of the version")
+    caller_dag_frame = inspect.stack()[1]
+    caller_dag_filepath = Path(caller_dag_frame.filename)
+    logger.info(f"The {dag_id} DAG is located in: {caller_dag_filepath}")
+    dag_last_modified = caller_dag_filepath.stat().st_mtime
+    mid_time = time.process_time() - start_time
+    logger.info(f"It took {mid_time:.3}s to calculate the first part of the version")
     # dag_last_modified = None
 
     # Combined value for when the dbt project directory files were last modified
@@ -241,8 +242,8 @@ def calculate_current_version(dag_id: str, project_dir: Path) -> str:
 
     elapsed_time = time.process_time() - start_time
     logger.info(f"It took {elapsed_time:.3}s to calculate the cache version for the {dag_id}")
-    # return f"{dag_last_modified} {dbt_combined_last_modified}"
-    return f"{dbt_combined_last_modified}"
+    return f"{dag_last_modified} {dbt_combined_last_modified}"
+    # return f"{dbt_combined_last_modified}"
 
 
 @functools.lru_cache

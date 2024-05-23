@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import functools
 import shutil
+import time
 from pathlib import Path
 
 import msgpack
@@ -171,3 +173,84 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     if source_manifest_filepath.exists():
         shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
+
+
+# The following methods are being used to cache DbtDag / DbtTaskGroup
+
+
+# It was considered to create a cache identifier based on the dbt project path, as opposed
+# to where it is used in Airflow. However, we could have concurrency issues if the same
+# dbt cached directory was being used by different dbt task groups or DAGs within the same
+# node. For this reason, as a starting point, the cache is identified by where it is used.
+# This can be reviewed in the future.
+def create_cache_identifier_v2(dag_id: str | None, task_group_id: str | None) -> str:
+    # FIXME: To be refactored and merged with _create_cache_identifier
+    # Missing support to: task_group.group_id
+    """
+    Given a DAG name and a (optional) task_group_name, create the identifier for caching.
+
+    :param dag_name: Name of the Cosmos DbtDag being cached
+    :param task_group_name: (optional) Name of the Cosmos DbtTaskGroup being cached
+    :return: Unique identifier representing the cache
+    """
+    cache_identifiers_list = []
+    if task_group_id:
+        if dag_id is not None:
+            cache_identifiers_list.append(dag_id)
+        if task_group_id is not None:
+            cache_identifiers_list.append(task_group_id)
+        cache_identifier = "__".join(cache_identifiers_list)
+    else:
+        cache_identifier = str(dag_id)
+
+    return cache_identifier
+
+
+@functools.lru_cache
+def get_cache_filepath(cache_identifier: str) -> Path:
+    cache_dir_path = _obtain_cache_dir_path(cache_identifier)
+    return cache_dir_path / f"{cache_identifier}.pkl"
+
+
+@functools.lru_cache
+def get_cache_version_filepath(cache_identifier: str) -> Path:
+    return Path(str(get_cache_filepath(cache_identifier)) + ".version")
+
+
+@functools.lru_cache
+def should_use_cache() -> bool:
+    return settings.enable_cache and settings.experimental_cache
+
+
+@functools.lru_cache
+def calculate_current_version(dag_id: str, project_dir: Path) -> str:
+    start_time = time.process_time()
+
+    # When DAG file was last changed - this is very slow (e.g. 0.6s)
+    # caller_dag_frame = inspect.stack()[1]
+    # caller_dag_filepath = Path(caller_dag_frame.filename)
+    # logger.info("The %s DAG is located in: %s" % (dag_id, caller_dag_filepath))
+    # dag_last_modified = caller_dag_filepath.stat().st_mtime
+    # mid_time = time.process_time() - start_time
+    # logger.info(f"It took {mid_time:.3}s to calculate the first part of the version")
+    # dag_last_modified = None
+
+    # Combined value for when the dbt project directory files were last modified
+    # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
+    dbt_combined_last_modified = sum([path.stat().st_mtime for path in project_dir.glob("**/*")])
+
+    elapsed_time = time.process_time() - start_time
+    logger.info(f"It took {elapsed_time:.3}s to calculate the cache version for the {dag_id}")
+    # return f"{dag_last_modified} {dbt_combined_last_modified}"
+    return f"{dbt_combined_last_modified}"
+
+
+@functools.lru_cache
+def is_project_unmodified(dag_id: str, current_version: str) -> Path | None:
+    cache_filepath = get_cache_filepath(dag_id)
+    cache_version_filepath = get_cache_version_filepath(dag_id)
+    if cache_version_filepath.exists() and cache_filepath.exists():
+        previous_cache_version = cache_version_filepath.read_text()
+        if previous_cache_version == current_version:
+            return cache_filepath
+    return None

@@ -1,8 +1,25 @@
 Changelog
 =========
 
-1.4.1 (2024-05-17)
+1.5.0a1 (2024-05-23)
 --------------------
+
+New Features
+
+* Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
+* Support caching at a DbtDag and DbtTaskGroupLevel in #992 by @tatiana (WIP)
+
+Others
+
+* Drop support for Airflow 2.3 in #994 by @pankajkoti
+* Update Astro Runtime image in #988 and #989 by @RNHTTR
+* Enable ruff F linting in #985 by @pankajastro
+* Move Cosmos Airflow configuration to settings.py in #975 by @pankajastro
+
+
+
+1.4.1 (2024-05-17)
+------------------
 
 Bug fixes
 
@@ -20,7 +37,7 @@ Others
 
 
 1.4.0 (2024-05-13)
---------------------
+------------------
 
 Features
 

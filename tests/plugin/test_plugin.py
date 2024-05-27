@@ -142,7 +142,7 @@ def test_open_file_calls(path, open_file_callback, monkeypatch):
         mock_callback.return_value = "mock file contents"
         res = open_file(path)
 
-    mock_callback.assert_called_with(conn_id="mock_conn_id", path=path)
+    mock_callback.assert_called_with(path, conn_id="mock_conn_id")
     assert res == "mock file contents"
 
 
@@ -153,7 +153,7 @@ def test_open_s3_file(conn_id):
         mock_hook = mock_module.S3Hook.return_value
         mock_hook.read_key.return_value = "mock file contents"
 
-        res = open_s3_file(conn_id=conn_id, path="s3://mock-path/to/docs")
+        res = open_s3_file("s3://mock-path/to/docs", conn_id=conn_id)
 
         if conn_id is not None:
             mock_module.S3Hook.assert_called_once_with(aws_conn_id=conn_id)
@@ -169,7 +169,7 @@ def test_open_gcs_file(conn_id):
         mock_hook = mock_module.GCSHook.return_value = MagicMock()
         mock_hook.download.return_value = b"mock file contents"
 
-        res = open_gcs_file(conn_id=conn_id, path="gs://mock-path/to/docs")
+        res = open_gcs_file("gs://mock-path/to/docs", conn_id=conn_id)
 
         if conn_id is not None:
             mock_module.GCSHook.assert_called_once_with(gcp_conn_id=conn_id)
@@ -186,7 +186,7 @@ def test_open_azure_file(conn_id):
         mock_hook.default_conn_name = PropertyMock(return_value="default_conn")
         mock_hook.read_file.return_value = "mock file contents"
 
-        res = open_azure_file(conn_id=conn_id, path="wasb://mock-path/to/docs")
+        res = open_azure_file("wasb://mock-path/to/docs", conn_id=conn_id)
 
         if conn_id is not None:
             mock_module.WasbHook.assert_called_once_with(wasb_conn_id=conn_id)
@@ -205,7 +205,7 @@ def test_open_http_file(conn_id):
         mock_hook.check_response.return_value = mock_response
         mock_response.text = "mock file contents"
 
-        res = open_http_file(conn_id=conn_id, path="http://mock-path/to/docs")
+        res = open_http_file("http://mock-path/to/docs", conn_id=conn_id)
 
         if conn_id is not None:
             mock_module.HttpHook.assert_called_once_with(method="GET", http_conn_id=conn_id)

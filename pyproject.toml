@@ -59,7 +59,7 @@ dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
 dbt-spark = ["dbt-spark"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
-openlineage = ["openlineage-integration-common", "openlineage-airflow"]
+openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 all = ["astronomer-cosmos[dbt-all]", "astronomer-cosmos[openlineage]"]
 docs = [
     "sphinx",

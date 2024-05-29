@@ -34,7 +34,7 @@ or as an environment variable:
 
 The path can be either a folder in the local file system the webserver is running on, or a URI to a cloud storage platform (S3, GCS, Azure).
 
-If your docs were generated using the `--static` flag, you can set the index filename using `dbt_docs_index_file_name`:
+If your docs were generated using the ``--static`` flag, you can set the index filename using ``dbt_docs_index_file_name``:
 
 .. code-block:: cfg
 

@@ -2,12 +2,22 @@ FROM quay.io/astronomer/astro-runtime:11.3.0-base
 
 USER root
 
+
+# dbt-postgres 1.8.0 requires building psycopg2 from source
+RUN /bin/sh -c set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends build-essential libpq-dev; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install -U uv
+
 COPY ./pyproject.toml  ${AIRFLOW_HOME}/astronomer_cosmos/
 COPY ./README.rst  ${AIRFLOW_HOME}/astronomer_cosmos/
 COPY ./cosmos/  ${AIRFLOW_HOME}/astronomer_cosmos/cosmos/
 
 # install the package in editable mode
-RUN pip install -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres,dbt-databricks]
+RUN uv pip install --system -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres,dbt-databricks]
 
 # make sure astro user owns the package
 RUN chown -R astro:astro ${AIRFLOW_HOME}/astronomer_cosmos

@@ -11,6 +11,7 @@ from warnings import warn
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
@@ -57,7 +58,7 @@ def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
     new_kwargs = {}
     non_airflow_kwargs = specific_kwargs(**kwargs)
     for arg_key, arg_value in kwargs.items():
-        if arg_key not in non_airflow_kwargs:
+        if arg_key not in non_airflow_kwargs or arg_key == "dag":
             new_kwargs[arg_key] = arg_value
     return new_kwargs
 
@@ -114,6 +115,7 @@ def validate_initial_user_config(
     """
     if profile_config is None and execution_config.execution_mode not in (
         ExecutionMode.KUBERNETES,
+        ExecutionMode.AWS_EKS,
         ExecutionMode.DOCKER,
     ):
         raise CosmosValueError(f"The profile_config is mandatory when using {execution_config.execution_mode}")
@@ -214,8 +216,6 @@ class DbtToAirflowConverter:
 
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
-        # If we are using the old interface, we should migrate it to the new interface
-        # This is safe to do now since we have validated which config interface we're using
         if project_config.dbt_project_path:
             execution_config, render_config = migrate_to_new_interface(execution_config, project_config, render_config)
 
@@ -224,21 +224,16 @@ class DbtToAirflowConverter:
         env_vars = project_config.env_vars or operator_args.get("env")
         dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
-        # Previously, we were creating a cosmos.dbt.project.DbtProject
-        # DbtProject has now been replaced with ProjectConfig directly
-        #   since the interface of the two classes were effectively the same
-        # Under this previous implementation, we were passing:
-        #  - name, root dir, models dir, snapshots dir and manifest path
-        # Internally in the dbtProject class, we were defaulting the profile_path
-        #   To be root dir/profiles.yml
-        # To keep this logic working, if converter is given no ProfileConfig,
-        #   we can create a default retaining this value to preserve this functionality.
-        # We may want to consider defaulting this value in our actual ProjceConfig class?
+        cache_dir = None
+        if settings.enable_cache:
+            cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache._create_cache_identifier(dag, task_group))
+
         self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,
             execution_config=execution_config,
             profile_config=profile_config,
+            cache_dir=cache_dir,
             dbt_vars=dbt_vars,
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
@@ -251,6 +246,7 @@ class DbtToAirflowConverter:
             "emit_datasets": render_config.emit_datasets,
             "env": env_vars,
             "vars": dbt_vars,
+            "cache_dir": cache_dir,
         }
         if execution_config.dbt_executable_path:
             task_args["dbt_executable_path"] = execution_config.dbt_executable_path

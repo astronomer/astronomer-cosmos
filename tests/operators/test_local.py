@@ -15,8 +15,9 @@ from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
 
+from cosmos import cache
 from cosmos.config import ProfileConfig
-from cosmos.constants import InvocationMode
+from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
     parse_number_of_warnings_dbt_runner,
@@ -88,13 +89,32 @@ def test_dbt_base_operator_add_global_flags() -> None:
             "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
         },
         no_version_check=True,
+        select=["my_first_model", "my_second_model"],
     )
     assert dbt_base_operator.add_global_flags() == [
+        "--select",
+        "my_first_model my_second_model",
         "--vars",
         "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
         "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
         "--no-version-check",
     ]
+
+
+def test_dbt_local_operator_append_env_is_true_by_default() -> None:
+    dbt_local_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        vars={
+            "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
+            "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
+        },
+        no_version_check=True,
+        select=["my_first_model", "my_second_model"],
+    )
+
+    assert dbt_local_operator.append_env == True
 
 
 def test_dbt_base_operator_add_user_supplied_flags() -> None:
@@ -379,11 +399,12 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have datasets until the 2.4 release",
+    version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets():
+def test_run_operator_dataset_inlets_and_outlets(caplog):
     from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
@@ -412,11 +433,76 @@ def test_run_operator_dataset_inlets_and_outlets():
             append_env=True,
         )
         seed_operator >> run_operator >> test_operator
+
     run_test_dag(dag)
+
     assert run_operator.inlets == []
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+    # https://github.com/apache/airflow/issues/39486
+)
+@pytest.mark.integration
+def test_run_operator_dataset_emission_is_skipped(caplog):
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+            emit_datasets=False,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            emit_datasets=False,
+        )
+
+        seed_operator >> run_operator
+
+    run_test_dag(dag)
+
+    assert run_operator.inlets == []
+    assert run_operator.outlets == []
+
+
+@pytest.mark.integration
+def test_run_operator_caches_partial_parsing(caplog, tmp_path):
+    caplog.set_level(logging.DEBUG)
+    with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+            cache_dir=cache._obtain_cache_dir_path("test-partial-parsing", tmp_path),
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        seed_operator
+
+    run_test_dag(dag)
+
+    # Unable to do partial parsing because saved manifest not found. Starting full parse.
+    assert "Unable to do partial parsing" in caplog.text
+
+    caplog.clear()
+    run_test_dag(dag)
+
+    assert not "Unable to do partial parsing" in caplog.text
 
 
 def test_dbt_base_operator_no_partial_parse() -> None:
@@ -564,28 +650,50 @@ def test_store_compiled_sql() -> None:
 @pytest.mark.parametrize(
     "operator_class,kwargs,expected_call_kwargs",
     [
-        (DbtSeedLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
-        (DbtBuildLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
-        (DbtRunLocalOperator, {"full_refresh": True}, {"context": {}, "cmd_flags": ["--full-refresh"]}),
+        (
+            DbtSeedLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["seed", "--full-refresh"]},
+        ),
+        (
+            DbtBuildLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["build", "--full-refresh"]},
+        ),
+        (
+            DbtRunLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["run", "--full-refresh"]},
+        ),
+        (
+            DbtTestLocalOperator,
+            {},
+            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+        ),
+        (
+            DbtTestLocalOperator,
+            {"select": []},
+            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+        ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
-            {"context": {}, "cmd_flags": ["--exclude", "tag:disabled", "--select", "tag:daily"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"]},
         ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "selector": "nightly_snowplow"},
-            {"context": {}, "cmd_flags": ["--selector", "nightly_snowplow"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test", "--selector", "nightly_snowplow"]},
         ),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
-            {"context": {}, "cmd_flags": ["--args", "days: 7\ndry_run: true\n"]},
+            {"context": {}, "env": {}, "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"]},
         ),
     ],
 )
-@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwargs, expected_call_kwargs):
+@patch("cosmos.operators.local.DbtLocalBaseOperator.run_command")
+def test_operator_execute_with_flags(mock_run_cmd, operator_class, kwargs, expected_call_kwargs):
     task = operator_class(
         profile_config=profile_config,
         task_id="my-task",
@@ -593,8 +701,11 @@ def test_operator_execute_with_flags(mock_build_and_run_cmd, operator_class, kwa
         invocation_mode=InvocationMode.DBT_RUNNER,
         **kwargs,
     )
+    task.get_env = MagicMock(return_value={})
     task.execute(context={})
-    mock_build_and_run_cmd.assert_called_once_with(**expected_call_kwargs)
+    mock_run_cmd.assert_called_once_with(
+        cmd=[task.dbt_executable_path, *expected_call_kwargs.pop("cmd_flags")], **expected_call_kwargs
+    )
 
 
 @pytest.mark.parametrize(
@@ -729,6 +840,7 @@ def test_operator_execute_deps_parameters(
         "dev",
     ]
     task = DbtRunLocalOperator(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         profile_config=real_profile_config,
         task_id="my-task",
         project_dir=DBT_PROJ_DIR,

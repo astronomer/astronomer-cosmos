@@ -1,9 +1,11 @@
 aenum
-sphinx
-pydata-sphinx-theme
-sphinx-autobuild
-sphinx-autoapi
 apache-airflow
 apache-airflow-providers-cncf-kubernetes>=5.1.1
+google-re2==1.1
+msgpack
 openlineage-airflow
 pydantic
+pydata-sphinx-theme
+sphinx
+sphinx-autoapi
+sphinx-autobuild

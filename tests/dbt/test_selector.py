@@ -4,7 +4,7 @@ import pytest
 
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
-from cosmos.dbt.selector import SelectorConfig, select_nodes
+from cosmos.dbt.selector import NodeSelector, SelectorConfig, select_nodes
 from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -418,3 +418,17 @@ def test_node_without_depends_on_with_tag_selector_should_not_raise_exception():
     )
     nodes = {standalone_test_node.unique_id: standalone_test_node}
     assert not select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["tag:some-tag"])
+
+
+def test_should_include_node_without_depends_on(selector_config):
+    node = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.standalone",
+        resource_type=DbtResourceType.TEST,
+        depends_on=None,
+        tags=[],
+        config={},
+        file_path=SAMPLE_PROJ_PATH / "tests/generic/builtin.sql",
+    )
+    selector = NodeSelector({}, selector_config)
+    selector.visited_nodes = set()
+    selector._should_include_node(node.unique_id, node)

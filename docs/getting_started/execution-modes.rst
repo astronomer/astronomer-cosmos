@@ -9,7 +9,8 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
 3. **docker**: Run ``dbt`` commands from Docker containers managed by Cosmos (requires a pre-existing Docker image)
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
-5. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
+5. **aws_eks**: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos (requires a pre-existing Docker image)
+6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -38,6 +39,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - Slow
      - High
      - No
+   * - AWS_EKS
+     - Slow
+     - High
+     - No
    * - Azure Container Instance
      - Slow
      - High
@@ -56,8 +61,10 @@ The ``local`` execution mode assumes a ``dbt`` binary is reachable within the Ai
 If ``dbt`` was not installed as part of the Cosmos packages,
 users can define a custom path to ``dbt`` by declaring the argument ``dbt_executable_path``.
 
-By default, if Cosmos sees a ``partial_parse.msgpack`` in the target directory of the dbt project directory when using ``local`` execution, it will use this for partial parsing to speed up task execution.
-This can be turned off by setting ``partial_parse=False`` in the ``ProjectConfig``.
+.. note::
+    Starting in the 1.4 version, Cosmos tries to leverage the dbt partial parsing (``partial_parse.msgpack``) to speed up task execution.
+    This feature is bound to `dbt partial parsing limitations <https://docs.getdbt.com/reference/parsing#known-limitations>`_.
+    Learn more: :ref:`partial-parsing`.
 
 When using the ``local`` execution mode, Cosmos converts Airflow Connections into a native ``dbt`` profiles file (``profiles.yml``).
 
@@ -152,6 +159,38 @@ Example DAG:
         ),
         operator_args={
             "image": "dbt-jaffle-shop:1.0.0",
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "secrets": [postgres_password_secret],
+        },
+    )
+AWS_EKS
+----------
+
+The ``aws_eks`` approach is very similar to the ``kubernetes`` approach, but it is specifically designed to run on AWS EKS clusters.
+It uses the `EKSPodOperator <https://airflow.apache.org/docs/apache-airflow-providers-amazon/8.19.0/operators/eks.html#perform-a-task-on-an-amazon-eks-cluster>`_
+to run the dbt commands. You need to provide the ``cluster_name`` in your operator_args to connect to the AWS EKS cluster.
+
+
+Example DAG:
+
+.. code-block:: python
+
+    postgres_password_secret = Secret(
+        deploy_type="env",
+        deploy_target="POSTGRES_PASSWORD",
+        secret="postgres-secrets",
+        key="password",
+    )
+
+    docker_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.AWS_EKS,
+        ),
+        operator_args={
+            "image": "dbt-jaffle-shop:1.0.0",
+            "cluster_name": CLUSTER_NAME,
             "get_logs": True,
             "is_delete_operator_pod": False,
             "secrets": [postgres_password_secret],

@@ -18,7 +18,6 @@ from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 
 import pytest
 from airflow.configuration import conf
-from airflow.exceptions import AirflowConfigException
 from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
@@ -72,6 +71,7 @@ def test_dbt_docs(monkeypatch, app):
             return original_conf_get(section, key, *args, **kwargs)
 
     monkeypatch.setattr(conf, "get", conf_get)
+    monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
 
     response = app.get("/cosmos/dbt_docs")
 
@@ -97,6 +97,7 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
             return original_conf_get(section, key, *args, **kwargs)
 
     monkeypatch.setattr(conf, "get", conf_get)
+    monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
 
     if artifact == "dbt_docs_index.html":
         mock_open_file.return_value = "<head></head><body></body>"
@@ -135,6 +136,7 @@ def test_open_file_calls(path, open_file_callback, monkeypatch):
             return original_conf_get(section, key, *args, **kwargs)
 
     monkeypatch.setattr(conf, "get", conf_get)
+    monkeypatch.setattr("cosmos.plugin.dbt_docs_conn_id", "mock_conn_id")
 
     with patch.object(cosmos.plugin, open_file_callback) as mock_callback:
         mock_callback.return_value = "mock file contents"

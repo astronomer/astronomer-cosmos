@@ -1,4 +1,5 @@
 import json
+from collections import namedtuple
 from unittest.mock import patch
 
 import pytest
@@ -8,6 +9,7 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 
+ConnExtraParams = namedtuple("ConnExtraParams", ["keyfile_dict", "keyfile_json_extra_key"])
 sample_keyfile_dict = {
     "type": "service_account",
     "private_key_id": "my_private_key_id",
@@ -15,7 +17,21 @@ sample_keyfile_dict = {
 }
 
 
-@pytest.fixture(params=[sample_keyfile_dict, json.dumps(sample_keyfile_dict)])
+def get_fixture_params():
+    """
+    Make a matrix of params for the fixture that mock connection, as there are multiple fields in
+    the airflow param mapping for the "keyfile_json" in GoogleCloudServiceAccountDictProfileMapping
+    """
+    fixture_params = []
+    for d in (sample_keyfile_dict, json.dumps(sample_keyfile_dict)):
+        for key in GoogleCloudServiceAccountDictProfileMapping.airflow_param_mapping.get("keyfile_json"):
+            if key.startswith("extra."):
+                key = key.replace("extra.", "")
+            fixture_params.append(ConnExtraParams(keyfile_dict=d, keyfile_json_extra_key=key))
+    return fixture_params
+
+
+@pytest.fixture(params=get_fixture_params())
 def mock_bigquery_conn_with_dict(request):  # type: ignore
     """
     Mocks and returns an Airflow BigQuery connection.
@@ -23,14 +39,13 @@ def mock_bigquery_conn_with_dict(request):  # type: ignore
     extra = {
         "project": "my_project",
         "dataset": "my_dataset",
-        "keyfile_dict": request.param,
+        request.param.keyfile_json_extra_key: request.param.keyfile_dict,
     }
     conn = Connection(
         conn_id="my_bigquery_connection",
         conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
-
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         yield conn
 

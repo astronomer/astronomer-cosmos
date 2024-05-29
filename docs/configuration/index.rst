@@ -14,12 +14,14 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Render Config <render-config>
 
    Parsing Methods <parsing-methods>
+   Configuring in Airflow <cosmos-conf>
    Configuring Lineage <lineage>
    Generating Docs <generating-docs>
    Hosting Docs <hosting-docs>
    Scheduling <scheduling>
    Testing Behavior <testing-behavior>
    Selecting & Excluding <selecting-excluding>
+   Partial Parsing <partial-parsing>
    Operator Args <operator-args>
    Compiled SQL <compiled-sql>
    Logging <logging>

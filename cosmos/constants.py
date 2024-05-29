@@ -3,20 +3,27 @@ from enum import Enum
 from pathlib import Path
 
 import aenum
+from packaging.version import Version
 
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
 DEFAULT_DBT_TARGET_NAME = "cosmos_target"
+DEFAULT_COSMOS_CACHE_DIR_NAME = "cosmos"
 DBT_LOG_PATH_ENVVAR = "DBT_LOG_PATH"
 DBT_LOG_DIR_NAME = "logs"
 DBT_TARGET_PATH_ENVVAR = "DBT_TARGET_PATH"
 DBT_TARGET_DIR_NAME = "target"
 DBT_PARTIAL_PARSE_FILE_NAME = "partial_parse.msgpack"
+DBT_MANIFEST_FILE_NAME = "manifest.json"
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
+
+# Cosmos will not emit datasets for the following Airflow versions, due to a breaking change that's fixed in later Airflow 2.x versions
+# https://github.com/apache/airflow/issues/39486
+PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1")]
 
 
 class LoadMode(Enum):
@@ -49,6 +56,7 @@ class ExecutionMode(Enum):
     LOCAL = "local"
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
+    AWS_EKS = "aws_eks"
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
 

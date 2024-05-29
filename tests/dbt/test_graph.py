@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DbtResourceType, ExecutionMode
+from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
     DbtGraph,
@@ -96,6 +96,77 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
 
     assert len(dbt_graph.nodes) == 28
     assert len(dbt_graph.filtered_nodes) == 26
+    assert "model.jaffle_shop.orders" not in dbt_graph.filtered_nodes
+
+    sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
+    assert sample_node.name == "customers"
+    assert sample_node.unique_id == "model.jaffle_shop.customers"
+    assert sample_node.resource_type == DbtResourceType.MODEL
+    assert sample_node.depends_on == [
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+    ]
+    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
+
+
+@pytest.mark.parametrize(
+    "project_name,manifest_filepath,model_filepath",
+    [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
+)
+def test_load_via_manifest_with_select(project_name, manifest_filepath, model_filepath):
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name, manifest_path=manifest_filepath
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(select=["+customers"])
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    expected_keys = [
+        "model.jaffle_shop.customers",
+        "model.jaffle_shop.orders",
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+        "seed.jaffle_shop.raw_customers",
+        "seed.jaffle_shop.raw_orders",
+        "seed.jaffle_shop.raw_payments",
+        "test.jaffle_shop.accepted_values_orders_status__placed__shipped__completed__return_pending__returned.be6b5b5ec3",
+        "test.jaffle_shop.accepted_values_stg_orders_status__placed__shipped__completed__return_pending__returned.080fb20aad",
+        "test.jaffle_shop.accepted_values_stg_payments_payment_method__credit_card__coupon__bank_transfer__gift_card.3c3820f278",
+        "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
+        "test.jaffle_shop.not_null_orders_amount.106140f9fd",
+        "test.jaffle_shop.not_null_orders_bank_transfer_amount.7743500c49",
+        "test.jaffle_shop.not_null_orders_coupon_amount.ab90c90625",
+        "test.jaffle_shop.not_null_orders_credit_card_amount.d3ca593b59",
+        "test.jaffle_shop.not_null_orders_customer_id.c5f02694af",
+        "test.jaffle_shop.not_null_orders_gift_card_amount.413a0d2d7a",
+        "test.jaffle_shop.not_null_orders_order_id.cf6c17daed",
+        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.jaffle_shop.not_null_stg_orders_order_id.81cfe2fe64",
+        "test.jaffle_shop.not_null_stg_payments_payment_id.c19cc50075",
+        "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2",
+        "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
+        "test.jaffle_shop.unique_orders_order_id.fed79b3a6e",
+        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
+        "test.jaffle_shop.unique_stg_orders_order_id.e3b841c71a",
+        "test.jaffle_shop.unique_stg_payments_payment_id.3744510712",
+    ]
+    assert sorted(dbt_graph.nodes.keys()) == expected_keys
+
+    assert len(dbt_graph.nodes) == 28
+    assert len(dbt_graph.filtered_nodes) == 7
     assert "model.jaffle_shop.orders" not in dbt_graph.filtered_nodes
 
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
@@ -482,7 +553,9 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_project_dir, postgres_profile_config):
+def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
+    tmp_dbt_project_dir, postgres_profile_config, caplog
+):
     local_flags = [
         "--project-dir",
         tmp_dbt_project_dir / DBT_PROJECT_NAME,
@@ -515,7 +588,42 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(tmp_dbt_
         profile_config=postgres_profile_config,
     )
 
-    dbt_graph.load_via_dbt_ls()  # does not raise exception
+    assert dbt_graph.load_via_dbt_ls() is None  # Doesn't raise any exceptions
+
+
+@pytest.mark.integration
+def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path):
+    """
+    When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
+    Cosmos should leverage dbt partial parsing.
+    """
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+
+    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=True, enable_mock_profile=False
+    )
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=postgres_profile_config,
+        cache_dir=tmp_path,
+    )
+
+    (tmp_path / DBT_TARGET_DIR_NAME).mkdir(parents=True, exist_ok=True)
+
+    # First time dbt ls is run, partial parsing was not cached, so we don't benefit from this
+    dbt_graph.load_via_dbt_ls()
+    assert "Unable to do partial parsing" in caplog.text
+
+    # From the second time we run dbt ls onwards, we benefit from partial parsing
+    caplog.clear()
+    dbt_graph.load_via_dbt_ls()  # should not not raise exception
+    assert not "Unable to do partial parsing" in caplog.text
 
 
 @pytest.mark.integration

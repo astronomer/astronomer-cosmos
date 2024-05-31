@@ -921,7 +921,11 @@ def test_handle_exception_subprocess(caplog):
     """
     Test the handle_exception_subprocess method of the DbtLocalBaseOperator class for non-zero dbt exit code.
     """
-    operator = ConcreteDbtLocalBaseOperator(profile_config=None)
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
     result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=["n" * n for n in range(1, 1000)])
 
     caplog.set_level(logging.ERROR)

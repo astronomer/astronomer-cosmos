@@ -179,10 +179,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
-            raise AirflowException(
-                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}. Details: ",
-                *result.full_output,
-            )
+            logger.error("\n".join(result.full_output))
+            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""

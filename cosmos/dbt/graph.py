@@ -148,6 +148,7 @@ class DbtGraph:
 
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
+    load_method: LoadMode = LoadMode.AUTOMATIC
 
     def __init__(
         self,
@@ -253,6 +254,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
+        self.load_method = LoadMode.DBT_LS
         self.render_config.validate_dbt_command(fallback_cmd=self.execution_config.dbt_executable_path)
         dbt_cmd = self.render_config.dbt_executable_path
         dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
@@ -330,6 +332,7 @@ class DbtGraph:
         This technically should increase performance and also removes the necessity to have your whole dbt project copied
         to the airflow image.
         """
+        self.load_method = LoadMode.DBT_LS_FILE
         logger.info("Trying to parse the dbt project `%s` using a dbt ls output file...", self.project.project_name)
 
         if not self.render_config.is_dbt_ls_file_available():
@@ -357,6 +360,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
+        self.load_method = LoadMode.CUSTOM
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
         if self.render_config.selector:
@@ -415,6 +419,7 @@ class DbtGraph:
         * self.nodes
         * self.filtered_nodes
         """
+        self.load_method = LoadMode.DBT_MANIFEST
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
 
         if self.render_config.selector:

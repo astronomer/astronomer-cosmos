@@ -450,48 +450,6 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     # https://github.com/apache/airflow/issues/39486
 )
 @pytest.mark.integration
-def test_run_operator_dataset_emission_fails(caplog):
-
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-
-        seed_operator >> run_operator
-
-    with pytest.raises(AirflowCompatibilityError) as exc:
-        run_test_dag(dag)
-
-    err_msg = str(exc.value)
-    assert (
-        "Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions"
-        in err_msg
-    )
-    assert (
-        "If you want to use Cosmos with one of these Airflow versions, you will have to disable emission of Datasets"
-        in err_msg
-    )
-
-
-@pytest.mark.skipif(
-    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-    # https://github.com/apache/airflow/issues/39486
-)
-@pytest.mark.integration
 def test_run_operator_dataset_emission_is_skipped(caplog):
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:

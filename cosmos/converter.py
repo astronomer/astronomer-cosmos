@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import copy
 import inspect
+import os
+import platform
+import time
 from typing import Any, Callable
 from warnings import warn
 
@@ -228,6 +231,7 @@ class DbtToAirflowConverter:
         if settings.enable_cache:
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache._create_cache_identifier(dag, task_group))
 
+        previous_time = time.process_time()
         self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,
@@ -237,6 +241,13 @@ class DbtToAirflowConverter:
             dbt_vars=dbt_vars,
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
+
+        current_time = time.process_time()
+        elapsed_time = current_time - previous_time
+        logger.info(
+            f"Cosmos performance [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to parse the dbt project for DAG {dag.dag_id} using {self.dbt_graph.load_method}"
+        )
+        previous_time = current_time
 
         task_args = {
             **operator_args,
@@ -271,4 +282,10 @@ class DbtToAirflowConverter:
             dbt_project_name=project_config.project_name,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
+        )
+
+        current_time = time.process_time()
+        elapsed_time = current_time - previous_time
+        logger.info(
+            f"Cosmos performance [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG {dag.dag_id}."
         )

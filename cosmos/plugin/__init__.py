@@ -191,7 +191,7 @@ class DbtDocsView(AirflowBaseView):
     def dbt_docs_index(self) -> str:
         if dbt_docs_dir is None:
             abort(404)
-        html = open_file(op.abspath(op.join(dbt_docs_dir, dbt_docs_index_file_name)), conn_id=dbt_docs_conn_id)
+        html = open_file(op.join(dbt_docs_dir, dbt_docs_index_file_name), conn_id=dbt_docs_conn_id)
         # Hack the dbt docs to render properly in an iframe
         iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
         html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)

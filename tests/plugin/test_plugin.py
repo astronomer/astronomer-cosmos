@@ -17,7 +17,6 @@ import sys
 from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 
 import pytest
-from airflow.configuration import conf
 from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
@@ -33,8 +32,6 @@ from cosmos.plugin import (
     open_http_file,
     open_s3_file,
 )
-
-original_conf_get = conf.get
 
 
 def _get_text_from_response(response) -> str:
@@ -64,13 +61,6 @@ def app() -> FlaskClient:
 
 
 def test_dbt_docs(monkeypatch, app):
-    def conf_get(section, key, *args, **kwargs):
-        if section == "cosmos" and key == "dbt_docs_dir":
-            return "path/to/docs/dir"
-        else:
-            return original_conf_get(section, key, *args, **kwargs)
-
-    monkeypatch.setattr(conf, "get", conf_get)
     monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
 
     response = app.get("/cosmos/dbt_docs")
@@ -90,23 +80,20 @@ def test_dbt_docs_not_set_up(monkeypatch, app):
 @patch.object(cosmos.plugin, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
-    def conf_get(section, key, *args, **kwargs):
-        if section == "cosmos" and key == "dbt_docs_dir":
-            return "path/to/docs/dir"
-        else:
-            return original_conf_get(section, key, *args, **kwargs)
-
-    monkeypatch.setattr(conf, "get", conf_get)
     monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
+    monkeypatch.setattr("cosmos.plugin.dbt_docs_conn_id", "mock_conn_id")
+    monkeypatch.setattr("cosmos.plugin.dbt_docs_index_file_name", "custom_index.html")
 
     if artifact == "dbt_docs_index.html":
         mock_open_file.return_value = "<head></head><body></body>"
+        storage_path = "path/to/docs/dir/custom_index.html"
     else:
         mock_open_file.return_value = "{}"
+        storage_path = f"path/to/docs/dir/{artifact}"
 
     response = app.get(f"/cosmos/{artifact}")
 
-    mock_open_file.assert_called_once()
+    mock_open_file.assert_called_once_with(storage_path, conn_id="mock_conn_id")
     assert response.status_code == 200
     if artifact == "dbt_docs_index.html":
         assert iframe_script in _get_text_from_response(response)
@@ -128,19 +115,10 @@ def test_dbt_docs_artifact_missing(app, artifact):
         ("https://my-bucket/my/path/", "open_http_file"),
     ],
 )
-def test_open_file_calls(path, open_file_callback, monkeypatch):
-    def conf_get(section, key, *args, **kwargs):
-        if section == "cosmos" and key == "dbt_docs_conn_id":
-            return "mock_conn_id"
-        else:
-            return original_conf_get(section, key, *args, **kwargs)
-
-    monkeypatch.setattr(conf, "get", conf_get)
-    monkeypatch.setattr("cosmos.plugin.dbt_docs_conn_id", "mock_conn_id")
-
+def test_open_file_calls(path, open_file_callback):
     with patch.object(cosmos.plugin, open_file_callback) as mock_callback:
         mock_callback.return_value = "mock file contents"
-        res = open_file(path)
+        res = open_file(path, conn_id="mock_conn_id")
 
     mock_callback.assert_called_with(path, conn_id="mock_conn_id")
     assert res == "mock file contents"

@@ -229,7 +229,8 @@ class DbtToAirflowConverter:
 
         cache_dir = None
         if settings.enable_cache:
-            cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache._create_cache_identifier(dag, task_group))
+            cache_identifier = cache._create_cache_identifier(dag, task_group)
+            cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
 
         previous_time = time.process_time()
         self.dbt_graph = DbtGraph(
@@ -238,6 +239,7 @@ class DbtToAirflowConverter:
             execution_config=execution_config,
             profile_config=profile_config,
             cache_dir=cache_dir,
+            cache_identifier=cache_identifier,
             dbt_vars=dbt_vars,
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)

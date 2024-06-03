@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import json
 import os
+import platform
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,8 +11,9 @@ from subprocess import PIPE, Popen
 from typing import Any
 
 import yaml
+from airflow.models import Variable
 
-from cosmos import cache
+from cosmos import cache, settings
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
@@ -98,7 +100,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
     return stdout
 
 
-def parse_dbt_ls_output(project_path: Path, ls_stdout: str) -> dict[str, DbtNode]:
+def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, DbtNode]:
     """Parses the output of `dbt ls` into a dictionary of `DbtNode` instances."""
     nodes = {}
     for line in ls_stdout.split("\n"):
@@ -139,6 +141,7 @@ class DbtGraph:
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
         cache_dir: Path | None = None,
+        cache_identifier: str = "UNDEFINED",
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
@@ -147,6 +150,7 @@ class DbtGraph:
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.cache_dir = cache_dir
+        self.cache_identifier = cache_identifier
         self.dbt_vars = dbt_vars or {}
 
     def load(
@@ -164,11 +168,11 @@ class DbtGraph:
         Fundamentally, there are two different execution paths
         There is automatic, and manual.
         """
-
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_LS_FILE: self.load_via_dbt_ls_file,
+            LoadMode.DBT_LS_CACHE: self.load_via_dbt_ls_cache,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
 
@@ -178,7 +182,8 @@ class DbtGraph:
             else:
                 if execution_mode == ExecutionMode.LOCAL and self.profile_config:
                     try:
-                        self.load_via_dbt_ls()
+                        if not self.load_via_dbt_ls_cache():
+                            self.load_via_dbt_ls()
                     except FileNotFoundError:
                         self.load_via_custom_parser()
                 else:
@@ -190,6 +195,25 @@ class DbtGraph:
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
+
+    def load_via_dbt_ls_cache(self) -> bool:
+        """
+        Load dbt ls cache
+        """
+        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_identifier}...")
+        if settings.enable_cache and settings.experimental_cache:
+            dbt_ls_cache = Variable.get(self.cache_identifier, "")
+            if dbt_ls_cache:
+                logger.info(
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_identifier} is {len(dbt_ls_cache.encode('utf-8'))}"
+                )
+                self.load_method = LoadMode.DBT_LS_CACHE
+                project_path = self.render_config.project_path
+                nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
+                self.nodes = nodes
+                self.filtered_nodes = nodes
+                return True
+        return False
 
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
@@ -223,6 +247,9 @@ class DbtGraph:
             with open(log_filepath) as logfile:
                 for line in logfile:
                     logger.debug(line.strip())
+
+        if settings.enable_cache and settings.experimental_cache:
+            Variable.set(self.cache_identifier, stdout)
 
         nodes = parse_dbt_ls_output(project_path, stdout)
         return nodes

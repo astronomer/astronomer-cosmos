@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.0a3 (2024-06-03)
+1.5.0a4 (2024-06-03)
 --------------------
 
 New Features
@@ -9,6 +9,7 @@ New Features
 * Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
 * Support caching dbt ls output in Airflow variable in #1014 by @tatiana (WIP)
    - different approach than 1.5.0a1 and 1.5.0a2
+   - fix log for TaskGroup
 
 
 1.4.3 (2024-06-07)

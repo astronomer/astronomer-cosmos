@@ -36,6 +36,7 @@ class LoadMode(Enum):
     CUSTOM = "custom"
     DBT_LS = "dbt_ls"
     DBT_LS_FILE = "dbt_ls_file"
+    DBT_LS_CACHE = "dbt_ls_cache"
     DBT_MANIFEST = "dbt_manifest"
 
 

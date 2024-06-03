@@ -1,8 +1,60 @@
 Changelog
 =========
 
+1.5.0a3 (2024-06-03)
+--------------------
+
+New Features
+
+* Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
+* Support caching dbt ls output in Airflow variable in #1014 by @tatiana (WIP)
+   - different approach than 1.5.0a1 and 1.5.0a2
+
+
 1.4.3 (2024-06-07)
------------------
+------------------
+
+Bug fixes
+
+* Bring back ``dataset`` as a required field for BigQuery profile by @pankajkoti in #1033
+
+Enhancements
+
+* Only run ``dbt deps`` when there are dependencies by @tatiana and @AlgirdasDubickas in #1030
+
+Docs
+
+* Fix docs so it does not reference non-existing ``get_dbt_dataset`` by @tatiana in #1034
+
+
+v1.4.2 (2024-06-06)
+-------------------
+
+Bug fixes
+
+* Fix the invocation mode for ``ExecutionMode.VIRTUALENV`` by @marco9663 in #1023
+* Fix Cosmos ``enable_cache`` setting by @tatiana in #1025
+* Make ``GoogleCloudServiceAccountDictProfileMapping`` dataset profile arg optional by @oliverrmaa and @pankajastro in #839 and #1017
+* Athena profile mapping set ``aws_session_token`` in profile only if it exists by @pankajastro in #1022
+
+Others
+
+* Update dbt and Airflow conflicts matrix by @tatiana in #1026
+* Enable Python 3.12 unittest by @pankajastro in #1018
+* Improve error logging in ``DbtLocalBaseOperator`` by @davidsteinar in #1004
+* Add GitHub issue templates for bug reports and feature request by @pankajkoti in #1009
+* Add more fields in bug template to reduce turnaround in issue triaging by @pankajkoti in #1027
+* Fix ``dev/Dockerfile`` + Add ``uv pip install`` for faster build time by @dwreeves in #997
+* Drop support for Airflow 2.3 by @pankajkoti in #994
+* Update Astro Runtime image by @RNHTTR in #988 and #989
+* Enable ruff F linting by @pankajastro in #985
+* Move Cosmos Airflow configuration to settings.py by @pankajastro in #975
+* Fix CI Issues by @tatiana in #1005
+* Pre-commit hook updates in #1000, #1019
+
+
+1.4.1 (2024-05-17)
+------------------
 
 Bug fixes
 

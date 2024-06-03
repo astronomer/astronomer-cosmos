@@ -23,6 +23,7 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
+from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtDocsAzureStorageLocalOperator,
@@ -914,3 +915,22 @@ def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
     dbt_base_operator.on_kill()
 
     mock_send_sigterm.assert_called_once()
+
+
+def test_handle_exception_subprocess(caplog):
+    """
+    Test the handle_exception_subprocess method of the DbtLocalBaseOperator class for non-zero dbt exit code.
+    """
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=["n" * n for n in range(1, 1000)])
+
+    caplog.set_level(logging.ERROR)
+    # Test when exit_code is non-zero
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+    assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
+    assert len(caplog.text) > 1000  # Ensure the log message is not truncated

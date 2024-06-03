@@ -1,6 +1,27 @@
 Changelog
 =========
 
+1.5.0a3 (2024-06-03)
+--------------------
+
+New Features
+
+* Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
+* Support caching dbt ls output in Airflow variable in #1014 by @tatiana (WIP)
+   - different approach than 1.5.0a1 and 1.5.0a2
+
+Others
+
+* Improve error logging in ``DbtLocalBaseOperator`` in #1004 by @davidsteinar
+* Add GitHub issue templates for bug reports and feature request in #1009 by @pankajkoti
+* Fix ``dev/Dockerfile`` + Add ``uv pip install`` for faster build time in #997 by @dwreeves
+* Drop support for Airflow 2.3 in #994 by @pankajkoti
+* Update Astro Runtime image in #988 and #989 by @RNHTTR
+* Enable ruff F linting in #985 by @pankajastro
+* Move Cosmos Airflow configuration to settings.py in #975 by @pankajastro
+* Fix CI Issues in #1005 by @tatiana
+* Pre-commit hook updates in #1000
+
 1.4.1 (2024-05-17)
 --------------------
 

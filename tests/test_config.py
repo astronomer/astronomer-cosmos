@@ -199,15 +199,34 @@ def test_render_config_env_vars_deprecated():
 
 
 @pytest.mark.parametrize(
-    "execution_mode, expectation",
+    "execution_mode, invocation_mode, expectation",
     [
-        (ExecutionMode.LOCAL, does_not_raise()),
-        (ExecutionMode.VIRTUALENV, does_not_raise()),
-        (ExecutionMode.KUBERNETES, pytest.raises(CosmosValueError)),
-        (ExecutionMode.DOCKER, pytest.raises(CosmosValueError)),
-        (ExecutionMode.AZURE_CONTAINER_INSTANCE, pytest.raises(CosmosValueError)),
+        (ExecutionMode.LOCAL, InvocationMode.DBT_RUNNER, does_not_raise()),
+        (ExecutionMode.LOCAL, InvocationMode.SUBPROCESS, does_not_raise()),
+        (ExecutionMode.LOCAL, None, does_not_raise()),
+        (ExecutionMode.VIRTUALENV, InvocationMode.DBT_RUNNER, pytest.raises(CosmosValueError)),
+        (ExecutionMode.VIRTUALENV, InvocationMode.SUBPROCESS, does_not_raise()),
+        (ExecutionMode.VIRTUALENV, None, does_not_raise()),
+        (ExecutionMode.KUBERNETES, InvocationMode.DBT_RUNNER, pytest.raises(CosmosValueError)),
+        (ExecutionMode.DOCKER, InvocationMode.DBT_RUNNER, pytest.raises(CosmosValueError)),
+        (ExecutionMode.AZURE_CONTAINER_INSTANCE, InvocationMode.DBT_RUNNER, pytest.raises(CosmosValueError)),
     ],
 )
-def test_execution_config_with_invocation_option(execution_mode, expectation):
+def test_execution_config_with_invocation_option(execution_mode, invocation_mode, expectation):
     with expectation:
-        ExecutionConfig(execution_mode=execution_mode, invocation_mode=InvocationMode.DBT_RUNNER)
+        ExecutionConfig(execution_mode=execution_mode, invocation_mode=invocation_mode)
+
+
+@pytest.mark.parametrize(
+    "execution_mode, expected_invocation_mode",
+    [
+        (ExecutionMode.LOCAL, None),
+        (ExecutionMode.VIRTUALENV, InvocationMode.SUBPROCESS),
+        (ExecutionMode.KUBERNETES, None),
+        (ExecutionMode.DOCKER, None),
+        (ExecutionMode.AZURE_CONTAINER_INSTANCE, None),
+    ],
+)
+def test_execution_config_default_config(execution_mode, expected_invocation_mode):
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    assert execution_config.invocation_mode == expected_invocation_mode

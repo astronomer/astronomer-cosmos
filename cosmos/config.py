@@ -319,6 +319,9 @@ class ExecutionConfig:
     project_path: Path | None = field(init=False)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
-        if self.invocation_mode and self.execution_mode != ExecutionMode.LOCAL:
-            raise CosmosValueError("ExecutionConfig.invocation_mode is only configurable for ExecutionMode.LOCAL.")
+        if self.invocation_mode and self.execution_mode not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
+            raise CosmosValueError("ExecutionConfig.invocation_mode is only configurable for ExecutionMode.LOCAL and ExecutionMode.VIRTUALENV.")
+        if self.execution_mode == ExecutionMode.VIRTUALENV and self.invocation_mode == InvocationMode.DBT_RUNNER:
+            logger.warning("InvocationMode.DBT_RUNNER has not been implemented for ExecutionMode.VIRTUALENV. Falling back to InvocationMode.SUBPROCESS")
+            self.invocation_mode = InvocationMode.SUBPROCESS
         self.project_path = Path(dbt_project_path) if dbt_project_path else None

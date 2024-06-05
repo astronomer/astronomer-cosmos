@@ -1,11 +1,12 @@
 "Tests for the Athena profile."
+from __future__ import annotations
 
 import json
 import sys
 from collections import namedtuple
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
-from unittest import mock
 import pytest
 from airflow.models.connection import Connection
 
@@ -170,7 +171,7 @@ def test_athena_profile_args_without_token(mock_temp_cred, mock_athena_conn_with
     """
     Tests that the profile values get set correctly for Athena.
     """
-    ReadOnlyCredentials = namedtuple('ReadOnlyCredentials', ['access_key', 'secret_key', 'token'])
+    ReadOnlyCredentials = namedtuple("ReadOnlyCredentials", ["access_key", "secret_key", "token"])
     credentials = ReadOnlyCredentials(access_key="my_aws_access_key", secret_key="my_aws_secret_key", token=None)
     mock_temp_cred.return_value = credentials
 

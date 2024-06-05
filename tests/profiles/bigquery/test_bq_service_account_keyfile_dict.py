@@ -65,7 +65,7 @@ def test_connection_claiming_succeeds(mock_bigquery_conn_with_dict: Connection):
 
 def test_connection_claiming_fails(mock_bigquery_conn_with_dict: Connection):
     # Remove the `project` key, which is mandatory
-    mock_bigquery_conn_with_dict.extra = json.dumps({"keyfile_dict": sample_keyfile_dict})
+    mock_bigquery_conn_with_dict.extra = json.dumps({"dataset": "my_dataset", "keyfile_dict": sample_keyfile_dict})
     profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
     assert not profile_mapping.can_claim_connection()
 

@@ -22,7 +22,6 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
 
     required_fields = [
         "project",
-        "dataset",
         "keyfile_json",
     ]
 
@@ -45,11 +44,13 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         Even though the Airflow connection contains hard-coded Service account credentials,
         we generate a temporary file and the DBT profile uses it.
         """
-        return {
+        profile_dict = {
             **self.mapped_params,
             "threads": 1,
             **self.profile_args,
         }
+
+        return self.filter_null(profile_dict)
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:

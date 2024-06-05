@@ -35,6 +35,17 @@ class ClickhouseUserPasswordProfileMapping(BaseProfileMapping):
         "clickhouse": "extra.clickhouse",
     }
 
+    def _set_default_param(self, profile_dict: dict) -> dict:
+        if not profile_dict.get("driver"):
+            profile_dict["driver"] = "native"
+
+        if not profile_dict.get("port"):
+            profile_dict["port"] = self.default_port
+
+        if not profile_dict.get("secure"):
+            profile_dict["secure"] = False
+        return profile_dict
+
     @property
     def profile(self) -> dict[str, Any | None]:
         """Gets profile. The password is stored in an environment variable."""
@@ -45,30 +56,14 @@ class ClickhouseUserPasswordProfileMapping(BaseProfileMapping):
             "password": self.get_env_var_format("password"),
         }
 
-        if not profile_dict.get("driver"):
-            profile_dict["driver"] = "native"
-
-        if not profile_dict.get("port"):
-            profile_dict["port"] = self.default_port
-
-        if not profile_dict.get("secure"):
-            profile_dict["secure"] = False
-
-        return self.filter_null(profile_dict)
+        return self.filter_null(self._set_default_param(profile_dict))
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
         """Gets mock profile."""
 
         profile_dict = {
-            "port": self.default_port,
             **super().mock_profile,
         }
 
-        if not profile_dict.get("driver"):
-            profile_dict["driver"] = "native"
-
-        if not profile_dict.get("secure"):
-            profile_dict["secure"] = False
-
-        return profile_dict
+        return self._set_default_param(profile_dict)

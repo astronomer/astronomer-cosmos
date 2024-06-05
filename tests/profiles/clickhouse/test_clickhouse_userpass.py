@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_automatic_profile_mapping, BaseProfileMapping
+from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.clickhouse.user_pass import (
     ClickhouseUserPasswordProfileMapping,
 )
@@ -95,7 +95,9 @@ def test_profile_args(mock_clickhouse_conn: Connection) -> None:
 
 def test_mock_profile() -> None:
     """Tests that the mock_profile values get set correctly."""
-    profile_mapping = ClickhouseUserPasswordProfileMapping("conn_id") #get_automatic_profile_mapping("mock_clickhouse_conn.conn_id", profile_args={})
+    profile_mapping = ClickhouseUserPasswordProfileMapping(
+        "conn_id"
+    )  # get_automatic_profile_mapping("mock_clickhouse_conn.conn_id", profile_args={})
 
     assert profile_mapping.mock_profile == {
         "type": "clickhouse",

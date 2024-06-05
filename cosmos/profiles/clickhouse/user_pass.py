@@ -1,4 +1,5 @@
 """Maps Airflow Postgres connections using user + password authentication to dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -35,7 +36,7 @@ class ClickhouseUserPasswordProfileMapping(BaseProfileMapping):
         "clickhouse": "extra.clickhouse",
     }
 
-    def _set_default_param(self, profile_dict: dict) -> dict:
+    def _set_default_param(self, profile_dict: dict[str, Any]) -> dict[str, Any]:
         if not profile_dict.get("driver"):
             profile_dict["driver"] = "native"
 

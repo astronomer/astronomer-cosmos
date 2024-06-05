@@ -5,6 +5,7 @@ import sys
 from collections import namedtuple
 from unittest.mock import MagicMock, patch
 
+from unittest import mock
 import pytest
 from airflow.models.connection import Connection
 
@@ -39,12 +40,7 @@ def mock_aws_module():
         yield mock_aws_hook
 
 
-@pytest.fixture()
-def mock_athena_conn():  # type: ignore
-    """
-    Sets the connection as an environment variable.
-    """
-
+def mock_conn_value(token: str | None = None) -> Connection:
     conn = Connection(
         conn_id="my_athena_connection",
         conn_type="aws",
@@ -52,7 +48,7 @@ def mock_athena_conn():  # type: ignore
         password="my_aws_secret_key",
         extra=json.dumps(
             {
-                "aws_session_token": "token123",
+                "aws_session_token": token,
                 "database": "my_database",
                 "region_name": "us-east-1",
                 "s3_staging_dir": "s3://my_bucket/dbt/",
@@ -60,7 +56,25 @@ def mock_athena_conn():  # type: ignore
             }
         ),
     )
+    return conn
 
+
+@pytest.fixture()
+def mock_athena_conn():  # type: ignore
+    """
+    Sets the connection as an environment variable.
+    """
+    conn = mock_conn_value(token="token123")
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
+@pytest.fixture()
+def mock_athena_conn_without_token():  # type: ignore
+    """
+    Sets the connection as an environment variable.
+    """
+    conn = mock_conn_value(token=None)
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
@@ -148,6 +162,28 @@ def test_athena_profile_args(
         "region_name": mock_athena_conn.extra_dejson.get("region_name"),
         "s3_staging_dir": mock_athena_conn.extra_dejson.get("s3_staging_dir"),
         "schema": mock_athena_conn.extra_dejson.get("schema"),
+    }
+
+
+@mock.patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping._get_temporary_credentials")
+def test_athena_profile_args_without_token(mock_temp_cred, mock_athena_conn_without_token: Connection) -> None:
+    """
+    Tests that the profile values get set correctly for Athena.
+    """
+    ReadOnlyCredentials = namedtuple('ReadOnlyCredentials', ['access_key', 'secret_key', 'token'])
+    credentials = ReadOnlyCredentials(access_key="my_aws_access_key", secret_key="my_aws_secret_key", token=None)
+    mock_temp_cred.return_value = credentials
+
+    profile_mapping = get_automatic_profile_mapping(mock_athena_conn_without_token.conn_id)
+
+    assert profile_mapping.profile == {
+        "type": "athena",
+        "aws_access_key_id": "my_aws_access_key",
+        "aws_secret_access_key": "{{ env_var('COSMOS_CONN_AWS_AWS_SECRET_ACCESS_KEY') }}",
+        "database": mock_athena_conn_without_token.extra_dejson.get("database"),
+        "region_name": mock_athena_conn_without_token.extra_dejson.get("region_name"),
+        "s3_staging_dir": mock_athena_conn_without_token.extra_dejson.get("s3_staging_dir"),
+        "schema": mock_athena_conn_without_token.extra_dejson.get("schema"),
     }
 
 

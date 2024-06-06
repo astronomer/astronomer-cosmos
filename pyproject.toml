@@ -25,6 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "aenum",
@@ -43,6 +44,7 @@ dependencies = [
 dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
+    "dbt-clickhouse",
     "dbt-databricks",
     "dbt-exasol",
     "dbt-postgres",
@@ -53,6 +55,7 @@ dbt-all = [
 ]
 dbt-athena = ["dbt-athena-community", "apache-airflow-providers-amazon>=8.0.0"]
 dbt-bigquery = ["dbt-bigquery"]
+dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-exasol = ["dbt-exasol"]
 dbt-postgres = ["dbt-postgres"]
@@ -138,7 +141,7 @@ dependencies = [
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11"]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
 
 [tool.hatch.envs.tests.overrides]

@@ -79,8 +79,6 @@ body:
         - "DBT_RUNNER"
         - "SUBPROCESS"
       multiple: false
-    validations:
-      required: true
   - type: input
     id: airflow-version
     attributes:

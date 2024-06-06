@@ -17,6 +17,7 @@ Others
 * Enable Python 3.12 unittest by @pankajastro in #1018
 * Improve error logging in ``DbtLocalBaseOperator`` by @davidsteinar in #1004
 * Add GitHub issue templates for bug reports and feature request by @pankajkoti in #1009
+* Add more fields in bug template to reduce turnaround in issue triaging by @pankajkoti in #1027
 * Fix ``dev/Dockerfile`` + Add ``uv pip install`` for faster build time by @dwreeves in #997
 * Drop support for Airflow 2.3 by @pankajkoti in #994
 * Update Astro Runtime image by @RNHTTR in #988 and #989

@@ -41,6 +41,46 @@ body:
       label: Versions of dbt adapters
       description: What dbt adapter versions are you using?
       placeholder: You can use `pip freeze | grep dbt` (you can leave only relevant ones)
+  - type: dropdown
+    id: load-mode
+    attributes:
+      label: LoadMode
+      description: Which LoadMode are you using?
+      options:
+        - "AUTOMATIC"
+        - "CUSTOM"
+        - "DBT_LS"
+        - "DBT_LS_FILE"
+        - "DBT_LS_MANIFEST"
+      multiple: false
+    validations:
+      required: true
+  - type: dropdown
+    id: execution-mode
+    attributes:
+      label: ExecutionMode
+      description: Which ExecutionMode are you using?
+      options:
+        - "AWS_EKS"
+        - "AZURE_CONTAINER_INSTANCE"
+        - "DOCKER"
+        - "KUBERNETES"
+        - "LOCAL"
+        - "VIRTUALENV"
+      multiple: false
+    validations:
+      required: true
+  - type: dropdown
+    id: invocation-mode
+    attributes:
+      label: InvocationMode
+      description: Which InvocationMode are you using?
+      options:
+        - "DBT_RUNNER"
+        - "SUBPROCESS"
+      multiple: false
+    validations:
+      required: true
   - type: input
     id: airflow-version
     attributes:

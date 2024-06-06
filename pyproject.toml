@@ -43,6 +43,7 @@ dependencies = [
 dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
+    "dbt-clickhouse",
     "dbt-databricks",
     "dbt-exasol",
     "dbt-postgres",
@@ -53,6 +54,7 @@ dbt-all = [
 ]
 dbt-athena = ["dbt-athena-community", "apache-airflow-providers-amazon>=8.0.0"]
 dbt-bigquery = ["dbt-bigquery"]
+dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-exasol = ["dbt-exasol"]
 dbt-postgres = ["dbt-postgres"]

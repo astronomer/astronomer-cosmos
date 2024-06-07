@@ -2,7 +2,9 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from cosmos.dbt.project import change_working_directory, create_symlinks, environ
+import pytest
+
+from cosmos.dbt.project import change_working_directory, create_symlinks, environ, has_non_empty_dependencies_file
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
@@ -49,3 +51,21 @@ def test_change_working_directory(mock_chdir):
 
     # Check if os.chdir is called with the previous working directory
     mock_chdir.assert_called_with(os.getcwd())
+
+
+@pytest.mark.parametrize("filename", ["packages.yml", "dependencies.yml"])
+def test_has_non_empty_dependencies_file_is_true(tmpdir, filename):
+    filepath = Path(tmpdir) / filename
+    filepath.write_text("content")
+    assert has_non_empty_dependencies_file(tmpdir)
+
+
+@pytest.mark.parametrize("filename", ["packages.yml", "dependencies.yml"])
+def test_has_non_empty_dependencies_file_is_false(tmpdir, filename):
+    filepath = Path(tmpdir) / filename
+    filepath.touch()
+    assert not has_non_empty_dependencies_file(tmpdir)
+
+
+def test_has_non_empty_dependencies_file_is_false_in_empty_dir(tmpdir):
+    assert not has_non_empty_dependencies_file(tmpdir)

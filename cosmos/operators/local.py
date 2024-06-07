@@ -18,7 +18,7 @@ from attr import define
 
 from cosmos import cache
 from cosmos.constants import InvocationMode
-from cosmos.dbt.project import get_partial_parse_path
+from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError
 from cosmos.settings import LINEAGE_NAMESPACE
 
@@ -126,7 +126,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
-        self.install_deps = install_deps
         self.callback = callback
         self.compiled_sql = ""
         self.should_store_compiled_sql = should_store_compiled_sql
@@ -145,6 +144,9 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
         # as it can break existing DAGs.
         self.append_env = append_env
+
+        # We should not spend time trying to install deps if the project doesn't have any dependencies
+        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

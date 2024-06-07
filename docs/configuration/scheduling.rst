@@ -24,23 +24,29 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
 Data-Aware Scheduling
 ---------------------
 
-By default, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets in the following format:
+By default, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
+
+An example how this could look like for a transformation that creates the table ``table`` in Postgres:
 
 .. code-block:: python
 
-    Dataset("DBT://{connection_id}/{project_name}/{model_name}")
+    Dataset("postgres://host:5432/database.schema.table")
 
+
+Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
 
 For example, let's say you have:
 
 - A dbt project (``project_one``) with a model called ``my_model`` that runs daily
 - A second dbt project (``project_two``) with a model called ``my_other_model`` that you want to run immediately after ``my_model``
 
+We are assuming that the Database used is Postgres, the host is ``host``, the database is ``database`` and the schema is ``schema``.
+
 Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_other_model`` to run after ``my_model``. For example, you can use the following DAGs:
 
 .. code-block:: python
 
-    from cosmos import DbtDag, get_dbt_dataset
+    from cosmos import DbtDa
 
     project_one = DbtDag(
         # ...
@@ -50,9 +56,9 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
     project_two = DbtDag(
         # for airflow <=2.3
-        # schedule=[get_dbt_dataset("my_conn", "project_one", "my_model")],
+        # schedule_interval=[Dataset("postgres://host:5432/database.schema.my_model")],,
         # for airflow > 2.3
-        schedule=[get_dbt_dataset("my_conn", "project_one", "my_model")],
+        schedule=[Dataset("postgres://host:5432/database.schema.my_model")],
         dbt_project_name="project_two",
     )
 

@@ -96,6 +96,7 @@ def test_mock_profile(mock_bigquery_conn_with_dict: Connection):
         "type": "bigquery",
         "method": "service-account-json",
         "project": "mock_value",
+        "dataset": "mock_value",
         "threads": 1,
         "keyfile_json": None,
     }

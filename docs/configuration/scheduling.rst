@@ -24,16 +24,18 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
 Data-Aware Scheduling
 ---------------------
 
-By default, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
+Apache Airflow 2.4 introduced the concept of `scheduling based on Datasets <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/datasets.html>`_.
 
-An example how this could look like for a transformation that creates the table ``table`` in Postgres:
+By default, if Airflow 2.4 or higher is used, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
+
+Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
+
+This block illustrates a Cosmos-generated dataset for Postgres:
 
 .. code-block:: python
 
     Dataset("postgres://host:5432/database.schema.table")
 
-
-Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
 
 For example, let's say you have:
 
@@ -46,7 +48,7 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
 .. code-block:: python
 
-    from cosmos import DbtDa
+    from cosmos import DbtDag
 
     project_one = DbtDag(
         # ...
@@ -55,9 +57,6 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
     )
 
     project_two = DbtDag(
-        # for airflow <=2.3
-        # schedule_interval=[Dataset("postgres://host:5432/database.schema.my_model")],,
-        # for airflow > 2.3
         schedule=[Dataset("postgres://host:5432/database.schema.my_model")],
         dbt_project_name="project_two",
     )

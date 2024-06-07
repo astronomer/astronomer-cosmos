@@ -1,6 +1,22 @@
 Changelog
 =========
 
+1.4.3 (2024-06-07)
+-----------------
+
+Bug fixes
+
+* Bring back ``dataset`` as a required field for BigQuery profile by @pankajkoti in #1033
+
+Enhancements
+
+* Only run ``dbt deps`` when there are dependencies by @tatiana in #1030
+
+Docs
+
+* Fix docs so it does not reference non-existing ``get_dbt_dataset`` by @tatiana in #1034
+
+
 1.4.2 (2024-06-06)
 ------------------
 

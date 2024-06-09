@@ -139,6 +139,9 @@ iframe_script = """
       )
     }
   }
+  window.addEventListener('hashchange', function () {
+    window.parent.postMessage(window.location.hash, '*');
+  });
 </script>
 """
 

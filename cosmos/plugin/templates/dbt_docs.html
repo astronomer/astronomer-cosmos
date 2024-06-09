@@ -10,6 +10,18 @@
                 minHeight: 500
             },
             '#dbtIframe'
-        )
+        );
+
+        window.addEventListener('message', function (event) {
+            let msgData = event.data;
+            if (msgData.startsWith('#!')) {
+                let updateUrl = new URL(window.location);
+                updateUrl.hash = msgData;
+                history.pushState(null, null, updateUrl);
+            }
+        }, false);
+
+        let dbtIframe = document.getElementById('dbtIframe');
+        dbtIframe.src = dbtIframe.src + window.location.hash;
     </script>
 {% endblock %}

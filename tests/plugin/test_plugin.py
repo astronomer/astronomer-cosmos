@@ -270,6 +270,27 @@ def test_open_http_file(conn_id):
         assert res == "mock file contents"
 
 
+def test_open_http_file_not_found():
+    from requests.exceptions import HTTPError
+
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.http.hooks.http": mock_module}):
+        mock_hook = mock_module.HttpHook.return_value = MagicMock()
+
+        def side_effect(*args, **kwargs):
+            raise HTTPError("404 Client Error: Not Found for url: https://google.com/this/is/a/fake/path")
+
+        mock_hook.run.side_effect = side_effect
+
+        with pytest.raises(FileNotFoundError):
+            open_http_file("https://google.com/this/is/a/fake/path", conn_id="mock-conn-id")
+
+        mock_module.HttpHook.assert_called_once()
+
+
+"404 Client Error: Not Found for url: https://google.com/ashjdfasdkfahdjsf"
+
+
 @patch("builtins.open", new_callable=mock_open, read_data="mock file contents")
 def test_open_file_local(mock_file):
     res = open_file("/my/path")

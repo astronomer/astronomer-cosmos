@@ -14,6 +14,7 @@ except ImportError:
     jinja2.escape = markupsafe.escape
 
 import sys
+from importlib.util import find_spec
 from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 
 import pytest
@@ -99,6 +100,17 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
         assert iframe_script in _get_text_from_response(response)
 
 
+@patch.object(cosmos.plugin, "open_file")
+@pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
+def test_dbt_docs_artifact_not_found(mock_open_file, monkeypatch, app, artifact):
+    mock_open_file.side_effect = FileNotFoundError
+
+    response = app.get(f"/cosmos/{artifact}")
+
+    mock_open_file.assert_called_once()
+    assert response.status_code == 404
+
+
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact_missing(app, artifact):
     response = app.get(f"/cosmos/{artifact}")
@@ -140,6 +152,24 @@ def test_open_s3_file(conn_id):
         assert res == "mock file contents"
 
 
+@pytest.mark.skipif(
+    find_spec("airflow.providers.google") is None,
+    reason="apache-airflow-providers-amazon not installed, which is required for this test.",
+)
+def test_open_s3_file_not_found():
+    from botocore.exceptions import ClientError
+
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_module}):
+        mock_hook = mock_module.S3Hook.return_value
+        mock_hook.read_key.side_effect = lambda: ClientError({"Error": {"Code": "NoSuchKey"}}, "")
+
+        with pytest.raises(FileNotFoundError):
+            open_s3_file("s3://mock-path/to/docs", conn_id="mock-conn-id")
+
+        mock_module.S3Hook.assert_called_once()
+
+
 @pytest.mark.parametrize("conn_id", ["mock_conn_id", None])
 def test_open_gcs_file(conn_id):
     mock_module = MagicMock()
@@ -154,6 +184,24 @@ def test_open_gcs_file(conn_id):
 
         mock_hook.download.assert_called_once_with(bucket_name="mock-path", object_name="to/docs")
         assert res == "mock file contents"
+
+
+@pytest.mark.skipif(
+    find_spec("airflow.providers.google") is None,
+    reason="apache-airflow-providers-google not installed, which is required for this test.",
+)
+def test_open_gcs_file_not_found():
+    from google.cloud.exceptions import NotFound
+
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_module}):
+        mock_hook = mock_module.GCSHook.return_value = MagicMock()
+        mock_hook.download.side_effect = NotFound
+
+        with pytest.raises(FileNotFoundError):
+            open_gcs_file("gs://mock-path/to/docs", conn_id="mock-conn-id")
+
+        mock_module.GCSHook.assert_called_once()
 
 
 @pytest.mark.parametrize("conn_id", ["mock_conn_id", None])
@@ -171,6 +219,24 @@ def test_open_azure_file(conn_id):
 
         mock_hook.read_file.assert_called_once_with(container_name="mock-path", blob_name="to/docs")
         assert res == "mock file contents"
+
+
+@pytest.mark.skipif(
+    find_spec("airflow.providers.microsoft") is None,
+    reason="apache-airflow-providers-microsoft not installed, which is required for this test.",
+)
+def test_open_azure_file_not_found():
+    from azure.core.exceptions import ResourceNotFoundError
+
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
+        mock_hook = mock_module.GCSHook.return_value = MagicMock()
+        mock_hook.download.side_effect = ResourceNotFoundError
+
+        with pytest.raises(FileNotFoundError):
+            open_azure_file("wasb://mock-path/to/docs", conn_id="mock-conn-id")
+
+        mock_module.GCSHook.assert_called_once()
 
 
 @pytest.mark.parametrize("conn_id", ["mock_conn_id", None])

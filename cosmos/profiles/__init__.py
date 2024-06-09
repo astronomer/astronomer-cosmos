@@ -9,6 +9,7 @@ from .base import BaseProfileMapping, DbtProfileConfigVars
 from .bigquery.oauth import GoogleCloudOauthProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
+from .clickhouse.user_pass import ClickhouseUserPasswordProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -25,6 +26,7 @@ from .vertica.user_pass import VerticaUserPasswordProfileMapping
 
 profile_mappings: list[Type[BaseProfileMapping]] = [
     AthenaAccessKeyProfileMapping,
+    ClickhouseUserPasswordProfileMapping,
     GoogleCloudServiceAccountFileProfileMapping,
     GoogleCloudServiceAccountDictProfileMapping,
     GoogleCloudOauthProfileMapping,

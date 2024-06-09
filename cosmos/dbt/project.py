@@ -5,7 +5,35 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-from cosmos.constants import DBT_LOG_DIR_NAME, DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
+from cosmos.constants import (
+    DBT_DEPENDENCIES_FILE_NAMES,
+    DBT_LOG_DIR_NAME,
+    DBT_PARTIAL_PARSE_FILE_NAME,
+    DBT_TARGET_DIR_NAME,
+)
+from cosmos.log import get_logger
+
+logger = get_logger()
+
+
+def has_non_empty_dependencies_file(project_path: Path) -> bool:
+    """
+    Check if the dbt project has dependencies.yml or packages.yml.
+
+    :param project_path: Path to the project
+    :returns: True or False
+    """
+    project_dir = Path(project_path)
+    has_deps = False
+    for filename in DBT_DEPENDENCIES_FILE_NAMES:
+        filepath = project_dir / filename
+        if filepath.exists() and filepath.stat().st_size > 0:
+            has_deps = True
+            break
+
+    if not has_deps:
+        logger.info(f"Project {project_path} does not have {DBT_DEPENDENCIES_FILE_NAMES}")
+    return has_deps
 
 
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:

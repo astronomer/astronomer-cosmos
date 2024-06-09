@@ -66,8 +66,10 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
             **self.profile_args,
             "aws_access_key_id": self.temporary_credentials.access_key,
             "aws_secret_access_key": self.get_env_var_format("aws_secret_access_key"),
-            "aws_session_token": self.get_env_var_format("aws_session_token"),
         }
+
+        if self.temporary_credentials.token:
+            profile["aws_session_token"] = self.get_env_var_format("aws_session_token")
 
         return self.filter_null(profile)
 

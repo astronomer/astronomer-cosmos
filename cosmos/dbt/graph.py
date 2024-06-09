@@ -24,7 +24,7 @@ from cosmos.constants import (
     LoadMode,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path
+from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -285,7 +285,9 @@ class DbtGraph:
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
-                if self.render_config.dbt_deps:
+                if self.render_config.dbt_deps and has_non_empty_dependencies_file(
+                    Path(self.render_config.project_path)
+                ):
                     deps_command = [dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)

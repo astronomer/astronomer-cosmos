@@ -20,6 +20,8 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     dbt_profile_type: str = "bigquery"
     dbt_profile_method: str = "service-account-json"
 
+    # Do not remove dataset as a required field form the below list. Although it's observed that it's not a required
+    # field for some databases like Postgres, it's required for BigQuery.
     required_fields = [
         "project",
         "dataset",
@@ -45,11 +47,13 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
         Even though the Airflow connection contains hard-coded Service account credentials,
         we generate a temporary file and the DBT profile uses it.
         """
-        return {
+        profile_dict = {
             **self.mapped_params,
             "threads": 1,
             **self.profile_args,
         }
+
+        return self.filter_null(profile_dict)
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:

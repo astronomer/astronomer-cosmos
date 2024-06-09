@@ -103,6 +103,7 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
 @patch.object(cosmos.plugin, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact_not_found(mock_open_file, monkeypatch, app, artifact):
+    monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
     mock_open_file.side_effect = FileNotFoundError
 
     response = app.get(f"/cosmos/{artifact}")
@@ -162,7 +163,11 @@ def test_open_s3_file_not_found():
     mock_module = MagicMock()
     with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_module}):
         mock_hook = mock_module.S3Hook.return_value
-        mock_hook.read_key.side_effect = lambda: ClientError({"Error": {"Code": "NoSuchKey"}}, "")
+
+        def side_effect(*args, **kwargs):
+            raise ClientError({"Error": {"Code": "NoSuchKey"}}, "")
+
+        mock_hook.read_key.side_effect = side_effect
 
         with pytest.raises(FileNotFoundError):
             open_s3_file("s3://mock-path/to/docs", conn_id="mock-conn-id")
@@ -196,7 +201,11 @@ def test_open_gcs_file_not_found():
     mock_module = MagicMock()
     with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_module}):
         mock_hook = mock_module.GCSHook.return_value = MagicMock()
-        mock_hook.download.side_effect = NotFound
+
+        def side_effect(*args, **kwargs):
+            raise NotFound("")
+
+        mock_hook.download.side_effect = side_effect
 
         with pytest.raises(FileNotFoundError):
             open_gcs_file("gs://mock-path/to/docs", conn_id="mock-conn-id")
@@ -230,13 +239,14 @@ def test_open_azure_file_not_found():
 
     mock_module = MagicMock()
     with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
-        mock_hook = mock_module.GCSHook.return_value = MagicMock()
-        mock_hook.download.side_effect = ResourceNotFoundError
+        mock_hook = mock_module.WasbHook.return_value = MagicMock()
+
+        mock_hook.read_file.side_effect = ResourceNotFoundError
 
         with pytest.raises(FileNotFoundError):
             open_azure_file("wasb://mock-path/to/docs", conn_id="mock-conn-id")
 
-        mock_module.GCSHook.assert_called_once()
+        mock_module.WasbHook.assert_called_once()
 
 
 @pytest.mark.parametrize("conn_id", ["mock_conn_id", None])

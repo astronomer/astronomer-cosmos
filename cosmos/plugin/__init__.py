@@ -9,7 +9,7 @@ from airflow.www.views import AirflowBaseView
 from flask import abort, url_for
 from flask_appbuilder import AppBuilder, expose
 
-from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir
+from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name
 
 
 def bucket_and_key(path: str) -> Tuple[str, str]:
@@ -19,32 +19,43 @@ def bucket_and_key(path: str) -> Tuple[str, str]:
     return bucket, key
 
 
-def open_s3_file(conn_id: Optional[str], path: str) -> str:
+def open_s3_file(path: str, conn_id: Optional[str]) -> str:
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+    from botocore.exceptions import ClientError
 
     if conn_id is None:
         conn_id = S3Hook.default_conn_name
 
     hook = S3Hook(aws_conn_id=conn_id)
     bucket, key = bucket_and_key(path)
-    content = hook.read_key(key=key, bucket_name=bucket)
+    try:
+        content = hook.read_key(key=key, bucket_name=bucket)
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code", "") == "NoSuchKey":
+            raise FileNotFoundError(f"{path} does not exist")
+        raise e
     return content  # type: ignore[no-any-return]
 
 
-def open_gcs_file(conn_id: Optional[str], path: str) -> str:
+def open_gcs_file(path: str, conn_id: Optional[str]) -> str:
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
+    from google.cloud.exceptions import NotFound
 
     if conn_id is None:
         conn_id = GCSHook.default_conn_name
 
     hook = GCSHook(gcp_conn_id=conn_id)
     bucket, blob = bucket_and_key(path)
-    content = hook.download(bucket_name=bucket, object_name=blob)
+    try:
+        content = hook.download(bucket_name=bucket, object_name=blob)
+    except NotFound:
+        raise FileNotFoundError(f"{path} does not exist")
     return content.decode("utf-8")  # type: ignore[no-any-return]
 
 
-def open_azure_file(conn_id: Optional[str], path: str) -> str:
+def open_azure_file(path: str, conn_id: Optional[str]) -> str:
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
+    from azure.core.exceptions import ResourceNotFoundError
 
     if conn_id is None:
         conn_id = WasbHook.default_conn_name
@@ -52,32 +63,45 @@ def open_azure_file(conn_id: Optional[str], path: str) -> str:
     hook = WasbHook(wasb_conn_id=conn_id)
 
     container, blob = bucket_and_key(path)
-    content = hook.read_file(container_name=container, blob_name=blob)
+    try:
+        content = hook.read_file(container_name=container, blob_name=blob)
+    except ResourceNotFoundError:
+        raise FileNotFoundError(f"{path} does not exist")
     return content  # type: ignore[no-any-return]
 
 
-def open_http_file(conn_id: Optional[str], path: str) -> str:
+def open_http_file(path: str, conn_id: Optional[str]) -> str:
     from airflow.providers.http.hooks.http import HttpHook
+    from requests.exceptions import HTTPError
 
     if conn_id is None:
         conn_id = ""
 
     hook = HttpHook(method="GET", http_conn_id=conn_id)
-    res = hook.run(endpoint=path)
-    hook.check_response(res)
+    try:
+        res = hook.run(endpoint=path)
+        hook.check_response(res)
+    except HTTPError as e:
+        if str(e).startswith("404"):
+            raise FileNotFoundError(f"{path} does not exist")
+        raise e
     return res.text  # type: ignore[no-any-return]
 
 
-def open_file(path: str) -> str:
-    """Retrieve a file from http, https, gs, s3, or wasb."""
+def open_file(path: str, conn_id: Optional[str] = None) -> str:
+    """
+    Retrieve a file from http, https, gs, s3, or wasb.
+
+    Raise a (base Python) FileNotFoundError if the file is not found.
+    """
     if path.strip().startswith("s3://"):
-        return open_s3_file(conn_id=dbt_docs_conn_id, path=path)
+        return open_s3_file(path, conn_id=conn_id)
     elif path.strip().startswith("gs://"):
-        return open_gcs_file(conn_id=dbt_docs_conn_id, path=path)
+        return open_gcs_file(path, conn_id=conn_id)
     elif path.strip().startswith("wasb://"):
-        return open_azure_file(conn_id=dbt_docs_conn_id, path=path)
+        return open_azure_file(path, conn_id=conn_id)
     elif path.strip().startswith("http://") or path.strip().startswith("https://"):
-        return open_http_file(conn_id=dbt_docs_conn_id, path=path)
+        return open_http_file(path, conn_id=conn_id)
     else:
         with open(path) as f:
             content = f.read()
@@ -167,27 +191,39 @@ class DbtDocsView(AirflowBaseView):
     def dbt_docs_index(self) -> str:
         if dbt_docs_dir is None:
             abort(404)
-        html = open_file(op.join(dbt_docs_dir, "index.html"))
-        # Hack the dbt docs to render properly in an iframe
-        iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
-        html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
-        return html
+        try:
+            html = open_file(op.join(dbt_docs_dir, dbt_docs_index_file_name), conn_id=dbt_docs_conn_id)
+        except FileNotFoundError:
+            abort(404)
+        else:
+            # Hack the dbt docs to render properly in an iframe
+            iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
+            html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
+            return html
 
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
-        data = open_file(op.join(dbt_docs_dir, "catalog.json"))
-        return data, 200, {"Content-Type": "application/json"}
+        try:
+            data = open_file(op.join(dbt_docs_dir, "catalog.json"), conn_id=dbt_docs_conn_id)
+        except FileNotFoundError:
+            abort(404)
+        else:
+            return data, 200, {"Content-Type": "application/json"}
 
     @expose("/manifest.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
-        data = open_file(op.join(dbt_docs_dir, "manifest.json"))
-        return data, 200, {"Content-Type": "application/json"}
+        try:
+            data = open_file(op.join(dbt_docs_dir, "manifest.json"), conn_id=dbt_docs_conn_id)
+        except FileNotFoundError:
+            abort(404)
+        else:
+            return data, 200, {"Content-Type": "application/json"}
 
 
 dbt_docs_view = DbtDocsView()

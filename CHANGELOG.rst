@@ -11,8 +11,9 @@ New Features
 * Support ``static_index.html`` docs by @dwreeves in #999
 * Support deep linking dbt docs via Airflow UI by @dwreeves in #1038
 * (WIP) Support caching dbt ls output in Airflow variable in #1014 by @tatiana
-   - a3 & a4: different approach than 1.5.0a1 and 1.5.0a2
-   - a4: introduce CachePurgeConfig
+   - since a3: different approach than 1.5.0a1 and 1.5.0a2
+   - a4: fix DbtTaskGroup logging
+   - a5: introduce CachePurgeConfig
 
 Others
 

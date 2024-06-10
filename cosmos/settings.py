@@ -14,6 +14,7 @@ enable_cache = conf.getboolean("cosmos", "enable_cache", fallback=True)
 propagate_logs = conf.getboolean("cosmos", "propagate_logs", fallback=True)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
+dbt_docs_index_file_name = conf.get("cosmos", "dbt_docs_index_file_name", fallback="index.html")
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

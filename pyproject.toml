@@ -34,6 +34,7 @@ dependencies = [
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
     "msgpack",
+    "packaging",
     "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
@@ -127,6 +128,7 @@ dependencies = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-amazon>=3.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
     "apache-airflow-providers-docker>=3.5.0",
+    "apache-airflow-providers-google",
     "apache-airflow-providers-microsoft-azure",
     "apache-airflow-providers-postgres",
     "types-PyYAML",

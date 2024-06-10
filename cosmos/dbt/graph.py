@@ -203,11 +203,11 @@ class DbtGraph:
                 self.load_from_dbt_manifest()
             else:
                 if execution_mode == ExecutionMode.LOCAL and self.profile_config:
-                    try:
-                        if not self.load_via_dbt_ls_cache():
-                            self.load_via_dbt_ls()
-                    except FileNotFoundError:
-                        self.load_via_custom_parser()
+                    # try:
+                    if not self.load_via_dbt_ls_cache():
+                        self.load_via_dbt_ls()
+                    # except FileNotFoundError:
+                    #    self.load_via_custom_parser()
                 else:
                     self.load_via_custom_parser()
         else:

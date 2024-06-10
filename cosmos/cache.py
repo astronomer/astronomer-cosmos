@@ -43,7 +43,7 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     else:
         cache_identifier = dag.dag_id
 
-    return cache_identifier
+    return f"cosmos_cache__{cache_identifier}"
 
 
 def _obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:
@@ -192,7 +192,7 @@ def calculate_current_version(cache_identifier: str, project_dir: Path, cache_pu
     dbt_combined_last_modified = sum([path.stat().st_mtime for path in project_dir.glob("**/*")])
 
     # The performance for the following will depend on the user's configuration
-    files_modified_time = sum(path.stat().st_mtime for path in cache_purge_config.file_paths)
+    files_modified_time = sum(path.stat().st_mtime for path in cache_purge_config.file_paths if path.exists())
     airflow_vars = [Variable.get(var_name, "") for var_name in cache_purge_config.airflow_vars]
     hash_airflow_vars = hashlib.md5("".join(airflow_vars).encode()).hexdigest()
     envvars = [os.getenv(envvar_name, "") for envvar_name in cache_purge_config.env_vars]

@@ -76,7 +76,8 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install hatch
+          python -m pip install uv
+          uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
@@ -129,7 +130,8 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install hatch
+          python -m pip install uv
+          uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
@@ -198,7 +200,8 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install hatch
+          python -m pip install uv
+          uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
@@ -259,7 +262,8 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install hatch
+          python -m pip install uv
+          uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
@@ -332,7 +336,8 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install hatch
+          python -m pip install uv
+          uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
@@ -404,7 +409,8 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m pip install hatch
+          python -m pip install uv
+          uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Run performance tests against against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}

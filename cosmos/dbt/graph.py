@@ -6,6 +6,7 @@ import os
 import platform
 import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
@@ -14,7 +15,7 @@ import yaml
 from airflow.models import Variable
 
 from cosmos import cache, settings
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import CachePurgeConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
@@ -133,6 +134,7 @@ class DbtGraph:
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
+    current_version: str = ""
 
     def __init__(
         self,
@@ -142,6 +144,7 @@ class DbtGraph:
         profile_config: ProfileConfig | None = None,
         cache_dir: Path | None = None,
         cache_identifier: str = "UNDEFINED",
+        cache_purge_config: CachePurgeConfig | None = None,
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
@@ -151,6 +154,7 @@ class DbtGraph:
         self.execution_config = execution_config
         self.cache_dir = cache_dir
         self.cache_identifier = cache_identifier
+        self.cache_purge_config = cache_purge_config or CachePurgeConfig()
         self.dbt_vars = dbt_vars or {}
 
     def load(
@@ -202,13 +206,29 @@ class DbtGraph:
         """
         logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_identifier}...")
         if settings.enable_cache and settings.experimental_cache:
-            dbt_ls_cache = Variable.get(self.cache_identifier, "")
-            if dbt_ls_cache:
+            project_path = self.render_config.project_path
+
+            try:
+                cache_dict = Variable.get(self.cache_identifier, deserialize_json=True)
+            except (json.decoder.JSONDecodeError, KeyError):
+                logger.info(f"Cosmos performance: Cache miss for {self.cache_identifier}")
+                return False
+            else:
+                logger.info(f"Cosmos performance: Cache hit for {self.cache_identifier}")
+
+            cache_version = cache_dict["version"]
+            dbt_ls_cache = cache_dict["dbt_ls"]
+
+            current_version = cache.calculate_current_version(
+                self.cache_identifier, project_path, self.cache_purge_config  # type: ignore
+            )
+
+            if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
                 logger.info(
                     f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_identifier} is {len(dbt_ls_cache.encode('utf-8'))}"
                 )
                 self.load_method = LoadMode.DBT_LS_CACHE
-                project_path = self.render_config.project_path
+
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
@@ -249,7 +269,14 @@ class DbtGraph:
                     logger.debug(line.strip())
 
         if settings.enable_cache and settings.experimental_cache:
-            Variable.set(self.cache_identifier, stdout)
+            cache_dict = {
+                "version": cache.calculate_current_version(
+                    self.cache_identifier, project_path, self.cache_purge_config
+                ),
+                "dbt_ls": stdout,
+                "last_modified": datetime.now().isoformat(),
+            }
+            Variable.set(self.cache_identifier, cache_dict, serialize_json=True)
 
         nodes = parse_dbt_ls_output(project_path, stdout)
         return nodes

@@ -7,9 +7,15 @@ Changelog
 New Features
 
 * Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
-* Support caching dbt ls output in Airflow variable in #1014 by @tatiana (WIP)
+* Add Clickhouse profile mapping by @roadan and @pankajastro in #353 and #1016
+* Support ``static_index.html`` docs by @dwreeves in #999
+* (WIP) Support caching dbt ls output in Airflow variable in #1014 by @tatiana
    - different approach than 1.5.0a1 and 1.5.0a2
    - fix log for TaskGroup
+
+Others
+
+*  Use uv in CI by @dwreeves in #1013
 
 
 1.4.3 (2024-06-07)

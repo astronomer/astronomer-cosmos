@@ -247,9 +247,11 @@ class DbtGraph:
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
-                logger.warning(f"Cosmos performance: Cache hit for {self.cache_identifier}")
+                logger.warning(f"Cosmos performance: Cache hit for {self.cache_identifier} - {current_version}")
                 return True
-        logger.warning(f"Cosmos performance: Cache miss for {self.cache_identifier}")
+        logger.warning(
+            f"Cosmos performance: Cache miss for {self.cache_identifier} - {current_version} {current_version}"
+        )
         return False
 
     def get_dbt_ls_args(self) -> list[str]:

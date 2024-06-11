@@ -106,6 +106,7 @@ def create_test_task_metadata(
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
+        task_args["retries"] = 0
 
     return TaskMetadata(
         id=test_task_name,

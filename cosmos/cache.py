@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import os
 import shutil
 import time
 from pathlib import Path
@@ -181,19 +182,35 @@ def should_use_cache() -> bool:
     return settings.enable_cache and settings.experimental_cache
 
 
+def create_hash_with_walk_files_md5(dir_path: Path) -> str:
+    # This approach is less efficient than using modified time
+    # sum([path.stat().st_mtime for path in project_dir.glob("**/*")])
+    # unfortunately, the modified time approach does not work well for dag-only deployments
+    # where DAGs are constantly synced to the deployed Airflow
+    # for 5k files, this seems to take 0.14
+    hasher = hashlib.md5()
+    for walk_result in os.walk(dir_path):
+        for element in walk_result[2]:
+            filepath = os.path.join(walk_result[0], element)
+            with open(str(filepath), "rb") as fp:
+                buf = fp.read()
+                hasher.update(buf)
+    return hasher.hexdigest()
+
+
 def calculate_current_version(cache_identifier: str, project_dir: Path, args: list[str]) -> str:
     start_time = time.process_time()
 
     # Combined value for when the dbt project directory files were last modified
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
-    dbt_combined_last_modified = sum([path.stat().st_mtime for path in project_dir.glob("**/*")])
+    dbt_project_md5 = create_hash_with_walk_files_md5(project_dir)
 
     # The performance for the following will depend on the user's configuration
     hash_args = hashlib.md5("".join(args).encode()).hexdigest()
 
     elapsed_time = time.process_time() - start_time
     logger.info(f"Cosmos performance: time to calculate {cache_identifier} current version: {elapsed_time}")
-    return f"{dbt_combined_last_modified},{hash_args}"
+    return f"{dbt_project_md5},{hash_args}"
 
 
 @functools.lru_cache

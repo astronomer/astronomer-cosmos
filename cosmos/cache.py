@@ -182,19 +182,20 @@ def should_use_cache() -> bool:
     return settings.enable_cache and settings.experimental_cache
 
 
-def create_hash_with_walk_files_md5(dir_path: Path) -> str:
+def create_hash_with_walk_files_sha256(dir_path: Path) -> str:
     # This approach is less efficient than using modified time
-    # sum([path.stat().st_mtime for path in project_dir.glob("**/*")])
+    # sum([path.stat().st_mtime for path in dir_path.glob("**/*")])
     # unfortunately, the modified time approach does not work well for dag-only deployments
     # where DAGs are constantly synced to the deployed Airflow
     # for 5k files, this seems to take 0.14
-    hasher = hashlib.md5()
+    hasher = hashlib.sha256()
     for walk_result in os.walk(dir_path):
         for element in walk_result[2]:
             filepath = os.path.join(walk_result[0], element)
             with open(str(filepath), "rb") as fp:
                 buf = fp.read()
                 hasher.update(buf)
+
     return hasher.hexdigest()
 
 
@@ -203,7 +204,7 @@ def calculate_current_version(cache_identifier: str, project_dir: Path, args: li
 
     # Combined value for when the dbt project directory files were last modified
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
-    dbt_project_md5 = create_hash_with_walk_files_md5(project_dir)
+    dbt_project_md5 = create_hash_with_walk_files_sha256(project_dir)
 
     # The performance for the following will depend on the user's configuration
     hash_args = hashlib.md5("".join(args).encode()).hexdigest()

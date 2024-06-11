@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.0a4 (2024-06-03)
+1.5.0a6 (2024-06-11)
 --------------------
 
 New Features
@@ -14,6 +14,9 @@ New Features
    - since a3: different approach than 1.5.0a1 and 1.5.0a2
    - a4: fix DbtTaskGroup logging
    - a5: introduce CachePurgeConfig
+   - a6: purge based on commands passed to dbt ls (only missing: dbt deps)
+         remove CachePurgeConfig
+         add RenderConfig.airflow_vars_to_purge_cache
 
 Others
 

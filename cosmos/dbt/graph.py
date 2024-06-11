@@ -229,6 +229,7 @@ class DbtGraph:
 
             cache_dict = self.get_cache()
             if not cache_dict:
+                logger.warning(f"Cosmos performance: Cache miss for {self.cache_identifier}")
                 return False
 
             cache_version = cache_dict.get("version")
@@ -247,7 +248,9 @@ class DbtGraph:
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
+                logger.warning(f"Cosmos performance: Cache hit for {self.cache_identifier}")
                 return True
+        logger.warning(f"Cosmos performance: Cache miss for {self.cache_identifier}")
         return False
 
     def get_dbt_ls_args(self) -> list[str]:
@@ -266,6 +269,7 @@ class DbtGraph:
 
         if not self.project.partial_parse:
             args.append("--no-partial-parse")
+
         return args
 
     def get_project_path(self) -> Path:
@@ -287,6 +291,10 @@ class DbtGraph:
         if env_vars:
             envvars_str = json.dumps(env_vars, sort_keys=True)
             args.append(envvars_str)
+        if self.render_config.airflow_vars_to_purge_cache:
+            airflow_vars = [Variable.get(var_name, "") for var_name in self.render_config.airflow_vars_to_purge_cache]
+            args.extend(airflow_vars)
+
         return args
 
     def save_cache(self, dbt_ls_output: str) -> None:
@@ -304,10 +312,7 @@ class DbtGraph:
         try:
             cache_dict = Variable.get(self.cache_identifier, deserialize_json=True)
         except (json.decoder.JSONDecodeError, KeyError):
-            logger.info(f"Cosmos performance: Cache miss for {self.cache_identifier}")
-
-        else:
-            logger.info(f"Cosmos performance: Cache hit for {self.cache_identifier}")
+            cache_dict = {}
         return cache_dict
 
     def run_dbt_ls(

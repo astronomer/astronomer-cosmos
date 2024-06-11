@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import os
 import shutil
 import time
 from pathlib import Path
 
 import msgpack
-from airflow.models import Variable
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
-from cosmos.config import CachePurgeConfig
 from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
@@ -184,7 +181,7 @@ def should_use_cache() -> bool:
     return settings.enable_cache and settings.experimental_cache
 
 
-def calculate_current_version(cache_identifier: str, project_dir: Path, cache_purge_config: CachePurgeConfig) -> str:
+def calculate_current_version(cache_identifier: str, project_dir: Path, args: list[str]) -> str:
     start_time = time.process_time()
 
     # Combined value for when the dbt project directory files were last modified
@@ -192,15 +189,11 @@ def calculate_current_version(cache_identifier: str, project_dir: Path, cache_pu
     dbt_combined_last_modified = sum([path.stat().st_mtime for path in project_dir.glob("**/*")])
 
     # The performance for the following will depend on the user's configuration
-    files_modified_time = sum(path.stat().st_mtime for path in cache_purge_config.file_paths if path.exists())
-    airflow_vars = [Variable.get(var_name, "") for var_name in cache_purge_config.airflow_vars]
-    hash_airflow_vars = hashlib.md5("".join(airflow_vars).encode()).hexdigest()
-    envvars = [os.getenv(envvar_name, "") for envvar_name in cache_purge_config.env_vars]
-    hash_envvars = hashlib.md5("".join(envvars).encode()).hexdigest()
+    hash_args = hashlib.md5("".join(args).encode()).hexdigest()
 
     elapsed_time = time.process_time() - start_time
     logger.info(f"Cosmos performance: time to calculate {cache_identifier} current version: {elapsed_time}")
-    return f"{dbt_combined_last_modified},{files_modified_time},{hash_airflow_vars},{hash_envvars}"
+    return f"{dbt_combined_last_modified},{hash_args}"
 
 
 @functools.lru_cache

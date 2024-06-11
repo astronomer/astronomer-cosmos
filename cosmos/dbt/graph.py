@@ -14,8 +14,8 @@ from typing import Any
 import yaml
 from airflow.models import Variable
 
-from cosmos import cache, settings
-from cosmos.config import CachePurgeConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import cache
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
@@ -162,7 +162,6 @@ class DbtGraph:
         profile_config: ProfileConfig | None = None,
         cache_dir: Path | None = None,
         cache_identifier: str = "UNDEFINED",
-        cache_purge_config: CachePurgeConfig | None = None,
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
@@ -172,7 +171,6 @@ class DbtGraph:
         self.execution_config = execution_config
         self.cache_dir = cache_dir
         self.cache_identifier = cache_identifier
-        self.cache_purge_config = cache_purge_config or CachePurgeConfig()
         self.dbt_vars = dbt_vars or {}
 
     def load(
@@ -203,11 +201,10 @@ class DbtGraph:
                 self.load_from_dbt_manifest()
             else:
                 if execution_mode == ExecutionMode.LOCAL and self.profile_config:
-                    # try:
-                    if not self.load_via_dbt_ls_cache():
+                    try:
                         self.load_via_dbt_ls()
-                    # except FileNotFoundError:
-                    #    self.load_via_custom_parser()
+                    except FileNotFoundError:
+                        self.load_via_custom_parser()
                 else:
                     self.load_via_custom_parser()
         else:
@@ -218,27 +215,27 @@ class DbtGraph:
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
+    def load_via_dbt_ls(self) -> None:
+        if not self.load_via_dbt_ls_cache():
+            self.load_via_dbt_ls_without_cache()
+
     def load_via_dbt_ls_cache(self) -> bool:
         """
-        Load dbt ls cache
-        """
+        Load dbt ls cache"""
+
         logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_identifier}...")
-        if settings.enable_cache and settings.experimental_cache:
-            project_path = self.render_config.project_path
+        if cache.should_use_cache():
+            project_path = self.get_project_path()
 
-            try:
-                cache_dict = Variable.get(self.cache_identifier, deserialize_json=True)
-            except (json.decoder.JSONDecodeError, KeyError):
-                logger.info(f"Cosmos performance: Cache miss for {self.cache_identifier}")
+            cache_dict = self.get_cache()
+            if not cache_dict:
                 return False
-            else:
-                logger.info(f"Cosmos performance: Cache hit for {self.cache_identifier}")
 
-            cache_version = cache_dict["version"]
-            dbt_ls_cache = cache_dict["dbt_ls"]
+            cache_version = cache_dict.get("version")
+            dbt_ls_cache = cache_dict.get("dbt_ls")
 
             current_version = cache.calculate_current_version(
-                self.cache_identifier, project_path, self.cache_purge_config  # type: ignore
+                self.cache_identifier, project_path, self.cache_key_args()
             )
 
             if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
@@ -253,28 +250,74 @@ class DbtGraph:
                 return True
         return False
 
+    def get_dbt_ls_args(self) -> list[str]:
+        args = []
+        if self.render_config.exclude:
+            args.extend(["--exclude", *self.render_config.exclude])
+
+        if self.render_config.select:
+            args.extend(["--select", *self.render_config.select])
+
+        if self.project.dbt_vars:
+            args.extend(["--vars", yaml.dump(self.project.dbt_vars)])
+
+        if self.render_config.selector:
+            args.extend(["--selector", self.render_config.selector])
+
+        if not self.project.partial_parse:
+            args.append("--no-partial-parse")
+        return args
+
+    def get_project_path(self) -> Path:
+        # we're considering the execution_config only due to backwards compatibility
+        path = self.render_config.project_path or self.execution_config.project_path
+        if not path:
+            raise CosmosLoadDbtException(
+                "Unable to load project via dbt ls without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
+            )
+        return path.absolute()
+
+    def get_env_vars(self) -> dict[str, str]:
+        return self.project.env_vars or self.render_config.env_vars or {}
+
+    def cache_key_args(self) -> list[str]:
+        # if dbt deps, we can consider the md5 of the packages or deps file
+        args = self.get_dbt_ls_args()
+        env_vars = self.get_env_vars()
+        if env_vars:
+            envvars_str = json.dumps(env_vars, sort_keys=True)
+            args.append(envvars_str)
+        return args
+
+    def save_cache(self, dbt_ls_output: str) -> None:
+        cache_dict = {
+            "version": cache.calculate_current_version(
+                self.cache_identifier, self.get_project_path(), self.cache_key_args()
+            ),
+            "dbt_ls": dbt_ls_output,
+            "last_modified": datetime.now().isoformat(),
+        }
+        Variable.set(self.cache_identifier, cache_dict, serialize_json=True)
+
+    def get_cache(self) -> dict[str, str]:
+        cache_dict = {}
+        try:
+            cache_dict = Variable.get(self.cache_identifier, deserialize_json=True)
+        except (json.decoder.JSONDecodeError, KeyError):
+            logger.info(f"Cosmos performance: Cache miss for {self.cache_identifier}")
+
+        else:
+            logger.info(f"Cosmos performance: Cache hit for {self.cache_identifier}")
+        return cache_dict
+
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [dbt_cmd, "ls", "--output", "json"]
-
-        if self.render_config.exclude:
-            ls_command.extend(["--exclude", *self.render_config.exclude])
-
-        if self.render_config.select:
-            ls_command.extend(["--select", *self.render_config.select])
-
-        if self.project.dbt_vars:
-            ls_command.extend(["--vars", yaml.dump(self.project.dbt_vars)])
-
-        if self.render_config.selector:
-            ls_command.extend(["--selector", self.render_config.selector])
-
-        if not self.project.partial_parse:
-            ls_command.append("--no-partial-parse")
-
+        args = self.get_dbt_ls_args()
         ls_command.extend(self.local_flags)
+        ls_command.extend(args)
 
         stdout = run_command(ls_command, tmp_dir, env_vars)
 
@@ -286,20 +329,13 @@ class DbtGraph:
                 for line in logfile:
                     logger.debug(line.strip())
 
-        if settings.enable_cache and settings.experimental_cache:
-            cache_dict = {
-                "version": cache.calculate_current_version(
-                    self.cache_identifier, project_path, self.cache_purge_config
-                ),
-                "dbt_ls": stdout,
-                "last_modified": datetime.now().isoformat(),
-            }
-            Variable.set(self.cache_identifier, cache_dict, serialize_json=True)
+        if cache.should_use_cache():
+            self.save_cache(stdout)
 
         nodes = parse_dbt_ls_output(project_path, stdout)
         return nodes
 
-    def load_via_dbt_ls(self) -> None:
+    def load_via_dbt_ls_without_cache(self) -> None:
         """
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
         line for both parsing and filtering the nodes.
@@ -314,32 +350,27 @@ class DbtGraph:
         dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
 
         logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
-        if not self.render_config.project_path or not self.execution_config.project_path:
-            raise CosmosLoadDbtException(
-                "Unable to load project via dbt ls without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
-            )
-
+        project_path = self.get_project_path()
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            logger.info(
+            logger.debug(
                 f"Content of the dbt project dir {self.render_config.project_path}: `{os.listdir(self.render_config.project_path)}`"
             )
             tmpdir_path = Path(tmpdir)
 
-            abs_project_path = self.render_config.project_path.absolute()
-            create_symlinks(abs_project_path, tmpdir_path, self.render_config.dbt_deps)
+            create_symlinks(project_path, tmpdir_path, self.render_config.dbt_deps)
 
             if self.project.partial_parse and self.cache_dir:
-                latest_partial_parse = cache._get_latest_partial_parse(abs_project_path, self.cache_dir)
+                latest_partial_parse = cache._get_latest_partial_parse(project_path, self.cache_dir)
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 if latest_partial_parse is not None:
                     cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
             with self.profile_config.ensure_profile(
                 use_mock_values=self.render_config.enable_mock_profile
-            ) as profile_values, environ(self.project.env_vars or self.render_config.env_vars or {}):
+            ) as profile_values, environ(self.get_env_vars()):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)
@@ -359,15 +390,13 @@ class DbtGraph:
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
-                if self.render_config.dbt_deps and has_non_empty_dependencies_file(
-                    Path(self.render_config.project_path)
-                ):
+                if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.get_project_path()):
                     deps_command = [dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)
                     logger.debug("dbt deps output: %s", stdout)
 
-                nodes = self.run_dbt_ls(dbt_cmd, self.execution_config.project_path, tmpdir_path, env)
+                nodes = self.run_dbt_ls(dbt_cmd, self.get_project_path(), tmpdir_path, env)
 
                 self.nodes = nodes
                 self.filtered_nodes = nodes

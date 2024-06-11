@@ -249,9 +249,7 @@ class DbtGraph:
                 self.filtered_nodes = nodes
                 logger.warning(f"Cosmos performance: Cache hit for {self.cache_identifier} - {current_version}")
                 return True
-        logger.warning(
-            f"Cosmos performance: Cache miss for {self.cache_identifier} - {current_version} {current_version}"
-        )
+        logger.warning(f"Cosmos performance: Cache miss for {self.cache_identifier} - skipped")
         return False
 
     def get_dbt_ls_args(self) -> list[str]:

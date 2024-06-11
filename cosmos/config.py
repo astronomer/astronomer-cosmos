@@ -216,13 +216,6 @@ class ProjectConfig:
 
 
 @dataclass
-class CachePurgeConfig:
-    file_paths: list[Path] = field(default_factory=lambda: list())
-    airflow_vars: list[str] = field(default_factory=lambda: list())
-    env_vars: list[str] = field(default_factory=lambda: list())
-
-
-@dataclass
 class ProfileConfig:
     """
     Class for setting profile config. Supports two modes of operation:

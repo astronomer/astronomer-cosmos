@@ -10,7 +10,6 @@ from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.config import CachePurgeConfig
 from cosmos.constants import InvocationMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -29,8 +28,6 @@ profile_config = ProfileConfig(
 shared_execution_config = ExecutionConfig(
     invocation_mode=InvocationMode.SUBPROCESS,
 )
-
-cache_purge_config = CachePurgeConfig(file_paths=Path(__file__), airflow_vars=["purge_cache"], env_vars=["PURGE_CACHE"])
 
 
 @dag(

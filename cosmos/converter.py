@@ -16,7 +16,7 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import CachePurgeConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
@@ -204,7 +204,6 @@ class DbtToAirflowConverter:
         profile_config: ProfileConfig | None = None,
         execution_config: ExecutionConfig | None = None,
         render_config: RenderConfig | None = None,
-        cache_purge_config: CachePurgeConfig = CachePurgeConfig(),
         dag: DAG | None = None,
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
@@ -242,7 +241,6 @@ class DbtToAirflowConverter:
             profile_config=profile_config,
             cache_dir=cache_dir,
             cache_identifier=cache_identifier,
-            cache_purge_config=cache_purge_config,
             dbt_vars=dbt_vars,
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)

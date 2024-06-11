@@ -7,6 +7,7 @@ import platform
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
@@ -225,7 +226,7 @@ class DbtGraph:
 
         logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_identifier}...")
         if cache.should_use_cache():
-            project_path = self.get_project_path()
+            project_path = self.project_path
 
             cache_dict = self.get_cache()
             if not cache_dict:
@@ -235,9 +236,7 @@ class DbtGraph:
             cache_version = cache_dict.get("version")
             dbt_ls_cache = cache_dict.get("dbt_ls")
 
-            current_version = cache.calculate_current_version(
-                self.cache_identifier, project_path, self.cache_key_args()
-            )
+            current_version = cache.calculate_current_version(self.cache_identifier, project_path, self.cache_key_args)
 
             if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
                 logger.info(
@@ -272,7 +271,8 @@ class DbtGraph:
 
         return args
 
-    def get_project_path(self) -> Path:
+    @cached_property
+    def project_path(self) -> Path:
         # we're considering the execution_config only due to backwards compatibility
         path = self.render_config.project_path or self.execution_config.project_path
         if not path:
@@ -281,13 +281,15 @@ class DbtGraph:
             )
         return path.absolute()
 
-    def get_env_vars(self) -> dict[str, str]:
+    @cached_property
+    def env_vars(self) -> dict[str, str]:
         return self.project.env_vars or self.render_config.env_vars or {}
 
+    @cached_property
     def cache_key_args(self) -> list[str]:
         # if dbt deps, we can consider the md5 of the packages or deps file
         args = self.get_dbt_ls_args()
-        env_vars = self.get_env_vars()
+        env_vars = self.env_vars
         if env_vars:
             envvars_str = json.dumps(env_vars, sort_keys=True)
             args.append(envvars_str)
@@ -299,9 +301,7 @@ class DbtGraph:
 
     def save_cache(self, dbt_ls_output: str) -> None:
         cache_dict = {
-            "version": cache.calculate_current_version(
-                self.cache_identifier, self.get_project_path(), self.cache_key_args()
-            ),
+            "version": cache.calculate_current_version(self.cache_identifier, self.project_path, self.cache_key_args),
             "dbt_ls": dbt_ls_output,
             "last_modified": datetime.now().isoformat(),
         }
@@ -355,7 +355,7 @@ class DbtGraph:
         dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
 
         logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
-        project_path = self.get_project_path()
+        project_path = self.project_path
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
@@ -375,7 +375,7 @@ class DbtGraph:
 
             with self.profile_config.ensure_profile(
                 use_mock_values=self.render_config.enable_mock_profile
-            ) as profile_values, environ(self.get_env_vars()):
+            ) as profile_values, environ(self.env_vars):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)
@@ -395,13 +395,13 @@ class DbtGraph:
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
-                if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.get_project_path()):
+                if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     deps_command = [dbt_cmd, "deps"]
                     deps_command.extend(self.local_flags)
                     stdout = run_command(deps_command, tmpdir_path, env)
                     logger.debug("dbt deps output: %s", stdout)
 
-                nodes = self.run_dbt_ls(dbt_cmd, self.get_project_path(), tmpdir_path, env)
+                nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)
 
                 self.nodes = nodes
                 self.filtered_nodes = nodes

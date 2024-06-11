@@ -43,10 +43,13 @@ def basic_cosmos_task_group() -> None:
 
     customers = DbtTaskGroup(
         group_id="customers",
-        project_config=ProjectConfig(
-            (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
+        project_config=ProjectConfig((DBT_ROOT_PATH / "jaffle_shop").as_posix(), dbt_vars={"var": "2"}),
+        render_config=RenderConfig(
+            select=["path:seeds/raw_customers.csv"],
+            enable_mock_profile=False,
+            env_vars={"PURGE": os.getenv("PURGE", "0")},
+            airflow_vars_to_purge_cache=["purge"],
         ),
-        render_config=RenderConfig(select=["path:seeds/raw_customers.csv"], enable_mock_profile=False),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,

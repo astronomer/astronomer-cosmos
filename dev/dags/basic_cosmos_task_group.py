@@ -48,7 +48,7 @@ def basic_cosmos_task_group() -> None:
             select=["path:seeds/raw_customers.csv"],
             enable_mock_profile=False,
             env_vars={"PURGE": os.getenv("PURGE", "0")},
-            airflow_vars_to_purge_cache=["purge"],
+            airflow_vars_to_purge_dbt_ls_cache=["purge"],
         ),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},

@@ -41,6 +41,10 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     else:
         cache_identifier = dag.dag_id
 
+    return f"{cache_identifier}"
+
+
+def create_cache_key(cache_identifier: str) -> str:
     return f"cosmos_cache__{cache_identifier}"
 
 
@@ -178,8 +182,8 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
 
 @functools.lru_cache
-def should_use_cache() -> bool:
-    return settings.enable_cache and settings.experimental_cache
+def should_use_dbt_ls_cache() -> bool:
+    return settings.enable_cache and settings.enable_cache_dbt_ls
 
 
 def create_hash_with_walk_files_sha256(dir_path: Path) -> str:

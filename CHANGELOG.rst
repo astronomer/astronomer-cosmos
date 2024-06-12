@@ -17,6 +17,7 @@ New Features
    - a6: purge based on commands passed to dbt ls (only missing: dbt deps)
          remove CachePurgeConfig
          add RenderConfig.airflow_vars_to_purge_cache
+   - a7: change from modified timestamp to sha256
 
 Others
 

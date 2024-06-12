@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import base64
 import itertools
 import json
 import os
 import platform
 import tempfile
+import zlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
@@ -162,7 +164,7 @@ class DbtGraph:
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
         cache_dir: Path | None = None,
-        cache_identifier: str = "UNDEFINED",
+        cache_identifier: str = "undefined",
         # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
@@ -171,8 +173,119 @@ class DbtGraph:
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.cache_dir = cache_dir
-        self.cache_identifier = cache_identifier
+        self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier)
         self.dbt_vars = dbt_vars or {}
+
+    @cached_property
+    def env_vars(self) -> dict[str, str]:
+        """
+        User-defined environment variables, relevant to running dbt ls.
+        """
+        return self.project.env_vars or self.render_config.env_vars or {}
+
+    @cached_property
+    def project_path(self) -> Path:
+        """
+        User-defined path to their dbt project. Tries to retrieve the configuration from render_config and (legacy support)
+        ExecutionConfig, where it was originally defined. Returns the
+        """
+        # we're considering the execution_config only due to backwards compatibility
+        path = self.render_config.project_path or self.execution_config.project_path
+        if not path:
+            raise CosmosLoadDbtException(
+                "Unable to load project via dbt ls without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
+            )
+        return path.absolute()
+
+    def get_dbt_ls_args(self) -> list[str]:
+        """
+        Flags set while running dbt ls. This information is also used to define the dbt ls cache key.
+        """
+        args = []
+        if self.render_config.exclude:
+            args.extend(["--exclude", *self.render_config.exclude])
+
+        if self.render_config.select:
+            args.extend(["--select", *self.render_config.select])
+
+        if self.project.dbt_vars:
+            args.extend(["--vars", yaml.dump(self.project.dbt_vars)])
+
+        if self.render_config.selector:
+            args.extend(["--selector", self.render_config.selector])
+
+        if not self.project.partial_parse:
+            args.append("--no-partial-parse")
+
+        return args
+
+    @cached_property
+    def dbt_ls_cache_key_args(self) -> list[str]:
+        """
+        Values that are used to represent the dbt ls cache key. If any parts are changed, the dbt ls command will be
+        executed and the new value will be stored.
+        """
+        # if dbt deps, we can consider the md5 of the packages or deps file
+        args = self.get_dbt_ls_args()
+        env_vars = self.env_vars
+        if env_vars:
+            envvars_str = json.dumps(env_vars, sort_keys=True)
+            args.append(envvars_str)
+        if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
+            airflow_vars = [
+                Variable.get(var_name, "") for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache
+            ]
+            args.extend(airflow_vars)
+
+        return args
+
+    def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
+        """
+        Store compressed dbt ls output into an Airflow Variable.
+
+        Stores:
+        {
+            "version": "cache-version",
+            "dbt_ls_compressed": "compressed dbt ls output",
+            "last_modified": "Isoformat timestamp"
+        }
+        """
+        # This compression reduces the dbt ls output to 10% of the original size
+        compressed_data = zlib.compress(dbt_ls_output.encode("utf-8"))
+        encoded_data = base64.b64encode(compressed_data)
+        dbt_ls_compressed = encoded_data.decode("utf-8")
+        cache_dict = {
+            "version": cache.calculate_current_version(
+                self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
+            ),
+            "dbt_ls_compressed": dbt_ls_compressed,
+            "last_modified": datetime.now().isoformat(),
+        }
+        Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
+
+    def get_dbt_ls_cache(self) -> dict[str, str]:
+        """
+        Retrieve previously saved dbt ls cache from an Airflow Variable, decompressing the dbt ls output.
+
+        Outputs:
+        {
+            "version": "cache-version",
+            "dbt_ls": "uncompressed dbt ls output",
+            "last_modified": "Isoformat timestamp"
+        }
+        """
+        cache_dict: dict[str, str] = {}
+        try:
+            cache_dict = Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
+        except (json.decoder.JSONDecodeError, KeyError):
+            return cache_dict
+        else:
+            dbt_ls_compressed = cache_dict.pop("dbt_ls_compressed", None)
+            if dbt_ls_compressed:
+                encoded_data = base64.b64decode(dbt_ls_compressed.encode())
+                cache_dict["dbt_ls"] = zlib.decompress(encoded_data).decode()
+
+        return cache_dict
 
     def load(
         self,
@@ -216,105 +329,6 @@ class DbtGraph:
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
-    def load_via_dbt_ls(self) -> None:
-        if not self.load_via_dbt_ls_cache():
-            self.load_via_dbt_ls_without_cache()
-
-    def load_via_dbt_ls_cache(self) -> bool:
-        """
-        Load dbt ls cache"""
-
-        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_identifier}...")
-        if cache.should_use_cache():
-            project_path = self.project_path
-
-            cache_dict = self.get_cache()
-            if not cache_dict:
-                logger.warning(f"Cosmos performance: Cache miss for {self.cache_identifier}")
-                return False
-
-            cache_version = cache_dict.get("version")
-            dbt_ls_cache = cache_dict.get("dbt_ls")
-
-            current_version = cache.calculate_current_version(self.cache_identifier, project_path, self.cache_key_args)
-
-            if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
-                logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_identifier} is {len(dbt_ls_cache.encode('utf-8'))}"
-                )
-                self.load_method = LoadMode.DBT_LS_CACHE
-
-                nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
-                self.nodes = nodes
-                self.filtered_nodes = nodes
-                logger.warning(f"Cosmos performance: Cache hit for {self.cache_identifier} - {current_version}")
-                return True
-        logger.warning(f"Cosmos performance: Cache miss for {self.cache_identifier} - skipped")
-        return False
-
-    def get_dbt_ls_args(self) -> list[str]:
-        args = []
-        if self.render_config.exclude:
-            args.extend(["--exclude", *self.render_config.exclude])
-
-        if self.render_config.select:
-            args.extend(["--select", *self.render_config.select])
-
-        if self.project.dbt_vars:
-            args.extend(["--vars", yaml.dump(self.project.dbt_vars)])
-
-        if self.render_config.selector:
-            args.extend(["--selector", self.render_config.selector])
-
-        if not self.project.partial_parse:
-            args.append("--no-partial-parse")
-
-        return args
-
-    @cached_property
-    def project_path(self) -> Path:
-        # we're considering the execution_config only due to backwards compatibility
-        path = self.render_config.project_path or self.execution_config.project_path
-        if not path:
-            raise CosmosLoadDbtException(
-                "Unable to load project via dbt ls without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
-            )
-        return path.absolute()
-
-    @cached_property
-    def env_vars(self) -> dict[str, str]:
-        return self.project.env_vars or self.render_config.env_vars or {}
-
-    @cached_property
-    def cache_key_args(self) -> list[str]:
-        # if dbt deps, we can consider the md5 of the packages or deps file
-        args = self.get_dbt_ls_args()
-        env_vars = self.env_vars
-        if env_vars:
-            envvars_str = json.dumps(env_vars, sort_keys=True)
-            args.append(envvars_str)
-        if self.render_config.airflow_vars_to_purge_cache:
-            airflow_vars = [Variable.get(var_name, "") for var_name in self.render_config.airflow_vars_to_purge_cache]
-            args.extend(airflow_vars)
-
-        return args
-
-    def save_cache(self, dbt_ls_output: str) -> None:
-        cache_dict = {
-            "version": cache.calculate_current_version(self.cache_identifier, self.project_path, self.cache_key_args),
-            "dbt_ls": dbt_ls_output,
-            "last_modified": datetime.now().isoformat(),
-        }
-        Variable.set(self.cache_identifier, cache_dict, serialize_json=True)
-
-    def get_cache(self) -> dict[str, str]:
-        cache_dict = {}
-        try:
-            cache_dict = Variable.get(self.cache_identifier, deserialize_json=True)
-        except (json.decoder.JSONDecodeError, KeyError):
-            cache_dict = {}
-        return cache_dict
-
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
@@ -334,11 +348,49 @@ class DbtGraph:
                 for line in logfile:
                     logger.debug(line.strip())
 
-        if cache.should_use_cache():
-            self.save_cache(stdout)
+        if cache.should_use_dbt_ls_cache():
+            self.save_dbt_ls_cache(stdout)
 
         nodes = parse_dbt_ls_output(project_path, stdout)
         return nodes
+
+    def load_via_dbt_ls(self) -> None:
+        """Retrieve the dbt ls cache if enabled and available or run dbt ls"""
+        if not self.load_via_dbt_ls_cache():
+            self.load_via_dbt_ls_without_cache()
+
+    def load_via_dbt_ls_cache(self) -> bool:
+        """(Try to) load dbt ls cache from an Airflow Variable"""
+
+        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
+        if cache.should_use_dbt_ls_cache():
+            project_path = self.project_path
+
+            cache_dict = self.get_dbt_ls_cache()
+            if not cache_dict:
+                logger.warning(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
+                return False
+
+            cache_version = cache_dict.get("version")
+            dbt_ls_cache = cache_dict.get("dbt_ls")
+
+            current_version = cache.calculate_current_version(
+                self.dbt_ls_cache_key, project_path, self.dbt_ls_cache_key_args
+            )
+
+            if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
+                logger.info(
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.dbt_ls_cache_key} is {len(dbt_ls_cache)}"
+                )
+                self.load_method = LoadMode.DBT_LS_CACHE
+
+                nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
+                self.nodes = nodes
+                self.filtered_nodes = nodes
+                logger.warning(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
+                return True
+        logger.warning(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
+        return False
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """

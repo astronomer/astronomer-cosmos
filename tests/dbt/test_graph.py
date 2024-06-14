@@ -1322,3 +1322,50 @@ def test_load_via_dbt_ls_calls_without_cache(mock_cache, mock_without_cache):
     graph.load_via_dbt_ls()
     assert mock_cache.called
     assert mock_without_cache.called
+
+
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
+def test_load_via_dbt_ls_cache_is_false_if_disabled(mock_should_use_dbt_ls_cache):
+    graph = DbtGraph(project=ProjectConfig())
+    assert not graph.load_via_dbt_ls_cache()
+    assert mock_should_use_dbt_ls_cache.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={})
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_is_false_if_no_cache(mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache):
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    assert not graph.load_via_dbt_ls_cache()
+    assert mock_should_use_dbt_ls_cache.called
+    assert mock_get_dbt_ls_cache.called
+
+
+@patch("cosmos.dbt.graph.cache.calculate_current_version", return_value=1)
+@patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 2, "dbt_ls": "output"})
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_is_false_if_cache_is_outdated(
+    mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache, mock_calculate_current_version
+):
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    assert not graph.load_via_dbt_ls_cache()
+    assert mock_should_use_dbt_ls_cache.called
+    assert mock_get_dbt_ls_cache.called
+    assert mock_calculate_current_version.called
+
+
+@patch("cosmos.dbt.graph.parse_dbt_ls_output", return_value={"some-node": {}})
+@patch("cosmos.dbt.graph.cache.calculate_current_version", return_value=1)
+@patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 1, "dbt_ls": "output"})
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_is_true(
+    mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache, mock_calculate_current_version, mock_parse_dbt_ls_output
+):
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    assert graph.load_via_dbt_ls_cache()
+    assert graph.load_method == LoadMode.DBT_LS_CACHE
+    assert graph.nodes == {"some-node": {}}
+    assert graph.filtered_nodes == {"some-node": {}}
+    assert mock_should_use_dbt_ls_cache.called
+    assert mock_get_dbt_ls_cache.called
+    assert mock_calculate_current_version.called
+    assert mock_parse_dbt_ls_output.called

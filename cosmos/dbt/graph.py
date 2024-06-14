@@ -357,7 +357,6 @@ class DbtGraph:
         if not self.load_via_dbt_ls_cache():
             self.load_via_dbt_ls_without_cache()
 
-    # TODO: test
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
 

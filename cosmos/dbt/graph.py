@@ -165,7 +165,6 @@ class DbtGraph:
         profile_config: ProfileConfig | None = None,
         cache_dir: Path | None = None,
         cache_identifier: str = "undefined",
-        # dbt_vars only supported for LegacyDbtProject
         dbt_vars: dict[str, str] | None = None,
     ):
         self.project = project

@@ -5,7 +5,6 @@ from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
 import pytest
-import yaml
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode
@@ -990,7 +989,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_node
     dbt_graph.load_via_dbt_ls()
     ls_command = mock_popen.call_args.args[0]
     assert "--vars" in ls_command
-    assert ls_command[ls_command.index("--vars") + 1] == yaml.dump(dbt_vars)
+    assert ls_command[ls_command.index("--vars") + 1] == '\'{"my_var1": "my_value1", "my_var2": "my_value2"}\''
 
 
 @patch("cosmos.dbt.graph.Popen")
@@ -1139,3 +1138,52 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
     assert "seed.jaffle_shop.raw_customers" in filtered_nodes
     # Two tests should be filtered
     assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 2
+
+
+def test_project_path_fails():
+    graph = DbtGraph(project=ProjectConfig())
+    with pytest.raises(CosmosLoadDbtException) as e:
+        graph.project_path
+
+    expected = "Unable to load project via dbt ls without RenderConfig.dbt_project_path, ProjectConfig.dbt_project_path or ExecutionConfig.dbt_project_path"
+    assert e.value.args[0] == expected
+
+
+@pytest.mark.parametrize(
+    "render_config,project_config,expected_dbt_ls_args",
+    [
+        (RenderConfig(), ProjectConfig(), []),
+        (RenderConfig(exclude=["package:snowplow"]), ProjectConfig(), ["--exclude", "package:snowplow"]),
+        (
+            RenderConfig(select=["tag:prod", "config.materialized:incremental"]),
+            ProjectConfig(),
+            ["--select", "tag:prod", "config.materialized:incremental"],
+        ),
+        (RenderConfig(selector="nightly"), ProjectConfig(), ["--selector", "nightly"]),
+        (RenderConfig(), ProjectConfig(dbt_vars={"a": 1}), ["--vars", "'{\"a\": 1}'"]),
+        (RenderConfig(), ProjectConfig(partial_parse=False), ["--no-partial-parse"]),
+        (
+            RenderConfig(exclude=["1", "2"], select=["a", "b"], selector="nightly"),
+            ProjectConfig(dbt_vars={"a": 1}, partial_parse=False),
+            [
+                "--exclude",
+                "1",
+                "2",
+                "--select",
+                "a",
+                "b",
+                "--vars",
+                "'{\"a\": 1}'",
+                "--selector",
+                "nightly",
+                "--no-partial-parse",
+            ],
+        ),
+    ],
+)
+def test_dbt_ls_args(render_config, project_config, expected_dbt_ls_args):
+    graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+    )
+    assert graph.dbt_ls_args == expected_dbt_ls_args

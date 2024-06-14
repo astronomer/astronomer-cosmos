@@ -1,7 +1,9 @@
 import sys
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
+from airflow.utils.context import Context
 
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
@@ -53,6 +55,83 @@ def test_dbt_base_operator_execute(mock_build_and_run_cmd, cmd_flags, monkeypatc
 
     base_operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=cmd_flags)
+
+
+@patch("cosmos.operators.base.context_merge")
+def test_dbt_base_operator_context_merge_called(mock_context_merge):
+    """Tests that the base operator execute method calls the context_merge method with the expected arguments."""
+    base_operator = AbstractDbtBaseOperator(
+        task_id="fake_task",
+        project_dir="fake_dir",
+        extra_context={"extra": "extra"},
+    )
+
+    base_operator.execute(context={})
+    mock_context_merge.assert_called_once_with({}, {"extra": "extra"})
+
+
+@pytest.mark.parametrize(
+    "context, extra_context, expected_context",
+    [
+        (
+            Context(
+                start_date=datetime(2021, 1, 1),
+            ),
+            {
+                "extra": "extra",
+            },
+            Context(
+                start_date=datetime(2021, 1, 1),
+                extra="extra",
+            ),
+        ),
+        (
+            Context(
+                start_date=datetime(2021, 1, 1),
+                end_date=datetime(2023, 1, 1),
+            ),
+            {
+                "extra": "extra",
+                "extra_2": "extra_2",
+            },
+            Context(
+                start_date=datetime(2021, 1, 1),
+                end_date=datetime(2023, 1, 1),
+                extra="extra",
+                extra_2="extra_2",
+            ),
+        ),
+        (
+            Context(
+                overwrite="to_overwrite",
+                start_date=datetime(2021, 1, 1),
+                end_date=datetime(2023, 1, 1),
+            ),
+            {
+                "overwrite": "overwritten",
+            },
+            Context(
+                start_date=datetime(2021, 1, 1),
+                end_date=datetime(2023, 1, 1),
+                overwrite="overwritten",
+            ),
+        ),
+    ],
+)
+def test_dbt_base_operator_context_merge(
+    context,
+    extra_context,
+    expected_context,
+):
+    """Tests that the base operator execute method calls and update context"""
+    base_operator = AbstractDbtBaseOperator(
+        task_id="fake_task",
+        project_dir="fake_dir",
+        extra_context=extra_context,
+    )
+
+    base_operator.execute(context=context)
+    assert context == expected_context
 
 
 @pytest.mark.parametrize(

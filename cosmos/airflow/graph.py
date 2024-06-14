@@ -93,6 +93,8 @@ def create_test_task_metadata(
     """
     task_args = dict(task_args)
     task_args["on_warning_callback"] = on_warning_callback
+    extra_context = {}
+
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
@@ -102,6 +104,9 @@ def create_test_task_metadata(
             task_args["select"] = f"source:{node.resource_name}"
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
+
+        extra_context = {f"{node.resource_type.value}_config": node.config}
+
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
@@ -114,6 +119,7 @@ def create_test_task_metadata(
             dbt_class="DbtTest",
         ),
         arguments=task_args,
+        extra_context=extra_context,
     )
 
 
@@ -140,6 +146,7 @@ def create_task_metadata(
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
+        extra_context = {f"{node.resource_type.value}_config": node.config}
         if node.resource_type == DbtResourceType.MODEL:
             task_id = f"{node.name}_run"
             if use_task_group is True:
@@ -155,6 +162,7 @@ def create_task_metadata(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),
             arguments=args,
+            extra_context=extra_context,
         )
         return task_metadata
     else:

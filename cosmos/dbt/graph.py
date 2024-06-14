@@ -352,7 +352,6 @@ class DbtGraph:
         nodes = parse_dbt_ls_output(project_path, stdout)
         return nodes
 
-    # TODO: test
     def load_via_dbt_ls(self) -> None:
         """Retrieve the dbt ls cache if enabled and available or run dbt ls"""
         if not self.load_via_dbt_ls_cache():

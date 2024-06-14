@@ -1257,7 +1257,7 @@ def test_dbt_ls_cache_key_args_sorts_envvars():
 
 @pytest.fixture()
 def airflow_variable():
-    key = "some_key"
+    key = "cosmos_cache__undefined"
     value = "some_value"
     Variable.set(key, value)
 
@@ -1286,3 +1286,39 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         "dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg==",
         "last_modified": "2022-01-01T12:00:00",
     }  # version and dbt_ls_compressed should be consistent across DAG runs, unless the project changed
+
+
+@pytest.mark.integration
+def test_get_dbt_ls_cache_returns_empty_if_non_json_var(airflow_variable):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_dbt_ls_cache() == {}
+
+
+@patch("cosmos.dbt.graph.Variable.get", return_value={"dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg=="})
+def test_get_dbt_ls_cache_returns_decoded_and_decompressed_value(mock_variable_get):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_dbt_ls_cache() == {"dbt_ls": "some output"}
+
+
+@patch("cosmos.dbt.graph.Variable.get", return_value={})
+def test_get_dbt_ls_cache_returns_empty_dict_if_empty_dict_var(mock_variable_get):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_dbt_ls_cache() == {}
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_without_cache")
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_does_not_call_without_cache(mock_cache, mock_without_cache):
+    graph = DbtGraph(project=ProjectConfig())
+    graph.load_via_dbt_ls()
+    assert mock_cache.called
+    assert not mock_without_cache.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_without_cache")
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_cache", return_value=False)
+def test_load_via_dbt_ls_calls_without_cache(mock_cache, mock_without_cache):
+    graph = DbtGraph(project=ProjectConfig())
+    graph.load_via_dbt_ls()
+    assert mock_cache.called
+    assert mock_without_cache.called

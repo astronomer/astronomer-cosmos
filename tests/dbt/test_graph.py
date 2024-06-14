@@ -938,10 +938,13 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     assert expected_nodes == nodes
 
 
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
-def test_load_via_dbt_ls_project_config_env_vars(mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir):
+def test_load_via_dbt_ls_project_config_env_vars(
+    mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
+):
     """Tests that the dbt ls command in the subprocess has the project config env vars set."""
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
@@ -966,10 +969,13 @@ def test_load_via_dbt_ls_project_config_env_vars(mock_validate, mock_update_node
     assert mock_popen.call_args.kwargs["env"]["MY_ENV_VAR"] == "my_value"
 
 
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
-def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir):
+def test_load_via_dbt_ls_project_config_dbt_vars(
+    mock_validate, mock_update_nodes, mock_popen, mock_use_case, tmp_dbt_project_dir
+):
     """Tests that the dbt ls command in the subprocess has "--vars" with the project config dbt_vars."""
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
@@ -994,11 +1000,12 @@ def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_node
     assert ls_command[ls_command.index("--vars") + 1] == '\'{"my_var1": "my_value1", "my_var2": "my_value2"}\''
 
 
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
 def test_load_via_dbt_ls_render_config_selector_arg_is_used(
-    mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
+    mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
     """Tests that the dbt ls command in the subprocess has "--selector" with the RenderConfig.selector."""
     mock_popen().communicate.return_value = ("", "")
@@ -1028,11 +1035,12 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     assert ls_command[ls_command.index("--selector") + 1] == selector
 
 
+@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
 def test_load_via_dbt_ls_render_config_no_partial_parse(
-    mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
+    mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
     """Tests that --no-partial-parse appears when partial_parse=False."""
     mock_popen().communicate.return_value = ("", "")
@@ -1240,11 +1248,12 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     dbt_ls_output = "some output"
     graph.save_dbt_ls_cache(dbt_ls_output)
     assert mock_variable_set.call_args[0][0] == "cosmos_cache__undefined"
-    assert mock_variable_set.call_args[0][1] == {
-        "version": "e89aa09a279d9473a3e48475e67f842c47ece4111be4df775f3e8c0458e01303,d41d8cd98f00b204e9800998ecf8427e",
-        "dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg==",
-        "last_modified": "2022-01-01T12:00:00",
-    }  # version and dbt_ls_compressed should be consistent across DAG runs, unless the project changed
+    assert mock_variable_set.call_args[0][1]["dbt_ls_compressed"] == "eJwrzs9NVcgvLSkoLQEAGpAEhg=="
+    assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
+    assert (
+        mock_variable_set.call_args[0][1]["version"]
+        == "3198e6655e3a6ab9fccedc9402344f6c37ce2f45a445816d8b18f15009e8c04f,d41d8cd98f00b204e9800998ecf8427e"
+    )
 
 
 @pytest.mark.integration

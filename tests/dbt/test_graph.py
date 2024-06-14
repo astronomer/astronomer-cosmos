@@ -1,10 +1,12 @@
 import shutil
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow.models import Variable
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode
@@ -1181,6 +1183,23 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
     assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 2
 
 
+@pytest.mark.parametrize(
+    "render_config,project_config,expected_envvars",
+    [
+        (RenderConfig(), ProjectConfig(), {}),
+        (RenderConfig(env_vars={"a": 1}), ProjectConfig(), {"a": 1}),
+        (RenderConfig(), ProjectConfig(env_vars={"b": 2}), {"b": 2}),
+        (RenderConfig(env_vars={"a": 1}), ProjectConfig(env_vars={"b": 2}), {"a": 1}),
+    ],
+)
+def test_env_vars(render_config, project_config, expected_envvars):
+    graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+    )
+    assert graph.env_vars == expected_envvars
+
+
 def test_project_path_fails():
     graph = DbtGraph(project=ProjectConfig())
     with pytest.raises(CosmosLoadDbtException) as e:
@@ -1228,3 +1247,42 @@ def test_dbt_ls_args(render_config, project_config, expected_dbt_ls_args):
         render_config=render_config,
     )
     assert graph.dbt_ls_args == expected_dbt_ls_args
+
+
+def test_dbt_ls_cache_key_args_sorts_envvars():
+    project_config = ProjectConfig(env_vars={11: "November", 12: "December", 5: "May"})
+    graph = DbtGraph(project=project_config)
+    assert graph.dbt_ls_cache_key_args == ['{"5": "May", "11": "November", "12": "December"}']
+
+
+@pytest.fixture()
+def airflow_variable():
+    key = "some_key"
+    value = "some_value"
+    Variable.set(key, value)
+
+    yield key, value
+
+    Variable.delete(key)
+
+
+@pytest.mark.integration
+def test_dbt_ls_cache_key_args_uses_airflow_vars_to_purge_dbt_ls_cache(airflow_variable):
+    key, value = airflow_variable
+    graph = DbtGraph(project=ProjectConfig(), render_config=RenderConfig(airflow_vars_to_purge_dbt_ls_cache=[key]))
+    assert graph.dbt_ls_cache_key_args == [key, value]
+
+
+@patch("cosmos.dbt.graph.datetime")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+    mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    dbt_ls_output = "some output"
+    graph.save_dbt_ls_cache(dbt_ls_output)
+    assert mock_variable_set.call_args[0][0] == "cosmos_cache__undefined"
+    assert mock_variable_set.call_args[0][1] == {
+        "version": "e89aa09a279d9473a3e48475e67f842c47ece4111be4df775f3e8c0458e01303,d41d8cd98f00b204e9800998ecf8427e",
+        "dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg==",
+        "last_modified": "2022-01-01T12:00:00",
+    }  # version and dbt_ls_compressed should be consistent across DAG runs, unless the project changed

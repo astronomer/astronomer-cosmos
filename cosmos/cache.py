@@ -181,11 +181,13 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
         shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
 
 
+# TODO: test
 @functools.lru_cache
 def should_use_dbt_ls_cache() -> bool:
     return settings.enable_cache and settings.enable_cache_dbt_ls
 
 
+# TODO: test and rename
 def create_hash_with_walk_files_sha256(dir_path: Path) -> str:
     # This approach is less efficient than using modified time
     # sum([path.stat().st_mtime for path in dir_path.glob("**/*")])
@@ -203,6 +205,7 @@ def create_hash_with_walk_files_sha256(dir_path: Path) -> str:
     return hasher.hexdigest()
 
 
+# TODO: test and rename
 def calculate_current_version(cache_identifier: str, project_dir: Path, args: list[str]) -> str:
     start_time = time.process_time()
 
@@ -218,6 +221,7 @@ def calculate_current_version(cache_identifier: str, project_dir: Path, args: li
     return f"{dbt_project_md5},{hash_args}"
 
 
+# TODO: test and rename
 @functools.lru_cache
 def was_project_modified(previous_version: str, current_version: str) -> bool:
     return previous_version != current_version

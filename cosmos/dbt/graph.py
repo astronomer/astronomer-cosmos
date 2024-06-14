@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import datetime
 import itertools
 import json
 import os
@@ -8,7 +9,6 @@ import platform
 import tempfile
 import zlib
 from dataclasses import dataclass, field
-from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -179,7 +179,7 @@ class DbtGraph:
         """
         User-defined environment variables, relevant to running dbt ls.
         """
-        return self.project.env_vars or self.render_config.env_vars or {}
+        return self.render_config.env_vars or self.project.env_vars or {}
 
     @cached_property
     def project_path(self) -> Path:
@@ -231,10 +231,9 @@ class DbtGraph:
             envvars_str = json.dumps(env_vars, sort_keys=True)
             args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
-            airflow_vars = [
-                Variable.get(var_name, "") for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache
-            ]
-            args.extend(airflow_vars)
+            for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:
+                airflow_vars = [var_name, Variable.get(var_name, "")]
+                args.extend(airflow_vars)
 
         return args
 
@@ -258,7 +257,7 @@ class DbtGraph:
                 self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
-            "last_modified": datetime.now().isoformat(),
+            "last_modified": datetime.datetime.now().isoformat(),
         }
         Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
 
@@ -353,11 +352,13 @@ class DbtGraph:
         nodes = parse_dbt_ls_output(project_path, stdout)
         return nodes
 
+    # TODO: test
     def load_via_dbt_ls(self) -> None:
         """Retrieve the dbt ls cache if enabled and available or run dbt ls"""
         if not self.load_via_dbt_ls_cache():
             self.load_via_dbt_ls_without_cache()
 
+    # TODO: test
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
 

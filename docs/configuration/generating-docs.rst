@@ -85,6 +85,12 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
         bucket_name="test_bucket",
     )
 
+Choosing a folder
+~~~~~~~~~~~~~~~~~~~~~~~
+
+All the DbtDocsOperators support specification of a custom folder (prefix) to place documentation in on the target cloud storage. This can be done by
+adding a ``folder_dir`` parameter to the operator definition.
+
 Static Flag
 ~~~~~~~~~~~~~~~~~~~~~~~
 

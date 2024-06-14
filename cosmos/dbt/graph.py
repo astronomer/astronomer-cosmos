@@ -14,7 +14,6 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
 
-import yaml
 from airflow.models import Variable
 
 from cosmos import cache
@@ -189,14 +188,15 @@ class DbtGraph:
         ExecutionConfig, where it was originally defined. Returns the
         """
         # we're considering the execution_config only due to backwards compatibility
-        path = self.render_config.project_path or self.execution_config.project_path
+        path = self.render_config.project_path or self.project.dbt_project_path or self.execution_config.project_path
         if not path:
             raise CosmosLoadDbtException(
-                "Unable to load project via dbt ls without RenderConfig.dbt_project_path and ExecutionConfig.dbt_project_path"
+                "Unable to load project via dbt ls without RenderConfig.dbt_project_path, ProjectConfig.dbt_project_path or ExecutionConfig.dbt_project_path"
             )
         return path.absolute()
 
-    def get_dbt_ls_args(self) -> list[str]:
+    @cached_property
+    def dbt_ls_args(self) -> list[str]:
         """
         Flags set while running dbt ls. This information is also used to define the dbt ls cache key.
         """
@@ -208,7 +208,7 @@ class DbtGraph:
             args.extend(["--select", *self.render_config.select])
 
         if self.project.dbt_vars:
-            args.extend(["--vars", yaml.dump(self.project.dbt_vars)])
+            args.extend(["--vars", f"'{json.dumps(self.project.dbt_vars, sort_keys=True)}'"])
 
         if self.render_config.selector:
             args.extend(["--selector", self.render_config.selector])
@@ -225,7 +225,7 @@ class DbtGraph:
         executed and the new value will be stored.
         """
         # if dbt deps, we can consider the md5 of the packages or deps file
-        args = self.get_dbt_ls_args()
+        args = self.dbt_ls_args
         env_vars = self.env_vars
         if env_vars:
             envvars_str = json.dumps(env_vars, sort_keys=True)
@@ -333,7 +333,7 @@ class DbtGraph:
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [dbt_cmd, "ls", "--output", "json"]
-        args = self.get_dbt_ls_args()
+        args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
         ls_command.extend(args)
 

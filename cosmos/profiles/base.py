@@ -5,6 +5,8 @@ inherit from to ensure consistency.
 
 from __future__ import annotations
 
+import hashlib
+import pickle
 import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
@@ -81,6 +83,15 @@ class BaseProfileMapping(ABC):
         self.disable_event_tracking = disable_event_tracking
         self.dbt_config_vars = dbt_config_vars
         self._validate_disable_event_tracking()
+
+    def version(self, mock_profile: bool = False) -> str:
+        # TODO: Handle connection actual value
+        if mock_profile:
+            profile = self.mock_profile
+        else:
+            profile = self.profile
+        hash_object = hashlib.sha256(pickle.dumps(profile))
+        return hash_object.hexdigest()
 
     def _validate_profile_args(self) -> None:
         """

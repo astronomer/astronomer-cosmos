@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import json
 import os
+import json
 import shutil
 import time
 from collections import defaultdict
@@ -22,6 +22,7 @@ from cosmos import settings
 from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
+from cosmos.settings import dbt_profile_cache_path
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
@@ -346,3 +347,64 @@ def delete_unused_dbt_ls_cache(
         f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
     )
     return deleted_cosmos_variables
+
+
+def get_cache_profile_version_path(current_version: str) -> Path | None:
+    """
+    Check if profile version and correspond dbt profile yml exit in metadata.json and return the yml path or None
+    """
+    if not dbt_profile_cache_path:
+        raise Exception("profile_cache_path must be set.")
+
+    cache_metadata_path = Path(dbt_profile_cache_path) / "metadata.json"
+    cache_metadata_path.touch(exist_ok=True)
+
+    if cache_metadata_path.stat().st_size == 0:
+        return None
+
+    with open(cache_metadata_path) as metadata_f:
+        json_data = json.load(metadata_f)
+        if json_data.get(current_version):
+            return Path(json_data.get(current_version))
+    return None
+
+
+def _invalidate_profile_cache_metadata() -> None:
+    """
+    Invalidate (clear) the metadata stored in the profile cache.
+
+    This function clears the metadata stored in 'metadata.json' located in the specified
+    dbt_profile_cache_path directory by writing an empty dictionary to the file.
+    """
+    cache_metadata_path = Path(dbt_profile_cache_path) / "metadata.json"
+    metadata: dict[str, str] = {}
+    with open(cache_metadata_path, "w", encoding="utf-8") as file:
+        json.dump(metadata, file, indent=2)
+
+
+def cache_profile_version_path(version: str, profile_path: str) -> None:
+    """
+    Store the profile version and corresponding dbt profile path in metadata.json
+    """
+    cache_metadata_path = Path(dbt_profile_cache_path) / "metadata.json"
+
+    metadata = {}
+
+    if cache_metadata_path.exists() and cache_metadata_path.stat().st_size > 0:
+        try:
+            with open(cache_metadata_path) as file:
+                metadata = json.load(file)
+        except json.JSONDecodeError as e:
+            logger.info(f"Error decoding JSON from '{cache_metadata_path}': {str(e)}")
+            _invalidate_profile_cache_metadata()
+            return
+
+    metadata[version] = profile_path
+
+    try:
+        with open(cache_metadata_path, "w", encoding="utf-8") as file:
+            json.dump(metadata, file, indent=2)
+        logger.info(f"Updated profile cache with version '{version}' and profile path '{profile_path}'")
+    except Exception as e:
+        logger.info(f"Error writing JSON to '{cache_metadata_path}': {str(e)}")
+        _invalidate_profile_cache_metadata()

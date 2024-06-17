@@ -208,7 +208,7 @@ class DbtGraph:
             args.extend(["--select", *self.render_config.select])
 
         if self.project.dbt_vars:
-            args.extend(["--vars", f"""'{json.dumps(self.project.dbt_vars, sort_keys=True)}'"""])
+            args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
 
         if self.render_config.selector:
             args.extend(["--selector", self.render_config.selector])

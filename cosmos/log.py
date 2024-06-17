@@ -15,7 +15,7 @@ LOG_FORMAT: str = (
 )
 
 
-def get_logger(name: str | None = None) -> logging.Logger:
+def get_logger(name: str) -> logging.Logger:
     """
     Get custom Astronomer cosmos logger.
 

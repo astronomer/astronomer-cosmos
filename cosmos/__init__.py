@@ -30,7 +30,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 try:
     from cosmos.operators.docker import (

@@ -1,4 +1,5 @@
-"Tests for the Athena profile."
+"""Tests for the Athena profile."""
+
 from __future__ import annotations
 
 import json

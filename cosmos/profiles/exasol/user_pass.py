@@ -1,4 +1,5 @@
-"Maps Airflow Exasol connections with a username and password to dbt profiles."
+"""Maps Airflow Exasol connections with a username and password to dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -45,7 +46,7 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile. The password is stored in an environment variable."
+        """Gets profile. The password is stored in an environment variable."""
         profile_vars = {
             **self.mapped_params,
             **self.profile_args,
@@ -57,7 +58,7 @@ class ExasolUserPasswordProfileMapping(BaseProfileMapping):
         return self.filter_null(profile_vars)
 
     def transform_dsn(self, host: str) -> str:
-        "Adds the port if it's not already there."
+        """Adds the port if it's not already there."""
         if ":" not in host:
             port = self.conn.port or self.default_port
             return f"{host}:{port}"

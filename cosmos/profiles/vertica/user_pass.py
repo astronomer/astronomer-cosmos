@@ -1,4 +1,5 @@
-"Maps Airflow Vertica connections using username + password authentication to dbt profiles."
+"""Maps Airflow Vertica connections using username + password authentication to dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -59,7 +60,7 @@ class VerticaUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile. The password is stored in an environment variable."
+        """Gets profile. The password is stored in an environment variable."""
         profile = {
             "port": 5433,
             **self.mapped_params,
@@ -72,7 +73,7 @@ class VerticaUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        "Gets mock profile. Defaults port to 5433."
+        """Gets mock profile. Defaults port to 5433."""
         parent_mock = super().mock_profile
 
         return {

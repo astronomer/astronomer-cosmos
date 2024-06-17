@@ -1,4 +1,4 @@
-"Tests for the Redshift profile."
+"""Tests for the Redshift profile."""
 
 from unittest.mock import patch
 

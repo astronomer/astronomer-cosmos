@@ -1,4 +1,5 @@
-"Maps Airflow Trino connections to Certificate Trino dbt profiles."
+"""Maps Airflow Trino connections to Certificate Trino dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -28,7 +29,7 @@ class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile."
+        """Gets profile."""
         common_profile_vars = super().profile
         profile_vars = {
             **self.mapped_params,

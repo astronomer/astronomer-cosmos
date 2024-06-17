@@ -1,4 +1,4 @@
-"BigQuery Airflow connection -> dbt profile mappings"
+"""BigQuery Airflow connection -> dbt profile mappings"""
 
 from .oauth import GoogleCloudOauthProfileMapping
 from .service_account_file import GoogleCloudServiceAccountFileProfileMapping

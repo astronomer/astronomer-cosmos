@@ -43,7 +43,7 @@ profile_config = ProfileConfig(
 
 @task.branch(task_id="which_upload")
 def which_upload():
-    "Only run the docs tasks if we have the proper connections set up"
+    """Only run the docs tasks if we have the proper connections set up"""
     downstream_tasks_to_run = []
 
     try:

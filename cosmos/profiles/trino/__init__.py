@@ -1,4 +1,4 @@
-"Trino Airflow connection -> dbt profile mappings"
+"""Trino Airflow connection -> dbt profile mappings"""
 
 from .base import TrinoBaseProfileMapping
 from .certificate import TrinoCertificateProfileMapping

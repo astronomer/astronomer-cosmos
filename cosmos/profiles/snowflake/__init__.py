@@ -1,4 +1,4 @@
-"Snowflake Airflow connection -> dbt profile mapping."
+"""Snowflake Airflow connection -> dbt profile mapping."""
 
 from .user_encrypted_privatekey_env_variable import SnowflakeEncryptedPrivateKeyPemProfileMapping
 from .user_encrypted_privatekey_file import SnowflakeEncryptedPrivateKeyFilePemProfileMapping

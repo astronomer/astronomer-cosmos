@@ -122,7 +122,7 @@ class BaseProfileMapping(ABC):
 
     @property
     def conn(self) -> Connection:
-        "Returns the Airflow connection."
+        """Returns the Airflow connection."""
         if not self._conn:
             conn = BaseHook.get_connection(self.conn_id)
             if not conn:
@@ -197,7 +197,7 @@ class BaseProfileMapping(ABC):
 
     @property
     def env_vars(self) -> dict[str, str]:
-        "Returns a dictionary of environment variables that should be set based on self.secret_fields."
+        """Returns a dictionary of environment variables that should be set based on self.secret_fields."""
         env_vars = {}
 
         for field in self.secret_fields:
@@ -287,7 +287,7 @@ class BaseProfileMapping(ABC):
 
     @property
     def mapped_params(self) -> dict[str, Any]:
-        "Turns the self.airflow_param_mapping into a dictionary of dbt fields and their values."
+        """Turns the self.airflow_param_mapping into a dictionary of dbt fields and their values."""
         mapped_params = {
             DBT_PROFILE_TYPE_FIELD: self.dbt_profile_type,
         }

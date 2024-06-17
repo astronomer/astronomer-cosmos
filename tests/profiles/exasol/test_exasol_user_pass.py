@@ -1,4 +1,4 @@
-"Tests for the Exasol profile."
+"""Tests for the Exasol profile."""
 
 from unittest.mock import patch
 

@@ -1,4 +1,5 @@
-"Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account file."
+"""Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account file."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,7 +33,7 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Generates profile. Defaults `threads` to 1."
+        """Generates profile. Defaults `threads` to 1."""
         return {
             **self.mapped_params,
             "threads": 1,
@@ -41,7 +42,7 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        "Generates mock profile. Defaults `threads` to 1."
+        """Generates mock profile. Defaults `threads` to 1."""
         parent_mock_profile = super().mock_profile
 
         return {

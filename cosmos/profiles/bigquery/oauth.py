@@ -1,4 +1,5 @@
-"Maps Airflow GCP connections to dbt BigQuery profiles that uses oauth via gcloud, if they don't use key file or JSON."
+"""Maps Airflow GCP connections to dbt BigQuery profiles that uses oauth via gcloud, if they don't use key file or JSON."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -31,7 +32,7 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Generates profile. Defaults `threads` to 1."
+        """Generates profile. Defaults `threads` to 1."""
         return {
             **self.mapped_params,
             "method": "oauth",
@@ -41,7 +42,7 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        "Generates mock profile. Defaults `threads` to 1."
+        """Generates mock profile. Defaults `threads` to 1."""
         parent_mock_profile = super().mock_profile
 
         return {

@@ -182,23 +182,23 @@ class DbtGraph:
         """
         Flags set while running dbt ls. This information is also used to define the dbt ls cache key.
         """
-        args = []
+        ls_args = []
         if self.render_config.exclude:
-            args.extend(["--exclude", *self.render_config.exclude])
+            ls_args.extend(["--exclude", *self.render_config.exclude])
 
         if self.render_config.select:
-            args.extend(["--select", *self.render_config.select])
+            ls_args.extend(["--select", *self.render_config.select])
 
         if self.project.dbt_vars:
-            args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+            ls_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
 
         if self.render_config.selector:
-            args.extend(["--selector", self.render_config.selector])
+            ls_args.extend(["--selector", self.render_config.selector])
 
         if not self.project.partial_parse:
-            args.append("--no-partial-parse")
+            ls_args.append("--no-partial-parse")
 
-        return args
+        return ls_args
 
     @cached_property
     def dbt_ls_cache_key_args(self) -> list[str]:
@@ -207,17 +207,17 @@ class DbtGraph:
         executed and the new value will be stored.
         """
         # if dbt deps, we can consider the md5 of the packages or deps file
-        args = self.dbt_ls_args
+        cache_args = list(self.dbt_ls_args)
         env_vars = self.env_vars
         if env_vars:
             envvars_str = json.dumps(env_vars, sort_keys=True)
-            args.append(envvars_str)
+            cache_args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:
                 airflow_vars = [var_name, Variable.get(var_name, "")]
-                args.extend(airflow_vars)
+                cache_args.extend(airflow_vars)
 
-        return args
+        return cache_args
 
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
         """
@@ -314,9 +314,10 @@ class DbtGraph:
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [dbt_cmd, "ls", "--output", "json"]
-        args = self.dbt_ls_args
+
+        ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
-        ls_command.extend(args)
+        ls_command.extend(ls_args)
 
         stdout = run_command(ls_command, tmp_dir, env_vars)
 

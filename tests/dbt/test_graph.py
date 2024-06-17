@@ -998,7 +998,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(
     dbt_graph.load_via_dbt_ls()
     ls_command = mock_popen.call_args.args[0]
     assert "--vars" in ls_command
-    assert ls_command[ls_command.index("--vars") + 1] == '\'{"my_var1": "my_value1", "my_var2": "my_value2"}\''
+    assert ls_command[ls_command.index("--vars") + 1] == '{"my_var1": "my_value1", "my_var2": "my_value2"}'
 
 
 @patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
@@ -1188,7 +1188,7 @@ def test_project_path_fails():
             ["--select", "tag:prod", "config.materialized:incremental"],
         ),
         (RenderConfig(selector="nightly"), ProjectConfig(), ["--selector", "nightly"]),
-        (RenderConfig(), ProjectConfig(dbt_vars={"a": 1}), ["--vars", "'{\"a\": 1}'"]),
+        (RenderConfig(), ProjectConfig(dbt_vars={"a": 1}), ["--vars", '{"a": 1}']),
         (RenderConfig(), ProjectConfig(partial_parse=False), ["--no-partial-parse"]),
         (
             RenderConfig(exclude=["1", "2"], select=["a", "b"], selector="nightly"),
@@ -1201,7 +1201,7 @@ def test_project_path_fails():
                 "a",
                 "b",
                 "--vars",
-                "'{\"a\": 1}'",
+                '{"a": 1}',
                 "--selector",
                 "nightly",
                 "--no-partial-parse",

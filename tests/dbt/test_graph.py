@@ -1,4 +1,5 @@
 import shutil
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -1291,10 +1292,17 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert mock_variable_set.call_args[0][0] == "cosmos_cache__undefined"
     assert mock_variable_set.call_args[0][1]["dbt_ls_compressed"] == "eJwrzs9NVcgvLSkoLQEAGpAEhg=="
     assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
-    assert (
-        mock_variable_set.call_args[0][1]["version"]
-        == "3198e6655e3a6ab9fccedc9402344f6c37ce2f45a445816d8b18f15009e8c04f,d41d8cd98f00b204e9800998ecf8427e"
-    )
+    version = mock_variable_set.call_args[0][1].get("version")
+    if sys.platform == "darwin":
+        assert (
+            version
+            == "3198e6655e3a6ab9fccedc9402344f6c37ce2f45a445816d8b18f15009e8c04f,d41d8cd98f00b204e9800998ecf8427e"
+        )
+    else:
+        assert (
+            version
+            == "dce66e139f65945cbfb0d8bdccd329ba0226203147f89376deaf9f3e8889cff2,d41d8cd98f00b204e9800998ecf8427e"
+        )
 
 
 @pytest.mark.integration

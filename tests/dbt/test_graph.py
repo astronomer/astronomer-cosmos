@@ -548,7 +548,7 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
     )
 
     with pytest.raises(CosmosLoadDbtException) as err_info:
-        dbt_graph.load_via_dbt_ls()
+        dbt_graph.load_via_dbt_ls_without_cache()
 
     expected = "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
     assert err_info.value.args[0] == expected
@@ -619,7 +619,7 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
     (tmp_path / DBT_TARGET_DIR_NAME).mkdir(parents=True, exist_ok=True)
 
     # First time dbt ls is run, partial parsing was not cached, so we don't benefit from this
-    dbt_graph.load_via_dbt_ls()
+    dbt_graph.load_via_dbt_ls_without_cache()
     assert "Unable to do partial parsing" in caplog.text
 
     # From the second time we run dbt ls onwards, we benefit from partial parsing

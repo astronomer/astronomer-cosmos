@@ -12,7 +12,7 @@ from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 # It was considered to create a cache identifier based on the dbt project path, as opposed

@@ -665,7 +665,7 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
 
     # From the second time we run dbt ls onwards, we benefit from partial parsing
     caplog.clear()
-    dbt_graph.load_via_dbt_ls()  # should not not raise exception
+    dbt_graph.load_via_dbt_ls_without_cache()  # should not not raise exception
     assert not "Unable to do partial parsing" in caplog.text
 
 

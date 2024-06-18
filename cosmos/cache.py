@@ -97,10 +97,8 @@ def _get_latest_partial_parse(dbt_project_path: Path, cache_dir: Path) -> Path |
     return None
 
 
-def _copy(src, dst, *, follow_symlinks=True):
-    """
-    Copy a file from `src` to `dst` and preserve metadata if possible.
-    """
+def _copy(src: str, dst: str, *, follow_symlinks: bool = True) -> None:
+    """Copy a file from `src` to `dst` and preserve metadata if possible."""
     # Handle destination as directory
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))

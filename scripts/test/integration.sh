@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -x
+set -e
 
 pip freeze | grep airflow
 echo $AIRFLOW_HOME

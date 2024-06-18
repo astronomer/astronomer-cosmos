@@ -187,7 +187,7 @@ def should_use_dbt_ls_cache() -> bool:
     return settings.enable_cache and settings.enable_cache_dbt_ls
 
 
-# TODO: test and rename
+# TODO: test and rename. It's important to confirm this value is deterministic
 def create_hash_with_walk_files(dir_path: Path) -> str:
     # This approach is less efficient than using modified time
     # sum([path.stat().st_mtime for path in dir_path.glob("**/*")])

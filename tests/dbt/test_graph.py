@@ -1294,10 +1294,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
     version = mock_variable_set.call_args[0][1].get("version")
     if sys.platform == "darwin":
-        assert (
-            version
-            == "e89aa09a279d9473a3e48475e67f842c47ece4111be4df775f3e8c0458e01303,d41d8cd98f00b204e9800998ecf8427e"
-        )
+        assert version == "6ee24a8f122fcc5f6addcec8b0631119,d41d8cd98f00b204e9800998ecf8427e"
     else:
         assert (
             version

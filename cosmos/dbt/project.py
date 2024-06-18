@@ -13,7 +13,7 @@ from cosmos.constants import (
 )
 from cosmos.log import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 def has_non_empty_dependencies_file(project_path: Path) -> bool:

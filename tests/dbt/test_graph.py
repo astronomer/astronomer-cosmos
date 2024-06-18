@@ -1,5 +1,4 @@
 import shutil
-import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -1252,13 +1251,11 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert mock_variable_set.call_args[0][1]["dbt_ls_compressed"] == "eJwrzs9NVcgvLSkoLQEAGpAEhg=="
     assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
     version = mock_variable_set.call_args[0][1].get("version")
-    if sys.platform == "darwin":
-        assert version == "7b420b083eaf80a48efc7139590bf894,d41d8cd98f00b204e9800998ecf8427e"
-    else:
-        if sys.version_info[1] == 9:
-            assert version == "caaa8a0be4158412252d6886ebf930d2,d41d8cd98f00b204e9800998ecf8427e"
-        else:
-            assert version == "57c93c430ceee8abafe9f10dd4660485,d41d8cd98f00b204e9800998ecf8427e"
+    hash_dir, hash_args = version.split(",")
+    assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
+    assert hash_dir in [
+        "71727f1ec3ed0886713ea6d9011a9d2c",  # darwin, always
+    ]
 
 
 @pytest.mark.integration

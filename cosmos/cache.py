@@ -195,12 +195,16 @@ def create_hash_with_walk_files(dir_path: Path) -> str:
     # where DAGs are constantly synced to the deployed Airflow
     # for 5k files, this seems to take 0.14
     hasher = hashlib.md5()
-    for walk_result in os.walk(dir_path):
-        for element in sorted(walk_result[2]):
-            filepath = os.path.join(walk_result[0], element)
-            with open(str(filepath), "rb") as fp:
-                buf = fp.read()
-                hasher.update(buf)
+    filepaths = []
+
+    for root_dir, dirs, files in os.walk(dir_path):
+        paths = [os.path.join(root_dir, filepath) for filepath in files]
+        filepaths.extend(paths)
+
+    for filepath in sorted(filepaths):
+        with open(str(filepath), "rb") as fp:
+            buf = fp.read()
+            hasher.update(buf)
 
     return hasher.hexdigest()
 

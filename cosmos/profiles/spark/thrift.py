@@ -1,4 +1,5 @@
-"Maps Airflow Spark connections to dbt profiles if they use a thrift connection."
+"""Maps Airflow Spark connections to dbt profiles if they use a thrift connection."""
+
 from __future__ import annotations
 
 from typing import Any

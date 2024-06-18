@@ -1,4 +1,5 @@
-"Maps Airflow AWS connections to a dbt Athena profile using an access key id and secret access key."
+"""Maps Airflow AWS connections to a dbt Athena profile using an access key id and secret access key."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -57,7 +58,7 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile. The password is stored in an environment variable."
+        """Gets profile. The password is stored in an environment variable."""
 
         self.temporary_credentials = self._get_temporary_credentials()  # type: ignore
 
@@ -75,7 +76,7 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
 
     @property
     def env_vars(self) -> dict[str, str]:
-        "Overwrites the env_vars for athena, Returns a dictionary of environment variables that should be set based on the self.temporary_credentials."
+        """Overwrites the env_vars for athena, Returns a dictionary of environment variables that should be set based on the self.temporary_credentials."""
 
         if self.temporary_credentials is None:
             raise CosmosValueError(f"Could not find the athena credentials.")

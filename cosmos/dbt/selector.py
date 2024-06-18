@@ -289,7 +289,7 @@ class NodeSelector:
         return selected_nodes
 
     def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
-        "Checks if a single node should be included. Only runs once per node with caching."
+        """Checks if a single node should be included. Only runs once per node with caching."""
         logger.debug("Inspecting if the node <%s> should be included.", node_id)
         if node_id in self.visited_nodes:
             return node_id in self.selected_nodes

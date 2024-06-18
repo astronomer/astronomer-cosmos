@@ -1,4 +1,5 @@
-"Maps Airflow Snowflake connections to dbt profiles if they use a user/password."
+"""Maps Airflow Snowflake connections to dbt profiles if they use a user/password."""
+
 from __future__ import annotations
 
 import json
@@ -72,7 +73,7 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile."
+        """Gets profile."""
         profile_vars = {
             **self.mapped_params,
             **self.profile_args,
@@ -84,7 +85,7 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
         return self.filter_null(profile_vars)
 
     def transform_account(self, account: str) -> str:
-        "Transform the account to the format <account>.<region> if it's not already."
+        """Transform the account to the format <account>.<region> if it's not already."""
         region = self.conn.extra_dejson.get("region")
         if region and region not in account:
             account = f"{account}.{region}"

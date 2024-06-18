@@ -1,4 +1,4 @@
-"Vertica Airflow connection -> dbt profile mappings"
+"""Vertica Airflow connection -> dbt profile mappings"""
 
 from .user_pass import VerticaUserPasswordProfileMapping
 

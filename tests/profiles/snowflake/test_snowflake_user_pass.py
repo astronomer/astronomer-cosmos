@@ -1,4 +1,4 @@
-"Tests for the Snowflake user/password profile."
+"""Tests for the Snowflake user/password profile."""
 
 import json
 from unittest.mock import patch

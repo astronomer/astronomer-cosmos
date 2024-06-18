@@ -1,4 +1,5 @@
-"Maps common fields for Airflow Trino connections to dbt profiles."
+"""Maps common fields for Airflow Trino connections to dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,7 +8,7 @@ from ..base import BaseProfileMapping
 
 
 class TrinoBaseProfileMapping(BaseProfileMapping):
-    "Maps common fields for Airflow Trino connections to dbt profiles."
+    """Maps common fields for Airflow Trino connections to dbt profiles."""
 
     airflow_connection_type: str = "trino"
     dbt_profile_type: str = "trino"
@@ -31,7 +32,7 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any]:
-        "Gets profile."
+        """Gets profile."""
         profile_vars = {
             **self.mapped_params,
             **self.profile_args,
@@ -41,5 +42,5 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
         return self.filter_null(profile_vars)
 
     def transform_host(self, host: str) -> str:
-        "Replaces http:// or https:// with nothing."
+        """Replaces http:// or https:// with nothing."""
         return host.replace("http://", "").replace("https://", "")

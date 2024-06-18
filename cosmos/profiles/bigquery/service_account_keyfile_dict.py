@@ -1,4 +1,5 @@
-"Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account keyfile dict/json."
+"""Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account keyfile dict/json."""
+
 from __future__ import annotations
 
 import json
@@ -57,7 +58,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        "Generates mock profile. Defaults `threads` to 1."
+        """Generates mock profile. Defaults `threads` to 1."""
         parent_mock_profile = super().mock_profile
 
         return {**parent_mock_profile, "threads": 1, "keyfile_json": None}
@@ -86,5 +87,5 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
 
     @property
     def env_vars(self) -> dict[str, str]:
-        "Returns a dictionary of environment variables that should be set based on self.secret_fields."
+        """Returns a dictionary of environment variables that should be set based on self.secret_fields."""
         return self._env_vars

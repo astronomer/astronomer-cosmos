@@ -1,4 +1,4 @@
-"Databricks Airflow connection -> dbt profile mappings"
+"""Databricks Airflow connection -> dbt profile mappings"""
 
 from .token import DatabricksTokenProfileMapping
 

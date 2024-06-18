@@ -1,4 +1,4 @@
-"Spark Airflow connection -> dbt profile mappings"
+"""Spark Airflow connection -> dbt profile mappings"""
 
 from .thrift import SparkThriftProfileMapping
 

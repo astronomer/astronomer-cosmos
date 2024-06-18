@@ -1,4 +1,5 @@
-"Maps Airflow Databricks connections with a token to dbt profiles."
+"""Maps Airflow Databricks connections with a token to dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -37,7 +38,7 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Generates profile. The token is stored in an environment variable."
+        """Generates profile. The token is stored in an environment variable."""
         return {
             **self.mapped_params,
             **self.profile_args,
@@ -46,5 +47,5 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
         }
 
     def transform_host(self, host: str) -> str:
-        "Removes the https:// prefix."
+        """Removes the https:// prefix."""
         return host.replace("https://", "")

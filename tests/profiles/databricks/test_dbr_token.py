@@ -1,4 +1,4 @@
-"Tests for the postgres profile."
+"""Tests for the postgres profile."""
 
 from unittest.mock import patch
 

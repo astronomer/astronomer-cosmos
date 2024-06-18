@@ -244,7 +244,7 @@ class ProfileConfig:
         self.validate_profile()
 
     def validate_profile(self) -> None:
-        "Validates that we have enough information to render a profile."
+        """Validates that we have enough information to render a profile."""
         if not self.profiles_yml_filepath and not self.profile_mapping:
             raise CosmosValueError("Either profiles_yml_filepath or profile_mapping must be set to render a profile")
         if self.profiles_yml_filepath and self.profile_mapping:
@@ -253,7 +253,7 @@ class ProfileConfig:
             )
 
     def validate_profiles_yml(self) -> None:
-        "Validates a user-supplied profiles.yml is present"
+        """Validates a user-supplied profiles.yml is present"""
         if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
@@ -261,7 +261,7 @@ class ProfileConfig:
     def ensure_profile(
         self, desired_profile_path: Path | None = None, use_mock_values: bool = False
     ) -> Iterator[tuple[Path, dict[str, str]]]:
-        "Context manager to ensure that there is a profile. If not, create one."
+        """Context manager to ensure that there is a profile. If not, create one."""
         if self.profiles_yml_filepath:
             logger.info("Using user-supplied profiles.yml at %s", self.profiles_yml_filepath)
             yield Path(self.profiles_yml_filepath), {}

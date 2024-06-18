@@ -631,7 +631,7 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
         folder_dir: str | None = None,
         **kwargs: Any,
     ) -> None:
-        "Initializes the operator."
+        """Initializes the operator."""
         self.connection_id = connection_id
         self.bucket_name = bucket_name
         self.folder_dir = folder_dir
@@ -674,7 +674,7 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
         super().__init__(*args, **kwargs)
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
-        "Uploads the generated documentation to S3."
+        """Uploads the generated documentation to S3."""
         logger.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
             self.connection_id,
@@ -740,7 +740,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
         super().__init__(*args, **kwargs)
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
-        "Uploads the generated documentation to Azure Blob Storage."
+        """Uploads the generated documentation to Azure Blob Storage."""
         logger.info(
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
             self.connection_id,
@@ -784,7 +784,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
     ui_color = "#4772d5"
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
-        "Uploads the generated documentation to Google Cloud Storage"
+        """Uploads the generated documentation to Google Cloud Storage"""
         logger.info(
             'Attempting to upload generated docs to Storage using GCSHook(conn_id="%s")',
             self.connection_id,

@@ -196,7 +196,7 @@ def create_hash_with_walk_files(dir_path: Path) -> str:
     # for 5k files, this seems to take 0.14
     hasher = hashlib.md5()
     for walk_result in os.walk(dir_path):
-        for element in walk_result[2]:
+        for element in sorted(walk_result[2]):
             filepath = os.path.join(walk_result[0], element)
             with open(str(filepath), "rb") as fp:
                 buf = fp.read()

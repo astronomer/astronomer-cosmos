@@ -1,4 +1,4 @@
-"Contains exceptions that Cosmos uses"
+"""Contains exceptions that Cosmos uses"""
 
 
 class CosmosValueError(ValueError):

@@ -1,4 +1,4 @@
-"Tests for the vertica profile."
+"""Tests for the vertica profile."""
 
 from unittest.mock import patch
 

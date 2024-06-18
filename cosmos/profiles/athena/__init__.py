@@ -1,4 +1,4 @@
-"Athena Airflow connection -> dbt profile mappings"
+"""Athena Airflow connection -> dbt profile mappings"""
 
 from .access_key import AthenaAccessKeyProfileMapping
 

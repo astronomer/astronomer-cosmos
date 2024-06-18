@@ -1,4 +1,4 @@
-"Tests for the Spark profile."
+"""Tests for the Spark profile."""
 
 from unittest.mock import patch
 

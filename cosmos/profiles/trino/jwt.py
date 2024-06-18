@@ -1,4 +1,5 @@
-"Maps Airflow Trino connections to JWT Trino dbt profiles."
+"""Maps Airflow Trino connections to JWT Trino dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -29,7 +30,7 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile."
+        """Gets profile."""
         common_profile_vars: dict[str, Any] = super().profile
 
         # need to remove jwt from profile_args because it will be set as an environment variable

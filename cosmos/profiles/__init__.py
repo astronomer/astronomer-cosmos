@@ -1,4 +1,4 @@
-"Contains a function to get the profile mapping based on the connection ID."
+"""Contains a function to get the profile mapping based on the connection ID."""
 
 from __future__ import annotations
 

@@ -15,7 +15,8 @@ from cosmos.profiles import BaseProfileMapping, profile_mappings
 
 @dataclass
 class Field:
-    "Represents a field in a profile mapping."
+    """Represents a field in a profile mapping."""
+
     dbt_name: str
     required: bool = False
     airflow_name: str | list[str] | None = None

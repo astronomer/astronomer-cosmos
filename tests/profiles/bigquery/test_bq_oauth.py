@@ -1,4 +1,4 @@
-"Tests for the BigQuery profile."
+"""Tests for the BigQuery profile."""
 
 import json
 from unittest.mock import patch

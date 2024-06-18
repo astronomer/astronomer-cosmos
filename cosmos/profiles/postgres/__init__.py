@@ -1,4 +1,4 @@
-"Postgres Airflow connection -> dbt profile mappings"
+"""Postgres Airflow connection -> dbt profile mappings"""
 
 from .user_pass import PostgresUserPasswordProfileMapping
 

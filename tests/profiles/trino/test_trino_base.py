@@ -1,4 +1,4 @@
-"Tests for the Trino profile."
+"""Tests for the Trino profile."""
 
 import json
 from unittest.mock import patch

@@ -1,4 +1,5 @@
-"Maps Airflow Trino connections to LDAP Trino dbt profiles."
+"""Maps Airflow Trino connections to LDAP Trino dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any

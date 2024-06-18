@@ -1,4 +1,5 @@
-"Maps Airflow Postgres connections using user + password authentication to dbt profiles."
+"""Maps Airflow Postgres connections using user + password authentication to dbt profiles."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -37,7 +38,7 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile. The password is stored in an environment variable."
+        """Gets profile. The password is stored in an environment variable."""
         profile = {
             "port": 5432,
             **self.mapped_params,
@@ -53,7 +54,7 @@ class PostgresUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        "Gets mock profile. Defaults port to 5432."
+        """Gets mock profile. Defaults port to 5432."""
         profile_dict = {
             "port": 5432,
             **super().mock_profile,

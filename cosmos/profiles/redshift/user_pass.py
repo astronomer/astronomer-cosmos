@@ -1,4 +1,5 @@
-"Maps Airflow Redshift connections to dbt Redshift profiles if they use a username and password."
+"""Maps Airflow Redshift connections to dbt Redshift profiles if they use a username and password."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -39,7 +40,7 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        "Gets profile."
+        """Gets profile."""
         profile = {
             "port": 5439,
             **self.mapped_params,
@@ -52,7 +53,7 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        "Gets mock profile. Defaults port to 5439."
+        """Gets mock profile. Defaults port to 5439."""
         parent_mock = super().mock_profile
 
         return {

@@ -1294,12 +1294,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
     version = mock_variable_set.call_args[0][1].get("version")
     if sys.platform == "darwin":
-        assert version == "6ee24a8f122fcc5f6addcec8b0631119,d41d8cd98f00b204e9800998ecf8427e"
+        assert version == "7b420b083eaf80a48efc7139590bf894,d41d8cd98f00b204e9800998ecf8427e"
     else:
-        assert (
-            version
-            == "dce66e139f65945cbfb0d8bdccd329ba0226203147f89376deaf9f3e8889cff2,d41d8cd98f00b204e9800998ecf8427e"
-        )
+        assert version == "48af2ce7ab6dfee18e91d7952db98d5c,d41d8cd98f00b204e9800998ecf8427e"
 
 
 @pytest.mark.integration

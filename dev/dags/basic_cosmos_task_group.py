@@ -20,7 +20,7 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="airflow_db",
+        conn_id="example_conn",
         profile_args={"schema": "public"},
     ),
 )

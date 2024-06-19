@@ -1,5 +1,5 @@
 """
-An airflow DAG that uses Cosmos to render a dbt project for performance testing.
+An Airflow DAG that uses Cosmos to render a dbt project for performance testing.
 """
 
 import os

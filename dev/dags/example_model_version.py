@@ -1,5 +1,5 @@
 """
-An example DAG that uses Cosmos to render a dbt project.
+An example DAG that uses Cosmos to render a dbt project as an Airflow DAG.
 """
 
 import os

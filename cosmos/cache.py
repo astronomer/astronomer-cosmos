@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
@@ -97,25 +96,6 @@ def _get_latest_partial_parse(dbt_project_path: Path, cache_dir: Path) -> Path |
     return None
 
 
-def _copy(src: str, dst: str, *, follow_symlinks: bool = True) -> None:
-    """Copy a file from `src` to `dst` and preserve metadata if possible."""
-    # Handle destination as directory
-    if os.path.isdir(dst):
-        dst = os.path.join(dst, os.path.basename(src))
-    # shutil.copy includes permission copying via chmod.
-    # If the user lacks permission to run chmod, a PermissionError occurs.
-    # To avoid this, we split the operation into two steps:
-    # first, copy the file contents; then, copy metadata if feasible without raising exceptions.
-    # Step 1: Copy file contents (no metadata)
-    shutil.copyfile(src, dst, follow_symlinks=follow_symlinks)
-
-    try:
-        # Step 2: Copy file metadata (permission bits and other metadata)
-        shutil.copystat(src, dst, follow_symlinks=follow_symlinks)
-    except PermissionError:
-        logger.info("Failed to copy the partial parse file metadata")
-
-
 def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: Path) -> None:
     """
     Update the cache to have the latest partial parse file contents.
@@ -127,8 +107,8 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
     latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
 
-    _copy(str(latest_partial_parse_filepath), str(cache_path))
-    _copy(str(latest_manifest_filepath), str(manifest_path))
+    shutil.copyfile(str(latest_partial_parse_filepath), str(cache_path))
+    shutil.copyfile(str(latest_manifest_filepath), str(manifest_path))
 
 
 def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path) -> bool:

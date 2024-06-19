@@ -208,7 +208,7 @@ class DbtDocsView(AirflowBaseView):
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])
-    def dbt_docs_index(self) -> str:
+    def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -219,7 +219,7 @@ class DbtDocsView(AirflowBaseView):
             # Hack the dbt docs to render properly in an iframe
             iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
             html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
-            return html
+            return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access([(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)])

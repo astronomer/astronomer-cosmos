@@ -9,6 +9,7 @@ ls $AIRFLOW_HOME
 
 airflow db check
 
+
 rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
     --cov=cosmos \

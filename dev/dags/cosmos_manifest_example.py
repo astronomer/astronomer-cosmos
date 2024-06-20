@@ -1,5 +1,5 @@
 """
-An example DAG that uses Cosmos to render a dbt project.
+An example DAG that uses Cosmos to render a dbt project into Airflow using a dbt manifest file.
 """
 
 import os
@@ -16,7 +16,7 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="airflow_db",
+        conn_id="example_conn",
         profile_args={"schema": "public"},
         dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=True),
     ),

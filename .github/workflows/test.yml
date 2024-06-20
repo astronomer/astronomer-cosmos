@@ -140,7 +140,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           DATABRICKS_HOST: mock
           DATABRICKS_WAREHOUSE_ID: mock
           DATABRICKS_TOKEN: mock
@@ -210,7 +210,7 @@ jobs:
           DATABRICKS_UNIQUE_ID="${{github.run_id}}" hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-expensive
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
           DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
@@ -231,7 +231,7 @@ jobs:
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
       AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
@@ -272,7 +272,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-sqlite
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
@@ -295,7 +295,7 @@ jobs:
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
   Run-Integration-Tests-DBT-1-5-4:
@@ -345,7 +345,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-dbt-1-5-4
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
@@ -368,7 +368,7 @@ jobs:
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
   Run-Performance-Tests:
@@ -424,7 +424,7 @@ jobs:
           cat /tmp/performance_results.txt > $GITHUB_STEP_SUMMARY
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
@@ -437,7 +437,7 @@ jobs:
           MODEL_COUNT: ${{ matrix.num-models }}
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_AIRFLOW_DB: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
   Code-Coverage:

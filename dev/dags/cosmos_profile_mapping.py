@@ -41,7 +41,7 @@ def cosmos_profile_mapping() -> None:
             profile_name="default",
             target_name="dev",
             profile_mapping=get_automatic_profile_mapping(
-                conn_id="airflow_db",
+                conn_id="example_conn",
                 profile_args={"schema": "public"},
             ),
         ),

@@ -98,6 +98,8 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
     assert response.status_code == 200
     if artifact == "dbt_docs_index.html":
         assert iframe_script in _get_text_from_response(response)
+        assert "Content-Security-Policy" in response.headers
+        assert response.headers["Content-Security-Policy"] == "frame-ancestors 'self'"
 
 
 @patch.object(cosmos.plugin, "open_file")

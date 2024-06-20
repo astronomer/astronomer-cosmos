@@ -58,9 +58,10 @@ def app() -> FlaskClient:
 
     yield app.test_client()
 
-    resetdb(skip_init=True)
+    resetdb()
 
 
+@pytest.mark.integration
 def test_dbt_docs(monkeypatch, app):
     monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
 
@@ -70,6 +71,7 @@ def test_dbt_docs(monkeypatch, app):
     assert "<iframe" in _get_text_from_response(response)
 
 
+@pytest.mark.integration
 @patch.object(cosmos.plugin, "open_file")
 def test_dbt_docs_not_set_up(monkeypatch, app):
     response = app.get("/cosmos/dbt_docs")
@@ -78,6 +80,7 @@ def test_dbt_docs_not_set_up(monkeypatch, app):
     assert "<iframe" not in _get_text_from_response(response)
 
 
+@pytest.mark.integration
 @patch.object(cosmos.plugin, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
@@ -100,6 +103,7 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
         assert iframe_script in _get_text_from_response(response)
 
 
+@pytest.mark.integration
 @patch.object(cosmos.plugin, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact_not_found(mock_open_file, monkeypatch, app, artifact):
@@ -112,6 +116,7 @@ def test_dbt_docs_artifact_not_found(mock_open_file, monkeypatch, app, artifact)
     assert response.status_code == 404
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact_missing(app, artifact):
     response = app.get(f"/cosmos/{artifact}")

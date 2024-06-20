@@ -265,7 +265,7 @@ def test_load_automatic_without_manifest_with_profile_mapping(mock_load_via_dbt_
         profile_name="test",
         target_name="test",
         profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example",
+            conn_id="example_conn",
             profile_args={"schema": "public"},
         ),
     )

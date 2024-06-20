@@ -66,7 +66,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            .nox
+            .local/share/hatch/
           key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -120,7 +120,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            .nox
+            .local/share/hatch/
           key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -190,7 +190,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            .nox
+            .local/share/hatch/
           key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -252,7 +252,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            .nox
+            .local/share/hatch/
           key: integration-sqlite-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -326,7 +326,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            .nox
+            .local/share/hatch/
           key: integration-dbt-1-5-4-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -399,7 +399,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            .nox
+            .local/share/hatch/
           key: perf-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}

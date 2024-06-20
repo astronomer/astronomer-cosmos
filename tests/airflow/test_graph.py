@@ -286,7 +286,19 @@ def test_create_task_metadata_unsupported(caplog):
             "my_model_run",
             "cosmos.operators.local.DbtRunLocalOperator",
             {"models": "my_model"},
-            {"model_config": {}},
+            {
+                "dbt_node_config": {
+                    "unique_id": "model.my_folder.my_model",
+                    "resource_type": "model",
+                    "depends_on": [],
+                    "file_path": ".",
+                    "tags": [],
+                    "config": {},
+                    "has_test": False,
+                    "resource_name": "my_model",
+                    "name": "my_model",
+                }
+            },
         ),
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
@@ -294,7 +306,19 @@ def test_create_task_metadata_unsupported(caplog):
             "my_source_run",
             "cosmos.operators.local.DbtRunLocalOperator",
             {"models": "my_source"},
-            {"source_config": {}},
+            {
+                "dbt_node_config": {
+                    "unique_id": "model.my_folder.my_source",
+                    "resource_type": "source",
+                    "depends_on": [],
+                    "file_path": ".",
+                    "tags": [],
+                    "config": {},
+                    "has_test": False,
+                    "resource_name": "my_source",
+                    "name": "my_source",
+                }
+            },
         ),
         (
             f"{DbtResourceType.SNAPSHOT.value}.my_folder.my_snapshot",
@@ -302,7 +326,19 @@ def test_create_task_metadata_unsupported(caplog):
             "my_snapshot_snapshot",
             "cosmos.operators.local.DbtSnapshotLocalOperator",
             {"models": "my_snapshot"},
-            {"snapshot_config": {}},
+            {
+                "dbt_node_config": {
+                    "unique_id": "snapshot.my_folder.my_snapshot",
+                    "resource_type": "snapshot",
+                    "depends_on": [],
+                    "file_path": ".",
+                    "tags": [],
+                    "config": {},
+                    "has_test": False,
+                    "resource_name": "my_snapshot",
+                    "name": "my_snapshot",
+                },
+            },
         ),
     ],
 )

@@ -105,7 +105,7 @@ def create_test_task_metadata(
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
 
-        extra_context = {f"{node.resource_type.value}_config": node.config}
+        extra_context = {"dbt_node_config": node.context_dict}
 
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
@@ -146,7 +146,7 @@ def create_task_metadata(
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
-        extra_context = {f"{node.resource_type.value}_config": node.config}
+        extra_context = {"dbt_node_config": node.context_dict}
         if node.resource_type == DbtResourceType.MODEL:
             task_id = f"{node.name}_run"
             if use_task_group is True:

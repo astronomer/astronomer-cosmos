@@ -1,5 +1,5 @@
 """
-An example DAG that uses Cosmos to render a dbt project as a TaskGroup.
+An example DAG that uses Cosmos to render a dbt project as an Airflow TaskGroup.
 """
 
 import os
@@ -20,7 +20,7 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="airflow_db",
+        conn_id="example_conn",
         profile_args={"schema": "public"},
     ),
 )

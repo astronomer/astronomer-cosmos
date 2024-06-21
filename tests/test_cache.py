@@ -1,6 +1,4 @@
-import importlib
 import logging
-import os
 import shutil
 import tempfile
 import time
@@ -12,13 +10,7 @@ import pytest
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos import settings
-from cosmos.cache import (
-    _copy_partial_parse_to_project,
-    _create_cache_identifier,
-    _get_latest_partial_parse,
-    should_use_dbt_ls_cache,
-)
+from cosmos.cache import _copy_partial_parse_to_project, _create_cache_identifier, _get_latest_partial_parse
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
 
 START_DATE = datetime(2024, 4, 16)
@@ -94,20 +86,3 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
         _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
-
-
-@pytest.mark.parametrize(
-    "enable_cache,enable_cache_dbt_ls,should_use",
-    [(False, True, False), (True, False, False), (False, False, False), (True, True, True)],
-)
-def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, should_use):
-    with patch.dict(
-        os.environ,
-        {
-            "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
-            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS": str(enable_cache_dbt_ls),
-        },
-    ):
-        importlib.reload(settings)
-        should_use_dbt_ls_cache.cache_clear()
-        assert should_use_dbt_ls_cache() == should_use

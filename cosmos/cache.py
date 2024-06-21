@@ -181,14 +181,14 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
         shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
 
 
-# TODO: test
-@functools.lru_cache
-def should_use_dbt_ls_cache() -> bool:
-    return settings.enable_cache and settings.enable_cache_dbt_ls
+def _create_folder_version_hash(dir_path: Path) -> str:
+    """
+    Given a directory, iterate through its content and create a hash that will change in case the
+    contents of the directory change. The value should not change if the values of the directory do not change, even if
+    the command is run from different Airflow instances.
 
-
-# TODO: test and rename. It's important to confirm this value is deterministic
-def create_hash_with_walk_files(dir_path: Path) -> str:
+    This method output must be concise and it currently changes based on operating system.
+    """
     # This approach is less efficient than using modified time
     # sum([path.stat().st_mtime for path in dir_path.glob("**/*")])
     # unfortunately, the modified time approach does not work well for dag-only deployments
@@ -209,23 +209,29 @@ def create_hash_with_walk_files(dir_path: Path) -> str:
     return hasher.hexdigest()
 
 
-# TODO: test and rename
-def calculate_current_version(cache_identifier: str, project_dir: Path, args: list[str]) -> str:
+def calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:
+    """
+    Taking into account the project directory contents and the command arguments, calculate the
+    hash that represents the "dbt ls" command version - to be used to decide if the cache should be refreshed or not.
+    """
     start_time = time.process_time()
 
     # Combined value for when the dbt project directory files were last modified
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
-    dbt_project_hash = create_hash_with_walk_files(project_dir)
+    dbt_project_hash = _create_folder_version_hash(project_dir)
 
     # The performance for the following will depend on the user's configuration
-    hash_args = hashlib.md5("".join(args).encode()).hexdigest()
+    hash_args = hashlib.md5("".join(cmd_args).encode()).hexdigest()
 
     elapsed_time = time.process_time() - start_time
     logger.info(f"Cosmos performance: time to calculate {cache_identifier} current version: {elapsed_time}")
     return f"{dbt_project_hash},{hash_args}"
 
 
-# TODO: test and rename
 @functools.lru_cache
 def was_project_modified(previous_version: str, current_version: str) -> bool:
+    """
+    Given the cache version of a project and the latest version of the project,
+    decides if the project was modified or not.
+    """
     return previous_version != current_version

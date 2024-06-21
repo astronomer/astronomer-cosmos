@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import datetime
+import functools
 import itertools
 import json
 import os
@@ -16,7 +17,7 @@ from typing import Any
 
 from airflow.models import Variable
 
-from cosmos import cache
+from cosmos import cache, settings
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
@@ -145,7 +146,7 @@ class DbtGraph:
         execution_config: ExecutionConfig = ExecutionConfig(),
         profile_config: ProfileConfig | None = None,
         cache_dir: Path | None = None,
-        cache_identifier: str = "undefined",
+        cache_identifier: str = "",
         dbt_vars: dict[str, str] | None = None,
     ):
         self.project = project
@@ -153,7 +154,10 @@ class DbtGraph:
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.cache_dir = cache_dir
-        self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier)
+        if cache_identifier:
+            self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier)
+        else:
+            self.dbt_ls_cache_key = ""
         self.dbt_vars = dbt_vars or {}
 
     @cached_property
@@ -235,7 +239,7 @@ class DbtGraph:
         encoded_data = base64.b64encode(compressed_data)
         dbt_ls_compressed = encoded_data.decode("utf-8")
         cache_dict = {
-            "version": cache.calculate_current_version(
+            "version": cache.calculate_dbt_ls_cache_current_version(
                 self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
@@ -329,7 +333,7 @@ class DbtGraph:
                 for line in logfile:
                     logger.debug(line.strip())
 
-        if cache.should_use_dbt_ls_cache():
+        if self.should_use_dbt_ls_cache():
             self.save_dbt_ls_cache(stdout)
 
         nodes = parse_dbt_ls_output(project_path, stdout)
@@ -340,11 +344,16 @@ class DbtGraph:
         if not self.load_via_dbt_ls_cache():
             self.load_via_dbt_ls_without_cache()
 
+    @functools.lru_cache
+    def should_use_dbt_ls_cache(self) -> bool:
+        """Identify if Cosmos should use/store dbt ls cache or not."""
+        return settings.enable_cache and settings.enable_cache_dbt_ls and bool(self.dbt_ls_cache_key)
+
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
 
         logger.info(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
-        if cache.should_use_dbt_ls_cache():
+        if self.should_use_dbt_ls_cache():
             project_path = self.project_path
 
             cache_dict = self.get_dbt_ls_cache()
@@ -355,7 +364,7 @@ class DbtGraph:
             cache_version = cache_dict.get("version")
             dbt_ls_cache = cache_dict.get("dbt_ls")
 
-            current_version = cache.calculate_current_version(
+            current_version = cache.calculate_dbt_ls_cache_current_version(
                 self.dbt_ls_cache_key, project_path, self.dbt_ls_cache_key_args
             )
 

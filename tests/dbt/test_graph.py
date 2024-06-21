@@ -1,3 +1,5 @@
+import importlib
+import os
 import shutil
 import sys
 import tempfile
@@ -9,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.models import Variable
 
+from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
@@ -980,7 +983,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     assert expected_nodes == nodes
 
 
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
@@ -1011,7 +1014,7 @@ def test_load_via_dbt_ls_project_config_env_vars(
     assert mock_popen.call_args.kwargs["env"]["MY_ENV_VAR"] == "my_value"
 
 
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
@@ -1042,7 +1045,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(
     assert ls_command[ls_command.index("--vars") + 1] == '{"my_var1": "my_value1", "my_var2": "my_value2"}'
 
 
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
@@ -1077,7 +1080,7 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     assert ls_command[ls_command.index("--selector") + 1] == selector
 
 
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
@@ -1286,10 +1289,10 @@ def test_dbt_ls_cache_key_args_uses_airflow_vars_to_purge_dbt_ls_cache(airflow_v
 @patch("cosmos.dbt.graph.Variable.set")
 def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
     mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
-    graph = DbtGraph(project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
     dbt_ls_output = "some output"
     graph.save_dbt_ls_cache(dbt_ls_output)
-    assert mock_variable_set.call_args[0][0] == "cosmos_cache__undefined"
+    assert mock_variable_set.call_args[0][0] == "cosmos_cache__something"
     assert mock_variable_set.call_args[0][1]["dbt_ls_compressed"] == "eJwrzs9NVcgvLSkoLQEAGpAEhg=="
     assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
     version = mock_variable_set.call_args[0][1].get("version")
@@ -1337,7 +1340,7 @@ def test_load_via_dbt_ls_calls_without_cache(mock_cache, mock_without_cache):
     assert mock_without_cache.called
 
 
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 def test_load_via_dbt_ls_cache_is_false_if_disabled(mock_should_use_dbt_ls_cache):
     graph = DbtGraph(project=ProjectConfig())
     assert not graph.load_via_dbt_ls_cache()
@@ -1345,7 +1348,7 @@ def test_load_via_dbt_ls_cache_is_false_if_disabled(mock_should_use_dbt_ls_cache
 
 
 @patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={})
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=True)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
 def test_load_via_dbt_ls_cache_is_false_if_no_cache(mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache):
     graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
     assert not graph.load_via_dbt_ls_cache()
@@ -1353,9 +1356,9 @@ def test_load_via_dbt_ls_cache_is_false_if_no_cache(mock_should_use_dbt_ls_cache
     assert mock_get_dbt_ls_cache.called
 
 
-@patch("cosmos.dbt.graph.cache.calculate_current_version", return_value=1)
+@patch("cosmos.dbt.graph.cache.calculate_dbt_ls_cache_current_version", return_value=1)
 @patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 2, "dbt_ls": "output"})
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=True)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
 def test_load_via_dbt_ls_cache_is_false_if_cache_is_outdated(
     mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache, mock_calculate_current_version
 ):
@@ -1367,9 +1370,9 @@ def test_load_via_dbt_ls_cache_is_false_if_cache_is_outdated(
 
 
 @patch("cosmos.dbt.graph.parse_dbt_ls_output", return_value={"some-node": {}})
-@patch("cosmos.dbt.graph.cache.calculate_current_version", return_value=1)
+@patch("cosmos.dbt.graph.cache.calculate_dbt_ls_cache_current_version", return_value=1)
 @patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 1, "dbt_ls": "output"})
-@patch("cosmos.dbt.graph.cache.should_use_dbt_ls_cache", return_value=True)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
 def test_load_via_dbt_ls_cache_is_true(
     mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache, mock_calculate_current_version, mock_parse_dbt_ls_output
 ):
@@ -1382,3 +1385,27 @@ def test_load_via_dbt_ls_cache_is_true(
     assert mock_get_dbt_ls_cache.called
     assert mock_calculate_current_version.called
     assert mock_parse_dbt_ls_output.called
+
+
+@pytest.mark.parametrize(
+    "enable_cache,enable_cache_dbt_ls,cache_id,should_use",
+    [
+        (False, True, "id", False),
+        (True, False, "id", False),
+        (False, False, "id", False),
+        (True, True, "", False),
+        (True, True, "id", True),
+    ],
+)
+def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, should_use):
+    with patch.dict(
+        os.environ,
+        {
+            "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
+            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS": str(enable_cache_dbt_ls),
+        },
+    ):
+        importlib.reload(settings)
+        graph = DbtGraph(cache_identifier=cache_id, project=ProjectConfig(dbt_project_path="/tmp"))
+        graph.should_use_dbt_ls_cache.cache_clear()
+        assert graph.should_use_dbt_ls_cache() == should_use

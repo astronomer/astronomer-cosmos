@@ -136,7 +136,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "apache-airflow=={matrix:airflow}.0",
+    "apache-airflow~={matrix:airflow}.0,!=2.9.0,!=2.9.1",  # https://github.com/apache/airflow/pull/39670
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

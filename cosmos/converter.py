@@ -242,6 +242,7 @@ class DbtToAirflowConverter:
             cache_dir=cache_dir,
             cache_identifier=cache_identifier,
             dbt_vars=dbt_vars,
+            airflow_metadata=cache._get_airflow_metadata(dag, task_group),
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 

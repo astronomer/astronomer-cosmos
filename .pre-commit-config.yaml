@@ -82,6 +82,7 @@ repos:
             types-PyYAML,
             types-attrs,
             attrs,
+            types-pytz,
             types-requests,
             types-python-dateutil,
             apache-airflow,

@@ -81,6 +81,7 @@ tests = [
     "pytest-cov",
     "pytest-describe",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
+    "types-pytz",
     "types-requests",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
     "pre-commit",

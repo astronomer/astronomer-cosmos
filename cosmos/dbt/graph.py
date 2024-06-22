@@ -148,12 +148,14 @@ class DbtGraph:
         cache_dir: Path | None = None,
         cache_identifier: str = "",
         dbt_vars: dict[str, str] | None = None,
+        airflow_metadata: dict[str, str] | None = None,
     ):
         self.project = project
         self.render_config = render_config
         self.profile_config = profile_config
         self.execution_config = execution_config
         self.cache_dir = cache_dir
+        self.airflow_metadata = airflow_metadata or {}
         if cache_identifier:
             self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier)
         else:
@@ -244,6 +246,7 @@ class DbtGraph:
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
             "last_modified": datetime.datetime.now().isoformat(),
+            **self.airflow_metadata,
         }
         Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
 

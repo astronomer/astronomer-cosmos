@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.0a6 (2024-06-11)
+1.5.0a8 (2024-06-22)
 --------------------
 
 New Features
@@ -18,6 +18,13 @@ New Features
          remove CachePurgeConfig
          add RenderConfig.airflow_vars_to_purge_cache
    - a7: change from modified timestamp to sha256
+   - a8: add 100% test coverage for the caching mechanism
+         fix issue with dbt project folder hash not being deterministic per OS/platform
+         breakdown improvements in CI in separate PRs
+         rename  AIRFLOW__COSMOS__EXPERIMENTAL_CACHE to  AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS and switch it on by default
+         change cache content to include dag/taskgroup
+         introduce method delete_unused_dbt_ls_cache to help cleaning up the cache when DbtDags and DbtTaskGroups are deleted
+   pending: documentation and cover delete_unused_dbt_ls_cache with tests
 
 Others
 

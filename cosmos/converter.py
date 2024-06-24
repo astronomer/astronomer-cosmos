@@ -249,7 +249,7 @@ class DbtToAirflowConverter:
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
-            f"Cosmos performance ({cache_identifier}) -  [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to parse the dbt project for DAG {cache_identifier} using {self.dbt_graph.load_method}"
+            f"Cosmos performance ({cache_identifier}) -  [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to parse the dbt project for DAG using {self.dbt_graph.load_method}"
         )
         previous_time = current_time
 

@@ -233,7 +233,7 @@ class DbtToAirflowConverter:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
 
-        previous_time = time.process_time()
+        previous_time = time.perf_counter()
         self.dbt_graph = DbtGraph(
             project=project_config,
             render_config=render_config,
@@ -246,7 +246,7 @@ class DbtToAirflowConverter:
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
-        current_time = time.process_time()
+        current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
             f"Cosmos performance ({cache_identifier}) -  [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to parse the dbt project for DAG {cache_identifier} using {self.dbt_graph.load_method}"
@@ -288,7 +288,7 @@ class DbtToAirflowConverter:
             render_config=render_config,
         )
 
-        current_time = time.process_time()
+        current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
             f"Cosmos performance ({cache_identifier}) - [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG."

@@ -241,7 +241,7 @@ def calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: P
     Taking into account the project directory contents and the command arguments, calculate the
     hash that represents the "dbt ls" command version - to be used to decide if the cache should be refreshed or not.
     """
-    start_time = time.process_time()
+    start_time = time.perf_counter()
 
     # Combined value for when the dbt project directory files were last modified
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
@@ -250,7 +250,7 @@ def calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: P
     # The performance for the following will depend on the user's configuration
     hash_args = hashlib.md5("".join(cmd_args).encode()).hexdigest()
 
-    elapsed_time = time.process_time() - start_time
+    elapsed_time = time.perf_counter() - start_time
     logger.info(f"Cosmos performance: time to calculate {cache_identifier} current version: {elapsed_time}")
     return f"{dbt_project_hash},{hash_args}"
 

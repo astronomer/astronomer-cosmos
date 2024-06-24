@@ -231,3 +231,27 @@ def test_appends_region() -> None:
             "database": conn.extra_dejson.get("database"),
             "warehouse": conn.extra_dejson.get("warehouse"),
         }
+
+
+def test_appends_host_and_port() -> None:
+    """
+    Tests that host/port extras are appended to the connection settings.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_connection",
+        conn_type="snowflake",
+        login="my_user",
+        password="my_password",
+        schema="my_schema",
+        extra=json.dumps(
+            {
+                "host": "snowflake.localhost.localstack.cloud",
+                "port": 4566,
+            }
+        ),
+    )
+
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+        assert profile_mapping.profile["host"] == "snowflake.localhost.localstack.cloud"
+        assert profile_mapping.profile["port"] == 4566

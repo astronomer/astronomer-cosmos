@@ -80,11 +80,11 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
 .. _profile_cache_path:
 
-`profile_cache_path`_:
+`profile_cache_dir`_:
     Folder path to store the DBT cached profile and related metadata
 
-    - Default: ``None``
-    - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_PATH``
+    - Default: ``profile``
+    - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR``
 
 
 [openlineage]

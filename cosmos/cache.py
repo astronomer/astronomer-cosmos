@@ -19,10 +19,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
-from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
+from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
-from cosmos.settings import dbt_profile_cache_path
+from cosmos.settings import cache_dir, dbt_profile_cache_dir_name, enable_cache, enable_profile_cache
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
@@ -349,62 +349,27 @@ def delete_unused_dbt_ls_cache(
     return deleted_cosmos_variables
 
 
-def get_cache_profile_version_path(current_version: str) -> Path | None:
-    """
-    Check if profile version and correspond dbt profile yml exit in metadata.json and return the yml path or None
-    """
-    if not dbt_profile_cache_path:
-        raise Exception("profile_cache_path must be set.")
+def is_profile_cache_enabled() -> bool:
+    return enable_cache and enable_profile_cache
 
-    cache_metadata_path = Path(dbt_profile_cache_path) / "metadata.json"
-    cache_metadata_path.touch(exist_ok=True)
 
-    if cache_metadata_path.stat().st_size == 0:
-        return None
+def _get_or_create_profile_cache_dir() -> Path:
+    profile_cache_dir = cache_dir / dbt_profile_cache_dir_name
+    if not profile_cache_dir.exists():
+        profile_cache_dir.mkdir(parents=True, exist_ok=True)
+    return profile_cache_dir
 
-    with open(cache_metadata_path) as metadata_f:
-        json_data = json.load(metadata_f)
-        if json_data.get(current_version):
-            return Path(json_data.get(current_version))
+
+def get_cached_profile(version: str) -> Path | None:
+    profile_yml_path = _get_or_create_profile_cache_dir() / version[-8:] / DEFAULT_PROFILES_FILE_NAME
+    if profile_yml_path.exists() and profile_yml_path.is_file():
+        return profile_yml_path
     return None
 
 
-def _invalidate_profile_cache_metadata() -> None:
-    """
-    Invalidate (clear) the metadata stored in the profile cache.
-
-    This function clears the metadata stored in 'metadata.json' located in the specified
-    dbt_profile_cache_path directory by writing an empty dictionary to the file.
-    """
-    cache_metadata_path = Path(dbt_profile_cache_path) / "metadata.json"
-    metadata: dict[str, str] = {}
-    with open(cache_metadata_path, "w", encoding="utf-8") as file:
-        json.dump(metadata, file, indent=2)
-
-
-def cache_profile_version_path(version: str, profile_path: str) -> None:
-    """
-    Store the profile version and corresponding dbt profile path in metadata.json
-    """
-    cache_metadata_path = Path(dbt_profile_cache_path) / "metadata.json"
-
-    metadata = {}
-
-    if cache_metadata_path.exists() and cache_metadata_path.stat().st_size > 0:
-        try:
-            with open(cache_metadata_path) as file:
-                metadata = json.load(file)
-        except json.JSONDecodeError as e:
-            logger.info(f"Error decoding JSON from '{cache_metadata_path}': {str(e)}")
-            _invalidate_profile_cache_metadata()
-            return
-
-    metadata[version] = profile_path
-
-    try:
-        with open(cache_metadata_path, "w", encoding="utf-8") as file:
-            json.dump(metadata, file, indent=2)
-        logger.info(f"Updated profile cache with version '{version}' and profile path '{profile_path}'")
-    except Exception as e:
-        logger.info(f"Error writing JSON to '{cache_metadata_path}': {str(e)}")
-        _invalidate_profile_cache_metadata()
+def create_cache_profile(version: str, profile_content: str) -> Path:
+    profile_yml_dir = _get_or_create_profile_cache_dir() / version[-8:]
+    profile_yml_dir.mkdir(parents=True, exist_ok=True)
+    profile_yml_path = profile_yml_dir / DEFAULT_PROFILES_FILE_NAME
+    profile_yml_path.write_text(profile_content)
+    return profile_yml_path

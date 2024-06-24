@@ -10,8 +10,9 @@ from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
-from cosmos.cache import cache_profile_version_path, get_cache_profile_version_path
+from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
+    DEFAULT_PROFILES_FILE_NAME,
     DbtResourceType,
     ExecutionMode,
     InvocationMode,
@@ -23,11 +24,8 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
-from cosmos.settings import dbt_profile_cache_path, enable_profile_cache
 
 logger = get_logger(__name__)
-
-DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 
 
 class CosmosConfigException(Exception):
@@ -260,34 +258,26 @@ class ProfileConfig:
         if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
-    def _handle_profile_caching(self, desired_profile_path: Path | None = None, use_mock_values: bool = False) -> Path:
+    def _get_profile_path(self, use_mock_values: bool = False) -> Path:
         """
         Handle the profile caching mechanism.
 
-        Check if profile object version is store in metadata.json and return the profile path
-        If Version not found in metadata.json then store version in metadata.json and create
-        corresponding profile at given path.
+        Check if profile object version is exist then reuse it
+        Otherwise, create profile yml for requested object and return the profile path
         """
         # TODO: Fix type
-        profile_version = self.profile_mapping.version(use_mock_values)  # type: ignore[union-attr]
-        cached_profile_path = get_cache_profile_version_path(profile_version)
+        current_profile_version = self.profile_mapping.version(use_mock_values)  # type: ignore[union-attr]
+        cached_profile_path = get_cached_profile(current_profile_version)
         if cached_profile_path:
             logger.info("Profile found in cache using profile: %s.", cached_profile_path)
             return cached_profile_path
         else:
-            if desired_profile_path:
-                profile_path = desired_profile_path
-            else:
-                profile_path = Path(dbt_profile_cache_path) / profile_version / DEFAULT_PROFILES_FILE_NAME
-                cache_profile_version_path(profile_version, profile_path.__str__())
-                # TODO: Fix type
-                profile_contents = self.profile_mapping.get_profile_file_contents(  # type: ignore[union-attr]
-                    profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
-                )
-
-                Path(Path(dbt_profile_cache_path) / profile_version).mkdir(parents=True, exist_ok=True)
-                logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
-                profile_path.write_text(profile_contents)
+            # TODO: Fix type
+            profile_contents = self.profile_mapping.get_profile_file_contents(  # type: ignore[union-attr]
+                profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
+            )
+            profile_path = create_cache_profile(current_profile_version, profile_contents)
+            logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
             return profile_path
 
     @contextlib.contextmanager
@@ -305,9 +295,9 @@ class ProfileConfig:
             else:
                 env_vars = self.profile_mapping.env_vars
 
-            if enable_profile_cache:
+            if is_profile_cache_enabled():
                 logger.info("Profile caching is enable.")
-                cached_profile_path = self._handle_profile_caching(desired_profile_path, use_mock_values)
+                cached_profile_path = self._get_profile_path(use_mock_values)
                 yield cached_profile_path, env_vars
             else:
                 profile_contents = self.profile_mapping.get_profile_file_contents(

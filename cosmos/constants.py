@@ -18,6 +18,7 @@ DBT_MANIFEST_FILE_NAME = "manifest.json"
 DBT_DEPENDENCIES_FILE_NAMES = {"packages.yml", "dependencies.yml"}
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
+DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"

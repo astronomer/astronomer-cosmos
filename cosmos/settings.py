@@ -18,7 +18,7 @@ dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
 dbt_docs_index_file_name = conf.get("cosmos", "dbt_docs_index_file_name", fallback="index.html")
 enable_profile_cache = conf.getboolean("cosmos", "enable_profile_cache", fallback=True)
-dbt_profile_cache_path = conf.get("cosmos", "profile_cache_path", fallback=None)
+dbt_profile_cache_dir_name = conf.get("cosmos", "profile_cache_dir", fallback="profile")
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

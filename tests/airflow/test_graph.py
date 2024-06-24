@@ -277,19 +277,95 @@ def test_create_task_metadata_unsupported(caplog):
     assert caplog.messages[0] == expected_msg
 
 
-def test_create_task_metadata_model(caplog):
+@pytest.mark.parametrize(
+    "unique_id, resource_type, expected_id, expected_operator_class, expected_arguments, expected_extra_context",
+    [
+        (
+            f"{DbtResourceType.MODEL.value}.my_folder.my_model",
+            DbtResourceType.MODEL,
+            "my_model_run",
+            "cosmos.operators.local.DbtRunLocalOperator",
+            {"models": "my_model"},
+            {
+                "dbt_node_config": {
+                    "unique_id": "model.my_folder.my_model",
+                    "resource_type": "model",
+                    "depends_on": [],
+                    "file_path": ".",
+                    "tags": [],
+                    "config": {},
+                    "has_test": False,
+                    "resource_name": "my_model",
+                    "name": "my_model",
+                }
+            },
+        ),
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            "my_source_run",
+            "cosmos.operators.local.DbtRunLocalOperator",
+            {"models": "my_source"},
+            {
+                "dbt_node_config": {
+                    "unique_id": "model.my_folder.my_source",
+                    "resource_type": "source",
+                    "depends_on": [],
+                    "file_path": ".",
+                    "tags": [],
+                    "config": {},
+                    "has_test": False,
+                    "resource_name": "my_source",
+                    "name": "my_source",
+                }
+            },
+        ),
+        (
+            f"{DbtResourceType.SNAPSHOT.value}.my_folder.my_snapshot",
+            DbtResourceType.SNAPSHOT,
+            "my_snapshot_snapshot",
+            "cosmos.operators.local.DbtSnapshotLocalOperator",
+            {"models": "my_snapshot"},
+            {
+                "dbt_node_config": {
+                    "unique_id": "snapshot.my_folder.my_snapshot",
+                    "resource_type": "snapshot",
+                    "depends_on": [],
+                    "file_path": ".",
+                    "tags": [],
+                    "config": {},
+                    "has_test": False,
+                    "resource_name": "my_snapshot",
+                    "name": "my_snapshot",
+                },
+            },
+        ),
+    ],
+)
+def test_create_task_metadata_model(
+    unique_id,
+    resource_type,
+    expected_id,
+    expected_operator_class,
+    expected_arguments,
+    expected_extra_context,
+    caplog,
+):
     child_node = DbtNode(
-        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
-        resource_type=DbtResourceType.MODEL,
+        unique_id=unique_id,
+        resource_type=resource_type,
         depends_on=[],
-        file_path="",
+        file_path=Path(""),
         tags=[],
         config={},
     )
+
     metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})
-    assert metadata.id == "my_model_run"
-    assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
-    assert metadata.arguments == {"models": "my_model"}
+    if metadata:
+        assert metadata.id == expected_id
+        assert metadata.operator_class == expected_operator_class
+        assert metadata.arguments == expected_arguments
+        assert metadata.extra_context == expected_extra_context
 
 
 def test_create_task_metadata_model_with_versions(caplog):

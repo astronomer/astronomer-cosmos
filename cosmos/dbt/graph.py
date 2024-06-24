@@ -71,6 +71,24 @@ class DbtNode:
         """
         return self.resource_name.replace(".", "_")
 
+    @property
+    def context_dict(self) -> dict[str, Any]:
+        """
+        Returns a dictionary containing all the attributes of the DbtNode object,
+        ensuring that the output is JSON serializable so it can be stored in Airflow's db
+        """
+        return {
+            "unique_id": self.unique_id,
+            "resource_type": self.resource_type.value,  # convert enum to value
+            "depends_on": self.depends_on,
+            "file_path": str(self.file_path),  # convert path to string
+            "tags": self.tags,
+            "config": self.config,
+            "has_test": self.has_test,
+            "resource_name": self.resource_name,
+            "name": self.name,
+        }
+
 
 def is_freshness_effective(freshness: dict[str, Any]) -> bool:
     """Function to find if a source has null freshness. Scenarios where freshness

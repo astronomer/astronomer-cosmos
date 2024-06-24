@@ -72,6 +72,47 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
 
 
 @pytest.mark.parametrize(
+    "unique_id,expected_dict",
+    [
+        (
+            "model.my_project.customers",
+            {
+                "unique_id": "model.my_project.customers",
+                "resource_type": "model",
+                "depends_on": [],
+                "file_path": "",
+                "tags": [],
+                "config": {},
+                "has_test": False,
+                "resource_name": "customers",
+                "name": "customers",
+            },
+        ),
+        (
+            "model.my_project.customers.v1",
+            {
+                "unique_id": "model.my_project.customers.v1",
+                "resource_type": "model",
+                "depends_on": [],
+                "file_path": "",
+                "tags": [],
+                "config": {},
+                "has_test": False,
+                "resource_name": "customers.v1",
+                "name": "customers_v1",
+            },
+        ),
+    ],
+)
+def test_dbt_node_context_dict(
+    unique_id,
+    expected_dict,
+):
+    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    assert node.context_dict == expected_dict
+
+
+@pytest.mark.parametrize(
     "project_name,manifest_filepath,model_filepath",
     [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
 )

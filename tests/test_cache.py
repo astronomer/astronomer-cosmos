@@ -4,13 +4,18 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 
-from cosmos.cache import _copy_partial_parse_to_project, _create_cache_identifier, _get_latest_partial_parse
+from cosmos.cache import (
+    _copy_partial_parse_to_project,
+    _create_cache_identifier,
+    _get_latest_partial_parse,
+    _update_partial_parse_cache,
+)
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
 
 START_DATE = datetime(2024, 4, 16)
@@ -74,7 +79,6 @@ def test_get_latest_partial_parse(tmp_path):
 
 @patch("cosmos.cache.msgpack.unpack", side_effect=ValueError)
 def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path, caplog):
-    # setup
     caplog.set_level(logging.INFO)
     source_dir = tmp_path / DBT_TARGET_DIR_NAME
     source_dir.mkdir()
@@ -86,3 +90,25 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
         _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
+
+
+@patch("cosmos.cache.shutil.copyfile")
+@patch("cosmos.cache.get_partial_parse_path")
+def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
+    mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"
+
+    latest_partial_parse_filepath = Path("/path/to/latest_partial_parse.yml")
+    cache_dir = Path("/path/to/cache_directory")
+
+    # Expected paths
+    cache_path = cache_dir / "partial_parse.yml"
+    manifest_path = cache_dir / "manifest.json"
+
+    _update_partial_parse_cache(latest_partial_parse_filepath, cache_dir)
+
+    # Assert shutil.copyfile was called twice with the correct arguments
+    calls = [
+        call(str(latest_partial_parse_filepath), str(cache_path)),
+        call(str(latest_partial_parse_filepath.parent / "manifest.json"), str(manifest_path)),
+    ]
+    mock_copyfile.assert_has_calls(calls)

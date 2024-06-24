@@ -107,8 +107,8 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
     latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
 
-    shutil.copy(str(latest_partial_parse_filepath), str(cache_path))
-    shutil.copy(str(latest_manifest_filepath), str(manifest_path))
+    shutil.copyfile(str(latest_partial_parse_filepath), str(cache_path))
+    shutil.copyfile(str(latest_manifest_filepath), str(manifest_path))
 
 
 def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path) -> bool:

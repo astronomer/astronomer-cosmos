@@ -10,18 +10,12 @@ import pytest
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 
-<<<<<<< HEAD
-from cosmos import settings
 from cosmos.cache import (
     _copy_partial_parse_to_project,
     _create_cache_identifier,
     _get_latest_partial_parse,
     _update_partial_parse_cache,
-    should_use_dbt_ls_cache,
 )
-=======
-from cosmos.cache import _copy_partial_parse_to_project, _create_cache_identifier, _get_latest_partial_parse
->>>>>>> b546a68 (Improve and tidy up tests)
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
 
 START_DATE = datetime(2024, 4, 16)
@@ -118,20 +112,3 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
         call(str(latest_partial_parse_filepath.parent / "manifest.json"), str(manifest_path)),
     ]
     mock_copyfile.assert_has_calls(calls)
-
-
-@pytest.mark.parametrize(
-    "enable_cache,enable_cache_dbt_ls,should_use",
-    [(False, True, False), (True, False, False), (False, False, False), (True, True, True)],
-)
-def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, should_use):
-    with patch.dict(
-        os.environ,
-        {
-            "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
-            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS": str(enable_cache_dbt_ls),
-        },
-    ):
-        importlib.reload(settings)
-        should_use_dbt_ls_cache.cache_clear()
-        assert should_use_dbt_ls_cache() == should_use

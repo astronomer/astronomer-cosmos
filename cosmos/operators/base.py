@@ -7,7 +7,7 @@ from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.models.baseoperator import BaseOperator
-from airflow.utils.context import Context
+from airflow.utils.context import Context, context_merge
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
@@ -63,6 +63,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     :param dbt_cmd_flags: List of flags to pass to dbt command
     :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
     :param cache_dir: Directory used to cache Cosmos/dbt artifacts in Airflow worker nodes
+    :param extra_context: A dictionary of values to add to the TaskInstance's Context
     """
 
     template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models")
@@ -111,6 +112,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         dbt_cmd_flags: list[str] | None = None,
         dbt_cmd_global_flags: list[str] | None = None,
         cache_dir: Path | None = None,
+        extra_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -139,6 +141,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.dbt_cmd_flags = dbt_cmd_flags
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         self.cache_dir = cache_dir
+        self.extra_context = extra_context or {}
         super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
@@ -261,6 +264,9 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         """Override this method for the operator to execute the dbt command"""
 
     def execute(self, context: Context) -> Any | None:  # type: ignore
+        if self.extra_context:
+            context_merge(context, self.extra_context)
+
         self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
 
 

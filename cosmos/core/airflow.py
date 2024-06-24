@@ -29,6 +29,7 @@ def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None
         task_id=task.id,
         dag=dag,
         task_group=task_group,
+        extra_context=task.extra_context,
         **task.arguments,
     )
 

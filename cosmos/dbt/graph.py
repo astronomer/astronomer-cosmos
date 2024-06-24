@@ -190,8 +190,8 @@ class DbtGraph:
     @cached_property
     def project_path(self) -> Path:
         """
-        User-defined path to their dbt project. Tries to retrieve the configuration from render_config and (legacy support)
-        ExecutionConfig, where it was originally defined. Returns the
+        Return the user-defined path to their dbt project. Tries to retrieve the configuration from render_config and
+        (legacy support) ExecutionConfig, where it was originally defined.
         """
         # we're considering the execution_config only due to backwards compatibility
         path = self.render_config.project_path or self.project.dbt_project_path or self.execution_config.project_path

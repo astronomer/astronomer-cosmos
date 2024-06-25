@@ -580,7 +580,10 @@ def test_load_via_dbt_ls_with_sources(load_method):
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
+@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@patch("cosmos.cache.enable_cache_profile")
+def test_load_via_dbt_ls_without_dbt_deps(mock_enable_cache_profile, enable_cache_profile, postgres_profile_config):
+    mock_enable_cache_profile.return_value = enable_cache_profile
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_deps=False)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)

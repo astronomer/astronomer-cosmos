@@ -236,7 +236,7 @@ def _create_folder_version_hash(dir_path: Path) -> str:
     return hasher.hexdigest()
 
 
-def calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:
+def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:
     """
     Taking into account the project directory contents and the command arguments, calculate the
     hash that represents the "dbt ls" command version - to be used to decide if the cache should be refreshed or not.

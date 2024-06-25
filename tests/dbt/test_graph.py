@@ -1356,7 +1356,7 @@ def test_load_via_dbt_ls_cache_is_false_if_no_cache(mock_should_use_dbt_ls_cache
     assert mock_get_dbt_ls_cache.called
 
 
-@patch("cosmos.dbt.graph.cache.calculate_dbt_ls_cache_current_version", return_value=1)
+@patch("cosmos.dbt.graph.cache._calculate_dbt_ls_cache_current_version", return_value=1)
 @patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 2, "dbt_ls": "output"})
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
 def test_load_via_dbt_ls_cache_is_false_if_cache_is_outdated(
@@ -1370,7 +1370,7 @@ def test_load_via_dbt_ls_cache_is_false_if_cache_is_outdated(
 
 
 @patch("cosmos.dbt.graph.parse_dbt_ls_output", return_value={"some-node": {}})
-@patch("cosmos.dbt.graph.cache.calculate_dbt_ls_cache_current_version", return_value=1)
+@patch("cosmos.dbt.graph.cache._calculate_dbt_ls_cache_current_version", return_value=1)
 @patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 1, "dbt_ls": "output"})
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
 def test_load_via_dbt_ls_cache_is_true(

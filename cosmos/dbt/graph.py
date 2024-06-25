@@ -259,7 +259,7 @@ class DbtGraph:
         encoded_data = base64.b64encode(compressed_data)
         dbt_ls_compressed = encoded_data.decode("utf-8")
         cache_dict = {
-            "version": cache.calculate_dbt_ls_cache_current_version(
+            "version": cache._calculate_dbt_ls_cache_current_version(
                 self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
@@ -385,7 +385,7 @@ class DbtGraph:
             cache_version = cache_dict.get("version")
             dbt_ls_cache = cache_dict.get("dbt_ls")
 
-            current_version = cache.calculate_dbt_ls_cache_current_version(
+            current_version = cache._calculate_dbt_ls_cache_current_version(
                 self.dbt_ls_cache_key, project_path, self.dbt_ls_cache_key_args
             )
 

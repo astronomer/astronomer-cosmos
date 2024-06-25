@@ -38,6 +38,7 @@ This feature is on by default. To turn it off, export the following environment 
 Users can purge or delete the cache via Airflow UI by identifying and deleting the cache key.
 
 Cosmos will refresh the cache in a few circumstances:
+
 * if any files of the dbt project change
 * if one of the arguments that affect the dbt ls command execution changes
 
@@ -65,7 +66,7 @@ Example:
 
 **Cleaning up stale cache**
 
-Not rarely, Cosmos ``DbtDag``s and ``DbtTaskGroup``s may be renamed or deleted. In those cases, to clean up the Airflow metadata database, it is possible to use the method ``delete_unused_dbt_ls_cache``.
+Not rarely, Cosmos DbtDags and DbtTaskGroups may be renamed or deleted. In those cases, to clean up the Airflow metadata database, it is possible to use the method ``delete_unused_dbt_ls_cache``.
 
 The method deletes the Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
 

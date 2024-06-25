@@ -265,15 +265,14 @@ class ProfileConfig:
         Check if profile object version is exist then reuse it
         Otherwise, create profile yml for requested object and return the profile path
         """
-        # TODO: Fix type
-        current_profile_version = self.profile_mapping.version(self.profile_name, self.target_name, use_mock_values)  # type: ignore[union-attr]
+        assert self.profile_mapping  # To satisfy MyPy
+        current_profile_version = self.profile_mapping.version(self.profile_name, self.target_name, use_mock_values)
         cached_profile_path = get_cached_profile(current_profile_version)
         if cached_profile_path:
             logger.info("Profile found in cache using profile: %s.", cached_profile_path)
             return cached_profile_path
         else:
-            # TODO: Fix type
-            profile_contents = self.profile_mapping.get_profile_file_contents(  # type: ignore[union-attr]
+            profile_contents = self.profile_mapping.get_profile_file_contents(
                 profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
             )
             profile_path = create_cache_profile(current_profile_version, profile_contents)

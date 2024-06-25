@@ -85,7 +85,13 @@ class BaseProfileMapping(ABC):
         self._validate_disable_event_tracking()
 
     def version(self, profile_name: str, target_name: str, mock_profile: bool = False) -> str:
-        # TODO: Handle connection actual value
+        """
+        Generate SHA-256 hash digest based on the provided profile, profile and target names.
+
+        :param profile_name: Name of the DBT profile.
+        :param target_name: Name of the DBT target
+        :param mock_profile: If True, use a mock profile.
+        """
         if mock_profile:
             profile = self.mock_profile
         else:

@@ -580,10 +580,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("enable_cache_profile", [True, False])
-@patch("cosmos.cache.enable_cache_profile")
-def test_load_via_dbt_ls_without_dbt_deps(mock_enable_cache_profile, enable_cache_profile, postgres_profile_config):
-    mock_enable_cache_profile.return_value = enable_cache_profile
+def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, dbt_deps=False)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -641,7 +638,11 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path):
+@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@patch("cosmos.config.is_profile_cache_enabled")
+def test_load_via_dbt_ls_caching_partial_parsing(
+    is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path
+):
     """
     When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
     Cosmos should leverage dbt partial parsing.
@@ -649,6 +650,8 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
     import logging
 
     caplog.set_level(logging.DEBUG)
+
+    is_profile_cache_enabled.return_value = enable_cache_profile
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     render_config = RenderConfig(

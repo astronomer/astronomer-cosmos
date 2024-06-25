@@ -264,7 +264,7 @@ class DbtGraph:
                 self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
-            "last_modified": datetime.datetime.now().isoformat(),
+            "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }
         Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)

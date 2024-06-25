@@ -7,11 +7,10 @@ import os
 import shutil
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import msgpack
-import pytz
 from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
@@ -337,7 +336,7 @@ def delete_unused_dbt_ls_cache(
             .order_by(DagRun.execution_date.desc())
             .first()
         )
-        if last_dag_run and last_dag_run.execution_date < (datetime.now(pytz.utc) - max_age_last_usage):
+        if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for var_key in vars_keys:
                 logger.info(f"Removing the dbt ls cache {var_key}")
                 Variable.delete(var_key)

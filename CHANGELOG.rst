@@ -1,35 +1,37 @@
 Changelog
 =========
 
-1.5.0a8 (2024-06-22)
+1.5.0a9 (2024-06-25)
 --------------------
 
 New Features
 
+* Speed up ``LoadMode.DBT_LS`` by caching dbt ls output in Airflow Variable by @tatiana in #1014
 * Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
 * Add Clickhouse profile mapping by @roadan and @pankajastro in #353 and #1016
+* Add node config to TaskInstance Context by @linchun3 in #1044
+
+Bug fixes
+
+* Fix disk permission error in restricted env by @pankajastro in #1051
+* Add CSP header to iframe contents by @dwreeves in #1055
+* Stop attaching log adaptors to root logger to reduce logging costs by @glebkrapivin in #1047
+
+Enhancements
+
 * Support ``static_index.html`` docs by @dwreeves in #999
 * Support deep linking dbt docs via Airflow UI by @dwreeves in #1038
-* (WIP) Support caching dbt ls output in Airflow variable in #1014 by @tatiana
-   - since a3: different approach than 1.5.0a1 and 1.5.0a2
-   - a4: fix DbtTaskGroup logging
-   - a5: introduce CachePurgeConfig
-   - a6: purge based on commands passed to dbt ls (only missing: dbt deps)
-         remove CachePurgeConfig
-         add RenderConfig.airflow_vars_to_purge_cache
-   - a7: change from modified timestamp to sha256
-   - a8: add 100% test coverage for the caching mechanism
-         fix issue with dbt project folder hash not being deterministic per OS/platform
-         breakdown improvements in CI in separate PRs
-         rename  AIRFLOW__COSMOS__EXPERIMENTAL_CACHE to  AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS and switch it on by default
-         change cache content to include dag/taskgroup
-         introduce method delete_unused_dbt_ls_cache to help cleaning up the cache when DbtDags and DbtTaskGroups are deleted
-   pending: documentation and cover delete_unused_dbt_ls_cache with tests
+* Add ability to specify host/port for Snowflake connection by @whummer in #1063
 
 Others
 
-*  Use uv in CI by @dwreeves in #1013
-
+* Update documentation for DbtDocs generator by @arjunanan6 in #1043
+* Use uv in CI by @dwreeves in #1013
+* Cache hatch folder in the CI by @tatiana in #1056
+* Change example DAGs to use ``example_conn`` as opposed to ``airflow_db`` by @tatiana in #1054
+* Mark plugin integration tests as integration by @tatiana in #1057
+* Ensure compliance with linting rule D300 by using triple quotes for docstrings by @pankajastro in #1049
+* Pre-commit hook updates in #1039, #1050, #1064
 
 1.4.3 (2024-06-07)
 ------------------

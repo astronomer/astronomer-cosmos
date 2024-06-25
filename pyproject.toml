@@ -81,6 +81,7 @@ tests = [
     "pytest-cov",
     "pytest-describe",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
+    "types-pytz",
     "types-requests",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
     "pre-commit",
@@ -136,7 +137,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "apache-airflow=={matrix:airflow}.0",
+    "apache-airflow~={matrix:airflow}.0,!=2.9.0,!=2.9.1",  # https://github.com/apache/airflow/pull/39670
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

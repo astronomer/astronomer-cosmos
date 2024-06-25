@@ -71,6 +71,7 @@ class RenderConfig:
     dbt_ls_path: Path | None = None
     project_path: Path | None = field(init=False)
     enable_mock_profile: bool = True
+    airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

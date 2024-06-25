@@ -1,3 +1,15 @@
+#!/bin/bash
+
+set -x
+set -e
+
+pip freeze | grep airflow
+echo $AIRFLOW_HOME
+ls $AIRFLOW_HOME
+
+airflow db check
+
+
 rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
     --cov=cosmos \

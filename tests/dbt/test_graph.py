@@ -1,12 +1,17 @@
+import importlib
+import os
 import shutil
+import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
 import pytest
-import yaml
+from airflow.models import Variable
 
+from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import (
@@ -587,7 +592,7 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
     )
 
     with pytest.raises(CosmosLoadDbtException) as err_info:
-        dbt_graph.load_via_dbt_ls()
+        dbt_graph.load_via_dbt_ls_without_cache()
 
     expected = "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
     assert err_info.value.args[0] == expected
@@ -658,12 +663,12 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
     (tmp_path / DBT_TARGET_DIR_NAME).mkdir(parents=True, exist_ok=True)
 
     # First time dbt ls is run, partial parsing was not cached, so we don't benefit from this
-    dbt_graph.load_via_dbt_ls()
+    dbt_graph.load_via_dbt_ls_without_cache()
     assert "Unable to do partial parsing" in caplog.text
 
     # From the second time we run dbt ls onwards, we benefit from partial parsing
     caplog.clear()
-    dbt_graph.load_via_dbt_ls()  # should not not raise exception
+    dbt_graph.load_via_dbt_ls_without_cache()  # should not not raise exception
     assert not "Unable to do partial parsing" in caplog.text
 
 
@@ -978,10 +983,13 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     assert expected_nodes == nodes
 
 
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
-def test_load_via_dbt_ls_project_config_env_vars(mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir):
+def test_load_via_dbt_ls_project_config_env_vars(
+    mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
+):
     """Tests that the dbt ls command in the subprocess has the project config env vars set."""
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
@@ -1006,10 +1014,13 @@ def test_load_via_dbt_ls_project_config_env_vars(mock_validate, mock_update_node
     assert mock_popen.call_args.kwargs["env"]["MY_ENV_VAR"] == "my_value"
 
 
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
-def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir):
+def test_load_via_dbt_ls_project_config_dbt_vars(
+    mock_validate, mock_update_nodes, mock_popen, mock_use_case, tmp_dbt_project_dir
+):
     """Tests that the dbt ls command in the subprocess has "--vars" with the project config dbt_vars."""
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
@@ -1031,14 +1042,15 @@ def test_load_via_dbt_ls_project_config_dbt_vars(mock_validate, mock_update_node
     dbt_graph.load_via_dbt_ls()
     ls_command = mock_popen.call_args.args[0]
     assert "--vars" in ls_command
-    assert ls_command[ls_command.index("--vars") + 1] == yaml.dump(dbt_vars)
+    assert ls_command[ls_command.index("--vars") + 1] == '{"my_var1": "my_value1", "my_var2": "my_value2"}'
 
 
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
 def test_load_via_dbt_ls_render_config_selector_arg_is_used(
-    mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
+    mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
     """Tests that the dbt ls command in the subprocess has "--selector" with the RenderConfig.selector."""
     mock_popen().communicate.return_value = ("", "")
@@ -1068,11 +1080,12 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     assert ls_command[ls_command.index("--selector") + 1] == selector
 
 
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
 def test_load_via_dbt_ls_render_config_no_partial_parse(
-    mock_validate, mock_update_nodes, mock_popen, tmp_dbt_project_dir
+    mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
     """Tests that --no-partial-parse appears when partial_parse=False."""
     mock_popen().communicate.return_value = ("", "")
@@ -1180,3 +1193,219 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
     assert "seed.jaffle_shop.raw_customers" in filtered_nodes
     # Two tests should be filtered
     assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 2
+
+
+@pytest.mark.parametrize(
+    "render_config,project_config,expected_envvars",
+    [
+        (RenderConfig(), ProjectConfig(), {}),
+        (RenderConfig(env_vars={"a": 1}), ProjectConfig(), {"a": 1}),
+        (RenderConfig(), ProjectConfig(env_vars={"b": 2}), {"b": 2}),
+        (RenderConfig(env_vars={"a": 1}), ProjectConfig(env_vars={"b": 2}), {"a": 1}),
+    ],
+)
+def test_env_vars(render_config, project_config, expected_envvars):
+    graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+    )
+    assert graph.env_vars == expected_envvars
+
+
+def test_project_path_fails():
+    graph = DbtGraph(project=ProjectConfig())
+    with pytest.raises(CosmosLoadDbtException) as e:
+        graph.project_path
+
+    expected = "Unable to load project via dbt ls without RenderConfig.dbt_project_path, ProjectConfig.dbt_project_path or ExecutionConfig.dbt_project_path"
+    assert e.value.args[0] == expected
+
+
+@pytest.mark.parametrize(
+    "render_config,project_config,expected_dbt_ls_args",
+    [
+        (RenderConfig(), ProjectConfig(), []),
+        (RenderConfig(exclude=["package:snowplow"]), ProjectConfig(), ["--exclude", "package:snowplow"]),
+        (
+            RenderConfig(select=["tag:prod", "config.materialized:incremental"]),
+            ProjectConfig(),
+            ["--select", "tag:prod", "config.materialized:incremental"],
+        ),
+        (RenderConfig(selector="nightly"), ProjectConfig(), ["--selector", "nightly"]),
+        (RenderConfig(), ProjectConfig(dbt_vars={"a": 1}), ["--vars", '{"a": 1}']),
+        (RenderConfig(), ProjectConfig(partial_parse=False), ["--no-partial-parse"]),
+        (
+            RenderConfig(exclude=["1", "2"], select=["a", "b"], selector="nightly"),
+            ProjectConfig(dbt_vars={"a": 1}, partial_parse=False),
+            [
+                "--exclude",
+                "1",
+                "2",
+                "--select",
+                "a",
+                "b",
+                "--vars",
+                '{"a": 1}',
+                "--selector",
+                "nightly",
+                "--no-partial-parse",
+            ],
+        ),
+    ],
+)
+def test_dbt_ls_args(render_config, project_config, expected_dbt_ls_args):
+    graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+    )
+    assert graph.dbt_ls_args == expected_dbt_ls_args
+
+
+def test_dbt_ls_cache_key_args_sorts_envvars():
+    project_config = ProjectConfig(env_vars={11: "November", 12: "December", 5: "May"})
+    graph = DbtGraph(project=project_config)
+    assert graph.dbt_ls_cache_key_args == ['{"5": "May", "11": "November", "12": "December"}']
+
+
+@pytest.fixture()
+def airflow_variable():
+    key = "cosmos_cache__undefined"
+    value = "some_value"
+    Variable.set(key, value)
+
+    yield key, value
+
+    Variable.delete(key)
+
+
+@pytest.mark.integration
+def test_dbt_ls_cache_key_args_uses_airflow_vars_to_purge_dbt_ls_cache(airflow_variable):
+    key, value = airflow_variable
+    graph = DbtGraph(project=ProjectConfig(), render_config=RenderConfig(airflow_vars_to_purge_dbt_ls_cache=[key]))
+    assert graph.dbt_ls_cache_key_args == [key, value]
+
+
+@patch("cosmos.dbt.graph.datetime")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+    mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    dbt_ls_output = "some output"
+    graph.save_dbt_ls_cache(dbt_ls_output)
+    assert mock_variable_set.call_args[0][0] == "cosmos_cache__something"
+    assert mock_variable_set.call_args[0][1]["dbt_ls_compressed"] == "eJwrzs9NVcgvLSkoLQEAGpAEhg=="
+    assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
+    version = mock_variable_set.call_args[0][1].get("version")
+    hash_dir, hash_args = version.split(",")
+    assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
+    if sys.platform == "darwin":
+        assert hash_dir == "cdc6f0bec00f4edc616f3aa755a34330"
+    else:
+        assert hash_dir == "77d08d6da374330ac1b49438ff2873f7"
+
+
+@pytest.mark.integration
+def test_get_dbt_ls_cache_returns_empty_if_non_json_var(airflow_variable):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_dbt_ls_cache() == {}
+
+
+@patch("cosmos.dbt.graph.Variable.get", return_value={"dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg=="})
+def test_get_dbt_ls_cache_returns_decoded_and_decompressed_value(mock_variable_get):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_dbt_ls_cache() == {"dbt_ls": "some output"}
+
+
+@patch("cosmos.dbt.graph.Variable.get", return_value={})
+def test_get_dbt_ls_cache_returns_empty_dict_if_empty_dict_var(mock_variable_get):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_dbt_ls_cache() == {}
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_without_cache")
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_does_not_call_without_cache(mock_cache, mock_without_cache):
+    graph = DbtGraph(project=ProjectConfig())
+    graph.load_via_dbt_ls()
+    assert mock_cache.called
+    assert not mock_without_cache.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_without_cache")
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls_cache", return_value=False)
+def test_load_via_dbt_ls_calls_without_cache(mock_cache, mock_without_cache):
+    graph = DbtGraph(project=ProjectConfig())
+    graph.load_via_dbt_ls()
+    assert mock_cache.called
+    assert mock_without_cache.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
+def test_load_via_dbt_ls_cache_is_false_if_disabled(mock_should_use_dbt_ls_cache):
+    graph = DbtGraph(project=ProjectConfig())
+    assert not graph.load_via_dbt_ls_cache()
+    assert mock_should_use_dbt_ls_cache.called
+
+
+@patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={})
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_is_false_if_no_cache(mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache):
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    assert not graph.load_via_dbt_ls_cache()
+    assert mock_should_use_dbt_ls_cache.called
+    assert mock_get_dbt_ls_cache.called
+
+
+@patch("cosmos.dbt.graph.cache._calculate_dbt_ls_cache_current_version", return_value=1)
+@patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 2, "dbt_ls": "output"})
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_is_false_if_cache_is_outdated(
+    mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache, mock_calculate_current_version
+):
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    assert not graph.load_via_dbt_ls_cache()
+    assert mock_should_use_dbt_ls_cache.called
+    assert mock_get_dbt_ls_cache.called
+    assert mock_calculate_current_version.called
+
+
+@patch("cosmos.dbt.graph.parse_dbt_ls_output", return_value={"some-node": {}})
+@patch("cosmos.dbt.graph.cache._calculate_dbt_ls_cache_current_version", return_value=1)
+@patch("cosmos.dbt.graph.DbtGraph.get_dbt_ls_cache", return_value={"version": 1, "dbt_ls": "output"})
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_is_true(
+    mock_should_use_dbt_ls_cache, mock_get_dbt_ls_cache, mock_calculate_current_version, mock_parse_dbt_ls_output
+):
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    assert graph.load_via_dbt_ls_cache()
+    assert graph.load_method == LoadMode.DBT_LS_CACHE
+    assert graph.nodes == {"some-node": {}}
+    assert graph.filtered_nodes == {"some-node": {}}
+    assert mock_should_use_dbt_ls_cache.called
+    assert mock_get_dbt_ls_cache.called
+    assert mock_calculate_current_version.called
+    assert mock_parse_dbt_ls_output.called
+
+
+@pytest.mark.parametrize(
+    "enable_cache,enable_cache_dbt_ls,cache_id,should_use",
+    [
+        (False, True, "id", False),
+        (True, False, "id", False),
+        (False, False, "id", False),
+        (True, True, "", False),
+        (True, True, "id", True),
+    ],
+)
+def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, should_use):
+    with patch.dict(
+        os.environ,
+        {
+            "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
+            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS": str(enable_cache_dbt_ls),
+        },
+    ):
+        importlib.reload(settings)
+        graph = DbtGraph(cache_identifier=cache_id, project=ProjectConfig(dbt_project_path="/tmp"))
+        graph.should_use_dbt_ls_cache.cache_clear()
+        assert graph.should_use_dbt_ls_cache() == should_use

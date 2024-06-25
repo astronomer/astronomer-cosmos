@@ -66,6 +66,9 @@ If you don't have a ``manifest.json`` file, Cosmos will attempt to generate one 
 
 When Cosmos runs ``dbt ls``, it also passes your ``select`` and ``exclude`` arguments to the command. This means that Cosmos will only generate a manifest for the models you want to run.
 
+Starting in Cosmos 1.5, Cosmos will cache the output of the ``dbt ls`` command, to improve the performance of this
+parsing method. Learn more `here <./caching.html>`_.
+
 To use this:
 
 .. code-block:: python

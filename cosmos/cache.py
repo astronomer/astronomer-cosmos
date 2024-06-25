@@ -272,7 +272,7 @@ def was_project_modified(previous_version: str, current_version: str) -> bool:
 @provide_session
 def delete_unused_dbt_ls_cache(
     max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
-) -> None:
+) -> int:
     """
     Delete Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
 
@@ -311,7 +311,7 @@ def delete_unused_dbt_ls_cache(
     In this last example, nothing is deleted.
     """
     if session is None:
-        return
+        return 0
 
     logger.info(f"Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  {max_age_last_usage}")
     cosmos_dags_ids = defaultdict(list)
@@ -345,3 +345,4 @@ def delete_unused_dbt_ls_cache(
     logger.info(
         f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
     )
+    return deleted_cosmos_variables

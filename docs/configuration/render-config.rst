@@ -17,6 +17,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``dbt_executable_path``: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
 - ``env_vars``: (available in v1.2.5, use``ProjectConfig.env_vars`` for v1.3.0 onwards) A dictionary of environment variables for rendering. Only supported when using ``load_method=LoadMode.DBT_LS``.
 - ``dbt_project_path``: Configures the DBT project location accessible on their airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
+- ``airflow_vars_to_purge_cache``: (new in v1.5) Specify Airflow variables that will affect the ``LoadMode.DBT_LS`` cache. See `Caching <./caching.html>`_ for more information.
 
 Customizing how nodes are rendered (experimental)
 -------------------------------------------------

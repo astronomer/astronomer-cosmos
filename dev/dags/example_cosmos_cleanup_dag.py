@@ -3,6 +3,7 @@ Example of cleanup DAG that can be used to clear cache originated from running t
 parsing the DbtDag or DbtTaskGroup since Cosmos 1.5.
 """
 
+# [START cache_example]
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
@@ -27,5 +28,7 @@ def example_cosmos_cleanup_dag():
 
     clear_db_ls_cache()
 
+
+# [END cache_example]
 
 example_cosmos_cleanup_dag()

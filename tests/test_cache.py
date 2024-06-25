@@ -173,6 +173,7 @@ def test_delete_unused_dbt_ls_cache_deletes_a_week_ago_cache(vars_session):
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
 
 
+@pytest.mark.integration
 def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()

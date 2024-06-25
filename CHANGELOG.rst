@@ -33,6 +33,7 @@ Others
 * Ensure compliance with linting rule D300 by using triple quotes for docstrings by @pankajastro in #1049
 * Pre-commit hook updates in #1039, #1050, #1064
 
+
 1.4.3 (2024-06-07)
 ------------------
 

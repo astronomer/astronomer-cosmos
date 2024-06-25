@@ -241,6 +241,7 @@ class DbtGraph:
                 airflow_vars = [var_name, Variable.get(var_name, "")]
                 cache_args.extend(airflow_vars)
 
+        logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.dbt_ls_cache_key}>: {cache_args}")
         return cache_args
 
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:

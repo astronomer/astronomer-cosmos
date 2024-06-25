@@ -84,12 +84,14 @@ class BaseProfileMapping(ABC):
         self.dbt_config_vars = dbt_config_vars
         self._validate_disable_event_tracking()
 
-    def version(self, mock_profile: bool = False) -> str:
+    def version(self, profile_name: str, target_name: str, mock_profile: bool = False) -> str:
         # TODO: Handle connection actual value
         if mock_profile:
             profile = self.mock_profile
         else:
             profile = self.profile
+        profile["profile_name"] = profile_name
+        profile["target_name"] = target_name
         hash_object = hashlib.sha256(pickle.dumps(profile))
         return hash_object.hexdigest()
 

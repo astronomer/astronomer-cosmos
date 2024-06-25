@@ -266,7 +266,7 @@ class ProfileConfig:
         Otherwise, create profile yml for requested object and return the profile path
         """
         # TODO: Fix type
-        current_profile_version = self.profile_mapping.version(use_mock_values)  # type: ignore[union-attr]
+        current_profile_version = self.profile_mapping.version(self.profile_name, self.target_name, use_mock_values)  # type: ignore[union-attr]
         cached_profile_path = get_cached_profile(current_profile_version)
         if cached_profile_path:
             logger.info("Profile found in cache using profile: %s.", cached_profile_path)

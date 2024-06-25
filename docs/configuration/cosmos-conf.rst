@@ -30,6 +30,22 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE``
 
+.. enable_cache_dbt_ls:
+
+`enable_cache_dbt_ls`_:
+    Enable or disable caching of the dbt ls command in case using ``LoadMode.DBT_LS`` in an Airflow Variable.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS``
+
+.. _enable_cache_partial_parse:
+
+`enable_cache_partial_parse`_:
+    Enable or disable caching of dbt partial parse files in the local disk.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE``
+
 .. _propagate_logs:
 
 `propagate_logs`_:

@@ -25,3 +25,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Operator Args <operator-args>
    Compiled SQL <compiled-sql>
    Logging <logging>
+   Caching <caching>

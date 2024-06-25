@@ -116,6 +116,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
       - uses: actions/cache@v3
         with:
           path: |
@@ -139,6 +140,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-setup
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration
         env:
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           DATABRICKS_HOST: mock

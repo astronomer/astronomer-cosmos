@@ -2,12 +2,14 @@ import logging
 import shutil
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
 from airflow import DAG
+from airflow.models import DagRun, Variable
+from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
@@ -15,6 +17,7 @@ from cosmos.cache import (
     _create_cache_identifier,
     _get_latest_partial_parse,
     _update_partial_parse_cache,
+    delete_unused_dbt_ls_cache,
 )
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
 
@@ -112,3 +115,70 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
         call(str(latest_partial_parse_filepath.parent / "manifest.json"), str(manifest_path)),
     ]
     mock_copyfile.assert_has_calls(calls)
+
+
+@pytest.fixture
+def vars_session():
+    with create_session() as session:
+        var1 = Variable(key="cosmos_cache__dag_a", val='{"dag_id": "dag_a"}')
+        var2 = Variable(key="cosmos_cache__dag_b", val='{"dag_id": "dag_b"}')
+        var3 = Variable(key="cosmos_cache__dag_c__task_group_1", val='{"dag_id": "dag_c"}')
+
+        dag_run_a = DagRun(
+            dag_id="dag_a",
+            run_id="dag_a_run_a_week_ago",
+            execution_date=datetime.now(timezone.utc) - timedelta(days=7),
+            state="success",
+            run_type="manual",
+        )
+        dag_run_b = DagRun(
+            dag_id="dag_b",
+            run_id="dag_b_run_yesterday",
+            execution_date=datetime.now(timezone.utc) - timedelta(days=1),
+            state="failed",
+            run_type="manual",
+        )
+        dag_run_c = DagRun(
+            dag_id="dag_c",
+            run_id="dag_c_run_on_hour_ago",
+            execution_date=datetime.now(timezone.utc) - timedelta(hours=1),
+            state="running",
+            run_type="manual",
+        )
+
+        session.add(var1)
+        session.add(var2)
+        session.add(var3)
+        session.add(dag_run_a)
+        session.add(dag_run_b)
+        session.add(dag_run_c)
+        session.commit()
+
+        yield session
+
+        session.query(Variable).filter_by(key="cosmos_cache__dag_a").delete()
+        session.query(Variable).filter_by(key="cosmos_cache__dag_b").delete()
+        session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").delete()
+
+        session.query(DagRun).filter_by(dag_id="dag_a", run_id="dag_a_run_a_week_ago").delete()
+        session.query(DagRun).filter_by(dag_id="dag_b", run_id="dag_b_run_yesterday").delete()
+        session.query(DagRun).filter_by(dag_id="dag_c", run_id="dag_c_run_on_hour_ago").delete()
+        session.commit()
+
+
+@pytest.mark.integration
+def test_delete_unused_dbt_ls_cache_deletes_a_week_ago_cache(vars_session):
+    assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
+    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
+    assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
+
+
+@pytest.mark.integration
+def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_session):
+    assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
+    assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
+    assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
+    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
+    assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
+    assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
+    assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()

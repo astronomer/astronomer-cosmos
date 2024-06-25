@@ -380,7 +380,7 @@ class DbtGraph:
 
             cache_dict = self.get_dbt_ls_cache()
             if not cache_dict:
-                logger.warning(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
+                logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
                 return False
 
             cache_version = cache_dict.get("version")
@@ -399,9 +399,9 @@ class DbtGraph:
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
-                logger.warning(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
+                logger.info(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
                 return True
-        logger.warning(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
+        logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
         return False
 
     def load_via_dbt_ls_without_cache(self) -> None:

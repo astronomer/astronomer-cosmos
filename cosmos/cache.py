@@ -361,14 +361,14 @@ def _get_or_create_profile_cache_dir() -> Path:
 
 
 def get_cached_profile(version: str) -> Path | None:
-    profile_yml_path = _get_or_create_profile_cache_dir() / version[-8:] / DEFAULT_PROFILES_FILE_NAME
+    profile_yml_path = _get_or_create_profile_cache_dir() / version / DEFAULT_PROFILES_FILE_NAME
     if profile_yml_path.exists() and profile_yml_path.is_file():
         return profile_yml_path
     return None
 
 
 def create_cache_profile(version: str, profile_content: str) -> Path:
-    profile_yml_dir = _get_or_create_profile_cache_dir() / version[-8:]
+    profile_yml_dir = _get_or_create_profile_cache_dir() / version
     profile_yml_dir.mkdir(parents=True, exist_ok=True)
     profile_yml_path = profile_yml_dir / DEFAULT_PROFILES_FILE_NAME
     profile_yml_path.write_text(profile_content)

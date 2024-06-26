@@ -62,18 +62,6 @@ def postgres_profile_config() -> ProfileConfig:
     )
 
 
-@pytest.fixture
-def postgres_profile_config_temp() -> ProfileConfig:
-    return ProfileConfig(
-        profile_name="default_t",
-        target_name="default_t",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
-        ),
-    )
-
-
 @pytest.mark.parametrize(
     "unique_id,expected_name, expected_select",
     [
@@ -417,14 +405,13 @@ def test_load(
 
 
 @pytest.mark.integration
-# @pytest.mark.parametrize("enable_cache_profile", [True, False])
-# @patch("cosmos.config.is_profile_cache_enabled")
+@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@patch("cosmos.config.is_profile_cache_enabled")
 @patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
-    mock_popen, tmp_dbt_project_dir, postgres_profile_config_temp
+    mock_popen, is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config
 ):
-    # is_profile_cache_enabled, enable_cache_profile
-    # is_profile_cache_enabled.return_value = enable_cache_profile
+    is_profile_cache_enabled.return_value = enable_cache_profile
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
     assert not (tmp_dbt_project_dir / "target").exists()
@@ -437,7 +424,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
         project=project_config,
         render_config=render_config,
         execution_config=execution_config,
-        profile_config=postgres_profile_config_temp,
+        profile_config=postgres_profile_config,
     )
     dbt_graph.load_via_dbt_ls()
     assert not (tmp_dbt_project_dir / "target").exists()
@@ -445,7 +432,10 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
 
     used_cwd = Path(mock_popen.call_args[0][0][-5])
     assert used_cwd != project_config.dbt_project_path
-    assert not used_cwd.exists()
+    # When the cache profile is enabled, the profile is created in {cache_dir}/profile/{version}/profiles.yml
+    # rather than in a temporary file. This ensures it is persisted for future use and remains uncleared.
+    if not enable_cache_profile:
+        assert not used_cwd.exists()
 
 
 @pytest.mark.integration

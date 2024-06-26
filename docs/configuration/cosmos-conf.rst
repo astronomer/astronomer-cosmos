@@ -76,7 +76,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     Enable caching for the DBT profile.
 
     - Default: ``True``
-    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_PROFILE_CACHING``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE``
 
 .. _profile_cache_dir_name:
 

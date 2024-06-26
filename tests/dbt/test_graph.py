@@ -405,10 +405,13 @@ def test_load(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@patch("cosmos.config.is_profile_cache_enabled")
 @patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
-    mock_popen, tmp_dbt_project_dir, postgres_profile_config
+    mock_popen, is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config
 ):
+    is_profile_cache_enabled.return_value = enable_cache_profile
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
     assert not (tmp_dbt_project_dir / "target").exists()
@@ -429,7 +432,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
 
     used_cwd = Path(mock_popen.call_args[0][0][-5])
     assert used_cwd != project_config.dbt_project_path
-    # assert not used_cwd.exists()
+    assert not used_cwd.exists()
 
 
 @pytest.mark.integration

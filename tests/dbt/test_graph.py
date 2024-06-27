@@ -1,4 +1,5 @@
 import importlib
+import logging
 import os
 import shutil
 import sys
@@ -643,8 +644,6 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
     When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
     Cosmos should leverage dbt partial parsing.
     """
-    import logging
-
     caplog.set_level(logging.DEBUG)
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
@@ -668,6 +667,39 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
 
     # From the second time we run dbt ls onwards, we benefit from partial parsing
     caplog.clear()
+    dbt_graph.load_via_dbt_ls_without_cache()  # should not not raise exception
+    assert not "Unable to do partial parsing" in caplog.text
+
+
+@pytest.mark.integration
+def test_load_via_dbt_ls_uses_partial_parse_when_cache_is_disabled(
+    tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path
+):
+    """
+    When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
+    Cosmos should leverage dbt partial parsing.
+    """
+    partial_parse = Path(__file__).parent.parent / "sample/jaffle_shop_partial_parse.msgpack"
+
+    target_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME / DBT_TARGET_DIR_NAME
+    target_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(partial_parse, target_dir / "partial_parse.msgpack")
+
+    caplog.set_level(logging.DEBUG)
+    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME, dbt_deps=True, enable_mock_profile=False
+    )
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=postgres_profile_config,
+        cache_dir="",  # Cache is disabled
+    )
+
+    # Should use the partial parse available in the original project folder
     dbt_graph.load_via_dbt_ls_without_cache()  # should not not raise exception
     assert not "Unable to do partial parsing" in caplog.text
 

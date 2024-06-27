@@ -430,12 +430,9 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
-    used_cwd = Path(mock_popen.call_args[0][0][-5])
+    used_cwd = Path(mock_popen.call_args[0][0][5])
     assert used_cwd != project_config.dbt_project_path
-    # When the cache profile is enabled, the profile is created in {cache_dir}/profile/{version}/profiles.yml
-    # rather than in a temporary file. This ensures it is persisted for future use and remains uncleared.
-    if not enable_cache_profile:
-        assert not used_cwd.exists()
+    assert not used_cwd.exists()
 
 
 @pytest.mark.integration

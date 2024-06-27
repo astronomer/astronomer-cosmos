@@ -405,10 +405,13 @@ def test_load(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@patch("cosmos.config.is_profile_cache_enabled")
 @patch("cosmos.dbt.graph.Popen")
 def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
-    mock_popen, tmp_dbt_project_dir, postgres_profile_config
+    mock_popen, is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config
 ):
+    is_profile_cache_enabled.return_value = enable_cache_profile
     mock_popen().communicate.return_value = ("", "")
     mock_popen().returncode = 0
     assert not (tmp_dbt_project_dir / "target").exists()
@@ -427,7 +430,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
-    used_cwd = Path(mock_popen.call_args[0][0][-5])
+    used_cwd = Path(mock_popen.call_args[0][0][5])
     assert used_cwd != project_config.dbt_project_path
     assert not used_cwd.exists()
 
@@ -638,7 +641,11 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path):
+@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@patch("cosmos.config.is_profile_cache_enabled")
+def test_load_via_dbt_ls_caching_partial_parsing(
+    is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path
+):
     """
     When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
     Cosmos should leverage dbt partial parsing.
@@ -646,6 +653,8 @@ def test_load_via_dbt_ls_caching_partial_parsing(tmp_dbt_project_dir, postgres_p
     import logging
 
     caplog.set_level(logging.DEBUG)
+
+    is_profile_cache_enabled.return_value = enable_cache_profile
 
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     render_config = RenderConfig(

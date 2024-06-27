@@ -5,6 +5,8 @@ inherit from to ensure consistency.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
@@ -81,6 +83,23 @@ class BaseProfileMapping(ABC):
         self.disable_event_tracking = disable_event_tracking
         self.dbt_config_vars = dbt_config_vars
         self._validate_disable_event_tracking()
+
+    def version(self, profile_name: str, target_name: str, mock_profile: bool = False) -> str:
+        """
+        Generate SHA-256 hash digest based on the provided profile, profile and target names.
+
+        :param profile_name: Name of the DBT profile.
+        :param target_name: Name of the DBT target
+        :param mock_profile: If True, use a mock profile.
+        """
+        if mock_profile:
+            profile = self.mock_profile
+        else:
+            profile = self.profile
+        profile["profile_name"] = profile_name
+        profile["target_name"] = target_name
+        hash_object = hashlib.sha256(json.dumps(profile, sort_keys=True).encode())
+        return hash_object.hexdigest()
 
     def _validate_profile_args(self) -> None:
         """

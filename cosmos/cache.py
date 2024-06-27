@@ -19,9 +19,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
-from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME
+from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
+from cosmos.settings import cache_dir, dbt_profile_cache_dir_name, enable_cache, enable_cache_profile
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
@@ -346,3 +347,52 @@ def delete_unused_dbt_ls_cache(
         f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
     )
     return deleted_cosmos_variables
+
+
+def is_profile_cache_enabled() -> bool:
+    """Return True if global and profile cache is enable"""
+    return enable_cache and enable_cache_profile
+
+
+def _get_or_create_profile_cache_dir() -> Path:
+    """
+    Get or create the directory path for caching DBT profiles.
+
+    - Constructs the profile cache directory path based on cache_dir and dbt_profile_cache_dir.
+    - Checks if the directory exists; if not, creates it
+    - Return profile cache directory
+    """
+    profile_cache_dir = cache_dir / dbt_profile_cache_dir_name
+    if not profile_cache_dir.exists():
+        profile_cache_dir.mkdir(parents=True, exist_ok=True)
+    return profile_cache_dir
+
+
+def get_cached_profile(version: str) -> Path | None:
+    """
+    Retrieve the path to a cached DBT profile YML file if it exists for the given version.
+
+    - Constructs the DBT profile YML Path based on version and profile cache directory
+    - Checks if the profile YML exists
+    - Return the profile YML Path
+    """
+    profile_yml_path = _get_or_create_profile_cache_dir() / version / DEFAULT_PROFILES_FILE_NAME
+    if profile_yml_path.exists() and profile_yml_path.is_file():
+        return profile_yml_path
+    return None
+
+
+def create_cache_profile(version: str, profile_content: str) -> Path:
+    """
+    Create a cached DBT profile YAML file with the provided content for the given version.
+
+    - Constructs the path for profile YML  based on the version in the profile cache directory
+    - Creates the profile directory if it does not exist
+    - Writes the profile content to the profile YML file
+    - Return the profile YML Path
+    """
+    profile_yml_dir = _get_or_create_profile_cache_dir() / version
+    profile_yml_dir.mkdir(parents=True, exist_ok=True)
+    profile_yml_path = profile_yml_dir / DEFAULT_PROFILES_FILE_NAME
+    profile_yml_path.write_text(profile_content)
+    return profile_yml_path

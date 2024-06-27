@@ -6,7 +6,7 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 import hashlib
-import pickle
+import json
 import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
@@ -98,7 +98,7 @@ class BaseProfileMapping(ABC):
             profile = self.profile
         profile["profile_name"] = profile_name
         profile["target_name"] = target_name
-        hash_object = hashlib.sha256(pickle.dumps(profile))
+        hash_object = hashlib.sha256(json.dumps(profile, sort_keys=True).encode())
         return hash_object.hexdigest()
 
     def _validate_profile_args(self) -> None:

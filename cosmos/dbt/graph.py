@@ -439,6 +439,10 @@ class DbtGraph:
         logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
         return False
 
+    def should_use_partial_parse_cache(self) -> bool:
+        """Identify if Cosmos should use/store dbt partial parse cache or not."""
+        return settings.enable_cache_partial_parse and settings.enable_cache and bool(self.cache_dir)
+
     def load_via_dbt_ls_without_cache(self) -> None:
         """
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
@@ -459,18 +463,21 @@ class DbtGraph:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            logger.debug(
-                f"Content of the dbt project dir {self.render_config.project_path}: `{os.listdir(self.render_config.project_path)}`"
-            )
+            logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
             tmpdir_path = Path(tmpdir)
 
             create_symlinks(project_path, tmpdir_path, self.render_config.dbt_deps)
 
-            if self.project.partial_parse and self.cache_dir:
-                latest_partial_parse = cache._get_latest_partial_parse(project_path, self.cache_dir)
+            latest_partial_parse = None
+            if self.project.partial_parse:
+                if self.should_use_partial_parse_cache() and self.cache_dir:
+                    latest_partial_parse = cache._get_latest_partial_parse(project_path, self.cache_dir)
+                else:
+                    latest_partial_parse = get_partial_parse_path(project_path)
+
+            if latest_partial_parse is not None and latest_partial_parse.exists():
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
-                if latest_partial_parse is not None:
-                    cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
+                cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
             with self.profile_config.ensure_profile(
                 use_mock_values=self.render_config.enable_mock_profile
@@ -505,9 +512,9 @@ class DbtGraph:
                 self.nodes = nodes
                 self.filtered_nodes = nodes
 
-            if self.project.partial_parse and self.cache_dir:
+            if self.should_use_partial_parse_cache():
                 partial_parse_file = get_partial_parse_path(tmpdir_path)
-                if partial_parse_file.exists():
+                if partial_parse_file.exists() and self.cache_dir:
                     cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
     def load_via_dbt_ls_file(self) -> None:

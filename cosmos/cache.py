@@ -139,6 +139,7 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     :param cache_dir: Path to the Cosmos project cache directory
     """
     cache_path = get_partial_parse_path(cache_dir)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
     latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
 

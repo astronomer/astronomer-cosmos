@@ -101,7 +101,7 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
     mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"
 
     latest_partial_parse_filepath = Path("/path/to/latest_partial_parse.yml")
-    cache_dir = Path("/path/to/cache_directory")
+    cache_dir = Path("/tmp/path/to/cache_directory")
 
     # Expected paths
     cache_path = cache_dir / "partial_parse.yml"

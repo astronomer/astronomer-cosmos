@@ -1,18 +1,20 @@
 Changelog
 =========
 
-1.5.0a9 (2024-06-25)
+1.5.0rc1 (2024-06-27)
 --------------------
 
 New Features
 
 * Speed up ``LoadMode.DBT_LS`` by caching dbt ls output in Airflow Variable by @tatiana in #1014
+* Support to cache profiles created via ``ProfileMapping`` by @pankajastro in #1046
 * Support for running dbt tasks in AWS EKS in #944 by @VolkerSchiewe
 * Add Clickhouse profile mapping by @roadan and @pankajastro in #353 and #1016
 * Add node config to TaskInstance Context by @linchun3 in #1044
 
 Bug fixes
 
+* Support partial parsing when cache is disabled by @tatiana in #1070
 * Fix disk permission error in restricted env by @pankajastro in #1051
 * Add CSP header to iframe contents by @dwreeves in #1055
 * Stop attaching log adaptors to root logger to reduce logging costs by @glebkrapivin in #1047
@@ -23,6 +25,10 @@ Enhancements
 * Support deep linking dbt docs via Airflow UI by @dwreeves in #1038
 * Add ability to specify host/port for Snowflake connection by @whummer in #1063
 
+Docs
+
+* Fix rendering for env ``enable_cache_dbt_ls`` by @pankajastro in #1069
+
 Others
 
 * Update documentation for DbtDocs generator by @arjunanan6 in #1043
@@ -32,6 +38,7 @@ Others
 * Mark plugin integration tests as integration by @tatiana in #1057
 * Ensure compliance with linting rule D300 by using triple quotes for docstrings by @pankajastro in #1049
 * Pre-commit hook updates in #1039, #1050, #1064
+* Remove duplicates in changelog by @jedcunningham in #1068
 
 
 1.4.3 (2024-06-07)

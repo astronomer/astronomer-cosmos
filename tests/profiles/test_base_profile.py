@@ -162,3 +162,9 @@ def test_profile_config_validate_dbt_config_vars_check_values(dbt_config_var: st
             conn_id="fake_conn_id",
             dbt_config_vars=DbtProfileConfigVars(**dbt_config_vars),
         )
+
+
+def test_profile_version_sha_consistency():
+    profile_mapping = TestProfileMapping(conn_id="fake_conn_id")
+    version = profile_mapping.version(profile_name="dev", target_name="dev")
+    assert version == "ea3bf1f70b033405ba9ff9cafe65af873fd7a868cac840cdbfd5e8e9a1da9650"

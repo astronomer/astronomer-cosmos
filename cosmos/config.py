@@ -10,7 +10,9 @@ from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
+    DEFAULT_PROFILES_FILE_NAME,
     DbtResourceType,
     ExecutionMode,
     InvocationMode,
@@ -24,8 +26,6 @@ from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
 
 logger = get_logger(__name__)
-
-DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 
 
 class CosmosConfigException(Exception):
@@ -258,6 +258,27 @@ class ProfileConfig:
         if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
+    def _get_profile_path(self, use_mock_values: bool = False) -> Path:
+        """
+        Handle the profile caching mechanism.
+
+        Check if profile object version is exist then reuse it
+        Otherwise, create profile yml for requested object and return the profile path
+        """
+        assert self.profile_mapping  # To satisfy MyPy
+        current_profile_version = self.profile_mapping.version(self.profile_name, self.target_name, use_mock_values)
+        cached_profile_path = get_cached_profile(current_profile_version)
+        if cached_profile_path:
+            logger.info("Profile found in cache using profile: %s.", cached_profile_path)
+            return cached_profile_path
+        else:
+            profile_contents = self.profile_mapping.get_profile_file_contents(
+                profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
+            )
+            profile_path = create_cache_profile(current_profile_version, profile_contents)
+            logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
+            return profile_path
+
     @contextlib.contextmanager
     def ensure_profile(
         self, desired_profile_path: Path | None = None, use_mock_values: bool = False
@@ -268,35 +289,40 @@ class ProfileConfig:
             yield Path(self.profiles_yml_filepath), {}
 
         elif self.profile_mapping:
-            profile_contents = self.profile_mapping.get_profile_file_contents(
-                profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
-            )
-
             if use_mock_values:
                 env_vars = {}
             else:
                 env_vars = self.profile_mapping.env_vars
 
-            if desired_profile_path:
-                logger.info(
-                    "Writing profile to %s with the following contents:\n%s",
-                    desired_profile_path,
-                    profile_contents,
-                )
-                # write profile_contents to desired_profile_path using yaml library
-                desired_profile_path.write_text(profile_contents)
-                yield desired_profile_path, env_vars
+            if is_profile_cache_enabled():
+                logger.info("Profile caching is enable.")
+                cached_profile_path = self._get_profile_path(use_mock_values)
+                yield cached_profile_path, env_vars
             else:
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    temp_file = Path(temp_dir) / DEFAULT_PROFILES_FILE_NAME
+                profile_contents = self.profile_mapping.get_profile_file_contents(
+                    profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
+                )
+
+                if desired_profile_path:
                     logger.info(
-                        "Creating temporary profiles.yml with use_mock_values=%s at %s with the following contents:\n%s",
-                        use_mock_values,
-                        temp_file,
+                        "Writing profile to %s with the following contents:\n%s",
+                        desired_profile_path,
                         profile_contents,
                     )
-                    temp_file.write_text(profile_contents)
-                    yield temp_file, env_vars
+                    # write profile_contents to desired_profile_path using yaml library
+                    desired_profile_path.write_text(profile_contents)
+                    yield desired_profile_path, env_vars
+                else:
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        temp_file = Path(temp_dir) / DEFAULT_PROFILES_FILE_NAME
+                        logger.info(
+                            "Creating temporary profiles.yml with use_mock_values=%s at %s with the following contents:\n%s",
+                            use_mock_values,
+                            temp_file,
+                            profile_contents,
+                        )
+                        temp_file.write_text(profile_contents)
+                        yield temp_file, env_vars
 
 
 @dataclass

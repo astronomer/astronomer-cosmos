@@ -116,3 +116,17 @@ Users can customize where to store the cache using the setting ``AIRFLOW__COSMOS
 It is possible to switch off this feature by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE=0``.
 
 For more information, read the `Cosmos partial parsing documentation <./partial-parsing.html>`_
+
+
+Caching the profiles
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+(Introduced in Cosmos 1.5)
+
+Cosmos 1.5 introduced `support to profile caching <https://github.com/astronomer/astronomer-cosmos/pull/1046>`_,
+enabling caching for the profile mapping in the path specified by env ``AIRFLOW__COSMOS__CACHE_DIR`` and ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``.
+This feature facilitates the reuse of Airflow connections and ``profiles.yml``.
+
+Users have the flexibility to customize the cache storage location using the settings ``AIRFLOW__COSMOS__CACHE_DIR`` and ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``.
+
+To disable this feature, users can set the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE=False``

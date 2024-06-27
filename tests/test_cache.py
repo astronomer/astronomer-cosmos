@@ -16,10 +16,15 @@ from cosmos.cache import (
     _copy_partial_parse_to_project,
     _create_cache_identifier,
     _get_latest_partial_parse,
+    _get_or_create_profile_cache_dir,
     _update_partial_parse_cache,
+    create_cache_profile,
     delete_unused_dbt_ls_cache,
+    get_cached_profile,
+    is_profile_cache_enabled,
 )
-from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME
+from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
+from cosmos.settings import dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
@@ -182,3 +187,100 @@ def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_sess
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
+
+
+@pytest.mark.parametrize(
+    "enable_cache, enable_cache_profile, expected_result",
+    [(True, True, True), (True, False, False), (False, True, False), (False, False, False)],
+)
+def test_is_profile_cache_enabled(enable_cache, enable_cache_profile, expected_result):
+    with patch("cosmos.cache.enable_cache", enable_cache), patch(
+        "cosmos.cache.enable_cache_profile", enable_cache_profile
+    ):
+        assert is_profile_cache_enabled() == expected_result
+
+
+def test_get_or_create_profile_cache_dir():
+    # Create a temporary directory for cache_dir
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+
+        # Test case 1: Directory does not exist, should create it
+        with patch("cosmos.cache.cache_dir", temp_dir_path):
+            profile_cache_dir = _get_or_create_profile_cache_dir()
+            expected_dir = temp_dir_path / dbt_profile_cache_dir_name
+            assert profile_cache_dir == expected_dir
+            assert expected_dir.exists()
+
+        # Test case 2: Directory already exists, should return existing path
+        with patch("cosmos.cache.cache_dir", temp_dir_path):
+            profile_cache_dir_again = _get_or_create_profile_cache_dir()
+            expected_dir = temp_dir_path / dbt_profile_cache_dir_name
+            assert profile_cache_dir_again == expected_dir
+            assert expected_dir.exists()
+
+
+def test_get_cached_profile_not_exists():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        # Mock cache_dir to use the temporary directory
+        with patch("cosmos.cache.cache_dir", temp_dir):
+            # Create a dummy profile YAML file for version 'v1'
+            version = "592906f650558ce1dadb75fcce84a2ec09e444441e6af6069f19204d59fe428b"
+            result = get_cached_profile(version)
+            assert result is None
+
+
+def test_get_cached_profile():
+    profile_content = """
+        default:
+          target: dev
+          outputs:
+            dev:
+              type: postgres
+              host: localhost
+              user: myuser
+              pass: mypassword
+              dbname: mydatabase
+        """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        with patch("cosmos.cache.cache_dir", temp_dir):
+            # Setup DBT profile
+            version = "592906f650558ce1dadb75fcce84a2ec09e444441e6af6069f19204d59fe428b"
+            create_cache_profile(version, profile_content)
+
+            expected_yml_path = temp_dir / dbt_profile_cache_dir_name / version / DEFAULT_PROFILES_FILE_NAME
+            result = get_cached_profile(version)
+            assert result == expected_yml_path
+
+
+def test_create_cache_profile():
+    version = "592906f650558ce1dadb75fcce84a2ec09e444441e6af6069f19204d59fe428b"
+    profile_content = """
+    default:
+      target: dev
+      outputs:
+        dev:
+          type: postgres
+          host: localhost
+          user: myuser
+          pass: mypassword
+          dbname: mydatabase
+    """
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        with patch("cosmos.cache.cache_dir", temp_dir):
+            profile_yml_path = create_cache_profile(version, profile_content)
+
+            expected_dir = temp_dir / dbt_profile_cache_dir_name / version
+            expected_path = expected_dir / DEFAULT_PROFILES_FILE_NAME
+
+            # Check if the directory and file were created
+            assert expected_dir.exists()
+            assert expected_path.exists()
+
+            # Check content of the created file
+            assert expected_path.read_text() == profile_content
+            assert profile_yml_path == expected_path

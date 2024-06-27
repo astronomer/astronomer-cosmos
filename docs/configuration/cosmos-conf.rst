@@ -70,6 +70,23 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_CONN_ID``
 
+.. _enable_cache_profile:
+
+`enable_cache_profile`_:
+    Enable caching for the DBT profile.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE``
+
+.. _profile_cache_dir_name:
+
+`profile_cache_dir_name`_:
+    Folder name to store the DBT cached profiles. This will be a sub-folder of ``cache_dir``
+
+    - Default: ``profile``
+    - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
+
+
 [openlineage]
 ~~~~~~~~~~~~~
 

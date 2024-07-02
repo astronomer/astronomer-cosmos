@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ..base import BaseProfileMapping
-
-if TYPE_CHECKING:
-    pass
 
 
 class TeradataUserPasswordProfileMapping(BaseProfileMapping):
@@ -19,6 +16,7 @@ class TeradataUserPasswordProfileMapping(BaseProfileMapping):
 
     airflow_connection_type: str = "teradata"
     dbt_profile_type: str = "teradata"
+    is_community = True
 
     required_fields = [
         "host",
@@ -51,12 +49,3 @@ class TeradataUserPasswordProfileMapping(BaseProfileMapping):
             profile["schema"] = profile["user"]
 
         return self.filter_null(profile)
-
-    @property
-    def mock_profile(self) -> dict[str, Any | None]:
-        """Gets mock profile."""
-        parent_mock = super().mock_profile
-
-        return {
-            **parent_mock,
-        }

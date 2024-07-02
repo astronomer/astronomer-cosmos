@@ -19,6 +19,7 @@ from .snowflake.user_encrypted_privatekey_file import SnowflakeEncryptedPrivateK
 from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
+from .teradata.user_pass import TeradataUserPasswordProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
@@ -39,6 +40,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     SnowflakePrivateKeyPemProfileMapping,
     SparkThriftProfileMapping,
     ExasolUserPasswordProfileMapping,
+    TeradataUserPasswordProfileMapping,
     TrinoLDAPProfileMapping,
     TrinoCertificateProfileMapping,
     TrinoJWTProfileMapping,
@@ -79,6 +81,7 @@ __all__ = [
     "SnowflakeEncryptedPrivateKeyFilePemProfileMapping",
     "SparkThriftProfileMapping",
     "ExasolUserPasswordProfileMapping",
+    "TeradataUserPasswordProfileMapping",
     "TrinoLDAPProfileMapping",
     "TrinoCertificateProfileMapping",
     "TrinoJWTProfileMapping",

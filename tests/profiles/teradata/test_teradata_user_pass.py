@@ -37,7 +37,6 @@ def mock_teradata_conn_custom_tmode():  # type: ignore
         host="my_host",
         login="my_user",
         password="my_password",
-        port=1025,
         schema="my_database",
         extra='{"tmode": "TERA"}',
     )
@@ -56,7 +55,7 @@ def test_connection_claiming() -> None:
     # - host
     # - user
     # - password
-    potential_values = {
+    potential_values: dict[str, str] = {
         "conn_type": "teradata",
         "host": "my_host",
         "login": "my_user",
@@ -69,12 +68,15 @@ def test_connection_claiming() -> None:
         del values[key]
         conn = Connection(**values)  # type: ignore
 
-        print("testing with", values)
-
         with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = TeradataUserPasswordProfileMapping(conn)
             assert not profile_mapping.can_claim_connection()
 
+    # Even there is no schema, making user as schema as user itself schema in teradata
+    conn = Connection(**{k: v for k, v in potential_values.items() if k != "schema"})
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = TeradataUserPasswordProfileMapping(conn, {"schema": None})
+        assert profile_mapping.can_claim_connection()
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -91,9 +93,13 @@ def test_profile_mapping_selected(
     profile_mapping = get_automatic_profile_mapping(
         mock_teradata_conn.conn_id,
     )
-    print(profile_mapping)
-    print(profile_mapping.profile)
     assert isinstance(profile_mapping, TeradataUserPasswordProfileMapping)
+
+
+def test_profile_mapping_keeps_port(mock_teradata_conn: Connection) -> None:
+    # port is not handled in airflow connection so adding it as profile_args
+    profile = TeradataUserPasswordProfileMapping(mock_teradata_conn.conn_id, profile_args={"port": 1025})
+    assert profile.profile["port"] == 1025
 
 
 def test_profile_mapping_keeps_custom_tmode(mock_teradata_conn_custom_tmode: Connection) -> None:
@@ -120,7 +126,6 @@ def test_profile_args(
         "host": mock_teradata_conn.host,
         "user": mock_teradata_conn.login,
         "password": "{{ env_var('COSMOS_CONN_TERADATA_PASSWORD') }}",
-        "port": mock_teradata_conn.port,
         "schema": "my_database",
     }
 
@@ -144,7 +149,6 @@ def test_profile_args_overrides(
         "host": mock_teradata_conn.host,
         "user": mock_teradata_conn.login,
         "password": "{{ env_var('COSMOS_CONN_TERADATA_PASSWORD') }}",
-        "port": mock_teradata_conn.port,
         "schema": "my_schema",
     }
 
@@ -169,4 +173,4 @@ def test_mock_profile() -> None:
     Tests that the mock profile port value get set correctly.
     """
     profile = TeradataUserPasswordProfileMapping("mock_conn_id")
-    assert profile.mock_profile.get("port") == 1025
+    assert profile.mock_profile.get("host") == "mock_value"

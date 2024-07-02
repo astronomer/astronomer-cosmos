@@ -40,21 +40,23 @@ class TeradataUserPasswordProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         """Gets profile. The password is stored in an environment variable."""
         profile = {
-            "port": 1025,
             **self.mapped_params,
             **self.profile_args,
             # password should always get set as env var
             "password": self.get_env_var_format("password"),
         }
+        # schema is not mandatory in teradata. In teradata user itself a database so if schema is not mentioned
+        # in both airflow connection and profile_args then treating user as schema.
+        if "schema" not in self.profile_args and self.mapped_params.get("schema") is None:
+            profile["schema"] = profile["user"]
 
         return self.filter_null(profile)
 
     @property
     def mock_profile(self) -> dict[str, Any | None]:
-        """Gets mock profile. Defaults port to 1025."""
+        """Gets mock profile."""
         parent_mock = super().mock_profile
 
         return {
-            "port": 1025,
             **parent_mock,
         }

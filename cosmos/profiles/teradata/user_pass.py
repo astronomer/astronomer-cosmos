@@ -35,7 +35,7 @@ class TeradataUserPasswordProfileMapping(BaseProfileMapping):
     }
 
     @property
-    def profile(self) -> dict[str, Any | None]:
+    def profile(self) -> dict[str, Any]:
         """Gets profile. The password is stored in an environment variable."""
         profile = {
             **self.mapped_params,

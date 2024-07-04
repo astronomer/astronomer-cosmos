@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -21,7 +23,10 @@ profile_config = ProfileConfig(
 
 
 class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
-    base_cmd = ["cmd"]
+
+    @property
+    def base_cmd(self) -> list[str]:
+        return ["cmd"]
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
@@ -96,7 +101,6 @@ def test_virtualenv_operator_append_env_is_true_by_default():
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.exception_handling")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
 @patch("airflow.hooks.base.BaseHook.get_connection")
@@ -104,7 +108,6 @@ def test_supply_virtualenv_dir_flag(
     mock_get_connection,
     mock_lock_available,
     mock_subprocess_hook,
-    mock_exception_handling,
     mock_store_compiled_sql,
     mock_calculate_openlineage_events_completes,
     mock_execute,
@@ -119,7 +122,7 @@ def test_supply_virtualenv_dir_flag(
         password="fake_password",
         schema="fake_schema",
     )
-    venv_operator = DbtVirtualenvBaseOperator(
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
         profile_config=profile_config,
         task_id="fake_task",
         install_deps=True,

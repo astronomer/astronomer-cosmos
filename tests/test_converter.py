@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.models import DAG
 
-from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
 from cosmos.dbt.graph import DbtGraph, DbtNode
@@ -220,7 +220,8 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
         profiles_yml_filepath=SAMPLE_PROFILE_YML,
     )
 
-    converter = DbtToAirflowConverter(
+    DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         nodes=nodes,
         project_config=project_config,
         profile_config=profile_config,

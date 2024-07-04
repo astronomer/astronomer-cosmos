@@ -1,6 +1,6 @@
 from datetime import datetime
-from unittest.mock import MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from airflow.models import DAG
 from airflow.models.connection import Connection
@@ -79,6 +79,18 @@ def test_run_command(
 def test_virtualenv_operator_append_env_is_true_by_default():
     venv_operator = ConcreteDbtVirtualenvBaseOperator(
         dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        profile_config=profile_config,
+        task_id="fake_task",
+        install_deps=True,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        py_system_site_packages=False,
+        pip_install_options=["--test-flag"],
+        py_requirements=["dbt-postgres==1.6.0b1"],
+        emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+
+    assert venv_operator.append_env is True
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
@@ -113,10 +125,8 @@ def test_supply_virtualenv_dir_flag(
         install_deps=True,
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
-        pip_install_options=["--test-flag"],
         py_requirements=["dbt-postgres==1.6.0b1"],
         emit_datasets=False,
-        invocation_mode=InvocationMode.SUBPROCESS,
         virtualenv_dir=Path("mock-venv"),
-    assert venv_operator.append_env is True
+    )
     assert venv_operator.venv_dbt_path == "mock-venv/bin/dbt"

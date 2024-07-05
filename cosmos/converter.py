@@ -16,7 +16,7 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import ProjectConfig, ExecutionConfig, RenderConfig, ProfileConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.selector import retrieve_by_label
@@ -237,10 +237,6 @@ class DbtToAirflowConverter:
                 "`ExecutionConfig.virtualenv_dir` is only supported when \
                 ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
             )
-
-        profile_args = {}
-        if profile_config.profile_mapping:
-            profile_args = profile_config.profile_mapping.profile_args
 
         if not operator_args:
             operator_args = {}

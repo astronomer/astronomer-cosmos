@@ -285,7 +285,6 @@ class ProfileConfig:
         """
         return {} if use_mock_values else self.profile_mapping.env_vars
 
-
     @contextlib.contextmanager
     def ensure_profile(
         self, desired_profile_path: Path | None = None, use_mock_values: bool = False

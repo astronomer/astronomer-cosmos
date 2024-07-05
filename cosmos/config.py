@@ -279,6 +279,13 @@ class ProfileConfig:
             logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
             return profile_path
 
+    def _get_env_vars(self, use_mock_values: bool = False) -> dict[str, str]:
+        """
+        Return profile env_vars.
+        """
+        return {} if use_mock_values else self.profile_mapping.env_vars
+
+
     @contextlib.contextmanager
     def ensure_profile(
         self, desired_profile_path: Path | None = None, use_mock_values: bool = False
@@ -287,21 +294,17 @@ class ProfileConfig:
         if self.profiles_yml_filepath:
             logger.info("Using user-supplied profiles.yml at %s", self.profiles_yml_filepath)
             yield Path(self.profiles_yml_filepath), {}
-
         elif self.profile_mapping:
-            if use_mock_values:
-                env_vars = {}
-            else:
-                env_vars = self.profile_mapping.env_vars
-
             if is_profile_cache_enabled():
                 logger.info("Profile caching is enable.")
                 cached_profile_path = self._get_profile_path(use_mock_values)
+                env_vars = self._get_env_vars(use_mock_values)
                 yield cached_profile_path, env_vars
             else:
                 profile_contents = self.profile_mapping.get_profile_file_contents(
                     profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
                 )
+                env_vars = self._get_env_vars(use_mock_values)
 
                 if desired_profile_path:
                     logger.info(

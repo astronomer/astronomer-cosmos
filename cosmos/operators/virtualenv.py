@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from functools import cached_property
 import os
-import psutil
 import time
-
+from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable
 
+import psutil
 from airflow.utils.python_virtualenv import prepare_virtualenv
 
 from cosmos.exceptions import CosmosValueError

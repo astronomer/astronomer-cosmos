@@ -6,12 +6,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag
 from airflow.configuration import get_airflow_home
+from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
-
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -26,6 +25,7 @@ profile_config = ProfileConfig(
         profile_args={"schema": "public"},
     ),
 )
+
 
 # [START virtualenv_example]
 @dag(

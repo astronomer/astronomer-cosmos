@@ -7,7 +7,6 @@ import itertools
 import json
 import os
 import platform
-import shutil
 import tempfile
 import zlib
 from dataclasses import dataclass, field
@@ -362,7 +361,6 @@ class DbtGraph:
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
-
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [self.dbt_cmd, "ls", "--output", "json"]
 
@@ -461,9 +459,6 @@ class DbtGraph:
         project_path = self.project_path
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
-
-        if not shutil.which(self.dbt_cmd):
-            raise CosmosLoadDbtException(f"Unable to find the dbt executable: {self.dbt_cmd}")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")

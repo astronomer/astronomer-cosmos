@@ -1,6 +1,19 @@
 Changelog
 =========
 
+1.6.0a1 (2024-07-05)
+--------------------
+
+New Features
+
+* Add Teradata ``ProfileMapping`` by @sc250072 in #1077
+
+Others
+
+* Pre-commit hook updates in #1074
+
+
+
 1.5.0 (2024-06-27)
 ------------------
 

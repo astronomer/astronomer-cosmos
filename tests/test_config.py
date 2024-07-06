@@ -159,7 +159,7 @@ def test_profile_config_ensure_profile_without_caching_calls_get_profile_file_co
     mock_manager.attach_mock(mock_get_profile_file_contents, "get_profile_file_contents")
     mock_manager.attach_mock(mock_env_vars, "env_vars")
 
-    with profile_config.ensure_profile(desired_profile_path=mock_path) as values:
+    with profile_config.ensure_profile(desired_profile_path=mock_path):
         mock_get_profile_file_contents.assert_called_once()
         mock_env_vars.assert_called_once()
         expected_calls = [
@@ -194,7 +194,7 @@ def test_profile_config_ensure_profile_with_caching_calls_get_profile_file_conte
     mock_manager.attach_mock(mock_get_profile_file_contents, "get_profile_file_contents")
     mock_manager.attach_mock(mock_env_vars, "env_vars")
 
-    with profile_config.ensure_profile(desired_profile_path=mock_path) as values:
+    with profile_config.ensure_profile(desired_profile_path=mock_path):
         mock_get_profile_file_contents.assert_called_once()
         mock_env_vars.assert_called_once()
         expected_calls = [

@@ -1077,7 +1077,13 @@ def test_load_via_dbt_ls_project_config_env_vars(
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
 def test_profile_created_correctly_with_profile_mapping(
-    mock_validate, mock_update_nodes, mock_popen, mock_enable_profile_cache, mock_enable_cache, tmp_dbt_project_dir, postgres_profile_config
+    mock_validate,
+    mock_update_nodes,
+    mock_popen,
+    mock_enable_profile_cache,
+    mock_enable_cache,
+    tmp_dbt_project_dir,
+    postgres_profile_config,
 ):
     """Tests that the temporary profile is created without errors."""
     mock_popen().communicate.return_value = ("", "")

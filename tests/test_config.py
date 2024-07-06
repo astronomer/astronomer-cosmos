@@ -1,14 +1,14 @@
 from contextlib import nullcontext as does_not_raise
 from pathlib import Path
-from unittest.mock import patch, call, PropertyMock, Mock
+from unittest.mock import Mock, PropertyMock, call, patch
 
 import pytest
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode
 from cosmos.exceptions import CosmosValueError
-from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
+from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
@@ -148,19 +148,13 @@ def test_profile_config_validate_profiles_yml():
 @patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_profile_file_contents")
 @patch("cosmos.config.Path")
 def test_profile_config_ensure_profile_without_caching_calls_get_profile_file_content_before_env_vars(
-    mock_path,
-    mock_get_profile_file_contents,
-    mock_env_vars, mock_cache
+    mock_path, mock_get_profile_file_contents, mock_env_vars, mock_cache
 ):
     """
     The `env_vars` should not be called if profile file is not populated.
     """
     profile_mapping = AthenaAccessKeyProfileMapping(conn_id="test", profile_args={})
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=profile_mapping
-    )
+    profile_config = ProfileConfig(profile_name="test", target_name="test", profile_mapping=profile_mapping)
     mock_manager = Mock()
     mock_manager.attach_mock(mock_get_profile_file_contents, "get_profile_file_contents")
     mock_manager.attach_mock(mock_env_vars, "env_vars")
@@ -168,7 +162,10 @@ def test_profile_config_ensure_profile_without_caching_calls_get_profile_file_co
     with profile_config.ensure_profile(desired_profile_path=mock_path) as values:
         mock_get_profile_file_contents.assert_called_once()
         mock_env_vars.assert_called_once()
-        expected_calls = [call.get_profile_file_contents(profile_name='test', target_name='test', use_mock_values=False), call.env_vars]
+        expected_calls = [
+            call.get_profile_file_contents(profile_name="test", target_name="test", use_mock_values=False),
+            call.env_vars,
+        ]
         mock_manager.assert_has_calls(expected_calls, any_order=False)
 
 
@@ -186,17 +183,13 @@ def test_profile_config_ensure_profile_with_caching_calls_get_profile_file_conte
     mock_cache,
     mock_get_cached_profile,
     mock_version,
-    mock_create_cache_profile
+    mock_create_cache_profile,
 ):
     """
     The `env_vars` should not be called if profile file is not populated.
     """
     profile_mapping = AthenaAccessKeyProfileMapping(conn_id="test", profile_args={})
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=profile_mapping
-    )
+    profile_config = ProfileConfig(profile_name="test", target_name="test", profile_mapping=profile_mapping)
     mock_manager = Mock()
     mock_manager.attach_mock(mock_get_profile_file_contents, "get_profile_file_contents")
     mock_manager.attach_mock(mock_env_vars, "env_vars")
@@ -204,7 +197,10 @@ def test_profile_config_ensure_profile_with_caching_calls_get_profile_file_conte
     with profile_config.ensure_profile(desired_profile_path=mock_path) as values:
         mock_get_profile_file_contents.assert_called_once()
         mock_env_vars.assert_called_once()
-        expected_calls = [call.get_profile_file_contents(profile_name='test', target_name='test', use_mock_values=False), call.env_vars]
+        expected_calls = [
+            call.get_profile_file_contents(profile_name="test", target_name="test", use_mock_values=False),
+            call.env_vars,
+        ]
         mock_manager.assert_has_calls(expected_calls, any_order=False)
 
 

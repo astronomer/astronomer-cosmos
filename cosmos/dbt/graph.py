@@ -77,6 +77,14 @@ class DbtNode:
         return self.resource_name.replace(".", "_")
 
     @property
+    def owner(self) -> str:
+        owner = self.config.get("owner")
+        if owner is None:
+            return "airflow"
+        else:
+            return owner
+
+    @property
     def context_dict(self) -> dict[str, Any]:
         """
         Returns a dictionary containing all the attributes of the DbtNode object,
@@ -158,15 +166,15 @@ class DbtGraph:
     current_version: str = ""
 
     def __init__(
-        self,
-        project: ProjectConfig,
-        render_config: RenderConfig = RenderConfig(),
-        execution_config: ExecutionConfig = ExecutionConfig(),
-        profile_config: ProfileConfig | None = None,
-        cache_dir: Path | None = None,
-        cache_identifier: str = "",
-        dbt_vars: dict[str, str] | None = None,
-        airflow_metadata: dict[str, str] | None = None,
+            self,
+            project: ProjectConfig,
+            render_config: RenderConfig = RenderConfig(),
+            execution_config: ExecutionConfig = ExecutionConfig(),
+            profile_config: ProfileConfig | None = None,
+            cache_dir: Path | None = None,
+            cache_identifier: str = "",
+            dbt_vars: dict[str, str] | None = None,
+            airflow_metadata: dict[str, str] | None = None,
     ):
         self.project = project
         self.render_config = render_config
@@ -294,9 +302,9 @@ class DbtGraph:
         return cache_dict
 
     def load(
-        self,
-        method: LoadMode = LoadMode.AUTOMATIC,
-        execution_mode: ExecutionMode = ExecutionMode.LOCAL,
+            self,
+            method: LoadMode = LoadMode.AUTOMATIC,
+            execution_mode: ExecutionMode = ExecutionMode.LOCAL,
     ) -> None:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
@@ -336,7 +344,7 @@ class DbtGraph:
         logger.info("Total filtered nodes: %i", len(self.nodes))
 
     def run_dbt_ls(
-        self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
+            self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
         ls_command = [dbt_cmd, "ls", "--output", "json"]
@@ -445,7 +453,7 @@ class DbtGraph:
                 cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
             with self.profile_config.ensure_profile(
-                use_mock_values=self.render_config.enable_mock_profile
+                    use_mock_values=self.render_config.enable_mock_profile
             ) as profile_values, environ(self.env_vars):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()

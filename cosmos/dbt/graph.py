@@ -78,11 +78,7 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        owner = self.config.get("meta").get("owner")
-        if owner is None:
-            return "airflow"
-        else:
-            return owner
+        return self.config.get("meta", {}).get("owner", "airflow")
 
     @property
     def context_dict(self) -> dict[str, Any]:

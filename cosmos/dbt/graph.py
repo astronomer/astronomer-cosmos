@@ -78,7 +78,7 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        owner = self.config.get("owner")
+        owner = self.config.get("meta").get("owner")
         if owner is None:
             return "airflow"
         else:

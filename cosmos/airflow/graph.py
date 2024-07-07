@@ -114,6 +114,7 @@ def create_test_task_metadata(
 
     return TaskMetadata(
         id=test_task_name,
+        owner=node.owner,
         operator_class=calculate_operator_class(
             execution_mode=execution_mode,
             dbt_class="DbtTest",

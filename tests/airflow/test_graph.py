@@ -42,7 +42,7 @@ parent_node = DbtNode(
     depends_on=[parent_seed.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
-    config={"materialized": "view"},
+    config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
 )
 test_parent_node = DbtNode(
@@ -122,6 +122,12 @@ def test_build_airflow_graph_with_after_each():
     assert len(dag.leaves) == 2
     assert dag.leaves[0].task_id == "child_run"
     assert dag.leaves[1].task_id == "child2_v2_run"
+
+    task_seed_parent_seed = dag.tasks[0]
+    task_parent_run = dag.tasks[1]
+
+    assert task_seed_parent_seed.owner == "airflow"
+    assert task_parent_run.owner == "parent_node"
 
 
 @pytest.mark.parametrize(
@@ -281,75 +287,75 @@ def test_create_task_metadata_unsupported(caplog):
     "unique_id, resource_type, expected_id, expected_operator_class, expected_arguments, expected_extra_context",
     [
         (
-            f"{DbtResourceType.MODEL.value}.my_folder.my_model",
-            DbtResourceType.MODEL,
-            "my_model_run",
-            "cosmos.operators.local.DbtRunLocalOperator",
-            {"models": "my_model"},
-            {
-                "dbt_node_config": {
-                    "unique_id": "model.my_folder.my_model",
-                    "resource_type": "model",
-                    "depends_on": [],
-                    "file_path": ".",
-                    "tags": [],
-                    "config": {},
-                    "has_test": False,
-                    "resource_name": "my_model",
-                    "name": "my_model",
-                }
-            },
-        ),
-        (
-            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
-            DbtResourceType.SOURCE,
-            "my_source_run",
-            "cosmos.operators.local.DbtRunLocalOperator",
-            {"models": "my_source"},
-            {
-                "dbt_node_config": {
-                    "unique_id": "model.my_folder.my_source",
-                    "resource_type": "source",
-                    "depends_on": [],
-                    "file_path": ".",
-                    "tags": [],
-                    "config": {},
-                    "has_test": False,
-                    "resource_name": "my_source",
-                    "name": "my_source",
-                }
-            },
-        ),
-        (
-            f"{DbtResourceType.SNAPSHOT.value}.my_folder.my_snapshot",
-            DbtResourceType.SNAPSHOT,
-            "my_snapshot_snapshot",
-            "cosmos.operators.local.DbtSnapshotLocalOperator",
-            {"models": "my_snapshot"},
-            {
-                "dbt_node_config": {
-                    "unique_id": "snapshot.my_folder.my_snapshot",
-                    "resource_type": "snapshot",
-                    "depends_on": [],
-                    "file_path": ".",
-                    "tags": [],
-                    "config": {},
-                    "has_test": False,
-                    "resource_name": "my_snapshot",
-                    "name": "my_snapshot",
+                f"{DbtResourceType.MODEL.value}.my_folder.my_model",
+                DbtResourceType.MODEL,
+                "my_model_run",
+                "cosmos.operators.local.DbtRunLocalOperator",
+                {"models": "my_model"},
+                {
+                    "dbt_node_config": {
+                        "unique_id": "model.my_folder.my_model",
+                        "resource_type": "model",
+                        "depends_on": [],
+                        "file_path": ".",
+                        "tags": [],
+                        "config": {},
+                        "has_test": False,
+                        "resource_name": "my_model",
+                        "name": "my_model",
+                    }
                 },
-            },
+        ),
+        (
+                f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+                DbtResourceType.SOURCE,
+                "my_source_run",
+                "cosmos.operators.local.DbtRunLocalOperator",
+                {"models": "my_source"},
+                {
+                    "dbt_node_config": {
+                        "unique_id": "model.my_folder.my_source",
+                        "resource_type": "source",
+                        "depends_on": [],
+                        "file_path": ".",
+                        "tags": [],
+                        "config": {},
+                        "has_test": False,
+                        "resource_name": "my_source",
+                        "name": "my_source",
+                    }
+                },
+        ),
+        (
+                f"{DbtResourceType.SNAPSHOT.value}.my_folder.my_snapshot",
+                DbtResourceType.SNAPSHOT,
+                "my_snapshot_snapshot",
+                "cosmos.operators.local.DbtSnapshotLocalOperator",
+                {"models": "my_snapshot"},
+                {
+                    "dbt_node_config": {
+                        "unique_id": "snapshot.my_folder.my_snapshot",
+                        "resource_type": "snapshot",
+                        "depends_on": [],
+                        "file_path": ".",
+                        "tags": [],
+                        "config": {},
+                        "has_test": False,
+                        "resource_name": "my_snapshot",
+                        "name": "my_snapshot",
+                    },
+                },
         ),
     ],
 )
 def test_create_task_metadata_model(
-    unique_id,
-    resource_type,
-    expected_id,
-    expected_operator_class,
-    expected_arguments,
-    expected_extra_context,
-    caplog,
+        unique_id,
+        resource_type,
+        expected_id,
+        expected_operator_class,
+        expected_arguments,
+        expected_extra_context,
+        caplog,
 ):
     child_node = DbtNode(
         unique_id=unique_id,
@@ -444,34 +450,34 @@ def test_create_task_metadata_snapshot(caplog):
     "node_type,node_unique_id,test_indirect_selection,additional_arguments",
     [
         (
-            DbtResourceType.MODEL,
-            f"{DbtResourceType.MODEL.value}.my_folder.node_name",
-            TestIndirectSelection.EAGER,
-            {"models": "node_name"},
+                DbtResourceType.MODEL,
+                f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+                TestIndirectSelection.EAGER,
+                {"models": "node_name"},
         ),
         (
-            DbtResourceType.MODEL,
-            f"{DbtResourceType.MODEL.value}.my_folder.node_name.v1",
-            TestIndirectSelection.EAGER,
-            {"models": "node_name.v1"},
+                DbtResourceType.MODEL,
+                f"{DbtResourceType.MODEL.value}.my_folder.node_name.v1",
+                TestIndirectSelection.EAGER,
+                {"models": "node_name.v1"},
         ),
         (
-            DbtResourceType.SEED,
-            f"{DbtResourceType.SEED.value}.my_folder.node_name",
-            TestIndirectSelection.CAUTIOUS,
-            {"select": "node_name", "indirect_selection": "cautious"},
+                DbtResourceType.SEED,
+                f"{DbtResourceType.SEED.value}.my_folder.node_name",
+                TestIndirectSelection.CAUTIOUS,
+                {"select": "node_name", "indirect_selection": "cautious"},
         ),
         (
-            DbtResourceType.SOURCE,
-            f"{DbtResourceType.SOURCE.value}.my_folder.node_name",
-            TestIndirectSelection.BUILDABLE,
-            {"select": "source:node_name", "indirect_selection": "buildable"},
+                DbtResourceType.SOURCE,
+                f"{DbtResourceType.SOURCE.value}.my_folder.node_name",
+                TestIndirectSelection.BUILDABLE,
+                {"select": "source:node_name", "indirect_selection": "buildable"},
         ),
         (
-            DbtResourceType.SNAPSHOT,
-            f"{DbtResourceType.SNAPSHOT.value}.my_folder.node_name",
-            TestIndirectSelection.EMPTY,
-            {"select": "node_name", "indirect_selection": "empty"},
+                DbtResourceType.SNAPSHOT,
+                f"{DbtResourceType.SNAPSHOT.value}.my_folder.node_name",
+                TestIndirectSelection.EMPTY,
+                {"select": "node_name", "indirect_selection": "empty"},
         ),
     ],
 )

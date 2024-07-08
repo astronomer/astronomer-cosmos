@@ -287,21 +287,17 @@ class ProfileConfig:
         if self.profiles_yml_filepath:
             logger.info("Using user-supplied profiles.yml at %s", self.profiles_yml_filepath)
             yield Path(self.profiles_yml_filepath), {}
-
         elif self.profile_mapping:
-            if use_mock_values:
-                env_vars = {}
-            else:
-                env_vars = self.profile_mapping.env_vars
-
             if is_profile_cache_enabled():
                 logger.info("Profile caching is enable.")
                 cached_profile_path = self._get_profile_path(use_mock_values)
+                env_vars = {} if use_mock_values else self.profile_mapping.env_vars
                 yield cached_profile_path, env_vars
             else:
                 profile_contents = self.profile_mapping.get_profile_file_contents(
                     profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
                 )
+                env_vars = {} if use_mock_values else self.profile_mapping.env_vars
 
                 if desired_profile_path:
                     logger.info(

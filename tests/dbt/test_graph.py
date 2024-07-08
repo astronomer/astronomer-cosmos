@@ -1072,6 +1072,37 @@ def test_load_via_dbt_ls_project_config_env_vars(
 
 
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.config.is_profile_cache_enabled", return_value=False)
+@patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
+@patch("cosmos.config.RenderConfig.validate_dbt_command")
+def test_profile_created_correctly_with_profile_mapping(
+    mock_validate,
+    mock_update_nodes,
+    mock_popen,
+    mock_enable_profile_cache,
+    mock_enable_cache,
+    tmp_dbt_project_dir,
+    postgres_profile_config,
+):
+    """Tests that the temporary profile is created without errors."""
+    mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
+    project_config = ProjectConfig(env_vars={})
+    render_config = RenderConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    profile_config = postgres_profile_config
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+
+    assert dbt_graph.load_via_dbt_ls() == None
+
+
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")

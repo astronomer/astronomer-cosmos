@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from airflow.models import Variable
 
 from cosmos import cache, settings
+from cosmos.cache import _copy_cached_lockfile_to_project, _get_latest_cached_lockfile, is_cache_lockfile_enabled
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     DBT_LOG_DIR_NAME,
@@ -487,6 +488,13 @@ class DbtGraph:
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
+                    if self.execution_config.execution_mode in (
+                        ExecutionMode.LOCAL,
+                        ExecutionMode.VIRTUALENV,
+                    ) and is_cache_lockfile_enabled(project_path):
+                        latest_package_lockfile = _get_latest_cached_lockfile(project_path)
+                        if latest_package_lockfile:
+                            _copy_cached_lockfile_to_project(latest_package_lockfile, Path(tmpdir))
                     self.run_dbt_deps(dbt_cmd, tmpdir_path, env)
 
                 nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)

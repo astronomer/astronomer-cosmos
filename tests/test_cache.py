@@ -16,12 +16,15 @@ from cosmos.cache import (
     _copy_partial_parse_to_project,
     _create_cache_identifier,
     _create_folder_version_hash,
+    _get_latest_cached_lockfile,
     _get_latest_partial_parse,
     _get_or_create_profile_cache_dir,
+    _get_sha1_hash,
     _update_partial_parse_cache,
     create_cache_profile,
     delete_unused_dbt_ls_cache,
     get_cached_profile,
+    is_cache_lockfile_enabled,
     is_profile_cache_enabled,
 )
 from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
@@ -317,3 +320,100 @@ def test_create_cache_profile():
             # Check content of the created file
             assert expected_path.read_text() == profile_content
             assert profile_yml_path == expected_path
+
+
+@patch("pathlib.Path.is_file")
+def test_cache_lockfile_enabled(mock_path_is_file):
+    # Mocking the return value of Path.is_file()
+    mock_path_is_file.return_value = True
+
+    # Test case where lockfile exists
+    project_dir = Path("/path/to/your/project")
+    result = is_cache_lockfile_enabled(project_dir)
+    assert result is True
+
+    # Test case where lockfile doesn't exist
+    mock_path_is_file.return_value = False
+    result = is_cache_lockfile_enabled(project_dir)
+    assert result is False
+
+
+@pytest.fixture
+def mock_package_lock_file():
+    # Create a temporary YAML file with test data
+    yaml_data = """
+    packages:
+      - package: dbt-labs/dbt_utils
+        version: 1.1.1
+    sha1_hash: a158c48c59c2bb7d729d2a4e215aabe5bb4f3353
+    """
+    tmp_file = Path("test_package-lock.yml")
+    with open(tmp_file, "w") as file:
+        file.write(yaml_data)
+    yield tmp_file
+    # Clean up: delete the temporary file after the test
+    tmp_file.unlink()
+
+
+def test_get_sha1_hash():
+    profile_lock_content = """
+    packages:
+      - package: dbt-labs/dbt_utils
+        version: 1.1.1
+    sha1_hash: a158c48c59c2bb7d729d2a4e215aabe5bb4f3353
+    """
+    tmp_file = Path("package-lock.yml")
+    with open(tmp_file, "w") as file:
+        file.write(profile_lock_content)
+
+    sha1_hash = _get_sha1_hash(tmp_file)
+    assert sha1_hash == "a158c48c59c2bb7d729d2a4e215aabe5bb4f3353"
+    tmp_file.unlink()
+
+
+def _test_tmp_dir(dir_name: str):
+    # Create a temporary directory for cache_dir
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cache_dir = Path(temp_dir) / "test_cache"
+        cache_dir.mkdir()
+        return cache_dir
+
+
+@patch("cosmos.cache.cache_dir")
+@patch("cosmos.cache._get_sha1_hash")
+def test_get_latest_cached_lockfile_with_cache(mock_get_sha, cache_dir):
+    # Create a fake cached lockfile
+    project_dir = _test_tmp_dir("test_project")
+    cache_dir.return_value = _test_tmp_dir("test_cache")
+    cache_identifier = project_dir.name
+    cached_profile_lockfile = cache_dir / cache_identifier / "package-lock.yml"
+    cached_profile_lockfile.parent.mkdir(parents=True, exist_ok=True)
+    cached_profile_lockfile.touch()
+
+    # Test case where there is a cached file
+    result = _get_latest_cached_lockfile(project_dir)
+    assert result == cached_profile_lockfile
+    assert cached_profile_lockfile.exists()
+
+
+@patch("cosmos.cache._get_sha1_hash")
+def test_get_latest_cached_lockfile_with_no_cache(mock_get_sha):
+    project_dir = _test_tmp_dir("test_project")
+    project_package_lockfile = project_dir / "package-lock.yml"
+    project_package_lockfile.parent.mkdir(parents=True, exist_ok=True)
+    project_package_lockfile.touch()
+
+    # Test case where there is a cached file
+    result = _get_latest_cached_lockfile(project_dir)
+    assert result.exists()
+
+
+def test_get_latest_cached_failed(caplog):
+    caplog.set_level(logging.WARNING)
+    project_dir = _test_tmp_dir("test_project")
+    cache_dir = _test_tmp_dir("test_cache")
+    project_dir.parent.mkdir(parents=True, exist_ok=True)
+    cache_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    _get_latest_cached_lockfile(project_dir)
+    assert "Error processing cached lockfile" in caplog.text

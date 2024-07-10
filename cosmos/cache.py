@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import msgpack
+import yaml
 from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
@@ -19,10 +20,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
-from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
+from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME, PACKAGE_LOCK_YML
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
-from cosmos.settings import cache_dir, dbt_profile_cache_dir_name, enable_cache, enable_cache_profile
+from cosmos.settings import (
+    cache_dir,
+    dbt_profile_cache_dir_name,
+    enable_cache,
+    enable_cache_profile,
+)
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
@@ -400,3 +406,48 @@ def create_cache_profile(version: str, profile_content: str) -> Path:
     profile_yml_path = profile_yml_dir / DEFAULT_PROFILES_FILE_NAME
     profile_yml_path.write_text(profile_content)
     return profile_yml_path
+
+
+def is_cache_lockfile_enabled(project_dir: Path) -> bool:
+    project_lockfile = project_dir / PACKAGE_LOCK_YML
+    return project_lockfile.is_file()
+
+
+def _get_sha1_hash(yaml_file: Path) -> str:
+    """Read package-lock.yml file and return sha1_hash"""
+    with open(yaml_file) as file:
+        yaml_content = file.read()
+    data = yaml.safe_load(yaml_content)
+    sha1_hash: str = data.get("sha1_hash", "")
+    return sha1_hash
+
+
+def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
+    """
+    Retrieves the latest cached package-lock.yml for the specified project directory,
+    or creates and caches it if not already cached and hashes match.
+    """
+    cache_identifier = project_dir.name
+    project_lockfile = project_dir / PACKAGE_LOCK_YML
+    cached_package_lockfile = cache_dir / cache_identifier / PACKAGE_LOCK_YML
+
+    try:
+        if cached_package_lockfile.exists() and cached_package_lockfile.is_file():
+            project_sha1_hash = _get_sha1_hash(project_lockfile)
+            cached_sha1_hash = _get_sha1_hash(cached_package_lockfile)
+            if project_sha1_hash == cached_sha1_hash:
+                return cached_package_lockfile
+        else:
+            cached_lockfile_dir = cache_dir / cache_identifier
+            cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(project_lockfile, cached_package_lockfile)
+            return cached_package_lockfile
+    except Exception as e:
+        logger.warning(f"Error processing cached lockfile: {e}")
+    return None
+
+
+def _copy_cached_lockfile_to_project(cached_lockfile: Path, project_dir: Path) -> None:
+    """Copy the cached package-lock.yml to tmp project dir"""
+    lock_file = project_dir / PACKAGE_LOCK_YML
+    shutil.copyfile(cached_lockfile, lock_file)

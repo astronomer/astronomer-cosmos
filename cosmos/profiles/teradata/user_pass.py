@@ -49,3 +49,10 @@ class TeradataUserPasswordProfileMapping(BaseProfileMapping):
             profile["schema"] = profile["user"]
 
         return self.filter_null(profile)
+
+    @property
+    def mock_profile(self) -> dict[str, Any | None]:
+        """Gets mock profile. Assigning user to schema as default"""
+        mock_profile = super().mock_profile
+        mock_profile["schema"] = mock_profile["user"]
+        return mock_profile

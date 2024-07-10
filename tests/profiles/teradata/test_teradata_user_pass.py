@@ -96,6 +96,12 @@ def test_profile_mapping_selected(
     assert isinstance(profile_mapping, TeradataUserPasswordProfileMapping)
 
 
+def test_profile_mapping_schema_validation(mock_teradata_conn: Connection) -> None:
+    # port is not handled in airflow connection so adding it as profile_args
+    profile = TeradataUserPasswordProfileMapping(mock_teradata_conn.conn_id)
+    assert profile.profile["schema"] == "my_user"
+
+
 def test_profile_mapping_keeps_port(mock_teradata_conn: Connection) -> None:
     # port is not handled in airflow connection so adding it as profile_args
     profile = TeradataUserPasswordProfileMapping(mock_teradata_conn.conn_id, profile_args={"port": 1025})
@@ -174,3 +180,6 @@ def test_mock_profile() -> None:
     """
     profile = TeradataUserPasswordProfileMapping("mock_conn_id")
     assert profile.mock_profile.get("host") == "mock_value"
+    assert profile.mock_profile.get("user") == "mock_value"
+    assert profile.mock_profile.get("password") == "mock_value"
+    assert profile.mock_profile.get("schema") == "mock_value"

@@ -37,6 +37,9 @@ def example_virtualenv() -> None:
     start_task = EmptyOperator(task_id="start-venv-examples")
     end_task = EmptyOperator(task_id="end-venv-examples")
 
+    # This first task group creates a new Cosmos virtualenv every time a task is run
+    # and deletes it afterwards
+    # It is much slower than if the user sets the `virtualenv_dir`
     tmp_venv_task_group = DbtTaskGroup(
         group_id="tmp-venv-group",
         # dbt/cosmos-specific parameters
@@ -58,6 +61,8 @@ def example_virtualenv() -> None:
         },
     )
 
+    # The following task group reuses the Cosmos-managed Python virtualenv across multiple tasks.
+    # It runs approximately 70% faster than the previous TaskGroup.
     cached_venv_task_group = DbtTaskGroup(
         group_id="cached-venv-group",
         # dbt/cosmos-specific parameters
@@ -73,7 +78,7 @@ def example_virtualenv() -> None:
         ),
         operator_args={
             "py_system_site_packages": False,
-            "py_requirements": ["dbt-postgres==1.6.0b1"],
+            "py_requirements": ["dbt-postgres==1.8"],
             "install_deps": True,
         },
     )

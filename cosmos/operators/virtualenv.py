@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import time
+import traceback
 from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,7 +14,6 @@ from airflow.utils.python_virtualenv import prepare_virtualenv
 
 from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtDocsLocalOperator,
@@ -27,8 +28,6 @@ from cosmos.operators.local import (
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
-
-logger = get_logger(__name__)
 
 
 PY_INTERPRETER = "python3"
@@ -57,7 +56,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
            Avoid using unless the dbt job requires it.
     """
 
-    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir",)  # type: ignore[operator]
+    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir", "is_virtualenv_dir_temporary")  # type: ignore[operator]
 
     def __init__(
         self,
@@ -65,14 +64,15 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         pip_install_options: list[str] | None = None,
         py_system_site_packages: bool = False,
         virtualenv_dir: Path | None = None,
+        is_virtualenv_dir_temporary: bool = False,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
         self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
-        super().__init__(**kwargs)
         self.virtualenv_dir = virtualenv_dir
-        self._venv_tmp_dir: None | TemporaryDirectory[str] = None
+        self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
+        super().__init__(**kwargs)
 
     @cached_property
     def venv_dbt_path(
@@ -88,7 +88,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
         # For this reason, we are not using contexts at this point.
         # The deletion of this directory is done explicitly at the end of the `execute` method.
-        self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
         py_interpreter = self._get_or_create_venv_py_interpreter()
         dbt_binary = Path(py_interpreter).parent / "dbt"
         cmd_output = self.subprocess_hook.run_command(
@@ -114,37 +113,45 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         )
         return subprocess_result
 
+    def clean_dir_if_temporary(self) -> None:
+        """
+        Delete the virtualenv directory if it is temporary.
+        """
+        if self.is_virtualenv_dir_temporary and self.virtualenv_dir:
+            self.log.info(f"Deleting the Python virtualenv {self.virtualenv_dir}")
+            shutil.rmtree(str(self.virtualenv_dir), ignore_errors=True)
+
     def execute(self, context: Context) -> None:
-        output = super().execute(context)
-        if self._venv_tmp_dir:
-            self._venv_tmp_dir.cleanup()
-        logger.info(output)
+        try:
+            output = super().execute(context)
+        except Exception:
+            self.log.error(traceback.format_exc())
+        else:
+            self.log.info(output)
+        finally:
+            self.clean_dir_if_temporary()
+
+    def on_kill(self) -> None:
+        self.clean_dir_if_temporary()
 
     def _get_or_create_venv_py_interpreter(self) -> str:
         """Helper method that parses virtual env configuration
         and returns a DBT binary within the resulting virtualenv"""
 
         # No virtualenv_dir set, so revert to making a temporary virtualenv
-        if self.virtualenv_dir is None:
+        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
             self.log.info("Creating temporary virtualenv")
-            self._venv_tmp_dir = TemporaryDirectory(prefix="cosmos-venv")
+            self.virtualenv_dir = Path(TemporaryDirectory(prefix="cosmos-venv").name)
 
-            return prepare_virtualenv(
-                venv_directory=self._venv_tmp_dir.name,
-                python_bin=PY_INTERPRETER,
-                system_site_packages=self.py_system_site_packages,
-                requirements=self.py_requirements,
-            )
+        if not self.is_virtualenv_dir_temporary:
+            self.log.info(f"Checking if {str(self.__lock_file)} exists")
+            while not self._is_lock_available():
+                self.log.info("Waiting for lock to release")
+                time.sleep(1)
+            self.log.info(f"Acquiring available lock")
+            self.__acquire_venv_lock()
 
-        self.log.info(f"Checking if {str(self.__lock_file)} exists")
-        while not self._is_lock_available():
-            self.log.info("Waiting for lock to release")
-            time.sleep(1)
-
-        self.log.info(f"Creating virtualenv at `{self.virtualenv_dir}")
-        self.log.info(f"Acquiring available lock")
-        self.__acquire_venv_lock()
-
+        self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,
@@ -153,8 +160,9 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             pip_install_options=self.pip_install_options,
         )
 
-        self.log.info("Releasing lock")
-        self.__release_venv_lock()
+        if not self.is_virtualenv_dir_temporary:
+            self.log.info("Releasing lock")
+            self.__release_venv_lock()
 
         return py_bin
 
@@ -196,7 +204,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def __release_venv_lock(self) -> None:
         if not self.__lock_file.is_file():
             self.log.warn(f"Lockfile {self.__lock_file} not found, perhaps deleted by other concurrent operator?")
-
             return
 
         with open(self.__lock_file) as lf:

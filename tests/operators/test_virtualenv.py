@@ -64,7 +64,7 @@ def test_run_command(
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
     )
-    assert venv_operator._venv_tmp_dir is None  # Otherwise we are creating empty directories during DAG parsing time
+    assert venv_operator.virtualenv_dir is None  # Otherwise we are creating empty directories during DAG parsing time
     # and not deleting them
     venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
     run_command_args = mock_subprocess_hook.run_command.call_args_list

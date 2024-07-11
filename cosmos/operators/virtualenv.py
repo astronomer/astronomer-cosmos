@@ -117,7 +117,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         """
         Delete the virtualenv directory if it is temporary.
         """
-        if self.is_virtualenv_dir_temporary and self.virtualenv_dir:
+        if self.is_virtualenv_dir_temporary and self.virtualenv_dir and self.virtualenv_dir.exists():
             self.log.info(f"Deleting the Python virtualenv {self.virtualenv_dir}")
             shutil.rmtree(str(self.virtualenv_dir), ignore_errors=True)
 
@@ -134,23 +134,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def on_kill(self) -> None:
         self.clean_dir_if_temporary()
 
-    def _get_or_create_venv_py_interpreter(self) -> str:
-        """Helper method that parses virtual env configuration
-        and returns a DBT binary within the resulting virtualenv"""
-
-        # No virtualenv_dir set, so revert to making a temporary virtualenv
-        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
-            self.log.info("Creating temporary virtualenv")
-            self.virtualenv_dir = Path(TemporaryDirectory(prefix="cosmos-venv").name)
-
-        if not self.is_virtualenv_dir_temporary:
-            self.log.info(f"Checking if {str(self.__lock_file)} exists")
-            while not self._is_lock_available():
-                self.log.info("Waiting for lock to release")
-                time.sleep(1)
-            self.log.info(f"Acquiring available lock")
-            self.__acquire_venv_lock()
-
+    def prepare_virtualenv(self) -> str:
         self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
@@ -159,9 +143,32 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             requirements=self.py_requirements,
             pip_install_options=self.pip_install_options,
         )
+        return py_bin
+
+    def _get_or_create_venv_py_interpreter(self) -> str:
+        """Helper method that parses virtual env configuration
+        and returns a DBT binary within the resulting virtualenv"""
+
+        # No virtualenv_dir set, so create a temporary virtualenv
+        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
+            self.log.info("Creating temporary virtualenv")
+            with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
+                self.virtualenv_dir = Path(tempdir)
+                py_bin = self.prepare_virtualenv()
+            return py_bin
+
+        # Use a reusable virtualenv
+        self.log.info(f"Checking if the virtualenv lock {str(self.__lock_file)} exists")
+        while not self._is_lock_available():
+            self.log.info("Waiting for virtualenv lock to be released")
+            time.sleep(1)
+
+        self.log.info(f"Acquiring the virtualenv lock")
+        self.__acquire_venv_lock()
+        py_bin = self.prepare_virtualenv()
 
         if not self.is_virtualenv_dir_temporary:
-            self.log.info("Releasing lock")
+            self.log.info("Releasing virtualenv lock")
             self.__release_venv_lock()
 
         return py_bin

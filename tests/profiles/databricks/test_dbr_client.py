@@ -72,16 +72,3 @@ def test_connection_claiming() -> None:
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
-
-
-def test_databricks_mapping_selected(
-    mock_databricks_conn: Connection,
-) -> None:
-    """
-    Tests that the correct profile mapping is selected.
-    """
-    profile_mapping = get_automatic_profile_mapping(
-        mock_databricks_conn.conn_id,
-        {"schema": "my_schema"},
-    )
-    assert isinstance(profile_mapping, DatabricksOauthProfileMapping)

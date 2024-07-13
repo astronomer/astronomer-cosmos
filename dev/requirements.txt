@@ -1,0 +1,1 @@
+apache-airflow-providers-databricks==6.7.0

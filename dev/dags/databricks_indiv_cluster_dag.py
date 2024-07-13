@@ -42,3 +42,4 @@ basic_cosmos_dag = DbtDag(
 )
 # [END local_example]
 # sudo chown -R 50000:50000 /home/corsetti/gitrepos/astronomer-cosmos/dev/dags once done
+

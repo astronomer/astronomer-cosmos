@@ -21,8 +21,7 @@ RUN uv pip install --system -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres,
 
 # make sure astro user owns the package
 RUN chown -R astro:astro ${AIRFLOW_HOME}/astronomer_cosmos
-COPY ./dev/requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+
 USER astro
 
 # add a connection to the airflow db for testing

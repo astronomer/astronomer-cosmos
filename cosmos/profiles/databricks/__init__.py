@@ -2,4 +2,4 @@
 
 from .token import DatabricksTokenProfileMapping
 
-__all__ = ["DatabricksTokenProfileMapping", "DatabricksClientProfileMapping"]
+__all__ = ["DatabricksTokenProfileMapping", "DatabricksOauthProfileMapping"]

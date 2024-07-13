@@ -7,7 +7,7 @@ from typing import Any
 from ..base import BaseProfileMapping
 
 
-class DatabricksClientProfileMapping(BaseProfileMapping):
+class DatabricksOauthProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Databricks connections with the client auth to dbt profiles.
 

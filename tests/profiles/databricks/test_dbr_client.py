@@ -7,7 +7,7 @@ from airflow.models.connection import Connection
 
 from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.databricks import (
-    DatabricksClientProfileMapping,
+    DatabricksOauthProfileMapping,
 )
 
 
@@ -58,19 +58,19 @@ def test_connection_claiming() -> None:
         print("testing with", values)
 
         with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-            profile_mapping = DatabricksClientProfileMapping(conn, {"schema": "my_schema"})
+            profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
             assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = DatabricksClientProfileMapping(conn, {})
+        profile_mapping = DatabricksOauthProfileMapping(conn, {})
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = DatabricksClientProfileMapping(conn, {"schema": "my_schema"})
+        profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
 
 
@@ -84,4 +84,4 @@ def test_databricks_mapping_selected(
         mock_databricks_conn.conn_id,
         {"schema": "my_schema"},
     )
-    assert isinstance(profile_mapping, DatabricksClientProfileMapping)
+    assert isinstance(profile_mapping, DatabricksOauthProfileMapping)

@@ -10,6 +10,7 @@ from cosmos.profiles.databricks import (
     DatabricksClientProfileMapping,
 )
 
+
 @pytest.fixture()
 def mock_databricks_conn():  # type: ignore
     """

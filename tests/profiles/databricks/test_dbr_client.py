@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.databricks import (
     DatabricksOauthProfileMapping,
 )

@@ -43,6 +43,6 @@ class DatabricksClientProfileMapping(BaseProfileMapping):
             **self.mapped_params,
             **self.profile_args,
             "auth_type": "oauth",
-            # client_secret should always get set as env var
             "client_secret": self.get_env_var_format("client_secret"),
+            "client_id": self.get_env_var_format("client_id"),
         }

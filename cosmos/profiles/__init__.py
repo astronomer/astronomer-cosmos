@@ -11,7 +11,7 @@ from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileM
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 from .clickhouse.user_pass import ClickhouseUserPasswordProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
-from .databricks.token import DatabricksClientProfileMapping
+from .databricks.client import DatabricksClientProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
 from .redshift.user_pass import RedshiftUserPasswordProfileMapping

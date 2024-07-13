@@ -17,7 +17,9 @@ profile_config = ProfileConfig(
     target_name="dev",
     profile_mapping=DatabricksClientProfileMapping(
         conn_id="databricks_default",
-        profile_args={"catalog": "dwh_test"},
+        profile_args={
+                      "http_path": "sql/protocolv1/o/4592942032988138/0912-130918-xud7s2hw"
+                      },
         disable_event_tracking=True,
     ),
 )

@@ -126,7 +126,7 @@ def test_build_airflow_graph_with_after_each():
     task_seed_parent_seed = dag.tasks[0]
     task_parent_run = dag.tasks[1]
 
-    assert task_seed_parent_seed.owner == "airflow"
+    assert task_seed_parent_seed.owner == ""
     assert task_parent_run.owner == "parent_node"
 
 

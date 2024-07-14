@@ -106,15 +106,20 @@ def create_test_task_metadata(
             task_args["select"] = node.resource_name
 
         extra_context = {"dbt_node_config": node.context_dict}
+        task_owner = node.owner
 
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
+        task_owner = ""
+
+    else:
+        task_owner = ""
 
     return TaskMetadata(
         id=test_task_name,
-        owner=node.owner,
+        owner=task_owner,
         operator_class=calculate_operator_class(
             execution_mode=execution_mode,
             dbt_class="DbtTest",

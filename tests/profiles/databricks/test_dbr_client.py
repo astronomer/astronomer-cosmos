@@ -1,4 +1,4 @@
-"""Tests for the databricks profile."""
+"""Tests for the databricks OAuth profile."""
 
 from unittest.mock import patch
 

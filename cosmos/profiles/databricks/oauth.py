@@ -38,7 +38,7 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
 
     @property
     def profile(self) -> dict[str, Any | None]:
-        """Generates profile. The token is stored in an environment variable."""
+        """Generates profile. The client-id and client-secret is stored in an environment variable."""
         return {
             **self.mapped_params,
             **self.profile_args,

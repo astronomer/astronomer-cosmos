@@ -5,9 +5,7 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 
-from cosmos.profiles.databricks import (
-    DatabricksOauthProfileMapping,
-)
+from cosmos.profiles.databricks import DatabricksOauthProfileMapping
 
 
 @pytest.fixture()

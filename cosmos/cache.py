@@ -230,9 +230,12 @@ def _create_folder_version_hash(dir_path: Path) -> str:
         filepaths.extend(paths)
 
     for filepath in sorted(filepaths):
-        with open(str(filepath), "rb") as fp:
-            buf = fp.read()
-            hasher.update(buf)
+        try:
+            with open(str(filepath), "rb") as fp:
+                buf = fp.read()
+                hasher.update(buf)
+        except FileNotFoundError:
+            logger.debug(f"Skipping invalid path {filepath}")
 
     return hasher.hexdigest()
 

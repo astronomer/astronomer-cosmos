@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.5.0a1 (2024-07-16)
+--------------------
+
+Bug fixes
+
+* (WIP) Fix project_path when using DBT_LS mode by @tatiana
+
+
 1.5.0 (2024-06-27)
 ------------------
 

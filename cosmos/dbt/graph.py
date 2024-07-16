@@ -195,6 +195,9 @@ class DbtGraph:
         """
         # we're considering the execution_config only due to backwards compatibility
         path = self.render_config.project_path or self.project.dbt_project_path or self.execution_config.project_path
+        logger.info(
+            f"Identifying the project path for {self.dbt_ls_cache_key}: path: {path}, path absolute: {path and path.absolute()}, render_config: {self.render_config.project_path}, project: {self.project.dbt_project_path}, execution_config: {self.execution_config.project_path}"
+        )
         if not path:
             raise CosmosLoadDbtException(
                 "Unable to load project via dbt ls without RenderConfig.dbt_project_path, ProjectConfig.dbt_project_path or ExecutionConfig.dbt_project_path"
@@ -261,7 +264,9 @@ class DbtGraph:
         dbt_ls_compressed = encoded_data.decode("utf-8")
         cache_dict = {
             "version": cache._calculate_dbt_ls_cache_current_version(
-                self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
+                cache_identifier=self.dbt_ls_cache_key,
+                project_dir=self.project_path,
+                cmd_args=self.dbt_ls_cache_key_args,
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),

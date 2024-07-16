@@ -187,7 +187,7 @@ class DbtGraph:
         """
         return self.render_config.env_vars or self.project.env_vars or {}
 
-    @cached_property
+    @property
     def project_path(self) -> Path:
         """
         Return the user-defined path to their dbt project. Tries to retrieve the configuration from render_config and
@@ -262,6 +262,7 @@ class DbtGraph:
         compressed_data = zlib.compress(dbt_ls_output.encode("utf-8"))
         encoded_data = base64.b64encode(compressed_data)
         dbt_ls_compressed = encoded_data.decode("utf-8")
+        logger.info(f"save_dbt_ls_cache for {self.dbt_ls_cache_key}: self.project_path: {self.project_path}")
         cache_dict = {
             "version": cache._calculate_dbt_ls_cache_current_version(
                 cache_identifier=self.dbt_ls_cache_key,

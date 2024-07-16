@@ -247,7 +247,7 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
     :param cmd_args: List containing the arguments passed to the dbt ls command that would affect its output
     """
     logger.info(
-        f"_calculate_dbt_ls_cache_current_version for {cache_identifier} received the project_dir: {project_dir}"
+        f"_calculate_dbt_ls_cache_current_version for {cache_identifier} received the project_dir: {project_dir} and cmd_args: {cmd_args}"
     )
     start_time = time.perf_counter()
 

@@ -1,12 +1,16 @@
 Changelog
 =========
 
-1.6.0a1 (2024-07-05)
+1.6.0a2 (2024-07-17)
 --------------------
 
 New Features
 
 * Add Teradata ``ProfileMapping`` by @sc250072 in #1077
+
+Bug fixes
+
+* Fix Teradata Profile mapping issue by @sc250072 in #1088
 
 Others
 

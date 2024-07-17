@@ -545,6 +545,7 @@ class DbtGraph:
         )
         for model_name, model in models:
             config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
+            tags = [selector for selector in model.config.config_selectors if selector.startswith("tags:")]
             node = DbtNode(
                 unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
                 resource_type=DbtResourceType(model.type.value),
@@ -554,7 +555,7 @@ class DbtGraph:
                         self.render_config.project_path.as_posix(), self.execution_config.project_path.as_posix()
                     )
                 ),
-                tags=[],
+                tags=tags or [],
                 config=config,
             )
             nodes[model_name] = node

@@ -1,4 +1,4 @@
-FROM quay.io/astronomer/astro-runtime:11.3.0-base
+FROM quay.io/astronomer/astro-runtime:11.6.0-base
 
 USER root
 
@@ -15,9 +15,11 @@ RUN pip install -U uv
 COPY ./pyproject.toml  ${AIRFLOW_HOME}/astronomer_cosmos/
 COPY ./README.rst  ${AIRFLOW_HOME}/astronomer_cosmos/
 COPY ./cosmos/  ${AIRFLOW_HOME}/astronomer_cosmos/cosmos/
-
+COPY ./dev/requirements.txt ${AIRFLOW_HOME}/requirements.txt
 # install the package in editable mode
-RUN uv pip install --system -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres,dbt-databricks]
+RUN uv pip install --system -e "${AIRFLOW_HOME}/astronomer_cosmos"[dbt-postgres,dbt-databricks] && \
+    uv pip install --system -r ${AIRFLOW_HOME}/requirements.txt
+
 
 # make sure astro user owns the package
 RUN chown -R astro:astro ${AIRFLOW_HOME}/astronomer_cosmos

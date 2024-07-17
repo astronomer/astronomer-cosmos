@@ -235,7 +235,7 @@ def _create_folder_version_hash(dir_path: Path) -> str:
                 buf = fp.read()
                 hasher.update(buf)
         except FileNotFoundError:
-            logger.debug(f"Skipping invalid path {filepath}")
+            logger.warning(f"The dbt project folder contains a symbolic link to a non-existent file: {filepath}")
 
     return hasher.hexdigest()
 

@@ -51,6 +51,7 @@ dbt-all = [
     "dbt-redshift",
     "dbt-snowflake",
     "dbt-spark",
+    "dbt-teradata",
     "dbt-vertica",
 ]
 dbt-athena = ["dbt-athena-community", "apache-airflow-providers-amazon>=8.0.0"]
@@ -62,6 +63,7 @@ dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
 dbt-spark = ["dbt-spark"]
+dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 all = ["astronomer-cosmos[dbt-all]", "astronomer-cosmos[openlineage]"]

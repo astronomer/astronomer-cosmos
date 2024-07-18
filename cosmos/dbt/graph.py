@@ -320,9 +320,10 @@ class DbtGraph:
             if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
             else:
-                if self.profile_config:
+                if self.profile_config and self.project_path:
                     try:
                         self.load_via_dbt_ls()
+                        logger.info("Using DBT ls")
                     except FileNotFoundError:
                         self.load_via_custom_parser()
                 else:

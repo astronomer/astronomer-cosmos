@@ -4,7 +4,7 @@ Airflow and dbt dependencies conflicts
 ======================================
 
 When using the `Local Execution Mode <execution-modes.html#local>`__, users may face dependency conflicts between
-Apache Airflow and dbt. The conflicts may increase depending on the Airflow providers and dbt adapters being used.
+Apache Airflow® and dbt. The conflicts may increase depending on the Airflow providers and dbt adapters being used.
 
 If you find errors, we recommend users look into using `alternative execution modes <execution-modes.html>`__.
 

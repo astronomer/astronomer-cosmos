@@ -3,7 +3,7 @@
 Hosting Docs
 ============
 
-dbt docs can be served directly from the Apache Airflow webserver with the Cosmos Airflow plugin, without requiring the user to set up anything outside of Airflow. This page describes how to host docs in the Airflow webserver directly, although some users may opt to host docs externally.
+dbt docs can be served directly from the Apache Airflow® webserver with the Cosmos Airflow plugin, without requiring the user to set up anything outside of Airflow. This page describes how to host docs in the Airflow webserver directly, although some users may opt to host docs externally.
 
 Overview
 ~~~~~~~~

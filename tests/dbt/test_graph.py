@@ -813,6 +813,32 @@ def test_load_via_load_via_custom_parser(project_name):
     assert len(dbt_graph.nodes) == 28
 
 
+def test_load_via_load_via_custom_parser_select_rendering_config():
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "jaffle_shop")
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, select=["customers"])
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert len(dbt_graph.filtered_nodes) == 1
+    for model_name in dbt_graph.filtered_nodes:
+        assert model_name == "customers"
+        filter_node = dbt_graph.filtered_nodes.get(model_name)
+        assert filter_node.file_path == DBT_PROJECTS_ROOT_DIR / "jaffle_shop/models/customers.sql"
+        assert filter_node.tags == ['tags:customers']
+
+
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency", return_value=None)
 def test_update_node_dependency_called(mock_update_node_dependency):
     project_config = ProjectConfig(

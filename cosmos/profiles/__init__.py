@@ -10,6 +10,7 @@ from .bigquery.oauth import GoogleCloudOauthProfileMapping
 from .bigquery.service_account_file import GoogleCloudServiceAccountFileProfileMapping
 from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDictProfileMapping
 from .clickhouse.user_pass import ClickhouseUserPasswordProfileMapping
+from .databricks.oauth import DatabricksOauthProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -32,6 +33,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudServiceAccountDictProfileMapping,
     GoogleCloudOauthProfileMapping,
     DatabricksTokenProfileMapping,
+    DatabricksOauthProfileMapping,
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
     SnowflakeUserPasswordProfileMapping,
@@ -73,6 +75,7 @@ __all__ = [
     "GoogleCloudServiceAccountDictProfileMapping",
     "GoogleCloudOauthProfileMapping",
     "DatabricksTokenProfileMapping",
+    "DatabricksOauthProfileMapping",
     "DbtProfileConfigVars",
     "PostgresUserPasswordProfileMapping",
     "RedshiftUserPasswordProfileMapping",

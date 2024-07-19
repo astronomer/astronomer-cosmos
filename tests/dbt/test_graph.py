@@ -813,6 +813,32 @@ def test_load_via_load_via_custom_parser(project_name):
     assert len(dbt_graph.nodes) == 28
 
 
+def test_load_via_load_via_custom_parser_select_rendering_config():
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "jaffle_shop")
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, select=["customers"])
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert len(dbt_graph.filtered_nodes) == 1
+    for model_name in dbt_graph.filtered_nodes:
+        assert model_name == "customers"
+        filter_node = dbt_graph.filtered_nodes.get(model_name)
+        assert filter_node.file_path == DBT_PROJECTS_ROOT_DIR / "jaffle_shop/models/customers.sql"
+        assert filter_node.tags == ["tags:customers"]
+
+
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency", return_value=None)
 def test_update_node_dependency_called(mock_update_node_dependency):
     project_config = ProjectConfig(
@@ -1387,9 +1413,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "cdc6f0bec00f4edc616f3aa755a34330"
+        assert hash_dir == "465fc0735d8bef08a0d375b2315069bb"
     else:
-        assert hash_dir == "77d08d6da374330ac1b49438ff2873f7"
+        assert hash_dir == "6c662da10b64a8390c469c884af88321"
 
 
 @pytest.mark.integration

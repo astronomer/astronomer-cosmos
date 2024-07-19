@@ -133,8 +133,8 @@ def test_dbtmodelconfig___repr__():
     dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     expected_start = (
         "DbtModel(name='some_name', type='DbtModelType.DBT_MODEL', "
-        "path='dev/dags/dbt/jaffle_shop/models/customers.sql', config=DbtModelConfig(config_selectors=set(), "
-        "upstream_models={'stg_"
+        "path='dev/dags/dbt/jaffle_shop/models/customers.sql', config=DbtModelConfig("
+        "config_selectors={'tags:customers'}, upstream_models={'stg_"
     )
     assert str(dbt_model).startswith(expected_start)
 

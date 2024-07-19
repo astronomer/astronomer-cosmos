@@ -12,7 +12,7 @@ requires-python = ">=3.8"
 authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
 keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",
     "Framework :: Apache Airflow",
     "Framework :: Apache Airflow :: Provider",

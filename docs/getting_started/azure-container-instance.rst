@@ -1,4 +1,4 @@
-.. _azure-container-instance
+.. _azure-container-instance:
 
 Azure Container Instance Execution Mode
 =======================================

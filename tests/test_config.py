@@ -1,12 +1,13 @@
 from contextlib import nullcontext as does_not_raise
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, PropertyMock, call, patch
 
 import pytest
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode
 from cosmos.exceptions import CosmosValueError
+from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
@@ -140,6 +141,67 @@ def test_profile_config_validate_profiles_yml():
         profile_config.validate_profiles_yml()
 
     assert err_info.value.args[0] == "The file /tmp/no-exists does not exist."
+
+
+@patch("cosmos.config.is_profile_cache_enabled", return_value=False)
+@patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.env_vars", new_callable=PropertyMock)
+@patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_profile_file_contents")
+@patch("cosmos.config.Path")
+def test_profile_config_ensure_profile_without_caching_calls_get_profile_file_content_before_env_vars(
+    mock_path, mock_get_profile_file_contents, mock_env_vars, mock_cache
+):
+    """
+    The `env_vars` should not be called if profile file is not populated.
+    """
+    profile_mapping = AthenaAccessKeyProfileMapping(conn_id="test", profile_args={})
+    profile_config = ProfileConfig(profile_name="test", target_name="test", profile_mapping=profile_mapping)
+    mock_manager = Mock()
+    mock_manager.attach_mock(mock_get_profile_file_contents, "get_profile_file_contents")
+    mock_manager.attach_mock(mock_env_vars, "env_vars")
+
+    with profile_config.ensure_profile(desired_profile_path=mock_path):
+        mock_get_profile_file_contents.assert_called_once()
+        mock_env_vars.assert_called_once()
+        expected_calls = [
+            call.get_profile_file_contents(profile_name="test", target_name="test", use_mock_values=False),
+            call.env_vars,
+        ]
+        mock_manager.assert_has_calls(expected_calls, any_order=False)
+
+
+@patch("cosmos.config.create_cache_profile")
+@patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.version")
+@patch("cosmos.config.get_cached_profile", return_value=None)
+@patch("cosmos.config.is_profile_cache_enabled", return_value=True)
+@patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.env_vars", new_callable=PropertyMock)
+@patch("cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping.get_profile_file_contents")
+@patch("cosmos.config.Path")
+def test_profile_config_ensure_profile_with_caching_calls_get_profile_file_content_before_env_vars(
+    mock_path,
+    mock_get_profile_file_contents,
+    mock_env_vars,
+    mock_cache,
+    mock_get_cached_profile,
+    mock_version,
+    mock_create_cache_profile,
+):
+    """
+    The `env_vars` should not be called if profile file is not populated.
+    """
+    profile_mapping = AthenaAccessKeyProfileMapping(conn_id="test", profile_args={})
+    profile_config = ProfileConfig(profile_name="test", target_name="test", profile_mapping=profile_mapping)
+    mock_manager = Mock()
+    mock_manager.attach_mock(mock_get_profile_file_contents, "get_profile_file_contents")
+    mock_manager.attach_mock(mock_env_vars, "env_vars")
+
+    with profile_config.ensure_profile(desired_profile_path=mock_path):
+        mock_get_profile_file_contents.assert_called_once()
+        mock_env_vars.assert_called_once()
+        expected_calls = [
+            call.get_profile_file_contents(profile_name="test", target_name="test", use_mock_values=False),
+            call.env_vars,
+        ]
+        mock_manager.assert_has_calls(expected_calls, any_order=False)
 
 
 @patch("cosmos.config.shutil.which", return_value=None)

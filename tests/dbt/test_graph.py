@@ -369,9 +369,9 @@ def test_load_manifest_with_manifest(mock_load_from_dbt_manifest):
     "exec_mode,method,expected_function",
     [
         (ExecutionMode.LOCAL, LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
-        (ExecutionMode.VIRTUALENV, LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
-        (ExecutionMode.KUBERNETES, LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
-        (ExecutionMode.DOCKER, LoadMode.AUTOMATIC, "mock_load_via_custom_parser"),
+        (ExecutionMode.VIRTUALENV, LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
+        (ExecutionMode.KUBERNETES, LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
+        (ExecutionMode.DOCKER, LoadMode.AUTOMATIC, "mock_load_via_dbt_ls"),
         (ExecutionMode.LOCAL, LoadMode.DBT_LS, "mock_load_via_dbt_ls"),
         (ExecutionMode.LOCAL, LoadMode.CUSTOM, "mock_load_via_custom_parser"),
     ],

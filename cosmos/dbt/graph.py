@@ -165,7 +165,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 config=node_dict.get("config", {}),
                 has_freshness=(
                     is_freshness_effective(node_dict.get("freshness", False))
-                    if node_dict["resource_type"] == "source"
+                    if node_dict["resource_type"] == DbtResourceType.SOURCE
                     else False
                 ),
             )

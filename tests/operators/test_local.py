@@ -444,7 +444,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 
     run_test_dag(dag)
 
-    assert run_operator.inlets == []
+    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []

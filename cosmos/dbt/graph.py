@@ -48,7 +48,7 @@ class CosmosLoadDbtException(Exception):
 @dataclass
 class DbtNode:
     """
-    Metadata related to a dbt node (e.g. model, seed, snapshot).
+    Metadata related to a dbt node (e.g. model, seed, snapshot, source).
     """
 
     unique_id: str
@@ -57,6 +57,7 @@ class DbtNode:
     file_path: Path
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
+    has_freshness: bool = False
     has_test: bool = False
 
     @property
@@ -93,6 +94,30 @@ class DbtNode:
             "resource_name": self.resource_name,
             "name": self.name,
         }
+
+
+def is_freshness_effective(freshness: dict[str, Any]) -> bool:
+    """Function to find if a source has null freshness. Scenarios where freshness
+    looks like:
+    "freshness": {
+                "warn_after": {
+                    "count": null,
+                    "period": null
+                },
+                "error_after": {
+                    "count": null,
+                    "period": null
+                },
+                "filter": null
+            }
+    should be considered as null, this function ensures that."""
+    for _, value in freshness.items():
+        if isinstance(value, dict):
+            if any(subvalue is not None for subvalue in value.values()):
+                return True
+        elif value is not None:
+            return True
+    return False
 
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
@@ -138,6 +163,11 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 file_path=project_path / node_dict["original_file_path"],
                 tags=node_dict.get("tags", []),
                 config=node_dict.get("config", {}),
+                has_freshness=(
+                    is_freshness_effective(node_dict.get("freshness", False))
+                    if node_dict["resource_type"] == "source"
+                    else False
+                ),
             )
             nodes[node.unique_id] = node
             logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
@@ -339,7 +369,14 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [dbt_cmd, "ls", "--output", "json"]
+        ls_command = [
+            dbt_cmd,
+            "ls",
+            "--output",
+            "json",
+            "--output-keys",
+            "name alias unique_id resource_type depends_on original_file_path tags config freshness",
+        ]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
@@ -605,6 +642,11 @@ class DbtGraph:
                     file_path=self.execution_config.project_path / Path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
                     config=node_dict["config"],
+                    has_freshness=(
+                        node_dict["freshness"] is not None
+                        if node_dict["resource_type"] == "source" and "freshness" in node_dict
+                        else False
+                    ),
                 )
 
                 nodes[node.unique_id] = node

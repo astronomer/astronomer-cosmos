@@ -142,6 +142,7 @@ def create_task_metadata(
         DbtResourceType.SNAPSHOT: "DbtSnapshot",
         DbtResourceType.SEED: "DbtSeed",
         DbtResourceType.TEST: "DbtTest",
+        DbtResourceType.SOURCE: "DbtSource",
     }
     args = {**args, **{"models": node.resource_name}}
 
@@ -151,6 +152,15 @@ def create_task_metadata(
             task_id = f"{node.name}_run"
             if use_task_group is True:
                 task_id = "run"
+        elif node.resource_type == DbtResourceType.SOURCE:
+            task_id = f"{node.name}_source"
+            args["select"] = f"source:{node.resource_name}"
+            args["models"] = None
+            if use_task_group is True:
+                task_id = node.resource_type.value
+            if node.has_freshness is False:
+                # render sources without freshness as empty operators
+                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator")
         else:
             task_id = f"{node.name}_{node.resource_type.value}"
             if use_task_group is True:

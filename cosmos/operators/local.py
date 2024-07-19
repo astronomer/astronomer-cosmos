@@ -816,3 +816,12 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
         raise DeprecationWarning(
             "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )
+
+
+class DbtSourceLocalOperator(DbtLocalBaseOperator):
+    """
+    Executes a dbt source freshness command.
+    """
+
+    ui_color = "#34CCEB"
+    base_cmd = ["source", "freshness"]

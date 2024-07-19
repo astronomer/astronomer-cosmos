@@ -453,13 +453,15 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     # This test is dependent upon dbt >= 1.5.4
-    assert len(dbt_graph.nodes) == 7
+    assert len(dbt_graph.nodes) == 9
     expected_keys = [
         "model.jaffle_shop.customers",
         "model.jaffle_shop.stg_customers",
         "seed.jaffle_shop.raw_customers",
         "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
         "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.jaffle_shop.source_not_null_postgres_db_raw_customers_id.de3e9fff76",
+        "test.jaffle_shop.source_unique_postgres_db_raw_customers_id.6e5ad1d707",
         "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
         "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
     ]
@@ -492,7 +494,7 @@ def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 28
+    assert len(dbt_graph.nodes) == 35
 
 
 def test_load_via_custom_without_project_path():
@@ -1276,11 +1278,11 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
     dbt_graph.load_via_dbt_ls()
 
     filtered_nodes = dbt_graph.filtered_nodes.keys()
-    assert len(filtered_nodes) == 4
+    assert len(filtered_nodes) == 6
     assert "model.jaffle_shop.stg_customers" in filtered_nodes
-    assert "seed.jaffle_shop.raw_customers" in filtered_nodes
-    # Two tests should be filtered
-    assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 2
+    assert "source.jaffle_shop.postgres_db.raw_customers" in filtered_nodes
+    # Four tests should be filtered
+    assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 4
 
 
 @pytest.mark.parametrize(

@@ -105,7 +105,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         output = super().execute(context)
         if self._venv_tmp_dir:
             self._venv_tmp_dir.cleanup()
-        logger.info(output)
+        self.log.info(output)
 
 
 class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]

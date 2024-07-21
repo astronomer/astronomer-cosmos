@@ -8,7 +8,6 @@ from airflow.utils.context import Context, context_merge
 
 from cosmos.config import ProfileConfig
 from cosmos.dbt.parser.output import extract_log_issues
-from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
@@ -22,8 +21,6 @@ from cosmos.operators.base import (
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
-
-logger = get_logger(__name__)
 
 try:
     # apache-airflow-providers-cncf-kubernetes >= 7.4.0
@@ -73,7 +70,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
         result = KubernetesPodOperator.execute(self, context)
-        logger.info(result)
+        self.log.info(result)
 
     def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt

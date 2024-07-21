@@ -4,6 +4,8 @@ from pathlib import Path
 
 import airflow
 from airflow.configuration import conf
+from airflow.version import version as airflow_version
+from packaging.version import Version
 
 from cosmos.constants import DEFAULT_COSMOS_CACHE_DIR_NAME, DEFAULT_OPENLINEAGE_NAMESPACE
 
@@ -24,3 +26,5 @@ try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
 except airflow.exceptions.AirflowConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
+
+AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")

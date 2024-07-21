@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import warnings
@@ -62,6 +63,7 @@ from cosmos.operators.base import (
     DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
+    DbtSourceMixin,
     DbtTestMixin,
 )
 
@@ -110,9 +112,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
+        "freshness": "json",
     }
 
     def __init__(
@@ -128,6 +131,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.profile_config = profile_config
         self.callback = callback
         self.compiled_sql = ""
+        self.freshness = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
@@ -220,6 +224,51 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self.compiled_sql += f"-- {name}\n{query}\n\n"
 
         self.compiled_sql = self.compiled_sql.strip()
+
+        # need to refresh the rendered task field record in the db because Airflow only does this
+        # before executing the task, not after
+        from airflow.models.renderedtifields import RenderedTaskInstanceFields
+
+        ti = context["ti"]
+
+        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
+            if TYPE_CHECKING:
+                assert ti.task is not None
+            ti.task.template_fields = self.template_fields
+            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
+
+            # delete the old records
+            session.query(RenderedTaskInstanceFields).filter(
+                RenderedTaskInstanceFields.dag_id == self.dag_id,
+                RenderedTaskInstanceFields.task_id == self.task_id,
+                RenderedTaskInstanceFields.run_id == ti.run_id,
+            ).delete()
+            session.add(rtif)
+        else:
+            logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+
+    @provide_session
+    def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
+        """
+        Takes the compiled sources.json file from the dbt source freshness and stores it in the freshness rendered template.
+        Gets called after every dbt run / source freshness.
+        """
+        if not self.should_store_compiled_sql:
+            return
+
+        sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+
+        if sources_json_path.exists():
+            sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+
+            sources_data = json.loads(sources_json_content)
+
+            formatted_sources_json = json.dumps(sources_data, indent=4)
+
+            self.freshness = formatted_sources_json
+
+        else:
+            self.freshness = ""
 
         # need to refresh the rendered task field record in the db because Airflow only does this
         # before executing the task, not after
@@ -355,6 +404,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     if partial_parse_file.exists():
                         cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
+                self.store_freshness_json(tmp_project_dir, context)
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.handle_exception(result)
                 if self.callback:
@@ -522,6 +572,12 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core snapshot command.
+    """
+
+
+class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt source freshness command.
     """
 
 
@@ -816,12 +872,3 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
         raise DeprecationWarning(
             "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )
-
-
-class DbtSourceLocalOperator(DbtLocalBaseOperator):
-    """
-    Executes a dbt source freshness command.
-    """
-
-    ui_color = "#34CCEB"
-    base_cmd = ["source", "freshness"]

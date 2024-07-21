@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any
+from typing import Any, Optional
 
 from airflow.models import Variable
 
@@ -96,7 +96,7 @@ class DbtNode:
         }
 
 
-def is_freshness_effective(freshness: dict[str, Any]) -> bool:
+def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
     """Function to find if a source has null freshness. Scenarios where freshness
     looks like:
     "freshness": {
@@ -111,6 +111,8 @@ def is_freshness_effective(freshness: dict[str, Any]) -> bool:
                 "filter": null
             }
     should be considered as null, this function ensures that."""
+    if freshness is None:
+        return False
     for _, value in freshness.items():
         if isinstance(value, dict):
             if any(subvalue is not None for subvalue in value.values()):
@@ -164,8 +166,8 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 tags=node_dict.get("tags", []),
                 config=node_dict.get("config", {}),
                 has_freshness=(
-                    is_freshness_effective(node_dict.get("freshness", False))
-                    if node_dict["resource_type"] == DbtResourceType.SOURCE
+                    is_freshness_effective(node_dict.get("freshness"))
+                    if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
                     else False
                 ),
             )
@@ -643,8 +645,8 @@ class DbtGraph:
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                     has_freshness=(
-                        node_dict["freshness"] is not None
-                        if node_dict["resource_type"] == "source" and "freshness" in node_dict
+                        is_freshness_effective(node_dict.get("freshness"))
+                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
                         else False
                     ),
                 )

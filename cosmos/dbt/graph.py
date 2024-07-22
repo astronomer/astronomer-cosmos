@@ -201,6 +201,13 @@ class DbtGraph:
             )
         return path.absolute()
 
+    def _add_vars_arg(self, cmd_args: list[str]) -> None:
+        """
+        Change args list in-place so they include dbt vars, if they are set.
+        """
+        if self.project.dbt_vars:
+            cmd_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+
     @cached_property
     def dbt_ls_args(self) -> list[str]:
         """
@@ -213,8 +220,7 @@ class DbtGraph:
         if self.render_config.select:
             ls_args.extend(["--select", *self.render_config.select])
 
-        if self.project.dbt_vars:
-            ls_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+        self._add_vars_arg(ls_args)
 
         if self.render_config.selector:
             ls_args.extend(["--selector", self.render_config.selector])
@@ -408,6 +414,16 @@ class DbtGraph:
         """Identify if Cosmos should use/store dbt partial parse cache or not."""
         return settings.enable_cache_partial_parse and settings.enable_cache and bool(self.cache_dir)
 
+    def run_dbt_deps(self, dbt_cmd: str, dbt_project_path: Path, env: dict[str, str]) -> None:
+        """
+        Given the dbt command path and the dbt project path, build and run the dbt deps command.
+        """
+        deps_command = [dbt_cmd, "deps"]
+        deps_command.extend(self.local_flags)
+        self._add_vars_arg(deps_command)
+        stdout = run_command(deps_command, dbt_project_path, env)
+        logger.debug("dbt deps output: %s", stdout)
+
     def load_via_dbt_ls_without_cache(self) -> None:
         """
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
@@ -461,16 +477,14 @@ class DbtGraph:
                     "--target",
                     self.profile_config.target_name,
                 ]
+
                 self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
-                    deps_command = [dbt_cmd, "deps"]
-                    deps_command.extend(self.local_flags)
-                    stdout = run_command(deps_command, tmpdir_path, env)
-                    logger.debug("dbt deps output: %s", stdout)
+                    self.run_dbt_deps(dbt_cmd, tmpdir_path, env)
 
                 nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)
 

@@ -1381,6 +1381,15 @@ def test_dbt_ls_cache_key_args_sorts_envvars():
     assert graph.dbt_ls_cache_key_args == ['{"5": "May", "11": "November", "12": "December"}']
 
 
+@patch("cosmos.dbt.graph.run_command")
+def test_run_dbt_deps(run_command_mock):
+    project_config = ProjectConfig(dbt_vars={"var-key": "var-value"})
+    graph = DbtGraph(project=project_config)
+    graph.local_flags = []
+    graph.run_dbt_deps("dbt", "/some/path", {})
+    run_command_mock.assert_called_with(["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {})
+
+
 @pytest.fixture()
 def airflow_variable():
     key = "cosmos_cache__undefined"
@@ -1413,7 +1422,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "465fc0735d8bef08a0d375b2315069bb"
+        assert hash_dir == "18b97e2bff2684161f71db817f1f50e2"
     else:
         assert hash_dir == "6c662da10b64a8390c469c884af88321"
 

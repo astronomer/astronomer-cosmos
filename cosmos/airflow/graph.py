@@ -95,6 +95,7 @@ def create_test_task_metadata(
     task_args["on_warning_callback"] = on_warning_callback
     extra_context = {}
 
+    task_owner = ""
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
@@ -112,10 +113,6 @@ def create_test_task_metadata(
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
-        task_owner = ""
-
-    else:
-        task_owner = ""
 
     return TaskMetadata(
         id=test_task_name,

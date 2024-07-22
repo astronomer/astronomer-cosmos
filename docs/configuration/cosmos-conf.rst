@@ -86,6 +86,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``profile``
     - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
 
+.. _render_source_nodes:
+
+`render_source_nodes`_:
+    Enable individual source node rendering. Nodes without freshness checks would be rendered as EmptyOperator.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__RENDER_SOURCE_NODES``
+
 
 [openlineage]
 ~~~~~~~~~~~~~

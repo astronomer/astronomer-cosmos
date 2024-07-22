@@ -19,6 +19,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
+from cosmos.settings import render_source_nodes
 
 logger = get_logger(__name__)
 
@@ -153,6 +154,14 @@ def create_task_metadata(
             if use_task_group is True:
                 task_id = "run"
         elif node.resource_type == DbtResourceType.SOURCE:
+            if str(render_source_nodes) != "True":
+                msg = (
+                    "Source node rendering is currently disabled. To enable it, set the environment variable "
+                    "AIRFLOW__COSMOS__RENDER_SOURCE_NODES=True. Enabling source node rendering may enhance the "
+                    "visual representation of your DAGs."
+                )
+                logger.warning(msg)
+                return None
             task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args["models"] = None

@@ -5,7 +5,7 @@ from pathlib import Path
 import aenum
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
-from airflow.providers.microsoft.azure.hooks.data_lake import AzureDataLakeHook
+from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 from packaging.version import Version
 
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
@@ -38,7 +38,7 @@ ABFS_FILE_SCHEME = "abfs"
 FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP = {
     S3_FILE_SCHEME: S3Hook.default_conn_name,
     GS_FILE_SCHEME: GCSHook.default_conn_name,
-    ABFS_FILE_SCHEME: AzureDataLakeHook.default_conn_name,
+    ABFS_FILE_SCHEME: WasbHook.default_conn_name,
 }
 
 

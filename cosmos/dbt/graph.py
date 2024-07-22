@@ -613,7 +613,7 @@ class DbtGraph:
         nodes = {}
 
         if TYPE_CHECKING:
-            assert self.project.manifest_path is not None
+            assert self.project.manifest_path is not None  # pragma: no cover
 
         with self.project.manifest_path.open() as fp:
             manifest = json.load(fp)

@@ -1,0 +1,19 @@
+name: Create Cluster
+
+on: push
+
+jobs:
+  create-cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Kubernetes KinD Cluster
+        uses: container-tools/kind-action@v1
+      - name: Run setup
+        run: |
+          sh ./scripts/test/kubernetes-setup.sh
+          pip install hatch
+          hatch -e tests.py3.9-2.9 run pip freeze
+          hatch run tests.py3.9-2.9:test-kubernetes
+          kubectl get pods -o wide
+          kubectl logs postgres-postgresql-0

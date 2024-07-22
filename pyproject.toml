@@ -168,6 +168,7 @@ freeze = "pip freeze"
 test = 'sh scripts/test/unit.sh'
 test-cov = 'sh scripts/test/unit-cov.sh'
 test-integration = 'sh scripts/test/integration.sh'
+test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-integration-setup = 'sh scripts/test/integration-setup.sh'

@@ -7,7 +7,6 @@ try:
 except ImportError:
     from functools import lru_cache as cache
 
-
 import airflow
 import pytest
 from airflow.models.dagbag import DagBag
@@ -32,7 +31,6 @@ MIN_VER_DAG_FILE: dict[str, list[str]] = {
 
 IGNORED_DAG_FILES = ["performance_dag.py"]
 
-
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
     Version(version): MIN_VER_DAG_FILE[version] for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
@@ -51,7 +49,7 @@ def session():
 
 
 @cache
-def get_dag_bag() -> DagBag:
+def get_dag_bag(in_kube: bool = False) -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
         return DagBag(dag_folder=None, include_examples=False)
@@ -72,6 +70,9 @@ def get_dag_bag() -> DagBag:
         if DBT_VERSION < Version("1.6.0"):
             file.writelines(["example_model_version.py\n"])
 
+        if not in_kube:
+            file.writelines(["jaffle_shop_kubernetes.py\n"])
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
@@ -80,8 +81,8 @@ def get_dag_bag() -> DagBag:
     return db
 
 
-def get_dag_ids() -> list[str]:
-    dag_bag = get_dag_bag()
+def get_dag_ids(in_kube: bool = False) -> list[str]:
+    dag_bag = get_dag_bag(in_kube)
     return dag_bag.dag_ids
 
 

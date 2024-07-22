@@ -10,3 +10,15 @@ default:
       dbname: "{{ env_var('POSTGRES_DB') }}"
       schema: "{{ env_var('POSTGRES_SCHEMA') }}"
       threads: 4
+
+postgres_profile:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      dbname: '{{ env_var(''POSTGRES_DATABASE'') }}'
+      host: '{{ env_var(''POSTGRES_HOST'') }}'
+      pass: '{{ env_var(''POSTGRES_PASSWORD'') }}'
+      port: '{{ env_var(''POSTGRES_PORT'') | as_number }}'
+      schema: '{{ env_var(''POSTGRES_SCHEMA'') }}'
+      user: '{{ env_var(''POSTGRES_USER'') }}'

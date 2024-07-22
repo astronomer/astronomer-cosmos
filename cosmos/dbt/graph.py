@@ -159,7 +159,6 @@ class DbtGraph:
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
-    current_version: str = ""
 
     def __init__(
         self,

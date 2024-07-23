@@ -42,7 +42,7 @@ parent_node = DbtNode(
     depends_on=[parent_seed.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
     tags=["has_child"],
-    config={"materialized": "view"},
+    config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
 )
 test_parent_node = DbtNode(
@@ -122,6 +122,12 @@ def test_build_airflow_graph_with_after_each():
     assert len(dag.leaves) == 2
     assert dag.leaves[0].task_id == "child_run"
     assert dag.leaves[1].task_id == "child2_v2_run"
+
+    task_seed_parent_seed = dag.tasks[0]
+    task_parent_run = dag.tasks[1]
+
+    assert task_seed_parent_seed.owner == ""
+    assert task_parent_run.owner == "parent_node"
 
 
 @pytest.mark.parametrize(

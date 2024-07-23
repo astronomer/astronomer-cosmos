@@ -67,7 +67,7 @@ dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 amazon = [
-    "apache-airflow-providers-amazon[s3fs]>=3.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
+    "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]
 google = ["apache-airflow-providers-google"]
 microsoft = ["apache-airflow-providers-microsoft-azure"]
@@ -106,7 +106,7 @@ kubernetes = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
 aws_eks = [
-    "apache-airflow-providers-amazon>=8.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
+    "apache-airflow-providers-amazon>=8.0.0",
 ]
 azure-container-instance = [
     "apache-airflow-providers-microsoft-azure>=8.4.0",
@@ -140,7 +140,7 @@ packages = ["/cosmos"]
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
-    "apache-airflow-providers-amazon[s3fs]>=3.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
+    "apache-airflow-providers-amazon[s3fs]>=3.0.0",
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-google",
     "apache-airflow-providers-microsoft-azure",
@@ -189,7 +189,7 @@ markers = ["integration", "sqlite", "perf"]
 [tool.hatch.envs.docs]
 dependencies = [
     "aenum",
-    "apache-airflow-providers-amazon[s3fs]>=3.0.0,<8.20.0", # https://github.com/apache/airflow/issues/39103
+    "apache-airflow-providers-amazon[s3fs]>=3.0.0",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-google",
     "apache-airflow-providers-microsoft-azure",

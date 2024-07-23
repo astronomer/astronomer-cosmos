@@ -1,6 +1,6 @@
 aenum
 apache-airflow
-apache-airflow-providers-amazon[s3fs]>=3.0.0,<8.20.0 # https://github.com/apache/airflow/issues/39103
+apache-airflow-providers-amazon[s3fs]>=3.0.0
 apache-airflow-providers-cncf-kubernetes>=5.1.1
 apache-airflow-providers-google
 apache-airflow-providers-microsoft-azure

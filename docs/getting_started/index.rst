@@ -12,6 +12,7 @@
    Docker Execution Mode <docker>
    Kubernetes Execution Mode <kubernetes>
    Azure Container Instance Execution Mode <azure-container-instance>
+   GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
    dbt and Airflow Similar Concepts <dbt-airflow-concepts>
 
 
@@ -40,6 +41,8 @@ For specific guides, see the following:
 
 - `Executing dbt DAGs with Docker Operators <docker.html>`__
 - `Executing dbt DAGs with KubernetesPodOperators <kubernetes.html>`__
+- `Executing dbt DAGs with AzureContainerInstancesOperators <azure-container-instance.html>`__
+- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <gcp-cloud-run-job.html>`__
 
 
 Concepts Overview

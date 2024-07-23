@@ -11,6 +11,7 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
 5. **aws_eks**: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos (requires a pre-existing Docker image)
 6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
+7. **gcp_cloud_run_job**: Run ``dbt`` commands from GCP Cloud Run Job instances managed by Cosmos (requires a pre-existing Docker image)
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -44,6 +45,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - High
      - No
    * - Azure Container Instance
+     - Slow
+     - High
+     - No
+   * - GCP Cloud Run Job Instance
      - Slow
      - High
      - No
@@ -209,6 +214,29 @@ Each task will create a new container on Azure, giving full isolation. This, how
         },
     )
 
+GCP Cloud Run Job
+------------------------
+.. versionadded:: 1.7
+The ``gcp_cloud_run_job`` execution mode is particularly useful for users who prefer to run their ``dbt`` commands on Google Cloud infrastructure, taking advantage of Cloud Run's scalability, isolation, and managed service capabilities.
+
+For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://cloud.google.com/run/docs/create-jobs>`__ .
+
+This execution mode allows users to run ``dbt`` core CLI commands in a Google Cloud Run Job instance. This mode leverages the ``CloudRunExecuteJobOperator`` from the Google Cloud Airflow provider to execute commands within a Cloud Run Job instance, where ``dbt`` is already installed. Similarly to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+
+Each task will create a new Cloud Run Job execution, giving full isolation. The separation of tasks adds extra overhead; however, that can be mitigated by using the ``concurrency`` parameter in ``DbtDag``, which will result in parallelized execution of ``dbt`` models.
+
+
+.. code-block:: python
+
+    gcp_cloud_run_job_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.GCP_CLOUD_RUN_JOB),
+        operator_args={
+            "project_id": "my-gcp-project-id",
+            "region": "europe-west1",
+            "job_name": "my-crj-{{ ti.task_id.replace('.','-').replace('_','-') }}",
+        },
+    )
 
 .. _invocation_modes:
 Invocation Modes

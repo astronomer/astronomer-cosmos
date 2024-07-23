@@ -215,7 +215,12 @@ class ProjectConfig:
         """
 
         mandatory_paths = {}
-
+        # We validate the existence of paths added to the `mandatory_paths` map by calling the `exists()` method on each
+        # one. Starting with Cosmos 1.6.0, if the Airflow version is `>= 2.8.0` and a `manifest_path` is provided, we
+        # cast it to an `airflow.io.path.ObjectStoragePath` instance during `ProjectConfig` initialisation, and it
+        # includes the `exists()` method. For the remaining paths in the `mandatory_paths` map, we cast them to
+        # `pathlib.Path` objects to ensure that the subsequent `exists()` call while iterating on the `mandatory_paths`
+        # map works correctly for all paths, thereby validating the project.
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
             mandatory_paths = {

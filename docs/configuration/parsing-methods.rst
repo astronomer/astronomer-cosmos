@@ -34,7 +34,6 @@ When you don't supply an argument to the ``load_mode`` parameter (or you supply 
 
 To use this method, you don't need to supply any additional config. This is the default.
 
-.. _manifest_parsing:
 
 ``dbt_manifest``
 ----------------
@@ -69,8 +68,8 @@ using the following command: ``pip install "astronomer-cosmos[amazon]"``
 
 .. literalinclude:: ../../dev/dags/cosmos_manifest_example.py
     :language: python
-    :start-after: [START s3_example]
-    :end-before: [END s3_example]
+    :start-after: [START aws_s3_example]
+    :end-before: [END aws_s3_example]
 
 - GCP GCS URL:
 
@@ -79,8 +78,8 @@ using the following command: ``pip install "astronomer-cosmos[google]"``
 
 .. literalinclude:: ../../dev/dags/cosmos_manifest_example.py
     :language: python
-    :start-after: [START gcs_example]
-    :end-before: [END gcs_example]
+    :start-after: [START gcp_gs_example]
+    :end-before: [END gcp_gs_example]
 
 - Azure Blob Storage URL:
 

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
@@ -611,7 +611,11 @@ class DbtGraph:
             raise CosmosLoadDbtException("Unable to load manifest without ExecutionConfig.dbt_project_path")
 
         nodes = {}
-        with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
+
+        if TYPE_CHECKING:
+            assert self.project.manifest_path is not None  # pragma: no cover
+
+        with self.project.manifest_path.open() as fp:
             manifest = json.load(fp)
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}

@@ -34,6 +34,7 @@ When you don't supply an argument to the ``load_mode`` parameter (or you supply 
 
 To use this method, you don't need to supply any additional config. This is the default.
 
+
 ``dbt_manifest``
 ----------------
 
@@ -41,19 +42,55 @@ If you already have a ``manifest.json`` file created by dbt, Cosmos will parse t
 
 You can supply a ``manifest_path`` parameter on the DbtDag / DbtTaskGroup with a path to a ``manifest.json`` file.
 
-To use this:
+Before Cosmos 1.6.0, the path to ``manifest.json`` supplied via the ``DbtDag`` / ``DbtTaskGroup`` ``manifest_path``
+argument accepted only local paths. However, starting with Cosmos 1.6.0, if you've Airflow >= 2.8.0, you can supply a
+a remote path (e.g., an S3 URL) too. For supporting remote paths, Cosmos leverages the
+`Airflow Object Storage <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
+feature released in Airflow 2.8.0.
+For remote paths, you can specify a ``manifest_conn_id``, which is an
+Airflow connection ID containing the credentials to access the remote path. If you do not specify a
+``manifest_conn_id``, Cosmos will use the default connection ID specific to the scheme, identified using the Airflow
+hook's ``default_conn_id`` corresponding to the URL's scheme.
 
-.. code-block:: python
+Examples of how to supply ``manifest.json`` using ``manifest_path`` argument:
 
-    DbtDag(
-        project_config=ProjectConfig(
-            manifest_path="/path/to/manifest.json",
-        ),
-        render_config=RenderConfig(
-            load_method=LoadMode.DBT_MANIFEST,
-        ),
-        # ...,
-    )
+- Local path:
+
+.. literalinclude:: ../../dev/dags/cosmos_manifest_example.py
+    :language: python
+    :start-after: [START local_example]
+    :end-before: [END local_example]
+
+- AWS S3 URL (available since Cosmos 1.6):
+
+Ensure that you have the required dependencies installed to use the S3 URL. You can install the required dependencies
+using the following command: ``pip install "astronomer-cosmos[amazon]"``
+
+.. literalinclude:: ../../dev/dags/cosmos_manifest_example.py
+    :language: python
+    :start-after: [START aws_s3_example]
+    :end-before: [END aws_s3_example]
+
+- GCP GCS URL (available since Cosmos 1.6):
+
+Ensure that you have the required dependencies installed to use the GCS URL. You can install the required dependencies
+using the following command: ``pip install "astronomer-cosmos[google]"``
+
+.. literalinclude:: ../../dev/dags/cosmos_manifest_example.py
+    :language: python
+    :start-after: [START gcp_gs_example]
+    :end-before: [END gcp_gs_example]
+
+- Azure Blob Storage URL (available since Cosmos 1.6):
+
+Ensure that you have the required dependencies installed to use the Azure blob URL. You can install the required
+dependencies using the following command: ``pip install "astronomer-cosmos[microsoft]"``
+
+.. literalinclude:: ../../dev/dags/cosmos_manifest_example.py
+    :language: python
+    :start-after: [START azure_abfs_example]
+    :end-before: [END azure_abfs_example]
+
 
 ``dbt_ls``
 ----------

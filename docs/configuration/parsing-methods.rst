@@ -61,7 +61,7 @@ Examples of how to supply ``manifest.json`` using ``manifest_path`` argument:
     :start-after: [START local_example]
     :end-before: [END local_example]
 
-- AWS S3 URL:
+- AWS S3 URL (available since Cosmos 1.6):
 
 Ensure that you have the required dependencies installed to use the S3 URL. You can install the required dependencies
 using the following command: ``pip install "astronomer-cosmos[amazon]"``
@@ -71,7 +71,7 @@ using the following command: ``pip install "astronomer-cosmos[amazon]"``
     :start-after: [START aws_s3_example]
     :end-before: [END aws_s3_example]
 
-- GCP GCS URL:
+- GCP GCS URL (available since Cosmos 1.6):
 
 Ensure that you have the required dependencies installed to use the GCS URL. You can install the required dependencies
 using the following command: ``pip install "astronomer-cosmos[google]"``
@@ -81,7 +81,7 @@ using the following command: ``pip install "astronomer-cosmos[google]"``
     :start-after: [START gcp_gs_example]
     :end-before: [END gcp_gs_example]
 
-- Azure Blob Storage URL:
+- Azure Blob Storage URL (available since Cosmos 1.6):
 
 Ensure that you have the required dependencies installed to use the Azure blob URL. You can install the required
 dependencies using the following command: ``pip install "astronomer-cosmos[microsoft]"``

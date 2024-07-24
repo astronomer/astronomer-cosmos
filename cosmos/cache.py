@@ -444,7 +444,7 @@ def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
             cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(project_lockfile, cached_package_lockfile)
             return cached_package_lockfile
-    except IOError as e:
+    except OSError as e:
         logger.warning(f"Error processing cached lockfile: {e}")
     return None
 
@@ -462,7 +462,7 @@ def _safe_cocy(src: Path, dst: Path) -> None:
     except OSError as err:
         if err.errno == errno.EXDEV:
             copy_id = uuid.uuid4()
-            tmp_dst = "%s.%s.tmp" % (dst, copy_id)
+            tmp_dst = "{}.{}.tmp".format(dst, copy_id)
             shutil.copyfile(src, tmp_dst)
             os.rename(tmp_dst, dst)
             os.unlink(src)

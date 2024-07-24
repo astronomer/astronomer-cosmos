@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import errno
 import functools
 import hashlib
 import json
 import os
 import shutil
 import time
+import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -442,7 +444,7 @@ def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
             cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(project_lockfile, cached_package_lockfile)
             return cached_package_lockfile
-    except Exception as e:
+    except IOError as e:
         logger.warning(f"Error processing cached lockfile: {e}")
     return None
 
@@ -450,4 +452,19 @@ def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
 def _copy_cached_lockfile_to_project(cached_lockfile: Path, project_dir: Path) -> None:
     """Copy the cached package-lock.yml to tmp project dir"""
     lock_file = project_dir / PACKAGE_LOCK_YML
-    shutil.copyfile(cached_lockfile, lock_file)
+    _safe_cocy(cached_lockfile, lock_file)
+
+
+# TODO: Move this function at different location
+def _safe_cocy(src: Path, dst: Path) -> None:
+    try:
+        os.rename(src, dst)
+    except OSError as err:
+        if err.errno == errno.EXDEV:
+            copy_id = uuid.uuid4()
+            tmp_dst = "%s.%s.tmp" % (dst, copy_id)
+            shutil.copyfile(src, tmp_dst)
+            os.rename(tmp_dst, dst)
+            os.unlink(src)
+        else:
+            raise

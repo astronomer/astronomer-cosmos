@@ -488,10 +488,7 @@ class DbtGraph:
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
-                    if self.execution_config.execution_mode in (
-                        ExecutionMode.LOCAL,
-                        ExecutionMode.VIRTUALENV,
-                    ) and is_cache_lockfile_enabled(project_path):
+                    if is_cache_lockfile_enabled(project_path):
                         latest_package_lockfile = _get_latest_cached_lockfile(project_path)
                         if latest_package_lockfile:
                             _copy_cached_lockfile_to_project(latest_package_lockfile, Path(tmpdir))

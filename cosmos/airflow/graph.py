@@ -12,6 +12,7 @@ from cosmos.constants import (
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
     ExecutionMode,
+    SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
 )
@@ -19,7 +20,6 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import render_source_nodes
 
 logger = get_logger(__name__)
 
@@ -125,7 +125,11 @@ def create_test_task_metadata(
 
 
 def create_task_metadata(
-    node: DbtNode, execution_mode: ExecutionMode, args: dict[str, Any], use_task_group: bool = False
+    node: DbtNode,
+    execution_mode: ExecutionMode,
+    args: dict[str, Any],
+    use_task_group: bool = False,
+    source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.ALL,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -154,20 +158,25 @@ def create_task_metadata(
             if use_task_group is True:
                 task_id = "run"
         elif node.resource_type == DbtResourceType.SOURCE:
-            if str(render_source_nodes) != "True":
+            if source_rendering_behavior == SourceRenderingBehavior.NONE:
                 msg = (
-                    "Source node rendering is currently disabled. To enable it, set the environment variable "
-                    "AIRFLOW__COSMOS__RENDER_SOURCE_NODES=True. Enabling source node rendering may enhance the "
-                    "visual representation of your DAGs."
+                    "Source node rendering is currently disabled. To enable it, set the RenderConfig source_rendering_behavior = all "
+                    "Enabling source node rendering may enhance the visual representation of your DAGs."
                 )
                 logger.warning(msg)
+                return None
+            elif (
+                source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
+                and node.has_freshness is False
+                and node.has_test is False
+            ):
                 return None
             task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args["models"] = None
             if use_task_group is True:
                 task_id = node.resource_type.value
-            if node.has_freshness is False:
+            if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator")
         else:
@@ -200,6 +209,7 @@ def generate_task_or_group(
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
     test_behavior: TestBehavior,
+    source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
     **kwargs: Any,
@@ -213,7 +223,11 @@ def generate_task_or_group(
     )
 
     task_meta = create_task_metadata(
-        node=node, execution_mode=execution_mode, args=task_args, use_task_group=use_task_group
+        node=node,
+        execution_mode=execution_mode,
+        args=task_args,
+        use_task_group=use_task_group,
+        source_rendering_behavior=source_rendering_behavior,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -275,6 +289,7 @@ def build_airflow_graph(
     """
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
+    source_rendering_behavior = render_config.source_rendering_behavior
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -293,6 +308,7 @@ def build_airflow_graph(
             execution_mode=execution_mode,
             task_args=task_args,
             test_behavior=test_behavior,
+            source_rendering_behavior=source_rendering_behavior,
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             node=node,

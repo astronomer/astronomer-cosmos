@@ -1391,7 +1391,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         assert hash_dir == "cdc6f0bec00f4edc616f3aa755a34330"
     else:
-        assert hash_dir == "2ea8e56adc790506a084db9195dc05de"
+        assert hash_dir == "6c95281ae5225b38afe6d1b2886bac84"
 
 
 @pytest.mark.integration

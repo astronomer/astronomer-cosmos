@@ -36,6 +36,7 @@ from cosmos.operators.local import (
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,
+    DbtSourceLocalOperator,
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -770,15 +771,19 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     [
         (
             DbtSeedLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
         ),
         (
             DbtRunLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
         ),
         (
             DbtBuildLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
+        ),
+        (
+            DbtSourceLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness"),
         ),
     ],
 )

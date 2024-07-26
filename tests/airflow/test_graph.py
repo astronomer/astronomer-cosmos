@@ -21,6 +21,7 @@ from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
     DbtResourceType,
     ExecutionMode,
+    SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
 )
@@ -163,6 +164,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
         },
         test_behavior=TestBehavior.AFTER_EACH,
         on_warning_callback=None,
+        source_rendering_behavior=SourceRenderingBehavior.ALL,
     )
     assert isinstance(output, TaskGroup)
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
@@ -303,12 +305,12 @@ def test_create_task_metadata_unsupported(caplog):
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
             DbtResourceType.SOURCE,
-            "my_source_run",
-            "cosmos.operators.local.DbtRunLocalOperator",
-            {"models": "my_source"},
+            "my_source_source",
+            "cosmos.operators.local.DbtSourceLocalOperator",
+            {"select": "source:my_source"},
             {
                 "dbt_node_config": {
-                    "unique_id": "model.my_folder.my_source",
+                    "unique_id": "source.my_folder.my_source",
                     "resource_type": "source",
                     "depends_on": [],
                     "file_path": ".",
@@ -358,6 +360,7 @@ def test_create_task_metadata_model(
         file_path=Path(""),
         tags=[],
         config={},
+        has_freshness=True,
     )
 
     metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})

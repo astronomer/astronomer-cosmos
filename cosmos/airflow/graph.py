@@ -173,7 +173,7 @@ def create_task_metadata(
                 return None
             task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
-            args["models"] = None
+            args.pop("models")
             if use_task_group is True:
                 task_id = node.resource_type.value
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:

@@ -270,28 +270,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         else:
             self.freshness = ""
 
-        # need to refresh the rendered task field record in the db because Airflow only does this
-        # before executing the task, not after
-        from airflow.models.renderedtifields import RenderedTaskInstanceFields
-
-        ti = context["ti"]
-
-        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
-            if TYPE_CHECKING:
-                assert ti.task is not None
-            ti.task.template_fields = self.template_fields
-            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
-            # delete the old records
-            session.query(RenderedTaskInstanceFields).filter(
-                RenderedTaskInstanceFields.dag_id == self.dag_id,
-                RenderedTaskInstanceFields.task_id == self.task_id,
-                RenderedTaskInstanceFields.run_id == ti.run_id,
-            ).delete()
-            session.add(rtif)
-        else:
-            logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
-
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(

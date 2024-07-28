@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import errno
 import functools
 import hashlib
 import json
 import os
 import shutil
+import tempfile
 import time
-import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -442,7 +441,7 @@ def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
         else:
             cached_lockfile_dir = cache_dir / cache_identifier
             cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(project_lockfile, cached_package_lockfile)
+            _safe_copy(project_lockfile, cached_package_lockfile)
             return cached_package_lockfile
     except OSError as e:
         logger.warning(f"Error processing cached lockfile: {e}")
@@ -452,19 +451,16 @@ def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
 def _copy_cached_lockfile_to_project(cached_lockfile: Path, project_dir: Path) -> None:
     """Copy the cached package-lock.yml to tmp project dir"""
     lock_file = project_dir / PACKAGE_LOCK_YML
-    _safe_cocy(cached_lockfile, lock_file)
+    _safe_copy(cached_lockfile, lock_file)
 
 
 # TODO: Move this function at different location
-def _safe_cocy(src: Path, dst: Path) -> None:
-    try:
-        os.rename(src, dst)
-    except OSError as err:
-        if err.errno == errno.EXDEV:
-            copy_id = uuid.uuid4()
-            tmp_dst = "{}.{}.tmp".format(dst, copy_id)
-            shutil.copyfile(src, tmp_dst)
-            os.rename(tmp_dst, dst)
-            os.unlink(src)
-        else:
-            raise
+def _safe_copy(src: Path, dst: Path) -> None:
+    # Create a temporary file in the same directory as the destination
+    dir_name, base_name = os.path.split(dst)
+    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)
+
+    shutil.copyfile(src, temp_path)
+
+    # Rename the temporary file to the destination file
+    os.rename(temp_path, dst)

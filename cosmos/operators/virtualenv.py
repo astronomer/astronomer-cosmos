@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import psutil
 from airflow.utils.python_virtualenv import prepare_virtualenv
 
+from cosmos import settings
 from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
@@ -71,6 +72,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.py_system_site_packages = py_system_site_packages
         self.virtualenv_dir = virtualenv_dir
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
+        self.max_retries_lock = settings.virtualenv_max_retries_lock
         super().__init__(**kwargs)
 
     @cached_property
@@ -154,9 +156,10 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
         # Use a reusable virtualenv
         self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
-        while not self._is_lock_available():
+        while not self._is_lock_available() and self.max_retries_lock:
             self.log.info("Waiting for virtualenv lock to be released")
             time.sleep(1)
+            self.max_retries_lock -= 1
 
         self.log.info(f"Acquiring the virtualenv lock")
         self._acquire_venv_lock()
@@ -176,7 +179,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def _pid(self) -> int:
         return os.getpid()
 
-    # TODO: test
     @depends_on_virtualenv_dir
     def _is_lock_available(self) -> bool:
         is_available = True
@@ -210,14 +212,11 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             return
 
         with open(self._lock_file) as lf:
-            # TODO: test
             lock_file_pid = int(lf.read())
 
             if lock_file_pid == self._pid:
                 return self._lock_file.unlink()
 
-            # TODO: test
-            # TODO: release lock if other process is not running
             self.log.warn(f"Lockfile owned by process of pid {lock_file_pid}, while operator has pid {self._pid}")
 
 

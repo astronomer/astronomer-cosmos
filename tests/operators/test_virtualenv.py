@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -209,6 +210,75 @@ def test__is_lock_available_returns_true_pid_no_lockfile(tmpdir):
         virtualenv_dir=tmpdir,
     )
     assert venv_operator._is_lock_available()
+
+
+def test__acquire_venv_lock_existing_dir(tmpdir, caplog):
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=Path(tmpdir),
+    )
+    assert venv_operator._acquire_venv_lock() is None
+    assert "Acquiring lock at" in caplog.text
+
+
+def test__acquire_venv_lock_new_subdir(tmpdir, caplog):
+    subdir = Path(tmpdir / "subdir")
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=subdir,
+    )
+    assert venv_operator._acquire_venv_lock() is None
+    assert "Acquiring lock at" in caplog.text
+
+
+def test__release_venv_lock_inexistent(tmpdir, caplog):
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=tmpdir,
+    )
+    assert venv_operator._release_venv_lock() is None
+    assert "not found, perhaps deleted by other concurrent operator?" in caplog.text
+
+
+def test__release_venv_lock_another_process(tmpdir, caplog):
+    caplog.set_level(logging.WARNING)
+    non_existent_pid = "747174"
+    lockfile = tmpdir / "cosmos_virtualenv.lock"
+    lockfile.write_text(str(non_existent_pid), encoding="utf-8")
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=Path(tmpdir),
+    )
+    assert venv_operator._release_venv_lock() is None
+    assert lockfile.exists()
+    assert "Lockfile owned by process of pid 747174, while operator has pid" in caplog.text
+
+
+def test__release_venv_lock_current_process(tmpdir):
+    parent_pid = os.getpid()
+    lockfile = tmpdir / "cosmos_virtualenv.lock"
+    lockfile.write_text(str(parent_pid), encoding="utf-8")
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=Path(tmpdir),
+    )
+    assert venv_operator._release_venv_lock() is None
+    assert not lockfile.exists()
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")

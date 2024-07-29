@@ -21,6 +21,7 @@ dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
 dbt_docs_index_file_name = conf.get("cosmos", "dbt_docs_index_file_name", fallback="index.html")
 enable_cache_profile = conf.getboolean("cosmos", "enable_cache_profile", fallback=True)
 dbt_profile_cache_dir_name = conf.get("cosmos", "profile_cache_dir_name", fallback="profile")
+virtualenv_max_retries_lock = conf.getint("cosmos", "virtualenv_max_retries_lock", fallback=120)
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

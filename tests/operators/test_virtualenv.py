@@ -140,6 +140,24 @@ def test_on_kill(mock_clean_dir_if_temporary):
     assert mock_clean_dir_if_temporary.called
 
 
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.prepare_virtualenv")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._acquire_venv_lock")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available", side_effect=[False, False, True])
+def test__get_or_create_venv_py_interpreter_waits_for_lock(
+    mock_is_lock_available, mock_acquire, mock_prepare, mock_release, tmpdir, caplog
+):
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=tmpdir,
+    )
+    venv_operator._get_or_create_venv_py_interpreter()
+    assert caplog.text.count("Waiting for virtualenv lock to be released") == 2
+
+
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")

@@ -159,17 +159,15 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         # Use a reusable virtualenv
         self.log.info(f"Checking if the virtualenv lock {str(self.__lock_file)} exists")
         while not self._is_lock_available():
-            # TODO: test
             self.log.info("Waiting for virtualenv lock to be released")
             time.sleep(1)
 
         self.log.info(f"Acquiring the virtualenv lock")
-        self.__acquire_venv_lock()
+        self._acquire_venv_lock()
         py_bin = self.prepare_virtualenv()
 
-        if not self.is_virtualenv_dir_temporary:
-            self.log.info("Releasing virtualenv lock")
-            self.__release_venv_lock()
+        self.log.info("Releasing virtualenv lock")
+        self._release_venv_lock()
 
         return py_bin
 
@@ -183,25 +181,26 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     @depends_on_virtualenv_dir
     def _is_lock_available(self) -> bool:
+        is_available = True
         if self.__lock_file.is_file():
+            _process_running = False
             with open(self.__lock_file) as lf:
                 pid = int(lf.read())
-
                 self.log.info(f"Checking for running process with PID {pid}")
                 try:
                     _process_running = psutil.Process(pid).is_running()
+                    self.log.info(f"Process {pid} running: {_process_running}. ")
                 except psutil.NoSuchProcess:
                     # TODO: test
                     _process_running = False
+                    self.log.info(f"Process {pid} is not running: {_process_running}. Releasing the lock.")
 
-                self.log.info(f"Process {pid} running: {_process_running}")
-                # TODO: test
-                return not _process_running
+            is_available = not _process_running
 
-        return True
+        return is_available
 
     @depends_on_virtualenv_dir
-    def __acquire_venv_lock(self) -> None:
+    def _acquire_venv_lock(self) -> None:
         if not self.virtualenv_dir.is_dir():  # type: ignore
             os.mkdir(str(self.virtualenv_dir))
 
@@ -210,7 +209,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             lf.write(str(self._pid))
 
     @depends_on_virtualenv_dir
-    def __release_venv_lock(self) -> None:
+    def _release_venv_lock(self) -> None:
         if not self.__lock_file.is_file():
             self.log.warn(f"Lockfile {self.__lock_file} not found, perhaps deleted by other concurrent operator?")
             return

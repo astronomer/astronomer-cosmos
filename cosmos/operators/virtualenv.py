@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import shutil
 import time
-import traceback
 from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -31,13 +30,14 @@ if TYPE_CHECKING:
 
 
 PY_INTERPRETER = "python3"
+LOCK_FILENAME = "cosmos_virtualenv.lock"
 
 
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    def wrapper(operator: DbtVirtualenvBaseOperator, *args: Any) -> None:
+    def wrapper(operator: DbtVirtualenvBaseOperator, *args: Any) -> Any | None:
         if operator.virtualenv_dir is None:
             raise CosmosValueError(f"Method relies on value of parameter `virtualenv_dir` which is None.")
-        method(operator, *args)
+        return method(operator, *args)
 
     return wrapper
 
@@ -122,11 +122,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     def execute(self, context: Context) -> None:
         try:
-            output = super().execute(context)
-        except Exception:
-            self.log.error(traceback.format_exc())
-        else:
-            self.log.info(output)
+            super().execute(context)
         finally:
             self.clean_dir_if_temporary()
 
@@ -157,7 +153,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             return py_bin
 
         # Use a reusable virtualenv
-        self.log.info(f"Checking if the virtualenv lock {str(self.__lock_file)} exists")
+        self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
         while not self._is_lock_available():
             self.log.info("Waiting for virtualenv lock to be released")
             time.sleep(1)
@@ -172,31 +168,30 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         return py_bin
 
     @property
-    def __lock_file(self) -> Path:
-        return Path(f"{self.virtualenv_dir}/LOCK")
+    def _lock_file(self) -> Path:
+        filepath = Path(f"{self.virtualenv_dir}/{LOCK_FILENAME}")
+        return filepath
 
     @property
     def _pid(self) -> int:
         return os.getpid()
 
+    # TODO: test
     @depends_on_virtualenv_dir
     def _is_lock_available(self) -> bool:
         is_available = True
-        if self.__lock_file.is_file():
-            _process_running = False
-            with open(self.__lock_file) as lf:
+        if self._lock_file.is_file():
+            with open(self._lock_file) as lf:
                 pid = int(lf.read())
                 self.log.info(f"Checking for running process with PID {pid}")
                 try:
                     _process_running = psutil.Process(pid).is_running()
-                    self.log.info(f"Process {pid} running: {_process_running}. ")
+                    self.log.info(f"Process {pid} running: {_process_running} and has the lock {self._lock_file}.")
                 except psutil.NoSuchProcess:
-                    # TODO: test
-                    _process_running = False
-                    self.log.info(f"Process {pid} is not running: {_process_running}. Releasing the lock.")
-
-            is_available = not _process_running
-
+                    self.log.info(f"Process {pid} is not running. Lock {self._lock_file} was outdated.")
+                    is_available = True
+                else:
+                    is_available = not _process_running
         return is_available
 
     @depends_on_virtualenv_dir
@@ -204,22 +199,22 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if not self.virtualenv_dir.is_dir():  # type: ignore
             os.mkdir(str(self.virtualenv_dir))
 
-        with open(self.__lock_file, "w") as lf:
-            self.log.info(f"Acquiring lock at {self.__lock_file} with pid {str(self._pid)}")
+        with open(self._lock_file, "w") as lf:
+            self.log.info(f"Acquiring lock at {self._lock_file} with pid {str(self._pid)}")
             lf.write(str(self._pid))
 
     @depends_on_virtualenv_dir
     def _release_venv_lock(self) -> None:
-        if not self.__lock_file.is_file():
-            self.log.warn(f"Lockfile {self.__lock_file} not found, perhaps deleted by other concurrent operator?")
+        if not self._lock_file.is_file():
+            self.log.warn(f"Lockfile {self._lock_file} not found, perhaps deleted by other concurrent operator?")
             return
 
-        with open(self.__lock_file) as lf:
+        with open(self._lock_file) as lf:
             # TODO: test
             lock_file_pid = int(lf.read())
 
             if lock_file_pid == self._pid:
-                return self.__lock_file.unlink()
+                return self._lock_file.unlink()
 
             # TODO: test
             # TODO: release lock if other process is not running

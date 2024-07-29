@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -156,6 +157,58 @@ def test__get_or_create_venv_py_interpreter_waits_for_lock(
     )
     venv_operator._get_or_create_venv_py_interpreter()
     assert caplog.text.count("Waiting for virtualenv lock to be released") == 2
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute", side_effect=ValueError)
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.clean_dir_if_temporary")
+def test__execute_cleans_dir(mock_clean_dir_if_temporary, mock_execute, caplog):
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+    )
+    with pytest.raises(ValueError):
+        venv_operator.execute(None)
+    assert mock_clean_dir_if_temporary.called
+
+
+def test__is_lock_available_returns_false(tmpdir):
+    parent_pid = os.getppid()
+    lockfile = tmpdir / "cosmos_virtualenv.lock"
+    lockfile.write_text(str(parent_pid), encoding="utf-8")
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=tmpdir,
+    )
+    assert not venv_operator._is_lock_available()
+
+
+def test__is_lock_available_returns_true_pid_no_longer_running(tmpdir):
+    non_existent_pid = "74717471"
+    lockfile = tmpdir / "cosmos_virtualenv.lock"
+    lockfile.write_text(str(non_existent_pid), encoding="utf-8")
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=tmpdir,
+    )
+    assert venv_operator._is_lock_available()
+
+
+def test__is_lock_available_returns_true_pid_no_lockfile(tmpdir):
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=False,
+        virtualenv_dir=tmpdir,
+    )
+    assert venv_operator._is_lock_available()
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")

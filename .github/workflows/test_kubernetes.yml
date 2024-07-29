@@ -3,7 +3,7 @@ name: Kubernetes Integration Tests
 on: push
 
 jobs:
-  create-cluster:
+  run-kubernets-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 from airflow.models.dagbag import DagBag
-
-from . import utils as test_utils
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
+
+from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
@@ -39,6 +39,6 @@ def get_all_dag_files():
 def test_example_dag_kubernetes(session):
     get_all_dag_files()
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
-    #for dag_id in KUBERNETES_DAG_FILES:
+    # for dag_id in KUBERNETES_DAG_FILES:
     dag = db.get_dag("jaffle_shop_kubernetes")
     test_utils.run_dag(dag)

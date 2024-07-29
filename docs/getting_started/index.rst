@@ -11,6 +11,7 @@
    Execution Modes <execution-modes>
    Docker Execution Mode <docker>
    Kubernetes Execution Mode <kubernetes>
+   Azure Container Instance Execution Mode <azure-container-instance>
    dbt and Airflow Similar Concepts <dbt-airflow-concepts>
 
 

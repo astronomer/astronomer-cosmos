@@ -25,11 +25,17 @@ def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None
     module = importlib.import_module(module_name)
     Operator = getattr(module, class_name)
 
+    if task.owner != "":
+        task_owner = task.owner
+    else:
+        task_owner = dag.owner
+
     airflow_task = Operator(
         task_id=task.id,
         dag=dag,
         task_group=task_group,
-        **({} if class_name == "EmptyOperator" else {"extra_context": task.extra_context}),
+        owner=task_owner,
+        extra_context=task.extra_context,
         **task.arguments,
     )
 

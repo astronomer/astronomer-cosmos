@@ -9,6 +9,7 @@ from cosmos.constants import ExecutionMode, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent / "sample/"
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
@@ -35,7 +36,12 @@ def test_init_with_manifest_path_and_project_path_succeeds():
     project_name in this case should be based on dbt_project_path
     """
     project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
-    assert project_config.manifest_path == Path("target/manifest.json")
+    if AIRFLOW_IO_AVAILABLE:
+        from airflow.io.path import ObjectStoragePath
+
+        assert project_config.manifest_path == ObjectStoragePath("target/manifest.json")
+    else:
+        assert project_config.manifest_path == Path("target/manifest.json")
     assert project_config.project_name == "some-path"
 
 
@@ -292,3 +298,36 @@ def test_execution_config_with_invocation_option(execution_mode, invocation_mode
 def test_execution_config_default_config(execution_mode, expected_invocation_mode):
     execution_config = ExecutionConfig(execution_mode=execution_mode)
     assert execution_config.invocation_mode == expected_invocation_mode
+
+
+@pytest.mark.parametrize(
+    "manifest_path, given_manifest_conn_id, used_manifest_conn_id",
+    [
+        ("s3://cosmos-manifest-test/manifest.json", None, "aws_default"),
+        ("s3://cosmos-manifest-test/manifest.json", "aws_s3_conn", "aws_s3_conn"),
+        ("gs://cosmos-manifest-test/manifest.json", None, "google_cloud_default"),
+        ("gs://cosmos-manifest-test/manifest.json", "gcp_gs_conn", "gcp_gs_conn"),
+        ("abfs://cosmos-manifest-test/manifest.json", None, "wasb_default"),
+        ("abfs://cosmos-manifest-test/manifest.json", "azure_abfs_conn", "azure_abfs_conn"),
+    ],
+)
+def test_remote_manifest_path(manifest_path, given_manifest_conn_id, used_manifest_conn_id):
+    if AIRFLOW_IO_AVAILABLE:
+        project_config = ProjectConfig(
+            dbt_project_path="/tmp/some-path", manifest_path=manifest_path, manifest_conn_id=given_manifest_conn_id
+        )
+
+        from airflow.io.path import ObjectStoragePath
+
+        assert project_config.manifest_path == ObjectStoragePath(manifest_path, conn_id=used_manifest_conn_id)
+    else:
+        from airflow.version import version as airflow_version
+
+        error_msg = (
+            f"The manifest path {manifest_path} uses a remote file scheme, but the required Object Storage feature is "
+            f"unavailable in Airflow version {airflow_version}. Please upgrade to Airflow 2.8 or later."
+        )
+        with pytest.raises(CosmosValueError, match=error_msg):
+            _ = ProjectConfig(
+                dbt_project_path="/tmp/some-path", manifest_path=manifest_path, manifest_conn_id=given_manifest_conn_id
+            )

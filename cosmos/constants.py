@@ -3,6 +3,9 @@ from enum import Enum
 from pathlib import Path
 
 import aenum
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.google.cloud.hooks.gcs import GCSHook
+from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 from packaging.version import Version
 
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
@@ -26,6 +29,17 @@ OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 # Cosmos will not emit datasets for the following Airflow versions, due to a breaking change that's fixed in later Airflow 2.x versions
 # https://github.com/apache/airflow/issues/39486
 PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1")]
+
+
+S3_FILE_SCHEME = "s3"
+GS_FILE_SCHEME = "gs"
+ABFS_FILE_SCHEME = "abfs"
+
+FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP = {
+    S3_FILE_SCHEME: S3Hook.default_conn_name,
+    GS_FILE_SCHEME: GCSHook.default_conn_name,
+    ABFS_FILE_SCHEME: WasbHook.default_conn_name,
+}
 
 
 class LoadMode(Enum):

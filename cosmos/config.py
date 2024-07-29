@@ -10,9 +10,12 @@ from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from airflow.version import version as airflow_version
+
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
     DEFAULT_PROFILES_FILE_NAME,
+    FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     DbtResourceType,
     ExecutionMode,
     InvocationMode,
@@ -25,6 +28,7 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 logger = get_logger(__name__)
 
@@ -153,6 +157,7 @@ class ProjectConfig:
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",
         manifest_path: str | Path | None = None,
+        manifest_conn_id: str | None = None,
         project_name: str | None = None,
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
@@ -178,7 +183,25 @@ class ProjectConfig:
                 self.project_name = self.dbt_project_path.stem
 
         if manifest_path:
-            self.manifest_path = Path(manifest_path)
+            manifest_path_str = str(manifest_path)
+            if not manifest_conn_id:
+                manifest_scheme = manifest_path_str.split("://")[0]
+                # Use the default Airflow connection ID for the scheme if it is not provided.
+                manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, None)
+
+            if manifest_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
+                raise CosmosValueError(
+                    f"The manifest path {manifest_path_str} uses a remote file scheme, but the required Object "
+                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                    f"Airflow 2.8 or later."
+                )
+
+            if AIRFLOW_IO_AVAILABLE:
+                from airflow.io.path import ObjectStoragePath
+
+                self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
+            else:
+                self.manifest_path = Path(manifest_path_str)
 
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars
@@ -195,28 +218,30 @@ class ProjectConfig:
         """
 
         mandatory_paths = {}
-
+        # We validate the existence of paths added to the `mandatory_paths` map by calling the `exists()` method on each
+        # one. Starting with Cosmos 1.6.0, if the Airflow version is `>= 2.8.0` and a `manifest_path` is provided, we
+        # cast it to an `airflow.io.path.ObjectStoragePath` instance during `ProjectConfig` initialisation, and it
+        # includes the `exists()` method. For the remaining paths in the `mandatory_paths` map, we cast them to
+        # `pathlib.Path` objects to ensure that the subsequent `exists()` call while iterating on the `mandatory_paths`
+        # map works correctly for all paths, thereby validating the project.
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
             mandatory_paths = {
-                "dbt_project.yml": project_yml_path,
-                "models directory ": self.models_path,
+                "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
+                "models directory ": Path(self.models_path) if self.models_path else None,
             }
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 
         for name, path in mandatory_paths.items():
-            if path is None or not Path(path).exists():
+            if path is None or not path.exists():
                 raise CosmosValueError(f"Could not find {name} at {path}")
 
     def is_manifest_available(self) -> bool:
         """
         Check if the `dbt` project manifest is set and if the file exists.
         """
-        if not self.manifest_path:
-            return False
-
-        return self.manifest_path.exists()
+        return self.manifest_path.exists() if self.manifest_path else False
 
 
 @dataclass

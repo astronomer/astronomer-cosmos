@@ -1,6 +1,20 @@
 Changelog
 =========
 
+1.5.1 (2024-07-17)
+------------------
+
+Bug fixes
+
+* Fix getting temporary AWS credentials with assume_role by @piotrkubicki in #1081
+* Fix issue 'No such file or directory' by @tatiana in #1097
+
+Others
+
+* Change Cosmos dev status from alpha to prod by @tatiana in #1098
+* Pre-commit hook updates in #1083, #1092
+
+
 1.5.0 (2024-06-27)
 ------------------
 

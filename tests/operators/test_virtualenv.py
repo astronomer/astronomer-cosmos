@@ -4,11 +4,13 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from airflow.models import DAG
 from airflow.models.connection import Connection
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -96,6 +98,46 @@ def test_virtualenv_operator_append_env_is_true_by_default():
     )
 
     assert venv_operator.append_env is True
+
+
+def test_depends_on_virtualenv_dir_raises_exeption():
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="buggy_task",
+    )
+    venv_operator.virtualenv_dir = None
+    with pytest.raises(CosmosValueError) as excepion_info:
+        venv_operator._is_lock_available()
+    assert str(excepion_info.value) == "Method relies on value of parameter `virtualenv_dir` which is None."
+
+
+def test_clean_dir_if_temporary(tmpdir):
+    tmp_filepath = Path(tmpdir / "tmpfile.txt")
+    tmp_filepath.touch()
+    assert tmp_filepath.exists()
+
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+        is_virtualenv_dir_temporary=True,
+        virtualenv_dir=tmpdir,
+    )
+    venv_operator.clean_dir_if_temporary()
+    assert not tmp_filepath.exists()
+    assert not tmpdir.exists()
+
+
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.clean_dir_if_temporary")
+def test_on_kill(mock_clean_dir_if_temporary):
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+    )
+    venv_operator.on_kill()
+    assert mock_clean_dir_if_temporary.called
 
 
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")

@@ -36,9 +36,7 @@ PY_INTERPRETER = "python3"
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
     def wrapper(operator: DbtVirtualenvBaseOperator, *args: Any) -> None:
         if operator.virtualenv_dir is None:
-            # TODO: test
             raise CosmosValueError(f"Method relies on value of parameter `virtualenv_dir` which is None.")
-
         method(operator, *args)
 
     return wrapper
@@ -119,7 +117,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         Delete the virtualenv directory if it is temporary.
         """
         if self.is_virtualenv_dir_temporary and self.virtualenv_dir and self.virtualenv_dir.exists():
-            # TODO: test
             self.log.info(f"Deleting the Python virtualenv {self.virtualenv_dir}")
             shutil.rmtree(str(self.virtualenv_dir), ignore_errors=True)
 
@@ -134,7 +131,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.clean_dir_if_temporary()
 
     def on_kill(self) -> None:
-        # TODO: test
         self.clean_dir_if_temporary()
 
     def prepare_virtualenv(self) -> str:
@@ -185,7 +181,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def _pid(self) -> int:
         return os.getpid()
 
-    # @depends_on_virtualenv_dir
+    @depends_on_virtualenv_dir
     def _is_lock_available(self) -> bool:
         if self.__lock_file.is_file():
             with open(self.__lock_file) as lf:

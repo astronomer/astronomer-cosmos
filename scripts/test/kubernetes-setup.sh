@@ -74,4 +74,3 @@ kubectl get svc --namespace default
 echo "pg log"
 kubectl logs postgres-postgresql-0 -c postgresql
 kubectl describe pod postgres-postgresql-0
-

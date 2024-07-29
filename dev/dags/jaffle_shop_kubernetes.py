@@ -9,22 +9,21 @@ The step-by-step to run this DAG are described in:
 https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#kubernetes
 
 """
+
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
 from pendulum import datetime
 
 from cosmos import (
-    ProfileConfig,
     DbtSeedKubernetesOperator,
+    ProfileConfig,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
 
 
-project_seeds = [
-    {"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}
-]
+project_seeds = [{"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}]
 
 postgres_password_secret = Secret(
     deploy_type="env",
@@ -61,7 +60,7 @@ with DAG(
                 conn_id="postgres_default",
                 profile_args={
                     "schema": "public",
-                }
-            )
-        )
+                },
+            ),
+        ),
     )

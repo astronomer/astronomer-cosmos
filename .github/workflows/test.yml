@@ -43,6 +43,8 @@ jobs:
         exclude:
           - python-version: "3.11"
             airflow-version: "2.4"
+          - python-version: "3.11"
+            airflow-version: "2.5"
           # Apache Airflow versions prior to 2.9.0 have not been tested with Python 3.12.
           # Official support for Python 3.12 and the corresponding constraints.txt are available only for Apache Airflow >= 2.9.0.
           # See: https://github.com/apache/airflow/tree/2.9.0?tab=readme-ov-file#requirements
@@ -100,6 +102,8 @@ jobs:
         exclude:
           - python-version: "3.11"
             airflow-version: "2.4"
+          - python-version: "3.11"
+            airflow-version: "2.5"
     services:
       postgres:
         image: postgres

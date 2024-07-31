@@ -1,0 +1,11 @@
+postgresql:
+  livenessProbe:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
+    initialDelaySeconds: 120
+    timeoutSeconds: 120
+    periodSeconds: 120
+    successThreshold: 1

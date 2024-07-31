@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.6.0a2 (2024-07-17)
+1.6.0a4 (2024-07-31)
 --------------------
 
 New Features
@@ -11,10 +11,28 @@ New Features
 Bug fixes
 
 * Fix Teradata Profile mapping issue by @sc250072 in #1088
+* Fix empty tag in case of custom parser by @pankajastro in #1100
+* Fix ``dbt deps`` of ``LoadMode.DBT_LS`` should use ``ProjectConfig.dbt_vars`` by @tatiana in #1114
+* Add support for loading manifest from cloud stores using Airflow Object Storage by @pankajkoti in #1109
+
+Enhancements
+
+* Add ``DatabricksOauthProfileMapping`` profile by @CorsettiS in #1091
+* Use ``dbt ls`` as the default parser when ``profile_config`` is provided by @pankajastro in #1101
+* Add task owner to dbt operators by @wornjs in #1082
+
+Docs
+
+* Fix documentation for Azure Container Instance by @pankajastro in #1106
+* Use Airflow trademark as it has been registered by @pankajastro in #1105
 
 Others
 
-* Pre-commit hook updates in #1074
+* Remove ``DbtGraph.current_version`` dead code by @tatiana in #1111
+* Install requirements.txt by default during dev env spin up by @CorsettiS in #1099
+* [CI] Disable test for Airflow-2.5 and Python-3.11 combination by @pankajastro in #1124
+* Pre-commit hook updates in #1074, #1113, #1125
+
 
 
 1.5.1 (2024-07-17)

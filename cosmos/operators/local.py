@@ -18,9 +18,9 @@ from attr import define
 
 from cosmos import cache
 from cosmos.cache import (
-    _copy_cached_lockfile_to_project,
-    _get_latest_cached_lockfile,
-    is_cache_lockfile_enabled,
+    _copy_cached_package_lockfile_to_project,
+    _get_latest_cached_package_lockfile,
+    is_cache_package_lockfile_enabled,
 )
 from cosmos.constants import InvocationMode
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
@@ -282,10 +282,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
-        if is_cache_lockfile_enabled(project_dir):
-            latest_package_lockfile = _get_latest_cached_lockfile(project_dir)
+        if is_cache_package_lockfile_enabled(project_dir):
+            latest_package_lockfile = _get_latest_cached_package_lockfile(project_dir)
             if latest_package_lockfile:
-                _copy_cached_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
+                _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
 
     def run_command(
         self,

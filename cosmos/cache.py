@@ -21,7 +21,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
-from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME, PACKAGE_LOCK_YML
+from cosmos.constants import (
+    DBT_MANIFEST_FILE_NAME,
+    DBT_TARGET_DIR_NAME,
+    DEFAULT_PROFILES_FILE_NAME,
+    PACKAGE_LOCKFILE_YML,
+)
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
 from cosmos.settings import (
@@ -409,9 +414,9 @@ def create_cache_profile(version: str, profile_content: str) -> Path:
     return profile_yml_path
 
 
-def is_cache_lockfile_enabled(project_dir: Path) -> bool:
-    project_lockfile = project_dir / PACKAGE_LOCK_YML
-    return project_lockfile.is_file()
+def is_cache_package_lockfile_enabled(project_dir: Path) -> bool:
+    package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
+    return package_lockfile.is_file()
 
 
 def _get_sha1_hash(yaml_file: Path) -> str:
@@ -423,39 +428,51 @@ def _get_sha1_hash(yaml_file: Path) -> str:
     return sha1_hash
 
 
-def _get_latest_cached_lockfile(project_dir: Path) -> Path | None:
+def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
     """
     Retrieves the latest cached package-lock.yml for the specified project directory,
     or creates and caches it if not already cached and hashes match.
     """
     cache_identifier = project_dir.name
-    project_lockfile = project_dir / PACKAGE_LOCK_YML
-    cached_package_lockfile = cache_dir / cache_identifier / PACKAGE_LOCK_YML
+    package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
+    cached_package_lockfile = cache_dir / cache_identifier / PACKAGE_LOCKFILE_YML
 
     try:
         if cached_package_lockfile.exists() and cached_package_lockfile.is_file():
-            project_sha1_hash = _get_sha1_hash(project_lockfile)
+            project_sha1_hash = _get_sha1_hash(package_lockfile)
             cached_sha1_hash = _get_sha1_hash(cached_package_lockfile)
             if project_sha1_hash == cached_sha1_hash:
                 return cached_package_lockfile
         else:
             cached_lockfile_dir = cache_dir / cache_identifier
             cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
-            _safe_copy(project_lockfile, cached_package_lockfile)
+            _safe_copy(package_lockfile, cached_package_lockfile)
             return cached_package_lockfile
     except OSError as e:
         logger.warning(f"Error processing cached lockfile: {e}")
     return None
 
 
-def _copy_cached_lockfile_to_project(cached_lockfile: Path, project_dir: Path) -> None:
+def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, project_dir: Path) -> None:
     """Copy the cached package-lock.yml to tmp project dir"""
-    lock_file = project_dir / PACKAGE_LOCK_YML
-    _safe_copy(cached_lockfile, lock_file)
+    package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
+    _safe_copy(cached_package_lockfile, package_lockfile)
 
 
 # TODO: Move this function at different location
 def _safe_copy(src: Path, dst: Path) -> None:
+    """
+    Safely copies a file from a source path to a destination path.
+
+    This function ensures that the copy operation is atomic by first
+    copying the file to a temporary file in the same directory as the
+    destination and then renaming the temporary file to the destination
+    file. This approach minimizes the risk of file corruption or partial
+    writes in case of a failure or interruption during the copy process.
+
+    See the blog for atomic file operations:
+    https://alexwlchan.net/2019/atomic-cross-filesystem-moves-in-python/
+    """
     # Create a temporary file in the same directory as the destination
     dir_name, base_name = os.path.split(dst)
     temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)

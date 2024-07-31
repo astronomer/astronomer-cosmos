@@ -49,7 +49,8 @@ POSTGRES_PASSWORD=$(kubectl get secret --namespace default postgres-postgresql -
 export POSTGRES_PASSWORD
 
 # Expose the Postgres to the host running Docker/Kind
-kubectl port-forward --namespace default postgres-postgresql-0  5432:5432 &
+#kubectl port-forward --namespace default postgres-postgresql-0  5432:5432 &
+kubectl port-forward --namespace default svc/postgres-postgresql 5432:5432 &
 kubectl create secret generic postgres-secrets --from-literal=host=postgres-postgresql.default.svc.cluster.local --from-literal=password=$POSTGRES_PASSWORD
 
 # Create a docker image containing the dbt project files and dbt profile

@@ -22,7 +22,7 @@ Step-by-step instructions
 
 **Install Airflow and Cosmos**
 
-Create a python virtualenv, activate it, upgrade pip to the latest version and install apache airflow & astronomer-postgres
+Create a python virtualenv, activate it, upgrade pip to the latest version and install `Apache Airflow® <https://airflow.apache.org/>`_ & astronomer-postgres
 
 .. code-block:: bash
 

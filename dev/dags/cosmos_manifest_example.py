@@ -6,11 +6,16 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ExecutionConfig, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
+from airflow.decorators import dag
+from airflow.operators.empty import EmptyOperator
+
+from cosmos import DbtTaskGroup, ExecutionConfig, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import DbtProfileConfigVars, PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+
+execution_config = ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "jaffle_shop")
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -22,22 +27,84 @@ profile_config = ProfileConfig(
     ),
 )
 
-# [START local_example]
-cosmos_manifest_example = DbtDag(
-    # dbt/cosmos-specific parameters
-    project_config=ProjectConfig(
-        manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
-        project_name="jaffle_shop",
-    ),
-    profile_config=profile_config,
-    render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:seeds/raw_customers.csv"]),
-    execution_config=ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "jaffle_shop"),
-    operator_args={"install_deps": True},
-    # normal dag parameters
+render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:seeds/raw_customers.csv"])
+
+
+@dag(
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-    dag_id="cosmos_manifest_example",
     default_args={"retries": 2},
 )
-# [END local_example]
+def cosmos_manifest_example() -> None:
+
+    pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+    # [START local_example]
+    local_example = DbtTaskGroup(
+        group_id="local_example",
+        project_config=ProjectConfig(
+            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
+    # [END local_example]
+
+    # [START aws_s3_example]
+    aws_s3_example = DbtTaskGroup(
+        group_id="aws_s3_example",
+        project_config=ProjectConfig(
+            manifest_path="s3://cosmos-manifest-test/manifest.json",
+            manifest_conn_id="aws_s3_conn",
+            # `manifest_conn_id` is optional. If not provided, the default connection ID `aws_default` is used.
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
+    # [END aws_s3_example]
+
+    # [START gcp_gs_example]
+    gcp_gs_example = DbtTaskGroup(
+        group_id="gcp_gs_example",
+        project_config=ProjectConfig(
+            manifest_path="gs://cosmos-manifest-test/manifest.json",
+            manifest_conn_id="gcp_gs_conn",
+            # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
+    # [END gcp_gs_example]
+
+    # [START azure_abfs_example]
+    azure_abfs_example = DbtTaskGroup(
+        group_id="azure_abfs_example",
+        project_config=ProjectConfig(
+            manifest_path="abfs://cosmos-manifest-test/manifest.json",
+            manifest_conn_id="azure_abfs_conn",
+            # `manifest_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
+    # [END azure_abfs_example]
+
+    post_dbt = EmptyOperator(task_id="post_dbt")
+
+    (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
+
+
+cosmos_manifest_example()

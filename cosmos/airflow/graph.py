@@ -95,6 +95,7 @@ def create_test_task_metadata(
     task_args["on_warning_callback"] = on_warning_callback
     extra_context = {}
 
+    task_owner = ""
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
@@ -106,6 +107,7 @@ def create_test_task_metadata(
             task_args["select"] = node.resource_name
 
         extra_context = {"dbt_node_config": node.context_dict}
+        task_owner = node.owner
 
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
@@ -114,6 +116,7 @@ def create_test_task_metadata(
 
     return TaskMetadata(
         id=test_task_name,
+        owner=task_owner,
         operator_class=calculate_operator_class(
             execution_mode=execution_mode,
             dbt_class="DbtTest",
@@ -158,6 +161,7 @@ def create_task_metadata(
 
         task_metadata = TaskMetadata(
             id=task_id,
+            owner=node.owner,
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),

@@ -20,7 +20,7 @@
 
 |fury| |ossrank| |downloads| |pre-commit|
 
-Run your dbt Core projects as `Apache Airflow <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
+Run your dbt Core projects as `Apache Airflow® <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
 
 - Run dbt projects against Airflow connections instead of dbt profiles
 - Native support for installing and running dbt in a virtual environment to avoid dependency conflicts with Airflow

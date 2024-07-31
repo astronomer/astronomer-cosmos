@@ -19,6 +19,7 @@ DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
+    "2.8": ["cosmos_manifest_example.py"],
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py"]

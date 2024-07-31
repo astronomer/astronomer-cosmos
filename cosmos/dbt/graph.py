@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
@@ -75,6 +75,10 @@ class DbtNode:
         Replace period (.) with underscore (_) due to versioned models.
         """
         return self.resource_name.replace(".", "_")
+
+    @property
+    def owner(self) -> str:
+        return str(self.config.get("meta", {}).get("owner", ""))
 
     @property
     def context_dict(self) -> dict[str, Any]:
@@ -155,7 +159,6 @@ class DbtGraph:
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
-    current_version: str = ""
 
     def __init__(
         self,
@@ -201,6 +204,13 @@ class DbtGraph:
             )
         return path.absolute()
 
+    def _add_vars_arg(self, cmd_args: list[str]) -> None:
+        """
+        Change args list in-place so they include dbt vars, if they are set.
+        """
+        if self.project.dbt_vars:
+            cmd_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+
     @cached_property
     def dbt_ls_args(self) -> list[str]:
         """
@@ -213,8 +223,7 @@ class DbtGraph:
         if self.render_config.select:
             ls_args.extend(["--select", *self.render_config.select])
 
-        if self.project.dbt_vars:
-            ls_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+        self._add_vars_arg(ls_args)
 
         if self.render_config.selector:
             ls_args.extend(["--selector", self.render_config.selector])
@@ -320,7 +329,7 @@ class DbtGraph:
             if self.project.is_manifest_available():
                 self.load_from_dbt_manifest()
             else:
-                if execution_mode == ExecutionMode.LOCAL and self.profile_config:
+                if self.profile_config and self.project_path:
                     try:
                         self.load_via_dbt_ls()
                     except FileNotFoundError:
@@ -408,6 +417,16 @@ class DbtGraph:
         """Identify if Cosmos should use/store dbt partial parse cache or not."""
         return settings.enable_cache_partial_parse and settings.enable_cache and bool(self.cache_dir)
 
+    def run_dbt_deps(self, dbt_cmd: str, dbt_project_path: Path, env: dict[str, str]) -> None:
+        """
+        Given the dbt command path and the dbt project path, build and run the dbt deps command.
+        """
+        deps_command = [dbt_cmd, "deps"]
+        deps_command.extend(self.local_flags)
+        self._add_vars_arg(deps_command)
+        stdout = run_command(deps_command, dbt_project_path, env)
+        logger.debug("dbt deps output: %s", stdout)
+
     def load_via_dbt_ls_without_cache(self) -> None:
         """
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
@@ -461,16 +480,14 @@ class DbtGraph:
                     "--target",
                     self.profile_config.target_name,
                 ]
+
                 self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
-                    deps_command = [dbt_cmd, "deps"]
-                    deps_command.extend(self.local_flags)
-                    stdout = run_command(deps_command, tmpdir_path, env)
-                    logger.debug("dbt deps output: %s", stdout)
+                    self.run_dbt_deps(dbt_cmd, tmpdir_path, env)
 
                 nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)
 
@@ -545,6 +562,7 @@ class DbtGraph:
         )
         for model_name, model in models:
             config = {item.split(":")[0]: item.split(":")[-1] for item in model.config.config_selectors}
+            tags = [selector for selector in model.config.config_selectors if selector.startswith("tags:")]
             node = DbtNode(
                 unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
                 resource_type=DbtResourceType(model.type.value),
@@ -554,7 +572,7 @@ class DbtGraph:
                         self.render_config.project_path.as_posix(), self.execution_config.project_path.as_posix()
                     )
                 ),
-                tags=[],
+                tags=tags or [],
                 config=config,
             )
             nodes[model_name] = node
@@ -593,7 +611,11 @@ class DbtGraph:
             raise CosmosLoadDbtException("Unable to load manifest without ExecutionConfig.dbt_project_path")
 
         nodes = {}
-        with open(self.project.manifest_path) as fp:  # type: ignore[arg-type]
+
+        if TYPE_CHECKING:
+            assert self.project.manifest_path is not None  # pragma: no cover
+
+        with self.project.manifest_path.open() as fp:
             manifest = json.load(fp)
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}

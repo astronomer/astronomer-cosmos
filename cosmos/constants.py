@@ -1,7 +1,7 @@
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Callable
+from typing import Callable, Dict
 
 import aenum
 from packaging.version import Version
@@ -34,29 +34,28 @@ ABFS_FILE_SCHEME = "abfs"
 
 def _default_s3_conn() -> str:
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-    return S3Hook.default_conn_name
+
+    return S3Hook.default_conn_name  # type: ignore[no-any-return]
 
 
 def _default_gcs_conn() -> str:
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
-    return GCSHook.default_conn_name
+
+    return GCSHook.default_conn_name  # type: ignore[no-any-return]
 
 
 def _default_wasb_conn() -> str:
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
-    return WasbHook.default_conn_name
 
-
-def _default_abfs_conn() -> str:
-    from airflow.providers.microsoft.azure.hooks.data_lake import AzureDataLakeStorageV2Hook
-    return AzureDataLakeStorageV2Hook.default_conn_name
+    return WasbHook.default_conn_name  # type: ignore[no-any-return]
 
 
 FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP: Dict[str, Callable[[], str]] = {
     "s3": _default_s3_conn,
     "gs": _default_gcs_conn,
-    "wasb": _default_wasb_conn,
-    "abfs": _default_abfs_conn,
+    "adl": _default_wasb_conn,
+    "abfs": _default_wasb_conn,
+    "abfss": _default_wasb_conn,
 }
 
 

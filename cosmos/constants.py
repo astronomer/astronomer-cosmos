@@ -29,7 +29,6 @@ OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1")]
 
 
-ABFS_FILE_SCHEME = "abfs"
 
 
 def _default_s3_conn() -> str:

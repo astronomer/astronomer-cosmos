@@ -1,11 +1,9 @@
 import os
 from enum import Enum
 from pathlib import Path
+from typing import Dict, Callable
 
 import aenum
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.google.cloud.hooks.gcs import GCSHook
-from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 from packaging.version import Version
 
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
@@ -31,14 +29,34 @@ OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1")]
 
 
-S3_FILE_SCHEME = "s3"
-GS_FILE_SCHEME = "gs"
 ABFS_FILE_SCHEME = "abfs"
 
-FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP = {
-    S3_FILE_SCHEME: S3Hook.default_conn_name,
-    GS_FILE_SCHEME: GCSHook.default_conn_name,
-    ABFS_FILE_SCHEME: WasbHook.default_conn_name,
+
+def _default_s3_conn() -> str:
+    from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+    return S3Hook.default_conn_name
+
+
+def _default_gcs_conn() -> str:
+    from airflow.providers.google.cloud.hooks.gcs import GCSHook
+    return GCSHook.default_conn_name
+
+
+def _default_wasb_conn() -> str:
+    from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
+    return WasbHook.default_conn_name
+
+
+def _default_abfs_conn() -> str:
+    from airflow.providers.microsoft.azure.hooks.data_lake import AzureDataLakeStorageV2Hook
+    return AzureDataLakeStorageV2Hook.default_conn_name
+
+
+FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP: Dict[str, Callable[[], str]] = {
+    "s3": _default_s3_conn,
+    "gs": _default_gcs_conn,
+    "wasb": _default_wasb_conn,
+    "abfs": _default_abfs_conn,
 }
 
 

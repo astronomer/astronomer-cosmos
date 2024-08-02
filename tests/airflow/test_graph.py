@@ -443,7 +443,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
             DbtResourceType.SOURCE,
-            False,
+            True,
             SourceRenderingBehavior.NONE,
             None,
             None,

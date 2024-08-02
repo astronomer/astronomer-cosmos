@@ -405,6 +405,80 @@ def test_create_task_metadata_model_use_task_group(caplog):
     assert metadata.id == "run"
 
 
+@pytest.mark.parametrize(
+    "unique_id, resource_type, has_freshness, source_rendering_behavior, expected_id, expected_operator_class",
+    [
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            True,
+            SourceRenderingBehavior.ALL,
+            "my_source_source",
+            "cosmos.operators.local.DbtSourceLocalOperator",
+        ),
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            False,
+            SourceRenderingBehavior.ALL,
+            "my_source_source",
+            "airflow.operators.empty.EmptyOperator",
+        ),
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            True,
+            SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+            "my_source_source",
+            "cosmos.operators.local.DbtSourceLocalOperator",
+        ),
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            False,
+            SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+            None,
+            None,
+        ),
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            False,
+            SourceRenderingBehavior.NONE,
+            None,
+            None,
+        ),
+        (
+            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+            DbtResourceType.SOURCE,
+            False,
+            SourceRenderingBehavior.NONE,
+            None,
+            None,
+        ),
+    ],
+)
+def test_create_task_metadata_source_with_rendering_options(
+    unique_id, resource_type, has_freshness, source_rendering_behavior, expected_id, expected_operator_class, caplog
+):
+    child_node = DbtNode(
+        unique_id=unique_id,
+        resource_type=resource_type,
+        depends_on=[],
+        file_path=Path(""),
+        tags=[],
+        config={},
+        has_freshness=has_freshness,
+    )
+
+    metadata = create_task_metadata(
+        child_node, execution_mode=ExecutionMode.LOCAL, source_rendering_behavior=source_rendering_behavior, args={}
+    )
+    if metadata:
+        assert metadata.id == expected_id
+        assert metadata.operator_class == expected_operator_class
+
+
 @pytest.mark.parametrize("use_task_group", (None, True, False))
 def test_create_task_metadata_seed(caplog, use_task_group):
     sample_node = DbtNode(

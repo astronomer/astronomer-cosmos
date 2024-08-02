@@ -161,14 +161,7 @@ def create_task_metadata(
             if use_task_group is True:
                 task_id = "run"
         elif node.resource_type == DbtResourceType.SOURCE:
-            if source_rendering_behavior == SourceRenderingBehavior.NONE:
-                msg = (
-                    "Source node rendering is currently disabled. To enable it, set the RenderConfig source_rendering_behavior = all "
-                    "Enabling source node rendering may enhance the visual representation of your DAGs."
-                )
-                logger.warning(msg)
-                return None
-            elif (
+            if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
                 and node.has_freshness is False
                 and node.has_test is False

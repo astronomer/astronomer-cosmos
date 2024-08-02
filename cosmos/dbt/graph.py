@@ -121,8 +121,6 @@ def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
         if isinstance(value, dict):
             if any(subvalue is not None for subvalue in value.values()):
                 return True
-        elif value is not None:
-            return True
     return False
 
 
@@ -386,7 +384,7 @@ class DbtGraph:
             "--output",
             "json",
             "--output-keys",
-            "name alias unique_id resource_type depends_on original_file_path tags config freshness",
+            '"name alias unique_id resource_type depends_on original_file_path tags config freshness"',
         ]
 
         ls_args = self.dbt_ls_args

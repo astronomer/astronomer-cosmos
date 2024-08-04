@@ -11,6 +11,7 @@ from airflow import DAG
 from airflow import __version__ as airflow_version
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessResult
+from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
@@ -616,13 +617,14 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
         should_store_compiled_sql=False,
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
-    facets = dbt_base_operator.get_openlineage_facets_on_complete(dbt_base_operator)
+    with patch.object(dbt_base_operator.log, "info") as mock_log_info:
+        facets = dbt_base_operator.get_openlineage_facets_on_complete(TaskInstance(dbt_base_operator))
+
     assert facets.inputs == []
     assert facets.outputs == []
     assert facets.run_facets == {}
     assert facets.job_facets == {}
-    log = "Unable to emit OpenLineage events due to lack of dependencies or data."
-    assert log in caplog.text
+    mock_log_info.assert_called_with("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
 
 def test_store_compiled_sql() -> None:
@@ -759,10 +761,11 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
         should_store_compiled_sql=False,
     )
 
-    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+    with patch.object(dbt_base_operator.log, "debug") as mock_log_debug:
+        dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+
     assert instance.parse.called
-    err_msg = "Unable to parse OpenLineage events"
-    assert err_msg in caplog.text
+    mock_log_debug.assert_called_with("Unable to parse OpenLineage events", stack_info=True)
 
 
 @pytest.mark.parametrize(
@@ -924,7 +927,7 @@ def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
     mock_send_sigterm.assert_called_once()
 
 
-def test_handle_exception_subprocess(caplog):
+def test_handle_exception_subprocess():
     """
     Test the handle_exception_subprocess method of the DbtLocalBaseOperator class for non-zero dbt exit code.
     """
@@ -933,11 +936,13 @@ def test_handle_exception_subprocess(caplog):
         task_id="my-task",
         project_dir="my/dir",
     )
-    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=["n" * n for n in range(1, 1000)])
+    full_output = ["n" * n for n in range(1, 1000)]
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output)
 
-    caplog.set_level(logging.ERROR)
     # Test when exit_code is non-zero
-    with pytest.raises(AirflowException) as err_context:
-        operator.handle_exception_subprocess(result)
+    with patch.object(operator.log, "error") as mock_log_error:
+        with pytest.raises(AirflowException) as err_context:
+            operator.handle_exception_subprocess(result)
+
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
-    assert len(caplog.text) > 1000  # Ensure the log message is not truncated
+    mock_log_error.assert_called_with("\n".join(full_output))

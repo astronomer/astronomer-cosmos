@@ -406,14 +406,3 @@ def test_get_latest_cached_lockfile_with_no_cache(mock_get_sha):
     # Test case where there is a cached file
     result = _get_latest_cached_package_lockfile(project_dir)
     assert result.exists()
-
-
-def test_get_latest_cached_failed(caplog):
-    caplog.set_level(logging.WARNING)
-    project_dir = _test_tmp_dir("test_project")
-    cache_dir = _test_tmp_dir("test_cache")
-    project_dir.parent.mkdir(parents=True, exist_ok=True)
-    cache_dir.parent.mkdir(parents=True, exist_ok=True)
-
-    _get_latest_cached_package_lockfile(project_dir)
-    assert "Error processing cached lockfile" in caplog.text

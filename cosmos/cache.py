@@ -33,6 +33,7 @@ from cosmos.settings import (
     cache_dir,
     dbt_profile_cache_dir_name,
     enable_cache,
+    enable_cache_package_lockfile,
     enable_cache_profile,
 )
 
@@ -415,6 +416,8 @@ def create_cache_profile(version: str, profile_content: str) -> Path:
 
 
 def is_cache_package_lockfile_enabled(project_dir: Path) -> bool:
+    if not enable_cache_package_lockfile:
+        return False
     package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
     return package_lockfile.is_file()
 
@@ -437,19 +440,16 @@ def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
     package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
     cached_package_lockfile = cache_dir / cache_identifier / PACKAGE_LOCKFILE_YML
 
-    try:
-        if cached_package_lockfile.exists() and cached_package_lockfile.is_file():
-            project_sha1_hash = _get_sha1_hash(package_lockfile)
-            cached_sha1_hash = _get_sha1_hash(cached_package_lockfile)
-            if project_sha1_hash == cached_sha1_hash:
-                return cached_package_lockfile
+    if cached_package_lockfile.exists() and cached_package_lockfile.is_file():
+        project_sha1_hash = _get_sha1_hash(package_lockfile)
+        cached_sha1_hash = _get_sha1_hash(cached_package_lockfile)
+        if project_sha1_hash == cached_sha1_hash:
+            return cached_package_lockfile
         else:
             cached_lockfile_dir = cache_dir / cache_identifier
             cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
             _safe_copy(package_lockfile, cached_package_lockfile)
             return cached_package_lockfile
-    except OSError as e:
-        logger.warning(f"Error processing cached lockfile: {e}")
     return None
 
 
@@ -459,7 +459,7 @@ def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, proj
     _safe_copy(cached_package_lockfile, package_lockfile)
 
 
-# TODO: Move this function at different location
+# TODO: Move this function to a different location
 def _safe_copy(src: Path, dst: Path) -> None:
     """
     Safely copies a file from a source path to a destination path.

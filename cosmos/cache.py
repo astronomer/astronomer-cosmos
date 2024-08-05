@@ -445,12 +445,10 @@ def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
         cached_sha1_hash = _get_sha1_hash(cached_package_lockfile)
         if project_sha1_hash == cached_sha1_hash:
             return cached_package_lockfile
-        else:
-            cached_lockfile_dir = cache_dir / cache_identifier
-            cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
-            _safe_copy(package_lockfile, cached_package_lockfile)
-            return cached_package_lockfile
-    return None
+    cached_lockfile_dir = cache_dir / cache_identifier
+    cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
+    _safe_copy(package_lockfile, cached_package_lockfile)
+    return cached_package_lockfile
 
 
 def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, project_dir: Path) -> None:

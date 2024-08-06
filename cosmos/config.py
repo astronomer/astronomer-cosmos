@@ -187,7 +187,7 @@ class ProjectConfig:
             if not manifest_conn_id:
                 manifest_scheme = manifest_path_str.split("://")[0]
                 # Use the default Airflow connection ID for the scheme if it is not provided.
-                manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, None)
+                manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, lambda: None)()
 
             if manifest_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
                 raise CosmosValueError(

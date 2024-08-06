@@ -384,7 +384,14 @@ class DbtGraph:
             "--output",
             "json",
             "--output-keys",
-            '"name alias unique_id resource_type depends_on original_file_path tags config freshness"',
+            "name",
+            "unique_id",
+            "resource_type",
+            "depends_on",
+            "original_file_path",
+            "tags",
+            "config",
+            "freshness",
         ]
 
         ls_args = self.dbt_ls_args

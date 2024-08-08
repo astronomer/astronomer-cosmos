@@ -495,7 +495,7 @@ class DbtGraph:
                     if is_cache_package_lockfile_enabled(project_path):
                         latest_package_lockfile = _get_latest_cached_package_lockfile(project_path)
                         if latest_package_lockfile:
-                            _copy_cached_package_lockfile_to_project(latest_package_lockfile, Path(tmpdir))
+                            _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmpdir_path)
                     self.run_dbt_deps(dbt_cmd, tmpdir_path, env)
 
                 nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)

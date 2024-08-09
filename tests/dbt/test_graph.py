@@ -1429,7 +1429,6 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         assert hash_dir == "7c214f32d2e428c215e791435065f617"
 
 
-
 @pytest.mark.integration
 def test_get_dbt_ls_cache_returns_empty_if_non_json_var(airflow_variable):
     graph = DbtGraph(project=ProjectConfig())

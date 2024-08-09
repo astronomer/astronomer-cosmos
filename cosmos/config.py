@@ -188,12 +188,14 @@ class ProjectConfig:
             elif AIRFLOW_IO_AVAILABLE:
                 from airflow.io.path import ObjectStoragePath
                 self.dbt_project_path = ObjectStoragePath(dbt_project_path_str, conn_id=manifest_conn_id)
-                import os
-                dir_list=os.listdir(self.dbt_project_path)
-                raise CosmoValueError(f"we found that at dir_list : {dir_list}")
-                
+                self.models_path = self.dbt_project_path / Path(models_relative_path)
+                self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
+                self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
             else:
                 self.dbt_project_path = Path(dbt_project_path_str)
+                self.models_path = self.dbt_project_path / Path(models_relative_path)
+                self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
+                self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
             if not project_name:
                 self.project_name = self.dbt_project_path.stem
 

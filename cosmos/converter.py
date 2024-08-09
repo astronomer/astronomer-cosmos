@@ -220,12 +220,26 @@ class DbtToAirflowConverter:
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
         if project_config.dbt_project_path:
-            execution_config, render_config = migrate_to_new_interface(execution_config, project_config, render_config)
+            # We copy the configuration so the change does not affect other DAGs or TaskGroups
+            # that may reuse the same original configuration
+            render_config = copy.deepcopy(render_config)
+            execution_config = copy.deepcopy(execution_config)
+            render_config.project_path = project_config.dbt_project_path
+            execution_config.project_path = project_config.dbt_project_path
 
         validate_adapted_user_config(execution_config, project_config, render_config)
 
-        env_vars = project_config.env_vars or operator_args.get("env")
-        dbt_vars = project_config.dbt_vars or operator_args.get("vars")
+        env_vars = copy.deepcopy(project_config.env_vars or operator_args.get("env"))
+        dbt_vars = copy.deepcopy(project_config.dbt_vars or operator_args.get("vars"))
+
+        if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
+            logger.warning(
+                "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
+            )
+
+        if not operator_args:
+            operator_args = {}
 
         cache_dir = None
         cache_identifier = None
@@ -275,6 +289,8 @@ class DbtToAirflowConverter:
             task_args,
             execution_mode=execution_config.execution_mode,
         )
+        if execution_config.execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
+            task_args["virtualenv_dir"] = execution_config.virtualenv_dir
 
         build_airflow_graph(
             nodes=self.dbt_graph.filtered_nodes,

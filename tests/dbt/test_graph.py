@@ -498,8 +498,9 @@ def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
 def test_load_via_custom_without_project_path():
     project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="test")
     execution_config = ExecutionConfig()
-    render_config = RenderConfig(dbt_executable_path="/inexistent/dbt")
+    render_config = RenderConfig()
     dbt_graph = DbtGraph(
+        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,
@@ -515,10 +516,9 @@ def test_load_via_custom_without_project_path():
 def test_load_via_dbt_ls_without_profile(mock_validate_dbt_command):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
-    render_config = RenderConfig(
-        dbt_executable_path="existing-dbt-cmd", dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
-    )
+    render_config = RenderConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
+        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,

@@ -34,6 +34,7 @@ from cosmos.constants import (
     ExecutionMode,
     LoadMode,
 )
+from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.dbt.selector import select_nodes
@@ -159,6 +160,15 @@ class DbtGraph:
     Supports different ways of loading the `dbt` project into this representation.
 
     Different loading methods can result in different `nodes` and `filtered_nodes`.
+
+    Example of how to use:
+
+        dbt_graph = DbtGraph(
+            project=ProjectConfig(dbt_project_path=DBT_PROJECT_PATH),
+            render_config=RenderConfig(exclude=["*orders*"], select=[]),
+            dbt_cmd="/usr/local/bin/dbt"
+        )
+        dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
     """
 
     nodes: dict[str, DbtNode] = dict()
@@ -175,6 +185,8 @@ class DbtGraph:
         cache_identifier: str = "",
         dbt_vars: dict[str, str] | None = None,
         airflow_metadata: dict[str, str] | None = None,
+        dbt_cmd: str = get_system_dbt(),
+        operator_args: dict[str, Any] | None = None,
     ):
         self.project = project
         self.render_config = render_config
@@ -187,6 +199,8 @@ class DbtGraph:
         else:
             self.dbt_ls_cache_key = ""
         self.dbt_vars = dbt_vars or {}
+        self.operator_args = operator_args or {}
+        self.dbt_cmd = dbt_cmd
 
     @cached_property
     def env_vars(self) -> dict[str, str]:
@@ -353,7 +367,7 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [dbt_cmd, "ls", "--output", "json"]
+        ls_command = [self.dbt_cmd, "ls", "--output", "json"]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
@@ -499,7 +513,6 @@ class DbtGraph:
                     self.run_dbt_deps(dbt_cmd, tmpdir_path, env)
 
                 nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)
-
                 self.nodes = nodes
                 self.filtered_nodes = nodes
 

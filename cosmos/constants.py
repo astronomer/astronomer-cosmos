@@ -20,6 +20,7 @@ DBT_DEPENDENCIES_FILE_NAMES = {"packages.yml", "dependencies.yml"}
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
 DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
+PACKAGE_LOCKFILE_YML = "package-lock.yml"
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"

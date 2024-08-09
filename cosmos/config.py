@@ -187,8 +187,11 @@ class ProjectConfig:
                 )
             elif AIRFLOW_IO_AVAILABLE:
                 from airflow.io.path import ObjectStoragePath
-
                 self.dbt_project_path = ObjectStoragePath(dbt_project_path_str, conn_id=manifest_conn_id)
+                import os
+                dir_list=os.listdir(self.dbt_project_path)
+                raise CosmoValueError(f"we found that at dir_list : {dir_list}")
+                
             else:
                 self.dbt_project_path = Path(dbt_project_path_str)
             if not project_name:

@@ -281,7 +281,23 @@ class DbtGraph:
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }
-        Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
+        if settings.remote_cache_path:
+            remote_cache_key_path = settings.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+            with remote_cache_key_path.open("w") as fp:
+                json.dump(cache_dict, fp)
+        else:
+            Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
+
+    def _get_dbt_ls_remote_cache(self) -> dict[str, str]:
+        """Loads the remote cache for dbt ls."""
+        cache_dict: dict[str, str] = {}
+        if settings.remote_cache_path is None:
+            return cache_dict
+        remote_cache_key_path = settings.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        if remote_cache_key_path.exists():
+            with remote_cache_key_path.open("r") as fp:
+                cache_dict = json.load(fp)
+        return cache_dict
 
     def get_dbt_ls_cache(self) -> dict[str, str]:
         """
@@ -296,7 +312,11 @@ class DbtGraph:
         """
         cache_dict: dict[str, str] = {}
         try:
-            cache_dict = Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
+            cache_dict = (
+                self._get_dbt_ls_remote_cache()
+                if settings.remote_cache_path
+                else Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
+            )
         except (json.decoder.JSONDecodeError, KeyError):
             return cache_dict
         else:

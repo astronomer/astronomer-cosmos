@@ -9,42 +9,17 @@ on:
 
 
 jobs:
-  spin-and-test:
+  run-kubernets-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Kind
-        uses: actions/setup-docker@v3
-      - name: Create Kind Cluster
+      - name: Kubernetes KinD Cluster
+        uses: container-tools/kind-action@v1
+      - name: Run tests
         run: |
-          kind create cluster
-      - name: Create PostgreSQL Deployment
-        run: |
-          kubectl apply -f postgres-deployment.yaml
-      - name: Expose PostgreSQL Service
-        run: |
-          kubectl apply -f postgres-service.yaml
-      - name: Port Forward (or Load Balancer Setup)
-        run: |
-          kubectl port-forward service/postgres 5432:5432
-      - name: Test PostgreSQL Connection
-        run: |
+          sh ./scripts/test/kubernetes-setup.sh
+          pip install hatch
+          hatch -e tests.py3.9-2.9 run pip freeze
+          hatch run tests.py3.9-2.9:test-kubernetes
           kubectl get pods -o wide
-      - name: Tear Down Cluster
-        run: |
-          kind delete cluster --name my-cluster
-#  run-kubernets-tests:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: Kubernetes KinD Cluster
-#        uses: container-tools/kind-action@v1
-#      - name: Run tests
-#        run: |
-#          sh ./scripts/test/kubernetes-setup.sh
-#          pip install hatch
-#          hatch -e tests.py3.9-2.9 run pip freeze
-#          hatch run tests.py3.9-2.9:test-kubernetes
-#          kubectl get pods -o wide
-#          kubectl logs postgres-postgresql-0
-
+          kubectl logs postgres-postgresql-0

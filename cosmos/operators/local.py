@@ -18,6 +18,11 @@ from airflow.utils.session import NEW_SESSION, create_session, provide_session
 from attr import define
 
 from cosmos import cache
+from cosmos.cache import (
+    _copy_cached_package_lockfile_to_project,
+    _get_latest_cached_package_lockfile,
+    is_cache_package_lockfile_enabled,
+)
 from cosmos.constants import InvocationMode
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError
@@ -302,6 +307,13 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         return result
 
+    def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
+        project_dir = Path(self.project_dir)
+        if is_cache_package_lockfile_enabled(project_dir):
+            latest_package_lockfile = _get_latest_cached_package_lockfile(project_dir)
+            if latest_package_lockfile:
+                _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
+
     def run_command(
         self,
         cmd: list[str],
@@ -347,6 +359,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 ]
 
                 if self.install_deps:
+                    self._cache_package_lockfile(tmp_dir_path)
                     deps_command = [self.dbt_executable_path, "deps"]
                     deps_command.extend(flags)
                     self.invoke_dbt(

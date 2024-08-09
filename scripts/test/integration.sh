@@ -3,6 +3,8 @@
 set -x
 set -e
 
+export SOURCE_RENDERING_BEHAVIOR=all
+
 pip freeze | grep airflow
 echo $AIRFLOW_HOME
 ls $AIRFLOW_HOME

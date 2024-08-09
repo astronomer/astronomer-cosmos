@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -30,6 +31,7 @@ from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
+SOURCE_RENDERING_BEHAVIOR_ENV = os.getenv("SOURCE_RENDERING_BEHAVIOR", "none")
 
 parent_seed = DbtNode(
     unique_id=f"{DbtResourceType.SEED.value}.{SAMPLE_PROJ_PATH.stem}.seed_parent",
@@ -101,6 +103,7 @@ def test_build_airflow_graph_with_after_each():
             task_args=task_args,
             render_config=RenderConfig(
                 test_behavior=TestBehavior.AFTER_EACH,
+                source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
             ),
             dbt_project_name="astro_shop",
         )
@@ -170,7 +173,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
         },
         test_behavior=TestBehavior.AFTER_EACH,
         on_warning_callback=None,
-        source_rendering_behavior=SourceRenderingBehavior.ALL,
+        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
     )
     assert isinstance(output, TaskGroup)
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
@@ -198,6 +201,7 @@ def test_build_airflow_graph_with_after_all():
         render_config = RenderConfig(
             select=["tag:some"],
             test_behavior=TestBehavior.AFTER_ALL,
+            source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
         )
         build_airflow_graph(
             nodes=sample_nodes,
@@ -412,7 +416,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
             DbtResourceType.SOURCE,
             True,
-            SourceRenderingBehavior.ALL,
+            SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
             "my_source_source",
             "cosmos.operators.local.DbtSourceLocalOperator",
         ),
@@ -420,25 +424,9 @@ def test_create_task_metadata_model_use_task_group(caplog):
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
             DbtResourceType.SOURCE,
             False,
-            SourceRenderingBehavior.ALL,
+            SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
             "my_source_source",
             "airflow.operators.empty.EmptyOperator",
-        ),
-        (
-            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
-            DbtResourceType.SOURCE,
-            True,
-            SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
-            "my_source_source",
-            "cosmos.operators.local.DbtSourceLocalOperator",
-        ),
-        (
-            f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
-            DbtResourceType.SOURCE,
-            False,
-            SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
-            None,
-            None,
         ),
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
@@ -601,7 +589,9 @@ def test_airflow_kwargs_generation():
         "group_id": "fake_group_id",
         "project_dir": SAMPLE_PROJ_PATH,
         "conn_id": "fake_conn",
-        "render_config": RenderConfig(select=["fake-render"]),
+        "render_config": RenderConfig(
+            select=["fake-render"], source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV)
+        ),
         "default_args": {"retries": 2},
         "profile_config": ProfileConfig(
             profile_name="default",

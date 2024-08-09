@@ -28,6 +28,7 @@ from cosmos.constants import (
     DbtResourceType,
     ExecutionMode,
     LoadMode,
+    SourceRenderingBehavior,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
@@ -378,21 +379,24 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        ls_command = [
-            dbt_cmd,
-            "ls",
-            "--output",
-            "json",
-            "--output-keys",
-            "name",
-            "unique_id",
-            "resource_type",
-            "depends_on",
-            "original_file_path",
-            "tags",
-            "config",
-            "freshness",
-        ]
+        if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+            ls_command = [
+                dbt_cmd,
+                "ls",
+                "--output",
+                "json",
+                "--output-keys",
+                "name",
+                "unique_id",
+                "resource_type",
+                "depends_on",
+                "original_file_path",
+                "tags",
+                "config",
+                "freshness",
+            ]
+        else:
+            ls_command = [dbt_cmd, "ls", "--output", "json"]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)

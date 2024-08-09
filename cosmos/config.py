@@ -187,6 +187,7 @@ class ProjectConfig:
                 )
             elif AIRFLOW_IO_AVAILABLE:
                 from airflow.io.path import ObjectStoragePath
+
                 self.dbt_project_path = ObjectStoragePath(dbt_project_path_str, conn_id=manifest_conn_id)
                 self.models_path = self.dbt_project_path / Path(models_relative_path)
                 self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)

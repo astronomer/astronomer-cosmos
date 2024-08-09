@@ -244,8 +244,8 @@ class ProjectConfig:
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
             mandatory_paths = {
-                "dbt_project.yml": project_yml_path else None,
-                "models directory ": self.models_path else None,
+                "dbt_project.yml": project_yml_path,
+                "models directory": self.models_path,
             }
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path

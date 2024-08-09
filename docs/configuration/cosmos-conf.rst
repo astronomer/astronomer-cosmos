@@ -94,7 +94,6 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``profile``
     - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
 
-
 [openlineage]
 ~~~~~~~~~~~~~
 

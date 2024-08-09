@@ -7,7 +7,7 @@ jobs:
 
   on:
     push:
-      branches: [ main ]
+      branches: [ kube_mode_ci ]
 
   jobs:
     spin-and-test:

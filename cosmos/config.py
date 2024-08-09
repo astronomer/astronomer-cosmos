@@ -150,6 +150,7 @@ class ProjectConfig:
     def __init__(
         self,
         dbt_project_path: str | Path | None = None,
+        dbt_project_conn_id: str | None = None,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",
@@ -172,10 +173,24 @@ class ProjectConfig:
             self.project_name = project_name
 
         if dbt_project_path:
-            self.dbt_project_path = Path(dbt_project_path)
-            self.models_path = self.dbt_project_path / Path(models_relative_path)
-            self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
-            self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
+            dbt_project_path_str = str(dbt_project_path)
+            if not dbt_project_conn_id:
+                self.dbt_project_path = Path(dbt_project_path)
+                self.models_path = self.dbt_project_path / Path(models_relative_path)
+                self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
+                self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
+            elif dbt_project_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
+                raise CosmosValueError(
+                    f"The dbt project path {dbt_project_path_str} uses a remote file scheme, but the required Object "
+                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                    f"Airflow 2.8 or later."
+                )
+            elif AIRFLOW_IO_AVAILABLE:
+                from airflow.io.path import ObjectStoragePath
+
+                self.dbt_project_path = ObjectStoragePath(dbt_project_path_str, conn_id=manifest_conn_id)
+            else:
+                self.dbt_project_path = Path(dbt_project_path_str)
             if not project_name:
                 self.project_name = self.dbt_project_path.stem
 

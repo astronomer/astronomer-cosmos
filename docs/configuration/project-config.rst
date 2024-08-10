@@ -4,7 +4,11 @@ Project Config
 The ``cosmos.config.ProjectConfig`` allows you to specify information about where your dbt project is located and project
 variables that should be used for rendering and execution. It takes the following arguments:
 
-- ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file
+- ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file.
+  Along with supporting local paths, starting with Cosmos 1.6.0, if you've Airflow >= 2.8.0, Cosmos also supports
+  remote paths for your dbt project (e.g. S3 URL). For that you need to provide the `dbt_project_conn_id` argument.
+- ``dbt_project_conn_id``: The connection id for the Airflow connection that contains the credentials for the remote
+  dbt project. This is only required if you're using a remote dbt project path.
 - ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. This defaults to
   ``models/``
 - ``seeds_relative_path``: The path to your seeds directory, relative to the ``dbt_project_path``. This defaults to
@@ -14,6 +18,8 @@ variables that should be used for rendering and execution. It takes the followin
 - ``manifest_path``: The absolute path to your manifests directory. This is only required if you're using Cosmos' manifest
   parsing mode. Along with supporting local paths for manifest parsing, starting with Cosmos 1.6.0, if you've
   Airflow >= 2.8.0, Cosmos also supports remote paths for manifest parsing(e.g. S3 URL). See :ref:`parsing-methods` for more details.
+- ``manifest_conn_id``: The connection id for the Airflow connection that contains the credentials for the remote
+  manifest path. This is only required if you're using a remote manifest path.
 - ``project_name`` : The name of the project. If ``dbt_project_path`` is provided, the ``project_name`` defaults to the
   folder name containing ``dbt_project.yml``. If ``dbt_project_path`` is not provided, and ``manifest_path`` is provided,
   ``project_name`` is required as the name can not be inferred from ``dbt_project_path``

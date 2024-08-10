@@ -36,15 +36,8 @@ def test_init_with_manifest_path_and_project_path_succeeds():
     project_name in this case should be based on dbt_project_path
     """
     project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
-    if AIRFLOW_IO_AVAILABLE:
-        from airflow.io.path import ObjectStoragePath
-
-        assert project_config.manifest_path == ObjectStoragePath("target/manifest.json")
-        assert project_config.dbt_project_path == ObjectStoragePath("/tmp/some-path")
-    else:
-        assert project_config.manifest_path == Path("target/manifest.json")
-        assert project_config.dbt_project_path == Path("/tmp/some-path")
-
+    assert project_config.manifest_path == Path("target/manifest.json")
+    assert project_config.dbt_project_path == Path("/tmp/some-path")
     assert project_config.project_name == "some-path"
 
 

@@ -199,7 +199,7 @@ class ProjectConfig:
                 f"Airflow 2.8 or later."
             )
 
-        if AIRFLOW_IO_AVAILABLE:
+        if AIRFLOW_IO_AVAILABLE and property_conn_id:
             from airflow.io.path import ObjectStoragePath
 
             return ObjectStoragePath(property_str, conn_id=property_conn_id)

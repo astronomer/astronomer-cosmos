@@ -170,8 +170,8 @@ class ProjectConfig:
                     "If ProjectConfig.dbt_project_path is not defined, ProjectConfig.manifest_path and ProjectConfig.project_name must be defined together, or both left undefined."
                 )
 
-        self.manifest_path = self.get_property_from_cloud(manifest_path, manifest_conn_id)
-        self.dbt_project_path = self.get_property_from_cloud(dbt_project_path, dbt_project_conn_id)
+        self.manifest_path = self.get_property_from_cloud_or_local(manifest_path, manifest_conn_id)
+        self.dbt_project_path = self.get_property_from_cloud_or_local(dbt_project_path, dbt_project_conn_id)
         self.models_path = self.dbt_project_path / Path(models_relative_path)
         self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
         self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
@@ -185,7 +185,7 @@ class ProjectConfig:
         self.dbt_vars = dbt_vars
         self.partial_parse = partial_parse
 
-    def get_property_from_cloud(self, property: Path | str, property_conn_id: str | None = None) -> Path:
+    def get_property_from_cloud_or_local(self, property: Path | str, property_conn_id: str | None = None) -> Path:
         if property:
             property_str = str(property)
             if not property_conn_id:

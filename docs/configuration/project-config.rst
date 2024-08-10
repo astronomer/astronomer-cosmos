@@ -6,7 +6,7 @@ variables that should be used for rendering and execution. It takes the followin
 
 - ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file.
   Along with supporting local paths, starting with Cosmos 1.6.0, if you've Airflow >= 2.8.0, Cosmos also supports
-  remote paths for your dbt project (e.g. S3 URL). For that you need to provide the `dbt_project_conn_id` argument.
+  remote paths for your dbt project (e.g. S3 URL).
 - ``dbt_project_conn_id``: The connection id for the Airflow connection that contains the credentials for the remote
   dbt project. This is only required if you're using a remote dbt project path.
 - ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. This defaults to

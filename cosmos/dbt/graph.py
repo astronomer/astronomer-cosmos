@@ -281,8 +281,8 @@ class DbtGraph:
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }
-        if settings.remote_cache_path:
-            remote_cache_key_path = settings.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        if self.project.remote_cache_path:
+            remote_cache_key_path = self.project.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
@@ -291,9 +291,9 @@ class DbtGraph:
     def _get_dbt_ls_remote_cache(self) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
         cache_dict: dict[str, str] = {}
-        if settings.remote_cache_path is None:
+        if self.project.remote_cache_path is None:
             return cache_dict
-        remote_cache_key_path = settings.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        remote_cache_key_path = self.project.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
                 cache_dict = json.load(fp)

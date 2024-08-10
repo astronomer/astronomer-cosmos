@@ -27,7 +27,8 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
+from cosmos.settings import AIRFLOW_IO_AVAILABLE, remote_cache_conn_id
+from cosmos.settings import remote_cache_path as settings_remote_cache_path
 
 logger = get_logger(__name__)
 
@@ -146,6 +147,7 @@ class ProjectConfig:
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
     project_name: str
+    remote_cache_path: Path | None = None
 
     def __init__(
         self,
@@ -203,6 +205,34 @@ class ProjectConfig:
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars
         self.partial_parse = partial_parse
+        self.remote_cache_path = self._configure_remote_cache_path()
+
+    @staticmethod
+    def _configure_remote_cache_path() -> Path | None:
+        """Configure the remote cache path if it is provided."""
+        cache_path = None
+
+        if settings_remote_cache_path and not AIRFLOW_IO_AVAILABLE:
+            raise CosmosValueError(
+                f"You're trying to specify dbt_ls_cache_remote_path {settings_remote_cache_path}, but the required "
+                f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                "Airflow 2.8 or later."
+            )
+        elif settings_remote_cache_path:
+            from airflow.io.path import ObjectStoragePath
+
+            remote_conn_id = remote_cache_conn_id or FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(
+                settings_remote_cache_path.split("://")[0], None
+            )
+
+            cache_path = ObjectStoragePath(settings_remote_cache_path, conn_id=remote_conn_id)
+            if not cache_path.exists():  # type: ignore[no-untyped-call]
+                raise CosmosValueError(
+                    f"remote_cache_path `{settings_remote_cache_path}` does not exist or is not accessible using "
+                    f"remote_cache_conn_id `{remote_conn_id}`"
+                )
+
+        return cache_path
 
     def validate_project(self) -> None:
         """

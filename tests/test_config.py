@@ -40,8 +40,11 @@ def test_init_with_manifest_path_and_project_path_succeeds():
         from airflow.io.path import ObjectStoragePath
 
         assert project_config.manifest_path == ObjectStoragePath("target/manifest.json")
+        assert project_config.dbt_project_path == ObjectStoragePath("/tmp/some-path")
     else:
         assert project_config.manifest_path == Path("target/manifest.json")
+        assert project_config.dbt_project_path == Path("/tmp/some-path")
+
     assert project_config.project_name == "some-path"
 
 
@@ -324,10 +327,49 @@ def test_remote_manifest_path(manifest_path, given_manifest_conn_id, used_manife
         from airflow.version import version as airflow_version
 
         error_msg = (
-            f"The manifest path {manifest_path} uses a remote file scheme, but the required Object Storage feature is "
+            f"The path {manifest_path} uses a remote file scheme, but the required Object Storage feature is "
             f"unavailable in Airflow version {airflow_version}. Please upgrade to Airflow 2.8 or later."
         )
         with pytest.raises(CosmosValueError, match=error_msg):
             _ = ProjectConfig(
                 dbt_project_path="/tmp/some-path", manifest_path=manifest_path, manifest_conn_id=given_manifest_conn_id
+            )
+
+
+@pytest.mark.parametrize(
+    "dbt_project_path, given_dbt_project_conn_id, used_dbt_project_conn_id, project_name",
+    [
+        ("s3://cosmos-dbt-project-test/test-project", None, "aws_default", "custom-project-name"),
+        ("s3://cosmos-dbt-project-test/test-project", "aws_s3_conn", "aws_s3_conn", None),
+        ("gs://cosmos-dbt-project-test/test-project", None, "google_cloud_default", "custom-project-name"),
+        ("gs://cosmos-dbt-project-test/test-project", "gcp_gs_conn", "gcp_gs_conn", None),
+        ("abfs://cosmos-dbt-project-test/test-project", None, "wasb_default", "custom-project-name"),
+        ("abfs://cosmos-dbt-project-test/test-project", "azure_abfs_conn", "azure_abfs_conn", None),
+    ],
+)
+def test_remote_dbt_project_path(dbt_project_path, given_dbt_project_conn_id, used_dbt_project_conn_id, project_name):
+    if AIRFLOW_IO_AVAILABLE:
+        project_config = ProjectConfig(
+            dbt_project_path=dbt_project_path,
+            dbt_project_conn_id=given_dbt_project_conn_id,
+            manifest_path="/some/manifest.json",
+            project_name=project_name,
+        )
+
+        from airflow.io.path import ObjectStoragePath
+
+        assert project_config.dbt_project_path == ObjectStoragePath(dbt_project_path, conn_id=used_dbt_project_conn_id)
+        assert project_config.project_name == project_name if project_name else "test-project"
+    else:
+        from airflow.version import version as airflow_version
+
+        error_msg = (
+            f"The path {dbt_project_path} uses a remote file scheme, but the required Object Storage feature is "
+            f"unavailable in Airflow version {airflow_version}. Please upgrade to Airflow 2.8 or later."
+        )
+        with pytest.raises(CosmosValueError, match=error_msg):
+            _ = ProjectConfig(
+                dbt_project_path=dbt_project_path,
+                dbt_project_conn_id=given_dbt_project_conn_id,
+                manifest_path="/some/manifest.json",
             )

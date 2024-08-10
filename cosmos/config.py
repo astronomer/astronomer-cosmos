@@ -172,43 +172,69 @@ class ProjectConfig:
         if project_name:
             self.project_name = project_name
 
-        if dbt_project_path:
-            dbt_project_path_str = str(dbt_project_path)
-            if not dbt_project_conn_id:
-                self.dbt_project_path = Path(dbt_project_path)
-                self.models_path = self.dbt_project_path / Path(models_relative_path)
-                self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
-                self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
-            elif dbt_project_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
-                raise CosmosValueError(
-                    f"The dbt project path {dbt_project_path_str} uses a remote file scheme, but the required Object "
-                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
-                    f"Airflow 2.8 or later."
-                )
-            elif AIRFLOW_IO_AVAILABLE:
-                from airflow.io.path import ObjectStoragePath
-                self.dbt_project_path = ObjectStoragePath(dbt_project_path_str, conn_id=manifest_conn_id)
-                self.models_path = self.dbt_project_path / Path(models_relative_path)
-                self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
-                self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
-            else:
-                self.dbt_project_path = Path(dbt_project_path_str)
-                self.models_path = self.dbt_project_path / Path(models_relative_path)
-                self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
-                self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
-            if not project_name:
-                self.project_name = self.dbt_project_path.stem
+        # if dbt_project_path:
+        #     dbt_project_path_str = str(dbt_project_path)
+        #     if not dbt_project_conn_id:
+        #         self.dbt_project_path = Path(dbt_project_path)
+        #     elif AIRFLOW_IO_AVAILABLE:
+        #         from airflow.io.path import ObjectStoragePath
+        #         self.dbt_project_path = ObjectStoragePath(str(dbt_project_path), conn_id=dbt_project_conn_id)
+        #     else:
+        #         raise CosmosValueError(
+        #             f"The dbt project path {dbt_project_path_str} uses a remote file scheme, but the required Object "
+        #             f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+        #             f"Airflow 2.8 or later."
+        #         )
+        #     self.models_path = self.dbt_project_path / Path(models_relative_path)
+        #     self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
+        #     self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
+        #     if not project_name:
+        #         self.project_name = self.dbt_project_path.stem
 
-        if manifest_path:
-            manifest_path_str = str(manifest_path)
-            if not manifest_conn_id:
-                manifest_scheme = manifest_path_str.split("://")[0]
+        # if manifest_path:
+        #     manifest_path_str = str(manifest_path)
+        #     if not manifest_conn_id:
+        #         manifest_scheme = manifest_path_str.split("://")[0]
+        #         # Use the default Airflow connection ID for the scheme if it is not provided.
+        #         manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, lambda: None)()
+        #
+        #     if manifest_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
+        #         raise CosmosValueError(
+        #             f"The manifest path {manifest_path_str} uses a remote file scheme, but the required Object "
+        #             f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+        #             f"Airflow 2.8 or later."
+        #         )
+        #
+        #     if AIRFLOW_IO_AVAILABLE:
+        #         from airflow.io.path import ObjectStoragePath
+        #
+        #         self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
+        #     else:
+        #         self.manifest_path = Path(manifest_path_str)
+
+        self.manifest_path = self.get_property_from_cloud(manifest_path, manifest_conn_id)
+        self.dbt_project_path = self.get_property_from_cloud(dbt_project_path, dbt_project_conn_id)
+        self.models_path = self.dbt_project_path / Path(models_relative_path)
+        self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
+        self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
+        if not project_name:
+            self.project_name = self.dbt_project_path.stem
+
+        self.env_vars = env_vars
+        self.dbt_vars = dbt_vars
+        self.partial_parse = partial_parse
+
+    def get_property_from_cloud(self, property: Path | str, property_conn_id: str | None = None) -> Path:
+        if property:
+            property_str = str(property)
+            if not property_conn_id:
+                scheme = property_str.split("://")[0]
                 # Use the default Airflow connection ID for the scheme if it is not provided.
-                manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, lambda: None)()
+                property_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(scheme, lambda: None)()
 
-            if manifest_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
+            if property_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
                 raise CosmosValueError(
-                    f"The manifest path {manifest_path_str} uses a remote file scheme, but the required Object "
+                    f"The path {property_str} uses a remote file scheme, but the required Object "
                     f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
                     f"Airflow 2.8 or later."
                 )
@@ -216,13 +242,9 @@ class ProjectConfig:
             if AIRFLOW_IO_AVAILABLE:
                 from airflow.io.path import ObjectStoragePath
 
-                self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
+                return ObjectStoragePath(property_str, conn_id=property_conn_id)
             else:
-                self.manifest_path = Path(manifest_path_str)
-
-        self.env_vars = env_vars
-        self.dbt_vars = dbt_vars
-        self.partial_parse = partial_parse
+                return Path(property_str)
 
     def validate_project(self) -> None:
         """

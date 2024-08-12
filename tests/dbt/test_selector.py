@@ -432,3 +432,34 @@ def test_should_include_node_without_depends_on(selector_config):
     selector = NodeSelector({}, selector_config)
     selector.visited_nodes = set()
     selector._should_include_node(node.unique_id, node)
+
+
+def test_select_upstream_nodes_with_select_path():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+path:gen2/models"])
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_downstream_nodes_with_select_path():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models+"])
+    expected = [
+        "model.dbt-proj.child",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_upstream_nodes_with_select_tag():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["1+tag:deprecated"])
+    expected = [
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected

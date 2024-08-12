@@ -237,8 +237,8 @@ class SelectorConfig:
             regex_match = re.search(GRAPH_SELECTOR_REGEX, item)
             if regex_match:
                 precursors, node_name, descendants = regex_match.groups()
-
-                if precursors or descendants:
+                if node_name is None: ...
+                elif precursors or descendants:
                     self._parse_unknown_selector(item)
                 elif node_name.startswith(PATH_SELECTOR):
                     self._parse_path_selector(item)

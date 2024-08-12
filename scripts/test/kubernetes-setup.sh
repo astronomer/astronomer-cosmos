@@ -47,7 +47,7 @@ kind load docker-image dbt-jaffle-shop:1.0.0
 # Deploy a Postgres pod to Kind
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
-helm install postgres bitnami/postgresql -f scripts/test/values.yaml
+helm install postgres bitnami/postgresql # -f scripts/test/values.yaml
 
 # Retrieve the Postgres password and set it as an environment variable
 POSTGRES_PASSWORD=$(kubectl get secret --namespace default postgres-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)

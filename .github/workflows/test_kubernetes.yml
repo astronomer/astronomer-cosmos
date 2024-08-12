@@ -2,10 +2,10 @@ name: Kubernetes Integration Tests
 
 
 on:
-#  push: # Run on pushes to the default branch
-#    branches: [kube_mode_ci]
-  pull_request_target: # Also run on pull requests originated from forks
+  push: # Run on pushes to the default branch
     branches: [kube_mode_ci]
+#  pull_request_target: # Also run on pull requests originated from forks
+#    branches: [kube_mode_ci]
 
 
 jobs:

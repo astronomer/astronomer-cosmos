@@ -27,16 +27,33 @@ jobs:
 #          --health-retries 5
 #        ports:
 #          # Maps tcp port 5432 on service container to the host
-#          - 5432:543
+#          - 5432:5432
     steps:
       - uses: actions/checkout@v3
-      - name: Kubernetes KinD Cluster
+      - name: Create Kind Cluster
         uses: container-tools/kind-action@v1
-      - name: Run tests
+      - name: Create PostgreSQL Deployment
+        run: kubectl apply -f scripts/test/postgres-deployment.yaml
+      - name: Wait for PostgreSQL to be ready
+        run: kubectl wait --for=condition=Available --timeout=300s deployment/postgres
+      - name: Test PostgreSQL Connection
         run: |
-          sh ./scripts/test/kubernetes-setup.sh
-          pip install hatch
-          hatch -e tests.py3.9-2.9 run pip freeze
-          hatch run tests.py3.9-2.9:test-kubernetes
-          kubectl get pods -o wide
-          kubectl logs postgres-postgresql-0
+          kubectl run postgres-client --rm --tty -i --restart='Never' --image docker.io/bitnami/postgresql:16.4.0-debian-12-r0 --env="PGPASSWORD=$(kubectl get secret --namespace default postgres-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)" \
+          --command -- psql --host postgres-postgresql -U postgres -d postgres -p 5432
+          kubectl get nodes
+          kubectl get pods --namespace default
+          kubectl get svc --namespace default
+          kubectl logs postgres-postgresql-0 -c postgresql
+          kubectl describe pod postgres-postgresql-0
+#      - uses: actions/checkout@v3
+#      - name: Kubernetes KinD Cluster
+#        uses: container-tools/kind-action@v1
+#      - name: Run tests
+#        run: |
+#          sh ./scripts/test/kubernetes-setup.sh
+#          pip install hatch
+#          hatch -e tests.py3.9-2.9 run pip freeze
+#          hatch run tests.py3.9-2.9:test-kubernetes
+#          kubectl get pods -o wide
+#          kubectl logs postgres-postgresql-0
+

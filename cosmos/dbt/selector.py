@@ -156,17 +156,11 @@ class GraphSelector:
         # for multiple GraphSelectors
         if PATH_SELECTOR in self.node_name:
             path_selection = self.node_name[len(PATH_SELECTOR) :]
-
-            for node_id, node in nodes.items():
-                if path_selection in str(node.file_path):
-                    root_nodes.add(node_id)
+            root_nodes.update({node_id for node_id, node in nodes.items() if path_selection in str(node.file_path)})
 
         elif TAG_SELECTOR in self.node_name:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
-
-            for node_id, node in nodes.items():
-                if tag_selection in node.tags:
-                    root_nodes.add(node_id)
+            root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
 
         elif CONFIG_SELECTOR in self.node_name:
             ...

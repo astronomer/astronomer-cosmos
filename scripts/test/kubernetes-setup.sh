@@ -62,6 +62,7 @@ kubectl create secret generic postgres-secrets --from-literal=host=postgres-post
 #
 ## Wait for the kind cluster to be in 'Ready' state
 #wait_for_nodes_ready
+sleep 120
 
 # For Debugging
 echo "nodes"

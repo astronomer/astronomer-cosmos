@@ -53,16 +53,16 @@ helm install postgres bitnami/postgresql # -f scripts/test/values.yaml
 POSTGRES_PASSWORD=$(kubectl get secret --namespace default postgres-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)
 export POSTGRES_PASSWORD
 
+kubectl create secret generic postgres-secrets --from-literal=host=postgres-postgresql.default.svc.cluster.local --from-literal=password=$POSTGRES_PASSWORD
+
+sleep 120
 # Expose the Postgres to the host running Docker/Kind
 #kubectl port-forward --namespace default postgres-postgresql-0  5432:5432 &
 kubectl port-forward --namespace default svc/postgres-postgresql 5432:5432 &
-kubectl create secret generic postgres-secrets --from-literal=host=postgres-postgresql.default.svc.cluster.local --from-literal=password=$POSTGRES_PASSWORD
-
 #wait_for_nodes_ready
 #
 ## Wait for the kind cluster to be in 'Ready' state
 #wait_for_nodes_ready
-sleep 120
 
 # For Debugging
 echo "nodes"

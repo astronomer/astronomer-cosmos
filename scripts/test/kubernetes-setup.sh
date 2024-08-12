@@ -84,4 +84,10 @@ kubectl apply -f scripts/test/postgres-deployment.yaml
 cd dev && docker build -t dbt-jaffle-shop:1.0.0 -f Dockerfile.postgres_profile_docker_k8s .
 kind load docker-image dbt-jaffle-shop:1.0.0
 
+POD_NAME=$(kubectl get pods -n default -l app=postgres -o jsonpath='{.items[0].metadata.name}')
+
+echo "$POD_NAME"
+
+kubectl port-forward --namespace default "$POD_NAME"  5432:5432 &
+
 kubectl get pod

@@ -314,7 +314,7 @@ class DbtGraph:
         try:
             cache_dict = (
                 self._get_dbt_ls_remote_cache()
-                if settings.remote_cache_path
+                if self.project.remote_cache_path
                 else Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
             )
         except (json.decoder.JSONDecodeError, KeyError):

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -13,14 +14,44 @@ spec:
         app: postgres
     spec:
       containers:
-
       - name: postgres
-        image: bitnami/postgres:latest  # Replace with desired Bitnami Postgres image
+        image: bitnami/postgresql:latest
         env:
+        - name: POSTGRES_DB
+          value: postgres
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: host  # Adjust according to your secret's key
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-postgresql
-              key: postgres-password
+              name: postgres-secrets
+              key: password
         ports:
         - containerPort: 5432
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secrets
+type: Opaque
+data:
+  host: MC4wLjAuMA==
+  password: cG9zdGdyZXM=
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: default  # Ensure this matches the namespace of the Deployment
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres

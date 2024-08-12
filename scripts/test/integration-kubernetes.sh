@@ -3,6 +3,7 @@
 set -x
 set -e
 
+# export POSTGRES_DB=postgres
 
 airflow db reset -y
 

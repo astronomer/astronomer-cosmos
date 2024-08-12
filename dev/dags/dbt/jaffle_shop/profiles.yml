@@ -16,9 +16,9 @@ postgres_profile:
   outputs:
     dev:
       type: postgres
-      dbname: '{{ env_var(''POSTGRES_DATABASE'') }}'
-      host: '{{ env_var(''POSTGRES_HOST'') }}'
-      pass: '{{ env_var(''POSTGRES_PASSWORD'') }}'
-      port: '{{ env_var(''POSTGRES_PORT'') | as_number }}'
-      schema: '{{ env_var(''POSTGRES_SCHEMA'') }}'
-      user: '{{ env_var(''POSTGRES_USER'') }}'
+      dbname: postgres #'{{ env_var(''POSTGRES_DATABASE'') }}'
+      host: "0.0.0.0" #'{{ env_var(''POSTGRES_HOST'') }}'
+      pass: postgres #'{{ env_var(''POSTGRES_PASSWORD'') }}'
+      port: 5432 #'{{ env_var(''POSTGRES_PORT'') | as_number }}'
+      schema: postgres # '{{ env_var(''POSTGRES_SCHEMA'') }}'
+      user: "postgres" #'{{ env_var(''POSTGRES_USER'') }}'

@@ -167,6 +167,8 @@ def create_task_metadata(
                 and node.has_test is False
             ):
                 return None
+            # TODO: https://github.com/astronomer/astronomer-cosmos
+            # pragma: no cover
             task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")

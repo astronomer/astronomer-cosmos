@@ -10,7 +10,7 @@ from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import InvocationMode
+from cosmos.constants import InvocationMode, SourceRenderingBehavior
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -64,6 +64,7 @@ def basic_cosmos_task_group() -> None:
         render_config=RenderConfig(
             select=["path:seeds/raw_orders.csv"],
             enable_mock_profile=False,  # This is necessary to benefit from partial parsing when using ProfileMapping
+            source_rendering_behavior=SourceRenderingBehavior.ALL
         ),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},

@@ -174,9 +174,7 @@ def test_load_via_manifest_with_select(project_name, manifest_filepath, model_fi
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    render_config = RenderConfig(
-        select=["+customers"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
-    )
+    render_config = RenderConfig(select=["+customers"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     dbt_graph = DbtGraph(
         project=project_config,
@@ -273,9 +271,7 @@ def test_load_dbt_ls_file_without_file():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    render_config = RenderConfig(
-        dbt_ls_path=None, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
-    )
+    render_config = RenderConfig(dbt_ls_path=None, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load(execution_mode=ExecutionMode.LOCAL, method=LoadMode.DBT_LS_FILE)
@@ -974,9 +970,7 @@ def test_tag_selected_node_test_exist():
         target_name="test",
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
-    render_config = RenderConfig(
-        select=["tag:test_tag"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
-    )
+    render_config = RenderConfig(select=["tag:test_tag"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     dbt_graph = DbtGraph(
         project=project_config,

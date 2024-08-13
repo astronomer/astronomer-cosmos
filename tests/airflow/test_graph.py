@@ -589,9 +589,7 @@ def test_airflow_kwargs_generation():
         "group_id": "fake_group_id",
         "project_dir": SAMPLE_PROJ_PATH,
         "conn_id": "fake_conn",
-        "render_config": RenderConfig(
-            select=["fake-render"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
-        ),
+        "render_config": RenderConfig(select=["fake-render"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR),
         "default_args": {"retries": 2},
         "profile_config": ProfileConfig(
             profile_name="default",

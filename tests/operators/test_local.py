@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -946,3 +947,73 @@ def test_handle_exception_subprocess(caplog):
         operator.handle_exception_subprocess(result)
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
     assert len(caplog.text) > 1000  # Ensure the log message is not truncated
+
+
+@pytest.fixture
+def mock_context():
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_session():
+    return MagicMock()
+
+
+@patch("cosmos.operators.local.Path")
+def test_store_freshness_json(mock_path_class, mock_context, mock_session):
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+    )
+
+    # Mock the behavior of Path.exists() and Path.read_text()
+    mock_sources_json_path = MagicMock()
+    mock_path_class.return_value = mock_sources_json_path
+    mock_sources_json_path.exists.return_value = True
+    mock_sources_json_path.read_text.return_value = '{"key": "value"}'
+
+    # Expected formatted JSON content
+    expected_freshness = json.dumps({"key": "value"}, indent=4)
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == expected_freshness
+
+
+@patch("cosmos.operators.local.Path")
+def test_store_freshness_json_no_file(mock_path_class, mock_context, mock_session):
+    # Create an instance of the class that contains the method
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+    )
+
+    # Mock the behavior of Path.exists() and Path.read_text()
+    mock_sources_json_path = MagicMock()
+    mock_path_class.return_value = mock_sources_json_path
+    mock_sources_json_path.exists.return_value = False
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == ""
+
+
+def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == ""

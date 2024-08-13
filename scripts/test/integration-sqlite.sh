@@ -1,4 +1,3 @@
-export SOURCE_RENDERING_BEHAVIOR=all
 pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \

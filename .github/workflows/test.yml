@@ -303,7 +303,6 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_SCHEMA: public
           POSTGRES_PORT: 5432
-          SOURCE_RENDERING_BEHAVIOR: all
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v2

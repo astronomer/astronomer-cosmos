@@ -32,7 +32,7 @@ SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
-SOURCE_RENDERING_BEHAVIOR_ENV = os.getenv("SOURCE_RENDERING_BEHAVIOR", "none")
+SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
 
 @pytest.fixture
@@ -134,7 +134,7 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
     )
     render_config = RenderConfig(
         exclude=["config.materialized:table"],
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     dbt_graph = DbtGraph(
@@ -175,7 +175,7 @@ def test_load_via_manifest_with_select(project_name, manifest_filepath, model_fi
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(
-        select=["+customers"], source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV)
+        select=["+customers"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
     )
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     dbt_graph = DbtGraph(
@@ -259,7 +259,7 @@ def test_load_automatic_dbt_ls_file_is_available(mock_load_via_dbt_ls_file):
     )
     render_config = RenderConfig(
         dbt_ls_path=SAMPLE_DBT_LS_OUTPUT,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
     dbt_graph.load(method=LoadMode.DBT_LS_FILE, execution_mode=ExecutionMode.LOCAL)
@@ -274,7 +274,7 @@ def test_load_dbt_ls_file_without_file():
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(
-        dbt_ls_path=None, source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV)
+        dbt_ls_path=None, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
     )
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config, render_config=render_config)
     with pytest.raises(CosmosLoadDbtException) as err_info:
@@ -292,7 +292,7 @@ def test_load_dbt_ls_file_without_project_path():
     render_config = RenderConfig(
         dbt_ls_path=SAMPLE_DBT_LS_OUTPUT,
         dbt_project_path=None,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(
         project=project_config,
@@ -436,7 +436,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -461,7 +461,7 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
         select=["*customers*"],
         exclude=["*orders*"],
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -506,7 +506,7 @@ def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -526,7 +526,7 @@ def test_load_via_custom_without_project_path():
     execution_config = ExecutionConfig()
     render_config = RenderConfig(
         dbt_executable_path="/inexistent/dbt",
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(
         project=project_config,
@@ -547,7 +547,7 @@ def test_load_via_dbt_ls_without_profile(mock_validate_dbt_command):
     render_config = RenderConfig(
         dbt_executable_path="existing-dbt-cmd",
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(
         project=project_config,
@@ -568,7 +568,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
         dbt_executable_path="/inexistent/dbt",
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     with patch("pathlib.Path.exists", return_value=True):
         dbt_graph = DbtGraph(
@@ -602,7 +602,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             dbt_deps=False,
             env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
-            source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
@@ -623,7 +623,7 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
         dbt_deps=False,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -670,7 +670,7 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         dbt_deps=False,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -702,7 +702,7 @@ def test_load_via_dbt_ls_caching_partial_parsing(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         dbt_deps=True,
         enable_mock_profile=False,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -745,7 +745,7 @@ def test_load_via_dbt_ls_uses_partial_parse_when_cache_is_disabled(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         dbt_deps=True,
         enable_mock_profile=False,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -788,7 +788,7 @@ def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(
     project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -810,7 +810,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_c
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -831,7 +831,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
@@ -853,7 +853,7 @@ def test_load_via_load_via_custom_parser(project_name):
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
@@ -879,7 +879,7 @@ def test_load_via_load_via_custom_parser_select_rendering_config():
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
         select=["customers"],
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
@@ -950,7 +950,7 @@ def test_update_node_dependency_test_not_exist():
     )
     render_config = RenderConfig(
         exclude=["config.materialized:test"],
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     dbt_graph = DbtGraph(
@@ -975,7 +975,7 @@ def test_tag_selected_node_test_exist():
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     render_config = RenderConfig(
-        select=["tag:test_tag"], source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV)
+        select=["tag:test_tag"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
     )
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
     dbt_graph = DbtGraph(
@@ -1003,7 +1003,7 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method, postgres_profi
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version",
-            source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "model_version"),
         profile_config=postgres_profile_config,
@@ -1054,7 +1054,7 @@ def test_load_via_dbt_ls_file():
     render_config = RenderConfig(
         dbt_ls_path=SAMPLE_DBT_LS_OUTPUT,
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(
         project=project_config,
@@ -1154,7 +1154,7 @@ def test_load_via_dbt_ls_project_config_env_vars(
     project_config = ProjectConfig(env_vars=env_vars)
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
@@ -1194,7 +1194,7 @@ def test_profile_created_correctly_with_profile_mapping(
     project_config = ProjectConfig(env_vars={})
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = postgres_profile_config
     execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
@@ -1222,7 +1222,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(
     project_config = ProjectConfig(dbt_vars=dbt_vars)
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
@@ -1258,7 +1258,7 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         load_method=LoadMode.DBT_LS,
         selector=selector,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
@@ -1292,7 +1292,7 @@ def test_load_via_dbt_ls_render_config_no_partial_parse(
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         load_method=LoadMode.DBT_LS,
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
@@ -1322,7 +1322,7 @@ def test_load_method_with_unsupported_render_config_selector_arg(load_method):
         render_config=RenderConfig(
             load_method=load_method,
             selector="my_selector",
-            source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         project=MagicMock(),
     )
@@ -1347,7 +1347,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             dbt_deps=False,
-            source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
@@ -1384,7 +1384,7 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
     render_config = RenderConfig(
         dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
         selector="stage_customers",
-        source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
 
     dbt_graph = DbtGraph(
@@ -1399,7 +1399,7 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
     assert len(filtered_nodes) == 7
     assert "model.jaffle_shop.stg_customers" in filtered_nodes
     assert "seed.jaffle_shop.raw_customers" in filtered_nodes
-    if SOURCE_RENDERING_BEHAVIOR_ENV == "all":
+    if SOURCE_RENDERING_BEHAVIOR == SourceRenderingBehavior.ALL:
         assert "source.jaffle_shop.postgres_db.raw_customers" in filtered_nodes
     # Four tests should be filtered
     assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 4
@@ -1504,7 +1504,7 @@ def test_dbt_ls_cache_key_args_uses_airflow_vars_to_purge_dbt_ls_cache(airflow_v
         project=ProjectConfig(),
         render_config=RenderConfig(
             airflow_vars_to_purge_dbt_ls_cache=[key],
-            source_rendering_behavior=SourceRenderingBehavior(SOURCE_RENDERING_BEHAVIOR_ENV),
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
     )
     assert graph.dbt_ls_cache_key_args == [key, value]
@@ -1524,7 +1524,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "65595448aded2c2b52878a801c1d9c59"
+        assert hash_dir == "a9879ec2ec503b0fe023d059caf50d41"
     else:
         assert hash_dir == "9001bedf4aa8a329f7b669c89f337c24"
 

@@ -4,7 +4,7 @@ Source Nodes Rendering
 ================
 
 .. note::
-    This feature is only available for dbt-core >= 1.5.
+    This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.
 
 By default, Cosmos does not render dbt sources automatically. Instead, you need to configure the rendering of sources explicitly.
 You can control this behavior using the ``source_rendering_behavior`` field in the ``RenderConfig`` object. This is how it works:

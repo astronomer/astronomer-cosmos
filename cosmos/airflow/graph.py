@@ -132,7 +132,7 @@ def create_task_metadata(
     execution_mode: ExecutionMode,
     args: dict[str, Any],
     use_task_group: bool = False,
-    source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.ALL,
+    source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.

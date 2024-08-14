@@ -155,7 +155,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.append_env = append_env
 
         # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        self.install_deps = install_deps and has_non_empty_dependencies_file(self.project_dir)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

@@ -308,9 +308,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         return result
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
-        project_dir = Path(self.project_dir)
-        if is_cache_package_lockfile_enabled(project_dir):
-            latest_package_lockfile = _get_latest_cached_package_lockfile(project_dir)
+        if is_cache_package_lockfile_enabled(self.project_dir):
+            latest_package_lockfile = _get_latest_cached_package_lockfile(self.project_dir)
             if latest_package_lockfile:
                 _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
 
@@ -333,9 +332,13 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 tmp_project_dir,
                 self.project_dir,
             )
+            print("step 1")
             tmp_dir_path = Path(tmp_project_dir)
+            print("step 2")
             env = {k: str(v) for k, v in env.items()}
-            create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+            print("step 3")
+            create_symlinks(self.project_dir, tmp_dir_path, self.install_deps)
+            print("step 4")
 
             if self.partial_parse and self.cache_dir is not None:
                 latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)

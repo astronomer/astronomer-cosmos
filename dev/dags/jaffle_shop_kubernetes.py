@@ -9,7 +9,6 @@ The step-by-step to run this DAG are described in:
 https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#kubernetes
 
 """
-from pathlib import Path
 
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
@@ -24,7 +23,6 @@ from cosmos import (
     ProjectConfig,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-
 
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
 

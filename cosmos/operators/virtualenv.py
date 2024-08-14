@@ -14,6 +14,7 @@ from airflow.utils.python_virtualenv import prepare_virtualenv
 from cosmos import settings
 from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
+from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtDocsLocalOperator,
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"
+logger = get_logger(__name__)
 
 
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -157,7 +159,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         # Use a reusable virtualenv
         self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
         while not self._is_lock_available() and self.max_retries_lock:
-            self.log.info("Waiting for virtualenv lock to be released")
+            logger.info("Waiting for virtualenv lock to be released")
             time.sleep(1)
             self.max_retries_lock -= 1
 
@@ -202,13 +204,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self._lock_file, "w") as lf:
-            self.log.info(f"Acquiring lock at {self._lock_file} with pid {str(self._pid)}")
+            logger.info(f"Acquiring lock at {self._lock_file} with pid {str(self._pid)}")
             lf.write(str(self._pid))
 
     @depends_on_virtualenv_dir
     def _release_venv_lock(self) -> None:
         if not self._lock_file.is_file():
-            self.log.warn(f"Lockfile {self._lock_file} not found, perhaps deleted by other concurrent operator?")
+            logger.warning(f"Lockfile {self._lock_file} not found, perhaps deleted by other concurrent operator?")
             return
 
         with open(self._lock_file) as lf:
@@ -217,7 +219,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             if lock_file_pid == self._pid:
                 return self._lock_file.unlink()
 
-            self.log.warn(f"Lockfile owned by process of pid {lock_file_pid}, while operator has pid {self._pid}")
+            logger.warning(f"Lockfile owned by process of pid {lock_file_pid}, while operator has pid {self._pid}")
 
 
 class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]

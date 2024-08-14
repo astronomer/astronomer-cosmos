@@ -4,6 +4,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
+
 from airflow.io.path import ObjectStoragePath
 
 from cosmos.constants import (

@@ -35,7 +35,6 @@ from cosmos.constants import (
     LoadMode,
     SourceRenderingBehavior,
 )
-from cosmos.dbt.executable import get_system_dbt
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.dbt.selector import select_nodes
@@ -216,7 +215,6 @@ class DbtGraph:
         cache_identifier: str = "",
         dbt_vars: dict[str, str] | None = None,
         airflow_metadata: dict[str, str] | None = None,
-        dbt_cmd: str = get_system_dbt(),
         operator_args: dict[str, Any] | None = None,
     ):
         self.project = project
@@ -231,7 +229,6 @@ class DbtGraph:
             self.dbt_ls_cache_key = ""
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
-        self.dbt_cmd = dbt_cmd
 
     @cached_property
     def env_vars(self) -> dict[str, str]:
@@ -400,7 +397,7 @@ class DbtGraph:
         """Runs dbt ls command and returns the parsed nodes."""
         if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
             ls_command = [
-                self.dbt_cmd,
+                dbt_cmd,
                 "ls",
                 "--output",
                 "json",
@@ -415,7 +412,7 @@ class DbtGraph:
                 "freshness",
             ]
         else:
-            ls_command = [self.dbt_cmd, "ls", "--output", "json"]
+            ls_command = [dbt_cmd, "ls", "--output", "json"]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)

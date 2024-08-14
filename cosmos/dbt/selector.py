@@ -163,7 +163,32 @@ class GraphSelector:
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
 
         elif CONFIG_SELECTOR in self.node_name:
-            ...
+            config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
+            if config_selection_key not in SUPPORTED_CONFIG:
+                logger.warning("Unsupported config key selector: %s", config_selection_key)
+
+            # currently tags, materialized, and schema are the only supported config keys
+            # logic is separated into two conditions because the config 'tags' contains a
+            # list of tags, but the config 'materialized', and 'schema' contain strings
+            elif config_selection_key == "tags":
+                root_nodes.update(
+                    {
+                        node_id
+                        for node_id, node in nodes.items()
+                        if config_selection_value in node.config.get(config_selection_key, [])
+                    }
+                )
+            elif config_selection_key in (
+                "materialized",
+                "schema",
+            ):
+                root_nodes.update(
+                    {
+                        node_id
+                        for node_id, node in nodes.items()
+                        if config_selection_value == node.config.get(config_selection_key, "")
+                    }
+                )
 
         else:
             node_by_name = {}

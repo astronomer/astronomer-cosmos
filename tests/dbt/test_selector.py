@@ -479,6 +479,22 @@ def test_should_include_node_without_depends_on(selector_config):
                 "model.dbt-proj.sibling2",
             ],
         ),
+        (
+            ["1+config.tags:deprecated"],
+            [
+                "model.dbt-proj.parent",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
+        (
+            ["config.materialized:table+"],
+            [
+                "model.dbt-proj.child",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
     ],
 )
 def test_select_using_graph_operators(select_statement, expected):

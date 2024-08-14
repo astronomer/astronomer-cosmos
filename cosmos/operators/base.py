@@ -13,10 +13,10 @@ from airflow.utils.strings import to_boolean
 from airflow.version import version as airflow_version
 
 from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
-from cosmos.exceptions import CosmosValueError
 from cosmos.dbt.executable import get_system_dbt
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 logger = get_logger(__name__)
 

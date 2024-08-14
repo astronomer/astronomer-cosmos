@@ -191,6 +191,14 @@ def test_select_nodes_by_select_path():
     assert selected == expected
 
 
+def test_select_nodes_with_slash_but_no_path_selector():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["gen2/models"])
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_select_union():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["tag:has_child", "tag:nightly"])
     expected = {

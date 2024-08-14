@@ -35,6 +35,10 @@ class GraphSelector:
         +model_d+
         2+model_e
         model_f+3
+        +/path/to/model_g+
+        path:/path/to/model_h+
+        +tag:nightly
+        +config.materialized:view
 
     https://docs.getdbt.com/reference/node-selection/graph-operators
     """

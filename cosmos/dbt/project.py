@@ -43,8 +43,7 @@ def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool
     if ignore_dbt_packages:
         # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
         ignore_paths.append("dbt_packages")
-    dir_files = [f for f in project_path.iterdir() if f.is_file()]
-    for child_name in dir_files:
+    for child_name in os.listdir(project_path):
         if child_name not in ignore_paths:
             os.symlink(project_path / child_name, tmp_dir / child_name)
 

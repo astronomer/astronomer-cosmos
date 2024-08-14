@@ -35,7 +35,7 @@ def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None
         dag=dag,
         task_group=task_group,
         owner=task_owner,
-        extra_context=task.extra_context,
+        **({} if class_name == "EmptyOperator" else {"extra_context": task.extra_context}),
         **task.arguments,
     )
 

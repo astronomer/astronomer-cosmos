@@ -525,7 +525,6 @@ def test_load_via_custom_without_project_path():
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,
@@ -547,7 +546,6 @@ def test_load_via_dbt_ls_without_profile(mock_validate_dbt_command):
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     dbt_graph = DbtGraph(
-        dbt_cmd="/inexistent/dbt",
         project=project_config,
         execution_config=execution_config,
         render_config=render_config,

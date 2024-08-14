@@ -4,7 +4,7 @@ RUN pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
 
 ENV POSTGRES_DATABASE=postgres
 ENV POSTGRES_HOST=postgres.default.svc.cluster.local
-ENV POSTGRES_PASSWORD=<postgres_password>
+ENV POSTGRES_PASSWORD=postgres
 ENV POSTGRES_PORT=5432
 ENV POSTGRES_SCHEMA=public
 ENV POSTGRES_USER=postgres

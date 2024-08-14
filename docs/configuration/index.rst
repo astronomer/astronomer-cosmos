@@ -22,6 +22,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Testing Behavior <testing-behavior>
    Selecting & Excluding <selecting-excluding>
    Partial Parsing <partial-parsing>
+   Source Nodes Rendering <source-nodes-rendering>
    Operator Args <operator-args>
    Compiled SQL <compiled-sql>
    Logging <logging>

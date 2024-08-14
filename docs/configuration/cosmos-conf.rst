@@ -46,6 +46,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE``
 
+.. _enable_cache_package_lockfile:
+
+`enable_cache_package_lockfile`_:
+    Enable or disable caching of dbt project package lockfile.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PACKAGE_LOCKFILE``
+
 .. _propagate_logs:
 
 `propagate_logs`_:
@@ -85,7 +93,6 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     - Default: ``profile``
     - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
-
 
 [openlineage]
 ~~~~~~~~~~~~~

@@ -14,6 +14,7 @@ from cosmos.operators.kubernetes import (
     DbtRunOperationKubernetesOperator,
     DbtSeedKubernetesOperator,
     DbtSnapshotKubernetesOperator,
+    DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
 )
 
@@ -98,6 +99,12 @@ class DbtSeedAwsEksOperator(DbtAwsEksBaseOperator, DbtSeedKubernetesOperator):
 class DbtSnapshotAwsEksOperator(DbtAwsEksBaseOperator, DbtSnapshotKubernetesOperator):
     """
     Executes a dbt core snapshot command.
+    """
+
+
+class DbtSourceAzureContainerInstanceOperator(DbtAwsEksBaseOperator, DbtSourceKubernetesOperator):
+    """
+    Executes a dbt source freshness command.
     """
 
 

@@ -16,6 +16,7 @@ from cosmos.operators.base import (
     DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
+    DbtSourceMixin,
     DbtTestMixin,
 )
 
@@ -119,6 +120,12 @@ class DbtSeedKubernetesOperator(DbtSeedMixin, DbtKubernetesBaseOperator):
 class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core snapshot command.
+    """
+
+
+class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
+    """
+    Executes a dbt source freshness command.
     """
 
 

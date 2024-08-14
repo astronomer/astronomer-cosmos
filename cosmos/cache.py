@@ -5,12 +5,14 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import msgpack
+import yaml
 from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
@@ -19,10 +21,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
-from cosmos.constants import DBT_MANIFEST_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
+from cosmos.constants import (
+    DBT_MANIFEST_FILE_NAME,
+    DBT_TARGET_DIR_NAME,
+    DEFAULT_PROFILES_FILE_NAME,
+    PACKAGE_LOCKFILE_YML,
+)
 from cosmos.dbt.project import get_partial_parse_path
 from cosmos.log import get_logger
-from cosmos.settings import cache_dir, dbt_profile_cache_dir_name, enable_cache, enable_cache_profile
+from cosmos.settings import (
+    cache_dir,
+    dbt_profile_cache_dir_name,
+    enable_cache,
+    enable_cache_package_lockfile,
+    enable_cache_profile,
+)
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
@@ -400,3 +413,69 @@ def create_cache_profile(version: str, profile_content: str) -> Path:
     profile_yml_path = profile_yml_dir / DEFAULT_PROFILES_FILE_NAME
     profile_yml_path.write_text(profile_content)
     return profile_yml_path
+
+
+def is_cache_package_lockfile_enabled(project_dir: Path) -> bool:
+    if not enable_cache_package_lockfile:
+        return False
+    package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
+    return package_lockfile.is_file()
+
+
+def _get_sha1_hash(yaml_file: Path) -> str:
+    """Read package-lock.yml file and return sha1_hash"""
+    with open(yaml_file) as file:
+        yaml_content = file.read()
+    data = yaml.safe_load(yaml_content)
+    sha1_hash: str = data.get("sha1_hash", "")
+    return sha1_hash
+
+
+def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
+    """
+    Retrieves the latest cached package-lock.yml for the specified project directory,
+    or creates and caches it if not already cached and hashes match.
+    """
+    cache_identifier = project_dir.name
+    package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
+    cached_package_lockfile = cache_dir / cache_identifier / PACKAGE_LOCKFILE_YML
+
+    if cached_package_lockfile.exists() and cached_package_lockfile.is_file():
+        project_sha1_hash = _get_sha1_hash(package_lockfile)
+        cached_sha1_hash = _get_sha1_hash(cached_package_lockfile)
+        if project_sha1_hash == cached_sha1_hash:
+            return cached_package_lockfile
+    cached_lockfile_dir = cache_dir / cache_identifier
+    cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
+    _safe_copy(package_lockfile, cached_package_lockfile)
+    return cached_package_lockfile
+
+
+def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, project_dir: Path) -> None:
+    """Copy the cached package-lock.yml to tmp project dir"""
+    package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
+    _safe_copy(cached_package_lockfile, package_lockfile)
+
+
+# TODO: Move this function to a different location
+def _safe_copy(src: Path, dst: Path) -> None:
+    """
+    Safely copies a file from a source path to a destination path.
+
+    This function ensures that the copy operation is atomic by first
+    copying the file to a temporary file in the same directory as the
+    destination and then renaming the temporary file to the destination
+    file. This approach minimizes the risk of file corruption or partial
+    writes in case of a failure or interruption during the copy process.
+
+    See the blog for atomic file operations:
+    https://alexwlchan.net/2019/atomic-cross-filesystem-moves-in-python/
+    """
+    # Create a temporary file in the same directory as the destination
+    dir_name, base_name = os.path.split(dst)
+    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)
+
+    shutil.copyfile(src, temp_path)
+
+    # Rename the temporary file to the destination file
+    os.rename(temp_path, dst)

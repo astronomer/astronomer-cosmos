@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -37,6 +38,7 @@ from cosmos.operators.local import (
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,
+    DbtSourceLocalOperator,
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -445,7 +447,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 
     run_test_dag(dag)
 
-    assert run_operator.inlets == []
+    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
@@ -773,15 +775,19 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     [
         (
             DbtSeedLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
         ),
         (
             DbtRunLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
         ),
         (
             DbtBuildLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
+        ),
+        (
+            DbtSourceLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness"),
         ),
     ],
 )
@@ -946,3 +952,73 @@ def test_handle_exception_subprocess():
 
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
     mock_log_error.assert_called_with("\n".join(full_output))
+
+
+@pytest.fixture
+def mock_context():
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_session():
+    return MagicMock()
+
+
+@patch("cosmos.operators.local.Path")
+def test_store_freshness_json(mock_path_class, mock_context, mock_session):
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+    )
+
+    # Mock the behavior of Path.exists() and Path.read_text()
+    mock_sources_json_path = MagicMock()
+    mock_path_class.return_value = mock_sources_json_path
+    mock_sources_json_path.exists.return_value = True
+    mock_sources_json_path.read_text.return_value = '{"key": "value"}'
+
+    # Expected formatted JSON content
+    expected_freshness = json.dumps({"key": "value"}, indent=4)
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == expected_freshness
+
+
+@patch("cosmos.operators.local.Path")
+def test_store_freshness_json_no_file(mock_path_class, mock_context, mock_session):
+    # Create an instance of the class that contains the method
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+    )
+
+    # Mock the behavior of Path.exists() and Path.read_text()
+    mock_sources_json_path = MagicMock()
+    mock_path_class.return_value = mock_sources_json_path
+    mock_sources_json_path.exists.return_value = False
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == ""
+
+
+def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == ""

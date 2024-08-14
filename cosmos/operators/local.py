@@ -338,7 +338,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             env = {k: str(v) for k, v in env.items()}
             print("step 3 - check if path even exists")
             self.project_dir.exists()
-            print('it does')
+            print("it does")
             create_symlinks(self.project_dir, tmp_dir_path, self.install_deps)
             print("step 4")
 

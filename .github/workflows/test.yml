@@ -490,7 +490,7 @@ jobs:
             uv pip install --system hatch
             hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
-        - name: Run kubernetes tests agains
+        - name: Run kubernetes tests
           run: |
             sh ./scripts/test/kubernetes-setup.sh
             hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-kubernetes

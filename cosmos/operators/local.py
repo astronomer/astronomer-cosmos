@@ -337,6 +337,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             print("step 2")
             env = {k: str(v) for k, v in env.items()}
             print("step 3")
+
             create_symlinks(self.project_dir, tmp_dir_path, self.install_deps)
             print("step 4")
 

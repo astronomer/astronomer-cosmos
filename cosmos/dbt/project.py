@@ -4,6 +4,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
+from airflow.io.path import ObjectStoragePath
 
 from cosmos.constants import (
     DBT_DEPENDENCIES_FILE_NAMES,
@@ -37,12 +38,19 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return has_deps
 
 
-def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:
+def create_symlinks(project_path: Path | ObjectStoragePath, tmp_dir: Path, ignore_dbt_packages: bool) -> None:
     """Helper function to create symlinks to the dbt project files."""
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, PACKAGE_LOCKFILE_YML, "profiles.yml"]
     if ignore_dbt_packages:
         # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
         ignore_paths.append("dbt_packages")
+        print(project_path)
+        base = ObjectStoragePath(project_path)
+        try:
+            os.listdir(base)
+            print("it worked to use base")
+        except:
+            print("it did not work to use base")
     for child_name in os.listdir(project_path):
         if child_name not in ignore_paths:
             os.symlink(project_path / child_name, tmp_dir / child_name)

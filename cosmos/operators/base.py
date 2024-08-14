@@ -10,7 +10,11 @@ from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context, context_merge
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
+from airflow.version import version as airflow_version
 
+from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
+from cosmos.exceptions import CosmosValueError
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
@@ -87,6 +91,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
     def __init__(
         self,
         project_dir: str,
+        project_conn_id: str | None = None,
         conn_id: str | None = None,
         select: str | None = None,
         exclude: str | None = None,
@@ -115,7 +120,8 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         extra_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        self.project_dir = project_dir
+        self.project_conn_id = project_conn_id
+        self.project_dir = self.get_property_from_cloud_or_local(project_dir, project_conn_id)
         self.conn_id = conn_id
         self.select = select
         self.exclude = exclude
@@ -143,6 +149,27 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
         super().__init__(**kwargs)
+
+    def get_property_from_cloud_or_local(self, property: Path | str, property_conn_id: str | None = None) -> Path:
+        property_str = str(property)
+        if not property_conn_id:
+            scheme = property_str.split("://")[0]
+            # Use the default Airflow connection ID for the scheme if it is not provided.
+            property_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(scheme, lambda: None)()
+
+        if property_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
+            raise CosmosValueError(
+                f"The path {property_str} uses a remote file scheme, but the required Object "
+                f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                f"Airflow 2.8 or later."
+            )
+
+        if AIRFLOW_IO_AVAILABLE and property_conn_id:
+            from airflow.io.path import ObjectStoragePath
+
+            return ObjectStoragePath(property_str, conn_id=property_conn_id)
+        else:
+            return Path(property_str)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """

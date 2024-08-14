@@ -153,7 +153,7 @@ class ProjectConfig:
     def __init__(
         self,
         dbt_project_path: str | Path | None = None,
-        dbt_project_conn_id: str | None = None,
+        project_conn_id: str | None = None,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",
@@ -177,7 +177,7 @@ class ProjectConfig:
         if manifest_path:
             self.manifest_path = self.get_property_from_cloud_or_local(manifest_path, manifest_conn_id)
         if dbt_project_path:
-            self.dbt_project_path = self.get_property_from_cloud_or_local(dbt_project_path, dbt_project_conn_id)
+            self.dbt_project_path = self.get_property_from_cloud_or_local(dbt_project_path, project_conn_id)
             self.models_path = self.dbt_project_path / Path(models_relative_path)
             self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
             self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)

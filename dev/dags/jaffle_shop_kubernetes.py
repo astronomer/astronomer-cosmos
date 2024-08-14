@@ -24,8 +24,8 @@ from cosmos import (
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
+# [START kubernetes_example]
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
-
 
 project_seeds = [{"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}]
 
@@ -69,27 +69,29 @@ with DAG(
         ),
     )
 
-    run_models = DbtTaskGroup(
-        profile_config=ProfileConfig(
-            profile_name="postgres_profile",
-            target_name="dev",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="postgres_default",
-                profile_args={
-                    "schema": "public",
-                },
-            ),
-        ),
-        project_config=ProjectConfig("dags/dbt/jaffle_shop"),
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.KUBERNETES,
-        ),
-        operator_args={
-            "image": DBT_IMAGE,
-            "get_logs": True,
-            "is_delete_operator_pod": False,
-            "secrets": [postgres_password_secret, postgres_host_secret],
-        },
-    )
+    # TODO: Enable it
+    # run_models = DbtTaskGroup(
+    #     profile_config=ProfileConfig(
+    #         profile_name="postgres_profile",
+    #         target_name="dev",
+    #         profile_mapping=PostgresUserPasswordProfileMapping(
+    #             conn_id="postgres_default",
+    #             profile_args={
+    #                 "schema": "public",
+    #             },
+    #         ),
+    #     ),
+    #     project_config=ProjectConfig("dags/dbt/jaffle_shop"),
+    #     execution_config=ExecutionConfig(
+    #         execution_mode=ExecutionMode.KUBERNETES,
+    #     ),
+    #     operator_args={
+    #         "image": DBT_IMAGE,
+    #         "get_logs": True,
+    #         "is_delete_operator_pod": False,
+    #         "secrets": [postgres_password_secret, postgres_host_secret],
+    #     },
+    # )
 
-    load_seeds >> run_models
+    # load_seeds >> run_models
+    # [END kubernetes_example]

@@ -23,7 +23,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: postgres-secrets
-              key: host  # Adjust according to your secret's key
+              key: host
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -39,7 +39,7 @@ metadata:
   name: postgres-secrets
 type: Opaque
 data:
-  host: MC4wLjAuMA==
+  host: cG9zdGdyZXMuZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbA==
   password: cG9zdGdyZXM=
 
 ---
@@ -47,11 +47,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: default  # Ensure this matches the namespace of the Deployment
+  namespace: default
 spec:
-  type: LoadBalancer
+  type: NodePort
   ports:
   - port: 5432
     targetPort: 5432
+    protocol: TCP
+    nodePort: 32583
   selector:
     app: postgres

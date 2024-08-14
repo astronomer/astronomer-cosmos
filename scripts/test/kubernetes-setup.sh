@@ -77,7 +77,7 @@ set -e
 #kubectl describe pod postgres-postgresql-0
 
 
-kubectl create secret generic postgres-secrets --from-literal=host=0.0.0.0 --from-literal=password=postgres
+kubectl create secret generic postgres-secrets --from-literal=host=postgres-postgresql.default.svc.cluster.local --from-literal=password=postgres
 
 kubectl apply -f scripts/test/postgres-deployment.yaml
 

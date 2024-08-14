@@ -9,6 +9,7 @@ The step-by-step to run this DAG are described in:
 https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#kubernetes
 
 """
+from pathlib import Path
 
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
@@ -24,7 +25,7 @@ from cosmos import (
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-# [START kubernetes_example]
+
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
 
 project_seeds = [{"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}]
@@ -49,6 +50,7 @@ with DAG(
     doc_md=__doc__,
     catchup=False,
 ) as dag:
+    # [START kubernetes_seed_example]
     load_seeds = DbtSeedKubernetesOperator(
         task_id="load_seeds",
         project_dir="dags/dbt/jaffle_shop",
@@ -68,30 +70,31 @@ with DAG(
             ),
         ),
     )
+    # [END kubernetes_seed_example]
 
-    # TODO: Enable it
-    # run_models = DbtTaskGroup(
-    #     profile_config=ProfileConfig(
-    #         profile_name="postgres_profile",
-    #         target_name="dev",
-    #         profile_mapping=PostgresUserPasswordProfileMapping(
-    #             conn_id="postgres_default",
-    #             profile_args={
-    #                 "schema": "public",
-    #             },
-    #         ),
-    #     ),
-    #     project_config=ProjectConfig("dags/dbt/jaffle_shop"),
-    #     execution_config=ExecutionConfig(
-    #         execution_mode=ExecutionMode.KUBERNETES,
-    #     ),
-    #     operator_args={
-    #         "image": DBT_IMAGE,
-    #         "get_logs": True,
-    #         "is_delete_operator_pod": False,
-    #         "secrets": [postgres_password_secret, postgres_host_secret],
-    #     },
-    # )
+    # [START kubernetes_tg_example]
+    run_models = DbtTaskGroup(
+        profile_config=ProfileConfig(
+            profile_name="postgres_profile",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="postgres_default",
+                profile_args={
+                    "schema": "public",
+                },
+            ),
+        ),
+        project_config=ProjectConfig(dbt_project_path="dags/dbt/jaffle_shop"),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.KUBERNETES,
+        ),
+        operator_args={
+            "image": DBT_IMAGE,
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "secrets": [postgres_password_secret, postgres_host_secret],
+        },
+    )
+    # [END kubernetes_tg_example]
 
-    # load_seeds >> run_models
-    # [END kubernetes_example]
+    load_seeds >> run_models

@@ -146,8 +146,8 @@ Example DAG:
 
 .. literalinclude:: ../../dev/dags/jaffle_shop_kubernetes.py
    :language: python
-   :start-after: [START kubernetes_example]
-   :end-before: [END kubernetes_example]
+   :start-after: [START kubernetes_seed_example]
+   :end-before: [END kubernetes_seed_example]
 
 AWS_EKS
 ----------

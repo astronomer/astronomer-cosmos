@@ -45,13 +45,7 @@ def create_symlinks(project_path: Path | ObjectStoragePath, tmp_dir: Path, ignor
         # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
         ignore_paths.append("dbt_packages")
         print(project_path)
-        base = ObjectStoragePath(project_path)
-        try:
-            os.listdir(base)
-            print("it worked to use base")
-        except:
-            print("it did not work to use base")
-    for child_name in os.listdir(project_path):
+    for child_name in os.listdir(ObjectStoragePath(project_path)):
         if child_name not in ignore_paths:
             os.symlink(project_path / child_name, tmp_dir / child_name)
 

@@ -16,7 +16,11 @@ from pendulum import datetime
 
 from cosmos import (
     DbtSeedKubernetesOperator,
+    DbtTaskGroup,
+    ExecutionConfig,
+    ExecutionMode,
     ProfileConfig,
+    ProjectConfig,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -64,3 +68,28 @@ with DAG(
             ),
         ),
     )
+
+    run_models = DbtTaskGroup(
+        profile_config=ProfileConfig(
+            profile_name="postgres_profile",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="postgres_default",
+                profile_args={
+                    "schema": "public",
+                },
+            ),
+        ),
+        project_config=ProjectConfig("dags/dbt/jaffle_shop"),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.KUBERNETES,
+        ),
+        operator_args={
+            "image": DBT_IMAGE,
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "secrets": [postgres_password_secret, postgres_host_secret],
+        },
+    )
+
+    load_seeds >> run_models

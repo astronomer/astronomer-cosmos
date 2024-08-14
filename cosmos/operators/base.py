@@ -344,6 +344,15 @@ class DbtSnapshotMixin:
     ui_color = "#964B00"
 
 
+class DbtSourceMixin:
+    """
+    Executes a dbt source freshness command.
+    """
+
+    base_cmd = ["source", "freshness"]
+    ui_color = "#34CCEB"
+
+
 class DbtRunMixin:
     """
     Mixin for dbt run command.

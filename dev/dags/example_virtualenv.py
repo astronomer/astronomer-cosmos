@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.configuration import get_airflow_home
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
@@ -55,7 +54,7 @@ def example_virtualenv() -> None:
         ),
         operator_args={
             "py_system_site_packages": False,
-            "py_requirements": ["dbt-postgres==1.6.0b1"],
+            "py_requirements": ["dbt-postgres==1.7"],
             "install_deps": True,
             "emit_datasets": False,  # Example of how to not set inlets and outlets
         },
@@ -74,11 +73,11 @@ def example_virtualenv() -> None:
             execution_mode=ExecutionMode.VIRTUALENV,
             # We can enable this flag if we want Airflow to create one virtualenv
             # and reuse that within the whole DAG.
-            virtualenv_dir=Path(f"{get_airflow_home()}/persistent-venv"),
+            virtualenv_dir=Path("/tmp/persistent-venv2"),
         ),
         operator_args={
             "py_system_site_packages": False,
-            "py_requirements": ["dbt-postgres==1.8"],
+            "py_requirements": ["dbt-postgres"],
             "install_deps": True,
         },
     )

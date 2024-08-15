@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import shutil
 import time
-from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable
@@ -77,44 +76,46 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
         self.max_retries_lock = settings.virtualenv_max_retries_lock
         super().__init__(**kwargs)
-
-    @cached_property
-    def venv_dbt_path(
-        self,
-    ) -> str:
-        """
-        Path to the dbt binary within a Python virtualenv.
-
-        The first time this property is called, it creates a new/temporary and installs the dependencies
-        based on the self.py_requirements, self.pip_install_options,  and self.py_system_site_packages,  or retrieves an existing virtualenv.
-        This value is cached for future calls.
-        """
-        # We are reusing the virtualenv directory for all subprocess calls within this task/operator.
-        # For this reason, we are not using contexts at this point.
-        # The deletion of this directory is done explicitly at the end of the `execute` method.
-        py_interpreter = self._get_or_create_venv_py_interpreter()
-        dbt_binary = Path(py_interpreter).parent / "dbt"
-        cmd_output = self.subprocess_hook.run_command(
-            [
-                py_interpreter,
-                "-c",
-                "from importlib.metadata import version; print(version('dbt-core'))",
-            ]
-        )
-        dbt_version = cmd_output.output
-        self.log.info("Using dbt version %s available at %s", dbt_version, dbt_binary)
-        return str(dbt_binary)
+        if not self.py_requirements:
+            self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
-        if self.py_requirements:
-            command[0] = self.venv_dbt_path
+        # No virtualenv_dir set, so create a temporary virtualenv
+        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
+            self.log.info("Creating temporary virtualenv")
+            with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
+                self.virtualenv_dir = Path(tempdir)
+                py_bin = self.prepare_virtualenv()
+                dbt_bin = Path(py_bin).parent / "dbt"
+                command[0] = dbt_bin  # type: ignore
+                subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+                    command=command,
+                    env=env,
+                    cwd=cwd,
+                    output_encoding=self.output_encoding,
+                )
+                return subprocess_result
 
-        subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
+        # Use a reusable virtualenv
+        self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
+        while not self._is_lock_available() and self.max_retries_lock:
+            logger.info("Waiting for virtualenv lock to be released")
+            time.sleep(1)
+            self.max_retries_lock -= 1
+
+        self.log.info(f"Acquiring the virtualenv lock")
+        self._acquire_venv_lock()
+        py_bin = self.prepare_virtualenv()
+        dbt_bin = Path(py_bin).parent / "dbt"
+        command[0] = dbt_bin  # type: ignore
+        subprocess_result = self.subprocess_hook.run_command(
             command=command,
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
         )
+        self.log.info("Releasing virtualenv lock")
+        self._release_venv_lock()
         return subprocess_result
 
     def clean_dir_if_temporary(self) -> None:
@@ -143,34 +144,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             requirements=self.py_requirements,
             pip_install_options=self.pip_install_options,
         )
-        return py_bin
-
-    def _get_or_create_venv_py_interpreter(self) -> str:
-        """Helper method that parses virtual env configuration
-        and returns a DBT binary within the resulting virtualenv"""
-
-        # No virtualenv_dir set, so create a temporary virtualenv
-        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
-            self.log.info("Creating temporary virtualenv")
-            with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
-                self.virtualenv_dir = Path(tempdir)
-                py_bin = self.prepare_virtualenv()
-            return py_bin
-
-        # Use a reusable virtualenv
-        self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
-        while not self._is_lock_available() and self.max_retries_lock:
-            logger.info("Waiting for virtualenv lock to be released")
-            time.sleep(1)
-            self.max_retries_lock -= 1
-
-        self.log.info(f"Acquiring the virtualenv lock")
-        self._acquire_venv_lock()
-        py_bin = self.prepare_virtualenv()
-
-        self.log.info("Releasing virtualenv lock")
-        self._release_venv_lock()
-
         return py_bin
 
     @property

@@ -14,7 +14,7 @@ kubectl create secret generic postgres-secrets \
 kubectl apply -f scripts/test/postgres-deployment.yaml
 
 # Build the Docker image with tag 'dbt-jaffle-shop:1.0.0' using the specified Dockerfile
-cd dev && docker build -t dbt-jaffle-shop:1.0.0 -f Dockerfile.postgres_profile_docker_k8s .
+cd dev && docker build --progress=plain --no-cache -t dbt-jaffle-shop:1.0.0 -f Dockerfile.postgres_profile_docker_k8s .
 
 # Load the Docker image into the local KIND cluster
 kind load docker-image dbt-jaffle-shop:1.0.0
@@ -32,4 +32,5 @@ kubectl port-forward --namespace default "$POD_NAME" 5432:5432 &
 
 # List all pods in the default namespace to verify the status of pods
 kubectl get pod
-docker run --rm -it dbt-jaffle-shop:1.0.0 /bin/sh -c "which dbt"
+bash -c 'echo "Path to dbt: $(which dbt)"'
+pip show dbt-postgres

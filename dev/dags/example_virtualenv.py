@@ -54,7 +54,7 @@ def example_virtualenv() -> None:
         ),
         operator_args={
             "py_system_site_packages": False,
-            "py_requirements": ["dbt-postgres==1.7"],
+            "py_requirements": ["dbt-postgres"],
             "install_deps": True,
             "emit_datasets": False,  # Example of how to not set inlets and outlets
         },

@@ -490,6 +490,7 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip
           pip install -e ".[tests]"
+          pip install apache-airflow-providers-cncf-kubernetes
           pip install apache-airflow==${{ matrix.airflow-version }}
           # hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 

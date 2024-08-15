@@ -494,7 +494,7 @@ jobs:
         run: |
           sh ./scripts/test/kubernetes-setup.sh
           cd dev && ../scripts/test/kubernetes-setup.sh
-          # TODO: Fix hatch taget it failing with incorrect dbt project path error
+          # TODO: Fix hatch target it failing with incorrect dbt project path error
           # hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-kubernetes
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/

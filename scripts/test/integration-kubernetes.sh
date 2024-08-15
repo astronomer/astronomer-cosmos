@@ -7,4 +7,10 @@ set -e
 airflow db reset -y
 
 # Run tests using pytest
-pytest tests/test_example_k8s_dags.py
+pytest -vv \
+    --cov=cosmos \
+    --cov-report=term-missing \
+    --cov-report=xml \
+    --durations=0 \
+    -m integration \
+    tests/test_example_k8s_dags.py

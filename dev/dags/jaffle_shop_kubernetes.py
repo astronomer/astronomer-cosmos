@@ -9,6 +9,7 @@ The step-by-step to run this DAG are described in:
 https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#kubernetes
 
 """
+from pathlib import Path
 
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
@@ -25,6 +26,8 @@ from cosmos import (
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
+
+PROJECT_PATH = Path("/home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt/jaffle_shop")
 
 project_seeds = [{"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}]
 
@@ -51,7 +54,7 @@ with DAG(
     # [START kubernetes_seed_example]
     load_seeds = DbtSeedKubernetesOperator(
         task_id="load_seeds",
-        project_dir="dags/dbt/jaffle_shop",
+        project_dir=PROJECT_PATH,
         get_logs=True,
         schema="public",
         image=DBT_IMAGE,
@@ -82,7 +85,7 @@ with DAG(
                 },
             ),
         ),
-        project_config=ProjectConfig(dbt_project_path="dags/dbt/jaffle_shop"),
+        project_config=ProjectConfig(dbt_project_path=PROJECT_PATH),
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.KUBERNETES,
         ),

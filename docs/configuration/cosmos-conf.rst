@@ -102,7 +102,10 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     using this configuration. The remote cache dir supports all schemes that are supported by the
     `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
     feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
-    ``abfs://your_azure_container/cache_r``, etc.)
+    ``abfs://your_azure_container/cache_dir``, etc.)
+
+    This is an experimental feature available since Cosmos 1.6 to gather user feedback and will be merged into the
+    ``cache_dir`` setting in upcoming releases.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__REMOTE_CACHE_DIR``

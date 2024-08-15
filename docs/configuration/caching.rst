@@ -33,11 +33,12 @@ Based on an initial `analysis <https://github.com/astronomer/astronomer-cosmos/p
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS=0``.
 
-(Introduced in Cosmos 1.6)
+(Introduced in Cosmos 1.6 - Experimental feature)
 
 Starting with Cosmos 1.6.0, users can also set a remote path to store this cache instead of using Airflow Variables.
-To do so, you need to configure a remote cache path. See :ref:`remote_cache_path` and :ref:`remote_cache_conn_id` for
-more information.
+To do so, you need to configure a remote cache path. See :ref:`remote_cache_dir` and :ref:`remote_cache_dir_conn_id` for
+more information. This is an experimental feature introduced in 1.6.0 to gather user feedback. The ``remote_cache_dir``
+will eventually be merged into the :ref:`cache_dir` setting in upcoming releases.
 
 **How the cache is refreshed**
 

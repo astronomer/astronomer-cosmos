@@ -1637,32 +1637,37 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("airflow.io.path.ObjectStoragePath")
 @patch("cosmos.config.ProjectConfig")
-def test_save_dbt_ls_cache_remote_cache_path(mock_project_config, mock_object_storage_path):
-    mock_remote_cache_path = mock_object_storage_path.return_value
-    mock_remote_cache_path.exists.return_value = True
+@patch("cosmos.dbt.graph._configure_remote_cache_dir")
+def test_save_dbt_ls_cache_remote_cache_dir(
+    mock_configure_remote_cache_dir, mock_project_config, mock_object_storage_path
+):
+    mock_remote_cache_dir_path = mock_object_storage_path.return_value
+    mock_remote_cache_dir_path.exists.return_value = True
 
-    mock_project_config.remote_cache_path = mock_remote_cache_path
+    mock_configure_remote_cache_dir.return_value = mock_remote_cache_dir_path
+
+    dbt_ls_output = "sample dbt ls output"
     mock_project_config.dbt_vars = {"var1": "value1"}
     mock_project_config.env_vars = {"var1": "value1"}
     mock_project_config._calculate_dbt_ls_cache_current_version.return_value = "mock_version"
-
-    dbt_ls_output = "sample dbt ls output"
     dbt_graph = DbtGraph(project=mock_project_config)
 
     dbt_graph.save_dbt_ls_cache(dbt_ls_output)
 
-    mock_remote_cache_key_path = mock_remote_cache_path / dbt_graph.dbt_ls_cache_key / "dbt_ls_cache.json"
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / dbt_graph.dbt_ls_cache_key / "dbt_ls_cache.json"
     mock_remote_cache_key_path.open.assert_called_once_with("w")
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("airflow.io.path.ObjectStoragePath")
 @patch("cosmos.config.ProjectConfig")
-def test_get_dbt_ls_cache_remote_cache_path(mock_project_config, mock_object_storage_path):
-    mock_remote_cache_path = mock_object_storage_path.return_value
-    mock_remote_cache_path.exists.return_value = True
-
-    mock_project_config.remote_cache_path = mock_remote_cache_path
+@patch("cosmos.dbt.graph._configure_remote_cache_dir")
+def test_get_dbt_ls_cache_remote_cache_dir(
+    mock_configure_remote_cache_dir, mock_project_config, mock_object_storage_path
+):
+    mock_remote_cache_dir_path = mock_object_storage_path.return_value
+    mock_remote_cache_dir_path.exists.return_value = True
+    mock_configure_remote_cache_dir.return_value = mock_remote_cache_dir_path
 
     dbt_ls_output = "sample dbt ls output"
     compressed_data = zlib.compress(dbt_ls_output.encode("utf-8"))
@@ -1674,7 +1679,7 @@ def test_get_dbt_ls_cache_remote_cache_path(mock_project_config, mock_object_sto
         "last_modified": "2024-08-13T12:34:56Z",
     }
 
-    mock_remote_cache_key_path = mock_remote_cache_path / "some_cache_key" / "dbt_ls_cache.json"
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / "some_cache_key" / "dbt_ls_cache.json"
     mock_remote_cache_key_path.exists.return_value = True
     mock_remote_cache_key_path.open.return_value.__enter__.return_value.read.return_value = json.dumps(cache_dict)
 

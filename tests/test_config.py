@@ -1,11 +1,11 @@
 from contextlib import nullcontext as does_not_raise
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
+from unittest.mock import Mock, PropertyMock, call, patch
 
 import pytest
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, InvocationMode, _default_s3_conn
+from cosmos.constants import ExecutionMode, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -331,55 +331,3 @@ def test_remote_manifest_path(manifest_path, given_manifest_conn_id, used_manife
             _ = ProjectConfig(
                 dbt_project_path="/tmp/some-path", manifest_path=manifest_path, manifest_conn_id=given_manifest_conn_id
             )
-
-
-@patch("cosmos.config.settings_remote_cache_path", new=None)
-def test_remote_cache_path_initialization_no_remote_cache():
-    config = ProjectConfig(dbt_project_path="/some/path", project_name="test_project")
-    assert config.remote_cache_path is None
-
-
-@patch("cosmos.config.settings_remote_cache_path", new="s3://some-bucket/cache")
-@patch("cosmos.config.AIRFLOW_IO_AVAILABLE", new=False)
-def test_remote_cache_path_initialization_object_storage_unavailable_on_earlier_airflow_versions():
-    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
-        ProjectConfig(dbt_project_path="/some/path", project_name="test_project")
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.config.settings_remote_cache_path", new="s3://some-bucket/cache")
-@patch("airflow.io.path.ObjectStoragePath")
-def test_remote_cache_path_initialization_path_available_default_connection(mock_object_storage_path):
-    mock_cache_path = MagicMock()
-    mock_cache_path.exists.return_value = True
-    mock_object_storage_path.return_value = mock_cache_path
-
-    config = ProjectConfig(dbt_project_path="/some/path", project_name="test_project")
-    mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id=_default_s3_conn)
-    assert config.remote_cache_path == mock_cache_path
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.config.settings_remote_cache_path", new="s3://some-bucket/cache")
-@patch("airflow.io.path.ObjectStoragePath")
-def test_remote_cache_path_initialization_path_not_exist(mock_object_storage_path):
-    mock_cache_path = MagicMock()
-    mock_cache_path.exists.return_value = False
-    mock_object_storage_path.return_value = mock_cache_path
-
-    with pytest.raises(CosmosValueError, match="remote_cache_path `s3://some-bucket/cache` does not exist"):
-        ProjectConfig(dbt_project_path="/some/path", project_name="test_project")
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.config.settings_remote_cache_path", new="s3://some-bucket/cache")
-@patch("cosmos.config.remote_cache_conn_id", new="my_conn_id")
-@patch("airflow.io.path.ObjectStoragePath")
-def test_remote_cache_path_initialization_with_conn_id(mock_object_storage_path):
-    mock_cache_path = MagicMock()
-    mock_cache_path.exists.return_value = True
-    mock_object_storage_path.return_value = mock_cache_path
-
-    config = ProjectConfig(dbt_project_path="/some/path", project_name="test_project")
-    mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id="my_conn_id")
-    assert config.remote_cache_path == mock_cache_path

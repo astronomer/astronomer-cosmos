@@ -35,15 +35,16 @@ This feature is on by default. To turn it off, export the following environment 
 
 (Introduced in Cosmos 1.6 - Experimental feature)
 
-Starting with Cosmos 1.6.0, users can also set a remote path to store this cache instead of using Airflow Variables.
-To do so, you need to configure a remote cache path. See :ref:`remote_cache_dir` and :ref:`remote_cache_dir_conn_id` for
-more information. This is an experimental feature introduced in 1.6.0 to gather user feedback. The ``remote_cache_dir``
-will eventually be merged into the :ref:`cache_dir` setting in upcoming releases.
+Starting with Cosmos 1.6.0, users can also set a remote directory path to store this cache instead of using Airflow
+Variables. To do so, you need to configure a remote cache directory. See :ref:`remote_cache_dir` and
+:ref:`remote_cache_dir_conn_id` for more information. This is an experimental feature introduced in 1.6.0 to gather
+user feedback. The ``remote_cache_dir`` will eventually be merged into the :ref:`cache_dir` setting in upcoming
+releases.
 
 **How the cache is refreshed**
 
 If using the default Variables cache approach, users can purge or delete the cache via Airflow UI by identifying and
-deleting the cache key. In case you're using the alternative approach by setting the ``remote_cache_path`` introduced
+deleting the cache key. In case you're using the alternative approach by setting the ``remote_cache_dir`` introduced
 in Cosmos 1.6.0, you can delete the cache by removing the specific files by identifying them using your configured path
 in the remote store.
 

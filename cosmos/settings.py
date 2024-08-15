@@ -28,8 +28,10 @@ dbt_docs_index_file_name = conf.get("cosmos", "dbt_docs_index_file_name", fallba
 enable_cache_profile = conf.getboolean("cosmos", "enable_cache_profile", fallback=True)
 dbt_profile_cache_dir_name = conf.get("cosmos", "profile_cache_dir_name", fallback="profile")
 
-remote_cache_path = conf.get("cosmos", "remote_cache_path", fallback=None)
-remote_cache_conn_id = conf.get("cosmos", "remote_cache_conn_id", fallback=None)
+# Experimentally adding `remote_cache_dir` as a separate entity in the Cosmos 1.6 release to gather feedback.
+# This will be merged with the `cache_dir` config parameter in upcoming releases.
+remote_cache_dir = conf.get("cosmos", "remote_cache_dir", fallback=None)
+remote_cache_dir_conn_id = conf.get("cosmos", "remote_cache_dir_conn_id", fallback=None)
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

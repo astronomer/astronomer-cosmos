@@ -19,6 +19,7 @@ from airflow.models import Variable
 
 from cosmos import cache, settings
 from cosmos.cache import (
+    _configure_remote_cache_dir,
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
@@ -281,19 +282,18 @@ class DbtGraph:
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }
-        if self.project.remote_cache_path:
-            remote_cache_key_path = self.project.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        remote_cache_dir = _configure_remote_cache_dir()
+        if remote_cache_dir:
+            remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
             Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
 
-    def _get_dbt_ls_remote_cache(self) -> dict[str, str]:
+    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
         cache_dict: dict[str, str] = {}
-        if self.project.remote_cache_path is None:
-            return cache_dict
-        remote_cache_key_path = self.project.remote_cache_path / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
                 cache_dict = json.load(fp)
@@ -312,9 +312,10 @@ class DbtGraph:
         """
         cache_dict: dict[str, str] = {}
         try:
+            remote_cache_dir = _configure_remote_cache_dir()
             cache_dict = (
-                self._get_dbt_ls_remote_cache()
-                if self.project.remote_cache_path
+                self._get_dbt_ls_remote_cache(remote_cache_dir)
+                if remote_cache_dir
                 else Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
             )
         except (json.decoder.JSONDecodeError, KeyError):

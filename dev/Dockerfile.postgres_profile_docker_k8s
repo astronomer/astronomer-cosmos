@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.11
 
 RUN pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
 

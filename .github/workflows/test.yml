@@ -489,7 +489,7 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
-          pip install -e .
+          pip install -e ".[tests]"
           pip install apache-airflow==${{ matrix.airflow-version }}
           # hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 

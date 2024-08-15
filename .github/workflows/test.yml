@@ -491,6 +491,7 @@ jobs:
           pip install --upgrade pip
           pip install -e ".[tests]"
           pip install apache-airflow-providers-cncf-kubernetes
+          pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
           pip install apache-airflow==${{ matrix.airflow-version }}
           # hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 

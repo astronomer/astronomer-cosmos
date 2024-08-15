@@ -32,3 +32,4 @@ kubectl port-forward --namespace default "$POD_NAME" 5432:5432 &
 
 # List all pods in the default namespace to verify the status of pods
 kubectl get pod
+docker run --rm -it dbt-jaffle-shop:1.0.0 /bin/sh -c "which dbt"

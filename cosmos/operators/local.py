@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import warnings
@@ -67,6 +68,7 @@ from cosmos.operators.base import (
     DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
+    DbtSourceMixin,
     DbtTestMixin,
 )
 
@@ -115,9 +117,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql",)  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
+        "freshness": "json",
     }
 
     def __init__(
@@ -133,6 +136,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.profile_config = profile_config
         self.callback = callback
         self.compiled_sql = ""
+        self.freshness = ""
         self.should_store_compiled_sql = should_store_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
@@ -176,17 +180,17 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             from dbt.cli.main import dbtRunner  # noqa
         except ImportError:
             self.invocation_mode = InvocationMode.SUBPROCESS
-            logger.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
+            self.log.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
         else:
             self.invocation_mode = InvocationMode.DBT_RUNNER
-            logger.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
+            self.log.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
         self._set_invocation_methods()
 
     def handle_exception_subprocess(self, result: FullOutputSubprocessResult) -> None:
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
-            logger.error("\n".join(result.full_output))
+            self.log.error("\n".join(result.full_output))
             raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
@@ -246,17 +250,40 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             ).delete()
             session.add(rtif)
         else:
-            logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+            self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+
+    @provide_session
+    def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
+        """
+        Takes the compiled sources.json file from the dbt source freshness and stores it in the freshness rendered template.
+        Gets called after every dbt run / source freshness.
+        """
+        if not self.should_store_compiled_sql:
+            return
+
+        sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+
+        if sources_json_path.exists():
+            sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+
+            sources_data = json.loads(sources_json_content)
+
+            formatted_sources_json = json.dumps(sources_data, indent=4)
+
+            self.freshness = formatted_sources_json
+
+        else:
+            self.freshness = ""
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
-        logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
             command=command,
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
         )
-        logger.info(subprocess_result.output)
+        self.log.info(subprocess_result.output)
         return subprocess_result
 
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
@@ -273,7 +300,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         # Exclude the dbt executable path from the command
         cli_args = command[1:]
-        logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
+        self.log.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
 
         with change_working_directory(cwd), environ(env):
             result = self._dbt_runner.invoke(cli_args)
@@ -301,7 +328,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
 
-            logger.info(
+            self.log.info(
                 "Cloning project to writable temp directory %s from %s",
                 tmp_project_dir,
                 self.project_dir,
@@ -312,7 +339,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
             if self.partial_parse and self.cache_dir is not None:
                 latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
-                logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+                self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 if latest_partial_parse is not None:
                     cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
@@ -343,7 +370,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 full_cmd = cmd + flags
 
-                logger.debug("Using environment variables keys: %s", env.keys())
+                self.log.debug("Using environment variables keys: %s", env.keys())
 
                 result = self.invoke_dbt(
                     command=full_cmd,
@@ -359,8 +386,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 if self.emit_datasets:
                     inlets = self.get_datasets("inputs")
                     outlets = self.get_datasets("outputs")
-                    logger.info("Inlets: %s", inlets)
-                    logger.info("Outlets: %s", outlets)
+                    self.log.info("Inlets: %s", inlets)
+                    self.log.info("Outlets: %s", outlets)
                     self.register_dataset(inlets, outlets)
 
                 if self.partial_parse and self.cache_dir:
@@ -368,6 +395,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     if partial_parse_file.exists():
                         cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
+                self.store_freshness_json(tmp_project_dir, context)
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.handle_exception(result)
                 if self.callback:
@@ -407,7 +435,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
         except (FileNotFoundError, NotImplementedError, ValueError, KeyError, jinja2.exceptions.UndefinedError):
-            logger.debug("Unable to parse OpenLineage events", stack_info=True)
+            self.log.debug("Unable to parse OpenLineage events", stack_info=True)
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
         """
@@ -424,7 +452,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + output.name
                 uris.append(dataset_uri)
-        logger.debug("URIs to be converted to Dataset: %s", uris)
+        self.log.debug("URIs to be converted to Dataset: %s", uris)
 
         datasets = []
         try:
@@ -476,7 +504,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         elif hasattr(task_instance, "openlineage_events_completes"):
             openlineage_events_completes = task_instance.openlineage_events_completes
         else:
-            logger.info("Unable to emit OpenLineage events due to lack of data.")
+            self.log.info("Unable to emit OpenLineage events due to lack of data.")
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
@@ -485,7 +513,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 run_facets = {**run_facets, **completed.run.facets}
                 job_facets = {**job_facets, **completed.job.facets}
         else:
-            logger.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
+            self.log.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
         return OperatorLineage(
             inputs=inputs,
@@ -535,6 +563,12 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core snapshot command.
+    """
+
+
+class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt source freshness command.
     """
 
 
@@ -688,7 +722,7 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
         """Uploads the generated documentation to S3."""
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
             self.connection_id,
         )
@@ -707,7 +741,7 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
         for filename in self.required_files:
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
             s3_path = f"s3://{self.bucket_name}/{key}"
-            logger.info("Uploading %s to %s", filename, s3_path)
+            self.log.info("Uploading %s to %s", filename, s3_path)
 
             hook.load_file(
                 filename=f"{target_dir}/{filename}",
@@ -754,7 +788,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
         """Uploads the generated documentation to Azure Blob Storage."""
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
             self.connection_id,
         )
@@ -768,7 +802,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info(
+            self.log.info(
                 "Uploading %s to %s",
                 filename,
                 f"wasb://{self.bucket_name}/{filename}",
@@ -798,7 +832,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
     def upload_to_cloud_storage(self, project_dir: str) -> None:
         """Uploads the generated documentation to Google Cloud Storage"""
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to Storage using GCSHook(conn_id="%s")',
             self.connection_id,
         )
@@ -810,7 +844,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
         for filename in self.required_files:
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
-            logger.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
+            self.log.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
             hook.upload(
                 filename=f"{target_dir}/{filename}",
                 bucket_name=self.bucket_name,

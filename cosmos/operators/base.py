@@ -12,9 +12,6 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.log import get_logger
-
-logger = get_logger(__name__)
 
 
 class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
@@ -178,14 +175,14 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
                 filtered_env[key] = val
             else:
                 if isinstance(key, accepted_types):
-                    logger.warning(
+                    self.log.warning(
                         "Env var %s was ignored because its key is not a valid type. Must be one of %s",
                         key,
                         accepted_types,
                     )
 
                 if isinstance(val, accepted_types):
-                    logger.warning(
+                    self.log.warning(
                         "Env var %s was ignored because its value is not a valid type. Must be one of %s",
                         key,
                         accepted_types,
@@ -342,6 +339,15 @@ class DbtSnapshotMixin:
 
     base_cmd = ["snapshot"]
     ui_color = "#964B00"
+
+
+class DbtSourceMixin:
+    """
+    Executes a dbt source freshness command.
+    """
+
+    base_cmd = ["source", "freshness"]
+    ui_color = "#34CCEB"
 
 
 class DbtRunMixin:

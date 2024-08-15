@@ -28,30 +28,10 @@ Additional KubernetesPodOperator parameters can be added on the operator_args pa
 
 For instance,
 
-.. code-block:: python
-
-    run_models = DbtTaskGroup(
-        profile_config=ProfileConfig(
-            profile_name="postgres_profile",
-            target_name="dev",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="postgres_default",
-                profile_args={
-                    "schema": "public",
-                },
-            ),
-        ),
-        project_config=ProjectConfig(PROJECT_DIR),
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.KUBERNETES,
-        ),
-        operator_args={
-            "image": DBT_IMAGE,
-            "get_logs": True,
-            "is_delete_operator_pod": False,
-            "secrets": [postgres_password_secret, postgres_host_secret],
-        },
-    )
+.. literalinclude:: ../../dev/dags/jaffle_shop_kubernetes.py
+   :language: python
+   :start-after: [START kubernetes_tg_example]
+   :end-before: [END kubernetes_tg_example]
 
 Step-by-step instructions
 +++++++++++++++++++++++++

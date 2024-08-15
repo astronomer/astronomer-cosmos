@@ -18,6 +18,7 @@ from cosmos.operators.local import (
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,
+    DbtSourceLocalOperator,
     DbtTestLocalOperator,
 )
 
@@ -105,7 +106,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         output = super().execute(context)
         if self._venv_tmp_dir:
             self._venv_tmp_dir.cleanup()
-        logger.info(output)
+        self.log.info(output)
 
 
 class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]
@@ -132,6 +133,13 @@ class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator)
 class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalOperator):
     """
     Executes a dbt core snapshot command within a Python Virtual Environment, that is created before running the dbt
+    command and deleted just after.
+    """
+
+
+class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOperator):
+    """
+    Executes `dbt source freshness` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
 

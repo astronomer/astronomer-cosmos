@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -11,6 +12,7 @@ from airflow import DAG
 from airflow import __version__ as airflow_version
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessResult
+from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
@@ -36,6 +38,7 @@ from cosmos.operators.local import (
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,
+    DbtSourceLocalOperator,
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -444,7 +447,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 
     run_test_dag(dag)
 
-    assert run_operator.inlets == []
+    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
@@ -616,13 +619,14 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
         should_store_compiled_sql=False,
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
-    facets = dbt_base_operator.get_openlineage_facets_on_complete(dbt_base_operator)
+    with patch.object(dbt_base_operator.log, "info") as mock_log_info:
+        facets = dbt_base_operator.get_openlineage_facets_on_complete(TaskInstance(dbt_base_operator))
+
     assert facets.inputs == []
     assert facets.outputs == []
     assert facets.run_facets == {}
     assert facets.job_facets == {}
-    log = "Unable to emit OpenLineage events due to lack of dependencies or data."
-    assert log in caplog.text
+    mock_log_info.assert_called_with("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
 
 def test_store_compiled_sql() -> None:
@@ -759,10 +763,11 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
         should_store_compiled_sql=False,
     )
 
-    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+    with patch.object(dbt_base_operator.log, "debug") as mock_log_debug:
+        dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+
     assert instance.parse.called
-    err_msg = "Unable to parse OpenLineage events"
-    assert err_msg in caplog.text
+    mock_log_debug.assert_called_with("Unable to parse OpenLineage events", stack_info=True)
 
 
 @pytest.mark.parametrize(
@@ -770,15 +775,19 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     [
         (
             DbtSeedLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
         ),
         (
             DbtRunLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
         ),
         (
             DbtBuildLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "full_refresh"),
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
+        ),
+        (
+            DbtSourceLocalOperator,
+            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness"),
         ),
     ],
 )
@@ -924,7 +933,7 @@ def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
     mock_send_sigterm.assert_called_once()
 
 
-def test_handle_exception_subprocess(caplog):
+def test_handle_exception_subprocess():
     """
     Test the handle_exception_subprocess method of the DbtLocalBaseOperator class for non-zero dbt exit code.
     """
@@ -933,11 +942,83 @@ def test_handle_exception_subprocess(caplog):
         task_id="my-task",
         project_dir="my/dir",
     )
-    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=["n" * n for n in range(1, 1000)])
+    full_output = ["n" * n for n in range(1, 1000)]
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output)
 
-    caplog.set_level(logging.ERROR)
     # Test when exit_code is non-zero
-    with pytest.raises(AirflowException) as err_context:
-        operator.handle_exception_subprocess(result)
+    with patch.object(operator.log, "error") as mock_log_error:
+        with pytest.raises(AirflowException) as err_context:
+            operator.handle_exception_subprocess(result)
+
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
-    assert len(caplog.text) > 1000  # Ensure the log message is not truncated
+    mock_log_error.assert_called_with("\n".join(full_output))
+
+
+@pytest.fixture
+def mock_context():
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_session():
+    return MagicMock()
+
+
+@patch("cosmos.operators.local.Path")
+def test_store_freshness_json(mock_path_class, mock_context, mock_session):
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+    )
+
+    # Mock the behavior of Path.exists() and Path.read_text()
+    mock_sources_json_path = MagicMock()
+    mock_path_class.return_value = mock_sources_json_path
+    mock_sources_json_path.exists.return_value = True
+    mock_sources_json_path.read_text.return_value = '{"key": "value"}'
+
+    # Expected formatted JSON content
+    expected_freshness = json.dumps({"key": "value"}, indent=4)
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == expected_freshness
+
+
+@patch("cosmos.operators.local.Path")
+def test_store_freshness_json_no_file(mock_path_class, mock_context, mock_session):
+    # Create an instance of the class that contains the method
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+    )
+
+    # Mock the behavior of Path.exists() and Path.read_text()
+    mock_sources_json_path = MagicMock()
+    mock_path_class.return_value = mock_sources_json_path
+    mock_sources_json_path.exists.return_value = False
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == ""
+
+
+def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Call the method under test
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+
+    # Verify the freshness attribute is set correctly
+    assert instance.freshness == ""

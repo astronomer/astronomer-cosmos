@@ -24,13 +24,14 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 AIRFLOW_VERSION = Version(airflow.__version__)
+KUBERNETES_DAGS = ["jaffle_shop_kubernetes"]
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
     "2.8": ["cosmos_manifest_example.py"],
 }
 
-IGNORED_DAG_FILES = ["performance_dag.py"]
+IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]
 
 
 # Sort descending based on Versions and convert string to an actual version
@@ -53,6 +54,7 @@ def session():
 @cache
 def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
+
     if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
         return DagBag(dag_folder=None, include_examples=False)
 
@@ -92,6 +94,8 @@ def get_dag_ids() -> list[str]:
 @pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):
+    if dag_id in KUBERNETES_DAGS:
+        return
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
     test_utils.run_dag(dag)

@@ -3,6 +3,8 @@
 set -x
 set -e
 
+export SOURCE_RENDERING_BEHAVIOR=all
+
 pip freeze | grep airflow
 echo $AIRFLOW_HOME
 ls $AIRFLOW_HOME
@@ -18,4 +20,5 @@ pytest -vv \
     --durations=0 \
     -m integration  \
     --ignore=tests/perf \
-    -k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv)'
+    --ignore=tests/test_example_k8s_dags.py \
+    -k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes)'

@@ -191,6 +191,14 @@ def test_select_nodes_by_select_path():
     assert selected == expected
 
 
+def test_select_nodes_with_slash_but_no_path_selector():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["gen2/models"])
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_select_union():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["tag:has_child", "tag:nightly"])
     expected = {
@@ -432,3 +440,71 @@ def test_should_include_node_without_depends_on(selector_config):
     selector = NodeSelector({}, selector_config)
     selector.visited_nodes = set()
     selector._should_include_node(node.unique_id, node)
+
+
+@pytest.mark.parametrize(
+    "select_statement, expected",
+    [
+        (
+            ["+path:gen2/models"],
+            [
+                "model.dbt-proj.another_grandparent_node",
+                "model.dbt-proj.grandparent",
+                "model.dbt-proj.parent",
+            ],
+        ),
+        (
+            ["path:gen2/models+"],
+            [
+                "model.dbt-proj.child",
+                "model.dbt-proj.parent",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
+        (
+            ["gen2/models+"],
+            [
+                "model.dbt-proj.child",
+                "model.dbt-proj.parent",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
+        (
+            ["+gen2/models"],
+            [
+                "model.dbt-proj.another_grandparent_node",
+                "model.dbt-proj.grandparent",
+                "model.dbt-proj.parent",
+            ],
+        ),
+        (
+            ["1+tag:deprecated"],
+            [
+                "model.dbt-proj.parent",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
+        (
+            ["1+config.tags:deprecated"],
+            [
+                "model.dbt-proj.parent",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
+        (
+            ["config.materialized:table+"],
+            [
+                "model.dbt-proj.child",
+                "model.dbt-proj.sibling1",
+                "model.dbt-proj.sibling2",
+            ],
+        ),
+    ],
+)
+def test_select_using_graph_operators(select_statement, expected):
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=select_statement)
+    assert sorted(selected.keys()) == expected

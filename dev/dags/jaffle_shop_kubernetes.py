@@ -10,8 +10,6 @@ https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#k
 
 """
 
-from pathlib import Path
-
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
 from pendulum import datetime
@@ -28,8 +26,6 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
 
-PROJECT_PATH = Path("/home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt/jaffle_shop")
-# PROJECT_PATH = Path("/Users/pankaj/Documents/astro_code/astronomer-cosmos/dev/dags/dbt/jaffle_shop")
 project_seeds = [{"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}]
 
 postgres_password_secret = Secret(
@@ -86,10 +82,9 @@ with DAG(
                 },
             ),
         ),
-        project_config=ProjectConfig(dbt_project_path=PROJECT_PATH),
+        project_config=ProjectConfig(dbt_project_path="dags/dbt/jaffle_shop"),
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.KUBERNETES,
-            dbt_executable_path="/usr/local/bin/dbt",
         ),
         operator_args={
             "image": DBT_IMAGE,

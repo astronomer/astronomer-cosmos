@@ -1,8 +1,6 @@
 FROM python:3.9
 
 RUN pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
-RUN bash -c 'echo "Path to dbt: $(which dbt)"'
-RUN pip show dbt-postgres
 
 ENV POSTGRES_DATABASE=postgres
 ENV POSTGRES_DB=postgres

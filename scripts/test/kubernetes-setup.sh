@@ -32,4 +32,3 @@ kubectl port-forward --namespace default "$POD_NAME" 5432:5432 &
 
 # List all pods in the default namespace to verify the status of pods
 kubectl get pod
-bash -c 'echo "Path to dbt: $(which dbt)"'

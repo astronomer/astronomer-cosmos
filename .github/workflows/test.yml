@@ -493,7 +493,7 @@ jobs:
       - name: Run kubernetes tests
         run: |
           sh ./scripts/test/kubernetes-setup.sh
-          cd dev && ../scripts/test/kubernetes-setup.sh
+          cd dev && sh ../scripts/test/integration-kubernetes.sh
           # TODO: Fix hatch target it failing with incorrect dbt project path error
           # hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-kubernetes
         env:

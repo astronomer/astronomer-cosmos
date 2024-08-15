@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: bitnami/postgresql:latest
+        env:
+        - name: POSTGRES_DB
+          value: postgres
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: host
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: password
+        ports:
+        - containerPort: 5432
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secrets
+type: Opaque
+data:
+  host: cG9zdGdyZXMuZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbA==
+  password: cG9zdGdyZXM=
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    nodePort: 32583
+  selector:
+    app: postgres

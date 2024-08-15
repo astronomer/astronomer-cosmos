@@ -1,0 +1,18 @@
+FROM python:3.11
+
+RUN pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
+
+ENV POSTGRES_DATABASE=postgres
+ENV POSTGRES_DB=postgres
+ENV POSTGRES_HOST=postgres.default.svc.cluster.local
+ENV POSTGRES_PASSWORD=postgres
+ENV POSTGRES_PORT=5432
+ENV POSTGRES_SCHEMA=public
+ENV POSTGRES_USER=postgres
+
+RUN mkdir /root/.dbt
+COPY dags/dbt/jaffle_shop/profiles.yml /root/.dbt/profiles.yml
+
+RUN mkdir dags
+COPY dags dags
+RUN rm dags/dbt/jaffle_shop/packages.yml

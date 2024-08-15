@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import logging
 
-from airflow.utils.log.colored_log import CustomTTYColoredFormatter
+from cosmos.settings import rich_logging
 
-from cosmos.settings import propagate_logs
 
-LOG_FORMAT: str = (
-    "[%(blue)s%(asctime)s%(reset)s] "
-    "{%(blue)s%(filename)s:%(reset)s%(lineno)d} "
-    "%(log_color)s%(levelname)s%(reset)s - "
-    "%(purple)s(astronomer-cosmos)%(reset)s - "
-    "%(log_color)s%(message)s%(reset)s"
-)
+class CosmosRichLogger(logging.Logger):
+    """Custom Logger that prepends ``(astronomer-cosmos)`` to each log message in the scheduler."""
 
-LOGGER_NAME_TEMPLATE = "astronomer-cosmos-{}"
+    def handle(self, record: logging.LogRecord) -> None:
+        record.msg = "\x1b[35m(astronomer-cosmos)\x1b[0m " + record.msg
+        return super().handle(record)
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -24,13 +20,16 @@ def get_logger(name: str) -> logging.Logger:
     Airflow logs usually look like:
     [2023-08-09T14:20:55.532+0100] {subprocess.py:94} INFO - 13:20:55  Completed successfully
 
-    By using this logger, we introduce a (yellow) astronomer-cosmos string into the project's log messages:
+    This logger introduces a (magenta) astronomer-cosmos string into the project's log messages,
+    as long as the ``rich_logging`` setting is True:
     [2023-08-09T14:20:55.532+0100] {subprocess.py:94} INFO - (astronomer-cosmos) - 13:20:55  Completed successfully
     """
-    logger = logging.getLogger(LOGGER_NAME_TEMPLATE.format(name))
-    formatter: logging.Formatter = CustomTTYColoredFormatter(fmt=LOG_FORMAT)  # type: ignore
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.propagate = propagate_logs
-    return logger
+    if rich_logging:
+        cls = logging.getLoggerClass()
+        try:
+            logging.setLoggerClass(CosmosRichLogger)
+            return logging.getLogger(name)
+        finally:
+            logging.setLoggerClass(cls)
+    else:
+        return logging.getLogger(name)

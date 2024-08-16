@@ -131,10 +131,9 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def execute(self, context: Context) -> None:
         try:
             output = super().execute(context)
+            self.log.info(output)
         finally:
             self.clean_dir_if_temporary()
-        else:
-            self.log.info(output)
 
     def on_kill(self) -> None:
         self.clean_dir_if_temporary()

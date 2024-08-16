@@ -4,7 +4,7 @@ import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from airflow import DAG
@@ -13,6 +13,7 @@ from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
+    _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
     _create_folder_version_hash,
@@ -27,8 +28,14 @@ from cosmos.cache import (
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
 )
-from cosmos.constants import DBT_PARTIAL_PARSE_FILE_NAME, DBT_TARGET_DIR_NAME, DEFAULT_PROFILES_FILE_NAME
-from cosmos.settings import dbt_profile_cache_dir_name
+from cosmos.constants import (
+    DBT_PARTIAL_PARSE_FILE_NAME,
+    DBT_TARGET_DIR_NAME,
+    DEFAULT_PROFILES_FILE_NAME,
+    _default_s3_conn,
+)
+from cosmos.exceptions import CosmosValueError
+from cosmos.settings import AIRFLOW_IO_AVAILABLE, dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
@@ -406,3 +413,55 @@ def test_get_latest_cached_lockfile_with_no_cache(mock_get_sha):
     # Test case where there is a cached file
     result = _get_latest_cached_package_lockfile(project_dir)
     assert result.exists()
+
+
+@patch("cosmos.cache.settings_remote_cache_dir", new=None)
+def test_remote_cache_path_initialization_no_remote_cache_dir():
+    configured_remote_cache_dir = _configure_remote_cache_dir()
+    assert configured_remote_cache_dir is None
+
+
+@patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
+@patch("cosmos.cache.AIRFLOW_IO_AVAILABLE", new=False)
+def test_remote_cache_path_initialization_object_storage_unavailable_on_earlier_airflow_versions():
+    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
+        _configure_remote_cache_dir()
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_remote_cache_path_initialization_path_available_default_connection(mock_object_storage_path):
+    mock_cache_dir_path = MagicMock()
+    mock_cache_dir_path.exists.return_value = True
+    mock_object_storage_path.return_value = mock_cache_dir_path
+
+    configured_remote_cache_dir = _configure_remote_cache_dir()
+    mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id=_default_s3_conn)
+    assert configured_remote_cache_dir == mock_cache_dir_path
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_remote_cache_dir_initialization_path_not_exist_creates_path(mock_object_storage_path):
+    mock_cache_dir_path = MagicMock()
+    mock_cache_dir_path.exists.return_value = False
+    mock_object_storage_path.return_value = mock_cache_dir_path
+
+    _ = _configure_remote_cache_dir()
+    mock_cache_dir_path.mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
+@patch("cosmos.cache.remote_cache_dir_conn_id", new="my_conn_id")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_remote_cache_path_initialization_with_conn_id(mock_object_storage_path):
+    mock_cache_path = MagicMock()
+    mock_cache_path.exists.return_value = True
+    mock_object_storage_path.return_value = mock_cache_path
+
+    configured_remote_cache_dir = _configure_remote_cache_dir()
+    mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id="my_conn_id")
+    assert configured_remote_cache_dir == mock_cache_path

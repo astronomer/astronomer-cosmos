@@ -1,9 +1,12 @@
+import base64
 import importlib
+import json
 import logging
 import os
 import shutil
 import sys
 import tempfile
+import zlib
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -24,6 +27,7 @@ from cosmos.dbt.graph import (
     run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
@@ -1628,3 +1632,65 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
         graph = DbtGraph(cache_identifier=cache_id, project=ProjectConfig(dbt_project_path="/tmp"))
         graph.should_use_dbt_ls_cache.cache_clear()
         assert graph.should_use_dbt_ls_cache() == should_use
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.config.ProjectConfig")
+@patch("cosmos.dbt.graph._configure_remote_cache_dir")
+def test_save_dbt_ls_cache_remote_cache_dir(
+    mock_configure_remote_cache_dir, mock_project_config, mock_object_storage_path
+):
+    mock_remote_cache_dir_path = mock_object_storage_path.return_value
+    mock_remote_cache_dir_path.exists.return_value = True
+
+    mock_configure_remote_cache_dir.return_value = mock_remote_cache_dir_path
+
+    dbt_ls_output = "sample dbt ls output"
+    mock_project_config.dbt_vars = {"var1": "value1"}
+    mock_project_config.env_vars = {"var1": "value1"}
+    mock_project_config._calculate_dbt_ls_cache_current_version.return_value = "mock_version"
+    dbt_graph = DbtGraph(project=mock_project_config)
+
+    dbt_graph.save_dbt_ls_cache(dbt_ls_output)
+
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / dbt_graph.dbt_ls_cache_key / "dbt_ls_cache.json"
+    mock_remote_cache_key_path.open.assert_called_once_with("w")
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.config.ProjectConfig")
+@patch("cosmos.dbt.graph._configure_remote_cache_dir")
+def test_get_dbt_ls_cache_remote_cache_dir(
+    mock_configure_remote_cache_dir, mock_project_config, mock_object_storage_path
+):
+    mock_remote_cache_dir_path = mock_object_storage_path.return_value
+    mock_remote_cache_dir_path.exists.return_value = True
+    mock_configure_remote_cache_dir.return_value = mock_remote_cache_dir_path
+
+    dbt_ls_output = "sample dbt ls output"
+    compressed_data = zlib.compress(dbt_ls_output.encode("utf-8"))
+    encoded_data = base64.b64encode(compressed_data).decode("utf-8")
+
+    cache_dict = {
+        "version": "cache-version",
+        "dbt_ls_compressed": encoded_data,
+        "last_modified": "2024-08-13T12:34:56Z",
+    }
+
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / "some_cache_key" / "dbt_ls_cache.json"
+    mock_remote_cache_key_path.exists.return_value = True
+    mock_remote_cache_key_path.open.return_value.__enter__.return_value.read.return_value = json.dumps(cache_dict)
+
+    dbt_graph = DbtGraph(project=mock_project_config)
+
+    result = dbt_graph.get_dbt_ls_cache()
+
+    expected_result = {
+        "version": "cache-version",
+        "dbt_ls": dbt_ls_output,
+        "last_modified": "2024-08-13T12:34:56Z",
+    }
+
+    assert result == expected_result

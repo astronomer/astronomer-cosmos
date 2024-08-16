@@ -56,6 +56,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).
            Avoid using unless the dbt job requires it.
+    :param virtualenv_dir: Directory path where Cosmos will create/update Python virtualenv. If defined, will persist the Python virtualenv in the Airflow worker node.
+    :param is_virtualenv_dir_temporary: Tells Cosmos if virtualenv should be persisted or not.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir", "is_virtualenv_dir_temporary")  # type: ignore[operator]

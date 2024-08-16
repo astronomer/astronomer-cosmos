@@ -144,27 +144,11 @@ Check the step-by-step guide on using the ``kubernetes`` execution mode at :ref:
 
 Example DAG:
 
-.. code-block:: python
+.. literalinclude:: ../../dev/dags/jaffle_shop_kubernetes.py
+   :language: python
+   :start-after: [START kubernetes_seed_example]
+   :end-before: [END kubernetes_seed_example]
 
-    postgres_password_secret = Secret(
-        deploy_type="env",
-        deploy_target="POSTGRES_PASSWORD",
-        secret="postgres-secrets",
-        key="password",
-    )
-
-    docker_cosmos_dag = DbtDag(
-        # ...
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.KUBERNETES,
-        ),
-        operator_args={
-            "image": "dbt-jaffle-shop:1.0.0",
-            "get_logs": True,
-            "is_delete_operator_pod": False,
-            "secrets": [postgres_password_secret],
-        },
-    )
 AWS_EKS
 ----------
 

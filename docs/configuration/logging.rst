@@ -3,17 +3,20 @@
 Logging
 ====================
 
-Cosmos uses a custom logger implementation so that all log messages are clearly tagged with ``(astronomer-cosmos)``. By default this logger has propagation enabled.
+Cosmos allows for a custom logger implementation that adds ``(astronomer-cosmos)`` to each log message.
 
-In some environments (for example when running Celery workers) this can cause duplicated log messages to appear in the logs. In this case log propagation can be disabled via airflow configuration using the boolean option ``propagate_logs`` under a ``cosmos`` section.
+By default this is not enabled; you can enable it with:
 
 .. code-block:: cfg
 
     [cosmos]
-    propagate_logs = False
+    rich_logging = True
 
 or
 
 .. code-block:: python
 
-    AIRFLOW__COSMOS__PROPAGATE_LOGS = "False"
+    AIRFLOW__COSMOS__ENRICH_LOGGING = "True"
+
+Previous versions of Cosmos had a feature called ``propagate_logs`` to handle issues with Cosmos's previous logging implementation on some systems.
+This config option is deprecated.

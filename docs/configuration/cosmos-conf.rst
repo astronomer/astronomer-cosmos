@@ -94,6 +94,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``profile``
     - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
 
+.. `virtualenv_max_retries_lock`_:
+    When using ``ExecutionMode.VIRTUALENV`` and persisted virtualenv directories (`virtualenv_dir` argument),
+    users can define how many seconds Cosmos waits for the lock to be released.
+
+    - Default: 120
+    - Environment Variable: ``AIRFLOW__COSMOS__VIRTUALENV_MAX_RETRIES_LOCK``
+
+
 [openlineage]
 ~~~~~~~~~~~~~
 

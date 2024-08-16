@@ -185,7 +185,7 @@ def test_on_kill(mock_clean_dir_if_temporary):
 
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.subprocess_hook")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
-@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.prepare_virtualenv")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._prepare_virtualenv")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._acquire_venv_lock")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available", side_effect=[False, False, True])
 def test_run_subprocess_waits_for_lock(

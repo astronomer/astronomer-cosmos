@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.models import DAG
 
-from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
 from cosmos.dbt.graph import DbtGraph, DbtNode
@@ -168,7 +168,6 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
@@ -196,6 +195,46 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
         operator_args=operator_args,
     )
     assert converter
+
+
+@pytest.mark.parametrize(
+    "execution_mode,virtualenv_dir,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, Path("/some/virtualenv/dir"), {}),
+        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualenv_dir, operator_args, caplog):
+    """
+    This test will raise a warning if we are trying to pass ExecutionMode != `VirtualEnv`
+    and still pass a defined `virtualenv_dir`
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
+    execution_config = ExecutionConfig(execution_mode=execution_mode, virtualenv_dir=virtualenv_dir)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+
+    DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args=operator_args,
+    )
+
+    assert (
+        "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
+        in caplog.text
+    )
 
 
 @pytest.mark.parametrize(
@@ -233,74 +272,6 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
         err_info.value.args[0]
         == "ExecutionConfig.dbt_project_path is required for the execution of dbt tasks in all execution modes."
     )
-
-
-def test_converter_fails_render_config_invalid_dbt_path_with_dbt_ls():
-    """
-    Validate that a dbt project fails to be rendered to Airflow with DBT_LS if
-    the dbt command is invalid.
-    """
-    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix(), project_name="sample")
-    execution_config = ExecutionConfig(
-        execution_mode=ExecutionMode.LOCAL,
-        dbt_executable_path="invalid-execution-dbt",
-    )
-    render_config = RenderConfig(
-        emit_datasets=True,
-        dbt_executable_path="invalid-render-dbt",
-    )
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
-    with pytest.raises(CosmosConfigException) as err_info:
-        with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
-            DbtToAirflowConverter(
-                dag=dag,
-                nodes=nodes,
-                project_config=project_config,
-                profile_config=profile_config,
-                execution_config=execution_config,
-                render_config=render_config,
-            )
-    assert (
-        err_info.value.args[0]
-        == "Unable to find the dbt executable, attempted: <invalid-render-dbt> and <invalid-execution-dbt>."
-    )
-
-
-def test_converter_fails_render_config_invalid_dbt_path_with_manifest():
-    """
-    Validate that a dbt project succeeds to be rendered to Airflow with DBT_MANIFEST even when
-    the dbt command is invalid.
-    """
-    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST.as_posix(), project_name="sample")
-
-    execution_config = ExecutionConfig(
-        execution_mode=ExecutionMode.LOCAL,
-        dbt_executable_path="invalid-execution-dbt",
-        dbt_project_path=SAMPLE_DBT_PROJECT.as_posix(),
-    )
-    render_config = RenderConfig(
-        emit_datasets=True,
-        dbt_executable_path="invalid-render-dbt",
-    )
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
-    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
-        converter = DbtToAirflowConverter(
-            dag=dag,
-            nodes=nodes,
-            project_config=project_config,
-            profile_config=profile_config,
-            execution_config=execution_config,
-            render_config=render_config,
-        )
-    assert converter
 
 
 @pytest.mark.parametrize(

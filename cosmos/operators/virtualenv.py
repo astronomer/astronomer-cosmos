@@ -86,7 +86,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
                 self.virtualenv_dir = Path(tempdir)
                 py_bin = self.prepare_virtualenv()
-                dbt_bin = Path(py_bin).parent / "dbt"
+                dbt_bin = str(Path(py_bin).parent / "dbt")
                 command[0] = dbt_bin  # type: ignore
                 subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
                     command=command,
@@ -106,7 +106,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.log.info(f"Acquiring the virtualenv lock")
         self._acquire_venv_lock()
         py_bin = self.prepare_virtualenv()
-        dbt_bin = Path(py_bin).parent / "dbt"
+        dbt_bin = str(Path(py_bin).parent / "dbt")
         command[0] = dbt_bin  # type: ignore
         subprocess_result = self.subprocess_hook.run_command(
             command=command,

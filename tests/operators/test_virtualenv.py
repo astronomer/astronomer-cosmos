@@ -39,7 +39,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
 @patch("airflow.hooks.base.BaseHook.get_connection")
-def test_run_command(
+def test_run_command_without_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,
     mock_exception_handling,
@@ -68,21 +68,62 @@ def test_run_command(
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
     )
-    assert venv_operator.virtualenv_dir is None  # Otherwise we are creating empty directories during DAG parsing time
-    # and not deleting them
+    assert venv_operator.virtualenv_dir == None
     venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
     run_command_args = mock_subprocess_hook.run_command.call_args_list
-    assert len(run_command_args) == 3
-    python_cmd = run_command_args[0]
-    dbt_deps = run_command_args[1].kwargs
-    dbt_cmd = run_command_args[2].kwargs
-    assert python_cmd[0][0][0].endswith("/bin/python")
-    assert python_cmd[0][-1][-1] == "from importlib.metadata import version; print(version('dbt-core'))"
-    assert dbt_deps["command"][1] == "deps"
-    assert dbt_deps["command"][0].endswith("/bin/dbt")
+    assert len(run_command_args) == 2
+    dbt_deps = run_command_args[0].kwargs
+    dbt_cmd = run_command_args[1].kwargs
     assert dbt_deps["command"][0] == dbt_cmd["command"][0]
+    assert dbt_deps["command"][1] == "deps"
     assert dbt_cmd["command"][1] == "do-something"
-    assert mock_execute.call_count == 2
+    assert mock_execute.call_count == 4
+
+
+@patch("airflow.utils.python_virtualenv.execute_in_subprocess")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
+@patch("airflow.hooks.base.BaseHook.get_connection")
+def test_run_command_with_virtualenv_dir(
+    mock_get_connection,
+    mock_subprocess_hook,
+    mock_exception_handling,
+    mock_store_compiled_sql,
+    mock_calculate_openlineage_events_completes,
+    mock_execute,
+):
+    mock_get_connection.return_value = Connection(
+        conn_id="fake_conn",
+        conn_type="postgres",
+        host="fake_host",
+        port=5432,
+        login="fake_login",
+        password="fake_password",
+        schema="fake_schema",
+    )
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        profile_config=profile_config,
+        task_id="fake_task",
+        install_deps=True,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        py_system_site_packages=False,
+        pip_install_options=["--test-flag"],
+        py_requirements=["dbt-postgres==1.6.0b1"],
+        emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        virtualenv_dir=Path("mock-venv"),
+    )
+    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
+    assert str(venv_operator.virtualenv_dir) == "mock-venv"
+    run_command_args = mock_subprocess_hook.run_command.call_args_list
+    assert len(run_command_args) == 2
+    dbt_deps = run_command_args[0].kwargs
+    dbt_cmd = run_command_args[1].kwargs
+    assert dbt_deps["command"][0] == "mock-venv/bin/dbt"
+    assert dbt_cmd["command"][0] == "mock-venv/bin/dbt"
 
 
 def test_virtualenv_operator_append_env_is_true_by_default():
@@ -142,12 +183,13 @@ def test_on_kill(mock_clean_dir_if_temporary):
     assert mock_clean_dir_if_temporary.called
 
 
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.subprocess_hook")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.prepare_virtualenv")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._acquire_venv_lock")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available", side_effect=[False, False, True])
-def test__get_or_create_venv_py_interpreter_waits_for_lock(
-    mock_is_lock_available, mock_acquire, mock_prepare, mock_release, tmpdir, caplog
+def test_run_subprocess_waits_for_lock(
+    mock_is_lock_available, mock_acquire, mock_prepare, mock_release, mock_subprocess_hook, tmpdir, caplog
 ):
     venv_operator = ConcreteDbtVirtualenvBaseOperator(
         profile_config=profile_config,
@@ -156,7 +198,7 @@ def test__get_or_create_venv_py_interpreter_waits_for_lock(
         is_virtualenv_dir_temporary=False,
         virtualenv_dir=tmpdir,
     )
-    venv_operator._get_or_create_venv_py_interpreter()
+    venv_operator.run_subprocess(["dbt", "run"], {}, "./dev/dags/dbt/jaffle_shop")
     assert caplog.text.count("Waiting for virtualenv lock to be released") == 2
 
 
@@ -279,40 +321,3 @@ def test__release_venv_lock_current_process(tmpdir):
     )
     assert venv_operator._release_venv_lock() is None
     assert not lockfile.exists()
-
-
-@patch("airflow.utils.python_virtualenv.execute_in_subprocess")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
-@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
-@patch("airflow.hooks.base.BaseHook.get_connection")
-def test_supply_virtualenv_dir_flag(
-    mock_get_connection,
-    mock_lock_available,
-    mock_subprocess_hook,
-    mock_store_compiled_sql,
-    mock_calculate_openlineage_events_completes,
-    mock_execute,
-):
-    mock_lock_available.return_value = True
-    mock_get_connection.return_value = Connection(
-        conn_id="fake_conn",
-        conn_type="postgres",
-        host="fake_host",
-        port=5432,
-        login="fake_login",
-        password="fake_password",
-        schema="fake_schema",
-    )
-    venv_operator = ConcreteDbtVirtualenvBaseOperator(
-        profile_config=profile_config,
-        task_id="fake_task",
-        install_deps=True,
-        project_dir="./dev/dags/dbt/jaffle_shop",
-        py_system_site_packages=False,
-        py_requirements=["dbt-postgres==1.6.0b1"],
-        emit_datasets=False,
-        virtualenv_dir=Path("mock-venv"),
-    )
-    assert venv_operator.venv_dbt_path == "mock-venv/bin/dbt"

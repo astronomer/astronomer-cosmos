@@ -48,9 +48,8 @@ def example_virtualenv() -> None:
         profile_config=profile_config,
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.VIRTUALENV,
-            # Without setting:
-            # virtualenv_dir="/some/path/persistent-venv",
-            # Cosmos creates a new virtualenv for each dbt task being executed
+            # Without setting virtualenv_dir="/some/path/persistent-venv",
+            # Cosmos creates a new Python virtualenv for each dbt task being executed
         ),
         operator_args={
             "py_system_site_packages": False,
@@ -71,8 +70,8 @@ def example_virtualenv() -> None:
         profile_config=profile_config,
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.VIRTUALENV,
-            # We can enable this flag if we want Airflow to create one virtualenv
-            # and reuse that within the whole DAG.
+            # We can set the argument `virtualenv_dir` if we want Cosmos to create one Python virtualenv
+            # and reuse that to run all the dbt tasks within the same worker node
             virtualenv_dir=Path("/tmp/persistent-venv2"),
         ),
         operator_args={

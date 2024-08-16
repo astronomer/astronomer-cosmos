@@ -87,7 +87,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.log.info("Creating temporary virtualenv")
             with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
                 self.virtualenv_dir = Path(tempdir)
-                py_bin = self.prepare_virtualenv()
+                py_bin = self._prepare_virtualenv()
                 dbt_bin = str(Path(py_bin).parent / "dbt")
                 command[0] = dbt_bin  # type: ignore
                 subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
@@ -107,7 +107,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
         self.log.info(f"Acquiring the virtualenv lock")
         self._acquire_venv_lock()
-        py_bin = self.prepare_virtualenv()
+        py_bin = self._prepare_virtualenv()
         dbt_bin = str(Path(py_bin).parent / "dbt")
         command[0] = dbt_bin  # type: ignore
         subprocess_result = self.subprocess_hook.run_command(
@@ -137,7 +137,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def on_kill(self) -> None:
         self.clean_dir_if_temporary()
 
-    def prepare_virtualenv(self) -> str:
+    def _prepare_virtualenv(self) -> str:
         self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),

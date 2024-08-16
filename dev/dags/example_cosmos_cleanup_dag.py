@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
 
-from cosmos.cache import delete_unused_dbt_ls_cache
+from cosmos.cache import delete_unused_dbt_ls_cache, delete_unused_dbt_ls_remote_cache_files
 
 
 @dag(
@@ -27,6 +27,15 @@ def example_cosmos_cleanup_dag():
         delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5))
 
     clear_db_ls_cache()
+
+    @task()
+    def clear_db_ls_remote_cache(session=None):
+        """
+        Delete the dbt ls remote cache files that have not been used for the last five days.
+        """
+        delete_unused_dbt_ls_remote_cache_files(max_age_last_usage=timedelta(days=5))
+
+    clear_db_ls_remote_cache()
 
 
 # [END cache_example]

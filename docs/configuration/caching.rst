@@ -19,7 +19,7 @@ It is possible to turn off any cache in Cosmos by exporting the environment vari
 Disabling individual types of cache in Cosmos is also possible, as explained below.
 
 Caching the dbt ls output
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.5)
 
@@ -29,13 +29,24 @@ also the tasks queueing time.
 
 Cosmos 1.5 introduced a feature to mitigate the performance issue associated with ``LoadMode.DBT_LS`` by caching the output
 of this command as an  `Airflow Variable <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/variables.html>`_.
-Based on an initial `analysis <https://github.com/astronomer/astronomer-cosmos/pull/1014>`_, enabling this setting reduced some DAGs ask queueing from 30s to 0s. Additionally, some users `reported improvements of 84% <https://github.com/astronomer/astronomer-cosmos/pull/1014#issuecomment-2168185343>`_ in the DAG run time.
+Based on an initial `analysis <https://github.com/astronomer/astronomer-cosmos/pull/1014>`_, enabling this setting reduced some DAGs task queueing from 30s to 0s. Additionally, some users `reported improvements of 84% <https://github.com/astronomer/astronomer-cosmos/pull/1014#issuecomment-2168185343>`_ in the DAG run time.
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS=0``.
 
+(Introduced in Cosmos 1.6 - Experimental feature)
+
+Starting with Cosmos 1.6.0, users can also set a remote directory path to store this cache instead of using Airflow
+Variables. To do so, you need to configure a remote cache directory. See :ref:`remote_cache_dir` and
+:ref:`remote_cache_dir_conn_id` for more information. This is an experimental feature introduced in 1.6.0 to gather
+user feedback. The ``remote_cache_dir`` will eventually be merged into the :ref:`cache_dir` setting in upcoming
+releases.
+
 **How the cache is refreshed**
 
-Users can purge or delete the cache via Airflow UI by identifying and deleting the cache key.
+If using the default Variables cache approach, users can purge or delete the cache via Airflow UI by identifying and
+deleting the cache key. In case you're using the alternative approach by setting the ``remote_cache_dir`` introduced
+in Cosmos 1.6.0, you can delete the cache by removing the specific files by identifying them using your configured path
+in the remote store.
 
 Cosmos will refresh the cache in a few circumstances:
 

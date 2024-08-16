@@ -94,6 +94,31 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``profile``
     - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
 
+.. _remote_cache_dir:
+
+`remote_cache_dir`_:
+    The remote directory to store the dbt cache. Starting with Cosmos 1.6.0, you can store the `dbt ls` output as cache
+    in a remote location (an alternative to the Variable cache approach released previously since Cosmos 1.5.0)
+    using this configuration. The value for the remote cache directory can be any of the schemes that are supported by
+    the `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
+    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
+    ``abfs://your_azure_container/cache_dir``, etc.)
+
+    This is an experimental feature available since Cosmos 1.6 to gather user feedback and will be merged into the
+    ``cache_dir`` setting in upcoming releases.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__REMOTE_CACHE_DIR``
+
+.. _remote_cache_dir_conn_id:
+
+`remote_cache_dir_conn_id`_:
+    The connection ID for the remote cache directory. If this is not set, the default Airflow connection ID identified
+    for the scheme will be used.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__REMOTE_CACHE_DIR_CONN_ID``
+
 [openlineage]
 ~~~~~~~~~~~~~
 

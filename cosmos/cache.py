@@ -17,6 +17,7 @@ from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
 from airflow.utils.task_group import TaskGroup
+from airflow.version import version as airflow_version
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,20 +26,64 @@ from cosmos.constants import (
     DBT_MANIFEST_FILE_NAME,
     DBT_TARGET_DIR_NAME,
     DEFAULT_PROFILES_FILE_NAME,
+    FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     PACKAGE_LOCKFILE_YML,
 )
 from cosmos.dbt.project import get_partial_parse_path
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.settings import (
+    AIRFLOW_IO_AVAILABLE,
     cache_dir,
     dbt_profile_cache_dir_name,
     enable_cache,
     enable_cache_package_lockfile,
     enable_cache_profile,
+    remote_cache_dir_conn_id,
 )
+from cosmos.settings import remote_cache_dir as settings_remote_cache_dir
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
+
+
+def _configure_remote_cache_dir() -> Path | None:
+    """Configure the remote cache dir if it is provided."""
+    if not settings_remote_cache_dir:
+        return None
+
+    _configured_cache_dir = None
+
+    cache_dir_str = str(settings_remote_cache_dir)
+
+    remote_cache_conn_id = remote_cache_dir_conn_id
+    if not remote_cache_conn_id:
+        cache_dir_schema = cache_dir_str.split("://")[0]
+        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)  # type: ignore[assignment]
+    if remote_cache_conn_id is None:
+        return _configured_cache_dir
+
+    if not AIRFLOW_IO_AVAILABLE:
+        raise CosmosValueError(
+            f"You're trying to specify remote cache_dir {cache_dir_str}, but the required "
+            f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+            "Airflow 2.8 or later."
+        )
+
+    from airflow.io.path import ObjectStoragePath
+
+    _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
+
+    if not _configured_cache_dir.exists():  # type: ignore[no-untyped-call]
+        # TODO: Check if we should raise an error instead in case the provided path does not exist.
+        _configured_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # raise CosmosValueError(
+        #     f"remote_cache_path `{cache_dir_str}` does not exist or is not accessible using "
+        #     f"remote_cache_conn_id `{remote_cache_conn_id}`"
+        # )
+
+    return _configured_cache_dir
 
 
 def _get_airflow_metadata(dag: DAG, task_group: TaskGroup | None) -> dict[str, str | None]:
@@ -364,6 +409,64 @@ def delete_unused_dbt_ls_cache(
         f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
     )
     return deleted_cosmos_variables
+
+
+# TODO: Add integration tests once remote cache is supported in the CI pipeline
+@provide_session
+def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+) -> int:
+    """
+    Delete Cosmos cache stored in remote storage based on the last execution of their associated DAGs.
+    """
+    if session is None:
+        return 0
+
+    logger.info(f"Delete the Cosmos cache stored remotely that hasn't been used for  {max_age_last_usage}")
+    cosmos_dags_ids_remote_cache_files = defaultdict(list)
+
+    configured_remote_cache_dir = _configure_remote_cache_dir()
+    if not configured_remote_cache_dir:
+        logger.info(
+            "No remote cache directory configured. Skipping the deletion of the dbt ls cache files in remote storage."
+        )
+        return 0
+
+    dirs = [obj for obj in configured_remote_cache_dir.iterdir() if obj.is_dir()]
+    files = [f for label in dirs for f in label.iterdir() if f.is_file()]
+
+    total_cosmos_remote_cache_files = 0
+    for file in files:
+        prefix_path = (configured_remote_cache_dir / VAR_KEY_CACHE_PREFIX).as_uri()
+        if file.as_uri().startswith(prefix_path):
+            with file.open("r") as fp:
+                cache_dict = json.load(fp)
+            cosmos_dags_ids_remote_cache_files[cache_dict["dag_id"]].append(file)
+            total_cosmos_remote_cache_files += 1
+
+    deleted_cosmos_remote_cache_files = 0
+
+    for dag_id, files in cosmos_dags_ids_remote_cache_files.items():
+        last_dag_run = (
+            session.query(DagRun)
+            .filter(
+                DagRun.dag_id == dag_id,
+            )
+            .order_by(DagRun.execution_date.desc())
+            .first()
+        )
+        if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
+            for file in files:
+                logger.info(f"Removing the dbt ls cache remote file {file}")
+                file.unlink()
+                deleted_cosmos_remote_cache_files += 1
+    logger.info(
+        "Deleted %s/%s dbt ls cache files in remote storage.",
+        deleted_cosmos_remote_cache_files,
+        total_cosmos_remote_cache_files,
+    )
+
+    return deleted_cosmos_remote_cache_files
 
 
 def is_profile_cache_enabled() -> bool:

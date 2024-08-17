@@ -79,11 +79,17 @@ class DbtBuildAwsEksOperator(DbtAwsEksBaseOperator, DbtBuildKubernetesOperator):
         DbtAwsEksBaseOperator.template_fields + DbtBuildKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtLSAwsEksOperator(DbtAwsEksBaseOperator, DbtLSKubernetesOperator):
     """
     Executes a dbt core ls command.
     """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
 
 class DbtSeedAwsEksOperator(DbtAwsEksBaseOperator, DbtSeedKubernetesOperator):
@@ -95,17 +101,26 @@ class DbtSeedAwsEksOperator(DbtAwsEksBaseOperator, DbtSeedKubernetesOperator):
         DbtAwsEksBaseOperator.template_fields + DbtSeedKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtSnapshotAwsEksOperator(DbtAwsEksBaseOperator, DbtSnapshotKubernetesOperator):
     """
     Executes a dbt core snapshot command.
     """
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtSourceAzureContainerInstanceOperator(DbtAwsEksBaseOperator, DbtSourceKubernetesOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
 
 class DbtRunAwsEksOperator(DbtAwsEksBaseOperator, DbtRunKubernetesOperator):
@@ -117,6 +132,9 @@ class DbtRunAwsEksOperator(DbtAwsEksBaseOperator, DbtRunKubernetesOperator):
         DbtAwsEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtTestAwsEksOperator(DbtAwsEksBaseOperator, DbtTestKubernetesOperator):
     """
@@ -127,6 +145,9 @@ class DbtTestAwsEksOperator(DbtAwsEksBaseOperator, DbtTestKubernetesOperator):
         DbtAwsEksBaseOperator.template_fields + DbtTestKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtRunOperationAwsEksOperator(DbtAwsEksBaseOperator, DbtRunOperationKubernetesOperator):
     """
@@ -136,3 +157,6 @@ class DbtRunOperationAwsEksOperator(DbtAwsEksBaseOperator, DbtRunOperationKubern
     template_fields: Sequence[str] = (
         DbtAwsEksBaseOperator.template_fields + DbtRunOperationKubernetesOperator.template_fields  # type: ignore[operator]
     )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)

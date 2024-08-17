@@ -545,11 +545,17 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core ls command.
     """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
 
 class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
@@ -559,17 +565,26 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core snapshot command.
     """
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
 
 class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
 
 class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
@@ -578,6 +593,9 @@ class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
 
 class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
@@ -640,6 +658,9 @@ class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):

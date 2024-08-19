@@ -267,7 +267,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
 
 
-class DbtBuildMixin:
+class DbtBuildMixin(BaseOperator, metaclass=ABCMeta):
     """Mixin for dbt build command."""
 
     base_cmd = ["build"]
@@ -294,7 +294,7 @@ class DbtBuildMixin:
         return flags
 
 
-class DbtLSMixin:
+class DbtLSMixin(BaseOperator, metaclass=ABCMeta):
     """
     Executes a dbt core ls command.
     """
@@ -303,7 +303,7 @@ class DbtLSMixin:
     ui_color = "#DBCDF6"
 
 
-class DbtSeedMixin:
+class DbtSeedMixin(BaseOperator, metaclass=ABCMeta):
     """
     Mixin for dbt seed operation command.
 
@@ -334,14 +334,14 @@ class DbtSeedMixin:
         return flags
 
 
-class DbtSnapshotMixin:
+class DbtSnapshotMixin(BaseOperator, metaclass=ABCMeta):
     """Mixin for a dbt snapshot command."""
 
     base_cmd = ["snapshot"]
     ui_color = "#964B00"
 
 
-class DbtSourceMixin:
+class DbtSourceMixin(BaseOperator, metaclass=ABCMeta):
     """
     Executes a dbt source freshness command.
     """
@@ -350,7 +350,7 @@ class DbtSourceMixin:
     ui_color = "#34CCEB"
 
 
-class DbtRunMixin:
+class DbtRunMixin(BaseOperator, metaclass=ABCMeta):
     """
     Mixin for dbt run command.
 
@@ -382,26 +382,14 @@ class DbtRunMixin:
         return flags
 
 
-class DbtTestMixin:
+class DbtTestMixin(BaseOperator, metaclass=ABCMeta):
     """Mixin for dbt test command."""
 
     base_cmd = ["test"]
     ui_color = "#8194E0"
 
-    def __init__(
-        self,
-        exclude: str | None = None,
-        select: str | None = None,
-        selector: str | None = None,
-        **kwargs: Any,
-    ) -> None:
-        self.select = select
-        self.exclude = exclude
-        self.selector = selector
-        super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
 
-
-class DbtRunOperationMixin:
+class DbtRunOperationMixin(BaseOperator, metaclass=ABCMeta):
     """
     Mixin for dbt run operation command.
 

@@ -154,7 +154,7 @@ def test_dbt_mixin_base_cmd(dbt_command, dbt_operator_class):
     "full_refresh, expected_flags", [("True", ["--full-refresh"]), (True, ["--full-refresh"]), (False, [])]
 )
 def test_dbt_mixin_add_cmd_flags_full_refresh(full_refresh, expected_flags, dbt_operator_class):
-    dbt_mixin = dbt_operator_class(full_refresh=full_refresh)
+    dbt_mixin = dbt_operator_class(task_id="test_task_id", full_refresh=full_refresh)
     flags = dbt_mixin.add_cmd_flags()
     assert flags == expected_flags
 
@@ -162,7 +162,7 @@ def test_dbt_mixin_add_cmd_flags_full_refresh(full_refresh, expected_flags, dbt_
 @pytest.mark.parametrize("args, expected_flags", [(None, []), ({"arg1": "val1"}, ["--args", "arg1: val1\n"])])
 def test_dbt_mixin_add_cmd_flags_run_operator(args, expected_flags):
     macro_name = "some_macro"
-    run_operation = DbtRunOperationMixin(macro_name=macro_name, args=args)
+    run_operation = DbtRunOperationMixin(task_id="test_task_id", macro_name=macro_name, args=args)
     assert run_operation.base_cmd == ["run-operation", "some_macro"]
 
     flags = run_operation.add_cmd_flags()

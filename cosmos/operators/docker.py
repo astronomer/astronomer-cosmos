@@ -69,8 +69,8 @@ class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBaseOperator):
 
     template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):
@@ -78,8 +78,8 @@ class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):
     Executes a dbt core ls command.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtSeedDockerOperator(DbtSeedMixin, DbtDockerBaseOperator):
@@ -91,8 +91,8 @@ class DbtSeedDockerOperator(DbtSeedMixin, DbtDockerBaseOperator):
 
     template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtSnapshotDockerOperator(DbtSnapshotMixin, DbtDockerBaseOperator):
@@ -100,8 +100,8 @@ class DbtSnapshotDockerOperator(DbtSnapshotMixin, DbtDockerBaseOperator):
     Executes a dbt core snapshot command.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtSourceDockerOperator(DbtSourceMixin, DbtDockerBaseOperator):
@@ -109,8 +109,8 @@ class DbtSourceDockerOperator(DbtSourceMixin, DbtDockerBaseOperator):
     Executes a dbt source freshness command.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtRunDockerOperator(DbtRunMixin, DbtDockerBaseOperator):
@@ -120,8 +120,8 @@ class DbtRunDockerOperator(DbtRunMixin, DbtDockerBaseOperator):
 
     template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestDockerOperator(DbtTestMixin, DbtDockerBaseOperator):
@@ -146,5 +146,5 @@ class DbtRunOperationDockerOperator(DbtRunOperationMixin, DbtDockerBaseOperator)
 
     template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)

@@ -205,12 +205,18 @@ class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperato
     and deleted just after.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
 
 class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
     """
     Executes a dbt core ls command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
 
 
 class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):  # type: ignore[misc]
@@ -219,12 +225,18 @@ class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator)
     and deleted just after.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
 
 class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalOperator):
     """
     Executes a dbt core snapshot command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
 
 
 class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOperator):
@@ -233,12 +245,18 @@ class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOpera
     command and deleted just after.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
 
 class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):  # type: ignore[misc]
     """
     Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator):
@@ -247,6 +265,9 @@ class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator)
     and deleted just after.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
 
 class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):  # type: ignore[misc]
     """
@@ -254,9 +275,15 @@ class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperati
     dbt command and deleted just after.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
 
 class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator):
     """
     Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)

@@ -102,11 +102,17 @@ class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBaseOperator):
 
     template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core ls command.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtSeedKubernetesOperator(DbtSeedMixin, DbtKubernetesBaseOperator):
@@ -116,17 +122,26 @@ class DbtSeedKubernetesOperator(DbtSeedMixin, DbtKubernetesBaseOperator):
 
     template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core snapshot command.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
@@ -135,6 +150,9 @@ class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
@@ -239,3 +257,6 @@ class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBaseO
     """
 
     template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)

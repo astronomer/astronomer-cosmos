@@ -1,6 +1,48 @@
 Changelog
 =========
 
+1.6.0 (2024-08-20)
+--------------------
+
+New Features
+
+* Add support for loading manifest from cloud stores using Airflow Object Storage by @pankajkoti in #1109
+* Cache ``package-lock.yml`` file by @pankajastro in #1086
+* Support persisting the ``LoadMode.VIRTUALENV`` directory by @tatiana in #1079
+* Add support to store and fetch ``dbt ls`` cache in remote stores by @pankajkoti in #1147
+* Add default source nodes rendering by @arojasb3 in #1107
+* Add Teradata ``ProfileMapping`` by @sc250072 in #1077
+
+Enhancements
+
+* Add ``DatabricksOauthProfileMapping`` profile by @CorsettiS in #1091
+* Use ``dbt ls`` as the default parser when ``profile_config`` is provided by @pankajastro in #1101
+* Add task owner to dbt operators by @wornjs in #1082
+* Extend Cosmos custom selector to support + when using paths and tags by @mvictoria in #1150
+* Simplify logging by @dwreeves in #1108
+
+Bug fixes
+
+* Fix Teradata ``ProfileMapping`` target invalid issue by @sc250072 in #1088
+* Fix empty tag in case of custom parser by @pankajastro in #1100
+* Fix ``dbt deps`` of ``LoadMode.DBT_LS`` should use ``ProjectConfig.dbt_vars`` by @tatiana in #1114
+* Fix import handling by lazy loading hooks introduced in PR #1109 by @dwreeves in #1132
+* Fix Airflow 2.10 regression and add Airflow 2.10 in test matrix by @pankajastro in #1162
+
+Docs
+
+* Fix typo in azure-container-instance docs by @pankajastro in #1106
+* Use Airflow trademark as it has been registered by @pankajastro in #1105
+
+Others
+
+* Run some example DAGs in Kubernetes execution mode in CI by @pankajastro in #1127
+* Install requirements.txt by default during dev env spin up by @@CorsettiS in #1099
+* Remove ``DbtGraph.current_version`` dead code by @tatiana in #1111
+* Disable test for Airflow-2.5 and Python-3.11 combination in CI by @pankajastro in #1124
+* Pre-commit hook updates in #1074, #1113, #1125, #1144, #1154, #1167
+
+
 1.5.1 (2024-07-17)
 ------------------
 

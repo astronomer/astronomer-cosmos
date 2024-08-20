@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.6.0a7 (2024-08-16)
+1.6.0a8 (2024-08-20)
 --------------------
 
 New Features
@@ -27,6 +27,7 @@ Bug fixes
 * Fix empty tag in case of custom parser by @pankajastro in #1100
 * Fix ``dbt deps`` of ``LoadMode.DBT_LS`` should use ``ProjectConfig.dbt_vars`` by @tatiana in #1114
 * Fix import handling by lazy loading hooks introduced in PR #1109 by @dwreeves in #1132
+* Fix Airflow 2.10 regression and add Airflow 2.10 in test matrix by @pankajastro in #1162
 
 Docs
 
@@ -39,7 +40,7 @@ Others
 * Install requirements.txt by default during dev env spin up by @@CorsettiS in #1099
 * Remove ``DbtGraph.current_version`` dead code by @tatiana in #1111
 * Disable test for Airflow-2.5 and Python-3.11 combination in CI by @pankajastro in #1124
-* Pre-commit hook updates in #1074, #1113, #1125, #1144, #1154
+* Pre-commit hook updates in #1074, #1113, #1125, #1144, #1154, #1167
 
 
 1.5.1 (2024-07-17)

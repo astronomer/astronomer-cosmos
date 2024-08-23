@@ -8,7 +8,7 @@ New Features
 
 * Add support for loading manifest from cloud stores using Airflow Object Storage by @pankajkoti in #1109
 * Cache ``package-lock.yml`` file by @pankajastro in #1086
-* Support persisting the ``LoadMode.VIRTUALENV`` directory by @tatiana in #1079
+* Support persisting the ``LoadMode.VIRTUALENV`` directory @LennartKloppenburg and @tatiana in #1079 and #611
 * Add support to store and fetch ``dbt ls`` cache in remote stores by @pankajkoti in #1147
 * Add default source nodes rendering by @arojasb3 in #1107
 * Add Teradata ``ProfileMapping`` by @sc250072 in #1077

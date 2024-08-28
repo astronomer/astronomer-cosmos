@@ -22,13 +22,15 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
 uv pip install pydantic --constraint /tmp/constraint.txt
-rm /tmp/constraint.txt
+
 
 if [ "$AIRFLOW_VERSION" = "2.7" ]; then
-  uv pip install "apache-airflow-providers-amazon[s3fs]==8.27.0"
-  uv pip install "apache-airflow-providers-cncf-kubernetes==8.3.4"
-  uv pip install "apache-airflow-providers-docker==3.12.3"
-  uv pip install "apache-airflow-providers-google==10.21.0"
-  uv pip install "apache-airflow-providers-microsoft-azure==10.3.0"
-  uv pip install "apache-airflow-providers-postgres==5.11.3"
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-postgres" --constraint /tmp/constraint.txt
 fi
+
+rm /tmp/constraint.txt

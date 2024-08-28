@@ -140,7 +140,7 @@ packages = ["/cosmos"]
 dependencies = [
     "astronomer-cosmos[tests]",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
-#    "apache-airflow-providers-amazon[s3fs]>=3.0.0",
+    "apache-airflow-providers-amazon[s3fs]>=3.0.0,<8.28.0",
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-google",
     "apache-airflow-providers-microsoft-azure",

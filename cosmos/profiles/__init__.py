@@ -13,6 +13,7 @@ from .clickhouse.user_pass import ClickhouseUserPasswordProfileMapping
 from .databricks.oauth import DatabricksOauthProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
+from .oracle.user_pass import OracleUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
 from .redshift.user_pass import RedshiftUserPasswordProfileMapping
 from .snowflake.user_encrypted_privatekey_env_variable import SnowflakeEncryptedPrivateKeyPemProfileMapping
@@ -34,6 +35,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudOauthProfileMapping,
     DatabricksTokenProfileMapping,
     DatabricksOauthProfileMapping,
+    OracleUserPasswordProfileMapping,
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
     SnowflakeUserPasswordProfileMapping,
@@ -77,6 +79,7 @@ __all__ = [
     "DatabricksTokenProfileMapping",
     "DatabricksOauthProfileMapping",
     "DbtProfileConfigVars",
+    "OracleUserPasswordProfileMapping",
     "PostgresUserPasswordProfileMapping",
     "RedshiftUserPasswordProfileMapping",
     "SnowflakeUserPasswordProfileMapping",

@@ -47,6 +47,7 @@ dbt-all = [
     "dbt-clickhouse",
     "dbt-databricks",
     "dbt-exasol",
+    "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
@@ -59,6 +60,7 @@ dbt-bigquery = ["dbt-bigquery"]
 dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-exasol = ["dbt-exasol"]
+dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
@@ -144,6 +146,7 @@ dependencies = [
     "apache-airflow-providers-docker>=3.5.0",
     "apache-airflow-providers-google",
     "apache-airflow-providers-microsoft-azure",
+    "apache-airflow-providers-oracle",
     "apache-airflow-providers-postgres",
     "types-PyYAML",
     "types-attrs",

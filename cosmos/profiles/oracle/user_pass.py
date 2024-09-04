@@ -75,14 +75,14 @@ class OracleUserPasswordProfileMapping(BaseProfileMapping):
             "port": 1521,
             **super().mock_profile,
         }
-		
+
         if "schema" not in profile_dict and "user" in profile_dict:
             proxy = re.search(r"\[([^]]+)\]", profile_dict["user"])
             if proxy:
                 profile_dict["schema"] = proxy.group(1)
             else:
                 profile_dict["schema"] = profile_dict["user"]
-				
+
         user_defined_schema = self.profile_args.get("schema")
         if user_defined_schema:
             profile_dict["schema"] = user_defined_schema

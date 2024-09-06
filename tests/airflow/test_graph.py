@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -626,7 +625,7 @@ def test_owner(dbt_extra_config, expected_owner):
             file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
             tags=["has_child"],
             config={"materialized": "view", **dbt_extra_config},
-            depends_on=[]
+            depends_on=[],
         )
 
     output: TaskGroup = generate_task_or_group(

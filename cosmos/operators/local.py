@@ -7,6 +7,7 @@ import warnings
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
+import urllib.parse
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
 import jinja2
@@ -450,7 +451,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         uris = []
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
-                dataset_uri = output.namespace + "/" + output.name
+                dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name)
                 uris.append(dataset_uri)
         self.log.debug("URIs to be converted to Dataset: %s", uris)
 

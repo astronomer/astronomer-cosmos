@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import urllib.parse
 import warnings
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
-import urllib.parse
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
 import jinja2

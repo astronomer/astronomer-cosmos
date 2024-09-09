@@ -77,7 +77,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.virtualenv_dir = virtualenv_dir
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
         self.max_retries_lock = settings.virtualenv_max_retries_lock
-        self._py_bin = None
+        self._py_bin: str | None = None
         super().__init__(**kwargs)
         if not self.py_requirements:
             self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")

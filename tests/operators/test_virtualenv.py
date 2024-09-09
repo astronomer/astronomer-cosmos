@@ -138,10 +138,8 @@ def test_run_command_with_virtualenv_dir(
     assert dbt_deps["command"][0] == "mock-venv/bin/dbt"
     assert dbt_cmd["command"][0] == "mock-venv/bin/dbt"
     caplog.text.count("Waiting for virtualenv lock to be released") == 2
-    assert mock_release_venv_lock.called_once()
-    cosmos_venv_dirs = [
-        f for f in os.listdir() if f == "mock-venv"
-    ]
+    assert mock_release_venv_lock.call_count == 1
+    cosmos_venv_dirs = [f for f in os.listdir() if f == "mock-venv"]
     assert len(cosmos_venv_dirs) == 1
 
 
@@ -203,9 +201,7 @@ def test_on_kill(mock_clean_dir_if_temporary):
 
 
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.subprocess_hook")
-def test_run_subprocess(
-    mock_subprocess_hook, tmpdir, caplog
-):
+def test_run_subprocess(mock_subprocess_hook, tmpdir, caplog):
     venv_operator = ConcreteDbtVirtualenvBaseOperator(
         profile_config=profile_config,
         project_dir="./dev/dags/dbt/jaffle_shop",

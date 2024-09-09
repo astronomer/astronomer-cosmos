@@ -84,6 +84,10 @@ def test_run_command_without_virtualenv_dir(
     assert virtualenv_call[0][0][2] == "virtualenv"
     assert "pip" in pip_install_call[0][0][0]
     assert pip_install_call[0][0][1] == "install"
+    cosmos_venv_dirs = [
+        f for f in os.listdir("/tmp") if os.path.isdir(os.path.join("/tmp", f)) and f.startswith("cosmos-venv")
+    ]
+    assert len(cosmos_venv_dirs) == 0
 
 
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
@@ -135,6 +139,10 @@ def test_run_command_with_virtualenv_dir(
     assert dbt_cmd["command"][0] == "mock-venv/bin/dbt"
     caplog.text.count("Waiting for virtualenv lock to be released") == 2
     assert mock_release_venv_lock.called_once()
+    cosmos_venv_dirs = [
+        f for f in os.listdir() if f == "mock-venv"
+    ]
+    assert len(cosmos_venv_dirs) == 1
 
 
 def test_virtualenv_operator_append_env_is_true_by_default():

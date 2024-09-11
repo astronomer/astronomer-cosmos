@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.6.1a1 (2024-09-11)
+------------------
+
+Bug fixes
+
+* Fix task owner fallback by @jmaicher in ##1195
+
+
 1.6.0 (2024-08-20)
 --------------------
 

@@ -53,10 +53,8 @@ def test_connection_claiming() -> None:
     """
     potential_values = {
         "conn_type": "oracle",
-        "host": "my_host",
         "login": "my_user",
         "password": "my_password",
-        "extra": '{"service_name": "my_service"}',
     }
 
     # if we're missing any of the required values, it shouldn't claim
@@ -114,8 +112,10 @@ def test_profile_args(
         "user": mock_oracle_conn.login,
         "password": "{{ env_var('COSMOS_CONN_ORACLE_PASSWORD') }}",
         "port": mock_oracle_conn.port,
-        "service_name": "my_service",
+        "database": "my_service",
+        "service": "my_service",
         "schema": "my_schema",
+        "protocol": "tcp",
     }
 
 
@@ -127,11 +127,16 @@ def test_profile_args_overrides(
     """
     profile_mapping = get_automatic_profile_mapping(
         mock_oracle_conn.conn_id,
-        profile_args={"schema": "my_schema", "service_name": "my_service_override"},
+        profile_args={
+            "schema": "my_schema_override",
+            "database": "my_database_override",
+            "service": "my_service_override",
+        },
     )
     assert profile_mapping.profile_args == {
-        "schema": "my_schema",
-        "service_name": "my_service_override",
+        "schema": "my_schema_override",
+        "database": "my_database_override",
+        "service": "my_service_override",
     }
 
     assert profile_mapping.profile == {
@@ -140,8 +145,10 @@ def test_profile_args_overrides(
         "user": mock_oracle_conn.login,
         "password": "{{ env_var('COSMOS_CONN_ORACLE_PASSWORD') }}",
         "port": mock_oracle_conn.port,
-        "service_name": "my_service_override",
-        "schema": "my_schema",
+        "database": "my_database_override",
+        "service": "my_service_override",
+        "schema": "my_schema_override",
+        "protocol": "tcp",
     }
 
 

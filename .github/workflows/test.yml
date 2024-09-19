@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main,ci-fix]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -97,6 +97,7 @@ jobs:
         with:
           name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
   Run-Integration-Tests:
     needs: Authorize
@@ -181,6 +182,7 @@ jobs:
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
   Run-Integration-Tests-Expensive:
     needs: Authorize
@@ -252,6 +254,7 @@ jobs:
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
@@ -319,6 +322,7 @@ jobs:
         with:
           name: coverage-integration-sqlite-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
@@ -395,6 +399,7 @@ jobs:
         with:
           name: coverage-integration-dbt-1-5-4-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
@@ -538,6 +543,7 @@ jobs:
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
   Code-Coverage:
     if: github.event.action != 'labeled'

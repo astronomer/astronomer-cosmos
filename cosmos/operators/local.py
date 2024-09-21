@@ -145,7 +145,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self._dbt_runner: dbtRunner | None = None
         if self.invocation_mode:
             self._set_invocation_methods()
-        kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
         super().__init__(**kwargs)
 
         # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment

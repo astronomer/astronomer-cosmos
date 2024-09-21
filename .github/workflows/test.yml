@@ -93,10 +93,11 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-cov
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
   Run-Integration-Tests:
     needs: Authorize
@@ -177,10 +178,11 @@ jobs:
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
   Run-Integration-Tests-Expensive:
     needs: Authorize
@@ -248,10 +250,11 @@ jobs:
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
@@ -315,10 +318,11 @@ jobs:
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-sqlite-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
@@ -391,10 +395,11 @@ jobs:
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-dbt-1-5-4-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
@@ -534,10 +539,11 @@ jobs:
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
           path: .coverage
+          include-hidden-files: true
 
   Code-Coverage:
     if: github.event.action != 'labeled'
@@ -559,7 +565,7 @@ jobs:
         run: |
           pip3 install coverage
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: ./coverage
       - name: Combine coverage

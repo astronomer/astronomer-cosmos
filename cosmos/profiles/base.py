@@ -33,7 +33,7 @@ class DbtProfileConfigVars:
     partial_parse: Optional[bool] = None
     use_experimental_parser: Optional[bool] = None
     static_parser: Optional[bool] = None
-    printer_width: Optional[bool] = None
+    printer_width: Optional[int] = None
     write_json: Optional[bool] = None
     warn_error: Optional[bool] = None
     warn_error_options: Optional[Dict[Literal["include", "exclude"], Any]] = None

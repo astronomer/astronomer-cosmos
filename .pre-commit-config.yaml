@@ -54,7 +54,7 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.2
+    rev: v0.6.5
     hooks:
       - id: ruff
         args:

@@ -16,7 +16,15 @@ from cosmos.config import (
     ProjectConfig,
     RenderConfig,
 )
-from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
+from cosmos.constants import (
+    DbtResourceType,
+    ExecutionMode,
+    InvocationMode,
+    LoadMode,
+    SourceRenderingBehavior,
+    TestBehavior,
+    TestIndirectSelection,
+)
 from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (
@@ -157,6 +165,10 @@ __all__ = [
     "ExecutionMode",
     "LoadMode",
     "TestBehavior",
+    "InvocationMode",
+    "TestIndirectSelection",
+    "SourceRenderingBehavior",
+    "DbtResourceType",
 ]
 
 """

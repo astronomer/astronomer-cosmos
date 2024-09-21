@@ -160,3 +160,6 @@ webserver_config.py
 
 # VI
 *.sw[a-z]
+
+# Ignore possibly created symlink to `dev/dags` for running `airflow dags test` command.
+dags

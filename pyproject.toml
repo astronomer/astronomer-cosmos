@@ -34,7 +34,7 @@ dependencies = [
     "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
     "msgpack",
-    "packaging",
+    "packaging>=22.0",
     "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
@@ -86,7 +86,7 @@ docs = [
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
 ]
 tests = [
-    "packaging",
+    "packaging>=22.0",
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",

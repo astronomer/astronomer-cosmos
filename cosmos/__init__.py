@@ -42,6 +42,7 @@ logger = get_logger(__name__)
 
 try:
     from cosmos.operators.docker import (
+        DbtBuildDockerOperator,
         DbtLSDockerOperator,
         DbtRunDockerOperator,
         DbtRunOperationDockerOperator,
@@ -62,6 +63,7 @@ except ImportError:
 
 try:
     from cosmos.operators.kubernetes import (
+        DbtBuildKubernetesOperator,
         DbtLSKubernetesOperator,
         DbtRunKubernetesOperator,
         DbtRunOperationKubernetesOperator,
@@ -71,6 +73,10 @@ try:
     )
 except ImportError:
     logger.debug("To import Kubernetes modules, install astronomer-cosmos[kubernetes].", stack_info=True)
+    DbtBuildKubernetesOperator = MissingPackage(
+        "cosmos.operators.kubernetes.DbtBuildKubernetesOperator",
+        "kubernetes",
+    )
     DbtLSKubernetesOperator = MissingPackage(
         "cosmos.operators.kubernetes.DbtLSKubernetesOperator",
         "kubernetes",
@@ -98,6 +104,7 @@ except ImportError:
 
 try:
     from cosmos.operators.azure_container_instance import (
+        DbtBuildAzureContainerInstanceOperator,
         DbtLSAzureContainerInstanceOperator,
         DbtRunAzureContainerInstanceOperator,
         DbtRunOperationAzureContainerInstanceOperator,
@@ -106,6 +113,9 @@ try:
         DbtTestAzureContainerInstanceOperator,
     )
 except ImportError:
+    DbtBuildAzureContainerInstanceOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtBuildAzureContainerInstanceOperator", "azure-container-instance"
+    )
     DbtLSAzureContainerInstanceOperator = MissingPackage(
         "cosmos.operators.azure_container_instance.DbtLSAzureContainerInstanceOperator", "azure-container-instance"
     )
@@ -127,41 +137,42 @@ except ImportError:
         "cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator", "azure-container-instance"
     )
 
+
+try:
+    from cosmos.operators.aws_eks import (
+        DbtBuildAwsEksOperator,
+        DbtLSAwsEksOperator,
+        DbtRunAwsEksOperator,
+        DbtRunOperationAwsEksOperator,
+        DbtSeedAwsEksOperator,
+        DbtSnapshotAwsEksOperator,
+        DbtTestAwsEksOperator,
+    )
+except ImportError:
+    DbtBuildAwsEksOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtBuildAwsEksOperator", "aws_eks"
+    )
+    DbtLSAwsEksOperator = MissingPackage("cosmos.operators.azure_container_instance.DbtLSAwsEksOperator", "aws_eks")
+    DbtRunAwsEksOperator = MissingPackage("cosmos.operators.azure_container_instance.DbtRunAwsEksOperator", "aws_eks")
+    DbtRunOperationAwsEksOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtRunOperationAwsEksOperator",
+        "aws_eks",
+    )
+    DbtSeedAwsEksOperator = MissingPackage("cosmos.operators.azure_container_instance.DbtSeedAwsEksOperator", "aws_eks")
+    DbtSnapshotAwsEksOperator = MissingPackage(
+        "cosmos.operators.azure_container_instance.DbtSnapshotAwsEksOperator",
+        "aws_eks",
+    )
+    DbtTestAwsEksOperator = MissingPackage("cosmos.operators.azure_container_instance.DbtTestAwsEksOperator", "aws_eks")
+
+
 __all__ = [
     "ProjectConfig",
     "ProfileConfig",
     "ExecutionConfig",
     "RenderConfig",
-    "DbtLSLocalOperator",
-    "DbtRunOperationLocalOperator",
-    "DbtRunLocalOperator",
-    "DbtSeedLocalOperator",
-    "DbtTestLocalOperator",
-    "DbtBuildLocalOperator",
-    "DbtDepsLocalOperator",
-    "DbtSnapshotLocalOperator",
     "DbtDag",
     "DbtTaskGroup",
-    "DbtLSDockerOperator",
-    "DbtRunOperationDockerOperator",
-    "DbtRunDockerOperator",
-    "DbtSeedDockerOperator",
-    "DbtTestDockerOperator",
-    "DbtBuildDockerOperator",
-    "DbtSnapshotDockerOperator",
-    "DbtLSKubernetesOperator",
-    "DbtRunOperationKubernetesOperator",
-    "DbtRunKubernetesOperator",
-    "DbtSeedKubernetesOperator",
-    "DbtTestKubernetesOperator",
-    "DbtBuildKubernetesOperator",
-    "DbtSnapshotKubernetesOperator",
-    "DbtLSAzureContainerInstanceOperator",
-    "DbtRunOperationAzureContainerInstanceOperator",
-    "DbtRunAzureContainerInstanceOperator",
-    "DbtSeedAzureContainerInstanceOperator",
-    "DbtTestAzureContainerInstanceOperator",
-    "DbtSnapshotAzureContainerInstanceOperator",
     "ExecutionMode",
     "LoadMode",
     "TestBehavior",
@@ -169,6 +180,47 @@ __all__ = [
     "TestIndirectSelection",
     "SourceRenderingBehavior",
     "DbtResourceType",
+    # Local Execution Mode
+    "DbtBuildLocalOperator",
+    "DbtDepsLocalOperator",  # deprecated, to be delete in Cosmos 2.x
+    "DbtLSLocalOperator",
+    "DbtRunLocalOperator",
+    "DbtRunOperationLocalOperator",
+    "DbtSeedLocalOperator",
+    "DbtSnapshotLocalOperator",
+    "DbtTestLocalOperator",
+    # Docker Execution Mode
+    "DbtBuildDockerOperator",
+    "DbtLSDockerOperator",
+    "DbtRunDockerOperator",
+    "DbtRunOperationDockerOperator",
+    "DbtSeedDockerOperator",
+    "DbtSnapshotDockerOperator",
+    "DbtTestDockerOperator",
+    # Kubernetes Execution Mode
+    "DbtBuildKubernetesOperator",
+    "DbtLSKubernetesOperator",
+    "DbtRunKubernetesOperator",
+    "DbtRunOperationKubernetesOperator",
+    "DbtSeedKubernetesOperator",
+    "DbtSnapshotKubernetesOperator",
+    "DbtTestKubernetesOperator",
+    # Azure Container Instance Execution Mode
+    "DbtBuildAzureContainerInstanceOperator",
+    "DbtLSAzureContainerInstanceOperator",
+    "DbtRunAzureContainerInstanceOperator",
+    "DbtRunOperationAzureContainerInstanceOperator",
+    "DbtSeedAzureContainerInstanceOperator",
+    "DbtSnapshotAzureContainerInstanceOperator",
+    "DbtTestAzureContainerInstanceOperator",
+    # AWS EKS Execution Mode
+    "DbtBuildAwsEksOperator",
+    "DbtLSAwsEksOperator",
+    "DbtRunAwsEksOperator",
+    "DbtRunOperationAwsEksOperator",
+    "DbtSeedAwsEksOperator",
+    "DbtSnapshotAwsEksOperator",
+    "DbtTestAwsEksOperator",
 ]
 
 """

@@ -6,6 +6,7 @@ from pendulum import datetime
 
 from cosmos.operators.azure_container_instance import (
     DbtAzureContainerInstanceBaseOperator,
+    DbtBuildAzureContainerInstanceOperator,
     DbtLSAzureContainerInstanceOperator,
     DbtRunAzureContainerInstanceOperator,
     DbtSeedAzureContainerInstanceOperator,
@@ -121,6 +122,7 @@ base_kwargs = {
 }
 
 result_map = {
+    "build": DbtBuildAzureContainerInstanceOperator(**base_kwargs),
     "ls": DbtLSAzureContainerInstanceOperator(**base_kwargs),
     "run": DbtRunAzureContainerInstanceOperator(**base_kwargs),
     "test": DbtTestAzureContainerInstanceOperator(**base_kwargs),

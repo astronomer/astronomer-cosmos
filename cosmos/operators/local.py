@@ -10,6 +10,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
+import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -17,6 +18,7 @@ from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
 from attr import define
+from packaging.version import Version
 
 from cosmos import cache
 from cosmos.cache import (
@@ -25,6 +27,7 @@ from cosmos.cache import (
     is_cache_package_lockfile_enabled,
 )
 from cosmos.constants import InvocationMode
+from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError
 from cosmos.settings import LINEAGE_NAMESPACE
@@ -42,6 +45,7 @@ if TYPE_CHECKING:
     from airflow.datasets import Dataset  # noqa: F811
     from dbt.cli.main import dbtRunner, dbtRunnerResult
     from openlineage.client.run import RunEvent
+
 
 from sqlalchemy.orm import Session
 
@@ -72,6 +76,8 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
 )
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 logger = get_logger(__name__)
 
@@ -388,7 +394,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     outlets = self.get_datasets("outputs")
                     self.log.info("Inlets: %s", inlets)
                     self.log.info("Outlets: %s", outlets)
-                    self.register_dataset(inlets, outlets)
+                    self.register_dataset(inlets, outlets, context)
 
                 if self.partial_parse and self.cache_dir:
                     partial_parse_file = get_partial_parse_path(tmp_dir_path)
@@ -469,20 +475,26 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             )
         return datasets
 
-    def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset]) -> None:
+    def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset], context: Context) -> None:
         """
         Register a list of datasets as outlets of the current task.
         Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
         """
-        with create_session() as session:
-            self.outlets.extend(new_outlets)
-            self.inlets.extend(new_inlets)
-            for task in self.dag.tasks:
-                if task.task_id == self.task_id:
-                    task.outlets.extend(new_outlets)
-                    task.inlets.extend(new_inlets)
-            DAG.bulk_write_to_db([self.dag], session=session)
-            session.commit()
+        if AIRFLOW_VERSION < Version("2.10"):
+            with create_session() as session:
+                self.outlets.extend(new_outlets)
+                self.inlets.extend(new_inlets)
+                for task in self.dag.tasks:
+                    if task.task_id == self.task_id:
+                        task.outlets.extend(new_outlets)
+                        task.inlets.extend(new_inlets)
+                DAG.bulk_write_to_db([self.dag], session=session)
+                session.commit()
+        else:
+            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
+            for outlet in new_outlets:
+                context["outlet_events"][dataset_alias_name].add(outlet)
+                # TODO: check equivalent to inlets
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """

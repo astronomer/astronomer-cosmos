@@ -7,6 +7,7 @@ from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
+    DbtBuildMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -75,6 +76,17 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBaseOperator, AzureContai
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.environment_variables: dict[str, Any] = {**env_vars, **self.environment_variables}
         self.command: list[str] = dbt_cmd
+
+
+class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+    """
+    Executes a dbt core build command.
+    """
+
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore

@@ -481,6 +481,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
         """
         if AIRFLOW_VERSION < Version("2.10"):
+            logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
                 self.outlets.extend(new_outlets)
                 self.inlets.extend(new_inlets)
@@ -491,6 +492,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 DAG.bulk_write_to_db([self.dag], session=session)
                 session.commit()
         else:
+            logger.info("Assigning inlets/outlets with DatasetAlias")
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
             for outlet in new_outlets:
                 context["outlet_events"][dataset_alias_name].add(outlet)

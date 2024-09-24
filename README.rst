@@ -15,6 +15,10 @@
 
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 
+.. raw:: html
+
+    <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=ac335a8b-a9f3-49e6-9e8e-a7ec614fb794" />
+
 
 ===========================================================
 
@@ -77,3 +81,9 @@ License
 _______
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
+
+
+Privacy Notice
+______________
+
+This project follows `Astronomer's Privacy Policy <https://www.astronomer.io/privacy/>`_

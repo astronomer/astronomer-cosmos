@@ -511,7 +511,13 @@ def test_run_operator_dataset_url_encoded_names(caplog):
 
     run_test_dag(dag)
 
-    assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.%EF%BD%8D%EF%BD%95%EF%BD%8C%EF%BD%94%EF%BD%89%EF%BD%82%EF%BD%99%EF%BD%94%EF%BD%85", extra=None)]
+    assert run_operator.outlets == [
+        Dataset(
+            uri="postgres://0.0.0.0:5432/postgres.public.%EF%BD%8D%EF%BD%95%EF%BD%8C%EF%BD%94%EF%BD%89%EF%BD%82%EF%BD%99%EF%BD%94%EF%BD%85",
+            extra=None,
+        )
+    ]
+
 
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):

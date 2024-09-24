@@ -28,8 +28,8 @@ from cosmos.operators.local import (
 )
 
 if TYPE_CHECKING:
-    from airflow.utils.context import Context
-    from dbt.cli.main import dbtRunnerResult
+    from airflow.utils.context import Context  # pragma: no cover
+    from dbt.cli.main import dbtRunnerResult  # pragma: no cover
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"

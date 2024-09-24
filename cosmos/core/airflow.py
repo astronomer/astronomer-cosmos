@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib
 
 import airflow
@@ -14,7 +16,7 @@ logger = get_logger(__name__)
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 
-def get_airflow_task(task: Task, dag: DAG, task_group: "TaskGroup | None" = None) -> BaseOperator:
+def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) -> BaseOperator:
     """
     Get the Airflow Operator class for a Task.
 

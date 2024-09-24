@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 

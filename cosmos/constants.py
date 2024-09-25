@@ -86,6 +86,7 @@ class ExecutionMode(Enum):
     """
 
     LOCAL = "local"
+    AIRFLOW_ASYNC = "airflow_async"
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     AWS_EKS = "aws_eks"

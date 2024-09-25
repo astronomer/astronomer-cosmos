@@ -8,6 +8,7 @@ import inspect
 import os
 import platform
 import time
+from pathlib import Path
 from typing import Any, Callable
 from warnings import warn
 
@@ -17,11 +18,12 @@ from airflow.utils.task_group import TaskGroup
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode
-from cosmos.dbt.graph import DbtGraph
+from cosmos.constants import DbtResourceType, ExecutionMode
+from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
+from cosmos.settings import dbt_compile_task_id
 
 logger = get_logger(__name__)
 
@@ -291,6 +293,18 @@ class DbtToAirflowConverter:
         )
         if execution_config.execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             task_args["virtualenv_dir"] = execution_config.virtualenv_dir
+
+        if execution_config.execution_mode == ExecutionMode.AIRFLOW_ASYNC:
+            compile_node = DbtNode(
+                unique_id=dbt_compile_task_id,
+                resource_type=DbtResourceType.COMPILE,
+                depends_on=[],
+                file_path=Path(""),
+            )
+            for node_id, node in self.dbt_graph.filtered_nodes.items():
+                if not node.depends_on:
+                    node.depends_on.append(compile_node.unique_id)
+            self.dbt_graph.filtered_nodes[compile_node.unique_id] = compile_node
 
         build_airflow_graph(
             nodes=self.dbt_graph.filtered_nodes,

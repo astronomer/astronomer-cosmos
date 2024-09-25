@@ -74,6 +74,8 @@ class DbtNode:
         The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
         For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
         """
+        if self.resource_type == DbtResourceType.COMPILE:
+            return self.unique_id
         return self.unique_id.split(".", 2)[2]
 
     @property

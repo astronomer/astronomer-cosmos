@@ -20,7 +20,6 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import dbt_compile_task_id
 
 logger = get_logger(__name__)
 
@@ -152,8 +151,11 @@ def create_task_metadata(
         DbtResourceType.SEED: "DbtSeed",
         DbtResourceType.TEST: "DbtTest",
         DbtResourceType.SOURCE: "DbtSource",
+        DbtResourceType.COMPILE: "DbtCompile",
     }
-    args = {**args, **{"models": node.resource_name}}
+
+    if node.resource_type != DbtResourceType.COMPILE:
+        args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context = {"dbt_node_config": node.context_dict}
@@ -178,6 +180,8 @@ def create_task_metadata(
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator")
+        elif node.resource_type == DbtResourceType.COMPILE:
+            task_id = node.name
         else:
             task_id = f"{node.name}_{node.resource_type.value}"
             if use_task_group is True:
@@ -333,22 +337,11 @@ def build_airflow_graph(
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
 
-    if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
-        compile_task_metadata = TaskMetadata(
-            id=dbt_compile_task_id,
-            owner="",  # Set appropriate owner if needed
-            operator_class=f"cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
-            arguments=task_args,
-            extra_context={},
-        )
-        compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=None)
-        tasks_map[dbt_compile_task_id] = compile_airflow_task
-
-    create_airflow_task_dependencies(nodes, tasks_map, execution_mode)
+    create_airflow_task_dependencies(nodes, tasks_map)
 
 
 def create_airflow_task_dependencies(
-    nodes: dict[str, DbtNode], tasks_map: dict[str, Union[TaskGroup, BaseOperator]], execution_mode: ExecutionMode
+    nodes: dict[str, DbtNode], tasks_map: dict[str, Union[TaskGroup, BaseOperator]]
 ) -> None:
     """
     Create the Airflow task dependencies between non-test nodes.
@@ -356,9 +349,6 @@ def create_airflow_task_dependencies(
     :param tasks_map: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
     for node_id, node in nodes.items():
-        if not node.depends_on and execution_mode == ExecutionMode.AIRFLOW_ASYNC:
-            tasks_map[dbt_compile_task_id] >> tasks_map[node_id]
-
         for parent_node_id in node.depends_on:
             # depending on the node type, it will not have mapped 1:1 to tasks_map
             if (node_id in tasks_map) and (parent_node_id in tasks_map):

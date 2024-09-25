@@ -129,6 +129,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore
     Type of dbt node.
     """
 
+    COMPILE = "compile"
     MODEL = "model"
     SNAPSHOT = "snapshot"
     SEED = "seed"

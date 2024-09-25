@@ -207,6 +207,7 @@ class DbtToAirflowConverter:
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
         on_warning_callback: Callable[..., Any] | None = None,
+        async_op_args: dict[str, Any] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -256,6 +257,7 @@ class DbtToAirflowConverter:
             cache_identifier=cache_identifier,
             dbt_vars=dbt_vars,
             airflow_metadata=cache._get_airflow_metadata(dag, task_group),
+            async_op_args=async_op_args,
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
@@ -301,6 +303,7 @@ class DbtToAirflowConverter:
             dbt_project_name=project_config.project_name,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
+            async_op_args=async_op_args,
         )
 
         current_time = time.perf_counter()

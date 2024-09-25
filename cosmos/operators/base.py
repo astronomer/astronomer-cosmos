@@ -110,6 +110,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         dbt_cmd_global_flags: list[str] | None = None,
         cache_dir: Path | None = None,
         extra_context: dict[str, Any] | None = None,
+        # configuration: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -140,6 +141,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
+        # kwargs["configuration"] = {}
         super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:

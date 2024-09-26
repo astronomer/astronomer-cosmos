@@ -77,3 +77,9 @@ License
 _______
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
+
+
+Privacy Notice
+______________
+
+This project follows `Astronomer's Privacy Policy <https://www.astronomer.io/privacy/>`_

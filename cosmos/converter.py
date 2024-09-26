@@ -116,10 +116,9 @@ def validate_initial_user_config(
     :param render_config: Configuration related to how to convert the dbt workflow into an Airflow DAG
     :param operator_args: Arguments to pass to the underlying operators.
     """
-    if profile_config is None and execution_config.execution_mode not in (
-        ExecutionMode.KUBERNETES,
-        ExecutionMode.AWS_EKS,
-        ExecutionMode.DOCKER,
+    if profile_config is None and execution_config.execution_mode in (
+        ExecutionMode.LOCAL,
+        ExecutionMode.VIRTUALENV,
     ):
         raise CosmosValueError(f"The profile_config is mandatory when using {execution_config.execution_mode}")
 

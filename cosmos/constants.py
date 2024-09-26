@@ -91,6 +91,7 @@ class ExecutionMode(Enum):
     AWS_EKS = "aws_eks"
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
+    GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"
 
 
 class InvocationMode(Enum):

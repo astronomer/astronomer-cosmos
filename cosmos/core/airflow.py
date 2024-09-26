@@ -9,7 +9,8 @@ from airflow.utils.task_group import TaskGroup
 from packaging.version import Version
 
 from cosmos.core.graph.entities import Task
-from cosmos.dataset import get_dataset_alias_name
+
+# from cosmos.dataset import get_dataset_alias_name
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -34,23 +35,6 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     task_kwargs = {}
     if task.owner != "":
         task_kwargs["owner"] = task.owner
-
-    if module_name.split(".")[-1] == "local" and AIRFLOW_VERSION >= Version("2.10"):
-        from airflow.datasets import DatasetAlias
-
-        # ignoring the type because older versions of Airflow raise the follow error in mypy
-        # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")  [assignment] Found 1 error in 1 file (checked 3 source files)
-        task_kwargs["outlets"] = [DatasetAlias(name=get_dataset_alias_name(dag, task_group, task.id))]  # type: ignore
-
-    logger.info("HELP ME!!!")
-    logger.info(module_name)
-    logger.info(Operator)
-    logger.info(task.id)
-    logger.info(dag)
-    logger.info(task_group)
-    logger.info(task_kwargs)
-    logger.info({} if class_name == "EmptyOperator" else {"extra_context": task.extra_context})
-    logger.info(task.arguments)
 
     airflow_task = Operator(
         task_id=task.id,

@@ -411,8 +411,10 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) >= version.parse("2.10")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
+    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets(caplog):
@@ -451,6 +453,59 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
+    from airflow.models.dataset import DatasetAliasModel, DatasetModel
+    from sqlalchemy import select
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    dag_run, session = run_test_dag(dag)
+
+    assert session.scalars(select(DatasetModel)).all()
+    assert session.scalars(select(DatasetAliasModel)).all()
+    assert False
+    # assert session == session
+    # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+    # assert dataset_model == 1
+    # dataset_alias_models = dataset_model.aliases  # Aliases associated to the URI.
+
+
+#    session.query(Dataset).filter_by
 
 
 @pytest.mark.skipif(

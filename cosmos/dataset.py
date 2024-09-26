@@ -17,16 +17,17 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
             dag_id = task_group.dag_id
         if task_group.group_id is not None:
             task_group_id = task_group.group_id
+            task_group_id = task_group_id.replace(".", "__")
     elif dag:
         dag_id = dag.dag_id
 
     identifiers_list = []
-    dag_id = dag_id
-    task_group_id = task_group_id
 
     if dag_id:
         identifiers_list.append(dag_id)
     if task_group_id:
-        identifiers_list.append(task_group_id.replace(".", "__"))
+        identifiers_list.append(task_group_id)
+
+    identifiers_list.append(task_id)
 
     return "__".join(identifiers_list)

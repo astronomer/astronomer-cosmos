@@ -132,6 +132,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     def __init__(
         self,
+        task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = False,
@@ -140,6 +141,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
+        self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
         self.compiled_sql = ""
@@ -152,7 +154,19 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self._dbt_runner: dbtRunner | None = None
         if self.invocation_mode:
             self._set_invocation_methods()
-        super().__init__(**kwargs)
+
+        if AIRFLOW_VERSION >= Version("2.10"):
+            from airflow.datasets import DatasetAlias
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            kwargs["outlets"] = [
+                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, task_id))
+            ]  # type: ignore
+
+        super().__init__(task_id=task_id, **kwargs)
 
         # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
         # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
@@ -479,6 +493,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         """
         Register a list of datasets as outlets of the current task.
         Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
+        This works before Airflow 2.10 with a few limitations, as described in the ticket:
+        TODO: add the link to the GH issue related to orphaned nodes
         """
         if AIRFLOW_VERSION < Version("2.10"):
             logger.info("Assigning inlets/outlets without DatasetAlias")

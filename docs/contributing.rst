@@ -115,7 +115,6 @@ To run the integration tests for the first time, use:
 
     export AIRFLOW_HOME=`pwd`
     export AIRFLOW_CONN_AIRFLOW_DB=postgres://postgres:postgres@0.0.0.0:5432/postgres
-    export AIRFLOW_CONN_EXAMPLE_CONN=postgres://postgres:postgres@0.0.0.0:5432/postgres
     export DATABRICKS_HOST=''
     export DATABRICKS_TOKEN=''
     export DATABRICKS_WAREHOUSE_ID=''

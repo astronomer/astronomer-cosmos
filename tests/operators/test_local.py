@@ -489,6 +489,36 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     assert run_operator.outlets == []
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_url_encoded_names(caplog):
+    from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/simple",
+            task_id="run",
+            dbt_cmd_flags=["--models", "ｍｕｌｔｉｂｙｔｅ"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator
+
+    run_test_dag(dag)
+
+    assert run_operator.outlets == [
+        Dataset(
+            uri="postgres://0.0.0.0:5432/postgres.public.%EF%BD%8D%EF%BD%95%EF%BD%8C%EF%BD%94%EF%BD%89%EF%BD%82%EF%BD%99%EF%BD%94%EF%BD%85",
+            extra=None,
+        )
+    ]
+
+
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
     caplog.set_level(logging.DEBUG)

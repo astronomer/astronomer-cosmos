@@ -267,6 +267,7 @@ class DbtToAirflowConverter:
         )
         previous_time = current_time
 
+        # get profile from here
         task_args = {
             **operator_args,
             "project_dir": execution_config.project_path,

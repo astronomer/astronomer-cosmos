@@ -10,6 +10,7 @@ from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+import yaml
 from airflow.version import version as airflow_version
 
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
@@ -285,6 +286,16 @@ class ProfileConfig:
         """Validates a user-supplied profiles.yml is present"""
         if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
+
+    def get_type(self):
+        profile_path = self._get_profile_path()
+
+        with open(profile_path, 'r') as file:
+            profiles = yaml.safe_load(file)
+
+            profile = profiles[self.profile_name]
+            target_type = profile['outputs'][self.target_name]['type']
+            return target_type
 
     def _get_profile_path(self, use_mock_values: bool = False) -> Path:
         """

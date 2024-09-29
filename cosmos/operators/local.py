@@ -65,6 +65,7 @@ from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCompileMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -949,3 +950,9 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
         raise DeprecationWarning(
             "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )
+
+
+class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs["should_upload_compiled_sql"] = True
+        super().__init__(*args, **kwargs)

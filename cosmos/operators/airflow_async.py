@@ -1,7 +1,5 @@
 from typing import Any
 
-from airflow.utils.context import Context
-
 from cosmos.operators.base import DbtCompileMixin
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -86,6 +84,3 @@ class DbtCompileAirflowAsyncOperator(DbtCompileMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["should_upload_compiled_sql"] = True
         super().__init__(*args, **kwargs)
-
-    def execute(self, context: Context) -> None:
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())

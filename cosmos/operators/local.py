@@ -256,10 +256,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
     @staticmethod
-    def _configure_remote_target_path() -> Path | None:
+    def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
         """Configure the remote target path if it is provided."""
         if not remote_target_path:
-            return None
+            return None, None
 
         _configured_target_path = None
 
@@ -270,7 +270,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             target_path_schema = target_path_str.split("://")[0]
             remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
         if remote_conn_id is None:
-            return _configured_target_path
+            return None, None
 
         if not AIRFLOW_IO_AVAILABLE:
             raise CosmosValueError(
@@ -286,7 +286,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
             _configured_target_path.mkdir(parents=True, exist_ok=True)
 
-        return _configured_target_path
+        return _configured_target_path, remote_conn_id
 
     def upload_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -295,7 +295,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         if not self.should_upload_compiled_sql:
             return
 
-        dest_target_dir = self._configure_remote_target_path()
+        dest_target_dir, dest_conn_id = self._configure_remote_target_path()
         if not dest_target_dir:
             raise CosmosValueError(
                 "You're trying to upload compiled SQL files, but the remote target path is not configured. "
@@ -303,9 +303,18 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         from airflow.io.path import ObjectStoragePath
 
-        source_target_dir = ObjectStoragePath(Path(tmp_project_dir) / "target" / "compiled")
+        source_compiled_dir = Path(tmp_project_dir) / "target" / "compiled"
+        files = [str(file) for file in source_compiled_dir.rglob("*") if file.is_file()]
 
-        source_target_dir.copy(dest_target_dir, recursive=True)  # type: ignore[arg-type]
+        for file_path in files:
+            rel_path = os.path.relpath(file_path, source_compiled_dir)
+
+            dest_path = ObjectStoragePath(
+                f"{str(dest_target_dir).rstrip('/')}/{context['dag'].dag_id}/{rel_path.lstrip('/')}",
+                conn_id=dest_conn_id,
+            )
+            ObjectStoragePath(file_path).copy(dest_path)
+            self.log.debug("Copied %s to %s", file_path, dest_path)
 
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:

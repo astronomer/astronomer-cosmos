@@ -253,6 +253,30 @@ def generate_task_or_group(
     return task_or_group
 
 
+def _add_dbt_compile_task(
+    nodes: dict[str, DbtNode],
+    dag: DAG,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+) -> None:
+    if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
+        return
+
+    compile_task_metadata = TaskMetadata(
+        id=dbt_compile_task_id,
+        operator_class=f"cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
+        arguments=task_args,
+        extra_context={},
+    )
+    compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=None)
+    tasks_map[dbt_compile_task_id] = compile_airflow_task
+
+    for node_id, node in nodes.items():
+        if not node.depends_on and node_id in tasks_map:
+            tasks_map[dbt_compile_task_id] >> tasks_map[node_id]
+
+
 def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
@@ -333,22 +357,14 @@ def build_airflow_graph(
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
 
-    if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
-        compile_task_metadata = TaskMetadata(
-            id=dbt_compile_task_id,
-            owner="",  # Set appropriate owner if needed
-            operator_class=f"cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
-            arguments=task_args,
-            extra_context={},
-        )
-        compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=None)
-        tasks_map[dbt_compile_task_id] = compile_airflow_task
+    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map)
 
-    create_airflow_task_dependencies(nodes, tasks_map, execution_mode)
+    create_airflow_task_dependencies(nodes, tasks_map)
 
 
 def create_airflow_task_dependencies(
-    nodes: dict[str, DbtNode], tasks_map: dict[str, Union[TaskGroup, BaseOperator]], execution_mode: ExecutionMode
+    nodes: dict[str, DbtNode],
+    tasks_map: dict[str, Union[TaskGroup, BaseOperator]],
 ) -> None:
     """
     Create the Airflow task dependencies between non-test nodes.
@@ -356,9 +372,6 @@ def create_airflow_task_dependencies(
     :param tasks_map: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
     for node_id, node in nodes.items():
-        if not node.depends_on and execution_mode == ExecutionMode.AIRFLOW_ASYNC:
-            tasks_map[dbt_compile_task_id] >> tasks_map[node_id]
-
         for parent_node_id in node.depends_on:
             # depending on the node type, it will not have mapped 1:1 to tasks_map
             if (node_id in tasks_map) and (parent_node_id in tasks_map):

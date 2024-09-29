@@ -33,4 +33,5 @@ simple_dag_async = DbtDag(
     catchup=False,
     dag_id="simple_dag_async",
     tags=["simple"],
+    operator_args={"install_deps": True},
 )

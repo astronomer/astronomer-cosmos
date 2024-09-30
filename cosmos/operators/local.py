@@ -310,6 +310,28 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         return _configured_target_path, remote_conn_id
 
+    def _construct_dest_file_path(
+        self, dest_target_dir: Path, file_path: str, source_compiled_dir: Path, context: Context
+    ) -> str:
+        """
+        Construct the destination path for the compiled SQL files to be uploaded to the remote store.
+        """
+        dest_target_dir_str = str(dest_target_dir).rstrip("/")
+
+        task = context["task"]
+        dag_id = task.dag_id
+        task_group_id = task.task_group.group_id if task.task_group else None
+        identifiers_list = []
+        if dag_id:
+            identifiers_list.append(dag_id)
+        if task_group_id:
+            identifiers_list.append(task_group_id)
+        dag_task_group_identifier = "__".join(identifiers_list)
+
+        rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
+
+        return f"{dest_target_dir_str}/{dag_task_group_identifier}/compiled/{rel_path}"
+
     def upload_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
         """
         Uploads the compiled SQL files from the dbt compile output to the remote store.
@@ -327,16 +349,11 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         source_compiled_dir = Path(tmp_project_dir) / "target" / "compiled"
         files = [str(file) for file in source_compiled_dir.rglob("*") if file.is_file()]
-
         for file_path in files:
-            rel_path = os.path.relpath(file_path, source_compiled_dir)
-
-            dest_path = ObjectStoragePath(
-                f"{str(dest_target_dir).rstrip('/')}/{context['dag'].dag_id}/{rel_path.lstrip('/')}",
-                conn_id=dest_conn_id,
-            )
-            ObjectStoragePath(file_path).copy(dest_path)
-            self.log.debug("Copied %s to %s", file_path, dest_path)
+            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, context)
+            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
+            ObjectStoragePath(file_path).copy(dest_object_storage_path)
+            self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:

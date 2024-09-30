@@ -259,6 +259,7 @@ def _add_dbt_compile_task(
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
+    task_group: TaskGroup | None,
 ) -> None:
     if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
         return
@@ -269,7 +270,7 @@ def _add_dbt_compile_task(
         arguments=task_args,
         extra_context={},
     )
-    compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=None)
+    compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=task_group)
     tasks_map[DBT_COMPILE_TASK_ID] = compile_airflow_task
 
     for node_id, node in nodes.items():
@@ -357,7 +358,7 @@ def build_airflow_graph(
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
 
-    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map)
+    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
 
     create_airflow_task_dependencies(nodes, tasks_map)
 

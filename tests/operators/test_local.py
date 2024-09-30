@@ -1241,6 +1241,7 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
         task_id="fake-task",
         profile_config=profile_config,
         project_dir="fake-dir",
+        dag=DAG("test_dag", start_date=datetime(2024, 4, 16)),
     )
 
     mock_configure_remote.return_value = ("mock_remote_path", "mock_conn_id")
@@ -1259,12 +1260,10 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
     files = [file1, file2]
 
     with patch.object(Path, "rglob", return_value=files):
-        context = {"dag": MagicMock(dag_id="test_dag")}
-
-        operator.upload_compiled_sql(tmp_project_dir, context)
+        operator.upload_compiled_sql(tmp_project_dir, context={"task": operator})
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
-            expected_dest_path = f"mock_remote_path/test_dag/{rel_path.lstrip('/')}"
+            expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
             mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)

@@ -287,9 +287,9 @@ class ProfileConfig:
         if self.profiles_yml_filepath and not Path(self.profiles_yml_filepath).exists():
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
-    def get_profile_type(self):
-        if self.profile_mapping.dbt_profile_type:
-            return self.profile_mapping.dbt_profile_type
+    def get_profile_type(self) -> str:
+        if self.profile_mapping is not None and hasattr(self.profile_mapping, "dbt_profile_type"):
+            return str(self.profile_mapping.dbt_profile_type)
 
         profile_path = self._get_profile_path()
 
@@ -298,7 +298,9 @@ class ProfileConfig:
 
             profile = profiles[self.profile_name]
             target_type = profile["outputs"][self.target_name]["type"]
-            return target_type
+            return str(target_type)
+
+        return "undefined"
 
     def _get_profile_path(self, use_mock_values: bool = False) -> Path:
         """

@@ -1147,7 +1147,7 @@ def test_dbt_compile_local_operator_initialisation():
 
 
 @patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
-@patch("cosmos.operators.local.AIRFLOW_IO_AVAILABLE", new=False)
+@patch("cosmos.settings.AIRFLOW_IO_AVAILABLE", new=False)
 def test_configure_remote_target_path_object_storage_unavailable_on_earlier_airflow_versions():
     operator = DbtCompileLocalOperator(
         task_id="fake-task",

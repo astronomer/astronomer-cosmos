@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from airflow.io.path import ObjectStoragePath
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.context import Context
 
+from cosmos import settings
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -43,22 +43,22 @@ class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
     pass
 
 
-class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  #
-    def __init__(self, *args, full_refresh: bool = False, **kwargs):
+class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
+    def __init__(self, *args, full_refresh: bool = False, **kwargs):  # type: ignore
         # dbt task param
         self.profile_config = kwargs.get("profile_config")
         self.project_dir = kwargs.get("project_dir")
         self.file_path = kwargs.get("extra_context", {}).get("dbt_node_config", {}).get("file_path")
-        self.profile_type = self.profile_config.get_profile_type()
+        self.profile_type: str = self.profile_config.get_profile_type()  # type: ignore
         self.full_refresh = full_refresh
 
         # airflow task param
         self.async_op_args = kwargs.pop("async_op_args", {})
-        self.configuration = {}
+        self.configuration: dict[str, object] = {}
         self.job_id = self.async_op_args.get("job_id", "")
         self.impersonation_chain = self.async_op_args.get("impersonation_chain", "")
         self.gcp_project = self.async_op_args.get("project_id", "astronomer-dag-authoring")
-        self.gcp_conn_id = self.profile_config.profile_mapping.conn_id
+        self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
         self.dataset = self.async_op_args.get("dataset", "my_dataset")
         self.location = self.async_op_args.get("location", "US")
         self.async_op_args["deferrable"] = True
@@ -67,9 +67,13 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  #
         super().__init__(*args, configuration=self.configuration, task_id=kwargs.get("task_id"), **self.async_op_args)
 
         if self.profile_type not in _SUPPORTED_DATABASES:
-            raise f"Async run are only supported: {_SUPPORTED_DATABASES}"
+            raise CosmosValueError(f"Async run are only supported: {_SUPPORTED_DATABASES}")
 
-    def get_remote_sql(self):
+    def get_remote_sql(self) -> str:
+        if not settings.AIRFLOW_IO_AVAILABLE:
+            raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
+        from airflow.io.path import ObjectStoragePath
+
         if not self.file_path or not self.project_dir:
             raise CosmosValueError("file_path and project_dir are required to be set on the task for async execution")
         project_dir_parent = str(self.project_dir.parent)
@@ -78,10 +82,10 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  #
 
         print("remote_model_path: ", remote_model_path)
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
-        with object_storage_path.open() as fp:
-            return fp.read()
+        with object_storage_path.open() as fp:  # type: ignore
+            return fp.read()  # type: ignore
 
-    def drop_table_sql(self):
+    def drop_table_sql(self) -> None:
         model_name = self.task_id.split(".")[0]
         sql = f"DROP TABLE IF EXISTS {self.gcp_project}.{self.dataset}.{model_name};"
         hook = BigQueryHook(
@@ -113,7 +117,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  #
                     "useLegacySql": False,
                 }
             }
-            super().execute(context)
+            return super().execute(context)
 
 
 class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):

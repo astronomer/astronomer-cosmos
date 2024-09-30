@@ -573,6 +573,7 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.integration
+@patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names(caplog):
     from airflow.datasets import Dataset
 

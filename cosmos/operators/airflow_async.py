@@ -126,4 +126,3 @@ class DbtRunOperationAirflowAsyncOperator(DbtRunOperationLocalOperator):
 
 class DbtCompileAirflowAsyncOperator(DbtCompileLocalOperator):
     pass
-

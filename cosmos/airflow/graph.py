@@ -21,7 +21,6 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import dbt_compile_task_id
 
 logger = get_logger(__name__)
 

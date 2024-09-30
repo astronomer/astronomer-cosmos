@@ -31,7 +31,6 @@ from cosmos.constants import (
 from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from cosmos.settings import dbt_compile_task_id
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))

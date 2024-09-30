@@ -493,10 +493,14 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         Register a list of datasets as outlets of the current task, when possible.
 
         Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
-        This works before Airflow 2.10 with a few limitations, as described in the ticket:
+        This works in Cosmos with versions before Airflow 2.10 with a few limitations, as described in the ticket:
         https://github.com/astronomer/astronomer-cosmos/issues/522
 
-        In Airflow 2.10.0 and 2.10.1, we are not able to test Airflow DAGs powered with DatasetAlias.
+        Since Airflow 2.10, Cosmos uses DatasetAlias by default, to generate datasets. This resolved the limitations
+        described before.
+
+        The only limitation is that with Airflow 2.10.0 and 2.10.1, the `airflow dags test` command will not work
+        with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
         if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:

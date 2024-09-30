@@ -12,7 +12,7 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 5. **aws_eks**: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos (requires a pre-existing Docker image)
 6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 7. **gcp_cloud_run_job**: Run ``dbt`` commands from GCP Cloud Run Job instances managed by Cosmos (requires a pre-existing Docker image)
-8. **airflow_async**: (Introduced since Cosmos 1.7.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
+8. **airflow_async**: (Experimental and introduced since Cosmos 1.7.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -243,25 +243,27 @@ Each task will create a new Cloud Run Job execution, giving full isolation. The 
         },
     )
 
-Airflow Async
--------------
+
+Airflow Async (experimental)
+----------------------------
 
 .. versionadded:: 1.7.0
 
-(**Experimental**)
 
-The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+(**Experimental**) The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
 `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 This execution mode could be preferred when you've long running resources and you want to run them asynchronously by
 leveraging Airflow's deferrable operators. With that, you would be able to potentially observe higher throughput of tasks
 as more dbt nodes will be run in parallel since they won't be blocking Airflow's worker slots.
 
-In this mode, Cosmos adds a new operator, ``DbtCompileAirflowAsyncOperator``, as a root task in the DAG. The task runs
+In this mode, Cosmos adds a new operator, ``DbtCompileAirflowAsyncOperator``, as a root task in the DbtDag or DbtTaskGroup. The task runs
 the ``dbt compile`` command on your dbt project which then outputs compiled SQLs in the project's target directory.
 As part of the same task run, these compiled SQLs are then stored remotely to a remote path set using the
 :ref:`remote_target_path` configuration. The remote path is then used by the subsequent tasks in the DAG to
 fetch (from the remote path) and run the compiled SQLs asynchronously using e.g. the ``DbtRunAirflowAsyncOperator``.
-You may observe that the compile task takes a bit longer to run due to the latency of storing the compiled SQLs remotely,
+You may observe that the compile task takes a bit longer to run due to the latency of storing the compiled SQLs
+remotely (e.g. for the classic ``jaffle_shop`` dbt project, upon compiling it produces about 31 files measuring about 124KB in total, but on a local
+machine it took approximately 25 seconds for the task to compile & upload the compiled SQLs to the remote path).,
 however, it is still a win as it is one-time overhead and the subsequent tasks run asynchronously utilising the Airflow's
 deferrable operators and supplying to them those compiled SQLs.
 
@@ -269,6 +271,7 @@ Note that currently, the ``airflow_async`` execution mode has the following limi
 
 1. Only supports the ``dbt resource type`` models to be run asynchronously using Airflow deferrable operators. All other resources are executed synchronously using dbt commands as they are in the ``local`` execution mode.
 2. Only supports BigQuery as the target database. If a profile target other than BigQuery is specified, Cosmos will error out saying that the target database is not supported with this execution mode.
+3. Only works for ``full_refresh`` models. There is pending work to support other modes.
 
 Example DAG:
 

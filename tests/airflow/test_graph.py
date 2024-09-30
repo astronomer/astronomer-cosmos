@@ -21,6 +21,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
+    DBT_COMPILE_TASK_ID,
     DbtResourceType,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -258,8 +259,8 @@ def test_build_airflow_graph_with_dbt_compile_task():
         )
 
     task_ids = [task.task_id for task in dag.tasks]
-    assert dbt_compile_task_id in task_ids
-    assert dbt_compile_task_id in dag.tasks[0].upstream_task_ids
+    assert DBT_COMPILE_TASK_ID in task_ids
+    assert DBT_COMPILE_TASK_ID in dag.tasks[0].upstream_task_ids
 
 
 def test_calculate_operator_class():

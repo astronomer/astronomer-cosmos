@@ -18,6 +18,7 @@ from cosmos.constants import (
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache = conf.getboolean("cosmos", "enable_cache", fallback=True)
+enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
 enable_cache_partial_parse = conf.getboolean("cosmos", "enable_cache_partial_parse", fallback=True)
 enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_lockfile", fallback=True)
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
@@ -33,8 +34,6 @@ virtualenv_max_retries_lock = conf.getint("cosmos", "virtualenv_max_retries_lock
 # This will be merged with the `cache_dir` config parameter in upcoming releases.
 remote_cache_dir = conf.get("cosmos", "remote_cache_dir", fallback=None)
 remote_cache_dir_conn_id = conf.get("cosmos", "remote_cache_dir_conn_id", fallback=None)
-
-dbt_compile_task_id = conf.get("cosmos", "dbt_compile_task_id", fallback="dbt_compile")
 remote_target_path = conf.get("cosmos", "remote_target_path", fallback=None)
 remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fallback=None)
 

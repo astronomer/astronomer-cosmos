@@ -11,12 +11,6 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtCompileLocalOperator,
-    DbtDepsLocalOperator,
-    DbtDocsAzureStorageLocalOperator,
-    DbtDocsCloudLocalOperator,
-    DbtDocsGCSLocalOperator,
-    DbtDocsLocalOperator,
-    DbtDocsS3LocalOperator,
     DbtLSLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
@@ -130,29 +124,6 @@ class DbtRunOperationAirflowAsyncOperator(DbtRunOperationLocalOperator):
     pass
 
 
-class DbtDocsAirflowAsyncOperator(DbtDocsLocalOperator):
-    pass
-
-
-class DbtDocsCloudAirflowAsyncOperator(DbtDocsCloudLocalOperator):
-    pass
-
-
-class DbtDocsS3AirflowAsyncOperator(DbtDocsS3LocalOperator):
-    pass
-
-
-class DbtDocsAzureStorageAirflowAsyncOperator(DbtDocsAzureStorageLocalOperator):
-    pass
-
-
-class DbtDocsGCSAirflowAsyncOperator(DbtDocsGCSLocalOperator):
-    pass
-
-
 class DbtCompileAirflowAsyncOperator(DbtCompileLocalOperator):
     pass
 
-
-class DbtDepsAirflowAsyncOperator(DbtDepsLocalOperator):
-    pass

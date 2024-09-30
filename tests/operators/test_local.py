@@ -414,8 +414,10 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) >= version.parse("2.10")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
+    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets(caplog):
@@ -454,6 +456,82 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
     assert test_operator.outlets == []
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
+    from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False,
+    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+        dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
+
+
+@patch("cosmos.settings.enable_dataset_alias", 0)
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
+    with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+    assert run_operator.outlets == []
 
 
 @pytest.mark.skipif(
@@ -498,6 +576,7 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.integration
+@patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names(caplog):
     from airflow.datasets import Dataset
 
@@ -1162,6 +1241,7 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
         task_id="fake-task",
         profile_config=profile_config,
         project_dir="fake-dir",
+        dag=DAG("test_dag", start_date=datetime(2024, 4, 16)),
     )
 
     mock_configure_remote.return_value = ("mock_remote_path", "mock_conn_id")
@@ -1180,12 +1260,10 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
     files = [file1, file2]
 
     with patch.object(Path, "rglob", return_value=files):
-        context = {"dag": MagicMock(dag_id="test_dag")}
-
-        operator.upload_compiled_sql(tmp_project_dir, context)
+        operator.upload_compiled_sql(tmp_project_dir, context={"task": operator})
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
-            expected_dest_path = f"mock_remote_path/test_dag/{rel_path.lstrip('/')}"
+            expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
             mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)

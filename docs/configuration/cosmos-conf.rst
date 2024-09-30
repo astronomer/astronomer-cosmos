@@ -133,7 +133,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     remotely copy & store in the files generated and stored by dbt in the dbt project's target directory. The value
     for the remote target path can be any of the schemes that are supported by the
     `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
-    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
+    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/target_dir/``, ``gs://your_gs_bucket/target_dir/``,
     ``abfs://your_azure_container/cache_dir``, etc.)
 
     - Default: ``None``

@@ -166,6 +166,40 @@ except ImportError:
     DbtTestAwsEksOperator = MissingPackage("cosmos.operators.azure_container_instance.DbtTestAwsEksOperator", "aws_eks")
 
 
+try:
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtBuildGcpCloudRunJobOperator,
+        DbtLSGcpCloudRunJobOperator,
+        DbtRunGcpCloudRunJobOperator,
+        DbtRunOperationGcpCloudRunJobOperator,
+        DbtSeedGcpCloudRunJobOperator,
+        DbtSnapshotGcpCloudRunJobOperator,
+        DbtTestGcpCloudRunJobOperator,
+    )
+except (ImportError, AttributeError):
+    DbtBuildGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtBuildGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+    DbtLSGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtLSGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+    DbtRunGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtRunGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+    DbtRunOperationGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtRunOperationGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+    DbtSeedGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtSeedGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+    DbtSnapshotGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtSnapshotGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+    DbtTestGcpCloudRunJobOperator = MissingPackage(
+        "cosmos.operators.gcp_cloud_run_job.DbtTestGcpCloudRunJobOperator", "gcp-cloud-run-job"
+    )
+
+
 __all__ = [
     "ProjectConfig",
     "ProfileConfig",
@@ -221,6 +255,14 @@ __all__ = [
     "DbtSeedAwsEksOperator",
     "DbtSnapshotAwsEksOperator",
     "DbtTestAwsEksOperator",
+    # GCP Cloud Run Job Execution Mode
+    "DbtBuildGcpCloudRunJobOperator",
+    "DbtLSGcpCloudRunJobOperator",
+    "DbtRunGcpCloudRunJobOperator",
+    "DbtRunOperationGcpCloudRunJobOperator",
+    "DbtSeedGcpCloudRunJobOperator",
+    "DbtSnapshotGcpCloudRunJobOperator",
+    "DbtTestGcpCloudRunJobOperator",
 ]
 
 """

@@ -429,3 +429,12 @@ class DbtRunOperationMixin:
             flags.append("--args")
             flags.append(yaml.dump(self.args))
         return flags
+
+
+class DbtCompileMixin:
+    """
+    Mixin for dbt compile command.
+    """
+
+    base_cmd = ["compile"]
+    ui_color = "#877c7c"

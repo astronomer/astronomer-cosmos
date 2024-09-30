@@ -11,12 +11,14 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 4. **kubernetes**: Run ``dbt`` commands from Kubernetes Pods managed by Cosmos (requires a pre-existing Docker image)
 5. **aws_eks**: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos (requires a pre-existing Docker image)
 6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
+7. **gcp_cloud_run_job**: Run ``dbt`` commands from GCP Cloud Run Job instances managed by Cosmos (requires a pre-existing Docker image)
+8. **airflow_async**: (Experimental and introduced since Cosmos 1.7.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
 
 .. list-table:: Execution Modes Comparison
-   :widths: 20 20 20 20 20
+   :widths: 25 25 25 25
    :header-rows: 1
 
    * - Execution Mode
@@ -47,6 +49,14 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - Slow
      - High
      - No
+   * - GCP Cloud Run Job Instance
+     - Slow
+     - High
+     - No
+   * - Airflow Async
+     - Medium
+     - None
+     - Yes
 
 Local
 -----
@@ -209,6 +219,65 @@ Each task will create a new container on Azure, giving full isolation. This, how
         },
     )
 
+GCP Cloud Run Job
+------------------------
+.. versionadded:: 1.7
+The ``gcp_cloud_run_job`` execution mode is particularly useful for users who prefer to run their ``dbt`` commands on Google Cloud infrastructure, taking advantage of Cloud Run's scalability, isolation, and managed service capabilities.
+
+For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://cloud.google.com/run/docs/create-jobs>`__ .
+
+This execution mode allows users to run ``dbt`` core CLI commands in a Google Cloud Run Job instance. This mode leverages the ``CloudRunExecuteJobOperator`` from the Google Cloud Airflow provider to execute commands within a Cloud Run Job instance, where ``dbt`` is already installed. Similarly to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+
+Each task will create a new Cloud Run Job execution, giving full isolation. The separation of tasks adds extra overhead; however, that can be mitigated by using the ``concurrency`` parameter in ``DbtDag``, which will result in parallelized execution of ``dbt`` models.
+
+
+.. code-block:: python
+
+    gcp_cloud_run_job_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.GCP_CLOUD_RUN_JOB),
+        operator_args={
+            "project_id": "my-gcp-project-id",
+            "region": "europe-west1",
+            "job_name": "my-crj-{{ ti.task_id.replace('.','-').replace('_','-') }}",
+        },
+    )
+
+Airflow Async (experimental)
+----------------------------
+
+.. versionadded:: 1.7.0
+
+
+(**Experimental**) The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+`Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
+This execution mode could be preferred when you've long running resources and you want to run them asynchronously by
+leveraging Airflow's deferrable operators. With that, you would be able to potentially observe higher throughput of tasks
+as more dbt nodes will be run in parallel since they won't be blocking Airflow's worker slots.
+
+In this mode, Cosmos adds a new operator, ``DbtCompileAirflowAsyncOperator``, as a root task in the DbtDag or DbtTaskGroup. The task runs
+the ``dbt compile`` command on your dbt project which then outputs compiled SQLs in the project's target directory.
+As part of the same task run, these compiled SQLs are then stored remotely to a remote path set using the
+:ref:`remote_target_path` configuration. The remote path is then used by the subsequent tasks in the DAG to
+fetch (from the remote path) and run the compiled SQLs asynchronously using e.g. the ``DbtRunAirflowAsyncOperator``.
+You may observe that the compile task takes a bit longer to run due to the latency of storing the compiled SQLs
+remotely (e.g. for the classic ``jaffle_shop`` dbt project, upon compiling it produces about 31 files measuring about 124KB in total, but on a local
+machine it took approximately 25 seconds for the task to compile & upload the compiled SQLs to the remote path).,
+however, it is still a win as it is one-time overhead and the subsequent tasks run asynchronously utilising the Airflow's
+deferrable operators and supplying to them those compiled SQLs.
+
+Note that currently, the ``airflow_async`` execution mode has the following limitations and is released as Experimental:
+
+1. Only supports the ``dbt resource type`` models to be run asynchronously using Airflow deferrable operators. All other resources are executed synchronously using dbt commands as they are in the ``local`` execution mode.
+2. Only supports BigQuery as the target database. If a profile target other than BigQuery is specified, Cosmos will error out saying that the target database is not supported with this execution mode.
+3. Only works for ``full_refresh`` models. There is pending work to support other modes.
+
+Example DAG:
+
+.. literalinclude:: ../../dev/dags/simple_dag_async.py
+   :language: python
+   :start-after: [START airflow_async_execution_mode_example]
+   :end-before: [END airflow_async_execution_mode_example]
 
 .. _invocation_modes:
 Invocation Modes

@@ -8,6 +8,7 @@ from airflow.utils.context import Context
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCompileMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -143,6 +144,7 @@ def test_dbt_base_operator_context_merge(
         ("seed", DbtSeedMixin),
         ("run", DbtRunMixin),
         ("build", DbtBuildMixin),
+        ("compile", DbtCompileMixin),
     ],
 )
 def test_dbt_mixin_base_cmd(dbt_command, dbt_operator_class):

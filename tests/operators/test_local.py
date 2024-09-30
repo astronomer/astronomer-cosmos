@@ -25,9 +25,11 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
+from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
+    DbtCompileLocalOperator,
     DbtDocsAzureStorageLocalOperator,
     DbtDocsGCSLocalOperator,
     DbtDocsLocalOperator,
@@ -42,6 +44,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
 from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
@@ -411,8 +414,10 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) >= version.parse("2.10")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
+    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets(caplog):
@@ -454,6 +459,82 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 
 
 @pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
+    from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False,
+    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+        dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
+
+
+@patch("cosmos.settings.enable_dataset_alias", 0)
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
+    with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+    assert run_operator.outlets == []
+
+
+@pytest.mark.skipif(
     version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
     # https://github.com/apache/airflow/issues/39486
@@ -487,6 +568,37 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
 
     assert run_operator.inlets == []
     assert run_operator.outlets == []
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+)
+@pytest.mark.integration
+@patch("cosmos.settings.enable_dataset_alias", 0)
+def test_run_operator_dataset_url_encoded_names(caplog):
+    from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/simple",
+            task_id="run",
+            dbt_cmd_flags=["--models", "ｍｕｌｔｉｂｙｔｅ"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator
+
+    run_test_dag(dag)
+
+    assert run_operator.outlets == [
+        Dataset(
+            uri="postgres://0.0.0.0:5432/postgres.public.%EF%BD%8D%EF%BD%95%EF%BD%8C%EF%BD%94%EF%BD%89%EF%BD%82%EF%BD%99%EF%BD%94%EF%BD%85",
+            extra=None,
+        )
+    ]
 
 
 @pytest.mark.integration
@@ -1022,3 +1134,136 @@ def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == ""
+
+
+def test_dbt_compile_local_operator_initialisation():
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+    assert operator.should_upload_compiled_sql is True
+    assert "compile" in operator.base_cmd
+
+
+@patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
+@patch("cosmos.operators.local.AIRFLOW_IO_AVAILABLE", new=False)
+def test_configure_remote_target_path_object_storage_unavailable_on_earlier_airflow_versions():
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
+        operator._configure_remote_target_path()
+
+
+@pytest.mark.parametrize(
+    "rem_target_path, rem_target_path_conn_id",
+    [
+        (None, "aws_s3_conn"),
+        ("unknown://some-bucket/cache", None),
+    ],
+)
+def test_config_remote_target_path_unset_settings(rem_target_path, rem_target_path_conn_id):
+    with patch("cosmos.operators.local.remote_target_path", new=rem_target_path):
+        with patch("cosmos.operators.local.remote_target_path_conn_id", new=rem_target_path_conn_id):
+            operator = DbtCompileLocalOperator(
+                task_id="fake-task",
+                profile_config=profile_config,
+                project_dir="fake-dir",
+            )
+            target_path, target_conn = operator._configure_remote_target_path()
+        assert target_path is None
+        assert target_conn is None
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
+@patch("cosmos.operators.local.remote_target_path_conn_id", new="aws_s3_conn")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_configure_remote_target_path(mock_object_storage_path):
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+    mock_remote_path = MagicMock()
+    mock_object_storage_path.return_value.exists.return_value = True
+    mock_object_storage_path.return_value = mock_remote_path
+    target_path, target_conn = operator._configure_remote_target_path()
+    assert target_path == mock_remote_path
+    assert target_conn == "aws_s3_conn"
+    mock_object_storage_path.assert_called_with("s3://some-bucket/target", conn_id="aws_s3_conn")
+
+    mock_object_storage_path.return_value.exists.return_value = False
+    mock_object_storage_path.return_value.mkdir.return_value = MagicMock()
+    _, _ = operator._configure_remote_target_path()
+    mock_object_storage_path.return_value.mkdir.assert_called_with(parents=True, exist_ok=True)
+
+
+@patch.object(DbtLocalBaseOperator, "_configure_remote_target_path")
+def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target_path):
+    operator = DbtSeedLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+    assert operator.should_upload_compiled_sql is False
+    operator.upload_compiled_sql("fake-dir", MagicMock())
+    mock_configure_remote_target_path.assert_not_called()
+
+
+@patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
+def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+
+    mock_configure_remote.return_value = (None, None)
+
+    tmp_project_dir = "/fake/tmp/project"
+    context = {"dag": MagicMock(dag_id="test_dag")}
+
+    with pytest.raises(CosmosValueError, match="remote target path is not configured"):
+        operator.upload_compiled_sql(tmp_project_dir, context)
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("airflow.io.path.ObjectStoragePath.copy")
+@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
+def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_storage_path, mock_copy):
+    """Test upload_compiled_sql when should_upload_compiled_sql is True and uploads files."""
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+        dag=DAG("test_dag", start_date=datetime(2024, 4, 16)),
+    )
+
+    mock_configure_remote.return_value = ("mock_remote_path", "mock_conn_id")
+
+    tmp_project_dir = "/fake/tmp/project"
+    source_compiled_dir = Path(tmp_project_dir) / "target" / "compiled"
+
+    file1 = MagicMock(spec=Path)
+    file1.is_file.return_value = True
+    file1.__str__.return_value = str(source_compiled_dir / "file1.sql")
+
+    file2 = MagicMock(spec=Path)
+    file2.is_file.return_value = True
+    file2.__str__.return_value = str(source_compiled_dir / "file2.sql")
+
+    files = [file1, file2]
+
+    with patch.object(Path, "rglob", return_value=files):
+        operator.upload_compiled_sql(tmp_project_dir, context={"task": operator})
+
+        for file_path in files:
+            rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
+            expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
+            mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
+            mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)

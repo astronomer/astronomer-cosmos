@@ -18,6 +18,7 @@ profile_config = ProfileConfig(
     ),
 )
 
+# [START airflow_async_execution_mode_example]
 simple_dag_async = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
@@ -35,3 +36,4 @@ simple_dag_async = DbtDag(
     tags=["simple"],
     operator_args={"install_deps": True},
 )
+# [END airflow_async_execution_mode_example]

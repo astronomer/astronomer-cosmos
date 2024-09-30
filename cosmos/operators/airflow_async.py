@@ -54,6 +54,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  #
         # dbt task param
         self.profile_config = kwargs.get("profile_config")
         self.project_dir = kwargs.get("project_dir")
+        self.file_path = kwargs.get("extra_context", {}).get("dbt_node_config", {}).get("file_path")
         self.profile_type = self.profile_config.get_profile_type()
         self.full_refresh = full_refresh
 
@@ -75,12 +76,11 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  #
             raise f"Async run are only supported: {_SUPPORTED_DATABASES}"
 
     def get_remote_sql(self):
-        project_name = str(self.project_dir).split("/")[-1]
-        model_name: str = self.task_id.split(".")[0]
-        if model_name.startswith("stg_"):
-            remote_model_path = f"{remote_target_path}/{self.dag_id}/{project_name}/models/staging/{model_name}.sql"
-        else:
-            remote_model_path = f"{remote_target_path}/{self.dag_id}/{project_name}/models/{model_name}.sql"
+        if not self.file_path or not self.project_dir:
+            raise CosmosValueError("file_path and project_dir are required to be set on the task for async execution")
+        project_dir_parent = str(self.project_dir.parent)
+        relative_file_path = str(self.file_path).replace(project_dir_parent, "").lstrip("/")
+        remote_model_path = f"{str(remote_target_path).rstrip('/')}/{self.dag_id}/{relative_file_path}"
 
         print("remote_model_path: ", remote_model_path)
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)

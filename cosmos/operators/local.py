@@ -291,7 +291,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         return _configured_target_path, remote_conn_id
 
-
     def upload_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
         """
         Uploads the compiled SQL files from the dbt compile output to the remote store.

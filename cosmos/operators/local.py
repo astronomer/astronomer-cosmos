@@ -32,7 +32,7 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosValueError
-from cosmos.settings import AIRFLOW_IO_AVAILABLE, LINEAGE_NAMESPACE, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import AIRFLOW_IO_AVAILABLE, remote_target_path, remote_target_path_conn_id
 
 try:
     from airflow.datasets import Dataset

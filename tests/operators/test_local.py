@@ -470,6 +470,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
             project_dir=DBT_PROJ_DIR,
             task_id="seed",
             dag=dag,
+            emit_datasets=False,
             dbt_cmd_flags=["--select", "raw_customers"],
             install_deps=True,
             append_env=True,
@@ -494,7 +495,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
         )
         seed_operator >> run_operator >> test_operator
 
-    assert seed_operator.outlets == [DatasetAliasModel(name="test_id_1__seed")]
+    assert seed_operator.outlets == []  # because emit_datasets=False,
     assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
 
@@ -508,6 +509,26 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
         # based on the resolution of the issue logged in Airflow:
         # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
         # assert dataset_model == 1
+
+
+@patch("cosmos.settings.enable_dataset_alias", 0)
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
+    with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+    assert run_operator.outlets == []
 
 
 @pytest.mark.skipif(

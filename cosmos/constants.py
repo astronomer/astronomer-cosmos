@@ -148,3 +148,5 @@ DEFAULT_DBT_RESOURCES = DbtResourceType.__members__.values()
 # It expects that you have already created those resources through the appropriate commands.
 # https://docs.getdbt.com/reference/commands/test
 TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
+
+DBT_COMPILE_TASK_ID = "dbt_compile"

@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
+from urllib.parse import urlparse
 
 import airflow
 import jinja2
@@ -288,7 +289,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         remote_conn_id = remote_target_path_conn_id
         if not remote_conn_id:
-            target_path_schema = target_path_str.split("://")[0]
+            target_path_schema = urlparse(target_path_str).scheme
             remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
         if remote_conn_id is None:
             return None, None

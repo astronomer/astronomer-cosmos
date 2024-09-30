@@ -8,6 +8,7 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos.config import RenderConfig
 from cosmos.constants import (
+    DBT_COMPILE_TASK_ID,
     DEFAULT_DBT_RESOURCES,
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
@@ -20,7 +21,6 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import dbt_compile_task_id
 
 logger = get_logger(__name__)
 
@@ -264,17 +264,17 @@ def _add_dbt_compile_task(
         return
 
     compile_task_metadata = TaskMetadata(
-        id=dbt_compile_task_id,
+        id=DBT_COMPILE_TASK_ID,
         operator_class="cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
         arguments=task_args,
         extra_context={},
     )
     compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=None)
-    tasks_map[dbt_compile_task_id] = compile_airflow_task
+    tasks_map[DBT_COMPILE_TASK_ID] = compile_airflow_task
 
     for node_id, node in nodes.items():
         if not node.depends_on and node_id in tasks_map:
-            tasks_map[dbt_compile_task_id] >> tasks_map[node_id]
+            tasks_map[DBT_COMPILE_TASK_ID] >> tasks_map[node_id]
 
 
 def build_airflow_graph(

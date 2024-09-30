@@ -87,7 +87,7 @@ def test_dag(
 
     print("conn_file_path", conn_file_path)
 
-    return dr
+    return dr, session
 
 
 def add_logger_if_needed(dag: DAG, ti: TaskInstance):

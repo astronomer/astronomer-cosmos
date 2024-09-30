@@ -2,19 +2,14 @@ from __future__ import annotations
 
 import importlib
 
-import airflow
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
-from packaging.version import Version
 
 from cosmos.core.graph.entities import Task
-
-# from cosmos.dataset import get_dataset_alias_name
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) -> BaseOperator:

@@ -20,7 +20,7 @@ from airflow.utils.session import NEW_SESSION, create_session, provide_session
 from attr import define
 from packaging.version import Version
 
-from cosmos import cache
+from cosmos import cache, settings
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
@@ -30,7 +30,6 @@ from cosmos.constants import InvocationMode
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError
-from cosmos.settings import LINEAGE_NAMESPACE
 
 try:
     from airflow.datasets import Dataset
@@ -155,7 +154,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         if self.invocation_mode:
             self._set_invocation_methods()
 
-        if AIRFLOW_VERSION >= Version("2.10"):
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
             from airflow.datasets import DatasetAlias
 
             # ignoring the type because older versions of Airflow raise the follow error in mypy
@@ -443,7 +442,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         openlineage_processor = DbtLocalArtifactProcessor(
             producer=OPENLINEAGE_PRODUCER,
-            job_namespace=LINEAGE_NAMESPACE,
+            job_namespace=settings.LINEAGE_NAMESPACE,
             project_dir=project_dir,
             profile_name=self.profile_config.profile_name,
             target=self.profile_config.target_name,
@@ -491,12 +490,16 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset], context: Context) -> None:
         """
-        Register a list of datasets as outlets of the current task.
+        Register a list of datasets as outlets of the current task, when possible.
+
         Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
         This works before Airflow 2.10 with a few limitations, as described in the ticket:
-        TODO: add the link to the GH issue related to orphaned nodes
+        https://github.com/astronomer/astronomer-cosmos/issues/522
+
+        In Airflow 2.10.0 and 2.10.1, we are not able to test Airflow DAGs powered with DatasetAlias.
+        https://github.com/apache/airflow/issues/42495
         """
-        if AIRFLOW_VERSION < Version("2.10"):
+        if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
                 self.outlets.extend(new_outlets)
@@ -512,7 +515,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
             for outlet in new_outlets:
                 context["outlet_events"][dataset_alias_name].add(outlet)
-                # TODO: check equivalent to inlets
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """

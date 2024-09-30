@@ -461,10 +461,10 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
-    from airflow.models.dataset import DatasetAliasModel, DatasetModel
-    from sqlalchemy import select
+    from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
 
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
@@ -494,18 +494,20 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
         )
         seed_operator >> run_operator >> test_operator
 
-    dag_run, session = run_test_dag(dag)
+    assert seed_operator.outlets == [DatasetAliasModel(name="test_id_1__seed")]
+    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
 
-    assert session.scalars(select(DatasetModel)).all()
-    assert session.scalars(select(DatasetAliasModel)).all()
-    assert False
-    # assert session == session
-    # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
-    # assert dataset_model == 1
-    # dataset_alias_models = dataset_model.aliases  # Aliases associated to the URI.
+    with pytest.raises(FlushError):
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+        dag_run, session = run_test_dag(dag)
 
-
-#    session.query(Dataset).filter_by
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
 
 
 @pytest.mark.skipif(

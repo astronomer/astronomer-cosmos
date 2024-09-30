@@ -243,20 +243,19 @@ Each task will create a new Cloud Run Job execution, giving full isolation. The 
         },
     )
 
-Airflow Async
+Airflow Async (experimental)
 -------------
 
 .. versionadded:: 1.7.0
 
-(**Experimental**)
 
-The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+(**Experimental**) The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
 `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 This execution mode could be preferred when you've long running resources and you want to run them asynchronously by
 leveraging Airflow's deferrable operators. With that, you would be able to potentially observe higher throughput of tasks
 as more dbt nodes will be run in parallel since they won't be blocking Airflow's worker slots.
 
-In this mode, Cosmos adds a new operator, ``DbtCompileAirflowAsyncOperator``, as a root task in the DAG. The task runs
+In this mode, Cosmos adds a new operator, ``DbtCompileAirflowAsyncOperator``, as a root task in the DbtDag or DbtTaskGroup. The task runs
 the ``dbt compile`` command on your dbt project which then outputs compiled SQLs in the project's target directory.
 As part of the same task run, these compiled SQLs are then stored remotely to a remote path set using the
 :ref:`remote_target_path` configuration. The remote path is then used by the subsequent tasks in the DAG to

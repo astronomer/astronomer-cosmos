@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
+from urllib.parse import urlparse
 
 import airflow
 import jinja2
@@ -17,6 +18,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
+from airflow.version import version as airflow_version
 from attr import define
 from packaging.version import Version
 
@@ -26,10 +28,11 @@ from cosmos.cache import (
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
 )
-from cosmos.constants import InvocationMode
+from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
-from cosmos.exceptions import AirflowCompatibilityError
+from cosmos.exceptions import AirflowCompatibilityError, CosmosValueError
+from cosmos.settings import AIRFLOW_IO_AVAILABLE, remote_target_path, remote_target_path_conn_id
 
 try:
     from airflow.datasets import Dataset
@@ -67,6 +70,7 @@ from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCompileMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -137,6 +141,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
         should_store_compiled_sql: bool = True,
+        should_upload_compiled_sql: bool = False,
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -146,6 +151,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.compiled_sql = ""
         self.freshness = ""
         self.should_store_compiled_sql = should_store_compiled_sql
+        self.should_upload_compiled_sql = should_upload_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self.invoke_dbt: Callable[..., FullOutputSubprocessResult | dbtRunnerResult]
@@ -270,6 +276,84 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             session.add(rtif)
         else:
             self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+
+    @staticmethod
+    def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
+        """Configure the remote target path if it is provided."""
+        if not remote_target_path:
+            return None, None
+
+        _configured_target_path = None
+
+        target_path_str = str(remote_target_path)
+
+        remote_conn_id = remote_target_path_conn_id
+        if not remote_conn_id:
+            target_path_schema = urlparse(target_path_str).scheme
+            remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
+        if remote_conn_id is None:
+            return None, None
+
+        if not AIRFLOW_IO_AVAILABLE:
+            raise CosmosValueError(
+                f"You're trying to specify remote target path {target_path_str}, but the required "
+                f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                "Airflow 2.8 or later."
+            )
+
+        from airflow.io.path import ObjectStoragePath
+
+        _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
+
+        if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
+            _configured_target_path.mkdir(parents=True, exist_ok=True)
+
+        return _configured_target_path, remote_conn_id
+
+    def _construct_dest_file_path(
+        self, dest_target_dir: Path, file_path: str, source_compiled_dir: Path, context: Context
+    ) -> str:
+        """
+        Construct the destination path for the compiled SQL files to be uploaded to the remote store.
+        """
+        dest_target_dir_str = str(dest_target_dir).rstrip("/")
+
+        task = context["task"]
+        dag_id = task.dag_id
+        task_group_id = task.task_group.group_id if task.task_group else None
+        identifiers_list = []
+        if dag_id:
+            identifiers_list.append(dag_id)
+        if task_group_id:
+            identifiers_list.append(task_group_id)
+        dag_task_group_identifier = "__".join(identifiers_list)
+
+        rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
+
+        return f"{dest_target_dir_str}/{dag_task_group_identifier}/compiled/{rel_path}"
+
+    def upload_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
+        """
+        Uploads the compiled SQL files from the dbt compile output to the remote store.
+        """
+        if not self.should_upload_compiled_sql:
+            return
+
+        dest_target_dir, dest_conn_id = self._configure_remote_target_path()
+        if not dest_target_dir:
+            raise CosmosValueError(
+                "You're trying to upload compiled SQL files, but the remote target path is not configured. "
+            )
+
+        from airflow.io.path import ObjectStoragePath
+
+        source_compiled_dir = Path(tmp_project_dir) / "target" / "compiled"
+        files = [str(file) for file in source_compiled_dir.rglob("*") if file.is_file()]
+        for file_path in files:
+            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, context)
+            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
+            ObjectStoragePath(file_path).copy(dest_object_storage_path)
+            self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
@@ -416,6 +500,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 self.store_freshness_json(tmp_project_dir, context)
                 self.store_compiled_sql(tmp_project_dir, context)
+                self.upload_compiled_sql(tmp_project_dir, context)
                 self.handle_exception(result)
                 if self.callback:
                     self.callback(tmp_project_dir)
@@ -920,3 +1005,9 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
         raise DeprecationWarning(
             "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
         )
+
+
+class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs["should_upload_compiled_sql"] = True
+        super().__init__(*args, **kwargs)

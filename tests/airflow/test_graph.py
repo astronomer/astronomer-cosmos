@@ -21,6 +21,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
+    DBT_COMPILE_TASK_ID,
     DbtResourceType,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -224,6 +225,41 @@ def test_build_airflow_graph_with_after_all():
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
     assert dag.leaves[0].select == ["tag:some"]
+
+
+@pytest.mark.integration
+def test_build_airflow_graph_with_dbt_compile_task():
+    with DAG("test-id-dbt-compile", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        render_config = RenderConfig(
+            select=["tag:some"],
+            test_behavior=TestBehavior.AFTER_ALL,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        )
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            dbt_project_name="astro_shop",
+            render_config=render_config,
+        )
+
+    task_ids = [task.task_id for task in dag.tasks]
+    assert DBT_COMPILE_TASK_ID in task_ids
+    assert DBT_COMPILE_TASK_ID in dag.tasks[0].upstream_task_ids
 
 
 def test_calculate_operator_class():

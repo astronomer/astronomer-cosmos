@@ -6,25 +6,22 @@ from airflow.io.path import ObjectStoragePath
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.context import Context
 
-from cosmos.operators.base import DbtCompileMixin
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
+    DbtCompileLocalOperator,
     DbtDepsLocalOperator,
     DbtDocsAzureStorageLocalOperator,
     DbtDocsCloudLocalOperator,
     DbtDocsGCSLocalOperator,
     DbtDocsLocalOperator,
     DbtDocsS3LocalOperator,
-    DbtLocalBaseOperator,
     DbtLSLocalOperator,
+    DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
-    DbtRunOperationLocalOperator,
-    DbtCompileLocalOperator,
 )
-
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 _SUPPORTED_DATABASES = ["bigquery"]
@@ -73,9 +70,9 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):
         project_name = str(self.project_dir).split("/")[-1]
         model_name: str = self.task_id.split(".")[0]
         if model_name.startswith("stg_"):
-            remote_model_path = f"{remote_target_path}/{project_name}/models/staging/{model_name}.sql"
+            remote_model_path = f"{remote_target_path}/{self.dag_id}/{project_name}/models/staging/{model_name}.sql"
         else:
-            remote_model_path = f"{remote_target_path}/{project_name}/models/{model_name}.sql"
+            remote_model_path = f"{remote_target_path}/{self.dag_id}/{project_name}/models/{model_name}.sql"
 
         print("remote_model_path: ", remote_model_path)
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
@@ -93,7 +90,6 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):
         }
         print("async_op_args: ", self.async_op_args)
         super().execute(context)
-
 
 
 class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):
@@ -127,7 +123,6 @@ class DbtDocsGCSAirflowAsyncOperator(DbtDocsGCSLocalOperator):
 class DbtCompileAirflowAsyncOperator(DbtCompileLocalOperator):
     pass
 
+
 class DbtDepsAirflowAsyncOperator(DbtDepsLocalOperator):
     pass
-
-

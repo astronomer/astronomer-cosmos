@@ -288,7 +288,7 @@ class ProfileConfig:
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
     def get_profile_type(self) -> str:
-        if self.profile_mapping is not None and hasattr(self.profile_mapping, "dbt_profile_type"):
+        if isinstance(self.profile_mapping, BaseProfileMapping):
             return str(self.profile_mapping.dbt_profile_type)
 
         profile_path = self._get_profile_path()

@@ -265,7 +265,7 @@ def _add_dbt_compile_task(
 
     compile_task_metadata = TaskMetadata(
         id=dbt_compile_task_id,
-        operator_class=f"cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
+        operator_class="cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
         arguments=task_args,
         extra_context={},
     )

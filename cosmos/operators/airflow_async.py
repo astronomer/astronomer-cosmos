@@ -96,7 +96,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
             return fp.read()  # type: ignore
 
     def drop_table_sql(self) -> None:
-        model_name = self.task_id.split(".")[0]
+        model_name = self.extra_context["dbt_node_config"]["resource_name"]
         sql = f"DROP TABLE IF EXISTS {self.gcp_project}.{self.dataset}.{model_name};"
         hook = BigQueryHook(
             gcp_conn_id=self.gcp_conn_id,
@@ -117,7 +117,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
             self.drop_table_sql()
 
             sql = self.get_remote_sql()
-            model_name = self.task_id.split(".")[0]
+            model_name = self.extra_context["dbt_node_config"]["resource_name"]
             # prefix explicit create command to create table
             sql = f"CREATE TABLE {self.gcp_project}.{self.dataset}.{model_name} AS  {sql}"
 

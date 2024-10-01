@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
@@ -30,7 +30,7 @@ from cosmos.constants import (
 )
 from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountFileProfileMapping, PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
@@ -228,19 +228,20 @@ def test_build_airflow_graph_with_after_all():
 
 
 @pytest.mark.integration
+@patch("airflow.hooks.base.BaseHook.get_connection", new=MagicMock())
 def test_build_airflow_graph_with_dbt_compile_task():
+    bigquery_profile_config = ProfileConfig(
+        profile_name="my-bigquery-db",
+        target_name="dev",
+        profile_mapping=GoogleCloudServiceAccountFileProfileMapping(
+            conn_id="fake_conn", profile_args={"dataset": "release_17"}
+        ),
+    )
     with DAG("test-id-dbt-compile", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
             "conn_id": "fake_conn",
-            "profile_config": ProfileConfig(
-                profile_name="default",
-                target_name="default",
-                profile_mapping=PostgresUserPasswordProfileMapping(
-                    conn_id="fake_conn",
-                    profile_args={"schema": "public"},
-                ),
-            ),
+            "profile_config": bigquery_profile_config,
         }
         render_config = RenderConfig(
             select=["tag:some"],

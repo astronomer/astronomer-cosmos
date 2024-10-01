@@ -32,9 +32,6 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     if task.owner != "":
         task_kwargs["owner"] = task.owner
 
-    if task.async_op_args:
-        task_kwargs["async_op_args"] = task.async_op_args
-
     airflow_task = Operator(
         task_id=task.id,
         dag=dag,

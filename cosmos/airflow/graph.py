@@ -81,7 +81,6 @@ def create_test_task_metadata(
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
     render_config: RenderConfig | None = None,
-    async_op_args: dict[str, Any] | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -126,7 +125,6 @@ def create_test_task_metadata(
         ),
         arguments=task_args,
         extra_context=extra_context,
-        async_op_args=async_op_args,
     )
 
 
@@ -309,7 +307,6 @@ def build_airflow_graph(
     render_config: RenderConfig,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-    async_op_args: dict[str, Any] | None = None,
 ) -> None:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -374,7 +371,6 @@ def build_airflow_graph(
             task_args=task_args,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
-            async_op_args=async_op_args,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

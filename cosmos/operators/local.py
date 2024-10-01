@@ -143,7 +143,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
-        async_op_args: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -158,7 +157,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.invoke_dbt: Callable[..., FullOutputSubprocessResult | dbtRunnerResult]
         self.handle_exception: Callable[..., None]
         self._dbt_runner: dbtRunner | None = None
-        self.async_op_args = async_op_args
         if self.invocation_mode:
             self._set_invocation_methods()
 

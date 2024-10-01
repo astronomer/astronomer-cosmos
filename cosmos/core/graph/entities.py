@@ -61,4 +61,3 @@ class Task(CosmosEntity):
     operator_class: str = "airflow.operators.empty.EmptyOperator"
     arguments: Dict[str, Any] = field(default_factory=dict)
     extra_context: Dict[str, Any] = field(default_factory=dict)
-    async_op_args: Dict[str, Any] | None = field(default_factory=dict)

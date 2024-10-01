@@ -217,7 +217,6 @@ class DbtGraph:
         dbt_vars: dict[str, str] | None = None,
         airflow_metadata: dict[str, str] | None = None,
         operator_args: dict[str, Any] | None = None,
-        async_op_args: dict[str, Any] | None = None,
     ):
         self.project = project
         self.render_config = render_config
@@ -225,7 +224,6 @@ class DbtGraph:
         self.execution_config = execution_config
         self.cache_dir = cache_dir
         self.airflow_metadata = airflow_metadata or {}
-        self.async_op_args = async_op_args
         if cache_identifier:
             self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier)
         else:

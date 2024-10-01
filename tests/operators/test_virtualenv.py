@@ -77,9 +77,22 @@ def test_run_command_without_virtualenv_dir(
     assert dbt_deps["command"][0] == dbt_cmd["command"][0]
     assert dbt_deps["command"][1] == "deps"
     assert dbt_cmd["command"][1] == "do-something"
-    assert mock_execute.call_count == 4
+    assert mock_execute.call_count == 2
+    virtualenv_call, pip_install_call = mock_execute.call_args_list
+    assert "python" in virtualenv_call[0][0][0]
+    assert virtualenv_call[0][0][1] == "-m"
+    assert virtualenv_call[0][0][2] == "virtualenv"
+    assert "pip" in pip_install_call[0][0][0]
+    assert pip_install_call[0][0][1] == "install"
+    cosmos_venv_dirs = [
+        f for f in os.listdir("/tmp") if os.path.isdir(os.path.join("/tmp", f)) and f.startswith("cosmos-venv")
+    ]
+    assert len(cosmos_venv_dirs) == 0
 
 
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
+@patch("time.sleep")
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
@@ -93,7 +106,12 @@ def test_run_command_with_virtualenv_dir(
     mock_store_compiled_sql,
     mock_calculate_openlineage_events_completes,
     mock_execute,
+    mock_release_venv_lock,
+    mock_sleep,
+    mock_is_lock_available,
+    caplog,
 ):
+    mock_is_lock_available.side_effect = [False, False, True]
     mock_get_connection.return_value = Connection(
         conn_id="fake_conn",
         conn_type="postgres",
@@ -124,6 +142,12 @@ def test_run_command_with_virtualenv_dir(
     dbt_cmd = run_command_args[1].kwargs
     assert dbt_deps["command"][0] == "mock-venv/bin/dbt"
     assert dbt_cmd["command"][0] == "mock-venv/bin/dbt"
+    assert caplog.text.count("Waiting for virtualenv lock to be released") == 2
+    assert mock_sleep.call_count == 2
+    assert mock_is_lock_available.call_count == 3
+    assert mock_release_venv_lock.call_count == 1
+    cosmos_venv_dirs = [f for f in os.listdir() if f == "mock-venv"]
+    assert len(cosmos_venv_dirs) == 1
 
 
 def test_virtualenv_operator_append_env_is_true_by_default():
@@ -184,13 +208,7 @@ def test_on_kill(mock_clean_dir_if_temporary):
 
 
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.subprocess_hook")
-@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
-@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._prepare_virtualenv")
-@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._acquire_venv_lock")
-@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available", side_effect=[False, False, True])
-def test_run_subprocess_waits_for_lock(
-    mock_is_lock_available, mock_acquire, mock_prepare, mock_release, mock_subprocess_hook, tmpdir, caplog
-):
+def test_run_subprocess(mock_subprocess_hook, tmpdir, caplog):
     venv_operator = ConcreteDbtVirtualenvBaseOperator(
         profile_config=profile_config,
         project_dir="./dev/dags/dbt/jaffle_shop",
@@ -199,7 +217,7 @@ def test_run_subprocess_waits_for_lock(
         virtualenv_dir=tmpdir,
     )
     venv_operator.run_subprocess(["dbt", "run"], {}, "./dev/dags/dbt/jaffle_shop")
-    assert caplog.text.count("Waiting for virtualenv lock to be released") == 2
+    assert len(mock_subprocess_hook.run_command.call_args_list) == 1
 
 
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute", side_effect=ValueError)

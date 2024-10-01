@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from typing import Any
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
@@ -27,7 +28,7 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     module = importlib.import_module(module_name)
     Operator = getattr(module, class_name)
 
-    task_kwargs = {}
+    task_kwargs: dict[str, Any] = {}
     if task.owner != "":
         task_kwargs["owner"] = task.owner
 

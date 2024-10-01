@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -86,6 +86,10 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         dbt_dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
 
         remote_target_path_str = str(remote_target_path).rstrip("/")
+
+        if TYPE_CHECKING:
+            assert self.project_dir is not None
+
         project_dir_parent = str(self.project_dir.parent)
         relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
         remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/compiled/{relative_file_path}"

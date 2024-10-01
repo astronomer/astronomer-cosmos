@@ -53,18 +53,14 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         self.full_refresh = full_refresh
 
         # airflow task param
-        self.async_op_args = kwargs.pop("async_op_args", {})
         self.configuration: dict[str, object] = {}
-        self.job_id = self.async_op_args.get("job_id", "")
-        self.impersonation_chain = self.async_op_args.get("impersonation_chain", "")
-        self.gcp_project = self.async_op_args.get("project_id", "astronomer-dag-authoring")
         self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
-        self.dataset = self.async_op_args.get("dataset", "my_dataset")
-        self.location = self.async_op_args.get("location", "US")
-        self.async_op_args["deferrable"] = True
-        self.reattach_states: set[str] = self.async_op_args.get("reattach_states") or set()
-
-        super().__init__(*args, configuration=self.configuration, task_id=kwargs.get("task_id"), **self.async_op_args)
+        if not self.profile_config or not self.profile_config.profile_mapping:
+            raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
+        profile = self.profile_config.profile_mapping.profile  # type: ignore
+        self.gcp_project = profile["project"]
+        self.dataset = profile["dataset"]
+        super().__init__(*args, configuration=self.configuration, task_id=kwargs["task_id"], deferrable=True)
 
         if self.profile_type not in _SUPPORTED_DATABASES:
             raise CosmosValueError(f"Async run are only supported: {_SUPPORTED_DATABASES}")
@@ -78,7 +74,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
             raise CosmosValueError("file_path and project_dir are required to be set on the task for async execution")
         project_dir_parent = str(self.project_dir.parent)
         relative_file_path = str(self.file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{str(remote_target_path).rstrip('/')}/{self.dag_id}/{relative_file_path}"
+        remote_model_path = f"{str(remote_target_path).rstrip('/')}/{self.dag_id}/compiled/{relative_file_path}"
 
         print("remote_model_path: ", remote_model_path)
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)

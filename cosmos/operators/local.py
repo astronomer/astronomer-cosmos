@@ -352,7 +352,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         source_compiled_dir = Path(tmp_project_dir) / "target" / "compiled"
         files = [str(file) for file in source_compiled_dir.rglob("*") if file.is_file()]
-
         for file_path in files:
             dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, context)
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
@@ -1013,5 +1012,5 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
 class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["should_upload_compiled_sql"] = True
+        kwargs["should_upload_compiled_sql"] = False
         super().__init__(*args, **kwargs)

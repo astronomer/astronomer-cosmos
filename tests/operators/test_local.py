@@ -1242,6 +1242,7 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
         profile_config=profile_config,
         project_dir="fake-dir",
         dag=DAG("test_dag", start_date=datetime(2024, 4, 16)),
+        extra_context={"dbt_dag_task_group_identifier": "test_dag"},
     )
 
     mock_configure_remote.return_value = ("mock_remote_path", "mock_conn_id")

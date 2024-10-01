@@ -11,4 +11,4 @@ rm -rf airflow.*
 pip freeze | grep airflow
 airflow db reset -y
 airflow db init
-pip install 'dbt-core' 'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'
+pip install 'dbt-core' 'dbt-bigquery' 'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'

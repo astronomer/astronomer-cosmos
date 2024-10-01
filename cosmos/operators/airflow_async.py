@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -44,6 +44,9 @@ class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
 
 
 class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
+
+    template_fields: Sequence[str] = ("full_refresh",)
+
     def __init__(self, *args, full_refresh: bool = False, **kwargs):  # type: ignore
         # dbt task param
         self.profile_config = kwargs.get("profile_config")

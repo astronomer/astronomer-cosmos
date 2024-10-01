@@ -285,7 +285,7 @@ Example DAG:
 
 **Known Issue:**
 
-The ```dag test``` command failed with the following error, likely because the trigger does not fully initialize during the ```dag test```, leading to an uninitialized task instance.
+The ``dag test`` command failed with the following error, likely because the trigger does not fully initialize during the ``dag test``, leading to an uninitialized task instance.
 This causes the BigQuery trigger to attempt accessing parameters of the Task Instance that are not properly initialized.
 
 .. code:: bash

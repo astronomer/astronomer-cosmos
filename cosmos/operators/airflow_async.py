@@ -57,7 +57,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
         if not self.profile_config or not self.profile_config.profile_mapping:
             raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
-        profile = self.profile_config.profile_mapping.profile  # type: ignore
+        profile = self.profile_config.profile_mapping.profile
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
         super().__init__(*args, configuration=self.configuration, task_id=kwargs["task_id"], deferrable=True)

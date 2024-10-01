@@ -57,7 +57,7 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         # dbt task param
         self.profile_config = kwargs.get("profile_config")
         self.project_dir = kwargs.get("project_dir")
-        self.file_path = kwargs.get("extra_context", {}).get("dbt_node_config", {}).get("file_path")
+        self.extra_context = kwargs.get("extra_context", {})
         self.profile_type: str = self.profile_config.get_profile_type()  # type: ignore
         self.full_refresh = full_refresh
 
@@ -82,11 +82,13 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
             raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
         from airflow.io.path import ObjectStoragePath
 
-        if not self.file_path or not self.project_dir:
-            raise CosmosValueError("file_path and project_dir are required to be set on the task for async execution")
+        file_path = self.extra_context["dbt_node_config"]["file_path"]
+        dbt_dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+
+        remote_target_path_str = str(remote_target_path).rstrip("/")
         project_dir_parent = str(self.project_dir.parent)
-        relative_file_path = str(self.file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{str(remote_target_path).rstrip('/')}/{self.dag_id}/compiled/{relative_file_path}"
+        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/compiled/{relative_file_path}"
 
         print("remote_model_path: ", remote_model_path)
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)

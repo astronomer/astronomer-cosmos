@@ -272,6 +272,9 @@ Note that currently, the ``airflow_async`` execution mode has the following limi
 1. Only supports the ``dbt resource type`` models to be run asynchronously using Airflow deferrable operators. All other resources are executed synchronously using dbt commands as they are in the ``local`` execution mode.
 2. Only supports BigQuery as the target database. If a profile target other than BigQuery is specified, Cosmos will error out saying that the target database is not supported with this execution mode.
 3. Only works for ``full_refresh`` models. There is pending work to support other modes.
+4. Only Support for the Bigquery profile type
+5. Users need to provide ProfileMapping parameter in ProfileConfig
+
 
 Example DAG:
 
@@ -279,6 +282,33 @@ Example DAG:
    :language: python
    :start-after: [START airflow_async_execution_mode_example]
    :end-before: [END airflow_async_execution_mode_example]
+
+**Known Issue:**
+
+The ```dag test``` command failed with the following error, likely because the trigger does not fully initialize during the ```dag test```, leading to an uninitialized task instance.
+This causes the BigQuery trigger to attempt accessing parameters of the Task Instance that are not properly initialized.
+
+.. code:: bash
+
+    [2024-10-01T18:19:09.726+0530] {base_events.py:1738} ERROR - unhandled exception during asyncio.run() shutdown
+    task: <Task finished name='Task-46' coro=<<async_generator_athrow without __name__>()> exception=AttributeError("'NoneType' object has no attribute 'dag_id'")>
+    Traceback (most recent call last):
+      File "/Users/pankaj/Documents/astro_code/astronomer-cosmos/devenv/lib/python3.9/site-packages/airflow/providers/google/cloud/triggers/bigquery.py", line 138, in run
+        yield TriggerEvent(
+    asyncio.exceptions.CancelledError
+
+    During handling of the above exception, another exception occurred:
+
+    Traceback (most recent call last):
+      File "/Users/pankaj/Documents/astro_code/astronomer-cosmos/devenv/lib/python3.9/site-packages/airflow/providers/google/cloud/triggers/bigquery.py", line 157, in run
+        if self.job_id and self.cancel_on_kill and self.safe_to_cancel():
+      File "/Users/pankaj/Documents/astro_code/astronomer-cosmos/devenv/lib/python3.9/site-packages/airflow/providers/google/cloud/triggers/bigquery.py", line 126, in safe_to_cancel
+        task_instance = self.get_task_instance()  # type: ignore[call-arg]
+      File "/Users/pankaj/Documents/astro_code/astronomer-cosmos/devenv/lib/python3.9/site-packages/airflow/utils/session.py", line 97, in wrapper
+        return func(*args, session=session, **kwargs)
+      File "/Users/pankaj/Documents/astro_code/astronomer-cosmos/devenv/lib/python3.9/site-packages/airflow/providers/google/cloud/triggers/bigquery.py", line 102, in get_task_instance
+        TaskInstance.dag_id == self.task_instance.dag_id,
+    AttributeError: 'NoneType' object has no attribute 'dag_id'
 
 .. _invocation_modes:
 Invocation Modes

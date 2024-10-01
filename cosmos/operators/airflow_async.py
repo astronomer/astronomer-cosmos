@@ -45,7 +45,13 @@ class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
 
 class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
 
-    template_fields: Sequence[str] = ("full_refresh",)
+    template_fields: Sequence[str] = (
+        "full_refresh",
+        "project_dir",
+        "gcp_project",
+        "dataset",
+        "location",
+    )
 
     def __init__(self, *args, full_refresh: bool = False, **kwargs):  # type: ignore
         # dbt task param

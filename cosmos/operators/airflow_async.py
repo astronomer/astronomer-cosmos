@@ -60,7 +60,10 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         profile = self.profile_config.profile_mapping.profile
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
-        super().__init__(*args, configuration=self.configuration, task_id=kwargs["task_id"], deferrable=True)
+        self.location = kwargs.get("location", "northamerica-northeast1")  # TODO: must be provided by users
+        super().__init__(
+            *args, configuration=self.configuration, location=self.location, task_id=kwargs["task_id"], deferrable=True
+        )
 
         if self.profile_type not in _SUPPORTED_DATABASES:
             raise CosmosValueError(f"Async run are only supported: {_SUPPORTED_DATABASES}")

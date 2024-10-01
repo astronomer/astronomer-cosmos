@@ -1005,5 +1005,5 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
 class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["should_upload_compiled_sql"] = True
+        kwargs["should_upload_compiled_sql"] = False
         super().__init__(*args, **kwargs)

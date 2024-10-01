@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.profiles import GoogleCloudServiceAccountFileProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -11,7 +11,7 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=GoogleCloudServiceAccountFileProfileMapping(
+    profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
         conn_id="gcp_gs_conn", profile_args={"dataset": "release_17"}
     ),
 )

@@ -28,8 +28,8 @@ from cosmos.operators.local import (
 )
 
 if TYPE_CHECKING:
-    from airflow.utils.context import Context
-
+    from airflow.utils.context import Context  # pragma: no cover
+    from dbt.cli.main import dbtRunnerResult  # pragma: no cover
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"
@@ -77,48 +77,53 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.virtualenv_dir = virtualenv_dir
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
         self.max_retries_lock = settings.virtualenv_max_retries_lock
+        self._py_bin: str | None = None
         super().__init__(**kwargs)
         if not self.py_requirements:
             self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
-        # No virtualenv_dir set, so create a temporary virtualenv
-        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
-            self.log.info("Creating temporary virtualenv")
-            with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
-                self.virtualenv_dir = Path(tempdir)
-                py_bin = self._prepare_virtualenv()
-                dbt_bin = str(Path(py_bin).parent / "dbt")
-                command[0] = dbt_bin  # type: ignore
-                subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
-                    command=command,
-                    env=env,
-                    cwd=cwd,
-                    output_encoding=self.output_encoding,
-                )
-                return subprocess_result
-
-        # Use a reusable virtualenv
-        self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
-        while not self._is_lock_available() and self.max_retries_lock:
-            logger.info("Waiting for virtualenv lock to be released")
-            time.sleep(1)
-            self.max_retries_lock -= 1
-
-        self.log.info(f"Acquiring the virtualenv lock")
-        self._acquire_venv_lock()
-        py_bin = self._prepare_virtualenv()
-        dbt_bin = str(Path(py_bin).parent / "dbt")
-        command[0] = dbt_bin  # type: ignore
+        self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        if self._py_bin is not None:
+            self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
+            command[0] = str(Path(self._py_bin).parent / "dbt")
         subprocess_result = self.subprocess_hook.run_command(
             command=command,
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
         )
-        self.log.info("Releasing virtualenv lock")
-        self._release_venv_lock()
+        self.log.info(subprocess_result.output)
         return subprocess_result
+
+    def run_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str | bytes | os.PathLike[Any]],
+        context: Context,
+    ) -> FullOutputSubprocessResult | dbtRunnerResult:
+        # No virtualenv_dir set, so create a temporary virtualenv
+        if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
+            self.log.info("Creating temporary virtualenv")
+            with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
+                self.virtualenv_dir = Path(tempdir)
+                self._py_bin = self._prepare_virtualenv()
+                return super().run_command(cmd, env, context)
+
+        try:
+            self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
+            while not self._is_lock_available() and self.max_retries_lock:
+                logger.info("Waiting for virtualenv lock to be released")
+                time.sleep(1)
+                self.max_retries_lock -= 1
+
+            self.log.info("Acquiring the virtualenv lock")
+            self._acquire_venv_lock()
+            self._py_bin = self._prepare_virtualenv()
+            return super().run_command(cmd, env, context)
+        finally:
+            self.log.info("Releasing virtualenv lock")
+            self._release_venv_lock()
 
     def clean_dir_if_temporary(self) -> None:
         """

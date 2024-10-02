@@ -25,8 +25,7 @@ Bug fixes
 
 Docs
 
-* Add scarf to readme and docs for website analytics by @cmarteepants
- in #1221
+* Add scarf to readme and docs for website analytics by @cmarteepants in #1221
 * Add ``virtualenv_dir`` param to ``ExecutionConfig`` docs by @pankajkoti in #1173
 * Give credits to @LennartKloppenburg in CHANGELOG.rst by @tatiana #1174
 

@@ -12,7 +12,7 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
-        conn_id="gcp_gs_conn", profile_args={"dataset": "release_17"}
+        conn_id="gcp_gs_conn", profile_args={"dataset": "release_17", "project": "astronomer-dag-authoring"}
     ),
 )
 

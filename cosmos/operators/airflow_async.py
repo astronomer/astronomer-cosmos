@@ -111,7 +111,13 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
                 clean_kwargs[arg_key] = arg_value
 
         # The following are the minimum required parameters to run BigQueryInsertJobOperator using the deferrable mode
-        super().__init__(configuration=self.configuration, location=self.location, deferrable=True, **clean_kwargs)
+        super().__init__(
+            gcp_conn_id=self.gcp_conn_id,
+            configuration=self.configuration,
+            location=self.location,
+            deferrable=True,
+            **clean_kwargs,
+        )
 
     def get_remote_sql(self) -> str:
         if not settings.AIRFLOW_IO_AVAILABLE:
@@ -138,6 +144,13 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
     def drop_table_sql(self) -> None:
         model_name = self.extra_context["dbt_node_config"]["resource_name"]  # type: ignore
         sql = f"DROP TABLE IF EXISTS {self.gcp_project}.{self.dataset}.{model_name};"
+
+        print("sql: ", sql)
+        print("gcp_project: ", self.gcp_project)
+        print("dataset: ", self.dataset)
+        print("gcp_conn_id: ", self.gcp_conn_id)
+        print("self.configuration: ", self.configuration)
+        print("self.location: ", self.location)
         hook = BigQueryHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,

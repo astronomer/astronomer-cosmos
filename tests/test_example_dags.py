@@ -98,4 +98,10 @@ def test_example_dag(session, dag_id: str):
         return
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
-    test_utils.run_dag(dag)
+
+    # This feature is available since Airflow 2.5 and we've backported it in Cosmos:
+    # https://airflow.apache.org/docs/apache-airflow/stable/release_notes.html#airflow-2-5-0-2022-12-02
+    if AIRFLOW_VERSION >= Version("2.5"):
+        dag.test()
+    else:
+        test_utils.run_dag(dag)

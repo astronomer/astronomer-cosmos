@@ -136,7 +136,6 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
         remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/compiled/{relative_file_path}"
 
-        print("remote_model_path: ", remote_model_path)
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
         with object_storage_path.open() as fp:  # type: ignore
             return fp.read()  # type: ignore
@@ -145,12 +144,6 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
         model_name = self.extra_context["dbt_node_config"]["resource_name"]  # type: ignore
         sql = f"DROP TABLE IF EXISTS {self.gcp_project}.{self.dataset}.{model_name};"
 
-        print("sql: ", sql)
-        print("gcp_project: ", self.gcp_project)
-        print("dataset: ", self.dataset)
-        print("gcp_conn_id: ", self.gcp_conn_id)
-        print("self.configuration: ", self.configuration)
-        print("self.location: ", self.location)
         hook = BigQueryHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,

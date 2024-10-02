@@ -277,13 +277,12 @@ def _add_dbt_compile_task(
         extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
     )
     compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=task_group)
+
+    for task_id, task in tasks_map.items():
+        if not task.upstream_list:
+            compile_airflow_task >> task
+
     tasks_map[DBT_COMPILE_TASK_ID] = compile_airflow_task
-
-    # TODO: check within tasks_map.values() all the tasks that do not have upstream node
-
-    for node_id, node in nodes.items():
-        if not node.depends_on and node_id in tasks_map:
-            tasks_map[DBT_COMPILE_TASK_ID] >> tasks_map[node_id]
 
 
 def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -> str:

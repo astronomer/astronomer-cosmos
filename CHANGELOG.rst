@@ -36,7 +36,7 @@ Others
 * Fix CI wrt broken coverage upload artifact @pankajkoti in #1210
 * Fix CI issues - Upgrade actions/upload-artifact & actions/download-artifact to v4 and set min version for packaging by @pankajkoti in #1208
 * Resolve CI failures for Apache Airflow 2.7 jobs by @pankajkoti in #1182
-* Pre-commit hook updates in #1176 #1186, #1186, #1201, #1219, #1231
+* Pre-commit hook updates in #1176 #1186, #1201, #1219, #1231
 
 
 1.6.0 (2024-08-20)

@@ -160,16 +160,20 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         if self.invocation_mode:
             self._set_invocation_methods()
 
+        logger.info(f"Checking: {kwargs} and {settings.enable_dataset_alias} and {AIRFLOW_VERSION}")
         if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
             from airflow.datasets import DatasetAlias
-
+            logger.info("Inside dataset if in the constructor")
             # ignoring the type because older versions of Airflow raise the follow error in mypy
             # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
             dag_id = kwargs.get("dag")
             task_group_id = kwargs.get("task_group")
+            logger.info(f"Info used to build dataset alias name: {dag_id} {task_group_id} {task_id}")
+            dataset_alias_name = get_dataset_alias_name(dag_id, task_group_id, task_id)
             kwargs["outlets"] = [
-                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, task_id))
+                DatasetAlias(name=dataset_alias_name)
             ]  # type: ignore
+            logger.info(dataset_alias_name)
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -550,7 +554,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name)
                 uris.append(dataset_uri)
-        self.log.debug("URIs to be converted to Dataset: %s", uris)
+        self.log.info("URIs to be converted to Dataset: %s", uris)
 
         datasets = []
         try:
@@ -582,6 +586,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
+        logger.info("register_dataset")
         if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
@@ -596,7 +601,9 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         else:
             logger.info("Assigning inlets/outlets with DatasetAlias")
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
+            logger.info(f"new_outlets: {new_outlets}")
             for outlet in new_outlets:
+                logger.info(f"outlet events dataset event {dataset_alias_name} {outlet}")
                 context["outlet_events"][dataset_alias_name].add(outlet)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:

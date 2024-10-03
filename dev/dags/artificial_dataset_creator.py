@@ -22,6 +22,6 @@ class CustomOperator(BaseOperator):
             context["outlet_events"][ALIAS_NAME].add(outlet)
 
 
-with DAG("artificial_dataset_creator", start_date=datetime(2023, 4, 20)) as dag:
+with DAG("artificial_dataset_creator", start_date=datetime(2023, 4, 20), schedule=None) as dag:
     do_something = CustomOperator(task_id="do_something")
     do_something

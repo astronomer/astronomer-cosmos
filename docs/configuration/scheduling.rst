@@ -20,6 +20,7 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
         schedule="@daily",
     )
 
+.. _data-aware-scheduling:
 
 Data-Aware Scheduling
 ---------------------
@@ -77,6 +78,7 @@ If using cosmos with an Airflow 2.9 or below, users will experience the followin
 Example of scheduler logs:
 
 .. code-block::
+
     scheduler | [2023-09-08T10:18:34.252+0100] {scheduler_job_runner.py:1742} INFO - Orphaning unreferenced dataset 'postgres://0.0.0.0:5432/postgres.public.stg_customers'
     scheduler | [2023-09-08T10:18:34.252+0100] {scheduler_job_runner.py:1742} INFO - Orphaning unreferenced dataset 'postgres://0.0.0.0:5432/postgres.public.stg_payments'
     scheduler | [2023-09-08T10:18:34.252+0100] {scheduler_job_runner.py:1742} INFO - Orphaning unreferenced dataset 'postgres://0.0.0.0:5432/postgres.public.stg_orders'
@@ -105,5 +107,6 @@ For users to overcome this limitation in local tests, until the Airflow communit
 they can set this configuration to ``False``. It can also be set in the ``airflow.cfg`` file:
 
 .. code-block::
+
     [cosmos]
     enable_dataset_alias = False

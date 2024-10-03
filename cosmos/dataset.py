@@ -17,7 +17,7 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
             dag_id = task_group.dag_id
         if task_group.group_id is not None:
             task_group_id = task_group.group_id
-            task_group_id = task_group_id.replace(".", "__")
+            task_group_id = task_group_id.split(".")[-1]
     elif dag:
         dag_id = dag.dag_id
 
@@ -28,6 +28,6 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     if task_group_id:
         identifiers_list.append(task_group_id)
 
-    identifiers_list.append(task_id)
+    identifiers_list.append(task_id.split(".")[-1])
 
     return "__".join(identifiers_list)

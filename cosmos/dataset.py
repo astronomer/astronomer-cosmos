@@ -28,6 +28,6 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     if task_group_id:
         identifiers_list.append(task_group_id)
 
-    identifiers_list.append(task_id)
+    identifiers_list.append(task_id.split(".")[-1])
 
     return "__".join(identifiers_list)

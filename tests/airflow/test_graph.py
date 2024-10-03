@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
@@ -30,7 +30,7 @@ from cosmos.constants import (
 )
 from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountFileProfileMapping, PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
@@ -228,19 +228,21 @@ def test_build_airflow_graph_with_after_all():
 
 
 @pytest.mark.integration
+@patch("airflow.hooks.base.BaseHook.get_connection", new=MagicMock())
 def test_build_airflow_graph_with_dbt_compile_task():
+    bigquery_profile_config = ProfileConfig(
+        profile_name="my-bigquery-db",
+        target_name="dev",
+        profile_mapping=GoogleCloudServiceAccountFileProfileMapping(
+            conn_id="fake_conn", profile_args={"dataset": "release_17"}
+        ),
+    )
     with DAG("test-id-dbt-compile", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
             "conn_id": "fake_conn",
-            "profile_config": ProfileConfig(
-                profile_name="default",
-                target_name="default",
-                profile_mapping=PostgresUserPasswordProfileMapping(
-                    conn_id="fake_conn",
-                    profile_args={"schema": "public"},
-                ),
-            ),
+            "profile_config": bigquery_profile_config,
+            "location": "",
         }
         render_config = RenderConfig(
             select=["tag:some"],
@@ -318,7 +320,7 @@ def test_create_task_metadata_unsupported(caplog):
         tags=[],
         config={},
     )
-    response = create_task_metadata(child_node, execution_mode="", args={})
+    response = create_task_metadata(child_node, execution_mode="", args={}, dbt_dag_task_group_identifier="")
     assert response is None
     expected_msg = (
         "Unavailable conversion function for <unsupported> (node <unsupported.dbt-proj.unsupported>). "
@@ -337,6 +339,7 @@ def test_create_task_metadata_unsupported(caplog):
             "cosmos.operators.local.DbtRunLocalOperator",
             {"models": "my_model"},
             {
+                "dbt_dag_task_group_identifier": "",
                 "dbt_node_config": {
                     "unique_id": "model.my_folder.my_model",
                     "resource_type": "model",
@@ -347,7 +350,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "has_test": False,
                     "resource_name": "my_model",
                     "name": "my_model",
-                }
+                },
             },
         ),
         (
@@ -377,6 +380,7 @@ def test_create_task_metadata_unsupported(caplog):
             "cosmos.operators.local.DbtSnapshotLocalOperator",
             {"models": "my_snapshot"},
             {
+                "dbt_dag_task_group_identifier": "",
                 "dbt_node_config": {
                     "unique_id": "snapshot.my_folder.my_snapshot",
                     "resource_type": "snapshot",
@@ -411,7 +415,9 @@ def test_create_task_metadata_model(
         has_freshness=True,
     )
 
-    metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})
+    metadata = create_task_metadata(
+        child_node, execution_mode=ExecutionMode.LOCAL, args={}, dbt_dag_task_group_identifier=""
+    )
     if metadata:
         assert metadata.id == expected_id
         assert metadata.operator_class == expected_operator_class
@@ -428,7 +434,9 @@ def test_create_task_metadata_model_with_versions(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={})
+    metadata = create_task_metadata(
+        child_node, execution_mode=ExecutionMode.LOCAL, args={}, dbt_dag_task_group_identifier=""
+    )
     assert metadata.id == "my_model_v1_run"
     assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
     assert metadata.arguments == {"models": "my_model.v1"}
@@ -443,7 +451,9 @@ def test_create_task_metadata_model_use_task_group(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(child_node, execution_mode=ExecutionMode.LOCAL, args={}, use_task_group=True)
+    metadata = create_task_metadata(
+        child_node, execution_mode=ExecutionMode.LOCAL, args={}, use_task_group=True, dbt_dag_task_group_identifier=""
+    )
     assert metadata.id == "run"
 
 
@@ -498,7 +508,11 @@ def test_create_task_metadata_source_with_rendering_options(
     )
 
     metadata = create_task_metadata(
-        child_node, execution_mode=ExecutionMode.LOCAL, source_rendering_behavior=source_rendering_behavior, args={}
+        child_node,
+        execution_mode=ExecutionMode.LOCAL,
+        source_rendering_behavior=source_rendering_behavior,
+        args={},
+        dbt_dag_task_group_identifier="",
     )
     if metadata:
         assert metadata.id == expected_id
@@ -516,12 +530,15 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         config={},
     )
     if use_task_group is None:
-        metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.DOCKER, args={})
+        metadata = create_task_metadata(
+            sample_node, execution_mode=ExecutionMode.DOCKER, args={}, dbt_dag_task_group_identifier=""
+        )
     else:
         metadata = create_task_metadata(
             sample_node,
             execution_mode=ExecutionMode.DOCKER,
             args={},
+            dbt_dag_task_group_identifier="",
             use_task_group=use_task_group,
         )
 
@@ -543,7 +560,9 @@ def test_create_task_metadata_snapshot(caplog):
         tags=[],
         config={},
     )
-    metadata = create_task_metadata(sample_node, execution_mode=ExecutionMode.KUBERNETES, args={})
+    metadata = create_task_metadata(
+        sample_node, execution_mode=ExecutionMode.KUBERNETES, args={}, dbt_dag_task_group_identifier=""
+    )
     assert metadata.id == "my_snapshot_snapshot"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator"
     assert metadata.arguments == {"models": "my_snapshot"}

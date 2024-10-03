@@ -467,7 +467,6 @@ class DbtGraph:
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
-
         logger.info(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
         if self.should_use_dbt_ls_cache():
             project_path = self.project_path

@@ -274,6 +274,13 @@ Note that currently, the ``airflow_async`` execution mode has the following limi
 3. Only works for ``full_refresh`` models. There is pending work to support other modes.
 4. Only Support for the Bigquery profile type
 5. Users need to provide ProfileMapping parameter in ProfileConfig
+6. It does not support dataset
+
+You can leverage async operator support by installing an additional dependency
+
+.. code:: bash
+
+    astronomer-cosmos[dbt-bigquery, google]
 
 
 Example DAG:
@@ -309,6 +316,8 @@ This causes the BigQuery trigger to attempt accessing parameters of the Task Ins
       File "/Users/pankaj/Documents/astro_code/astronomer-cosmos/devenv/lib/python3.9/site-packages/airflow/providers/google/cloud/triggers/bigquery.py", line 102, in get_task_instance
         TaskInstance.dag_id == self.task_instance.dag_id,
     AttributeError: 'NoneType' object has no attribute 'dag_id'
+
+
 
 .. _invocation_modes:
 Invocation Modes

@@ -132,6 +132,7 @@ def create_task_metadata(
     node: DbtNode,
     execution_mode: ExecutionMode,
     args: dict[str, Any],
+    dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
 ) -> TaskMetadata | None:
@@ -142,6 +143,7 @@ def create_task_metadata(
     :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.LOCAL, ExecutionMode.KUBERNETES).
          Default is ExecutionMode.LOCAL.
     :param args: Arguments to be used to instantiate an Airflow Task
+    :param dbt_dag_task_group_identifier: Identifier to refer to the DbtDAG or DbtTaskGroup in the DAG.
     :param use_task_group: It determines whether to use the name as a prefix for the task id or not.
         If it is False, then use the name as a prefix for the task id, otherwise do not.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
@@ -156,7 +158,10 @@ def create_task_metadata(
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
-        extra_context = {"dbt_node_config": node.context_dict}
+        extra_context = {
+            "dbt_node_config": node.context_dict,
+            "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
+        }
         if node.resource_type == DbtResourceType.MODEL:
             task_id = f"{node.name}_run"
             if use_task_group is True:
@@ -226,6 +231,7 @@ def generate_task_or_group(
         node=node,
         execution_mode=execution_mode,
         args=task_args,
+        dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
     )
@@ -268,14 +274,28 @@ def _add_dbt_compile_task(
         id=DBT_COMPILE_TASK_ID,
         operator_class="cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator",
         arguments=task_args,
-        extra_context={},
+        extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
     )
     compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=task_group)
+
+    for task_id, task in tasks_map.items():
+        if not task.upstream_list:
+            compile_airflow_task >> task
+
     tasks_map[DBT_COMPILE_TASK_ID] = compile_airflow_task
 
-    for node_id, node in nodes.items():
-        if not node.depends_on and node_id in tasks_map:
-            tasks_map[DBT_COMPILE_TASK_ID] >> tasks_map[node_id]
+
+def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
+    dag_id = dag.dag_id
+    task_group_id = task_group.group_id if task_group else None
+    identifiers_list = []
+    if dag_id:
+        identifiers_list.append(dag_id)
+    if task_group_id:
+        identifiers_list.append(task_group_id)
+    dag_task_group_identifier = "__".join(identifiers_list)
+
+    return dag_task_group_identifier
 
 
 def build_airflow_graph(
@@ -358,9 +378,8 @@ def build_airflow_graph(
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
 
-    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
-
     create_airflow_task_dependencies(nodes, tasks_map)
+    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
 
 
 def create_airflow_task_dependencies(

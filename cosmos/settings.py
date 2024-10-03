@@ -34,7 +34,6 @@ virtualenv_max_retries_lock = conf.getint("cosmos", "virtualenv_max_retries_lock
 # This will be merged with the `cache_dir` config parameter in upcoming releases.
 remote_cache_dir = conf.get("cosmos", "remote_cache_dir", fallback=None)
 remote_cache_dir_conn_id = conf.get("cosmos", "remote_cache_dir_conn_id", fallback=None)
-
 remote_target_path = conf.get("cosmos", "remote_target_path", fallback=None)
 remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fallback=None)
 

@@ -68,6 +68,10 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
+        # Ignore Async DAG for dbt <=1.5
+        if DBT_VERSION <= Version("1.5.0"):
+            file.writelines(["simple_dag_async.py\n"])
+
         # The dbt sqlite adapter is only available until dbt 1.4
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])
@@ -98,4 +102,10 @@ def test_example_dag(session, dag_id: str):
         return
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
-    test_utils.run_dag(dag)
+
+    # This feature is available since Airflow 2.5 and we've backported it in Cosmos:
+    # https://airflow.apache.org/docs/apache-airflow/stable/release_notes.html#airflow-2-5-0-2022-12-02
+    if AIRFLOW_VERSION >= Version("2.5"):
+        dag.test()
+    else:
+        test_utils.run_dag(dag)

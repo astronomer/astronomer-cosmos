@@ -74,7 +74,7 @@ def cosmos_manifest_example() -> None:
     gcp_gs_example = DbtTaskGroup(
         group_id="gcp_gs_example",
         project_config=ProjectConfig(
-            manifest_path="gs://cosmos-manifest-test/manifest.json",
+            manifest_path="gs://cosmos_remote_targe/manifest.json",
             manifest_conn_id="gcp_gs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
             project_name="jaffle_shop",

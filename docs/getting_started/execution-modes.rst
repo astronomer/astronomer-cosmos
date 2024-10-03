@@ -269,12 +269,13 @@ deferrable operators and supplying to them those compiled SQLs.
 
 Note that currently, the ``airflow_async`` execution mode has the following limitations and is released as Experimental:
 
-1. Only supports the ``dbt resource type`` models to be run asynchronously using Airflow deferrable operators. All other resources are executed synchronously using dbt commands as they are in the ``local`` execution mode.
-2. Only supports BigQuery as the target database. If a profile target other than BigQuery is specified, Cosmos will error out saying that the target database is not supported with this execution mode.
-3. Only works for ``full_refresh`` models. There is pending work to support other modes.
-4. Only Support for the Bigquery profile type
-5. Users need to provide ProfileMapping parameter in ProfileConfig
-6. It does not support dataset
+1. This feature only works when using Airflow 2.8 and above
+2. Only supports the ``dbt resource type`` models to be run asynchronously using Airflow deferrable operators. All other resources are executed synchronously using dbt commands as they are in the ``local`` execution mode.
+3. Only supports BigQuery as the target database. If a profile target other than BigQuery is specified, Cosmos will error out saying that the target database is not supported with this execution mode.
+4. Only works for ``full_refresh`` models. There is pending work to support other modes.
+5. Only Support for the Bigquery profile type
+6. Users need to provide ProfileMapping parameter in ProfileConfig
+7. It does not support dataset
 
 You can leverage async operator support by installing an additional dependency
 

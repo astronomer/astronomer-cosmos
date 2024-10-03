@@ -68,6 +68,10 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
+        # Ignore Async DAG for dbt 1.4
+        if DBT_VERSION <= Version("1.5.0"):
+            file.writelines(["simple_dag_async.py\n"])
+
         # The dbt sqlite adapter is only available until dbt 1.4
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])

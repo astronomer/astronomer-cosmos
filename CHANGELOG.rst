@@ -7,8 +7,19 @@ Changelog
 New Features
 
 * Introduction of experimental support to run dbt BQ models using Airflow deferrable operators by @pankajkoti @pankajastro @tatiana in #1224 #1230
+
+  For more information, check the documentation: https://astronomer.github.io/astronomer-cosmos/getting_started/execution-modes.html#airflow-async-experimental
+
+  This work has been inspired by the talk "Airflow at Monzo: Evolving our data platform as the bank scales" by
+  @jonathanrainer @ed-sparkes given at Airflow Summit 2023: https://airflowsummit.org/sessions/2023/airflow-at-monzo-evolving-our-data-platform-as-the-bank-scales/.
+
 * Support using ``DatasetAlias`` and fix orphaning unreferenced dataset by @tatiana in #1217
+
+  Documentation: https://astronomer.github.io/astronomer-cosmos/configuration/scheduling.html#data-aware-scheduling
+
 * Add GCP_CLOUD_RUN_JOB execution mode by @ags-de #1153
+
+  Learn more about it: https://astronomer.github.io/astronomer-cosmos/getting_started/gcp-cloud-run-job.html
 
 Enhancements
 

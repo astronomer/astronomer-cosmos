@@ -64,6 +64,71 @@ Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_
 
 In this scenario, ``project_one`` runs once a day and ``project_two`` runs immediately after ``project_one``. You can view these dependencies in Airflow's UI.
 
+
+Examples
+.................
+
+This example DAG:
+
+..
+   The following renders in Sphinx but not Github:
+
+.. literalinclude:: ./../dev/dags/basic_cosmos_dag.py
+    :language: python
+    :start-after: [START local_example]
+    :end-before: [END local_example]
+
+
+Will trigger the following DAG to be run (when using Cosmos 1.1 when using Airflow 2.4 or newer):
+
+.. code-block:: python
+
+    from datetime import datetime
+    from airflow import DAG
+    from airflow.datasets import Dataset
+    from airflow.operators.empty import EmptyOperator
+
+
+    with DAG(
+        "dataset_triggered_dag",
+        description="A DAG that should be triggered via Dataset",
+        start_date=datetime(2024, 9, 1),
+        schedule=[Dataset(uri="postgres://0.0.0.0:5434/postgres.public.orders")],
+    ) as dag:
+        t1 = EmptyOperator(
+            task_id="task_1",
+        )
+        t2 = EmptyOperator(
+            task_id="task_2",
+        )
+
+        t1 >> t2
+
+
+From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be run by using ``DatasetAliases``:
+
+.. code-block:: python
+
+    from datetime import datetime
+    from airflow import DAG
+    from airflow.datasets import DatasetAlias
+    from airflow.operators.empty import EmptyOperator
+
+
+    with DAG(
+        "datasetalias_triggered_dag",
+        description="A DAG that should be triggered via Dataset alias",
+        start_date=datetime(2024, 9, 1),
+        schedule=[DatasetAlias(name="basic_cosmos_dag__orders__run")],
+    ) as dag:
+
+        t3 = EmptyOperator(
+            task_id="task_3",
+        )
+
+        t3
+
+
 Known Limitations
 .................
 

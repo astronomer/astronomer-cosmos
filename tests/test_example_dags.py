@@ -108,7 +108,7 @@ def test_example_dag(session, dag_id: str):
     # This feature is available since Airflow 2.5 and we've backported it in Cosmos:
     # https://airflow.apache.org/docs/apache-airflow/stable/release_notes.html#airflow-2-5-0-2022-12-02
     if AIRFLOW_VERSION >= Version("2.5"):
-        if AIRFLOW_VERSION not in (Version("2.10.0", "2.10.1", "2.10.2")):
+        if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
             dag.test()
         else:
             # This is a work around until we fix the issue in Airflow:

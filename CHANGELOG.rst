@@ -28,6 +28,7 @@ Docs
 * Add scarf to readme and docs for website analytics by @cmarteepants in #1221
 * Add ``virtualenv_dir`` param to ``ExecutionConfig`` docs by @pankajkoti in #1173
 * Give credits to @LennartKloppenburg in CHANGELOG.rst by @tatiana #1174
+* Refactor docs for async mode execution by @pankajkoti in #1241
 
 Others
 
@@ -35,6 +36,7 @@ Others
 * Fix CI wrt broken coverage upload artifact @pankajkoti in #1210
 * Fix CI issues - Upgrade actions/upload-artifact & actions/download-artifact to v4 and set min version for packaging by @pankajkoti in #1208
 * Resolve CI failures for Apache Airflow 2.7 jobs by @pankajkoti in #1182
+* CI: Update GCP manifest file path based on new secret update by @pankajkoti in #1237
 * Pre-commit hook updates in #1176 #1186, #1186, #1201, #1219, #1231
 
 

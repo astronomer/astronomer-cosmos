@@ -1,19 +1,20 @@
 Changelog
 =========
 
-1.7.0 (2024-10-02)
+1.7.0 (2024-10-04)
 ------------------
 
 New Features
 
-* Introduction of experimental support to run dbt BQ models using Airflow deferrable operators by @pankajkoti @pankajastro @tatiana in #1224 #1230
+* Introduction of experimental support to run dbt BQ models using Airflow deferrable operators by @pankajkoti @pankajastro @tatiana in #1224 #1230.
+  This is a first step in this journey and we would really appreciate feedback from the community.
 
   For more information, check the documentation: https://astronomer.github.io/astronomer-cosmos/getting_started/execution-modes.html#airflow-async-experimental
 
   This work has been inspired by the talk "Airflow at Monzo: Evolving our data platform as the bank scales" by
   @jonathanrainer @ed-sparkes given at Airflow Summit 2023: https://airflowsummit.org/sessions/2023/airflow-at-monzo-evolving-our-data-platform-as-the-bank-scales/.
 
-* Support using ``DatasetAlias`` and fix orphaning unreferenced dataset by @tatiana in #1217
+* Support using ``DatasetAlias`` and fix orphaning unreferenced dataset by @tatiana in #1217 #1240
 
   Documentation: https://astronomer.github.io/astronomer-cosmos/configuration/scheduling.html#data-aware-scheduling
 
@@ -49,7 +50,6 @@ Others
 * Resolve CI failures for Apache Airflow 2.7 jobs by @pankajkoti in #1182
 * CI: Update GCP manifest file path based on new secret update by @pankajkoti in #1237
 * Pre-commit hook updates in #1176 #1186, #1186, #1201, #1219, #1231
-
 
 
 1.6.0 (2024-08-20)

@@ -28,19 +28,60 @@
 
 |fury| |ossrank| |downloads| |pre-commit|
 
-Run your dbt Core projects as `Apache Airflow® <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
 
-- Run dbt projects against Airflow connections instead of dbt profiles
-- Native support for installing and running dbt in a virtual environment to avoid dependency conflicts with Airflow
-- Run tests immediately after a model is done to catch issues early
-- Utilize Airflow's data-aware scheduling to run models immediately after upstream ingestion
-- Turn each dbt model into a task/task group complete with retries, alerting, etc.
+Welcome to Astronomer Cosmos! Whether you're an experienced data practitioner or just getting started, Cosmos makes it
+simple to manage and orchestrate your dbt workflows using `Apache Airflow® <https://airflow.apache.org/>`_, saving you
+time and effort. By automatically turning dbt workflows into Airflow DAGs, Cosmos allows you to focus on building
+high-quality data models without the hassle of managing complex integrations.
+
+To get started right away, please check out our `Quickstart guide <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_
+
+To learn more about Cosmos, please read on.
 
 
-Example Usage
-___________________
+What Is Astronomer Cosmos?
+___________________________
 
-You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an example with the `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_:
+Astronomer Cosmos is an open-source library that bridges Apache Airflow and dbt, allowing you to easily transform your
+dbt projects into Airflow DAGs and manage everything seamlessly. With Cosmos, you can write your data transformations
+using dbt and then schedule and orchestrate them with Airflow, making the entire process smooth and straightforward.
+
+**Why Cosmos?**  Integrating dbt and Airflow can be complex, but Cosmos simplifies it by seamlessly connecting these
+powerful tools—letting you focus on what matters most: delivering impactful data models and results without getting
+bogged down by technical challenges.
+
+
+Why Should You Use Cosmos?
+___________________________
+
+Cosmos makes orchestrating dbt workflows:
+
+- **Effortless**: Transform your dbt projects into Airflow DAGs without writing extra code—Cosmos handles the heavy lifting.
+- **Reliable**: Rely on Airflow's robust scheduling and monitoring features to ensure your dbt workflows run smoothly and efficiently.
+- **Scalable**: Easily scale your workflows to match growing data demands, thanks to Airflow's distributed capabilities.
+
+Whether you're handling intricate data tasks or looking to streamline your processes, Cosmos helps you orchestrate dbt
+with Airflow effortlessly, saving you time and letting you focus on what truly matters—creating impactful insights.
+
+
+Example Usage: Jaffle Shop Project
+__________________________________
+
+Let's explore a practical example to see how Cosmos can convert the dbt workflow into an Airflow DAG.
+
+The `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_ is a sample dbt project that simulates an e-commerce store's data.
+The project includes a series of dbt models that transform raw data into structured tables, such as sales, customers, and products.
+
+Below, you can see what the original dbt workflow looks like in a lineage graph. This graph helps illustrate the
+relationships between different models:
+
+.. image:: /_static/jaffle_shop_dbt_graph.png
+
+Cosmos can take this dbt workflow and convert it into an Airflow DAG, allowing you to leverage Airflow's scheduling and
+orchestration capabilities.
+
+To convert this dbt workflow into an Airflow DAG, create a new DAG definition file, import `DbtDag` from the Cosmos library,
+and fill in a few parameters, such as the dbt project directory path and the profile name:
 
 ..
    The following renders in Sphinx but not Github:
@@ -51,9 +92,12 @@ You can render a Cosmos Airflow DAG using the ``DbtDag`` class. Here's an exampl
     :end-before: [END local_example]
 
 
-This will generate an Airflow DAG that looks like this:
+This code snippet will generate an Airflow DAG that looks like this:
 
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_dag.png
+
+With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools
+for managing and scaling your data workflows.
 
 Getting Started
 _______________

@@ -34,9 +34,11 @@ simple to manage and orchestrate your dbt workflows using `Apache Airflow® <htt
 time and effort. By automatically turning dbt workflows into Airflow DAGs, Cosmos allows you to focus on building
 high-quality data models without the hassle of managing complex integrations.
 
-To get started right away, please check out our `Quickstart guide <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_
+To get started right away, please check out our `Quickstart Guides <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_.
+You can also explore more examples in the `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_
+or in the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
-To learn more about Cosmos, please read on.
+To learn more about about Cosmos, please read on.
 
 
 What Is Astronomer Cosmos?
@@ -104,18 +106,14 @@ as `max_active_tasks`, `max_active_runs` and `default_args`.
 With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
 
-Getting Started
-_______________
-
-Check out the Quickstart guide on our `docs <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_. See more examples at `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ and at the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
-
 
 Changelog
 _________
 
 We follow `Semantic Versioning <https://semver.org/>`_ for releases.
-Check `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
+Refer to `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
 for the latest changes.
+
 
 Contributing Guide
 __________________

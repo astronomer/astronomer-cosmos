@@ -98,10 +98,10 @@ This code snippet will generate an Airflow DAG that looks like this:
 
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_dag.png
 
-`DbtDag` is a custom DAG generator that converts dbt projects into Airflow DAGs and accepts Cosmos-specific args like
-`fail_fast` to immediately fail a dag if dbt fails to process a resource, or `cancel_query_on_kill` to cancel any running
+``DbtDag`` is a custom DAG generator that converts dbt projects into Airflow DAGs and accepts Cosmos-specific args like
+``fail_fast`` to immediately fail a dag if dbt fails to process a resource, or `cancel_query_on_kill` to cancel any running
 queries if the task is externally killed or manually set to failed in Airflow. `DbtDag` also accepts standard DAG arguments such
-as `max_active_tasks`, `max_active_runs` and `default_args`.
+as ``max_active_tasks``, ``max_active_runs`` and ``default_args``.
 
 With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
@@ -115,15 +115,21 @@ Refer to `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/ma
 for the latest changes.
 
 
-Contributing Guide
+Join the Community
 __________________
 
-All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
+Have questions, need help, or interested in contributing? We welcome all contributions and feedback!
 
-A detailed overview on how to contribute can be found in the `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/contributing>`_.
-Find out more about `our contributors <https://astronomer.github.io/astronomer-cosmos/contributors>`_.
+- Join the community on Slack! You can find us in the Airflow Slack workspace `#airflow-dbt <https://apache-airflow.slack.com/archives/C059CC42E9W>`_
+channel. If you don't have an account, click `here <https://apache-airflow-slack.herokuapp.com/>`_ to sign up.
 
-As contributors and maintainers to this project, you are expected to abide by the
+- Report bugs, request features, or ask questions by creating an issue in the `GitHub repository <https://github.com/astronomer/astronomer-cosmos/issues/new/choose>`_
+
+- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/contributing>`_.
+
+- Check out this `link <https://astronomer.github.io/astronomer-cosmos/contributors>`_. to learn more about our current contributors
+
+Note that contributors and maintainers are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
 

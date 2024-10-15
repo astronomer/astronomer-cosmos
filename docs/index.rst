@@ -82,7 +82,7 @@ relationships between different models:
 Cosmos can take this dbt workflow and convert it into an Airflow DAG, allowing you to leverage Airflow's scheduling and
 orchestration capabilities.
 
-To convert this dbt workflow into an Airflow DAG, create a new DAG definition file, import `DbtDag` from the Cosmos library,
+To convert this dbt workflow into an Airflow DAG, create a new DAG definition file, import ``DbtDag`` from the Cosmos library,
 and fill in a few parameters, such as the dbt project directory path and the profile name:
 
 ..
@@ -99,8 +99,8 @@ This code snippet will generate an Airflow DAG that looks like this:
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_dag.png
 
 ``DbtDag`` is a custom DAG generator that converts dbt projects into Airflow DAGs and accepts Cosmos-specific args like
-``fail_fast`` to immediately fail a dag if dbt fails to process a resource, or `cancel_query_on_kill` to cancel any running
-queries if the task is externally killed or manually set to failed in Airflow. `DbtDag` also accepts standard DAG arguments such
+``fail_fast`` to immediately fail a dag if dbt fails to process a resource, or ``cancel_query_on_kill`` to cancel any running
+queries if the task is externally killed or manually set to failed in Airflow. ``DbtDag`` also accepts standard DAG arguments such
 as ``max_active_tasks``, ``max_active_runs`` and ``default_args``.
 
 With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools

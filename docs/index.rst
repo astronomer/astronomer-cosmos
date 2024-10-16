@@ -35,7 +35,7 @@ time and effort. By automatically turning dbt workflows into Airflow DAGs, Cosmo
 high-quality data models without the hassle of managing complex integrations.
 
 To get started right away, please check out our `Quickstart Guides <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_.
-You can also explore more examples in the `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_
+You can also explore more examples in `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_
 or in the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
 To learn more about about Cosmos, please read on.

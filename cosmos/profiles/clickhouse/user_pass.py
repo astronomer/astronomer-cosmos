@@ -1,4 +1,4 @@
-"""Maps Airflow Postgres connections using user + password authentication to dbt profiles."""
+"""Maps Airflow Clickhouse connections using user + password authentication to dbt profiles."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class ClickhouseUserPasswordProfileMapping(BaseProfileMapping):
 
     required_fields = [
         "host",
-        "login",
+        "user",
         "schema",
         "clickhouse",
     ]
@@ -29,7 +29,7 @@ class ClickhouseUserPasswordProfileMapping(BaseProfileMapping):
     ]
     airflow_param_mapping = {
         "host": "host",
-        "login": "login",
+        "user": "login",
         "password": "password",
         "port": "port",
         "schema": "schema",

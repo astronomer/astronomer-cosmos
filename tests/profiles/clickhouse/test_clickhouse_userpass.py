@@ -83,7 +83,7 @@ def test_profile_args(mock_clickhouse_conn: Connection) -> None:
     assert profile_mapping.profile == {
         "type": "clickhouse",
         "schema": mock_clickhouse_conn.schema,
-        "login": mock_clickhouse_conn.login,
+        "user": mock_clickhouse_conn.login,
         "password": "{{ env_var('COSMOS_CONN_GENERIC_PASSWORD') }}",
         "driver": "native",
         "port": 9000,
@@ -102,7 +102,7 @@ def test_mock_profile() -> None:
     assert profile_mapping.mock_profile == {
         "type": "clickhouse",
         "schema": "mock_value",
-        "login": "mock_value",
+        "user": "mock_value",
         "driver": "native",
         "port": 9000,
         "host": "mock_value",

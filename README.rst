@@ -83,3 +83,8 @@ Privacy Notice
 ______________
 
 This project follows `Astronomer's Privacy Policy <https://www.astronomer.io/privacy/>`_
+
+.. Tracking pixel for Scarf
+.. raw:: html
+
+    <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=ae43a92a-5a21-4c77-af8b-99c2242adf93" />

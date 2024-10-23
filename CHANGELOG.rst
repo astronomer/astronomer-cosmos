@@ -4,10 +4,12 @@ Changelog
 1.7.1a1 (2024-10-24)
 --------------------
 
+Bug fixes
+* Fix displaying dbt docs as menu item in Astro
+
 Others
 
 * Fix release to PyPI after rst directive disabled by @tatiana in #1281
-
 
 
 1.7.0 (2024-10-04)

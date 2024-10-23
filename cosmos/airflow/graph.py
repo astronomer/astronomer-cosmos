@@ -135,6 +135,7 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
+    set_task_id_by_node: Callable[..., Any] | None = None
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -163,9 +164,13 @@ def create_task_metadata(
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
         }
         if node.resource_type == DbtResourceType.MODEL:
-            task_id = f"{node.name}_run"
             if use_task_group is True:
                 task_id = "run"
+            elif set_task_id_by_node:
+                task_id = set_task_id_by_node(node)
+                args["task_display_name"] = f"{node.name}_run"
+            else:
+                task_id = f"{node.name}_run"
         elif node.resource_type == DbtResourceType.SOURCE:
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
@@ -175,18 +180,26 @@ def create_task_metadata(
                 return None
             # TODO: https://github.com/astronomer/astronomer-cosmos
             # pragma: no cover
-            task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
             if use_task_group is True:
                 task_id = node.resource_type.value
+            elif set_task_id_by_node:
+                task_id = set_task_id_by_node(node)
+                args["task_display_name"] = f"{node.name}_source"
+            else:
+                task_id = f"{node.name}_source"
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator")
         else:
-            task_id = f"{node.name}_{node.resource_type.value}"
             if use_task_group is True:
                 task_id = node.resource_type.value
+            elif set_task_id_by_node:
+                task_id = set_task_id_by_node(node)
+                args["task_display_name"] = f"{node.name}_{node.resource_type.value}"
+            else:
+                task_id = f"{node.name}_{node.resource_type.value}"
 
         task_metadata = TaskMetadata(
             id=task_id,
@@ -217,6 +230,7 @@ def generate_task_or_group(
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
+    set_task_id_by_node: Callable[..., Any] | None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -234,6 +248,7 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
+        set_task_id_by_node=set_task_id_by_node
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -335,6 +350,7 @@ def build_airflow_graph(
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
+    set_task_id_by_node = render_config.set_task_id_by_node
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -356,6 +372,7 @@ def build_airflow_graph(
             source_rendering_behavior=source_rendering_behavior,
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
+            set_task_id_by_node=set_task_id_by_node,
             node=node,
         )
         if task_or_group is not None:

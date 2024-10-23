@@ -135,7 +135,7 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
-    set_task_id_by_node: Callable[..., Any] | None = None
+    set_task_id_by_node: Callable[..., Any] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -248,7 +248,7 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
-        set_task_id_by_node=set_task_id_by_node
+        set_task_id_by_node=set_task_id_by_node,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task

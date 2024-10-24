@@ -276,6 +276,6 @@ class CosmosPlugin(AirflowPlugin):
         "name": "dbt Docs",
         "category": "Browse",
         "view": dbt_docs_view,
-        "href": conf.get("webserver", "base_url") + "/dbt_docs",
+        "href": conf.get("webserver", "base_url") + "/cosmos/dbt_docs",
     }
     appbuilder_views = [item]

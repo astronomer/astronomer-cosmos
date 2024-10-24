@@ -1,13 +1,21 @@
 Changelog
 =========
 
-1.7.1a1 (2024-10-24)
+
+1.7.1a3 (2024-10-24)
 --------------------
+
+Bug fixes
+
+* Fix displaying dbt docs as menu item in Astro by @tatiana in #1280
+
+Docs
+
+* Update the URL for sample dbt docs hosted in Astronomer S3 bucket by @pankajkoti in #1283
 
 Others
 
-* Fix release to PyPI after rst directive disabled by @tatiana in #1281
-
+* Fix release after the raw rst directive disabled was disabled in PyPI by @tatiana in #1282
 
 
 1.7.0 (2024-10-04)

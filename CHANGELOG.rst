@@ -9,6 +9,10 @@ Bug fixes
 
 * Fix displaying dbt docs as menu item in Astro by @tatiana in #1280
 
+Docs
+
+* Update the URL for sample dbt docs hosted in Astronomer S3 bucket by @pankajkoti in #1283
+
 Others
 
 * Fix release after the raw rst directive disabled was disabled in PyPI by @tatiana in #1282

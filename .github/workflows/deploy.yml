@@ -3,7 +3,6 @@ name: Deploy to PyPi
 on:
   release:
     types: [published]
-    branches: [fix-release]
 
 jobs:
   build:

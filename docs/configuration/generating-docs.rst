@@ -3,7 +3,7 @@
 Generating Docs
 ===============
 
-dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-docs.s3-website-us-east-1.amazonaws.com/>`_.
+dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
 
 After generating the dbt docs, you can host them natively within Airflow via the Cosmos Airflow plugin; see `Hosting Docs <hosting-docs.html>`__ for more information.
 

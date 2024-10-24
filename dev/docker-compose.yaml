@@ -10,7 +10,7 @@ x-airflow-common:
   environment:
     &airflow-common-env
     DB_BACKEND: postgres
-    AIRFLOW__COSMOS__DBT_DOCS_DIR: http://cosmos-docs.s3-website-us-east-1.amazonaws.com/
+    AIRFLOW__COSMOS__DBT_DOCS_DIR: http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:pg_password@postgres:5432/airflow
     AIRFLOW__CORE__FERNET_KEY: ''

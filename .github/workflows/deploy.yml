@@ -3,6 +3,7 @@ name: Deploy to PyPi
 on:
   release:
     types: [published]
+    branches: [fix-release]
 
 jobs:
   build:
@@ -37,7 +38,7 @@ jobs:
           path: dist
 
       - name: Push build artifacts to PyPi
-        uses: pypa/gh-action-pypi-publish@v1.8.14
+        uses: pypa/gh-action-pypi-publish@v1.10.3
         with:
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}

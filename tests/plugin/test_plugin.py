@@ -305,6 +305,7 @@ def test_open_file_local(mock_file):
     assert res == "mock file contents"
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "url_path", ["/cosmos/dbt_docs", "/cosmos/dbt_docs_index.html", "/cosmos/catalog.json", "/cosmos/manifest.json"]
 )

@@ -572,6 +572,7 @@ def _set_task_id_by_node(node: DbtNode) -> str:
     """for test_create_task_metadata_set_task_id_by_node"""
     return f"new_task_id_{node.name}_{node.resource_type.value}"
 
+
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.9"),
     reason="Airflow task did not have display_name until the 2.9 release",

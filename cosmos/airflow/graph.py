@@ -133,7 +133,7 @@ def _get_task_id_and_args(
     use_task_group: bool,
     set_task_id_by_node: Callable[..., Any] | None,
     resource_suffix: str,
-) -> tuple[str, dict]:
+) -> tuple[str, dict[str, Any]]:
     """
     Generate task ID and update args with display name if needed.
     """

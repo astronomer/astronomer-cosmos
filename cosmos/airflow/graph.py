@@ -127,6 +127,24 @@ def create_test_task_metadata(
         extra_context=extra_context,
     )
 
+def _get_task_id_and_args(
+    node: DbtNode,
+    use_task_group: bool,
+    set_task_id_by_node: Callable[..., Any] | None,
+    resource_suffix: str,
+) -> tuple[str, dict]:
+    """
+    Generate task ID and update args with display name if needed.
+    """
+    args_update = {}
+    if use_task_group:
+        task_id = resource_suffix
+    elif set_task_id_by_node:
+        task_id = set_task_id_by_node(node)
+        args_update["task_display_name"] = f"{node.name}_{resource_suffix}"
+    else:
+        task_id = f"{node.name}_{resource_suffix}"
+    return task_id, args_update
 
 def create_task_metadata(
     node: DbtNode,
@@ -156,68 +174,60 @@ def create_task_metadata(
         DbtResourceType.TEST: "DbtTest",
         DbtResourceType.SOURCE: "DbtSource",
     }
-    args = {**args, **{"models": node.resource_name}}
-
-    if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
-        extra_context = {
-            "dbt_node_config": node.context_dict,
-            "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
-        }
-        if node.resource_type == DbtResourceType.MODEL:
-            if use_task_group is True:
-                task_id = "run"
-            elif set_task_id_by_node:
-                task_id = set_task_id_by_node(node)
-                args["task_display_name"] = f"{node.name}_run"
-            else:
-                task_id = f"{node.name}_run"
-        elif node.resource_type == DbtResourceType.SOURCE:
-            if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
-                source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
-                and node.has_freshness is False
-                and node.has_test is False
-            ):
-                return None
-            # TODO: https://github.com/astronomer/astronomer-cosmos
-            # pragma: no cover
-            args["select"] = f"source:{node.resource_name}"
-            args.pop("models")
-            if use_task_group is True:
-                task_id = node.resource_type.value
-            elif set_task_id_by_node:
-                task_id = set_task_id_by_node(node)
-                args["task_display_name"] = f"{node.name}_source"
-            else:
-                task_id = f"{node.name}_source"
-            if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
-                # render sources without freshness as empty operators
-                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator")
-        else:
-            if use_task_group is True:
-                task_id = node.resource_type.value
-            elif set_task_id_by_node:
-                task_id = set_task_id_by_node(node)
-                args["task_display_name"] = f"{node.name}_{node.resource_type.value}"
-            else:
-                task_id = f"{node.name}_{node.resource_type.value}"
-
-        task_metadata = TaskMetadata(
-            id=task_id,
-            owner=node.owner,
-            operator_class=calculate_operator_class(
-                execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
-            ),
-            arguments=args,
-            extra_context=extra_context,
-        )
-        return task_metadata
-    else:
+    if DbtResourceType(node.resource_type) not in DEFAULT_DBT_RESOURCES or node.resource_type not in dbt_resource_to_class:
         msg = (
             f"Unavailable conversion function for <{node.resource_type}> (node <{node.unique_id}>). "
             "Define a converter function using render_config.node_converters."
         )
         logger.warning(msg)
         return None
+
+    args = {**args, **{"models": node.resource_name}}
+    extra_context = {
+        "dbt_node_config": node.context_dict,
+        "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
+    }
+
+    if node.resource_type == DbtResourceType.MODEL:
+        task_id, args_update = _get_task_id_and_args(node,use_task_group,set_task_id_by_node,"run")
+        args.update(args_update)
+    elif node.resource_type == DbtResourceType.SOURCE:
+        if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
+            source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
+            and node.has_freshness is False
+            and node.has_test is False
+        ):
+            return None
+        # TODO: https://github.com/astronomer/astronomer-cosmos
+        # pragma: no cover
+        args["select"] = f"source:{node.resource_name}"
+        args.pop("models")
+        task_id, args_update = _get_task_id_and_args(node,use_task_group,set_task_id_by_node,"source")
+        args.update(args_update)
+        if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
+            # render sources without freshness as empty operators
+            # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
+            if "task_display_name" in args:
+                args = {
+                    "task_display_name": args["task_display_name"]
+                }
+            else:
+                args = {}
+            return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
+    else:
+        task_id, args_update = _get_task_id_and_args(node,use_task_group,set_task_id_by_node,node.resource_type.value)
+        args.update(args_update)
+
+    task_metadata = TaskMetadata(
+        id=task_id,
+        owner=node.owner,
+        operator_class=calculate_operator_class(
+            execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
+        ),
+        arguments=args,
+        extra_context=extra_context,
+    )
+    return task_metadata
 
 
 def generate_task_or_group(
@@ -230,7 +240,7 @@ def generate_task_or_group(
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
-    set_task_id_by_node: Callable[..., Any] | None,
+    set_task_id_by_node: Callable[..., Any] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None

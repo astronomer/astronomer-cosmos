@@ -18,13 +18,13 @@ You can provide a function to convert the model name to an ASCII-compatible form
 
     from slugify import slugify
 
+
     def set_task_id_by_node(node):
         return slugify(node.name)
+
 
     from cosmos import DbtTaskGroup, RenderConfig
 
     jaffle_shop = DbtTaskGroup(
-        render_config=RenderConfig(
-        set_task_id_by_node=set_task_id_by_node
-        )
+        render_config=RenderConfig(set_task_id_by_node=set_task_id_by_node)
     )

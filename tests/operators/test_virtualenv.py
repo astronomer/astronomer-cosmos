@@ -6,16 +6,19 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import airflow
 import pytest
 from airflow.models import DAG
 from airflow.models.connection import Connection
+from packaging.version import Version
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.virtualenv import DbtSeedVirtualenvOperator, DbtVirtualenvBaseOperator
+from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from tests.utils import test_dag as run_test_dag
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
@@ -354,32 +357,21 @@ def test__release_venv_lock_current_process(tmpdir):
     assert not lockfile.exists()
 
 
-@pytest.mark.integration  # although we're not running dbt, we are still creating a virtualenv
-@patch("cosmos.operators.local.FullOutputSubprocessHook.run_command")
-@patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
-def test_integration_virtualenv_operator(mock_handle_exception_subprocess, mock_run_command):
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.5"),
+    reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",
+)
+@pytest.mark.integration
+def test_integration_virtualenv_operator(caplog):
     """
     Confirm we're using the correct dbt command to run with virtualenv.
     """
+    from airflow.models.dagbag import DagBag
 
-    with DAG("test-id-virtualenv", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedVirtualenvOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-            py_system_site_packages=False,
-            py_requirements=["dbt-postgres"],
-            virtualenv_dir=Path("/tmp/persistent-venv2"),
-        )
-        seed_operator
+    dag_bag = DagBag(dag_folder=None, include_examples=False)
+    dag = dag_bag.get_dag("example_virtualenv_mini")
 
-    run_test_dag(dag)
+    dag.test()
 
-    assert len(mock_run_command.call_args_list) == 2
-    assert mock_run_command.call_args_list[0].kwargs["command"][0] == "/tmp/persistent-venv2/bin/dbt"
-    assert mock_run_command.call_args_list[0].kwargs["command"][1] == "deps"
-    assert mock_run_command.call_args_list[1].kwargs["command"][0] == "/tmp/persistent-venv2/bin/dbt"
-    assert mock_run_command.call_args_list[1].kwargs["command"][1] == "seed"
+    assert "Trying to run the command:\n ['/tmp/persistent-venv2', 'deps'" in caplog.text
+    assert "Trying to run the command:\n ['/tmp/persistent-venv2', 'seed'" in caplog.text

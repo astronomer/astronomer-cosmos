@@ -13,7 +13,7 @@ Bug fixes
 Enhancements
 
 * Improve dbt Docs Hosting Debugging -- Update dbt_docs_not_set_up.html by @johnmcochran in #1250
-* Minor refactor on VirtualenvOperators & add test for PR by @tatiana in #1253
+* Minor refactor on VirtualenvOperators & add test for PR #1253 by @tatiana in #1286
 
 Docs
 

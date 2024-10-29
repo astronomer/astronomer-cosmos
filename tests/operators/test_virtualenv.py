@@ -373,5 +373,5 @@ def test_integration_virtualenv_operator(caplog):
 
     dag.test()
 
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2', 'deps'" in caplog.text
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2', 'seed'" in caplog.text
+    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
+    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text

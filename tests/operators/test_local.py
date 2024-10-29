@@ -175,9 +175,24 @@ def test_dbt_base_operator_set_invocation_methods(invocation_mode, invoke_dbt_me
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config, task_id="my-task", project_dir="my/dir", invocation_mode=invocation_mode
     )
-    dbt_base_operator._set_invocation_methods()
     assert dbt_base_operator.invoke_dbt.__name__ == invoke_dbt_method
     assert dbt_base_operator.handle_exception.__name__ == handle_exception_method
+
+
+def test_dbt_base_operator_invalid_invocation_mode():
+    """Tests that an invalid invocation_mode raises a ValueError when invoke_dbt or handle_exception is accessed."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    operator.invocation_mode = "invalid_mode"
+
+    with pytest.raises(ValueError, match="Invalid invocation mode: invalid_mode"):
+        _ = operator.invoke_dbt
+
+    with pytest.raises(ValueError, match="Invalid invocation mode: invalid_mode"):
+        _ = operator.handle_exception
 
 
 @pytest.mark.parametrize(

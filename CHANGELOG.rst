@@ -1,21 +1,33 @@
 Changelog
 =========
 
-
-1.7.1a3 (2024-10-24)
+1.7.1 (2024-10-29)
 --------------------
 
 Bug fixes
 
+* Fix ``DbtVirtualenvBaseOperator`` to use correct virtualenv Python path by kesompochy in #1252
 * Fix displaying dbt docs as menu item in Astro by @tatiana in #1280
+* Fix: Replace login by user for clickhouse profile by @petershenri in #1255
+
+Enhancements
+
+* Improve dbt Docs Hosting Debugging -- Update dbt_docs_not_set_up.html by @johnmcochran in #1250
+* Minor refactor on VirtualenvOperators & add test for PR by @tatiana in #1253
 
 Docs
 
+* Add Welcome Section and "What Is Cosmos" Blurb to Home Page by @cmarteepants and @yanmastin-astro in #1251
 * Update the URL for sample dbt docs hosted in Astronomer S3 bucket by @pankajkoti in #1283
+* Add dedicated scarf tracking pixel to readme by @cmarteepants in #1256
+
 
 Others
 
-* Fix release after the raw rst directive disabled was disabled in PyPI by @tatiana in #1282
+* Update ``CODEOWNERS`` to track all files by @pankajkoti in #1284
+* Fix release after the ``raw`` rst directive disabled was disabled in PyPI by @tatiana in #1282
+* Update issue template ``bug.yml`` - cosmos version update in the dropdown by @pankajkoti in #1275
+* Pre-commit hook updates in #1285, #1274, #1254, #1244
 
 
 1.7.0 (2024-10-04)

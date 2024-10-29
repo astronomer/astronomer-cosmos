@@ -22,6 +22,7 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
+DAGS_FOLDER = Path(__file__).parent.parent.parent / "dev/dags/"
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -368,7 +369,7 @@ def test_integration_virtualenv_operator(caplog):
     """
     from airflow.models.dagbag import DagBag
 
-    dag_bag = DagBag(dag_folder=None, include_examples=False)
+    dag_bag = DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
     dag = dag_bag.get_dag("example_virtualenv_mini")
 
     dag.test()

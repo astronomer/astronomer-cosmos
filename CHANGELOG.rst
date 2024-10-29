@@ -25,7 +25,7 @@ Docs
 Others
 
 * Update ``CODEOWNERS`` to track all files by @pankajkoti in #1284
-* Fix release after the ``raw`` rst directive disabled was disabled in PyPI by @tatiana in #1282
+* Fix release after the ``raw`` rst directive was disabled in PyPI by @tatiana in #1282
 * Update issue template ``bug.yml`` - cosmos version update in the dropdown by @pankajkoti in #1275
 * Pre-commit hook updates in #1285, #1274, #1254, #1244
 

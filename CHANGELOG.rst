@@ -6,7 +6,7 @@ Changelog
 
 Bug fixes
 
-* Fix ``DbtVirtualenvBaseOperator`` to use correct virtualenv Python path by kesompochy in #1252
+* Fix ``DbtVirtualenvBaseOperator`` to use correct virtualenv Python path by @kesompochy in #1252
 * Fix displaying dbt docs as menu item in Astro by @tatiana in #1280
 * Fix: Replace login by user for clickhouse profile by @petershenri in #1255
 

@@ -82,20 +82,6 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if not self.py_requirements:
             self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")
 
-    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
-        self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
-        if self._py_bin is not None:
-            self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
-            command[0] = str(Path(self._py_bin).parent / "dbt")
-        subprocess_result = self.subprocess_hook.run_command(
-            command=command,
-            env=env,
-            cwd=cwd,
-            output_encoding=self.output_encoding,
-        )
-        self.log.info(subprocess_result.output)
-        return subprocess_result
-
     def run_command(
         self,
         cmd: list[str],

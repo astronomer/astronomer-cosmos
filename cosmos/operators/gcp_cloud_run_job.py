@@ -15,6 +15,7 @@ from cosmos.operators.base import (
     DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
+    DbtSourceMixin,
     DbtTestMixin,
 )
 
@@ -121,6 +122,15 @@ class DbtSeedGcpCloudRunJobOperator(DbtSeedMixin, DbtGcpCloudRunJobBaseOperator)
     """
 
     template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSourceGcpCloudRunJobOperator(DbtSourceMixin, DbtGcpCloudRunJobBaseOperator):
+    """
+    Executes a dbt core source freshness command.
+    """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

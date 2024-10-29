@@ -11,6 +11,7 @@ import psutil
 from airflow.utils.python_virtualenv import prepare_virtualenv
 
 from cosmos import settings
+from cosmos.constants import InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.log import get_logger
@@ -78,6 +79,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
         self.max_retries_lock = settings.virtualenv_max_retries_lock
         self._py_bin: str | None = None
+        kwargs["invocation_mode"] = InvocationMode.SUBPROCESS
         super().__init__(**kwargs)
         if not self.py_requirements:
             self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")
@@ -86,15 +88,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if self._py_bin is not None:
             self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
             command[0] = str(Path(self._py_bin).parent / "dbt")
-        self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
-        subprocess_result = self.subprocess_hook.run_command(
-            command=command,
-            env=env,
-            cwd=cwd,
-            output_encoding=self.output_encoding,
-        )
-        self.log.info(subprocess_result.output)
-        return subprocess_result
+        return super().run_subprocess(command, env, cwd)
 
     def run_command(
         self,

@@ -2,8 +2,6 @@ name: Handle stale issues and PRs
 on:
   schedule:
     - cron: "0 11 * * *"
-  push:
-    branches: [stale-bot]
 jobs:
   handle-stale:
     runs-on: ubuntu-latest

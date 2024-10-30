@@ -14,7 +14,7 @@ jobs:
       - uses: actions/stale@v9
         with:
           days-before-issue-stale: 30
-          days-before-issue-close: -1
+          days-before-issue-close: -1  # Never closes issues, more information in https://github.com/actions/stale/
           stale-issue-label: "stale"
           stale-issue-message: "This issue is stale because it has been open for 30 days with no activity."
           days-before-pr-stale: 30

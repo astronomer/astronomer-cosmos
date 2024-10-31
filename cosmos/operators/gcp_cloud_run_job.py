@@ -127,18 +127,18 @@ class DbtSeedGcpCloudRunJobOperator(DbtSeedMixin, DbtGcpCloudRunJobBaseOperator)
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceGcpCloudRunJobOperator(DbtSourceMixin, DbtGcpCloudRunJobBaseOperator):
+class DbtSnapshotGcpCloudRunJobOperator(DbtSnapshotMixin, DbtGcpCloudRunJobBaseOperator):
     """
-    Executes a dbt core source freshness command.
+    Executes a dbt core snapshot command.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotGcpCloudRunJobOperator(DbtSnapshotMixin, DbtGcpCloudRunJobBaseOperator):
+class DbtSourceGcpCloudRunJobOperator(DbtSourceMixin, DbtGcpCloudRunJobBaseOperator):
     """
-    Executes a dbt core snapshot command.
+    Executes a dbt core source freshness command.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

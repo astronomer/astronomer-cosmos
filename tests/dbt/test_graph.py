@@ -1102,6 +1102,63 @@ def test_run_command(mock_popen, stdout, returncode):
     assert return_value == stdout
 
 
+def test_parse_dbt_ls_output_real_life_customer_bug(caplog):
+    dbt_ls_output = """
+11:20:43  Running with dbt=1.7.6
+11:20:45  Registered adapter: bigquery=1.7.2
+11:20:45  Unable to do partial parsing because saved manifest not found. Starting full parse.
+/***************************/
+Values returned by mac_get_values:
+{}
+/***************************/
+{"name": "some_model", "resource_type": "model", "package_name": "some_package", "original_file_path": "models/some_model.sql", "unique_id": "model.some_package.some_model", "alias": "some_model_some_package_1_8_0", "config": {"enabled": true, "alias": "some_model_some_package-1.8.0", "schema": "some_schema", "database": null, "tags": [], "meta": {}, "group": null, "materialized": "view", "incremental_strategy": null, "persist_docs": {}, "post-hook": [], "pre-hook": [], "quoting": {}, "column_types": {}, "full_refresh": null, "unique_key": null, "on_schema_change": "ignore", "on_configuration_change": "apply", "grants": {}, "packages": [], "docs": {"show": true, "node_color": null}, "contract": {"enforced": false, "alias_types": true}, "access": "protected"}, "tags": [], "depends_on": {"macros": [], "nodes": ["source.some_source"]}}"""
+
+    expected_nodes = {
+        "model.some_package.some_model": DbtNode(
+            unique_id="model.some_package.some_model",
+            resource_type=DbtResourceType.MODEL,
+            file_path=Path("fake-project/models/some_model.sql"),
+            tags=[],
+            config={
+                "access": "protected",
+                "alias": "some_model_some_package-1.8.0",
+                "column_types": {},
+                "contract": {
+                    "alias_types": True,
+                    "enforced": False,
+                },
+                "database": None,
+                "docs": {
+                    "node_color": None,
+                    "show": True,
+                },
+                "enabled": True,
+                "full_refresh": None,
+                "grants": {},
+                "group": None,
+                "incremental_strategy": None,
+                "materialized": "view",
+                "meta": {},
+                "on_configuration_change": "apply",
+                "on_schema_change": "ignore",
+                "packages": [],
+                "persist_docs": {},
+                "post-hook": [],
+                "pre-hook": [],
+                "quoting": {},
+                "schema": "some_schema",
+                "tags": [],
+                "unique_key": None,
+            },
+            depends_on=["source.some_source"],
+        ),
+    }
+    nodes = parse_dbt_ls_output(Path("fake-project"), dbt_ls_output)
+
+    assert expected_nodes == nodes
+    assert "Could not parse following the dbt ls line even though it was a valid JSON `{}" in caplog.text
+
+
 def test_parse_dbt_ls_output():
     fake_ls_stdout = '{"resource_type": "model", "name": "fake-name", "original_file_path": "fake-file-path.sql", "unique_id": "fake-unique-id", "tags": [], "config": {}}'
 

@@ -208,7 +208,9 @@ def create_task_metadata(
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
         else:
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, node.resource_type.value)
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, node.resource_type.value
+            )
 
         task_metadata = TaskMetadata(
             id=task_id,
@@ -227,6 +229,7 @@ def create_task_metadata(
         )
         logger.warning(msg)
         return None
+
 
 def generate_task_or_group(
     dag: DAG,

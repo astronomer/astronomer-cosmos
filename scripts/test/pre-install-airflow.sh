@@ -24,7 +24,7 @@ uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.t
 uv pip install pydantic --constraint /tmp/constraint.txt
 
 
-if [ "$AIRFLOW_VERSION" = "2.7" ]; then
+if [ "$AIRFLOW_VERSION" = "2.7" ]  || [ "$AIRFLOW_VERSION" = "2.6" ]; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt

@@ -141,19 +141,13 @@ packages = ["/cosmos"]
 
 [tool.hatch.envs.tests]
 dependencies = [
-    "astronomer-cosmos[tests]",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
-    "apache-airflow-providers-amazon[s3fs]>=3.0.0",
-    "apache-airflow-providers-docker>=3.5.0",
-    "apache-airflow-providers-google",
-    "apache-airflow-providers-microsoft-azure",
-    "apache-airflow-providers-postgres",
+    # do not install Airflow dependencies here!
+    # we need to use constrantis and we're doing this in the pre-install-commands
     "types-PyYAML",
     "types-attrs",
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "apache-airflow~={matrix:airflow}.0,!=2.9.0,!=2.9.1",  # https://github.com/apache/airflow/pull/39670
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

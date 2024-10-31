@@ -8,7 +8,7 @@ Task display name
 
 In Airflow, `task_id` does not support non-ASCII characters. Therefore, if users wish to use non-ASCII characters (such as their native language) as display names while keeping `task_id` in ASCII, they can use the `display_name` parameter.
 
-To work with projects that use non-ASCII characters in model names, the `set_task_id_by_node` field of `RenderConfig` can be utilized.
+To work with projects that use non-ASCII characters in model names, the `normalize_task_id` field of `RenderConfig` can be utilized.
 
 Example:
 
@@ -19,12 +19,12 @@ You can provide a function to convert the model name to an ASCII-compatible form
     from slugify import slugify
 
 
-    def set_task_id_by_node(node):
+    def normalize_task_id(node):
         return slugify(node.name)
 
 
     from cosmos import DbtTaskGroup, RenderConfig
 
     jaffle_shop = DbtTaskGroup(
-        render_config=RenderConfig(set_task_id_by_node=set_task_id_by_node)
+        render_config=RenderConfig(normalize_task_id=normalize_task_id)
     )

@@ -63,7 +63,7 @@ class RenderConfig:
     :param enable_mock_profile: Allows to enable/disable mocking profile. Enabled by default. Mock profiles are useful for parsing Cosmos DAGs in the CI, but should be disabled to benefit from partial parsing (since Cosmos 1.4).
     :param source_rendering_behavior: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6).
     :param airflow_vars_to_purge_dbt_ls_cache: Specify Airflow variables that will affect the LoadMode.DBT_LS cache.
-    :param set_task_id_by_node: A callable that takes a dbt node as input and returns the task ID. This allows users to assign a custom node ID separate from the display name.
+    :param normalize_task_id: A callable that takes a dbt node as input and returns the task ID. This allows users to assign a custom node ID separate from the display name.
     """
 
     emit_datasets: bool = True
@@ -82,7 +82,7 @@ class RenderConfig:
     enable_mock_profile: bool = True
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
-    set_task_id_by_node: Callable[..., Any] | None = None
+    normalize_task_id: Callable[..., Any] | None = None
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

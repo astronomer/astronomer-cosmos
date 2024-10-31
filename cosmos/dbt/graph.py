@@ -131,16 +131,20 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
-            node = DbtNode(
-                unique_id=node_dict["unique_id"],
-                resource_type=DbtResourceType(node_dict["resource_type"]),
-                depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                file_path=project_path / node_dict["original_file_path"],
-                tags=node_dict.get("tags", []),
-                config=node_dict.get("config", {}),
-            )
-            nodes[node.unique_id] = node
-            logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+            try:
+                node = DbtNode(
+                    unique_id=node_dict["unique_id"],
+                    resource_type=DbtResourceType(node_dict["resource_type"]),
+                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+                    file_path=project_path / node_dict["original_file_path"],
+                    tags=node_dict.get("tags", []),
+                    config=node_dict.get("config", {}),
+                )
+            except KeyError:
+                logger.warning("SKIPPING Could not parse the node even though it is a valid JSON `%s`", line)
+            else:
+                nodes[node.unique_id] = node
+                logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
     return nodes
 
 

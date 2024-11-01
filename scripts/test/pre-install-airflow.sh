@@ -33,6 +33,8 @@ uv pip -v install "apache-airflow-providers-postgres" --constraint /tmp/constrai
 
 if [ "$AIRFLOW_VERSION" >= "2.7" ] ; then
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+else
+   uv pip install "apache-airflow-providers-kubernetes" --constraint /tmp/constraint.txt
 fi
 
 rm /tmp/constraint.txt

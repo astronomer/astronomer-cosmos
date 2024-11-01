@@ -172,7 +172,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
         "seed": DbtSeedGcpCloudRunJobOperator(**BASE_KWARGS),
         "build": DbtBuildGcpCloudRunJobOperator(**BASE_KWARGS),
         "snapshot": DbtSnapshotGcpCloudRunJobOperator(**BASE_KWARGS),
-        "source freshness": DbtSourceGcpCloudRunJobOperator(**BASE_KWARGS),
+        "source": DbtSourceGcpCloudRunJobOperator(**BASE_KWARGS),
         "run-operation": DbtRunOperationGcpCloudRunJobOperator(macro_name="some-macro", **BASE_KWARGS),
     }
 

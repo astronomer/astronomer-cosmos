@@ -25,7 +25,6 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
 uv pip install pydantic --constraint /tmp/constraint.txt
-
 uv pip -v install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
 uv pip -v install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
 uv pip -v install "apache-airflow-providers-google" --constraint /tmp/constraint.txt

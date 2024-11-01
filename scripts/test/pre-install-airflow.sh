@@ -30,11 +30,6 @@ uv pip -v install "apache-airflow-providers-docker" --constraint /tmp/constraint
 uv pip -v install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
 uv pip -v install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
 uv pip -v install "apache-airflow-providers-postgres" --constraint /tmp/constraint.txt
-
-if [ "$AIRFLOW_VERSION" == "2.4" || "$AIRFLOW_VERSION" == "2.5" || "$AIRFLOW_VERSION" == "2.6" ] ; then
-   uv pip install "apache-airflow-providers-kubernetes" --constraint /tmp/constraint.txt
-else
-  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-fi
+uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
 
 rm /tmp/constraint.txt

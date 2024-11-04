@@ -31,10 +31,10 @@ uv pip install apache-airflow-providers-docker --constraint /tmp/constraint.txt
 uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.txt
 
 if [ "$AIRFLOW_VERSION" = "2.4" ] ; then
-  uv pip install "apache-airflow-providers-amazon[s3fs]" \
-    "apache-airflow-providers-cncf-kubernetes" \
-    "apache-airflow-providers-google<10.11." \
-    "apache-airflow-providers-microsoft-azure"
+  uv pip install "apache-airflow-providers-amazon[s3fs]" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
+  uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install pyopenssl --upgrade
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" # --constraint /tmp/constraint.txt
@@ -44,3 +44,12 @@ else
 fi
 
 rm /tmp/constraint.txt
+
+actual_version=$(airflow version | cut -d. -f1,2)
+
+if [ "$actual_version" == $AIRFLOW_VERSION ]; then
+    echo "Version is as expected: $actual_version"
+else
+    echo "Version does not match. Expected: $expected_version, but got: $actual_version"
+    exit 1
+fi

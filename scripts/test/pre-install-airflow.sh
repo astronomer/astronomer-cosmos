@@ -39,7 +39,7 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] ; then
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google>=10.11.0" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
 fi
 

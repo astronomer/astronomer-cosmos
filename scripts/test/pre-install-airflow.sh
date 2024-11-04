@@ -36,12 +36,16 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] ; then
   uv pip install "apache-airflow-providers-cncf-kubernetes>=5.1.1"
   uv pip install "apache-airflow-providers-microsoft-azure~=7.0.0"
   uv pip install pyopenssl --upgrade
+elif [ "$AIRFLOW_VERSION" = "2.5" ] ; then
+  uv pip install "apache-airflow-providers-amazon[s3fs]~=8.12.0"
+  uv pip install "apache-airflow-providers-cncf-kubernetes~=7.10.0"
+  uv pip install "apache-airflow-providers-google~=10.12.0"
+  uv pip install "apache-airflow-providers-microsoft-azure~=8.3.0"
 elif [ "$AIRFLOW_VERSION" = "2.6" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]~=8.20.0"
   uv pip install "apache-airflow-providers-cncf-kubernetes~=8.1.1"
   uv pip install "apache-airflow-providers-google~=10.17.0"
   uv pip install "apache-airflow-providers-microsoft-azure~=9.0.1"
-  #uv pip install "urllib3<2"
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]>=3.0.0" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes>=5.1.1" --constraint /tmp/constraint.txt

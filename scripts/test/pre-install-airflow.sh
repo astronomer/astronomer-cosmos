@@ -42,6 +42,7 @@ elif [ "$AIRFLOW_VERSION" = "2.5" ] ; then
   uv pip install "apache-airflow-providers-google~=10.12.0"
   uv pip install "apache-airflow-providers-microsoft-azure~=8.3.0"
 elif [ "$AIRFLOW_VERSION" = "2.6" ] ; then
+  uv pip install "typing_extensions<4.6"
   uv pip install "apache-airflow-providers-amazon[s3fs]~=8.20.0"
   uv pip install "apache-airflow-providers-cncf-kubernetes~=8.1.1"
   uv pip install "apache-airflow-providers-google~=10.17.0"

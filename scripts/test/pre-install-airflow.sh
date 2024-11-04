@@ -48,8 +48,8 @@ rm /tmp/constraint.txt
 actual_version=$(airflow version | cut -d. -f1,2)
 
 if [ "$actual_version" == $AIRFLOW_VERSION ]; then
-    echo "Version is as expected: $actual_version"
+    echo "Version is as expected: $AIRFLOW_VERSION"
 else
-    echo "Version does not match. Expected: $expected_version, but got: $actual_version"
+    echo "Version does not match. Expected: $AIRFLOW_VERSION, but got: $actual_version"
     exit 1
 fi

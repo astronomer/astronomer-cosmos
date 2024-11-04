@@ -36,10 +36,15 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFL
   uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install pyopenssl --upgrade
+elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install  "apache-airflow-providers-google>10.11" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google>=10.11.0" --constraint /tmp/constraint.txt
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
 fi
 

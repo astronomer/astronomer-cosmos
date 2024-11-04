@@ -511,14 +511,10 @@ jobs:
 
       - name: Install packages and dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -e ".[tests]"
-          pip install apache-airflow-providers-cncf-kubernetes
+          python -m pip install uv
+          uv pip install --system hatch
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
           pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
-          pip install apache-airflow==${{ matrix.airflow-version }}
-          # hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
 
       - name: Run kubernetes tests
         run: |

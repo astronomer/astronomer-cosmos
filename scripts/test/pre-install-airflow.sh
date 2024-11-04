@@ -32,8 +32,8 @@ uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.tx
 
 if [ "$AIRFLOW_VERSION" = "2.4" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]~=8.7.1"
-  uv pip install "apache-airflow-providers-google=~10.10.1"
   uv pip install "apache-airflow-providers-cncf-kubernetes~=8.4.2"
+  uv pip install "apache-airflow-providers-google~=10.10.1"
   uv pip install "apache-airflow-providers-microsoft-azure~=7.0.0"
   uv pip install pyopenssl --upgrade
 elif [ "$AIRFLOW_VERSION" = "2.5" ] ; then

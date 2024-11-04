@@ -30,7 +30,7 @@ uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.t
 uv pip install apache-airflow-providers-docker --constraint /tmp/constraint.txt
 uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.txt
 
-if [ "$AIRFLOW_VERSION" = "2.4" ] ; then
+if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
   uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"

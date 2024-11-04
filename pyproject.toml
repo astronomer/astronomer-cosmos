@@ -127,6 +127,8 @@ packages = ["/cosmos"]
 
 [tool.hatch.envs.tests]
 dependencies = [
+    # do not install Airflow dependencies here!
+    # we need to use constrantis and we're doing this in the `pre-install-commands`
     "packaging>=22.0",
     "pytest>=6.0",
     "pytest-split",
@@ -136,8 +138,6 @@ dependencies = [
     "pytest-describe",
     "sqlalchemy-stubs", # Change when sqlalchemy is upgraded https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
     "pre-commit",
-    # do not install Airflow dependencies here!
-    # we need to use constrantis and we're doing this in the pre-install-commands
     "types-PyYAML",
     "types-attrs",
     "types-pytz",

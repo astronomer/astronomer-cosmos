@@ -17,7 +17,15 @@ from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
 from pendulum import datetime
 
-from cosmos import DbtSeedKubernetesOperator, DbtTaskGroup, ExecutionConfig, ExecutionMode, ProfileConfig, RenderConfig
+from cosmos import (
+    DbtSeedKubernetesOperator,
+    DbtTaskGroup,
+    ExecutionConfig,
+    ExecutionMode,
+    ProfileConfig,
+    ProjectConfig,
+    RenderConfig,
+)
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -75,6 +83,7 @@ with DAG(
 
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(
+        project_config=ProjectConfig(),
         profile_config=ProfileConfig(
             profile_name="postgres_profile",
             target_name="dev",

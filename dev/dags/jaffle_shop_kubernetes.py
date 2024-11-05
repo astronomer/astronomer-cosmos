@@ -83,7 +83,7 @@ with DAG(
 
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(
-        project_config=ProjectConfig(name="jaffle_shop"),
+        project_config=ProjectConfig(project_name="jaffle_shop"),
         profile_config=ProfileConfig(
             profile_name="postgres_profile",
             target_name="dev",

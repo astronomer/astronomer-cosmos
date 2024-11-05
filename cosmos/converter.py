@@ -180,6 +180,8 @@ def validate_changed_config_paths(
         raise CosmosValueError(
             "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
         )
+    else:
+        project_config.project_name = render_config.project_path.stem
 
 
 class DbtToAirflowConverter:
@@ -210,6 +212,7 @@ class DbtToAirflowConverter:
         *args: Any,
         **kwargs: Any,
     ) -> None:
+
         project_config.validate_project()
 
         execution_config = execution_config or ExecutionConfig()

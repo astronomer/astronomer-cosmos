@@ -180,7 +180,10 @@ def validate_changed_config_paths(
         raise CosmosValueError(
             "RenderConfig.dbt_project_path is required for rendering an airflow DAG from a DBT Graph if no manifest is provided."
         )
-    else:
+
+    if render_config and hasattr(render_config, "project_path"):
+        # Project config is further expected to have project name
+        # even if it had no manifest
         project_config.project_name = render_config.project_path.stem
 
 

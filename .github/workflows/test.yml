@@ -491,7 +491,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.9" ]
+        airflow-version: [ "2.10" ]
     steps:
       - uses: actions/checkout@v3
         with:

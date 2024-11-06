@@ -413,6 +413,41 @@ def test_converter_multiple_calls_same_operator_args(
     assert operator_args == original_operator_args
 
 
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.build_airflow_graph")
+@patch("cosmos.converter.DbtGraph.load")
+def test_validate_converter_fetches_project_name_from_render_config(
+    mock_dbt_graph_load, mock_build_airflow_graph, mock_validate_project
+):
+    """
+    Allow DbtToAirflowConverter to work when using:
+     - RenderMode.DBT_LS
+     - ExecutionConfig(dbt_project_path)
+     - RenderConfig(dbt_project_path)
+    In other words, when ProjectConfig does not contain name.
+
+    This scenario can be useful when using ExecutionMode.KUBERNETES or other similar ones and was found out during:
+    https://github.com/astronomer/astronomer-cosmos/pull/1297
+    """
+    execution_config = ExecutionConfig(dbt_project_path="/data/project1")
+    project_config = ProjectConfig()
+    profile_config = MagicMock()
+    render_config = RenderConfig(dbt_project_path="/home/usr/airflow/project1")
+
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+
+    mock_build_airflow_graph.assert_called_once()
+    assert mock_build_airflow_graph.call_args.kwargs["dbt_project_name"] == "project1"
+
+
 @pytest.mark.parametrize("invocation_mode", [None, InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 @patch("cosmos.config.ProjectConfig.validate_project")
 @patch("cosmos.converter.validate_initial_user_config")

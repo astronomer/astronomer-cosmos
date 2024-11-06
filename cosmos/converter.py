@@ -158,7 +158,7 @@ def validate_initial_user_config(
         )
 
 
-def validate_adapted_user_config(
+def validate_changed_config_paths(
     execution_config: ExecutionConfig | None, project_config: ProjectConfig, render_config: RenderConfig | None
 ):
     """
@@ -226,7 +226,7 @@ class DbtToAirflowConverter:
             render_config.project_path = project_config.dbt_project_path
             execution_config.project_path = project_config.dbt_project_path
 
-        validate_adapted_user_config(execution_config, project_config, render_config)
+        validate_changed_config_paths(execution_config, project_config, render_config)
 
         env_vars = copy.deepcopy(project_config.env_vars or operator_args.get("env"))
         dbt_vars = copy.deepcopy(project_config.dbt_vars or operator_args.get("vars"))
@@ -298,7 +298,7 @@ class DbtToAirflowConverter:
             execution_mode=execution_config.execution_mode,
             task_args=task_args,
             test_indirect_selection=execution_config.test_indirect_selection,
-            dbt_project_name=project_config.project_name,
+            dbt_project_name=render_config.project_name,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
         )

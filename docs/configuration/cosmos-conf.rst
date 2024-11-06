@@ -130,8 +130,12 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
 `remote_target_path`_:
     (Introduced since Cosmos 1.7.0) The path to the remote target directory. This is the directory designated to
-    remotely copy & store in the files generated and stored by dbt in the dbt project's target directory. The value
-    for the remote target path can be any of the schemes that are supported by the
+    remotely copy & store in the files generated and stored by dbt in the dbt project's target directory.
+    While this remote path is intended to copy files from the dbt project’s target directory, Cosmos currently only
+    supports copying files from the ``compiled`` directory within the ``target`` folder — and only when the execution
+    mode is set to ``ExecutionMode.AIRFLOW_ASYNC``. Future releases will add support for copying additional files from
+    the target directory.
+    The value for the remote target path can be any of the schemes that are supported by the
     `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
     feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/target_dir/``, ``gs://your_gs_bucket/target_dir/``,
     ``abfs://your_azure_container/cache_dir``, etc.)

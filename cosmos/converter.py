@@ -210,6 +210,7 @@ class DbtToAirflowConverter:
         *args: Any,
         **kwargs: Any,
     ) -> None:
+
         project_config.validate_project()
 
         execution_config = execution_config or ExecutionConfig()

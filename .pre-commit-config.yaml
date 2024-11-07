@@ -24,6 +24,9 @@ repos:
       - id: pretty-format-json
         args: ["--autofix"]
       - id: trailing-whitespace
+      - id: detect-private-key
+      - id: detect-aws-credentials
+        args: ["--allow-missing-credentials"]
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
     hooks:
@@ -54,7 +57,7 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.1
+    rev: v0.7.2
     hooks:
       - id: ruff
         args:

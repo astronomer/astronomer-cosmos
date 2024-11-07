@@ -2,8 +2,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow import __version__ as airflow_version
 from airflow.models import TaskInstance
 from airflow.utils.context import Context, context_merge
+from packaging import version
 from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
@@ -114,6 +116,11 @@ base_kwargs = {
     },
     "no_version_check": True,
 }
+
+
+if version.parse(airflow_version) == version.parse("2.4"):
+    base_kwargs["name"] = "some-pod-name"
+
 
 result_map = {
     "ls": DbtLSKubernetesOperator(**base_kwargs),

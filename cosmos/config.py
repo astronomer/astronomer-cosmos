@@ -91,6 +91,13 @@ class RenderConfig:
         # allows us to initiate this attribute from Path objects and str
         self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None
 
+    @property
+    def project_name(self) -> str:
+        if self.project_path:
+            return Path(self.project_path).stem
+        else:
+            return ""
+
     def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
         """
         When using LoadMode.DBT_LS, the dbt executable path is necessary for rendering.

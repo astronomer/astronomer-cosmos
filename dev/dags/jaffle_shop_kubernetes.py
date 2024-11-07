@@ -10,6 +10,9 @@ https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#k
 
 """
 
+import os
+from pathlib import Path
+
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.secret import Secret
 from pendulum import datetime
@@ -21,8 +24,16 @@ from cosmos import (
     ExecutionMode,
     ProfileConfig,
     ProjectConfig,
+    RenderConfig,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+AIRFLOW_PROJECT_DIR = DBT_ROOT_PATH / "jaffle_shop"
+
+K8S_PROJECT_DIR = "dags/dbt/jaffle_shop"
 
 DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
 
@@ -51,7 +62,7 @@ with DAG(
     # [START kubernetes_seed_example]
     load_seeds = DbtSeedKubernetesOperator(
         task_id="load_seeds",
-        project_dir="dags/dbt/jaffle_shop",
+        project_dir=K8S_PROJECT_DIR,
         get_logs=True,
         schema="public",
         image=DBT_IMAGE,
@@ -72,6 +83,7 @@ with DAG(
 
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(
+        project_config=ProjectConfig(),
         profile_config=ProfileConfig(
             profile_name="postgres_profile",
             target_name="dev",
@@ -82,10 +94,8 @@ with DAG(
                 },
             ),
         ),
-        project_config=ProjectConfig(dbt_project_path="dags/dbt/jaffle_shop"),
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.KUBERNETES,
-        ),
+        render_config=RenderConfig(dbt_project_path=AIRFLOW_PROJECT_DIR),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.KUBERNETES, dbt_project_path=K8S_PROJECT_DIR),
         operator_args={
             "image": DBT_IMAGE,
             "get_logs": True,

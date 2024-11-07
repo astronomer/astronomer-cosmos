@@ -154,11 +154,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.should_upload_compiled_sql = should_upload_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
-        self.invoke_dbt: Callable[..., FullOutputSubprocessResult | dbtRunnerResult]
-        self.handle_exception: Callable[..., None]
         self._dbt_runner: dbtRunner | None = None
-        if self.invocation_mode:
-            self._set_invocation_methods()
 
         if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
             from airflow.datasets import DatasetAlias
@@ -187,14 +183,23 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         """Returns hook for running the bash command."""
         return FullOutputSubprocessHook()
 
-    def _set_invocation_methods(self) -> None:
-        """Sets the associated run and exception handling methods based on the invocation mode."""
+    @property
+    def invoke_dbt(self) -> Callable[..., FullOutputSubprocessResult | dbtRunnerResult]:
         if self.invocation_mode == InvocationMode.SUBPROCESS:
-            self.invoke_dbt = self.run_subprocess
-            self.handle_exception = self.handle_exception_subprocess
+            return self.run_subprocess
         elif self.invocation_mode == InvocationMode.DBT_RUNNER:
-            self.invoke_dbt = self.run_dbt_runner
-            self.handle_exception = self.handle_exception_dbt_runner
+            return self.run_dbt_runner
+        else:
+            raise ValueError(f"Invalid invocation mode: {self.invocation_mode}")
+
+    @property
+    def handle_exception(self) -> Callable[..., None]:
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            return self.handle_exception_subprocess
+        elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+            return self.handle_exception_dbt_runner
+        else:
+            raise ValueError(f"Invalid invocation mode: {self.invocation_mode}")
 
     def _discover_invocation_mode(self) -> None:
         """Discovers the invocation mode based on the availability of dbtRunner for import. If dbtRunner is available, it will
@@ -209,7 +214,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         else:
             self.invocation_mode = InvocationMode.DBT_RUNNER
             self.log.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
-        self._set_invocation_methods()
 
     def handle_exception_subprocess(self, result: FullOutputSubprocessResult) -> None:
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:

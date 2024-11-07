@@ -303,3 +303,14 @@ def test_open_file_local(mock_file):
     res = open_file("/my/path")
     mock_file.assert_called_with("/my/path")
     assert res == "mock file contents"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "url_path", ["/cosmos/dbt_docs", "/cosmos/dbt_docs_index.html", "/cosmos/catalog.json", "/cosmos/manifest.json"]
+)
+def test_has_access_with_permissions(url_path, app):
+    dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
+    mock_check_auth = dbt_docs_view.appbuilder.sm.check_authorization
+    app.get(url_path)
+    assert mock_check_auth.call_args[0][0] == [("menu_access", "Custom Menu"), ("can_read", "Website")]

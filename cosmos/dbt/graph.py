@@ -167,21 +167,25 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
-            node = DbtNode(
-                unique_id=node_dict["unique_id"],
-                resource_type=DbtResourceType(node_dict["resource_type"]),
-                depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                file_path=project_path / node_dict["original_file_path"],
-                tags=node_dict.get("tags", []),
-                config=node_dict.get("config", {}),
-                has_freshness=(
-                    is_freshness_effective(node_dict.get("freshness"))
-                    if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
-                    else False
-                ),
-            )
-            nodes[node.unique_id] = node
-            logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+            try:
+                node = DbtNode(
+                    unique_id=node_dict["unique_id"],
+                    resource_type=DbtResourceType(node_dict["resource_type"]),
+                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+                    file_path=project_path / node_dict["original_file_path"],
+                    tags=node_dict.get("tags", []),
+                    config=node_dict.get("config", {}),
+                    has_freshness=(
+                        is_freshness_effective(node_dict.get("freshness"))
+                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                        else False
+                    ),
+                )
+            except KeyError:
+                logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
+            else:
+                nodes[node.unique_id] = node
+                logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
     return nodes
 
 

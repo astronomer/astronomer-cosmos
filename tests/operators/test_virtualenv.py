@@ -6,9 +6,11 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import airflow
 import pytest
 from airflow.models import DAG
 from airflow.models.connection import Connection
+from packaging.version import Version
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
@@ -16,11 +18,26 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
+AIRFLOW_VERSION = Version(airflow.__version__)
+
+DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+
+DAGS_FOLDER = Path(__file__).parent.parent.parent / "dev/dags/"
+
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=PostgresUserPasswordProfileMapping(
         conn_id="fake_conn",
+        profile_args={"schema": "public"},
+    ),
+)
+
+real_profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
         profile_args={"schema": "public"},
     ),
 )
@@ -339,3 +356,23 @@ def test__release_venv_lock_current_process(tmpdir):
     )
     assert venv_operator._release_venv_lock() is None
     assert not lockfile.exists()
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.5"),
+    reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",
+)
+@pytest.mark.integration
+def test_integration_virtualenv_operator(caplog):
+    """
+    Confirm we're using the correct dbt command to run with virtualenv.
+    """
+    from airflow.models.dagbag import DagBag
+
+    dag_bag = DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
+    dag = dag_bag.get_dag("example_virtualenv_mini")
+
+    dag.test()
+
+    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
+    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text

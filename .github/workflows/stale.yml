@@ -1,0 +1,23 @@
+name: Handle stale issues and PRs
+on:
+  schedule:
+    - cron: "0 11 * * *"
+jobs:
+  handle-stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: 30
+          days-before-issue-close: -1  # Never closes issues, more information in https://github.com/actions/stale/
+          stale-issue-label: "stale"
+          stale-issue-message: "This issue is stale because it has been open for 30 days with no activity."
+          days-before-pr-stale: 30
+          days-before-pr-close: 10
+          stale-pr-label: "stale"
+          stale-pr-message: "This PR is stale because it has been open for 30 days with no activity."
+          close-pr-message: "This PR was closed because it has been inactive for 10 days since being marked as stale."
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

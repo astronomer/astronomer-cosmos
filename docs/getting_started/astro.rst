@@ -93,7 +93,7 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
     import os
     from datetime import datetime
 
-    airflow_home = os.environ['AIRFLOW_HOME']
+    airflow_home = os.environ["AIRFLOW_HOME"]
 
     profile_config = ProfileConfig(
         profile_name="default",

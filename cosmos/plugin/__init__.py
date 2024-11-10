@@ -10,7 +10,17 @@ from airflow.www.views import AirflowBaseView
 from flask import abort, url_for
 from flask_appbuilder import AppBuilder, expose
 
-from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name
+from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name, in_astro_cloud
+
+if in_astro_cloud:
+    MENU_ACCESS_PERMISSIONS = [
+        (permissions.ACTION_CAN_ACCESS_MENU, "Custom Menu"),
+        (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
+    ]
+else:
+    MENU_ACCESS_PERMISSIONS = [
+        (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
+    ]
 
 
 def bucket_and_key(path: str) -> Tuple[str, str]:
@@ -201,24 +211,14 @@ class DbtDocsView(AirflowBaseView):
         return super().create_blueprint(appbuilder, endpoint=endpoint, static_folder=self.static_folder)  # type: ignore[no-any-return]
 
     @expose("/dbt_docs")  # type: ignore[misc]
-    @has_access(
-        [
-            (permissions.ACTION_CAN_ACCESS_MENU, "Custom Menu"),
-            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
-        ]
-    )
+    @has_access(MENU_ACCESS_PERMISSIONS)
     def dbt_docs(self) -> str:
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
-    @has_access(
-        [
-            (permissions.ACTION_CAN_ACCESS_MENU, "Custom Menu"),
-            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
-        ]
-    )
+    @has_access(MENU_ACCESS_PERMISSIONS)
     def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
@@ -233,12 +233,7 @@ class DbtDocsView(AirflowBaseView):
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
     @expose("/catalog.json")  # type: ignore[misc]
-    @has_access(
-        [
-            (permissions.ACTION_CAN_ACCESS_MENU, "Custom Menu"),
-            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
-        ]
-    )
+    @has_access(MENU_ACCESS_PERMISSIONS)
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
@@ -250,12 +245,7 @@ class DbtDocsView(AirflowBaseView):
             return data, 200, {"Content-Type": "application/json"}
 
     @expose("/manifest.json")  # type: ignore[misc]
-    @has_access(
-        [
-            (permissions.ACTION_CAN_ACCESS_MENU, "Custom Menu"),
-            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
-        ]
-    )
+    @has_access(MENU_ACCESS_PERMISSIONS)
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)

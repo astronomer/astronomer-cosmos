@@ -16,6 +16,7 @@ try:
         DbtRunOperationGcpCloudRunJobOperator,
         DbtSeedGcpCloudRunJobOperator,
         DbtSnapshotGcpCloudRunJobOperator,
+        DbtSourceGcpCloudRunJobOperator,
         DbtTestGcpCloudRunJobOperator,
     )
 
@@ -171,15 +172,26 @@ def test_dbt_gcp_cloud_run_job_build_command():
         "seed": DbtSeedGcpCloudRunJobOperator(**BASE_KWARGS),
         "build": DbtBuildGcpCloudRunJobOperator(**BASE_KWARGS),
         "snapshot": DbtSnapshotGcpCloudRunJobOperator(**BASE_KWARGS),
+        "source": DbtSourceGcpCloudRunJobOperator(**BASE_KWARGS),
         "run-operation": DbtRunOperationGcpCloudRunJobOperator(macro_name="some-macro", **BASE_KWARGS),
     }
 
     for command_name, command_operator in result_map.items():
         command_operator.build_command(context=MagicMock(), cmd_flags=MagicMock())
-        if command_name != "run-operation":
+        if command_name not in ("run-operation", "source"):
             assert command_operator.command == [
                 "dbt",
                 command_name,
+                "--vars",
+                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "--no-version-check",
+            ]
+        elif command_name == "run-operation":
+            assert command_operator.command == [
+                "dbt",
+                command_name,
+                "some-macro",
                 "--vars",
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
@@ -189,7 +201,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
             assert command_operator.command == [
                 "dbt",
                 command_name,
-                "some-macro",
+                "freshness",
                 "--vars",
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",

@@ -68,8 +68,8 @@ def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
     appbuilder.sm.check_authorization = lambda *args, **kwargs: True
 
     if cosmos.plugin.dbt_docs_view not in appbuilder.baseviews:
-        app._got_first_request = False
-        # unregister blueprints registered in global Airflow flask app
+        # unregister blueprints registered in global context
+        app._got_first_request = False  # Necessary for Airflow 2.4, Flask==2.2.2 & Flask-AppBuilder==4.1.3
         del app.blueprints["DbtDocsView"]
         keys_to_delete = [view_name for view_name in app.view_functions.keys() if view_name.startswith("DbtDocsView")]
         [app.view_functions.pop(view_name) for view_name in keys_to_delete]

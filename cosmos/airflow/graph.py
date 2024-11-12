@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Union
-
 from datetime import timedelta
+from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
@@ -246,7 +245,7 @@ def generate_task_or_group(
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
         model_timeout=model_timeout,
-        model_sla=model_sla
+        model_sla=model_sla,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task

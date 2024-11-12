@@ -43,3 +43,6 @@ except airflow.exceptions.AirflowConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
+
+# The following environment variable is populated in Astro Cloud
+in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"

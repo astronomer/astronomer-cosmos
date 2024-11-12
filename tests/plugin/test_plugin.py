@@ -13,19 +13,22 @@ except ImportError:
     jinja2.Markup = markupsafe.Markup
     jinja2.escape = markupsafe.escape
 
+import importlib
 import sys
 from importlib.util import find_spec
 from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
 from flask.testing import FlaskClient
 
+import cosmos
 import cosmos.plugin
+import cosmos.settings
 from cosmos.plugin import (
-    dbt_docs_view,
     iframe_script,
     open_azure_file,
     open_file,
@@ -44,6 +47,42 @@ def _get_text_from_response(response) -> str:
 
 
 @pytest.fixture(scope="module")
+def module_monkeypatch():
+    mp = MonkeyPatch()
+    yield mp
+    mp.undo()
+
+
+@pytest.fixture(scope="module")
+def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
+    module_monkeypatch.setenv("ASTRONOMER_ENVIRONMENT", "cloud")
+    importlib.reload(cosmos.settings)
+    importlib.reload(cosmos.plugin)
+    importlib.reload(cosmos)
+    initdb()
+
+    cached_app._cached_app = None
+    app = cached_app(testing=True)
+    appbuilder: AirflowAppBuilder = app.extensions["appbuilder"]
+
+    appbuilder.sm.check_authorization = lambda *args, **kwargs: True
+
+    if cosmos.plugin.dbt_docs_view not in appbuilder.baseviews:
+        # unregister blueprints registered in global context
+        app._got_first_request = False  # Necessary for Airflow 2.4, Flask==2.2.2 & Flask-AppBuilder==4.1.3
+        del app.blueprints["DbtDocsView"]
+        keys_to_delete = [view_name for view_name in app.view_functions.keys() if view_name.startswith("DbtDocsView")]
+        [app.view_functions.pop(view_name) for view_name in keys_to_delete]
+
+        appbuilder._check_and_init(cosmos.plugin.dbt_docs_view)
+        appbuilder.register_blueprint(cosmos.plugin.dbt_docs_view)
+
+    yield app.test_client()
+
+    resetdb()
+
+
+@pytest.fixture(scope="module")
 def app() -> FlaskClient:
     initdb()
 
@@ -52,9 +91,9 @@ def app() -> FlaskClient:
 
     appbuilder.sm.check_authorization = lambda *args, **kwargs: True
 
-    if dbt_docs_view not in appbuilder.baseviews:
-        appbuilder._check_and_init(dbt_docs_view)
-        appbuilder.register_blueprint(dbt_docs_view)
+    if cosmos.plugin.dbt_docs_view not in appbuilder.baseviews:
+        appbuilder._check_and_init(cosmos.plugin.dbt_docs_view)
+        appbuilder.register_blueprint(cosmos.plugin.dbt_docs_view)
 
     yield app.test_client()
 
@@ -309,8 +348,20 @@ def test_open_file_local(mock_file):
 @pytest.mark.parametrize(
     "url_path", ["/cosmos/dbt_docs", "/cosmos/dbt_docs_index.html", "/cosmos/catalog.json", "/cosmos/manifest.json"]
 )
-def test_has_access_with_permissions(url_path, app):
-    dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
-    mock_check_auth = dbt_docs_view.appbuilder.sm.check_authorization
+def test_has_access_with_permissions_outside_astro_does_not_include_custom_menu(url_path, app):
+    cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
+    mock_check_auth = cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization
+    app.get(url_path)
+    assert mock_check_auth.call_args[0][0] == [("can_read", "Website")]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "url_path", ["/cosmos/dbt_docs", "/cosmos/dbt_docs_index.html", "/cosmos/catalog.json", "/cosmos/manifest.json"]
+)
+def test_has_access_with_permissions_in_astro_must_include_custom_menu(url_path, app_within_astro_cloud):
+    app = app_within_astro_cloud
+    cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
+    mock_check_auth = cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization
     app.get(url_path)
     assert mock_check_auth.call_args[0][0] == [("menu_access", "Custom Menu"), ("can_read", "Website")]

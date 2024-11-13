@@ -43,10 +43,6 @@ while true; do
     sleep 5
   fi
 done
-#while [ "$(kubectl get pod "$POD_NAME" -n default -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]; do
-#  echo "Pod $POD_NAME is not ready yet. Waiting..."
-#  sleep 5
-#done
 # Print the name of the PostgreSQL pod
 echo "$POD_NAME"
 

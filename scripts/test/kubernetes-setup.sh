@@ -26,6 +26,13 @@ kind load docker-image dbt-jaffle-shop:1.0.0
 # The output is filtered to get the first pod's name
 POD_NAME=$(kubectl get pods -n default -l app=postgres -o jsonpath='{.items[0].metadata.name}')
 
+# Wait for the PostgreSQL pod to be in the 'Running' and 'Ready' state
+echo "Waiting for PostgreSQL pod to be ready..."
+while [ "$(kubectl get pod "$POD_NAME" -n default -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]; do
+  echo "Pod $POD_NAME is not ready yet. Waiting..."
+  sleep 5
+done
+
 # Print the name of the PostgreSQL pod
 echo "$POD_NAME"
 

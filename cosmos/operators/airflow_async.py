@@ -59,6 +59,7 @@ class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalO
     pass
 
 
+# Test
 class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator):  # type: ignore
 
     template_fields: Sequence[str] = (

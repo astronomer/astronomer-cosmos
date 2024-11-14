@@ -91,12 +91,12 @@ def test_mock_profile() -> None:
     Tests that the mock_profile values get set correctly. A non-integer value of port will crash dbt ls.
     """
     profile_mapping = TrinoBaseProfileMapping(conn_id="mock_conn_id")
-    
+
     assert profile_mapping.mock_profile == {
         "type": "trino",
         "host": "mock_value",
         "database": "mock_value",
         "schema": "mock_value",
         "port": 99999,
-        "user": "mock_value"
-        }
+        "user": "mock_value",
+    }

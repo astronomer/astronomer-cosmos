@@ -46,6 +46,7 @@ def get_dag_bag() -> DagBag:
         # Ignore Async DAG for dbt <=1.5
         if DBT_VERSION <= Version("1.5.0"):
             file.writelines(["simple_dag_async.py\n"])
+            file.writelines(["example_source_rendering.py\n"])
 
         if DBT_VERSION >= Version("1.5.0"):
             file.writelines(["example_cosmos_sources.py\n"])

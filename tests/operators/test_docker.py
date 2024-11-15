@@ -7,6 +7,7 @@ from pendulum import datetime
 
 from cosmos.operators.docker import (
     DbtBuildDockerOperator,
+    DbtCloneDockerOperator,
     DbtLSDockerOperator,
     DbtRunDockerOperator,
     DbtSeedDockerOperator,
@@ -113,6 +114,7 @@ result_map = {
     "test": DbtTestDockerOperator(**base_kwargs),
     "build": DbtBuildDockerOperator(**base_kwargs),
     "seed": DbtSeedDockerOperator(**base_kwargs),
+    "clone": DbtCloneDockerOperator(**base_kwargs),
 }
 
 

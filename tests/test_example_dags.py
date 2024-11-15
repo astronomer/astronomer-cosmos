@@ -79,6 +79,8 @@ def get_dag_bag() -> DagBag:
             file.writelines(["example_cosmos_sources.py\n"])
         if DBT_VERSION < Version("1.6.0"):
             file.writelines(["example_model_version.py\n"])
+            file.writelines(["example_clone.py\n"])
+
         if DBT_VERSION < Version("1.5.0"):
             file.writelines(["example_source_rendering.py\n"])
 

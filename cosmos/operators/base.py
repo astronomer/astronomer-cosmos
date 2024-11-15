@@ -438,3 +438,10 @@ class DbtCompileMixin:
 
     base_cmd = ["compile"]
     ui_color = "#877c7c"
+
+
+class DbtCloneMixin:
+    """Mixin for dbt clone command."""
+
+    base_cmd = ["clone"]
+    ui_color = "#83a300"

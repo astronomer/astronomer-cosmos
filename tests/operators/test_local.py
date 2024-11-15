@@ -29,6 +29,7 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
+    DbtCloneLocalOperator,
     DbtCompileLocalOperator,
     DbtDocsAzureStorageLocalOperator,
     DbtDocsGCSLocalOperator,
@@ -1159,6 +1160,19 @@ def test_dbt_compile_local_operator_initialisation():
     )
     assert operator.should_upload_compiled_sql is True
     assert "compile" in operator.base_cmd
+
+
+def test_dbt_clone_local_operator_initialisation():
+    operator = DbtCloneLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="clone",
+        dbt_cmd_flags=["--state", "/usr/local/airflow/dbt/jaffle_shop/target"],
+        install_deps=True,
+        append_env=True,
+    )
+
+    assert "clone" in operator.base_cmd
 
 
 @patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")

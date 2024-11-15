@@ -14,6 +14,7 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.operators.base import AbstractDbtBaseOperator
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
+    DbtCloneLocalOperator,
     DbtCompileLocalOperator,
     DbtLocalBaseOperator,
     DbtLSLocalOperator,
@@ -187,4 +188,8 @@ class DbtRunOperationAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtRunOpe
 
 
 class DbtCompileAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtCompileLocalOperator):  # type: ignore
+    pass
+
+
+class DbtCloneAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtCloneLocalOperator):
     pass

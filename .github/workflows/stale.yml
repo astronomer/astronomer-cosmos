@@ -18,6 +18,8 @@ jobs:
           days-before-pr-stale: 30
           days-before-pr-close: 10
           stale-pr-label: "stale"
+          exempt-issue-labels: "do-not-stale"
+          exempt-pr-labels: "do-not-stale"
           stale-pr-message: "This PR is stale because it has been open for 30 days with no activity."
           close-pr-message: "This PR was closed because it has been inactive for 10 days since being marked as stale."
           repo-token: ${{ secrets.GITHUB_TOKEN }}

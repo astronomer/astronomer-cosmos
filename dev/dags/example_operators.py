@@ -25,7 +25,7 @@ profile_config2 = ProfileConfig(
 )
 
 
-with DAG("test-id-1", start_date=datetime(2024, 1, 1), catchup=False) as dag:
+with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as dag:
     seed_operator = DbtSeedLocalOperator(
         profile_config=profile_config1,
         project_dir=DBT_PROJ_DIR,

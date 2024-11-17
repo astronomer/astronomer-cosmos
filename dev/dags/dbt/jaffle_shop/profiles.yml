@@ -22,3 +22,28 @@ postgres_profile:
       port: 5432 # "{{ env_var('POSTGRES_PORT') | as_number }}"
       schema: "{{ env_var('POSTGRES_SCHEMA') }}"
       user: "{{ env_var('POSTGRES_USER') }}"
+
+bigquery_dev:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: astronomer-dag-authoring
+      dataset: bq_dev
+      threads: 4 # Must be a value of 1 or greater
+      keyfile: /usr/local/airflow/include/key.json
+      location: US
+
+
+bigquery_clone:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: astronomer-dag-authoring
+      dataset: bq_clone
+      threads: 4 # Must be a value of 1 or greater
+      keyfile: /usr/local/airflow/include/key.json
+      location: US

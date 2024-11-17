@@ -18,7 +18,7 @@ The ``DbtCloneLocalOperator`` implement `dbt clone <https://docs.getdbt.com/refe
 
 Example of how to use
 
-.. literalinclude:: ../../dev/dags/example_clone.py
+.. literalinclude:: ../../dev/dags/example_operators.py
     :language: python
     :start-after: [START clone_example]
     :end-before: [END clone_example]

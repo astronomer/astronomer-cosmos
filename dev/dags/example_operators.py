@@ -1,21 +1,27 @@
+import os
 from datetime import datetime
+from pathlib import Path
 
 from airflow import DAG
 
 from cosmos import DbtCloneLocalOperator, DbtRunLocalOperator, DbtSeedLocalOperator, ProfileConfig
 
-DBT_PROJ_DIR = "/usr/local/airflow/dbt/jaffle_shop"
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+DBT_PROJ_DIR = DBT_ROOT_PATH / "jaffle_shop"
+DBT_PROFILE_PATH = DBT_ROOT_PATH / "profiles.yml"
+DBT_ARTIFACT = DBT_ROOT_PATH / "target"
 
 profile_config1 = ProfileConfig(
     profile_name="bigquery_dev",
     target_name="dev",
-    profiles_yml_filepath="/usr/local/airflow/dbt/jaffle_shop/profiles.yml",
+    profiles_yml_filepath=DBT_PROFILE_PATH,
 )
 
 profile_config2 = ProfileConfig(
     profile_name="bigquery_clone",
     target_name="dev",
-    profiles_yml_filepath="/usr/local/airflow/dbt/jaffle_shop/profiles.yml",
+    profiles_yml_filepath=DBT_PROFILE_PATH,
 )
 
 
@@ -42,7 +48,7 @@ with DAG("test-id-1", start_date=datetime(2024, 1, 1), catchup=False) as dag:
         profile_config=profile_config2,
         project_dir=DBT_PROJ_DIR,
         task_id="clone",
-        dbt_cmd_flags=["--models", "stg_customers", "--state", "/usr/local/airflow/dbt/jaffle_shop/target"],
+        dbt_cmd_flags=["--models", "stg_customers", "--state", DBT_ARTIFACT],
         install_deps=True,
         append_env=True,
     )

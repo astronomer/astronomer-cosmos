@@ -35,7 +35,6 @@ bigquery_dev:
       keyfile: /usr/local/airflow/include/key.json
       location: US
 
-
 bigquery_clone:
   target: dev
   outputs:

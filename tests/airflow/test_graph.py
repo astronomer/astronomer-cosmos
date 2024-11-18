@@ -575,9 +575,7 @@ def test_create_task_metadata_timeout():
         depends_on=[],
         file_path="",
         tags=[],
-        config={
-            "cosmos_task_timeout": 1
-        },
+        config={"cosmos_task_timeout": 1},
     )
     metadata = create_task_metadata(
         sample_node, execution_mode=ExecutionMode.LOCAL, args={}, dbt_dag_task_group_identifier=""

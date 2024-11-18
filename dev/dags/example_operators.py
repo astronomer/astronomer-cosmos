@@ -12,22 +12,15 @@ DBT_PROJ_DIR = DBT_ROOT_PATH / "jaffle_shop"
 DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 DBT_ARTIFACT = DBT_PROJ_DIR / "target"
 
-profile_config1 = ProfileConfig(
-    profile_name="bigquery_dev",
+profile_config = ProfileConfig(
+    profile_name="postgres_profile",
     target_name="dev",
     profiles_yml_filepath=DBT_PROFILE_PATH,
 )
-
-profile_config2 = ProfileConfig(
-    profile_name="bigquery_clone",
-    target_name="dev",
-    profiles_yml_filepath=DBT_PROFILE_PATH,
-)
-
 
 with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as dag:
     seed_operator = DbtSeedLocalOperator(
-        profile_config=profile_config1,
+        profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
         task_id="seed",
         dbt_cmd_flags=["--select", "raw_customers"],
@@ -35,7 +28,7 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         append_env=True,
     )
     run_operator = DbtRunLocalOperator(
-        profile_config=profile_config1,
+        profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
         task_id="run",
         dbt_cmd_flags=["--models", "stg_customers"],
@@ -45,7 +38,7 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
 
     # [START clone_example]
     clone_operator = DbtCloneLocalOperator(
-        profile_config=profile_config2,
+        profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
         task_id="clone",
         dbt_cmd_flags=["--models", "stg_customers", "--state", DBT_ARTIFACT],

@@ -80,8 +80,6 @@ class RenderConfig:
     enable_mock_profile: bool = True
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
-    model_timeout: bool = False
-    model_sla: bool = False
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

@@ -136,8 +136,6 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
-    model_timeout: bool = False,
-    model_sla: bool = False,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -169,11 +167,8 @@ def create_task_metadata(
             task_id = f"{node.name}_run"
             if use_task_group is True:
                 task_id = "run"
-            if model_timeout and "model_timeout" in node.config.keys():
-                logger.error(f'model_timeout: {node.config["model_timeout"]} in values')
-                args["execution_timeout"] = timedelta(seconds=int(node.config["model_timeout"]))
-            if model_sla and "model_sla" in node.config.keys():
-                args["sla"] = timedelta(seconds=int(node.config["model_sla"]))
+            if "cosmos_task_timeout" in node.config.keys():
+                args["execution_timeout"] = timedelta(seconds=int(node.config["cosmos_task_timeout"]))
         elif node.resource_type == DbtResourceType.SOURCE:
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
@@ -225,8 +220,6 @@ def generate_task_or_group(
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
-    model_timeout: bool,
-    model_sla: bool,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -244,8 +237,6 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
-        model_timeout=model_timeout,
-        model_sla=model_sla,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -347,8 +338,6 @@ def build_airflow_graph(
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
-    model_timeout = render_config.model_timeout
-    model_sla = render_config.model_sla
     tasks_map = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -370,8 +359,6 @@ def build_airflow_graph(
             source_rendering_behavior=source_rendering_behavior,
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
-            model_timeout=model_timeout,
-            model_sla=model_sla,
             node=node,
         )
         if task_or_group is not None:

@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -566,6 +566,24 @@ def test_create_task_metadata_snapshot(caplog):
     assert metadata.id == "my_snapshot_snapshot"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator"
     assert metadata.arguments == {"models": "my_snapshot"}
+
+
+def test_create_task_metadata_timeout():
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        tags=[],
+        config={
+            "cosmos_task_timeout": 1
+        },
+    )
+    metadata = create_task_metadata(
+        sample_node, execution_mode=ExecutionMode.LOCAL, args={}, dbt_dag_task_group_identifier=""
+    )
+    assert "execution_timeout" in metadata.arguments
+    assert metadata.arguments["execution_timeout"] == timedelta(seconds=1)
 
 
 @pytest.mark.parametrize(

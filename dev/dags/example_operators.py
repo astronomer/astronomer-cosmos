@@ -13,7 +13,7 @@ DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 DBT_ARTIFACT = DBT_PROJ_DIR / "target"
 
 profile_config = ProfileConfig(
-    profile_name="postgres_profile",
+    profile_name="default",
     target_name="dev",
     profiles_yml_filepath=DBT_PROFILE_PATH,
 )

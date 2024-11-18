@@ -806,6 +806,11 @@ def test_store_compiled_sql() -> None:
             {"context": {}, "env": {}, "cmd_flags": ["run", "--full-refresh"]},
         ),
         (
+            DbtCloneLocalOperator,
+            {"full_refresh": True},
+            {"context": {}, "env": {}, "cmd_flags": ["clone", "--full-refresh"]},
+        ),
+        (
             DbtTestLocalOperator,
             {},
             {"context": {}, "env": {}, "cmd_flags": ["test"]},

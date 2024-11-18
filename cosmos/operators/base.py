@@ -445,3 +445,21 @@ class DbtCloneMixin:
 
     base_cmd = ["clone"]
     ui_color = "#83a300"
+
+    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
+        self.full_refresh = full_refresh
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+
+        if isinstance(self.full_refresh, str):
+            # Handle template fields when render_template_as_native_obj=False
+            full_refresh = to_boolean(self.full_refresh)
+        else:
+            full_refresh = self.full_refresh
+
+        if full_refresh is True:
+            flags.append("--full-refresh")
+
+        return flags

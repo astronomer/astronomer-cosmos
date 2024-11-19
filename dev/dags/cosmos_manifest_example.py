@@ -104,7 +104,6 @@ def cosmos_manifest_example() -> None:
 
     post_dbt = EmptyOperator(task_id="post_dbt")
 
-    # (pre_dbt >> local_example >> aws_s3_example >> post_dbt)
     (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> post_dbt)
     # TODO: re-enable the following
     # (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)

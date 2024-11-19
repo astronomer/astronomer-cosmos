@@ -70,7 +70,7 @@ amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]
 google = ["apache-airflow-providers-google>=10.17.0"]
-microsoft = ["apache-airflow-providers-microsoft-azure"]
+microsoft = ["apache-airflow-providers-microsoft-azure>=8.5.0"]
 all = [
     "astronomer-cosmos[dbt-all]",
     "astronomer-cosmos[openlineage]",
@@ -95,7 +95,7 @@ aws_eks = [
     "apache-airflow-providers-amazon>=8.0.0",
 ]
 azure-container-instance = [
-    "apache-airflow-providers-microsoft-azure>=8.4.0",
+    "apache-airflow-providers-microsoft-azure>=8.5.0",
 ]
 gcp-cloud-run-job = [
     "apache-airflow-providers-google>=10.11.0",
@@ -187,7 +187,7 @@ dependencies = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
     "apache-airflow-providers-cncf-kubernetes>=5.1.1",
     "apache-airflow-providers-google>=10.17.0",
-    "apache-airflow-providers-microsoft-azure",
+    "apache-airflow-providers-microsoft-azure>=8.5.0",
     "msgpack",
     "openlineage-airflow",
     "pydantic>=1.10.0",

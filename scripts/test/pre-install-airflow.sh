@@ -54,7 +54,7 @@ else
   # version does not meet our requirements.
   uv pip install "apache-airflow-providers-google>=10.17.0"
 
-  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0"
 fi
 
 rm /tmp/constraint.txt

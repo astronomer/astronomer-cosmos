@@ -54,6 +54,12 @@ else
   # version does not meet our requirements.
   uv pip install "apache-airflow-providers-google>=10.17.0"
 
+  # The Airflow 2.8 constraints file at
+  # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
+  # specifies apache-airflow-providers-microsoft-azure==8.4.0. However, our Azure connection setup in the CI,
+  # previously led to authentication issues with this version. This issue got resolved in
+  # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
+  # and skipping installation with constraints, as the specified version does not meet our requirements.
   uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0"
 fi
 

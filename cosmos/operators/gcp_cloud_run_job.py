@@ -10,6 +10,7 @@ from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCloneMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -179,4 +180,13 @@ class DbtRunOperationGcpCloudRunJobOperator(DbtRunOperationMixin, DbtGcpCloudRun
     template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneGcpCloudRunJobOperator(DbtCloneMixin, DbtGcpCloudRunJobBaseOperator):
+    """
+    Executes a dbt core clone command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

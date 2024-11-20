@@ -10,6 +10,7 @@ from pendulum import datetime
 try:
     from cosmos.operators.gcp_cloud_run_job import (
         DbtBuildGcpCloudRunJobOperator,
+        DbtCloneGcpCloudRunJobOperator,
         DbtGcpCloudRunJobBaseOperator,
         DbtLSGcpCloudRunJobOperator,
         DbtRunGcpCloudRunJobOperator,
@@ -173,6 +174,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
         "build": DbtBuildGcpCloudRunJobOperator(**BASE_KWARGS),
         "snapshot": DbtSnapshotGcpCloudRunJobOperator(**BASE_KWARGS),
         "source": DbtSourceGcpCloudRunJobOperator(**BASE_KWARGS),
+        "clone": DbtCloneGcpCloudRunJobOperator(**BASE_KWARGS),
         "run-operation": DbtRunOperationGcpCloudRunJobOperator(macro_name="some-macro", **BASE_KWARGS),
     }
 

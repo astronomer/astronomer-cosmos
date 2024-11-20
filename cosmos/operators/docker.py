@@ -7,6 +7,7 @@ from airflow.utils.context import Context
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCloneMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -147,4 +148,13 @@ class DbtRunOperationDockerOperator(DbtRunOperationMixin, DbtDockerBaseOperator)
     template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneDockerOperator(DbtCloneMixin, DbtDockerBaseOperator):
+    """
+    Executes a dbt core clone command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

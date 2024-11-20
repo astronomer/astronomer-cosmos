@@ -70,6 +70,7 @@ from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCloneMixin,
     DbtCompileMixin,
     DbtLSMixin,
     DbtRunMixin,
@@ -1008,4 +1009,13 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["should_upload_compiled_sql"] = True
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt core clone command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

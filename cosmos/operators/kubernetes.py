@@ -11,6 +11,7 @@ from cosmos.dbt.parser.output import extract_log_issues
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCloneMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -259,4 +260,11 @@ class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBaseO
     template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneKubernetesOperator(DbtCloneMixin, DbtKubernetesBaseOperator):
+    """Executes a dbt core clone command."""
+
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

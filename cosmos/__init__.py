@@ -30,6 +30,7 @@ from cosmos.log import get_logger
 from cosmos.operators.lazy_load import MissingPackage
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
+    DbtCloneLocalOperator,
     DbtDepsLocalOperator,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
@@ -44,6 +45,7 @@ logger = get_logger(__name__)
 try:
     from cosmos.operators.docker import (
         DbtBuildDockerOperator,
+        DbtCloneDockerOperator,
         DbtLSDockerOperator,
         DbtRunDockerOperator,
         DbtRunOperationDockerOperator,
@@ -65,6 +67,7 @@ except ImportError:
 try:
     from cosmos.operators.kubernetes import (
         DbtBuildKubernetesOperator,
+        DbtCloneKubernetesOperator,
         DbtLSKubernetesOperator,
         DbtRunKubernetesOperator,
         DbtRunOperationKubernetesOperator,
@@ -106,6 +109,7 @@ except ImportError:
 try:
     from cosmos.operators.azure_container_instance import (
         DbtBuildAzureContainerInstanceOperator,
+        DbtCloneAzureContainerInstanceOperator,
         DbtLSAzureContainerInstanceOperator,
         DbtRunAzureContainerInstanceOperator,
         DbtRunOperationAzureContainerInstanceOperator,
@@ -142,6 +146,7 @@ except ImportError:
 try:
     from cosmos.operators.aws_eks import (
         DbtBuildAwsEksOperator,
+        DbtCloneAwsEksOperator,
         DbtLSAwsEksOperator,
         DbtRunAwsEksOperator,
         DbtRunOperationAwsEksOperator,
@@ -170,6 +175,7 @@ except ImportError:
 try:
     from cosmos.operators.gcp_cloud_run_job import (
         DbtBuildGcpCloudRunJobOperator,
+        DbtCloneGcpCloudRunJobOperator,
         DbtLSGcpCloudRunJobOperator,
         DbtRunGcpCloudRunJobOperator,
         DbtRunOperationGcpCloudRunJobOperator,
@@ -217,6 +223,7 @@ __all__ = [
     "DbtResourceType",
     # Local Execution Mode
     "DbtBuildLocalOperator",
+    "DbtCloneLocalOperator",
     "DbtDepsLocalOperator",  # deprecated, to be delete in Cosmos 2.x
     "DbtLSLocalOperator",
     "DbtRunLocalOperator",
@@ -226,6 +233,7 @@ __all__ = [
     "DbtTestLocalOperator",
     # Docker Execution Mode
     "DbtBuildDockerOperator",
+    "DbtCloneDockerOperator",
     "DbtLSDockerOperator",
     "DbtRunDockerOperator",
     "DbtRunOperationDockerOperator",
@@ -234,6 +242,7 @@ __all__ = [
     "DbtTestDockerOperator",
     # Kubernetes Execution Mode
     "DbtBuildKubernetesOperator",
+    "DbtCloneKubernetesOperator",
     "DbtLSKubernetesOperator",
     "DbtRunKubernetesOperator",
     "DbtRunOperationKubernetesOperator",
@@ -242,6 +251,7 @@ __all__ = [
     "DbtTestKubernetesOperator",
     # Azure Container Instance Execution Mode
     "DbtBuildAzureContainerInstanceOperator",
+    "DbtCloneAzureContainerInstanceOperator",
     "DbtLSAzureContainerInstanceOperator",
     "DbtRunAzureContainerInstanceOperator",
     "DbtRunOperationAzureContainerInstanceOperator",
@@ -250,6 +260,7 @@ __all__ = [
     "DbtTestAzureContainerInstanceOperator",
     # AWS EKS Execution Mode
     "DbtBuildAwsEksOperator",
+    "DbtCloneAwsEksOperator",
     "DbtLSAwsEksOperator",
     "DbtRunAwsEksOperator",
     "DbtRunOperationAwsEksOperator",
@@ -258,6 +269,7 @@ __all__ = [
     "DbtTestAwsEksOperator",
     # GCP Cloud Run Job Execution Mode
     "DbtBuildGcpCloudRunJobOperator",
+    "DbtCloneGcpCloudRunJobOperator",
     "DbtLSGcpCloudRunJobOperator",
     "DbtRunGcpCloudRunJobOperator",
     "DbtRunOperationGcpCloudRunJobOperator",

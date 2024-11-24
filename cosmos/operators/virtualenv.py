@@ -38,6 +38,7 @@ LOCK_FILENAME = "cosmos_virtualenv.lock"
 logger = get_logger(__name__)
 
 
+# TODO: Fix CI
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
     def wrapper(operator: DbtVirtualenvBaseOperator, *args: Any) -> Any:
         if operator.virtualenv_dir is None:

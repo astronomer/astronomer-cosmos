@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Optional, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
@@ -79,7 +79,6 @@ class DbtNode:
             Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
         """
         return self.config.get("meta", {}).get("cosmos", {})
-
 
     @property
     def resource_name(self) -> str:

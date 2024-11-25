@@ -6,7 +6,7 @@ set -x
 set -e
 
 
-pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
+pip install dbt-postgres==1.8.2 dbt-core<1.8.9 psycopg2==2.9.3 pytz
 
 # Create a Kubernetes secret named 'postgres-secrets' with the specified literals for host and password
 kubectl create secret generic postgres-secrets \

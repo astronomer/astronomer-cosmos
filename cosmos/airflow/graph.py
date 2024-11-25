@@ -119,6 +119,7 @@ def create_test_task_metadata(
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
+        cosmos_custom=node.cosmos_custom,
         operator_class=calculate_operator_class(
             execution_mode=execution_mode,
             dbt_class="DbtTest",
@@ -191,6 +192,7 @@ def create_task_metadata(
         task_metadata = TaskMetadata(
             id=task_id,
             owner=node.owner,
+            cosmos_custom=node.cosmos_custom,
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),

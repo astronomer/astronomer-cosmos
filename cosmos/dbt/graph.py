@@ -78,7 +78,10 @@ class DbtNode:
         Returns:
             Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
         """
-        return self.config.get("meta", {}).get("cosmos", {})
+        airflow_task_config = self.config.get("meta", {}).get("cosmos")
+        if isinstance(airflow_task_config, dict):
+            return airflow_task_config
+        return {}
 
     @property
     def resource_name(self) -> str:

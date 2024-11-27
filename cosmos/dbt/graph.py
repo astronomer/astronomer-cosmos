@@ -68,7 +68,7 @@ class DbtNode:
     has_test: bool = False
 
     @property
-    def cosmos_custom(self) -> Dict[str, Any]:
+    def airflow_task_config(self) -> Dict[str, Any]:
         """
         This method is designed to extend the dbt project's functionality by incorporating Airflow-related metadata into the dbt YAML configuration.
         Since dbt projects are independent of Airflow, adding Airflow-specific information to the `meta` field within the dbt YAML allows Airflow tasks to

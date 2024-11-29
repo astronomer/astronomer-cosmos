@@ -133,7 +133,8 @@ def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
-    logger.info("Running command: `%s`", " ".join(str(arg) if arg is not None else "<None>" for arg in command))
+    command = [str(arg) if arg is not None else "<None>" for arg in command]
+    logger.info("Running command: `%s`", " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
     process = Popen(
         command,

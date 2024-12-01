@@ -5,6 +5,7 @@ from airflow.exceptions import AirflowException
 
 from cosmos.operators.aws_eks import (
     DbtBuildAwsEksOperator,
+    DbtCloneAwsEksOperator,
     DbtLSAwsEksOperator,
     DbtRunAwsEksOperator,
     DbtSeedAwsEksOperator,
@@ -44,6 +45,7 @@ def test_dbt_kubernetes_build_command():
         "test": DbtTestAwsEksOperator(**base_kwargs),
         "build": DbtBuildAwsEksOperator(**base_kwargs),
         "seed": DbtSeedAwsEksOperator(**base_kwargs),
+        "clone": DbtCloneAwsEksOperator(**base_kwargs),
     }
 
     for command_name, command_operator in result_map.items():

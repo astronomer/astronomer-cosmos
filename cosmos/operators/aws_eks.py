@@ -8,6 +8,7 @@ from airflow.utils.context import Context
 
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
+    DbtCloneKubernetesOperator,
     DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
@@ -157,6 +158,15 @@ class DbtRunOperationAwsEksOperator(DbtAwsEksBaseOperator, DbtRunOperationKubern
     template_fields: Sequence[str] = (
         DbtAwsEksBaseOperator.template_fields + DbtRunOperationKubernetesOperator.template_fields  # type: ignore[operator]
     )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneAwsEksOperator(DbtAwsEksBaseOperator, DbtCloneKubernetesOperator):
+    """
+    Executes a dbt core clone command.
+    """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

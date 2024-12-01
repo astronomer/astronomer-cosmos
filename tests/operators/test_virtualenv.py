@@ -15,7 +15,7 @@ from packaging.version import Version
 from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
+from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 AIRFLOW_VERSION = Version(airflow.__version__)
@@ -376,3 +376,16 @@ def test_integration_virtualenv_operator(caplog):
 
     assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
     assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
+
+
+def test_dbt_clone_virtualenv_operator_initialisation():
+    operator = DbtCloneVirtualenvOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="clone",
+        dbt_cmd_flags=["--state", "/usr/local/airflow/dbt/jaffle_shop/target"],
+        install_deps=True,
+        append_env=True,
+    )
+
+    assert "clone" in operator.base_cmd

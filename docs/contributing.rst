@@ -166,7 +166,7 @@ This will run the docs server in a virtual environment with the right dependenci
 Building
 ________
 
-We use ```hatch``` to build the project. To build the project, run:
+We use ``hatch`` to build the project. To build the project, run:
 
 .. code-block:: bash
 
@@ -183,7 +183,7 @@ We use GitHub actions to create and deploy new releases. To create a new release
     hatch version minor
 
 
-```hatch``` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
+``hatch`` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
 
 .. note::
     You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.

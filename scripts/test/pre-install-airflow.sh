@@ -44,8 +44,23 @@ elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google>=10.11.0" --constraint /tmp/constraint.txt
-  uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
+
+  # The Airflow 2.9 constraints file at
+  # https://raw.githubusercontent.com/apache/airflow/constraints-2.9.0/constraints-3.11.txt
+  # specifies apache-airflow-providers-google==10.16.0. However, our CI setup uses a Google connection without a token,
+  # which previously led to authentication issues when the token was None. This issue was resolved in PR
+  # https://github.com/apache/airflow/pull/38102 and fixed in apache-airflow-providers-google==10.17.0. Consequently,
+  # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
+  # version does not meet our requirements.
+  uv pip install "apache-airflow-providers-google>=10.17.0"
+
+  # The Airflow 2.8 constraints file at
+  # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
+  # specifies apache-airflow-providers-microsoft-azure==8.4.0. However, our Azure connection setup in the CI,
+  # previously led to authentication issues with this version. This issue got resolved in
+  # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
+  # and skipping installation with constraints, as the specified version does not meet our requirements.
+  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0"
 fi
 
 rm /tmp/constraint.txt

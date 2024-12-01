@@ -71,42 +71,40 @@ def cosmos_manifest_example() -> None:
     # [END aws_s3_example]
 
     # [START gcp_gs_example]
-    # gcp_gs_example = DbtTaskGroup(
-    #     group_id="gcp_gs_example",
-    #     project_config=ProjectConfig(
-    #         manifest_path="gs://cosmos_remote_target/manifest.json",
-    #         manifest_conn_id="gcp_gs_conn",
-    #         # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
-    #         project_name="jaffle_shop",
-    #     ),
-    #     profile_config=profile_config,
-    #     render_config=render_config,
-    #     execution_config=execution_config,
-    #     operator_args={"install_deps": True},
-    # )
+    gcp_gs_example = DbtTaskGroup(
+        group_id="gcp_gs_example",
+        project_config=ProjectConfig(
+            manifest_path="gs://cosmos_remote_target/manifest.json",
+            manifest_conn_id="gcp_gs_conn",
+            # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
     # [END gcp_gs_example]
 
     # [START azure_abfs_example]
-    # azure_abfs_example = DbtTaskGroup(
-    #     group_id="azure_abfs_example",
-    #     project_config=ProjectConfig(
-    #         manifest_path="abfs://cosmos-manifest-test/manifest.json",
-    #         manifest_conn_id="azure_abfs_conn",
-    #         # `manifest_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
-    #         project_name="jaffle_shop",
-    #     ),
-    #     profile_config=profile_config,
-    #     render_config=render_config,
-    #     execution_config=execution_config,
-    #     operator_args={"install_deps": True},
-    # )
+    azure_abfs_example = DbtTaskGroup(
+        group_id="azure_abfs_example",
+        project_config=ProjectConfig(
+            manifest_path="abfs://cosmos-manifest-test/manifest.json",
+            manifest_conn_id="azure_abfs_conn",
+            # `manifest_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
     # [END azure_abfs_example]
 
     post_dbt = EmptyOperator(task_id="post_dbt")
 
-    (pre_dbt >> local_example >> aws_s3_example >> post_dbt)
-    # TODO: re-enable the following
-    # (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
+    (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
 
 
 cosmos_manifest_example()

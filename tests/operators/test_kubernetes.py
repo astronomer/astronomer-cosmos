@@ -10,6 +10,7 @@ from pendulum import datetime
 
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
+    DbtCloneKubernetesOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
     DbtSeedKubernetesOperator,
@@ -128,6 +129,7 @@ result_map = {
     "test": DbtTestKubernetesOperator(**base_kwargs),
     "build": DbtBuildKubernetesOperator(**base_kwargs),
     "seed": DbtSeedKubernetesOperator(**base_kwargs),
+    "clone": DbtCloneKubernetesOperator(**base_kwargs),
 }
 
 

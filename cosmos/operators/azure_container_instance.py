@@ -8,6 +8,7 @@ from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
+    DbtCloneMixin,
     DbtLSMixin,
     DbtRunMixin,
     DbtRunOperationMixin,
@@ -166,4 +167,13 @@ class DbtRunOperationAzureContainerInstanceOperator(DbtRunOperationMixin, DbtAzu
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneAzureContainerInstanceOperator(DbtCloneMixin, DbtAzureContainerInstanceBaseOperator):
+    """
+    Executes a dbt core clone command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

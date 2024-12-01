@@ -17,6 +17,7 @@ from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
+    DbtCloneLocalOperator,
     DbtDocsLocalOperator,
     DbtLocalBaseOperator,
     DbtLSLocalOperator,
@@ -282,6 +283,15 @@ class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator)
     """
     Executes `dbt docs generate` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtCloneVirtualenvOperator(DbtVirtualenvBaseOperator, DbtCloneLocalOperator):
+    """
+    Executes a dbt core clone command.
     """
 
     def __init__(self, *args: Any, **kwargs: Any):

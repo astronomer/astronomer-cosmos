@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
@@ -166,6 +167,8 @@ def create_task_metadata(
             task_id = f"{node.name}_run"
             if use_task_group is True:
                 task_id = "run"
+            if "cosmos_task_timeout" in node.config.keys():
+                args["execution_timeout"] = timedelta(seconds=int(node.config["cosmos_task_timeout"]))
         elif node.resource_type == DbtResourceType.SOURCE:
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS

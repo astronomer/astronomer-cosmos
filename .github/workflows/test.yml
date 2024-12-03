@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, enable-kubernetes-test]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -491,7 +491,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ "3.11" ]
+        python-version: [ "3.12" ]
         airflow-version: [ "2.10" ]
     steps:
       - uses: actions/checkout@v3

@@ -336,7 +336,7 @@ def build_airflow_graph(
     render_config: RenderConfig,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-) -> None:
+) -> dict[str, Union[TaskGroup, BaseOperator]]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
 
@@ -359,11 +359,12 @@ def build_airflow_graph(
     :param task_group: Airflow Task Group instance
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
+    :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
-    tasks_map = {}
+    tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
 
     for node_id, node in nodes.items():
@@ -408,6 +409,7 @@ def build_airflow_graph(
 
     create_airflow_task_dependencies(nodes, tasks_map)
     _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
+    return tasks_map
 
 
 def create_airflow_task_dependencies(

@@ -578,3 +578,35 @@ def test_converter_contains_dbt_graph(mock_load_dbt_graph, execution_mode, opera
         operator_args=operator_args,
     )
     assert isinstance(converter.dbt_graph, DbtGraph)
+
+
+@pytest.mark.parametrize(
+    "execution_mode,operator_args",
+    [
+        (ExecutionMode.KUBERNETES, {}),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_contains_tasks_map(mock_load_dbt_graph, execution_mode, operator_args):
+    """
+    This test validates that DbtToAirflowConverter contains and exposes a tasks map instance
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 1, 1)),
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args=operator_args,
+    )
+    assert isinstance(converter.tasks_map, dict)

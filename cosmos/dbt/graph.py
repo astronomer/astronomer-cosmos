@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
@@ -66,6 +66,22 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+
+    @property
+    def airflow_task_config(self) -> Dict[str, Any]:
+        """
+        This method is designed to extend the dbt project's functionality by incorporating Airflow-related metadata into the dbt YAML configuration.
+        Since dbt projects are independent of Airflow, adding Airflow-specific information to the `meta` field within the dbt YAML allows Airflow tasks to
+        utilize this information during execution.
+
+        Examples: pool, pool_slots, queue, ...
+        Returns:
+            Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
+        """
+        airflow_task_config = self.config.get("meta", {}).get("cosmos")
+        if isinstance(airflow_task_config, dict):
+            return airflow_task_config
+        return {}
 
     @property
     def resource_name(self) -> str:

@@ -32,6 +32,9 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     if task.owner != "":
         task_kwargs["owner"] = task.owner
 
+    for k, v in task.airflow_task_config.items():
+        task_kwargs[k] = v
+
     airflow_task = Operator(
         task_id=task.id,
         dag=dag,

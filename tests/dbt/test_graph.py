@@ -588,7 +588,6 @@ def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
     assert err_info.value.args[0] == expected
 
 
-@pytest.mark.sqlite
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_sources(load_method):
@@ -601,7 +600,6 @@ def test_load_via_dbt_ls_with_sources(load_method):
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
             dbt_deps=False,
-            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
@@ -1385,7 +1383,6 @@ def test_load_method_with_unsupported_render_config_selector_arg(load_method):
         dbt_graph.load(method=load_method)
 
 
-@pytest.mark.sqlite
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_project_config_vars():
     """
@@ -1396,7 +1393,6 @@ def test_load_via_dbt_ls_with_project_config_vars():
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
             dbt_vars={"animation_alias": "top_5_animated_movies"},
         ),
         render_config=RenderConfig(

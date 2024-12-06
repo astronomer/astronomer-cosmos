@@ -168,8 +168,6 @@ test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh"
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-integration-setup = 'sh scripts/test/integration-setup.sh'
-test-integration-sqlite = 'sh scripts/test/integration-sqlite.sh'
-test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
 test-performance = 'sh scripts/test/performance.sh'
 test-performance-setup = 'sh scripts/test/performance-setup.sh'
 type-check = "pre-commit run mypy --files cosmos/**/*"
@@ -177,7 +175,7 @@ type-check = "pre-commit run mypy --files cosmos/**/*"
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "sqlite", "perf"]
+markers = ["integration", "perf"]
 
 ######################################
 # DOCS

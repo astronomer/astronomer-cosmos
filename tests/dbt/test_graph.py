@@ -611,8 +611,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     )
     getattr(dbt_graph, load_method)()
     assert len(dbt_graph.nodes) >= 4
-    # TODO: FixMe
-    # assert "source.simple.main.movies_ratings" in dbt_graph.nodes
+    assert "source.simple.main.movies_ratings" in dbt_graph.nodes
 
 
 @pytest.mark.integration
@@ -1408,8 +1407,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
         ),
     )
     dbt_graph.load_via_dbt_ls()
-    # TODO: FixMe
-    # assert dbt_graph.nodes["model.jaffle_shop.stg_orders"] .config["alias"] == "top_5_animated_movies"
+    assert dbt_graph.nodes["model.jaffle_shop.stg_orders"].config["alias"] == "top_5_animated_movies"
 
 
 @pytest.mark.integration

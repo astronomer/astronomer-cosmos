@@ -1407,6 +1407,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
         ),
     )
     dbt_graph.load_via_dbt_ls()
+    assert dbt_graph.nodes is None
     assert dbt_graph.nodes["model.jaffle_shop.orders"].config["alias"] == "orders"
 
 

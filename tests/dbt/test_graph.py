@@ -599,7 +599,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_deps=False,
+            dbt_deps=True,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
@@ -1397,7 +1397,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_deps=False,
+            dbt_deps=True,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),

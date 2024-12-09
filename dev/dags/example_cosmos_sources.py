@@ -66,7 +66,6 @@ render_config = RenderConfig(
         DbtResourceType("source"): convert_source,  # known dbt node type to Cosmos (part of DbtResourceType)
         DbtResourceType("exposure"): convert_exposure,  # dbt node type new to Cosmos (will be added to DbtResourceType)
     },
-    dbt_deps=True,
 )
 
 project_config = ProjectConfig(
@@ -85,5 +84,8 @@ example_cosmos_sources = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_cosmos_sources",
+    operator_args={
+        "install_deps": True,
+    },
 )
 # [END custom_dbt_nodes]

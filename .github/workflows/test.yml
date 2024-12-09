@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main, issue-1343]
+    branches: [main]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -134,12 +134,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
-      #- uses: actions/cache@v3
-      #  with:
-      #    path: |
-      #      ~/.cache/pip
-      #      .local/share/hatch/
-      #    key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -211,12 +211,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      #- uses: actions/cache@v3
-      #  with:
-      #    path: |
-      #      ~/.cache/pip
-      #      .local/share/hatch/
-      #    key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4

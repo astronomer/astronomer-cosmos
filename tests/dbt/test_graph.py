@@ -518,7 +518,7 @@ def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 37
+    assert len(dbt_graph.nodes) == 39
 
 
 def test_load_via_custom_without_project_path():
@@ -588,11 +588,10 @@ def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
     assert err_info.value.args[0] == expected
 
 
-@pytest.mark.sqlite
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_sources(load_method):
-    project_name = "simple"
+    project_name = "jaffle_shop"
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -600,21 +599,20 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_deps=False,
-            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
+            dbt_deps=True,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
-            profile_name="simple",
+            profile_name="postgres_profile",
             target_name="dev",
             profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
         ),
     )
     getattr(dbt_graph, load_method)()
     assert len(dbt_graph.nodes) >= 4
-    assert "source.simple.main.movies_ratings" in dbt_graph.nodes
-    assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
+    assert "source.jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
+    assert "exposure.jaffle_shop.weekly_metrics" in dbt_graph.nodes
 
 
 @pytest.mark.integration
@@ -1385,34 +1383,32 @@ def test_load_method_with_unsupported_render_config_selector_arg(load_method):
         dbt_graph.load(method=load_method)
 
 
-@pytest.mark.sqlite
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_project_config_vars():
     """
     Integration that tests that the dbt ls command is successful and that the node affected by the dbt_vars is
     rendered correctly.
     """
-    project_name = "simple"
+    project_name = "jaffle_shop"
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
-            dbt_vars={"animation_alias": "top_5_animated_movies"},
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_deps=False,
+            dbt_deps=True,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
-            profile_name="simple",
+            profile_name="postgres_profile",
             target_name="dev",
             profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
         ),
     )
     dbt_graph.load_via_dbt_ls()
-    assert dbt_graph.nodes["model.simple.top_animations"].config["alias"] == "top_5_animated_movies"
+    assert dbt_graph.nodes is None
+    assert dbt_graph.nodes["model.jaffle_shop.orders"].config["alias"] == "orders"
 
 
 @pytest.mark.integration

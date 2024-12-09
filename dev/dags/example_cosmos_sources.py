@@ -75,7 +75,6 @@ render_config = RenderConfig(
 # executing dbt models.
 project_config = ProjectConfig(
     DBT_ROOT_PATH / "simple",
-    env_vars={"DBT_SQLITE_PATH": DBT_SQLITE_PATH},
     dbt_vars={"animation_alias": "top_5_animated_movies"},
 )
 

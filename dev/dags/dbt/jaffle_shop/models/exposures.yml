@@ -1,0 +1,13 @@
+version: 2
+
+exposures:
+
+  - name: weekly_metrics
+    label: Jaffle shop metrics
+    type: dashboard
+    maturity: high
+    depends_on:
+      - ref('customers')
+    owner:
+      name: Cosmos Team
+      email: team@astronomer-cosmos.org

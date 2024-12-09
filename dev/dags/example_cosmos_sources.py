@@ -65,7 +65,8 @@ render_config = RenderConfig(
     node_converters={
         DbtResourceType("source"): convert_source,  # known dbt node type to Cosmos (part of DbtResourceType)
         DbtResourceType("exposure"): convert_exposure,  # dbt node type new to Cosmos (will be added to DbtResourceType)
-    }
+    },
+    dbt_deps=True,
 )
 
 project_config = ProjectConfig(

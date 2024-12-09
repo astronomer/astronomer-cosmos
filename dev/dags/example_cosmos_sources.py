@@ -31,13 +31,11 @@ from cosmos.dbt.graph import DbtNode
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-DBT_SQLITE_PATH = str(DEFAULT_DBT_ROOT_PATH / "data")
-
 
 profile_config = ProfileConfig(
     profile_name="simple",
     target_name="dev",
-    profiles_yml_filepath=(DBT_ROOT_PATH / "simple/profiles.yml"),
+    profiles_yml_filepath=(DBT_ROOT_PATH / "jaffle_shop/profiles.yml"),
 )
 
 
@@ -70,11 +68,8 @@ render_config = RenderConfig(
     }
 )
 
-# `ProjectConfig` can pass dbt variables and environment variables to dbt commands. Below is an example of
-# passing a required env var for the profiles.yml file and a dbt variable that is used for rendering and
-# executing dbt models.
 project_config = ProjectConfig(
-    DBT_ROOT_PATH / "simple",
+    DBT_ROOT_PATH / "jaffle_shop",
     dbt_vars={"animation_alias": "top_5_animated_movies"},
 )
 

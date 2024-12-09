@@ -591,7 +591,7 @@ def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_sources(load_method):
-    project_name = "simple"
+    project_name = "jaffle_shop"
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -604,7 +604,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
-            profile_name="simple",
+            profile_name="postgres_profile",
             target_name="dev",
             profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
         ),
@@ -1389,7 +1389,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
     Integration that tests that the dbt ls command is successful and that the node affected by the dbt_vars is
     rendered correctly.
     """
-    project_name = "simple"
+    project_name = "jaffle_shop"
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -1402,7 +1402,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
-            profile_name="simple",
+            profile_name="postgres_profile",
             target_name="dev",
             profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
         ),

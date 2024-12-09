@@ -508,3 +508,83 @@ def test_should_include_node_without_depends_on(selector_config):
 def test_select_using_graph_operators(select_statement, expected):
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=select_statement)
     assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_at_operator():
+    """Test basic @ operator selecting node, descendants and ancestors of all"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@parent"])
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_at_operator_leaf_node():
+    """Test @ operator on a leaf node (no descendants)"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@child"])
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_at_operator_root_node():
+    """Test @ operator on a root node (no ancestors)"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@grandparent"])
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_at_operator_union():
+    """Test @ operator union with another selector"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@child", "tag:has_child"])
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_at_operator_with_path():
+    """Test @ operator with a path"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@gen2/models"])
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
+    assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_at_operator_nonexistent_node():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@nonexistent"])
+    expected = []
+    assert sorted(selected.keys()) == expected
+
+
+def test_exclude_with_at_operator():
+    """Test excluding nodes selected by @ operator"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["@parent"])
+    expected = ["model.dbt-proj.orphaned"]
+    assert sorted(selected.keys()) == expected

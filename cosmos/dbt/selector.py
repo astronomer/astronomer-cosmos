@@ -20,7 +20,8 @@ PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
 PLUS_SELECTOR = "+"
-GRAPH_SELECTOR_REGEX = r"^([0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
+AT_SELECTOR = "@"
+GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,7 @@ class GraphSelector:
         +model_d+
         2+model_e
         model_f+3
+        @model_g
         +/path/to/model_g+
         path:/path/to/model_h+
         +tag:nightly
@@ -46,6 +48,7 @@ class GraphSelector:
     node_name: str
     precursors: str | None
     descendants: str | None
+    at_operator: bool = False
 
     @property
     def precursors_depth(self) -> int:
@@ -56,6 +59,8 @@ class GraphSelector:
             0: if it shouldn't return any precursors
             >0: upperbound number of parent generations
         """
+        if self.at_operator:
+            return -1
         if not self.precursors:
             return 0
         if self.precursors == "+":
@@ -90,7 +95,13 @@ class GraphSelector:
             precursors, node_name, descendants = regex_match.groups()
             if "/" in node_name and not node_name.startswith(PATH_SELECTOR):
                 node_name = f"{PATH_SELECTOR}{node_name}"
-            return GraphSelector(node_name, precursors, descendants)
+
+            at_operator = precursors == AT_SELECTOR
+            if at_operator:
+                precursors = None
+                descendants = "+"  # @ implies all descendants
+
+            return GraphSelector(node_name, precursors, descendants, at_operator)
         return None
 
     def select_node_precursors(self, nodes: dict[str, DbtNode], root_id: str, selected_nodes: set[str]) -> None:
@@ -101,7 +112,7 @@ class GraphSelector:
         :param root_id: Unique identifier of self.node_name
         :param selected_nodes: Set where precursor nodes will be added to.
         """
-        if self.precursors:
+        if self.precursors or self.at_operator:
             depth = self.precursors_depth
             previous_generation = {root_id}
             processed_nodes = set()
@@ -203,15 +214,38 @@ class GraphSelector:
                 root_id = node_by_name[self.node_name]
                 root_nodes.add(root_id)
             else:
-                logger.warn(f"Selector {self.node_name} not found.")
+                logger.warning(f"Selector {self.node_name} not found.")
                 return selected_nodes
 
         selected_nodes.update(root_nodes)
 
-        for root_id in root_nodes:
-            self.select_node_precursors(nodes, root_id, selected_nodes)
-            self.select_node_descendants(nodes, root_id, selected_nodes)
+        self._select_nodes(nodes, root_nodes, selected_nodes)
+
         return selected_nodes
+
+    def _select_nodes(self, nodes: dict[str, DbtNode], root_nodes: set[str], selected_nodes: set[str]) -> None:
+        """
+        Handle selection of nodes based on the graph selector configuration.
+
+        :param nodes: dbt project nodes
+        :param root_nodes: Set of root node ids
+        :param selected_nodes: Set where selected nodes will be added to.
+        """
+        if self.at_operator:
+            descendants: set[str] = set()
+            # First get all descendants
+            for root_id in root_nodes:
+                self.select_node_descendants(nodes, root_id, descendants)
+            selected_nodes.update(descendants)
+
+            # Get ancestors for root nodes and all descendants
+            for node_id in root_nodes | descendants:
+                self.select_node_precursors(nodes, node_id, selected_nodes)
+        else:
+            # Normal selection
+            for root_id in root_nodes:
+                self.select_node_precursors(nodes, root_id, selected_nodes)
+                self.select_node_descendants(nodes, root_id, selected_nodes)
 
 
 class SelectorConfig:

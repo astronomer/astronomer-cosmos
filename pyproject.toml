@@ -45,7 +45,8 @@ dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
     "dbt-clickhouse",
-    "dbt-databricks",
+    # TODO: https://github.com/astronomer/astronomer-cosmos/issues/1379
+    "dbt-databricks<1.9",
     "dbt-exasol",
     "dbt-postgres",
     "dbt-redshift",
@@ -144,7 +145,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "dbt-core"
+    "dbt-core",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
@@ -189,7 +190,6 @@ dependencies = [
     "apache-airflow-providers-microsoft-azure>=8.5.0",
     "msgpack",
     "openlineage-airflow",
-    "pydantic>=1.10.0",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",

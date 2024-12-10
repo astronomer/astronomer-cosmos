@@ -229,7 +229,7 @@ class DbtToAirflowConverter:
 
         validate_changed_config_paths(execution_config, project_config, render_config)
 
-        env_vars = project_config.env_vars or operator_args.get("vars")
+        env_vars = project_config.env_vars or operator_args.get("env")
         dbt_vars = project_config.dbt_vars or operator_args.get("vars")
 
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:

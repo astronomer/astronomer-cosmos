@@ -1,5 +1,5 @@
 {{ config(
-    materialized='table',
+    materialized='view',
     alias=var('animation_alias', 'orders')
    )
 }}

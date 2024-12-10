@@ -868,7 +868,7 @@ def test_load_via_load_via_custom_parser(project_name):
     dbt_graph.load_via_custom_parser()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 28
+    assert len(dbt_graph.nodes) == 29
 
 
 def test_load_via_load_via_custom_parser_select_rendering_config():
@@ -1407,7 +1407,6 @@ def test_load_via_dbt_ls_with_project_config_vars():
         ),
     )
     dbt_graph.load_via_dbt_ls()
-    assert dbt_graph.nodes is None
     assert dbt_graph.nodes["model.jaffle_shop.orders"].config["alias"] == "orders"
 
 
@@ -1575,9 +1574,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "25beeb54cc4eeabe6198248e286a1cfe"
+        assert hash_dir == "a8cc983457e0f21740c53c864e747e55"
     else:
-        assert hash_dir == "6f63493009733a7be34364a6ea3ffd3c"
+        assert hash_dir == "7c6012b38862ff39586f3316a0226a53"
 
 
 @pytest.mark.integration

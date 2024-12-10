@@ -1393,7 +1393,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_vars={"orders_alias": "orders"},
+            dbt_vars={"animation_alias": "orders"},
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,

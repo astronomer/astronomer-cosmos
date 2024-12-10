@@ -35,7 +35,7 @@ dependencies = [
     "Jinja2>=3.0.0",
     "msgpack",
     "packaging>=22.0",
-    "pydantic>=1.10.0",
+    # "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
 ]

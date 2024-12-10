@@ -45,7 +45,7 @@ dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
     "dbt-clickhouse",
-    "dbt-databricks",
+    "dbt-databricks<1.9",
     "dbt-exasol",
     "dbt-postgres",
     "dbt-redshift",
@@ -144,7 +144,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "dbt-core"
+    "dbt-core",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

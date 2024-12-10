@@ -845,18 +845,18 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
     mock_popen_communicate.assert_called_once()
 
 
-@pytest.mark.parametrize("project_name", ("jaffle_shop", "jaffle_shop_python"))
-def test_load_via_load_via_custom_parser(project_name):
+@pytest.mark.parametrize("project_name,nodes_count", [("altered_jaffle_shop", 29), ("jaffle_shop_python", 28)])
+def test_load_via_load_via_custom_parser(project_name, nodes_count):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
     render_config = RenderConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
-        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml",
     )
     dbt_graph = DbtGraph(
         project=project_config,
@@ -868,7 +868,7 @@ def test_load_via_load_via_custom_parser(project_name):
     dbt_graph.load_via_custom_parser()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 29
+    assert len(dbt_graph.nodes) == nodes_count
 
 
 def test_load_via_load_via_custom_parser_select_rendering_config():
@@ -1574,9 +1574,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "c071049cc70ca52d74cf0845f15ae12d"
+        assert hash_dir == "512856ce9da2ce2255524aec677dfc6a"
     else:
-        assert hash_dir == "a432b2d06e6badd7c00dbaf4141d7292"
+        assert hash_dir == "6563b6c21f143f7133a85e1b904efc25"
 
 
 @pytest.mark.integration

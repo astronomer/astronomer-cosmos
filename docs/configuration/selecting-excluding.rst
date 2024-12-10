@@ -17,6 +17,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
 - ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory
 - ``+node_name+1`` (graph operators): include/exclude the node with name ``node_name``, all its parents, and its first generation of children (`dbt graph selector docs <https://docs.getdbt.com/reference/node-selection/graph-operators>`_)
+- ``@node_name`` (@ operator): include/exclude the node with name ``node_name``, all its descendants, and all ancestors of those descendants. This is useful in CI environments where you want to build a model and all its descendants, but you need the ancestors of those descendants to exist first.
 - ``tag:my_tag,+node_name`` (intersection): include/exclude ``node_name`` and its parents if they have the tag ``my_tag`` (`dbt set operator docs <https://docs.getdbt.com/reference/node-selection/set-operators>`_)
 - ``['tag:first_tag', 'tag:second_tag']`` (union): include/exclude nodes that have either ``tag:first_tag`` or ``tag:second_tag``
 
@@ -88,6 +89,17 @@ Examples:
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
             exclude=["node_name+"],  # node_name and its children
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            select=["@my_model"],  # selects my_model, all its descendants,
+            # and all ancestors needed to build those descendants
         )
     )
 

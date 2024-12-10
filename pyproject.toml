@@ -64,7 +64,7 @@ dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
 dbt-spark = ["dbt-spark"]
 dbt-teradata = ["dbt-teradata"]
-dbt-vertica = ["dbt-vertica<=1.5.4"]
+dbt-vertica = ["dbt-vertica"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
@@ -189,7 +189,6 @@ dependencies = [
     "apache-airflow-providers-microsoft-azure>=8.5.0",
     "msgpack",
     "openlineage-airflow",
-    "pydantic>=1.10.0",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",

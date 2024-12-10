@@ -35,7 +35,6 @@ dependencies = [
     "Jinja2>=3.0.0",
     "msgpack",
     "packaging>=22.0",
-    # "pydantic>=1.10.0",
     "typing-extensions; python_version < '3.8'",
     "virtualenv",
 ]
@@ -65,7 +64,7 @@ dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
 dbt-spark = ["dbt-spark"]
 dbt-teradata = ["dbt-teradata"]
-dbt-vertica = ["dbt-vertica"]
+dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",

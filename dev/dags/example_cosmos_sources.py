@@ -35,7 +35,7 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 profile_config = ProfileConfig(
     profile_name="postgres_profile",
     target_name="dev",
-    profiles_yml_filepath=(DBT_ROOT_PATH / "jaffle_shop/profiles.yml"),
+    profiles_yml_filepath=(DBT_ROOT_PATH / "altered_jaffle_shop/profiles.yml"),
 )
 
 

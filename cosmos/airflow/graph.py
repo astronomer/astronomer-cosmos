@@ -129,6 +129,31 @@ def create_test_task_metadata(
     )
 
 
+def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
+    """
+    Return the map from dbt node type to Cosmos class prefix that should be used
+    to handle them.
+    """
+
+    if test_behavior == TestBehavior.BUILD:
+        dbt_resource_to_class = {
+            DbtResourceType.MODEL: "DbtBuild",
+            DbtResourceType.SNAPSHOT: "DbtBuild",
+            DbtResourceType.SEED: "DbtBuild",
+            DbtResourceType.TEST: "DbtTest",
+            DbtResourceType.SOURCE: "DbtSource",
+        }
+    else:
+        dbt_resource_to_class = {
+            DbtResourceType.MODEL: "DbtRun",
+            DbtResourceType.SNAPSHOT: "DbtSnapshot",
+            DbtResourceType.SEED: "DbtSeed",
+            DbtResourceType.TEST: "DbtTest",
+            DbtResourceType.SOURCE: "DbtSource",
+        }
+    return dbt_resource_to_class
+
+
 def create_task_metadata(
     node: DbtNode,
     execution_mode: ExecutionMode,
@@ -150,22 +175,8 @@ def create_task_metadata(
         If it is False, then use the name as a prefix for the task id, otherwise do not.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
-    if test_behavior == TestBehavior.BUILD:
-        dbt_resource_to_class = {
-            DbtResourceType.MODEL: "DbtBuild",
-            DbtResourceType.SNAPSHOT: "DbtBuild",
-            DbtResourceType.SEED: "DbtBuild",
-            DbtResourceType.TEST: "DbtTest",
-            DbtResourceType.SOURCE: "DbtSource",
-        }
-    else:
-        dbt_resource_to_class = {
-            DbtResourceType.MODEL: "DbtRun",
-            DbtResourceType.SNAPSHOT: "DbtSnapshot",
-            DbtResourceType.SEED: "DbtSeed",
-            DbtResourceType.TEST: "DbtTest",
-            DbtResourceType.SOURCE: "DbtSource",
-        }
+    dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
+
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:

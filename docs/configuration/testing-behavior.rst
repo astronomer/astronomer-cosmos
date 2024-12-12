@@ -22,7 +22,7 @@ Cosmos supports the following test behaviors:
 Example of the standard behavior of ``TestBehavior.AFTER_EACH``,
 when using the example DAG available in ``dev/dags/basic_cosmos_dag.py``:
 
-.. figure:: /docs/_static/test_behavior_build.png
+.. image:: ../_static//test_behavior_build.png
 
 Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
 
@@ -37,7 +37,7 @@ Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
         )
     )
 
-.. figure:: /docs/_static/test_behavior_after_all.png
+.. image:: ../_static/test_behavior_after_all.png
 
 
 Finally, an example DAG and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD``:
@@ -47,7 +47,7 @@ Finally, an example DAG and how it is rendered in the Airflow UI when using ``Te
     :start-after: [START build_example]
     :end-before: [END build_example]
 
-.. figure:: /docs/_static/test_behavior_build.png
+.. image:: ../_static/test_behavior_build.png
 
 Warning Behavior
 ----------------

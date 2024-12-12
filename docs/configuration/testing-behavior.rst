@@ -22,7 +22,7 @@ Cosmos supports the following test behaviors:
 Example of the standard behavior of ``TestBehavior.AFTER_EACH``,
 when using the example DAG available in ``dev/dags/basic_cosmos_dag.py``:
 
-.. image:: ../_static//test_behavior_build.png
+.. image:: ../_static/test_behavior_after_each.png
 
 Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
 

@@ -919,7 +919,7 @@ def test_load_via_load_via_custom_parser_select_rendering_config():
         assert model_name == "customers"
         filter_node = dbt_graph.filtered_nodes.get(model_name)
         assert filter_node.file_path == DBT_PROJECTS_ROOT_DIR / "jaffle_shop/models/customers.sql"
-        assert filter_node.tags == ["tags:customers"]
+        assert filter_node.tags == ["customers"]
 
 
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency", return_value=None)

@@ -1,0 +1,123 @@
+Security
+________
+
+This document contains information on how to report security vulnerabilities in Astronomer Cosmos and
+how security issues reported to the Astronomer security team are handled.
+If you would like to learn more, please refer to `https://www.astronomer.io/security/ <https://www.astronomer.io/security/>`_.
+
+At Astronomer, we recognize the critical nature of security and view it as a transparent and collaborative effort.
+If you have any concern around the security of any Astronomer public repository or believe you have uncovered a vulnerability,
+please email `oss_security@astronomer.io <mailto:oss_security@astronomer.io>`_.
+
+.. warning::
+    Note: Due to the nature of some security vulnerabilities, we ask that you not create a GitHub issue.
+
+
+Use of Email for Vulnerability Disclosure
+=========================================
+
+Only use the above email to disclose security vulnerabilities.
+We do not accept bug reports, security implementation questions or other security-related issues at this email address.
+If you are a customer of Astronomer, please reach out to your account team if you have any security-related questions or
+issues other than vulnerabilities, and they can assist you. Otherwise, this codebase is provided ‘as-is’ in accordance
+with its licensing structure.
+
+Scope
+=====
+
+When submitting vulnerabilities, please ensure that it is within scope. Out of scope will be ignored.
+
+In-scope
+........
+
+* Code base with tagged releases
+* When integrated as specified in the following documentation TODO.
+
+Out-of-scope
+............
+
+* Any other codebase, including Astronomer products
+* Astronomer.io website
+* Dependencies used in Astronomer Cosmos
+* Astronomer Cosmos when modified or run in a configuration not intended
+* Other systems integrated with or CSP systems hosting the deployment
+* Cookie transfers between browsers
+
+For other products and repositories owned by Astronomer, please refer to their specific security policy or to
+`https://www.astronomer.io/vulnerability-disclosure/ <https://www.astronomer.io/vulnerability-disclosure/>`_ for
+vulnerabilities associated with Astronomer products.
+
+What information and how to disclose
+====================================
+
+Please send a single, plain-text (not HTML) email for each vulnerability you are reporting.
+At a minimum, it should include the following:
+
+* Brief description/title of the vulnerability
+* Steps to recreate the issue
+* Contact information
+
+Upon review, we may request additional information including, but not limited to, images or a proof-of-concept video.
+
+Severity
+========
+
+The vulnerability severity rating system used internally by Astronomer is not the same as the one used by the Apache Foundation.
+Please do not provide a severity for the vulnerability when disclosing, however, providing a CWE (Common Weakness Enumeration) is recommended.
+
+Follow-on Communication
+=======================
+
+Because Astronomer uses the BugCrowd Vulnerability Disclosure Platform, communication occurs through this program.
+In order for a vulnerability to be claimed and to enable follow-on communication, it is necessary that the vulnerability
+discoverer claim the vulnerability in the BugCrowd Vulnerability Disclosure Platform.
+This will be done through the vulnerability discoverer’s account in the BugCrowd Vulnerability Disclosure Platform.
+
+Response Timeframe
+==================
+
+We aim to acknowledge and validate disclosures within 5 business days. Resolutions will be provided in a timely manner.
+
+Partial Safe Harbor
+===================
+
+Astronomer will not threaten or bring any legal action against anyone who makes a good faith effort to comply with this
+vulnerability disclosure policy. This includes any claim under the DMCA for circumventing technological measures to
+protect the services and applications eligible under this policy.
+
+**As long as you comply with this policy:**
+
+* We consider your security research to be "authorized" under the Computer Fraud and Abuse Act (and/or similar state laws), and
+* We waive any restrictions in our application Terms of Use and Usage Policies that would prohibit your participation in this policy, but only for the limited purpose of your security research under this policy.
+
+Notification Requirement
+========================
+
+* Safe harbor under this policy is only extended if the discoverer of the vulnerability notifies Astronomer as outlined elsewhere in this policy, prior to notifying any other third-party entities, and does not notify any other third-party entities for 90 days after notifying Astronomer, without Astronomer’s prior written approval.
+* After notification of Astronomer and the lapse of the 90 day period, it is requested that any publications, third-party releases, or other disseminations of information related to or derived from the vulnerability discovery be coordinated with Astronomer prior.
+
+Right to rescind safe harbor protections
+========================================
+
+Astronomer reserves the right to rescind any and all safe harbor protections originally extended to the vulnerability
+discoverer in the event that the discoverer, at any point prior to or after notification to Astronomer,
+has knowingly and willfully released, published, or otherwise used information related to the discovered vulnerability in a manner that:
+
+1. Maligns or damages the reputation of Astronomer, its customers, or its employees;
+2. Is used to conduct malicious attacks against Astronomer systems, regardless of whether material damages occur; or
+3. Exacerbates existing vulnerabilities or threats, thereby increasing the risk to Astronomer or its stakeholders.
+
+Extension of safe harbor to third-party systems and services
+============================================================
+
+Astronomer systems and services may be interconnected with third-party systems and services.
+If you submit a report through our vulnerability disclosure program that affects a third-party service,
+we will limit what we share with the affected third party.
+Please understand that, while we can authorize your research on Astronomer’s systems and services,
+we cannot authorize your efforts on third-party products or guarantee they won’t pursue legal action against you.
+That said, if legal action is initiated by a third party against you because of your participation in this vulnerability
+disclosure program, and you have complied with our vulnerability disclosure policy, we will take steps to make it known
+that your actions were conducted in compliance with this policy.
+This is not, and should not be understood as, any agreement on our part to defend, indemnify, or otherwise protect you
+from any third-party action based on your actions.
+You are expected, as always, to comply with all applicable laws.

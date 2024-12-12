@@ -17,8 +17,7 @@ pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \
-    --durations=0 \
-    -m integration  \
+    -m 'integration'  \
     --ignore=tests/perf \
     --ignore=tests/test_example_k8s_dags.py \
-    -k 'not (sqlite or example_cosmos_sources or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes)'
+    -k 'not ( example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes)'

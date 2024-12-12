@@ -1,6 +1,7 @@
-FROM python:3.11
+FROM python:3.12
 
-RUN pip install dbt-postgres==1.8.2 psycopg2==2.9.3 pytz
+RUN pip install --force-reinstall 'dbt-postgres>=1.8'
+RUN pip install --force-reinstall dbt-adapters
 
 ENV POSTGRES_DATABASE=postgres
 ENV POSTGRES_DB=postgres

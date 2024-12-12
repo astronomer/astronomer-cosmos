@@ -36,7 +36,6 @@ dependencies = [
     "msgpack",
     "packaging>=22.0",
     "pydantic>=1.10.0",
-    "typing-extensions; python_version < '3.8'",
     "virtualenv",
 ]
 
@@ -45,7 +44,8 @@ dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
     "dbt-clickhouse",
-    "dbt-databricks",
+    # TODO: https://github.com/astronomer/astronomer-cosmos/issues/1379
+    "dbt-databricks<1.9",
     "dbt-exasol",
     "dbt-postgres",
     "dbt-redshift",
@@ -144,8 +144,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "eval_type_backport", # TODO: https://github.com/astronomer/astronomer-cosmos/issues/1342
-    "dbt-core<1.8.9"  # TODO: https://github.com/astronomer/astronomer-cosmos/issues/1343
+    "dbt-core",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
@@ -168,8 +167,6 @@ test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh"
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-integration-setup = 'sh scripts/test/integration-setup.sh'
-test-integration-sqlite = 'sh scripts/test/integration-sqlite.sh'
-test-integration-sqlite-setup = 'sh scripts/test/integration-sqlite-setup.sh'
 test-performance = 'sh scripts/test/performance.sh'
 test-performance-setup = 'sh scripts/test/performance-setup.sh'
 type-check = "pre-commit run mypy --files cosmos/**/*"
@@ -177,7 +174,7 @@ type-check = "pre-commit run mypy --files cosmos/**/*"
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "sqlite", "perf"]
+markers = ["integration", "perf"]
 
 ######################################
 # DOCS
@@ -192,7 +189,6 @@ dependencies = [
     "apache-airflow-providers-microsoft-azure>=8.5.0",
     "msgpack",
     "openlineage-airflow",
-    "pydantic>=1.10.0",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",

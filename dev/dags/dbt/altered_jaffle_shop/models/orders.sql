@@ -1,3 +1,9 @@
+{{ config(
+    materialized='view',
+    alias=var('orders_alias', 'orders')
+   )
+}}
+
 {% set payment_methods = ['credit_card', 'coupon', 'bank_transfer', 'gift_card'] %}
 
 with orders as (

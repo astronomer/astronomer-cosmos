@@ -5,6 +5,7 @@ from pathlib import Path
 from airflow import DAG
 
 from cosmos import DbtCloneLocalOperator, DbtRunLocalOperator, DbtSeedLocalOperator, ProfileConfig
+from cosmos.helpers import upload_artifacts_to_aws_s3
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -26,6 +27,8 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         dbt_cmd_flags=["--select", "raw_customers"],
         install_deps=True,
         append_env=True,
+        callback=upload_artifacts_to_aws_s3,
+        callback_args={"aws_conn_id": "aws_s3_conn", "bucket_name": "cosmos-artifacts-upload"},
     )
     run_operator = DbtRunLocalOperator(
         profile_config=profile_config,

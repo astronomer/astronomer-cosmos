@@ -141,6 +141,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
+        callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
@@ -149,6 +150,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
+        self.callback_args = callback_args or {}
         self.compiled_sql = ""
         self.freshness = ""
         self.should_store_compiled_sql = should_store_compiled_sql
@@ -500,9 +502,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 self.store_freshness_json(tmp_project_dir, context)
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.upload_compiled_sql(tmp_project_dir, context)
-                self.handle_exception(result)
                 if self.callback:
-                    self.callback(tmp_project_dir)
+                    self.callback_args.update(context)
+                    self.callback(tmp_project_dir, **self.callback_args)
+                self.handle_exception(result)
 
                 return result
 

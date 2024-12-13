@@ -7,9 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ProfileConfig, ProjectConfig
-from cosmos.helpers import (
-    upload_artifacts_to_cloud_storage,
-)
+from cosmos.helpers import upload_artifacts_to_cloud_storage
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"

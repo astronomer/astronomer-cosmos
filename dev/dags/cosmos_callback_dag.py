@@ -36,10 +36,6 @@ cosmos_callback_dag = DbtDag(
         # --------------------------------------------------------------
         # Callback function to upload artifacts using Airflow Object storage and Cosmos remote_target_path setting on Airflow 2.8 and above
         "callback": upload_artifacts_to_cloud_storage,
-        # --------------------------------------------------------------
-        # Callback function to upload artifacts to AWS S3 for Airflow < 2.8
-        # "callback": upload_artifacts_to_aws_s3,
-        # "callback_args": {"aws_conn_id": "aws_s3_conn", "bucket_name": "cosmos-artifacts-upload"},
     },
     # normal dag parameters
     schedule_interval="@daily",

@@ -78,9 +78,20 @@ class DbtNode:
         Returns:
             Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
         """
-        airflow_task_config = self.config.get("meta", {}).get("cosmos")
-        if isinstance(airflow_task_config, dict):
-            return airflow_task_config
+
+        if "meta" in self.config:
+            meta = self.config["meta"]
+            if "cosmos" in meta:
+                cosmos = meta["cosmos"]
+                if isinstance(cosmos, dict):
+                    if "operator_kwargs" in cosmos:
+                        operator_kwargs = cosmos["operator_kwargs"]
+                        if isinstance(operator_kwargs, dict):
+                            return operator_kwargs
+                    else:
+                        logger.error(f"Invalid type: 'operator_kwargs' in meta.cosmos must be a dict.")
+                else:
+                    logger.error(f"Invalid type: 'cosmos' in meta must be a dict.")
         return {}
 
     @property

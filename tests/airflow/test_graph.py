@@ -62,7 +62,7 @@ child_node = DbtNode(
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
     tags=["nightly"],
-    config={"materialized": "table"},
+    config={"materialized": "table", "meta": {"cosmos": {"queue": "custom_queue"}}},
 )
 
 child2_node = DbtNode(
@@ -735,9 +735,14 @@ def test_custom_meta():
             ),
             dbt_project_name="astro_shop",
         )
-        # pool test
+        # test custom meta (queue, pool)
         for task in dag.tasks:
             if task.task_id == "child2_v2_run":
                 assert task.pool == "custom_pool"
             else:
                 assert task.pool == "default_pool"
+
+            if task.task_id == "child_run":
+                assert task.queue == "custom_queue"
+            else:
+                assert task.queue == "default"

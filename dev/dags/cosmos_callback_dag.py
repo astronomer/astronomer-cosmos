@@ -44,4 +44,4 @@ cosmos_callback_dag = DbtDag(
     dag_id="cosmos_callback_dag",
     default_args={"retries": 2},
 )
-# [END local_example]
+# [END cosmos_callback_example]

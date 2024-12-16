@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ProfileConfig, ProjectConfig
+from cosmos.io import upload_artifacts_to_cloud_storage
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -22,8 +23,8 @@ profile_config = ProfileConfig(
     ),
 )
 
-# [START local_example]
-basic_cosmos_dag = DbtDag(
+# [START cosmos_callback_example]
+cosmos_callback_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "jaffle_shop",
@@ -32,12 +33,19 @@ basic_cosmos_dag = DbtDag(
     operator_args={
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag
+        # --------------------------------------------------------------
+        # Callback function to upload artifacts using Airflow Object storage and Cosmos remote_target_path setting on Airflow 2.8 and above
+        "callback": upload_artifacts_to_cloud_storage,
+        # --------------------------------------------------------------
+        # Callback function to upload artifacts to AWS S3 for Airflow < 2.8
+        # "callback": upload_artifacts_to_aws_s3,
+        # "callback_args": {"aws_conn_id": "aws_s3_conn", "bucket_name": "cosmos-artifacts-upload"},
     },
     # normal dag parameters
     schedule_interval="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-    dag_id="basic_cosmos_dag",
+    dag_id="cosmos_callback_dag",
     default_args={"retries": 2},
 )
 # [END local_example]

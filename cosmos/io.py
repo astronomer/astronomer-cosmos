@@ -12,6 +12,11 @@ from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 
 def upload_artifacts_to_aws_s3(project_dir: str, **kwargs: Any) -> None:
+    """
+    Helper function demonstrating how to upload artifacts to AWS S3 that can be used as a callback.
+
+    :param project_dir: Path of the cloned project directory which Cosmos tasks work from.
+    """
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
     target_dir = f"{project_dir}/target"
@@ -38,6 +43,11 @@ def upload_artifacts_to_aws_s3(project_dir: str, **kwargs: Any) -> None:
 
 
 def upload_artifacts_to_gcp_gs(project_dir: str, **kwargs: Any) -> None:
+    """
+    Helper function demonstrating how to upload artifacts to GCP GS that can be used as a callback.
+
+    :param project_dir: Path of the cloned project directory which Cosmos tasks work from.
+    """
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
     target_dir = f"{project_dir}/target"
@@ -63,6 +73,11 @@ def upload_artifacts_to_gcp_gs(project_dir: str, **kwargs: Any) -> None:
 
 
 def upload_artifacts_to_azure_wasb(project_dir: str, **kwargs: Any) -> None:
+    """
+    Helper function demonstrating how to upload artifacts to Azure WASB that can be used as a callback.
+
+    :param project_dir: Path of the cloned project directory which Cosmos tasks work from.
+    """
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 
     target_dir = f"{project_dir}/target"
@@ -146,6 +161,13 @@ def _construct_dest_file_path(
 
 
 def upload_artifacts_to_cloud_storage(project_dir: str, **kwargs: Any) -> None:
+    """
+    Helper function demonstrating how to upload artifacts to remote blob stores that can be used as a callback. This is
+    an example of a helper function that can be used if on Airflow >= 2.8 and cosmos configurations like
+    ``remote_target_path`` and ``remote_target_path_conn_id`` when set can be leveraged.
+
+    :param project_dir: Path of the cloned project directory which Cosmos tasks work from.
+    """
     dest_target_dir, dest_conn_id = _configure_remote_target_path()
 
     if not dest_target_dir:

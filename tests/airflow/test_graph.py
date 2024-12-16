@@ -74,7 +74,17 @@ child2_node = DbtNode(
     config={"materialized": "table"},
 )
 
-sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node]
+custom_meta_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.custom_meta",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[parent_node.unique_id],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/custom_meta.sql",
+    tags=["custom_meta"],
+    config={"meta": {"cosmos": {"pool": "custom_pool"}}},
+)
+
+
+sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node, custom_meta_node]
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
 
 

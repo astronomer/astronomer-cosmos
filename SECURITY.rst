@@ -31,7 +31,7 @@ In-scope
 ........
 
 * Code base with tagged releases
-* When integrated as specified in the following documentation TODO.
+* When integrated as specified in the `official Astronomer Cosmos documentation <https://astronomer.github.io/astronomer-cosmos/>`_.
 
 Out-of-scope
 ............
@@ -39,7 +39,7 @@ Out-of-scope
 * Any other codebase, including Astronomer products
 * Astronomer.io website
 * Dependencies used in Astronomer Cosmos
-* Astronomer Cosmos when modified or run in a configuration not intended
+* Astronomer Cosmos when modified or run using a not intended configuration
 * Other systems integrated with or CSP systems hosting the deployment
 * Cookie transfers between browsers
 
@@ -120,4 +120,5 @@ disclosure program, and you have complied with our vulnerability disclosure poli
 that your actions were conducted in compliance with this policy.
 This is not, and should not be understood as, any agreement on our part to defend, indemnify, or otherwise protect you
 from any third-party action based on your actions.
+
 You are expected, as always, to comply with all applicable laws.

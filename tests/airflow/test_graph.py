@@ -62,7 +62,7 @@ child_node = DbtNode(
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
     tags=["nightly"],
-    config={"materialized": "table", "meta": {"cosmos": {"queue": "custom_queue"}}},
+    config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"queue": "custom_queue"}}}},
 )
 
 child2_node = DbtNode(
@@ -71,7 +71,7 @@ child2_node = DbtNode(
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
     tags=["nightly"],
-    config={"materialized": "table", "meta": {"cosmos": {"pool": "custom_pool"}}},
+    config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
 )
 
 sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node]

@@ -707,3 +707,37 @@ def test_owner(dbt_extra_config, expected_owner):
 
     assert len(output.leaves) == 1
     assert output.leaves[0].owner == expected_owner
+
+
+def test_custom_meta():
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.AFTER_EACH,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            dbt_project_name="astro_shop",
+        )
+        # pool test
+        for task in dag.tasks:
+            if task.task_id == "child2_v2_run":
+                assert task.pool == "custom_pool"
+            else:
+                assert task.pool == "default_pool"

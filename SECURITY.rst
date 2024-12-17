@@ -75,7 +75,7 @@ Follow-up communication and claims go through the vulnerability discoverer’s a
 Response Timeframe
 ==================
 
-We aim to acknowledge and validate disclosures within 5 business days. Resolutions will be provided in a timely manner.
+Astronomer aims to acknowledge and validate disclosures within 5 business days. Resolutions will be provided in a timely manner.
 
 Partial Safe Harbor
 ===================

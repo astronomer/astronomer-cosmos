@@ -6,10 +6,11 @@ Changelog
 
 New Features
 
-* Support customizing operator arguments at a dbt node level by @wornjs in #1339
-* Add support to ``TestBehavior.BUILD`` by @tatiana in #1377
+* Support customizing Airflow operator arguments per dbt node by @wornjs in #1339. `More information <https://astronomer.github.io/astronomer-cosmos/getting_started/custom-airflow-properties.html>`_.
+* Support uploading dbt artifacts to remote cloud storages via callback by @pankajkoti in #1389. `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_.
+* Add support to ``TestBehavior.BUILD`` by @tatiana in #1377. `Documentation <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
 * Add support for the "at" operator when using ``LoadMode.DBT_MANIFEST`` or ``CUSTOM`` by @benjy44 in #1372
-* Add dbt clone operator by @pankajastro in #1326
+* Add dbt clone operator by @pankajastro in #1326, as documented in `here <https://astronomer.github.io/astronomer-cosmos/getting_started/operators.html>`_.
 
 Bug Fixes
 

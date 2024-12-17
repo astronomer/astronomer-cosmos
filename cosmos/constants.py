@@ -10,6 +10,7 @@ DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"
 DEFAULT_DBT_TARGET_NAME = "cosmos_target"
 DEFAULT_COSMOS_CACHE_DIR_NAME = "cosmos"
+DEFAULT_TARGET_PATH = "target"
 DBT_LOG_PATH_ENVVAR = "DBT_LOG_PATH"
 DBT_LOG_DIR_NAME = "logs"
 DBT_TARGET_PATH_ENVVAR = "DBT_TARGET_PATH"

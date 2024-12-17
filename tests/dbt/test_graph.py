@@ -1121,6 +1121,20 @@ def test_run_command(mock_popen, stdout, returncode):
     assert return_value == stdout
 
 
+@patch("cosmos.dbt.graph.Popen")
+def test_run_command_none_argument(mock_popen, caplog):
+    fake_command = ["invalid-cmd", None]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = ("Invalid None argument", None)
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        run_command(fake_command, fake_dir, env_vars)
+
+    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nInvalid None argument"
+    assert str(exc_info.value) == expected
+
+
 def test_parse_dbt_ls_output_real_life_customer_bug(caplog):
     dbt_ls_output = """
 11:20:43  Running with dbt=1.7.6

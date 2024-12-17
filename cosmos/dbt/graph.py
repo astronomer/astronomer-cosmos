@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
@@ -66,6 +66,33 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+
+    @property
+    def airflow_task_config(self) -> Dict[str, Any]:
+        """
+        This method is designed to extend the dbt project's functionality by incorporating Airflow-related metadata into the dbt YAML configuration.
+        Since dbt projects are independent of Airflow, adding Airflow-specific information to the `meta` field within the dbt YAML allows Airflow tasks to
+        utilize this information during execution.
+
+        Examples: pool, pool_slots, queue, ...
+        Returns:
+            Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
+        """
+
+        if "meta" in self.config:
+            meta = self.config["meta"]
+            if "cosmos" in meta:
+                cosmos = meta["cosmos"]
+                if isinstance(cosmos, dict):
+                    if "operator_kwargs" in cosmos:
+                        operator_kwargs = cosmos["operator_kwargs"]
+                        if isinstance(operator_kwargs, dict):
+                            return operator_kwargs
+                    else:
+                        logger.error(f"Invalid type: 'operator_kwargs' in meta.cosmos must be a dict.")
+                else:
+                    logger.error(f"Invalid type: 'cosmos' in meta must be a dict.")
+        return {}
 
     @property
     def resource_name(self) -> str:
@@ -133,6 +160,7 @@ def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
 
 def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
+    command = [str(arg) if arg is not None else "<None>" for arg in command]
     logger.info("Running command: `%s`", " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
     process = Popen(

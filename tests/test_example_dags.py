@@ -30,7 +30,7 @@ KUBERNETES_DAGS = ["jaffle_shop_kubernetes"]
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
-    "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py"],
+    "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py", "cosmos_callback_dag.py"],
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]

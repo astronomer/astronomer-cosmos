@@ -3,7 +3,7 @@ ________
 
 This document contains information on how to report security vulnerabilities in Astronomer Cosmos and
 how security issues reported to the Astronomer security team are handled.
-If you would like to learn more, please refer to `https://www.astronomer.io/security/ <https://www.astronomer.io/security/>`_.
+If you would like to learn more, refer to `https://www.astronomer.io/security/ <https://www.astronomer.io/security/>`_.
 
 At Astronomer, we recognize the critical nature of security and view it as a transparent and collaborative effort.
 If you have any concern around the security of any Astronomer public repository or believe you have uncovered a vulnerability,

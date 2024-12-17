@@ -267,76 +267,6 @@ jobs:
       AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
 
-# TODO: https://github.com/astronomer/astronomer-cosmos/issues/1341
-#  Run-Integration-Tests-Sqlite:
-#    needs: Authorize
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        python-version: ["3.11"]
-#        airflow-version: ["2.8"]
-#
-#    steps:
-#      - uses: actions/checkout@v3
-#        with:
-#          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-#      - uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.cache/pip
-#            .local/share/hatch/
-#          key: integration-sqlite-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
-#
-#      - name: Set up Python ${{ matrix.python-version }}
-#        uses: actions/setup-python@v4
-#        with:
-#          python-version: ${{ matrix.python-version }}
-#
-#      - name: Install packages and dependencies
-#        run: |
-#          python -m pip install uv
-#          uv pip install --system hatch
-#          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
-#
-#      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
-#        run: |
-#          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-sqlite-setup
-#          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-integration-sqlite
-#        env:
-#          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-#          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
-#          AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
-#          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
-#          AIRFLOW_CONN_AZURE_ABFS_CONN: ${{ secrets.AIRFLOW_CONN_AZURE_ABFS_CONN }}
-#          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
-#          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-#          AIRFLOW__COSMOS__ENABLE_CACHE: 0
-#          COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
-#          DATABRICKS_CLUSTER_ID: mock
-#          DATABRICKS_HOST: mock
-#          DATABRICKS_WAREHOUSE_ID: mock
-#          DATABRICKS_TOKEN: mock
-#          POSTGRES_HOST: localhost
-#          POSTGRES_USER: postgres
-#          POSTGRES_PASSWORD: postgres
-#          POSTGRES_DB: postgres
-#          POSTGRES_SCHEMA: public
-#          POSTGRES_PORT: 5432
-#          AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
-#          AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-#
-#      - name: Upload coverage to Github
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: coverage-integration-sqlite-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
-#          path: .coverage
-#          include-hidden-files: true
-#
-#    env:
-#      AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-#      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
-#      PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-
   Run-Integration-Tests-DBT-1-5-4:
     needs: Authorize
     runs-on: ubuntu-latest
@@ -491,7 +421,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ "3.11" ]
+        python-version: [ "3.12" ]
         airflow-version: [ "2.10" ]
     steps:
       - uses: actions/checkout@v3

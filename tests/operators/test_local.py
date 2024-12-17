@@ -439,10 +439,12 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 def test_run_operator_dataset_inlets_and_outlets(caplog):
     from airflow.datasets import Dataset
 
+    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
+
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
+            project_dir=project_dir,
             task_id="seed",
             dbt_cmd_flags=["--select", "raw_customers"],
             install_deps=True,
@@ -450,7 +452,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
         )
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
+            project_dir=project_dir,
             task_id="run",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
@@ -458,7 +460,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
         )
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
+            project_dir=project_dir,
             task_id="test",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
@@ -599,7 +601,7 @@ def test_run_operator_dataset_url_encoded_names(caplog):
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
-            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/simple",
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop",
             task_id="run",
             dbt_cmd_flags=["--models", "ｍｕｌｔｉｂｙｔｅ"],
             install_deps=True,

@@ -10,6 +10,7 @@ from cosmos.config import RenderConfig
 from cosmos.constants import (
     DBT_COMPILE_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
     ExecutionMode,
@@ -131,6 +132,31 @@ def create_test_task_metadata(
     )
 
 
+def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
+    """
+    Return the map from dbt node type to Cosmos class prefix that should be used
+    to handle them.
+    """
+
+    if test_behavior == TestBehavior.BUILD:
+        dbt_resource_to_class = {
+            DbtResourceType.MODEL: "DbtBuild",
+            DbtResourceType.SNAPSHOT: "DbtBuild",
+            DbtResourceType.SEED: "DbtBuild",
+            DbtResourceType.TEST: "DbtTest",
+            DbtResourceType.SOURCE: "DbtSource",
+        }
+    else:
+        dbt_resource_to_class = {
+            DbtResourceType.MODEL: "DbtRun",
+            DbtResourceType.SNAPSHOT: "DbtSnapshot",
+            DbtResourceType.SEED: "DbtSeed",
+            DbtResourceType.TEST: "DbtTest",
+            DbtResourceType.SOURCE: "DbtSource",
+        }
+    return dbt_resource_to_class
+
+
 def create_task_metadata(
     node: DbtNode,
     execution_mode: ExecutionMode,
@@ -138,6 +164,7 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
+    test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -151,13 +178,8 @@ def create_task_metadata(
         If it is False, then use the name as a prefix for the task id, otherwise do not.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
-    dbt_resource_to_class = {
-        DbtResourceType.MODEL: "DbtRun",
-        DbtResourceType.SNAPSHOT: "DbtSnapshot",
-        DbtResourceType.SEED: "DbtSeed",
-        DbtResourceType.TEST: "DbtTest",
-        DbtResourceType.SOURCE: "DbtSource",
-    }
+    dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
+
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
@@ -165,10 +187,13 @@ def create_task_metadata(
             "dbt_node_config": node.context_dict,
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
         }
-        if node.resource_type == DbtResourceType.MODEL:
-            task_id = f"{node.name}_run"
-            if use_task_group is True:
+        if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            task_id = f"{node.name}_{node.resource_type.value}_build"
+        elif node.resource_type == DbtResourceType.MODEL:
+            if use_task_group:
                 task_id = "run"
+            else:
+                task_id = f"{node.name}_run"
         elif node.resource_type == DbtResourceType.SOURCE:
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
@@ -176,8 +201,6 @@ def create_task_metadata(
                 and node.has_test is False
             ):
                 return None
-            # TODO: https://github.com/astronomer/astronomer-cosmos
-            # pragma: no cover
             task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
@@ -238,6 +261,7 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
+        test_behavior=test_behavior,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task

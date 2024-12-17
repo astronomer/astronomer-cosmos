@@ -7,7 +7,7 @@ exposures:
     type: dashboard
     maturity: high
     depends_on:
-      - ref('top_animations')
+      - ref('customers')
     owner:
       name: Cosmos Team
       email: team@astronomer-cosmos.org

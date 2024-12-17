@@ -75,6 +75,7 @@ class TestBehavior(Enum):
     Behavior of the tests.
     """
 
+    BUILD = "build"
     NONE = "none"
     AFTER_EACH = "after_each"
     AFTER_ALL = "after_all"
@@ -143,6 +144,14 @@ class DbtResourceType(aenum.Enum):  # type: ignore
 
 
 DEFAULT_DBT_RESOURCES = DbtResourceType.__members__.values()
+
+# According to the dbt documentation (https://docs.getdbt.com/reference/commands/build), build also supports test nodes.
+# However, in the context of Cosmos, we will run test nodes together with the respective models/seeds/snapshots nodes
+SUPPORTED_BUILD_RESOURCES = [
+    DbtResourceType.MODEL,
+    DbtResourceType.SNAPSHOT,
+    DbtResourceType.SEED,
+]
 
 # dbt test runs tests defined on models, sources, snapshots, and seeds.
 # It expects that you have already created those resources through the appropriate commands.

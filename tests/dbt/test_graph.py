@@ -838,7 +838,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_c
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome stderr message"
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: Some stderr message\nstdout: "
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
@@ -859,7 +859,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome Runtime Error"
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: \nstdout: Some Runtime Error"
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 

@@ -51,7 +51,7 @@ Required information and how to disclose
 ====================================
 
 Please send a single, plain-text (not HTML) email for each vulnerability you report.
-At a minimum, it should include the following:
+At a minimum, the report must include the following:
 
 * Brief description/title of the vulnerability
 * Steps to recreate the issue

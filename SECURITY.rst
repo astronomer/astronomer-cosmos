@@ -39,7 +39,7 @@ Out-of-scope
 * Any other codebase, including other Astronomer products
 * Astronomer.io website
 * Dependencies used in Astronomer Cosmos
-* Astronomer Cosmos when modified or run using a not intended configuration
+* Astronomer Cosmos when modified or run using an unintended configuration
 * Other systems integrated with or CSP systems hosting the deployment
 * Cookie transfers between browsers
 

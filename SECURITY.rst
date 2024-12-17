@@ -10,7 +10,7 @@ If you have any concern about the security of any Astronomer public repository, 
 please email `oss_security@astronomer.io <mailto:oss_security@astronomer.io>`_.
 
 .. warning::
-    Note: Due to the nature of some security vulnerabilities, do not create a GitHub issue to report a vulnerability.
+    Due to the nature of some security vulnerabilities, do not create a GitHub issue to report a vulnerability.
 
 
 Use of Email for Vulnerability Disclosure
@@ -65,17 +65,20 @@ Severity
 The vulnerability severity rating system used internally by Astronomer is not the same as the one used by the Apache Foundation.
 Please do not provide a severity for the vulnerability when disclosing, however, providing a CWE (Common Weakness Enumeration) is recommended.
 
-Follow-up Communication
-=======================
-
-Astronomer uses the BugCrowd Vulnerability Disclosure Platform for disclosures and follow-up communication.
-In order for the discoverer to claim a vulnerability report and to enable follow-up communication from Astronomer, the discoverer must claim the vulnerability in the BugCrowd Vulnerability Disclosure Platform.
-Follow-up communication and claims go through the vulnerability discoverer’s account in the BugCrowd Vulnerability Disclosure Platform.
-
 Response Timeframe
 ==================
 
 Astronomer aims to acknowledge and validate disclosures within 5 business days. Resolutions will be provided in a timely manner.
+
+
+Follow-up Communication
+=======================
+
+Astronomer will handle the disclosures sent to `oss_security@astronomer.io <mailto:oss_security@astronomer.io>`_ on a best-case effort,
+usually replying using the same tool.
+
+If the disclosure involves an Astronomer product or repository covered by the BugCrowd Vulnerability Disclosure Platform,
+the terms and timeframes may differ and the communication will happen via Bugcrowd.
 
 Partial Safe Harbor
 ===================

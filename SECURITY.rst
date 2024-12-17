@@ -10,7 +10,7 @@ If you have any concern about the security of any Astronomer public repository, 
 please email `oss_security@astronomer.io <mailto:oss_security@astronomer.io>`_.
 
 .. warning::
-    Note: Due to the nature of some security vulnerabilities, we ask that you not create a GitHub issue.
+    Note: Due to the nature of some security vulnerabilities, do not create a GitHub issue to report a vulnerability.
 
 
 Use of Email for Vulnerability Disclosure

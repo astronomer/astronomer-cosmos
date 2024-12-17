@@ -109,15 +109,15 @@ has knowingly and willfully released, published, or otherwise used information r
 Extension of safe harbor to third-party systems and services
 ============================================================
 
-Astronomer systems and services may be interconnected with third-party systems and services.
-If you submit a report through our vulnerability disclosure program that affects a third-party service,
-we will limit what we share with the affected third party.
+Astronomer systems and services can interconnect with third-party systems and services.
+If you submit a report that affects a third-party service through the `vulnerability disclosure program <https://www.astronomer.io/vulnerability-disclosure/>`_,
+Astronomer will limit what we share with the affected third party.
 Please understand that, while we can authorize your research on Astronomer’s systems and services,
 we cannot authorize your efforts on third-party products or guarantee they won’t pursue legal action against you.
-That said, if legal action is initiated by a third party against you because of your participation in this vulnerability
+If legal action is initiated by a third party against you because of your participation in this vulnerability
 disclosure program, and you have complied with our vulnerability disclosure policy, we will take steps to make it known
 that your actions were conducted in compliance with this policy.
-This is not, and should not be understood as, any agreement on our part to defend, indemnify, or otherwise protect you
+This is not, and should not be understood as, any agreement on Astronomer's part to defend, indemnify, or otherwise protect you
 from any third-party action based on your actions.
 
 You are expected, as always, to comply with all applicable laws.

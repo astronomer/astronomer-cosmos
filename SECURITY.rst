@@ -65,7 +65,7 @@ Severity
 The vulnerability severity rating system used internally by Astronomer is not the same as the one used by the Apache Foundation.
 Please do not provide a severity for the vulnerability when disclosing, however, providing a CWE (Common Weakness Enumeration) is recommended.
 
-Follow-on Communication
+Follow-up Communication
 =======================
 
 Because Astronomer uses the BugCrowd Vulnerability Disclosure Platform, communication occurs through this program.

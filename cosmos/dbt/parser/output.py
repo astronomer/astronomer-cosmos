@@ -11,6 +11,7 @@ from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
+DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
 
 
 def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
@@ -39,6 +40,10 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     return num
 
 
+def parse_number_of_freshness_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
+    return sum(1 for line in result.full_output if DBT_FRESHNESS_WARN_MSG in line)
+
+
 def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
@@ -48,6 +53,21 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
         if run_result.status == "warn":
             num += 1
     return num
+
+
+def extract_freshness_warn_issue(log_list: List[str]) -> Tuple[List[str], List[str]]:
+
+    test_names = []
+    test_results = []
+
+    for line in log_list:
+
+        if DBT_FRESHNESS_WARN_MSG in line:
+            test_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
+            test_names.append(test_name)
+            test_results.append(line)
+
+    return test_names, test_results
 
 
 def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:

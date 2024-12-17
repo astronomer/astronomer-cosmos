@@ -57,7 +57,9 @@ from cosmos.constants import (
 )
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
+    extract_freshness_warn_issue,
     extract_log_issues,
+    parse_number_of_freshness_warnings_subprocess,
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
@@ -706,8 +708,44 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
     Executes a dbt source freshness command.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self.on_warning_callback = on_warning_callback
+        self.extract_issues: Callable[..., tuple[list[str], list[str]]]
+        self.parse_number_of_warnings: Callable[..., int]
+
+    def _set_test_result_parsing_methods(self) -> None:
+        """Sets the extract_issues and parse_number_of_warnings methods based on the invocation mode."""
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.extract_issues = extract_freshness_warn_issue
+            self.parse_number_of_warnings = parse_number_of_freshness_warnings_subprocess
+        # TODO: FIXME
+        # elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+        #     self.extract_issues = extract_dbt_runner_issues
+        #     self.parse_number_of_warnings = parse_number_of_warnings_dbt_runner
+
+    def _handle_warnings(self, result: FullOutputSubprocessResult | dbtRunnerResult, context: Context) -> None:
+        """
+         Handles warnings by extracting log issues, creating additional context, and calling the
+         on_warning_callback with the updated context.
+
+        :param result: The result object from the build and run command.
+        :param context: The original airflow context in which the build and run command was executed.
+        """
+        test_names, test_results = self.extract_issues(result.full_output)
+
+        warning_context = dict(context)
+        warning_context["test_names"] = test_names
+        warning_context["test_results"] = test_results
+
+        self.on_warning_callback and self.on_warning_callback(warning_context)
+
+    def execute(self, context: Context) -> None:
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        self._set_test_result_parsing_methods()
+        number_of_warnings = self.parse_number_of_warnings(result)  # type: ignore
+        if self.on_warning_callback and number_of_warnings > 0:
+            self._handle_warnings(result, context)
 
 
 class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):

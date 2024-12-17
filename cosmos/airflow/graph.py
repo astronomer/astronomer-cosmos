@@ -165,6 +165,7 @@ def create_task_metadata(
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
+    on_warning_callback: Callable[..., Any] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -176,6 +177,7 @@ def create_task_metadata(
     :param dbt_dag_task_group_identifier: Identifier to refer to the DbtDAG or DbtTaskGroup in the DAG.
     :param use_task_group: It determines whether to use the name as a prefix for the task id or not.
         If it is False, then use the name as a prefix for the task id, otherwise do not.
+    :param on_warning_callback:
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
@@ -183,10 +185,11 @@ def create_task_metadata(
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
-        extra_context = {
+        extra_context: dict[str, Any] = {
             "dbt_node_config": node.context_dict,
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
         }
+
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             task_id = f"{node.name}_{node.resource_type.value}_build"
         elif node.resource_type == DbtResourceType.MODEL:
@@ -195,6 +198,9 @@ def create_task_metadata(
             else:
                 task_id = f"{node.name}_run"
         elif node.resource_type == DbtResourceType.SOURCE:
+            # if on_warning_callback is not None:
+            extra_context["on_warning_callback"] = on_warning_callback
+
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
                 and node.has_freshness is False
@@ -262,6 +268,7 @@ def generate_task_or_group(
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
         test_behavior=test_behavior,
+        on_warning_callback=on_warning_callback,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task

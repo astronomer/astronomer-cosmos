@@ -1131,7 +1131,7 @@ def test_run_command_none_argument(mock_popen, caplog):
     with pytest.raises(CosmosLoadDbtException) as exc_info:
         run_command(fake_command, fake_dir, env_vars)
 
-    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nInvalid None argument"
+    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nstderr: None\nstdout: Invalid None argument"
     assert str(exc_info.value) == expected
 
 

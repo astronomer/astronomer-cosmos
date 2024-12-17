@@ -25,7 +25,7 @@ with its licensing structure.
 Scope
 =====
 
-When submitting vulnerabilities, please ensure that it is within scope. Out of scope will be ignored.
+When submitting vulnerabilities, please ensure that it is within the scope of the project. Out-of-scope vulnerability reports will be ignored.
 
 In-scope
 ........

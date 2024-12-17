@@ -17,7 +17,7 @@ Use of Email for Vulnerability Disclosure
 =========================================
 
 Only use the OSS security email to disclose security vulnerabilities.
-We do not accept bug reports, security implementation questions or other security-related issues at this email address.
+Astronomer does not accept bug reports, security implementation questions, or other security-related issues at this email address.
 If you are a customer of Astronomer, please reach out to your account team if you have any security-related questions or
 issues other than vulnerabilities, and they can assist you. Otherwise, this codebase is provided ‘as-is’ in accordance
 with its licensing structure.

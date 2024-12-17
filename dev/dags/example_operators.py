@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 from cosmos import DbtCloneLocalOperator, DbtRunLocalOperator, DbtSeedLocalOperator, ProfileConfig
-from cosmos.io import upload_artifacts_to_aws_s3
+from cosmos.io import upload_to_aws_s3
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -41,17 +41,18 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         dbt_cmd_flags=["--select", "raw_customers"],
         install_deps=True,
         append_env=True,
+        # --------------------------------------------------------------
         # Callback function to upload artifacts to AWS S3
-        callback=upload_artifacts_to_aws_s3,
+        callback=upload_to_aws_s3,
         callback_args={"aws_conn_id": "aws_s3_conn", "bucket_name": "cosmos-artifacts-upload"},
         # --------------------------------------------------------------
         # Callback function to upload artifacts to GCP GS
-        # "callback": upload_artifacts_to_gcp_gs,
-        # "callback_args": {"gcp_conn_id": "gcp_gs_conn", "bucket_name": "cosmos-artifacts-upload"},
+        # callback=upload_to_gcp_gs,
+        # callback_args={"gcp_conn_id": "gcp_gs_conn", "bucket_name": "cosmos-artifacts-upload"},
         # --------------------------------------------------------------
         # Callback function to upload artifacts to Azure WASB
-        # "callback": upload_artifacts_to_azure_wasb,
-        # "callback_args": {"azure_conn_id": "azure_wasb_conn", "container_name": "cosmos-artifacts-upload"},
+        # callback=upload_to_azure_wasb,
+        # callback_args={"azure_conn_id": "azure_wasb_conn", "container_name": "cosmos-artifacts-upload"},
         # --------------------------------------------------------------
     )
     # [END single_operator_callback]

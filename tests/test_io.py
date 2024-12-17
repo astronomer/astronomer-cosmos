@@ -3,15 +3,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cosmos.constants import _default_s3_conn
+from cosmos.constants import DEFAULT_TARGET_PATH, _default_s3_conn
 from cosmos.exceptions import CosmosValueError
 from cosmos.io import (
     _configure_remote_target_path,
     _construct_dest_file_path,
-    upload_artifacts_to_aws_s3,
-    upload_artifacts_to_azure_wasb,
-    upload_artifacts_to_cloud_storage,
-    upload_artifacts_to_gcp_gs,
+    upload_to_aws_s3,
+    upload_to_azure_wasb,
+    upload_to_cloud_storage,
+    upload_to_gcp_gs,
 )
 from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
@@ -20,9 +20,11 @@ from cosmos.settings import AIRFLOW_IO_AVAILABLE
 def dummy_kwargs():
     """Fixture for reusable test kwargs."""
     return {
-        "dag": MagicMock(dag_id="test_dag"),
-        "run_id": "test_run_id",
-        "task_instance": MagicMock(task_id="test_task", _try_number=1),
+        "context": {
+            "dag": MagicMock(dag_id="test_dag"),
+            "run_id": "test_run_id",
+            "task_instance": MagicMock(task_id="test_task", _try_number=1),
+        },
         "bucket_name": "test_bucket",
         "container_name": "test_container",
     }
@@ -33,7 +35,7 @@ def test_upload_artifacts_to_aws_s3(dummy_kwargs):
     with patch("airflow.providers.amazon.aws.hooks.s3.S3Hook") as mock_hook, patch("os.walk") as mock_walk:
         mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
 
-        upload_artifacts_to_aws_s3("/project_dir", **dummy_kwargs)
+        upload_to_aws_s3("/project_dir", **dummy_kwargs)
 
         mock_walk.assert_called_once_with("/project_dir/target")
         hook_instance = mock_hook.return_value
@@ -45,7 +47,7 @@ def test_upload_artifacts_to_gcp_gs(dummy_kwargs):
     with patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook, patch("os.walk") as mock_walk:
         mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
 
-        upload_artifacts_to_gcp_gs("/project_dir", **dummy_kwargs)
+        upload_to_gcp_gs("/project_dir", **dummy_kwargs)
 
         mock_walk.assert_called_once_with("/project_dir/target")
         hook_instance = mock_hook.return_value
@@ -57,7 +59,7 @@ def test_upload_artifacts_to_azure_wasb(dummy_kwargs):
     with patch("airflow.providers.microsoft.azure.hooks.wasb.WasbHook") as mock_hook, patch("os.walk") as mock_walk:
         mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
 
-        upload_artifacts_to_azure_wasb("/project_dir", **dummy_kwargs)
+        upload_to_azure_wasb("/project_dir", **dummy_kwargs)
 
         mock_walk.assert_called_once_with("/project_dir/target")
         hook_instance = mock_hook.return_value
@@ -79,14 +81,17 @@ def test_construct_dest_file_path(dummy_kwargs):
     file_path = "/project_dir/target/subdir/file.txt"
 
     expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
-    assert _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, **dummy_kwargs) == expected_path
+    assert (
+        _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, DEFAULT_TARGET_PATH, **dummy_kwargs)
+        == expected_path
+    )
 
 
 def test_upload_artifacts_to_cloud_storage_no_remote_path():
     """Test upload_artifacts_to_cloud_storage with no remote path."""
     with patch("cosmos.io._configure_remote_target_path", return_value=(None, None)):
         with pytest.raises(CosmosValueError):
-            upload_artifacts_to_cloud_storage("/project_dir", **{})
+            upload_to_cloud_storage("/project_dir", **{})
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
@@ -108,7 +113,7 @@ def test_upload_artifacts_to_cloud_storage_success(dummy_kwargs):
 
         mock_rglob.return_value = [mock_file1, mock_file2]
 
-        upload_artifacts_to_cloud_storage("/project_dir", **dummy_kwargs)
+        upload_to_cloud_storage("/project_dir", **dummy_kwargs)
 
         mock_configure.assert_called_once()
         assert mock_copy.call_count == 2

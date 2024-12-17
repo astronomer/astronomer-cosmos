@@ -503,7 +503,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.upload_compiled_sql(tmp_project_dir, context)
                 if self.callback:
-                    self.callback_args.update(context)
+                    self.callback_args.update({"context": context})
                     self.callback(tmp_project_dir, **self.callback_args)
                 self.handle_exception(result)
 

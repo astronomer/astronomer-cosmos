@@ -47,7 +47,7 @@ For other products and repositories owned by Astronomer, please refer to their s
 `https://www.astronomer.io/vulnerability-disclosure/ <https://www.astronomer.io/vulnerability-disclosure/>`_ for
 vulnerabilities associated with Astronomer products.
 
-What information and how to disclose
+Required information and how to disclose
 ====================================
 
 Please send a single, plain-text (not HTML) email for each vulnerability you are reporting.

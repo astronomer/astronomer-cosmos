@@ -50,7 +50,7 @@ vulnerabilities associated with Astronomer products.
 Required information and how to disclose
 ====================================
 
-Please send a single, plain-text (not HTML) email for each vulnerability you are reporting.
+Please send a single, plain-text (not HTML) email for each vulnerability you report.
 At a minimum, it should include the following:
 
 * Brief description/title of the vulnerability

@@ -10,6 +10,7 @@ from airflow.www.views import AirflowBaseView
 from flask import abort, url_for
 from flask_appbuilder import AppBuilder, expose
 
+from cosmos.listeners import dag_run
 from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name, in_astro_cloud
 
 if in_astro_cloud:
@@ -269,3 +270,4 @@ class CosmosPlugin(AirflowPlugin):
         "href": conf.get("webserver", "base_url") + "/cosmos/dbt_docs",
     }
     appbuilder_views = [item]
+    listeners = [dag_run]

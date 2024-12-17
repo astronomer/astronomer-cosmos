@@ -36,7 +36,7 @@ In-scope
 Out-of-scope
 ............
 
-* Any other codebase, including Astronomer products
+* Any other codebase, including other Astronomer products
 * Astronomer.io website
 * Dependencies used in Astronomer Cosmos
 * Astronomer Cosmos when modified or run using a not intended configuration

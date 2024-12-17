@@ -68,10 +68,9 @@ Please do not provide a severity for the vulnerability when disclosing, however,
 Follow-up Communication
 =======================
 
-Because Astronomer uses the BugCrowd Vulnerability Disclosure Platform, communication occurs through this program.
-In order for a vulnerability to be claimed and to enable follow-on communication, it is necessary that the vulnerability
-discoverer claim the vulnerability in the BugCrowd Vulnerability Disclosure Platform.
-This will be done through the vulnerability discoverer’s account in the BugCrowd Vulnerability Disclosure Platform.
+Astronomer uses the BugCrowd Vulnerability Disclosure Platform for disclosures and follow-up communication.
+In order for the discoverer to claim a vulnerability report and to enable follow-up communication from Astronomer, the discoverer must claim the vulnerability in the BugCrowd Vulnerability Disclosure Platform.
+Follow-up communication and claims go through the vulnerability discoverer’s account in the BugCrowd Vulnerability Disclosure Platform.
 
 Response Timeframe
 ==================

@@ -26,7 +26,7 @@ profile_config = ProfileConfig(
 source_rendering_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop",
+        DBT_ROOT_PATH / "altered_jaffle_shop",
     ),
     profile_config=profile_config,
     operator_args={

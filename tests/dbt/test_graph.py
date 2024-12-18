@@ -494,15 +494,15 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     # This test is dependent upon dbt >= 1.5.4
     assert len(dbt_graph.nodes) == 9
     expected_keys = [
-        "model.jaffle_shop.customers",
-        "model.jaffle_shop.stg_customers",
-        "seed.jaffle_shop.raw_customers",
-        "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
-        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
-        "test.jaffle_shop.source_not_null_postgres_db_raw_customers_id.de3e9fff76",
-        "test.jaffle_shop.source_unique_postgres_db_raw_customers_id.6e5ad1d707",
-        "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
-        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
+        "model.altered_jaffle_shop.customers",
+        "model.altered_jaffle_shop.stg_customers",
+        "seed.altered_jaffle_shop.raw_customers",
+        "test.altered_jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
+        "test.altered_jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.altered_jaffle_shop.source_not_null_postgres_db_raw_customers_id.de3e9fff76",
+        "test.altered_jaffle_shop.source_unique_postgres_db_raw_customers_id.6e5ad1d707",
+        "test.altered_jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
+        "test.altered_jaffle_shop.unique_stg_customers_customer_id.c7614daada",
     ]
     assert sorted(dbt_graph.nodes.keys()) == expected_keys
 
@@ -511,9 +511,9 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     assert sample_node.unique_id == "model.jaffle_shop.customers"
     assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
-        "model.jaffle_shop.stg_customers",
-        "model.jaffle_shop.stg_orders",
-        "model.jaffle_shop.stg_payments",
+        "model.altered_jaffle_shop.stg_customers",
+        "model.altered_jaffle_shop.stg_orders",
+        "model.altered_jaffle_shop.stg_payments",
     ]
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "models/customers.sql"
 
@@ -632,8 +632,8 @@ def test_load_via_dbt_ls_with_sources(load_method):
     )
     getattr(dbt_graph, load_method)()
     assert len(dbt_graph.nodes) >= 4
-    assert "source.jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
-    assert "exposure.jaffle_shop.weekly_metrics" in dbt_graph.nodes
+    assert "source.altered_jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
+    assert "exposure.altered_jaffle_shop.weekly_metrics" in dbt_graph.nodes
 
 
 @pytest.mark.integration
@@ -1442,7 +1442,7 @@ def test_load_via_dbt_ls_with_project_config_vars():
         ),
     )
     dbt_graph.load_via_dbt_ls()
-    assert dbt_graph.nodes["model.jaffle_shop.orders"].config["alias"] == "orders"
+    assert dbt_graph.nodes["model.altered_jaffle_shop.orders"].config["alias"] == "orders"
 
 
 @pytest.mark.integration
@@ -1482,12 +1482,12 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_altered_dbt_project_dir, postgres
 
     filtered_nodes = dbt_graph.filtered_nodes.keys()
     assert len(filtered_nodes) == 7
-    assert "model.jaffle_shop.stg_customers" in filtered_nodes
-    assert "seed.jaffle_shop.raw_customers" in filtered_nodes
+    assert "model.altered_jaffle_shop.stg_customers" in filtered_nodes
+    assert "seed.altered_jaffle_shop.raw_customers" in filtered_nodes
     if SOURCE_RENDERING_BEHAVIOR == SourceRenderingBehavior.ALL:
-        assert "source.jaffle_shop.postgres_db.raw_customers" in filtered_nodes
+        assert "source.altered_jaffle_shop.postgres_db.raw_customers" in filtered_nodes
     # Four tests should be filtered
-    assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 4
+    assert sum(node.startswith("test.altered_jaffle_shop") for node in filtered_nodes) == 4
 
 
 @pytest.mark.parametrize(

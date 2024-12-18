@@ -81,7 +81,7 @@ def test_emit_usage_metrics_succeeds(caplog):
         "event_type": "dag_run",
         "status": "success",
         "dag_hash": "d151d1fa2f03270ea116cc7494f2c591",
-        "task_count": 3,
+        "cosmos_task_count": 3,
     }
     is_success = telemetry.emit_usage_metrics(sample_metrics)
     assert is_success

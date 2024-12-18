@@ -77,11 +77,7 @@ Astronomer aims to acknowledge and validate disclosures within 5 business days. 
 Follow-up Communication
 =======================
 
-Astronomer will handle the disclosures sent to `oss_security@astronomer.io <mailto:oss_security@astronomer.io>`_ on a best-case effort,
-usually replying using the same tool.
-
-If the disclosure involves an Astronomer product or repository covered by the BugCrowd Vulnerability Disclosure Platform,
-the terms and timeframes may differ and the communication will happen via Bugcrowd.
+Astronomer handles follow-up communications to disclosures sent to [oss_security@astronomer.io](mailto:oss_security@astronomer.io) on a best-case effort, often within 3-5 business days. If the disclosure involves a product or repository that is covered by Astronomer's use of the Bugcrowd Vulnerability Disclosure Platform, please see Bugcrowd's terms of service for follow-up communication timelines. Disclosures to the Bugcrowd Vulnerability Disclosure Platform will result in communications through that platform.
 
 Partial Safe Harbor
 ===================

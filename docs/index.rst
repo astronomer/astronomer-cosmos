@@ -151,6 +151,6 @@ This project follows `Astronomer's Privacy Policy <https://www.astronomer.io/pri
 Security Policy
 ---------------
 
-Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY>`_ to learn
+Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY.rst>`_ to learn
 how to report security vulnerabilities in Astronomer Cosmos and how security issues reported to the Astronomer Cosmos
 security team are handled.

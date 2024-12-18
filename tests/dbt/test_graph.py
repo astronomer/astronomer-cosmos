@@ -506,9 +506,9 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     ]
     assert sorted(dbt_graph.nodes.keys()) == expected_keys
 
-    sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
+    sample_node = dbt_graph.nodes["model.altered_jaffle_shop.customers"]
     assert sample_node.name == "customers"
-    assert sample_node.unique_id == "model.jaffle_shop.customers"
+    assert sample_node.unique_id == "model.altered_jaffle_shop.customers"
     assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
         "model.altered_jaffle_shop.stg_customers",

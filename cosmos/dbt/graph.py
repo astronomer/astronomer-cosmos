@@ -12,7 +12,7 @@ import zlib
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from subprocess import PIPE, Popen
+from subprocess import PIPE, STDOUT, Popen
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
@@ -166,7 +166,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
     process = Popen(
         command,
         stdout=PIPE,
-        stderr=PIPE,
+        stderr=STDOUT,
         cwd=tmp_dir,
         universal_newlines=True,
         env=env_vars,
@@ -180,8 +180,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
         )
 
     if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
-        details = f"stderr: {stderr}\nstdout: {stdout}"
-        raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
+        raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{stdout}")
 
     return stdout
 

@@ -146,3 +146,11 @@ This project follows `Astronomer's Privacy Policy <https://www.astronomer.io/pri
 .. raw:: html
 
     <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=ac335a8b-a9f3-49e6-9e8e-a7ec614fb794" />
+
+
+Security Policy
+---------------
+
+Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY.rst>`_ to learn
+how to report security vulnerabilities in Astronomer Cosmos and how security issues reported to the Astronomer Cosmos
+security team are handled.

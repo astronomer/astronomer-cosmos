@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from ..base import BaseProfileMapping
+from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
+class SnowflakeUserPasswordProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/password.
     https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup

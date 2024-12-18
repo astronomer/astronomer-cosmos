@@ -56,6 +56,16 @@ def example_virtualenv() -> None:
             "py_requirements": ["dbt-postgres"],
             "install_deps": True,
             "emit_datasets": False,  # Example of how to not set inlets and outlets
+            # --------------------------------------------------------------------------
+            # Callback function to upload files using Airflow Object storage and Cosmos remote_target_path setting on
+            # Airflow 2.8 and above
+            # "callback": upload_to_cloud_storage,
+            # --------------------------------------------------------------------------
+            # Callback function if you'd like to upload files from the target directory to remote store e.g. AWS S3 that
+            # works with Airflow < 2.8 too
+            # "callback": upload_to_aws_s3,
+            # "callback_args": {"aws_conn_id": "aws_s3_conn", "bucket_name": "cosmos-artifacts-upload"}
+            # --------------------------------------------------------------------------
         },
     )
 

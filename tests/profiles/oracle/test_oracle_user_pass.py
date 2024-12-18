@@ -165,3 +165,60 @@ def test_profile_env_vars(
     assert profile_mapping.env_vars == {
         "COSMOS_CONN_ORACLE_PASSWORD": mock_oracle_conn.password,
     }
+
+
+def test_env_vars_thick_mode(mock_oracle_conn: Connection) -> None:
+    """
+    Tests that `env_vars` includes `ORA_PYTHON_DRIVER_TYPE` when `extra.thick_mode` is enabled.
+    """
+    mock_oracle_conn.extra = '{"service_name": "my_service", "thick_mode": true}'
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {"schema": "my_schema"})
+    assert profile_mapping.env_vars == {
+        "COSMOS_CONN_ORACLE_PASSWORD": mock_oracle_conn.password,
+        "ORA_PYTHON_DRIVER_TYPE": "thick",
+    }
+
+
+def test_profile_filter_null(mock_oracle_conn: Connection) -> None:
+    """
+    Tests that `profile` filters out null values.
+    """
+    mock_oracle_conn.extra = '{"service_name": "my_service"}'
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {"schema": None})
+    profile = profile_mapping.profile
+    assert "schema" not in profile
+
+
+def test_mock_profile(mock_oracle_conn: Connection) -> None:
+    """
+    Tests that `mock_profile` sets default port and schema correctly.
+    """
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {"schema": "my_schema"})
+    mock_profile = profile_mapping.mock_profile
+    assert mock_profile["port"] == 1521
+    assert mock_profile["schema"] == "my_schema"
+    assert mock_profile["protocol"] == "tcp"
+
+
+def test_invalid_connection_type() -> None:
+    """
+    Tests that the profile mapping does not claim a non-oracle connection type.
+    """
+    conn = Connection(conn_id="invalid_conn", conn_type="postgres", login="my_user", password="my_password")
+    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = OracleUserPasswordProfileMapping(conn, {})
+        assert not profile_mapping.can_claim_connection()
+
+
+def test_airflow_param_mapping(mock_oracle_conn: Connection) -> None:
+    """
+    Tests that `airflow_param_mapping` correctly maps Airflow fields to dbt profile fields.
+    """
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {"schema": "my_schema"})
+    mapped_params = profile_mapping.mapped_params
+
+    assert mapped_params["host"] == mock_oracle_conn.host
+    assert mapped_params["port"] == mock_oracle_conn.port
+    assert mapped_params["service"] == "my_service"
+    assert mapped_params["user"] == mock_oracle_conn.login
+    assert mapped_params["password"] == mock_oracle_conn.password

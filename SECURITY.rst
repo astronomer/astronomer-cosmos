@@ -1,5 +1,5 @@
 ..
-   [important] This document is reused across Astronomer OSS Integrations projects, any changes should also be applied in the other repositories
+   [important] This document is reused across Astronomer OSS Integrations projects, any changes should also be applied to security docs in the other repositories
 
 Security
 ________

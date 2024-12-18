@@ -134,7 +134,7 @@ nodes = {"seed_parent": parent_seed}
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+        (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
@@ -168,6 +168,7 @@ def test_converter_creates_dag_with_seed(mock_load_dbt_graph, execution_mode, op
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
+        (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
@@ -201,7 +202,7 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
     "execution_mode,virtualenv_dir,operator_args",
     [
         (ExecutionMode.KUBERNETES, Path("/some/virtualenv/dir"), {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+        (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
@@ -241,7 +242,7 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+        (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
@@ -278,7 +279,7 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+        (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
@@ -317,7 +318,7 @@ def test_converter_fails_project_config_path_and_execution_config_path(
     "execution_mode,operator_args",
     [
         (ExecutionMode.KUBERNETES, {}),
-        # (ExecutionMode.DOCKER, {"image": "sample-image"}),
+        (ExecutionMode.DOCKER, {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)

@@ -40,4 +40,5 @@ source_rendering_dag = DbtDag(
     catchup=False,
     dag_id="source_rendering_dag",
     default_args={"retries": 2},
+    on_warning_callback=lambda context: print(context),
 )

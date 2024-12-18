@@ -54,17 +54,17 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
 def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> Tuple[List[str], List[str]]:
     log_list = result.full_output
 
-    test_names = []
-    test_results = []
+    node_names = []
+    node_results = []
 
     for line in log_list:
 
         if DBT_FRESHNESS_WARN_MSG in line:
-            test_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
-            test_names.append(test_name)
-            test_results.append(line)
+            node_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
+            node_names.append(node_name)
+            node_results.append(line)
 
-    return test_names, test_results
+    return node_names, node_results
 
 
 def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:

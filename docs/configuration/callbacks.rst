@@ -3,7 +3,8 @@
 Callbacks
 =========
 
-Cosmos supports callback functions that execute at the end of a task's execution when using ``ExecutionMode.LOCAL``.
+Cosmos supports callback functions that execute at the end of a task's execution when using ``ExecutionMode.LOCAL`` and
+``ExecutionMode.VIRTUALENV``.
 These callbacks can be used for various purposes, such as uploading files from the target directory to remote
 storage. While this feature has been available for some time, users may not be fully aware of its capabilities.
 
@@ -46,6 +47,6 @@ metadata.
 Limitations and Contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Currently, callback support is available only when using ``ExecutionMode.LOCAL``. Contributions to extend this
-functionality to other execution modes are welcome and encouraged. You can reference the implementation for
-``ExecutionMode.LOCAL`` to add support for other modes.
+Currently, callback support is available only when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
+Contributions to extend this functionality to other execution modes are welcome and encouraged. You can reference the
+implementation for ``ExecutionMode.LOCAL`` to add support for other modes.

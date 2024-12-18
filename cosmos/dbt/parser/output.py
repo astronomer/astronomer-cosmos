@@ -40,10 +40,6 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     return num
 
 
-def parse_number_of_freshness_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
-    return sum(1 for line in result.full_output if DBT_FRESHNESS_WARN_MSG in line)
-
-
 def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
@@ -55,7 +51,8 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     return num
 
 
-def extract_freshness_warn_issue(log_list: List[str]) -> Tuple[List[str], List[str]]:
+def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> Tuple[List[str], List[str]]:
+    log_list = result.full_output
 
     test_names = []
     test_results = []

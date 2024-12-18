@@ -222,3 +222,33 @@ def test_airflow_param_mapping(mock_oracle_conn: Connection) -> None:
     assert mapped_params["service"] == "my_service"
     assert mapped_params["user"] == mock_oracle_conn.login
     assert mapped_params["password"] == mock_oracle_conn.password
+
+
+def test_profile_schema_extraction_with_proxy(mock_oracle_conn: Connection) -> None:
+    """
+    Tests that the `schema` is extracted correctly from the `user` field
+    when a proxy schema is provided in square brackets.
+    """
+    mock_oracle_conn.login = "my_user[proxy_schema]"
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {})
+
+    assert profile_mapping.profile["schema"] == "proxy_schema"
+
+
+def test_profile_schema_defaults_to_user(mock_oracle_conn: Connection) -> None:
+    """
+    Tests that the `schema` defaults to the `user` field when no proxy schema is provided.
+    """
+    mock_oracle_conn.login = "my_user"
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {})
+
+    assert profile_mapping.profile["schema"] == "my_user"
+
+
+def test_mock_profile_schema_extraction_with_proxy_gets_mock_value(mock_oracle_conn: Connection) -> None:
+    mock_oracle_conn.login = "my_user[proxy_schema]"
+    profile_mapping = OracleUserPasswordProfileMapping(mock_oracle_conn.conn_id, {})
+
+    mock_profile = profile_mapping.mock_profile
+
+    assert mock_profile["schema"] == "mock_value"

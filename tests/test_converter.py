@@ -202,7 +202,7 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
     "execution_mode,virtualenv_dir,operator_args",
     [
         (ExecutionMode.KUBERNETES, Path("/some/virtualenv/dir"), {}),
-        (ExecutionMode.DOCKER, {"image": "sample-image"}),
+        (ExecutionMode.DOCKER, Path("/some/virtualenv/dir"), {"image": "sample-image"}),
     ],
 )
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)

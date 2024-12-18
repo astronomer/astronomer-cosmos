@@ -54,7 +54,8 @@ Required information and how to disclose
 ====================================
 
 Please send a single, plain-text (not HTML) email for each vulnerability you report.
-At a minimum, the report must include the following:
+
+Your written description of the vulnerability is a critical part of the initial report. You can optionally include images and videos in your initial report, but the written description of the vulnerability must includes the following information, at a minimum:
 
 * Brief description/title of the vulnerability
 * Steps to recreate the issue

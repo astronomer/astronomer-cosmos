@@ -44,8 +44,7 @@ dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
     "dbt-clickhouse",
-    # TODO: https://github.com/astronomer/astronomer-cosmos/issues/1379
-    "dbt-databricks<1.9",
+    "dbt-databricks!=1.9.0",
     "dbt-exasol",
     "dbt-postgres",
     "dbt-redshift",

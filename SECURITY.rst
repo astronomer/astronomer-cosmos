@@ -65,7 +65,7 @@ Upon review, we may request additional information including, but not limited to
 Severity
 ========
 
-The vulnerability severity rating system used internally by Astronomer is not the same as the one used by the Apache Foundation.
+The vulnerability severity rating system used internally by Astronomer is not the same as the one used by the Apache Software Foundation.
 Please do not provide a severity for the vulnerability when disclosing, however, providing a CWE (Common Weakness Enumeration) is recommended.
 
 Response Timeframe

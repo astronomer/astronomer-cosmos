@@ -36,7 +36,9 @@ def example_taskflow() -> None:
     DbtTaskGroup(
         group_id="transform_task_group",
         project_config=ProjectConfig(
-            dbt_project_path=DBT_ROOT_PATH / "altered_jaffle_shop", env_vars=build_partial_dbt_env()
+            dbt_project_path=DBT_ROOT_PATH / "jaffle_shop",
+            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+            env_vars=build_partial_dbt_env(),
         ),
         profile_config=profile_config,
     )

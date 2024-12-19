@@ -35,7 +35,6 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     for k, v in task.airflow_task_config.items():
         task_kwargs[k] = v
 
-    # Set the on_warning_callback of source node in task_kwargs
     on_warning_callback = task.extra_context.get("on_warning_callback")
     if on_warning_callback:
         task_kwargs["on_warning_callback"] = on_warning_callback

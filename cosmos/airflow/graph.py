@@ -177,7 +177,8 @@ def create_task_metadata(
     :param dbt_dag_task_group_identifier: Identifier to refer to the DbtDAG or DbtTaskGroup in the DAG.
     :param use_task_group: It determines whether to use the name as a prefix for the task id or not.
         If it is False, then use the name as a prefix for the task id, otherwise do not.
-    :param on_warning_callback:
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+        and “test_results” of type List. This is param available for dbt test and dbt source freshness command.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)

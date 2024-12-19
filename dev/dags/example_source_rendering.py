@@ -23,6 +23,8 @@ profile_config = ProfileConfig(
     ),
 )
 
+# [START cosmos_source_node_example]
+
 source_rendering_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
@@ -42,3 +44,4 @@ source_rendering_dag = DbtDag(
     default_args={"retries": 2},
     on_warning_callback=lambda context: print(context),
 )
+# [END cosmos_source_node_example]

@@ -1,8 +1,8 @@
 Changelog
 =========
 
-1.8.0a3 (2024-12-17)
-------------------
+1.8.0a4 (2024-12-19)
+--------------------
 
 New Features
 
@@ -11,6 +11,9 @@ New Features
 * Add support to ``TestBehavior.BUILD`` by @tatiana in #1377. `Documentation <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
 * Add support for the "at" operator when using ``LoadMode.DBT_MANIFEST`` or ``CUSTOM`` by @benjy44 in #1372
 * Add dbt clone operator by @pankajastro in #1326, as documented in `here <https://astronomer.github.io/astronomer-cosmos/getting_started/operators.html>`_.
+* Support rendering tasks with non-ASCII characters by @t0momi219 in #1278 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/task-display-name.html>`_.
+* Add warning callback on source freshness by @pankajastro in #1400 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/source-nodes-rendering.html#on-warning-callback-callback>`_.
+* Add Oracle Profile mapping by @slords and @pankajkoti in #1190 and #1404
 
 Bug Fixes
 
@@ -19,16 +22,21 @@ Bug Fixes
 * Add missing ``DbtSourceGcpCloudRunJobOperator`` in module ``cosmos.operators.gcp_cloud_run_job`` by @anai-s in #1290
 * Support building ``DbtDag`` without setting paths in ``ProjectConfig`` by @tatiana in #1307
 * Fix parsing dbt ls outputs that contain JSONs that are not dbt nodes by @tatiana in #1296
+* Fix Snowflake Profile mapping when using AWS default region by @tatiana in #1406
 
 Enhancements
 
 * Improve dbt command execution logs to troubleshoot ``None`` values by @tatiana in #1392
+* Add logging of stdout to dbt graph run_command by @KarolGongola in #1390
+* Save tasks map as DbtToAirflowConverter property by @internetcoffeephone and @hheemskerk in #1362
 
 Docs
 
 * Remove extra ` char from docs by @pankajastro in #1345
 * Add limitation about copying target dir files to remote by @pankajkoti in #1305
 * Generalise example from README by @ReadytoRocc in #1311
+* Add security policy by @tatiana, @chaosmaw and @lzdanski in # 1385
+* Mention in documentation that the callback functionality is supported in ``ExecutionMode.VIRTUALENV`` by @pankajkoti in #1401
 
 Others
 
@@ -52,6 +60,11 @@ Others
 * Fix security vulnerability, by not pinning Airflow 2.10.0 by @tatiana in #1298
 * Fix Netlify build timeouts by @tatiana in #1294
 * Add stalebot to label/close stale PRs and issues by @tatiana in #1288
+* Unpin dbt-databricks version by @pankajastro in #1409
+* Fix source resource type tests by @pankajastro in #1405
+* Increase performance tests models by @tatiana in #1403
+* Drop running 1000 models in the CI by @pankajkoti in #1411
+* Fix releasing package to PyPI by @tatiana in #1396
 * Pre-commit hook updates in #1394, #1373, #1358, #1340, #1331, #1314, #1301
 
 

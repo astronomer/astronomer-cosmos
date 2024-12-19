@@ -199,7 +199,7 @@ def create_task_metadata(
             else:
                 task_id = f"{node.name}_run"
         elif node.resource_type == DbtResourceType.SOURCE:
-            extra_context["on_warning_callback"] = on_warning_callback
+            args["on_warning_callback"] = on_warning_callback
 
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS

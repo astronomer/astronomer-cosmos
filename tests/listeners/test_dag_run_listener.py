@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+import pytest
 from airflow.models import DAG
 
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
@@ -23,6 +24,7 @@ profile_config = ProfileConfig(
 )
 
 
+@pytest.mark.integration
 def test_is_cosmos_dag_is_true():
     dag = DbtDag(
         project_config=ProjectConfig(
@@ -38,6 +40,7 @@ def test_is_cosmos_dag_is_true():
     assert uses_cosmos(dag)
 
 
+@pytest.mark.integration
 def test_total_cosmos_task_groups():
     with DAG("test-id-dbt-compile", start_date=datetime(2022, 1, 1)) as dag:
         _ = DbtTaskGroup(
@@ -52,6 +55,7 @@ def test_total_cosmos_task_groups():
     assert uses_cosmos(dag)
 
 
+@pytest.mark.integration
 def test_total_cosmos_tasks_in_task_group():
     with DAG("test-id-dbt-compile", start_date=datetime(2022, 1, 1)) as dag:
         _ = DbtTaskGroup(

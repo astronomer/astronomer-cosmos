@@ -31,7 +31,6 @@ def build_partial_dbt_env():
     schedule_interval="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["simple"],
 )
 def example_taskflow() -> None:
     DbtTaskGroup(

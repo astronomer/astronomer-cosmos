@@ -186,13 +186,6 @@ markers = ["integration", "perf"]
 
 [tool.hatch.envs.docs]
 dependencies = [
-    "aenum",
-    "apache-airflow-providers-amazon[s3fs]>=3.0.0",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
-    "apache-airflow-providers-google>=10.17.0",
-    "apache-airflow-providers-microsoft-azure>=8.5.0",
-    "msgpack",
-    "openlineage-airflow",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",

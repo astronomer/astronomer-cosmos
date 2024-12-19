@@ -41,6 +41,7 @@ def example_taskflow() -> None:
             env_vars=build_partial_dbt_env(),
         ),
         profile_config=profile_config,
+        operator_args={"install_deps": True},
     )
 
 

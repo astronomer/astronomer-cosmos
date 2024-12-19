@@ -29,3 +29,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Logging <logging>
    Caching <caching>
    Callbacks <callbacks>
+   Task display name <task-display-name>

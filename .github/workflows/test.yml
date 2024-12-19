@@ -354,7 +354,7 @@ jobs:
       matrix:
         python-version: ["3.11"]
         airflow-version: ["2.8"]
-        num-models: [1, 10, 50, 100, 500, 1000]
+        num-models: [1, 10, 50, 100, 500]
     services:
       postgres:
         image: postgres

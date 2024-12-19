@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import functools
-import time
-from contextlib import contextmanager
-from typing import Generator
 
 from airflow.listeners import hookimpl
 from airflow.models.dag import DAG
@@ -13,14 +10,6 @@ from cosmos import telemetry
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-
-
-@contextmanager
-def measure_time() -> Generator[None, None, None]:
-    start = time.perf_counter()
-    yield
-    end = time.perf_counter()
-    logger.info(f"DAG listener metrics collection time: {end - start:.6f} seconds")
 
 
 class EventStatus:
@@ -75,15 +64,14 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     if not uses_cosmos(dag):
         return
 
-    with measure_time():
-        additional_telemetry_metrics = {
-            "dag_hash": dag_run.dag_hash,
-            "status": EventStatus.SUCCESS,
-            "task_count": len(dag.task_ids),
-            "cosmos_task_count": total_cosmos_tasks(dag),
-            "cosmos_task_groups_count": total_cosmos_task_groups(dag),
-            "is_cosmos_dag": is_cosmos_dag(dag),
-        }
+    additional_telemetry_metrics = {
+        "dag_hash": dag_run.dag_hash,
+        "status": EventStatus.SUCCESS,
+        "task_count": len(dag.task_ids),
+        "cosmos_task_count": total_cosmos_tasks(dag),
+        "cosmos_task_groups_count": total_cosmos_task_groups(dag),
+        "is_cosmos_dag": is_cosmos_dag(dag),
+    }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
     logger.info("Completed on_dag_run_success")
@@ -97,15 +85,14 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
     if not uses_cosmos(dag):
         return
 
-    with measure_time():
-        additional_telemetry_metrics = {
-            "dag_hash": dag_run.dag_hash,
-            "status": EventStatus.FAILED,
-            "task_count": len(dag.task_ids),
-            "cosmos_task_count": total_cosmos_tasks(dag),
-            "cosmos_task_groups_count": total_cosmos_task_groups(dag),
-            "is_cosmos_dag": is_cosmos_dag(dag),
-        }
+    additional_telemetry_metrics = {
+        "dag_hash": dag_run.dag_hash,
+        "status": EventStatus.FAILED,
+        "task_count": len(dag.task_ids),
+        "cosmos_task_count": total_cosmos_tasks(dag),
+        "cosmos_task_groups_count": total_cosmos_task_groups(dag),
+        "is_cosmos_dag": is_cosmos_dag(dag),
+    }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
     logger.info("Completed on_dag_run_failed")

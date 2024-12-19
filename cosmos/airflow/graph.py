@@ -146,7 +146,7 @@ def _get_task_id_and_args(
     args_update = args
     task_display_name = f"{node.name}_{resource_suffix}"
     if include_resource_type:
-        task_display_name = f"{node.name}_{node.resource_type}_{resource_suffix}"
+        task_display_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
     if use_task_group:
         task_id = resource_suffix
     elif normalize_task_id:

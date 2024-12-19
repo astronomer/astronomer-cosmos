@@ -259,15 +259,15 @@ def test_build_airflow_graph_with_build():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed_build", "parent_model_build", "child_model_build", "child2_v2_model_build"]
+    expected_sort = ["seed_parent_build", "parent_build", "child_build", "child2_v2_build"]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
     assert len(task_groups) == 0
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id in ("child_model_build", "child2_v2_model_build")
-    assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
+    assert dag.leaves[0].task_id in ("child_build", "child2_v2_build")
+    assert dag.leaves[1].task_id in ("child_build", "child2_v2_build")
 
 
 @pytest.mark.integration

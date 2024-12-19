@@ -153,7 +153,7 @@ def _get_task_id_and_args(
     return task_id, args_update
 
 
-  def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
+def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
     """
     Return the map from dbt node type to Cosmos class prefix that should be used
     to handle them.

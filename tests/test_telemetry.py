@@ -27,7 +27,7 @@ def test_should_emit_is_false_when_no_analytics():
 
 def test_collect_standard_usage_metrics():
     metrics = telemetry.collect_standard_usage_metrics()
-    expected_keus = [
+    expected_keys = [
         "airflow_version",
         "cosmos_version",
         "platform_machine",
@@ -35,7 +35,7 @@ def test_collect_standard_usage_metrics():
         "python_version",
         "variables",
     ]
-    assert sorted(metrics.keys()) == expected_keus
+    assert sorted(metrics.keys()) == expected_keys
 
 
 class MockFailedResponse:

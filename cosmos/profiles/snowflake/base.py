@@ -16,8 +16,7 @@ class SnowflakeBaseProfileMapping(BaseProfileMapping):
             **self.mapped_params,
             **self.profile_args,
         }
-
-        return self.filter_null(profile_vars)
+        return profile_vars
 
     def transform_account(self, account: str) -> str:
         """Transform the account to the format <account>.<region> if it's not already."""

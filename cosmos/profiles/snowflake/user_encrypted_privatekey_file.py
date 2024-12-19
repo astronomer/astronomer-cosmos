@@ -74,14 +74,8 @@ class SnowflakeEncryptedPrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapp
     @property
     def profile(self) -> dict[str, Any | None]:
         """Gets profile."""
-        profile_vars = {
-            **self.mapped_params,
-            **self.profile_args,
-            # private_key_passphrase should always get set as env var
-            "private_key_passphrase": self.get_env_var_format("private_key_passphrase"),
-        }
-
-        # remove any null values
+        profile_vars = super().profile
+        profile_vars["private_key_passphrase"] = self.get_env_var_format("private_key_passphrase")
         return self.filter_null(profile_vars)
 
     def transform_account(self, account: str) -> str:

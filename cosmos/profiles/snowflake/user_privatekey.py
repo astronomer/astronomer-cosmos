@@ -65,12 +65,7 @@ class SnowflakePrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):
     @property
     def profile(self) -> dict[str, Any | None]:
         """Gets profile."""
-        profile_vars = {
-            **self.mapped_params,
-            **self.profile_args,
-            # private_key should always get set as env var
-            "private_key": self.get_env_var_format("private_key"),
-        }
-
-        # remove any null values
+        profile_vars = super().profile
+        # private_key should always get set as env var
+        profile_vars["private_key"] = self.get_env_var_format("private_key")
         return self.filter_null(profile_vars)

@@ -49,6 +49,7 @@ dbt-all = [
     # See: https://github.com/astronomer/astronomer-cosmos/issues/1379
     "dbt-databricks!=1.9.0",
     "dbt-exasol",
+    "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
@@ -61,6 +62,7 @@ dbt-bigquery = ["dbt-bigquery"]
 dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-exasol = ["dbt-exasol"]
+dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]

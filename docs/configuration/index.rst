@@ -28,4 +28,5 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Compiled SQL <compiled-sql>
    Logging <logging>
    Caching <caching>
+   Task display name <task-display-name>
    Callbacks <callbacks>

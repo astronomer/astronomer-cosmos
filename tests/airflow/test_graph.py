@@ -611,6 +611,123 @@ def test_create_task_metadata_snapshot(caplog):
     assert metadata.arguments == {"models": "my_snapshot"}
 
 
+def _normalize_task_id(node: DbtNode) -> str:
+    """for test_create_task_metadata_normalize_task_id"""
+    return f"new_task_id_{node.name}_{node.resource_type.value}"
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.9"),
+    reason="Airflow task did not have display_name until the 2.9 release",
+)
+@pytest.mark.parametrize(
+    "node_type,node_id,normalize_task_id,use_task_group,expected_node_id,expected_display_name",
+    [
+        # normalize_task_id is None (default)
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            None,
+            False,
+            "test_node_run",
+            None,
+        ),
+        (
+            DbtResourceType.SOURCE,
+            f"{DbtResourceType.SOURCE.value}.my_folder.test_node",
+            None,
+            False,
+            "test_node_source",
+            None,
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.SEED.value}.my_folder.test_node",
+            None,
+            False,
+            "test_node_seed",
+            None,
+        ),
+        # normalize_task_id is passed and use_task_group is False
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            False,
+            "new_task_id_test_node_model",
+            "test_node_run",
+        ),
+        (
+            DbtResourceType.SOURCE,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            False,
+            "new_task_id_test_node_source",
+            "test_node_source",
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            False,
+            "new_task_id_test_node_seed",
+            "test_node_seed",
+        ),
+        # normalize_task_id is passed and use_task_group is True
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            True,
+            "run",
+            None,
+        ),
+        (
+            DbtResourceType.SOURCE,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            True,
+            "source",
+            None,
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            True,
+            "seed",
+            None,
+        ),
+    ],
+)
+def test_create_task_metadata_normalize_task_id(
+    node_type, node_id, normalize_task_id, use_task_group, expected_node_id, expected_display_name
+):
+    node = DbtNode(
+        unique_id=node_id,
+        resource_type=node_type,
+        depends_on=[],
+        file_path="",
+        tags=[],
+        config={},
+    )
+    args = {}
+    metadata = create_task_metadata(
+        node,
+        execution_mode=ExecutionMode.LOCAL,
+        args=args,
+        dbt_dag_task_group_identifier="",
+        use_task_group=use_task_group,
+        normalize_task_id=normalize_task_id,
+        source_rendering_behavior=SourceRenderingBehavior.ALL,
+    )
+    assert metadata.id == expected_node_id
+    if expected_display_name:
+        assert metadata.arguments["task_display_name"] == expected_display_name
+    else:
+        assert "task_display_name" not in metadata.arguments
+
+
 @pytest.mark.parametrize(
     "node_type,node_unique_id,test_indirect_selection,additional_arguments",
     [

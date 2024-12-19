@@ -10,8 +10,6 @@ from airflow.models.dag import DAG
 from airflow.models.dagrun import DagRun
 
 from cosmos import telemetry
-from cosmos.airflow.dag import DbtDag
-from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -35,6 +33,8 @@ DAG_RUN = "dag_run"
 
 @functools.lru_cache()
 def is_cosmos_dag(dag: DAG) -> bool:
+    from cosmos.airflow.dag import DbtDag
+
     if isinstance(dag, DbtDag):
         return True
     return False
@@ -42,6 +42,8 @@ def is_cosmos_dag(dag: DAG) -> bool:
 
 @functools.lru_cache()
 def total_cosmos_task_groups(dag: DAG) -> int:
+    from cosmos.airflow.task_group import DbtTaskGroup
+
     cosmos_task_groups = 0
     for group_id, task_group in dag.task_group_dict.items():
         if isinstance(task_group, DbtTaskGroup):

@@ -44,6 +44,9 @@ dbt-all = [
     "dbt-athena",
     "dbt-bigquery",
     "dbt-clickhouse",
+    # The dbt-databricks:1.9.0 version causes a dependency conflict with
+    # the Pydantic version required by Airflow (version > 2.7)
+    # See: https://github.com/astronomer/astronomer-cosmos/issues/1379
     "dbt-databricks!=1.9.0",
     "dbt-exasol",
     "dbt-postgres",

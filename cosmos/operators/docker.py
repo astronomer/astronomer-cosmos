@@ -4,6 +4,8 @@ from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
 
+from cosmos.config import ProfileConfig
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
@@ -42,8 +44,17 @@ class DbtDockerBaseOperator(AbstractDbtBaseOperator, DockerOperator):  # type: i
     def __init__(
         self,
         image: str,  # Make image a required argument since it's required by DockerOperator
+        profile_config: ProfileConfig | None = None,
         **kwargs: Any,
     ) -> None:
+        self.profile_config = profile_config
+        if self.profile_config and not self.profile_config.profiles_yml_filepath:
+            raise CosmosValueError(
+                "For ExecutionMode.DOCKER, specifying ProfileConfig only works with profiles_yml_filepath method and "
+                "it must be specified. ProfileConfig with ProfileMapping method is not supported as the underlying "
+                "Airflow connections are not available in the Docker container for the mapping to work."
+            )
+
         super().__init__(image=image, **kwargs)
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:

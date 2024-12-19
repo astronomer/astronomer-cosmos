@@ -5,6 +5,8 @@ import pytest
 from airflow.utils.context import Context
 from pendulum import datetime
 
+from cosmos import ProfileConfig
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.docker import (
     DbtBuildDockerOperator,
     DbtCloneDockerOperator,
@@ -13,6 +15,7 @@ from cosmos.operators.docker import (
     DbtSeedDockerOperator,
     DbtTestDockerOperator,
 )
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 
 @pytest.fixture()
@@ -133,3 +136,27 @@ def test_dbt_docker_build_command():
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
             "--no-version-check",
         ]
+
+
+def test_profile_config_without_profiles_yml_raises_error(base_operator):
+    with pytest.raises(CosmosValueError) as err:
+        base_operator(
+            conn_id="my_airflow_connection",
+            task_id="my-task",
+            image="my_image",
+            project_dir="my/dir",
+            append_env=False,
+            profile_config=ProfileConfig(
+                profile_name="profile_name",
+                target_name="target_name",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="example_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        )
+
+    error_message = str(err.value)
+    expected_err_msg = "For ExecutionMode.DOCKER, specifying ProfileConfig only works with profiles_yml_filepath method"
+
+    assert expected_err_msg in error_message

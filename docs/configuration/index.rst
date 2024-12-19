@@ -23,8 +23,10 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Selecting & Excluding <selecting-excluding>
    Partial Parsing <partial-parsing>
    Source Nodes Rendering <source-nodes-rendering>
+   Post-rendering DAG customization <dag-customization>
    Operator Args <operator-args>
    Compiled SQL <compiled-sql>
    Logging <logging>
    Caching <caching>
    Task display name <task-display-name>
+   Callbacks <callbacks>

@@ -30,7 +30,7 @@ KUBERNETES_DAGS = ["jaffle_shop_kubernetes"]
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
-    "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py"],
+    "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py", "cosmos_callback_dag.py"],
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]
@@ -74,9 +74,6 @@ def get_dag_bag() -> DagBag:
         if DBT_VERSION <= Version("1.5.0"):
             file.writelines(["simple_dag_async.py\n"])
 
-        # The dbt sqlite adapter is only available until dbt 1.4
-        if DBT_VERSION >= Version("1.5.0"):
-            file.writelines(["example_cosmos_sources.py\n"])
         if DBT_VERSION < Version("1.6.0"):
             file.writelines(["example_model_version.py\n"])
             file.writelines(["example_operators.py\n"])

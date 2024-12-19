@@ -62,7 +62,7 @@ child_node = DbtNode(
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
     tags=["nightly"],
-    config={"materialized": "table"},
+    config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"queue": "custom_queue"}}}},
 )
 
 child2_node = DbtNode(
@@ -71,7 +71,7 @@ child2_node = DbtNode(
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
     tags=["nightly"],
-    config={"materialized": "table"},
+    config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
 )
 
 sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node]
@@ -225,6 +225,49 @@ def test_build_airflow_graph_with_after_all():
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
     assert dag.leaves[0].select == ["tag:some"]
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4"),
+    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
+)
+@pytest.mark.integration
+def test_build_airflow_graph_with_build():
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.BUILD,
+        )
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            dbt_project_name="astro_shop",
+            render_config=render_config,
+        )
+    topological_sort = [task.task_id for task in dag.topological_sort()]
+    expected_sort = ["seed_parent_seed_build", "parent_model_build", "child_model_build", "child2_v2_model_build"]
+    assert topological_sort == expected_sort
+
+    task_groups = dag.task_group_dict
+    assert len(task_groups) == 0
+
+    assert len(dag.leaves) == 2
+    assert dag.leaves[0].task_id in ("child_model_build", "child2_v2_model_build")
+    assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
 
 
 @pytest.mark.integration
@@ -824,3 +867,42 @@ def test_owner(dbt_extra_config, expected_owner):
 
     assert len(output.leaves) == 1
     assert output.leaves[0].owner == expected_owner
+
+
+def test_custom_meta():
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.AFTER_EACH,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            dbt_project_name="astro_shop",
+        )
+        # test custom meta (queue, pool)
+        for task in dag.tasks:
+            if task.task_id == "child2_v2_run":
+                assert task.pool == "custom_pool"
+            else:
+                assert task.pool == "default_pool"
+
+            if task.task_id == "child_run":
+                assert task.queue == "custom_queue"
+            else:
+                assert task.queue == "default"

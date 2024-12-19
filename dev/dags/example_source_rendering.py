@@ -23,10 +23,12 @@ profile_config = ProfileConfig(
     ),
 )
 
+# [START cosmos_source_node_example]
+
 source_rendering_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop",
+        DBT_ROOT_PATH / "altered_jaffle_shop",
     ),
     profile_config=profile_config,
     operator_args={
@@ -40,4 +42,6 @@ source_rendering_dag = DbtDag(
     catchup=False,
     dag_id="source_rendering_dag",
     default_args={"retries": 2},
+    on_warning_callback=lambda context: print(context),
 )
+# [END cosmos_source_node_example]

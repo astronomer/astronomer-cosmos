@@ -439,10 +439,12 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 def test_run_operator_dataset_inlets_and_outlets(caplog):
     from airflow.datasets import Dataset
 
+    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
+
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
+            project_dir=project_dir,
             task_id="seed",
             dbt_cmd_flags=["--select", "raw_customers"],
             install_deps=True,
@@ -450,7 +452,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
         )
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
+            project_dir=project_dir,
             task_id="run",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
@@ -458,7 +460,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
         )
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
+            project_dir=project_dir,
             task_id="test",
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
@@ -599,7 +601,7 @@ def test_run_operator_dataset_url_encoded_names(caplog):
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
-            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/simple",
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop",
             task_id="run",
             dbt_cmd_flags=["--models", "ｍｕｌｔｉｂｙｔｅ"],
             install_deps=True,
@@ -1155,6 +1157,38 @@ def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == ""
+
+
+@pytest.mark.parametrize(
+    "invocation_mode, expected_extract_function",
+    [
+        (InvocationMode.SUBPROCESS, "extract_freshness_warn_msg"),
+        (InvocationMode.DBT_RUNNER, "extract_dbt_runner_issues"),
+    ],
+)
+def test_handle_warnings(invocation_mode, expected_extract_function, mock_context):
+    result = MagicMock()
+
+    instance = DbtSourceLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        on_warning_callback=lambda context: print(context),
+        invocation_mode=invocation_mode,
+    )
+
+    with patch(f"cosmos.operators.local.{expected_extract_function}") as mock_extract_issues, patch.object(
+        instance, "on_warning_callback"
+    ) as mock_on_warning_callback:
+        mock_extract_issues.return_value = (["test_name1", "test_name2"], ["test_name1", "test_name2"])
+
+        instance._handle_warnings(result, mock_context)
+
+        mock_extract_issues.assert_called_once_with(result)
+
+        mock_on_warning_callback.assert_called_once_with(
+            {**mock_context, "test_names": ["test_name1", "test_name2"], "test_results": ["test_name1", "test_name2"]}
+        )
 
 
 def test_dbt_compile_local_operator_initialisation():

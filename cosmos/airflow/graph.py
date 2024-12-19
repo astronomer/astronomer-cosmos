@@ -10,6 +10,7 @@ from cosmos.config import RenderConfig
 from cosmos.constants import (
     DBT_COMPILE_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
     ExecutionMode,
@@ -98,6 +99,7 @@ def create_test_task_metadata(
     extra_context = {}
 
     task_owner = ""
+    airflow_task_config = {}
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
@@ -110,6 +112,7 @@ def create_test_task_metadata(
 
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
+        airflow_task_config = node.airflow_task_config
 
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
@@ -119,6 +122,7 @@ def create_test_task_metadata(
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
+        airflow_task_config=airflow_task_config,
         operator_class=calculate_operator_class(
             execution_mode=execution_mode,
             dbt_class="DbtTest",
@@ -148,6 +152,31 @@ def _get_task_id_and_args(
         task_id = f"{node.name}_{resource_suffix}"
     return task_id, args_update
 
+  
+  def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
+    """
+    Return the map from dbt node type to Cosmos class prefix that should be used
+    to handle them.
+    """
+
+    if test_behavior == TestBehavior.BUILD:
+        dbt_resource_to_class = {
+            DbtResourceType.MODEL: "DbtBuild",
+            DbtResourceType.SNAPSHOT: "DbtBuild",
+            DbtResourceType.SEED: "DbtBuild",
+            DbtResourceType.TEST: "DbtTest",
+            DbtResourceType.SOURCE: "DbtSource",
+        }
+    else:
+        dbt_resource_to_class = {
+            DbtResourceType.MODEL: "DbtRun",
+            DbtResourceType.SNAPSHOT: "DbtSnapshot",
+            DbtResourceType.SEED: "DbtSeed",
+            DbtResourceType.TEST: "DbtTest",
+            DbtResourceType.SOURCE: "DbtSource",
+        }
+    return dbt_resource_to_class
+
 
 def create_task_metadata(
     node: DbtNode,
@@ -157,6 +186,8 @@ def create_task_metadata(
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
+    test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
+    on_warning_callback: Callable[..., Any] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -168,34 +199,33 @@ def create_task_metadata(
     :param dbt_dag_task_group_identifier: Identifier to refer to the DbtDAG or DbtTaskGroup in the DAG.
     :param use_task_group: It determines whether to use the name as a prefix for the task id or not.
         If it is False, then use the name as a prefix for the task id, otherwise do not.
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+        and “test_results” of type List. This is param available for dbt test and dbt source freshness command.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
-    dbt_resource_to_class = {
-        DbtResourceType.MODEL: "DbtRun",
-        DbtResourceType.SNAPSHOT: "DbtSnapshot",
-        DbtResourceType.SEED: "DbtSeed",
-        DbtResourceType.TEST: "DbtTest",
-        DbtResourceType.SOURCE: "DbtSource",
-    }
+    dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
+
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
-        extra_context = {
+        extra_context: dict[str, Any] = {
             "dbt_node_config": node.context_dict,
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
         }
-        if node.resource_type == DbtResourceType.MODEL:
+
+        if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            task_id = f"{node.name}_{node.resource_type.value}_build"
+        elif node.resource_type == DbtResourceType.MODEL:
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SOURCE:
+            args["on_warning_callback"] = on_warning_callback
+
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
                 and node.has_freshness is False
                 and node.has_test is False
             ):
                 return None
-            # TODO: https://github.com/astronomer/astronomer-cosmos
-            # pragma: no cover
-            task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
@@ -215,6 +245,7 @@ def create_task_metadata(
         task_metadata = TaskMetadata(
             id=task_id,
             owner=node.owner,
+            airflow_task_config=node.airflow_task_config,
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),
@@ -260,6 +291,8 @@ def generate_task_or_group(
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
         normalize_task_id=normalize_task_id,
+        test_behavior=test_behavior,
+        on_warning_callback=on_warning_callback,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -334,7 +367,7 @@ def build_airflow_graph(
     render_config: RenderConfig,
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
-) -> None:
+) -> dict[str, Union[TaskGroup, BaseOperator]]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
 
@@ -357,12 +390,13 @@ def build_airflow_graph(
     :param task_group: Airflow Task Group instance
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
+    :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
-    tasks_map = {}
+    tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
 
     for node_id, node in nodes.items():
@@ -408,6 +442,7 @@ def build_airflow_graph(
 
     create_airflow_task_dependencies(nodes, tasks_map)
     _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
+    return tasks_map
 
 
 def create_airflow_task_dependencies(

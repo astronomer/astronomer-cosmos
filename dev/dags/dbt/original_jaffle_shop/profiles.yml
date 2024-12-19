@@ -1,0 +1,19 @@
+airflow_db:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      user: postgres
+      password: postgres
+      port: 5432
+      dbname: postgres
+      schema: public
+      threads: 4
+    bq:
+      type: bigquery
+      method: service-account
+      project: observability-sandbox-344122
+      schema: "{{ env_var('DEMO_SCHEMA', 'moonactive') }}"
+      threads: 2
+      keyfile:  /usr/local/airflow/dbt/jaffle_shop/key.json

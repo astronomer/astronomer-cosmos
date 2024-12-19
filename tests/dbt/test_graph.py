@@ -31,6 +31,7 @@ from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
+ALTERED_DBT_PROJECT_NAME = "altered_jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
@@ -48,6 +49,23 @@ def tmp_dbt_project_dir():
 
     tmp_dir = Path(tempfile.mkdtemp())
     target_proj_dir = tmp_dir / DBT_PROJECT_NAME
+    shutil.copytree(source_proj_dir, target_proj_dir)
+    shutil.rmtree(target_proj_dir / "logs", ignore_errors=True)
+    shutil.rmtree(target_proj_dir / "target", ignore_errors=True)
+    yield tmp_dir
+
+    shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
+
+
+@pytest.fixture
+def tmp_altered_dbt_project_dir():
+    """
+    Creates a plain dbt project structure, which does not contain logs or target folders.
+    """
+    source_proj_dir = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME
+
+    tmp_dir = Path(tempfile.mkdtemp())
+    target_proj_dir = tmp_dir / ALTERED_DBT_PROJECT_NAME
     shutil.copytree(source_proj_dir, target_proj_dir)
     shutil.rmtree(target_proj_dir / "logs", ignore_errors=True)
     shutil.rmtree(target_proj_dir / "target", ignore_errors=True)
@@ -456,14 +474,14 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
 
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
-    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME)
     render_config = RenderConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME,
         select=["*customers*"],
         exclude=["*orders*"],
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME)
     dbt_graph = DbtGraph(
         project=project_config,
         render_config=render_config,
@@ -476,39 +494,42 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     # This test is dependent upon dbt >= 1.5.4
     assert len(dbt_graph.nodes) == 9
     expected_keys = [
-        "model.jaffle_shop.customers",
-        "model.jaffle_shop.stg_customers",
-        "seed.jaffle_shop.raw_customers",
-        "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
-        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
-        "test.jaffle_shop.source_not_null_postgres_db_raw_customers_id.de3e9fff76",
-        "test.jaffle_shop.source_unique_postgres_db_raw_customers_id.6e5ad1d707",
-        "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
-        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
+        "model.altered_jaffle_shop.customers",
+        "model.altered_jaffle_shop.stg_customers",
+        "seed.altered_jaffle_shop.raw_customers",
+        "test.altered_jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
+        "test.altered_jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.altered_jaffle_shop.source_not_null_postgres_db_raw_customers_id.de3e9fff76",
+        "test.altered_jaffle_shop.source_unique_postgres_db_raw_customers_id.6e5ad1d707",
+        "test.altered_jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
+        "test.altered_jaffle_shop.unique_stg_customers_customer_id.c7614daada",
     ]
     assert sorted(dbt_graph.nodes.keys()) == expected_keys
 
-    sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
+    sample_node = dbt_graph.nodes["model.altered_jaffle_shop.customers"]
     assert sample_node.name == "customers"
-    assert sample_node.unique_id == "model.jaffle_shop.customers"
+    assert sample_node.unique_id == "model.altered_jaffle_shop.customers"
     assert sample_node.resource_type == DbtResourceType.MODEL
     assert sample_node.depends_on == [
-        "model.jaffle_shop.stg_customers",
-        "model.jaffle_shop.stg_orders",
-        "model.jaffle_shop.stg_payments",
+        "model.altered_jaffle_shop.stg_customers",
+        "model.altered_jaffle_shop.stg_orders",
+        "model.altered_jaffle_shop.stg_payments",
     ]
-    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / "jaffle_shop/models/customers.sql"
+    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "models/customers.sql"
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("project_name", ("jaffle_shop", "jaffle_shop_python"))
-def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
-    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+@pytest.mark.parametrize(
+    "project_dir,node_count",
+    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 39), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
+)
+def test_load_via_dbt_ls_without_exclude(project_dir, node_count, postgres_profile_config):
+    project_config = ProjectConfig(dbt_project_path=project_dir)
     render_config = RenderConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        dbt_project_path=project_dir,
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
     dbt_graph = DbtGraph(
         project=project_config,
         render_config=render_config,
@@ -518,7 +539,7 @@ def test_load_via_dbt_ls_without_exclude(project_name, postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 37
+    assert len(dbt_graph.nodes) == node_count
 
 
 def test_load_via_custom_without_project_path():
@@ -588,11 +609,10 @@ def test_load_via_dbt_ls_with_invalid_dbt_path(mock_which):
     assert err_info.value.args[0] == expected
 
 
-@pytest.mark.sqlite
 @pytest.mark.parametrize("load_method", ["load_via_dbt_ls", "load_from_dbt_manifest"])
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_sources(load_method):
-    project_name = "simple"
+    project_name = ALTERED_DBT_PROJECT_NAME
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -600,21 +620,20 @@ def test_load_via_dbt_ls_with_sources(load_method):
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_deps=False,
-            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
+            dbt_deps=True,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
-            profile_name="simple",
+            profile_name="postgres_profile",
             target_name="dev",
             profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
         ),
     )
     getattr(dbt_graph, load_method)()
     assert len(dbt_graph.nodes) >= 4
-    assert "source.simple.main.movies_ratings" in dbt_graph.nodes
-    assert "exposure.simple.weekly_metrics" in dbt_graph.nodes
+    assert "source.altered_jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
+    assert "exposure.altered_jaffle_shop.weekly_metrics" in dbt_graph.nodes
 
 
 @pytest.mark.integration
@@ -819,7 +838,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_c
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome stderr message"
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: Some stderr message\nstdout: "
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
@@ -840,25 +859,25 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nSome Runtime Error"
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: \nstdout: Some Runtime Error"
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
     mock_popen_communicate.assert_called_once()
 
 
-@pytest.mark.parametrize("project_name", ("jaffle_shop", "jaffle_shop_python"))
-def test_load_via_load_via_custom_parser(project_name):
+@pytest.mark.parametrize("project_name,nodes_count", [("altered_jaffle_shop", 29), ("jaffle_shop_python", 28)])
+def test_load_via_load_via_custom_parser(project_name, nodes_count):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
-    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
     render_config = RenderConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
-        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml",
     )
     dbt_graph = DbtGraph(
         project=project_config,
@@ -870,7 +889,7 @@ def test_load_via_load_via_custom_parser(project_name):
     dbt_graph.load_via_custom_parser()
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
-    assert len(dbt_graph.nodes) == 28
+    assert len(dbt_graph.nodes) == nodes_count
 
 
 def test_load_via_load_via_custom_parser_select_rendering_config():
@@ -1100,6 +1119,20 @@ def test_run_command(mock_popen, stdout, returncode):
     assert kwargs["env"] == env_vars
 
     assert return_value == stdout
+
+
+@patch("cosmos.dbt.graph.Popen")
+def test_run_command_none_argument(mock_popen, caplog):
+    fake_command = ["invalid-cmd", None]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = ("Invalid None argument", None)
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        run_command(fake_command, fake_dir, env_vars)
+
+    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nstderr: None\nstdout: Invalid None argument"
+    assert str(exc_info.value) == expected
 
 
 def test_parse_dbt_ls_output_real_life_customer_bug(caplog):
@@ -1385,38 +1418,35 @@ def test_load_method_with_unsupported_render_config_selector_arg(load_method):
         dbt_graph.load(method=load_method)
 
 
-@pytest.mark.sqlite
 @pytest.mark.integration
 def test_load_via_dbt_ls_with_project_config_vars():
     """
     Integration that tests that the dbt ls command is successful and that the node affected by the dbt_vars is
     rendered correctly.
     """
-    project_name = "simple"
+    project_name = ALTERED_DBT_PROJECT_NAME
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            env_vars={"DBT_SQLITE_PATH": str(DBT_PROJECTS_ROOT_DIR / "data")},
-            dbt_vars={"animation_alias": "top_5_animated_movies"},
+            dbt_vars={"orders_alias": "orders"},
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            dbt_deps=False,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
         execution_config=ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name),
         profile_config=ProfileConfig(
-            profile_name="simple",
+            profile_name="postgres_profile",
             target_name="dev",
             profiles_yml_filepath=(DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml"),
         ),
     )
     dbt_graph.load_via_dbt_ls()
-    assert dbt_graph.nodes["model.simple.top_animations"].config["alias"] == "top_5_animated_movies"
+    assert dbt_graph.nodes["model.altered_jaffle_shop.orders"].config["alias"] == "orders"
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile_config):
+def test_load_via_dbt_ls_with_selector_arg(tmp_altered_dbt_project_dir, postgres_profile_config):
     """
     Tests that the dbt ls load method is successful if a selector arg is used with RenderConfig
     and that the filtered nodes are expected.
@@ -1431,13 +1461,13 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
           value: stg_customers
           parents: true
     """
-    with open(tmp_dbt_project_dir / DBT_PROJECT_NAME / "selectors.yml", "w") as f:
+    with open(tmp_altered_dbt_project_dir / ALTERED_DBT_PROJECT_NAME / "selectors.yml", "w") as f:
         f.write(selectors_yaml)
 
-    project_config = ProjectConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
-    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    project_config = ProjectConfig(dbt_project_path=tmp_altered_dbt_project_dir / ALTERED_DBT_PROJECT_NAME)
+    execution_config = ExecutionConfig(dbt_project_path=tmp_altered_dbt_project_dir / ALTERED_DBT_PROJECT_NAME)
     render_config = RenderConfig(
-        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        dbt_project_path=tmp_altered_dbt_project_dir / ALTERED_DBT_PROJECT_NAME,
         selector="stage_customers",
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
@@ -1452,12 +1482,12 @@ def test_load_via_dbt_ls_with_selector_arg(tmp_dbt_project_dir, postgres_profile
 
     filtered_nodes = dbt_graph.filtered_nodes.keys()
     assert len(filtered_nodes) == 7
-    assert "model.jaffle_shop.stg_customers" in filtered_nodes
-    assert "seed.jaffle_shop.raw_customers" in filtered_nodes
+    assert "model.altered_jaffle_shop.stg_customers" in filtered_nodes
+    assert "seed.altered_jaffle_shop.raw_customers" in filtered_nodes
     if SOURCE_RENDERING_BEHAVIOR == SourceRenderingBehavior.ALL:
-        assert "source.jaffle_shop.postgres_db.raw_customers" in filtered_nodes
+        assert "source.altered_jaffle_shop.postgres_db.raw_customers" in filtered_nodes
     # Four tests should be filtered
-    assert sum(node.startswith("test.jaffle_shop") for node in filtered_nodes) == 4
+    assert sum(node.startswith("test.altered_jaffle_shop") for node in filtered_nodes) == 4
 
 
 @pytest.mark.parametrize(
@@ -1579,9 +1609,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "25beeb54cc4eeabe6198248e286a1cfe"
+        assert hash_dir == "2b0b0c3d243f9bfdda0f60b56ab65836"
     else:
-        assert hash_dir == "6f63493009733a7be34364a6ea3ffd3c"
+        assert hash_dir == "cd0535d9a4acb972d74e49eaab85fb6f"
 
 
 @pytest.mark.integration

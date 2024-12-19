@@ -11,6 +11,7 @@ from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
+DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
 
 
 def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
@@ -48,6 +49,22 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
         if run_result.status == "warn":
             num += 1
     return num
+
+
+def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> Tuple[List[str], List[str]]:
+    log_list = result.full_output
+
+    node_names = []
+    node_results = []
+
+    for line in log_list:
+
+        if DBT_FRESHNESS_WARN_MSG in line:
+            node_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
+            node_names.append(node_name)
+            node_results.append(line)
+
+    return node_names, node_results
 
 
 def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:

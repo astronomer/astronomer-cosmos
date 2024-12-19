@@ -6,10 +6,12 @@ from airflow.hooks.subprocess import SubprocessResult
 
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,
+    extract_freshness_warn_msg,
     extract_log_issues,
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
+from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 
 @pytest.mark.parametrize(
@@ -112,3 +114,23 @@ def test_extract_dbt_runner_issues_with_status_levels():
 
     assert node_names == ["node1", "node2"]
     assert node_results == ["An error message", "A failure message"]
+
+
+def test_extract_freshness_warn_msg():
+    result = FullOutputSubprocessResult(
+        full_output=[
+            "Info: some other log message",
+            "INFO - 11:50:42  1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]",
+            "INFO - 11:50:42",
+            "INFO - 11:50:42  Finished running 1 source in 0 hours 0 minutes and 0.04 seconds (0.04s).",
+            "INFO - 11:50:42  Done.",
+        ],
+        output="INFO - 11:50:42  Done.",
+        exit_code=0,
+    )
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["postgres_db.raw_orders"]
+    assert node_results == [
+        "INFO - 11:50:42  1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
+    ]

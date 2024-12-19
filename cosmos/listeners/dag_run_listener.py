@@ -24,6 +24,7 @@ DAG_RUN = "dag_run"
 def is_cosmos_dag(dag: DAG) -> bool:
     from cosmos.airflow.dag import DbtDag
 
+    logger.info(f"is_cosmos_dag: {isinstance(dag, DbtDag)}")
     if isinstance(dag, DbtDag):
         return True
     return False
@@ -62,6 +63,7 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
 
     dag = dag_run.get_dag()
     if not uses_cosmos(dag):
+        logger.info("The DAG does not use Cosmos")
         return
 
     additional_telemetry_metrics = {

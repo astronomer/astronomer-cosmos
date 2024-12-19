@@ -37,12 +37,28 @@ remote_cache_dir_conn_id = conf.get("cosmos", "remote_cache_dir_conn_id", fallba
 remote_target_path = conf.get("cosmos", "remote_target_path", fallback=None)
 remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fallback=None)
 
+AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
+
+# The following environment variable is populated in Astro Cloud
+in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
+
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
 except airflow.exceptions.AirflowConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
-AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 
-# The following environment variable is populated in Astro Cloud
-in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
+def convert_to_boolean(value: str | None) -> bool:
+    """
+    Convert a string that represents a boolean to a Python boolean.
+    """
+    value = str(value).lower().strip()
+    if value in ("f", "false", "0", "", "none"):
+        return False
+    return True
+
+
+# Telemetry-related settings
+enable_telemetry = conf.getboolean("cosmos", "enable_telemetry", fallback=True)
+do_not_track = convert_to_boolean(os.getenv("DO_NOT_TRACK"))
+no_analytics = convert_to_boolean(os.getenv("SCARF_NO_ANALYTICS"))

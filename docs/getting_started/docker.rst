@@ -97,3 +97,15 @@ Enable and trigger a run of the `jaffle_shop_docker <https://github.com/astronom
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_docker_dag_run.png
     :width: 800
+
+
+Specifying ProfileConfig
++++++++++++++++++++++++++
+
+Starting with Cosmos 1.8.0, you can use the ``profile_config`` argument in your Dbt DAG Docker operators to reference
+profiles for your dbt project defined in a profiles.yml file. To do so, provide the file’s path via the
+``profiles_yml_path`` parameter in ``profile_config``.
+
+Note that in ``ExecutionMode.DOCKER``, the ``profile_config`` is only compatible with the ``profiles_yml_path``
+approach. The ``profile_mapping`` method will not work because the required Airflow connections cannot be accessed
+within the Docker container to map them to the dbt profile.

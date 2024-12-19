@@ -138,18 +138,22 @@ def _get_task_id_and_args(
     use_task_group: bool,
     normalize_task_id: Callable[..., Any] | None,
     resource_suffix: str,
+    include_resource_type: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     """
     Generate task ID and update args with display name if needed.
     """
     args_update = args
+    task_display_name = f"{node.name}_{resource_suffix}"
+    if include_resource_type:
+        task_display_name = f"{node.name}_{node.resource_type}_{resource_suffix}"
     if use_task_group:
         task_id = resource_suffix
     elif normalize_task_id:
         task_id = normalize_task_id(node)
-        args_update["task_display_name"] = f"{node.name}_{resource_suffix}"
+        args_update["task_display_name"] = task_display_name
     else:
-        task_id = f"{node.name}_{resource_suffix}"
+        task_id = task_display_name
     return task_id, args_update
 
 
@@ -214,7 +218,7 @@ def create_task_metadata(
         }
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
-            task_id = f"{node.name}_{node.resource_type.value}_build"
+            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "build", True)
         elif node.resource_type == DbtResourceType.MODEL:
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SOURCE:

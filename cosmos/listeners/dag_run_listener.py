@@ -20,17 +20,23 @@ class EventStatus:
 DAG_RUN = "dag_run"
 
 
-@functools.lru_cache()
 def is_cosmos_dag(dag: DAG) -> bool:
+    import inspect
+
     from cosmos.airflow.dag import DbtDag
 
-    logger.info(f"is_cosmos_dag: {isinstance(dag, DbtDag)}")
+    dag_class = dag.__class__
+    dag_module = inspect.getmodule(dag_class)
+
+    logger.info(
+        f"is_cosmos_dag ({dag}, {DbtDag}, {dag_class and dag_class.__name__}, {dag_module and dag_module.__name__}): {isinstance(dag, DbtDag)}"
+    )
+    return True
     if isinstance(dag, DbtDag):
         return True
     return False
 
 
-@functools.lru_cache()
 def total_cosmos_task_groups(dag: DAG) -> int:
     from cosmos.airflow.task_group import DbtTaskGroup
 
@@ -41,7 +47,6 @@ def total_cosmos_task_groups(dag: DAG) -> int:
     return cosmos_task_groups
 
 
-@functools.lru_cache()
 def total_cosmos_tasks(dag: DAG) -> int:
     cosmos_tasks = 0
     for task in dag.tasks:

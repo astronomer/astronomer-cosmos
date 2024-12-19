@@ -44,7 +44,7 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
     telemetry_url = constants.TELEMETRY_URL.format(
         **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
     )
-    logging.info("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
+    logging.debug("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
     response = httpx.get(telemetry_url, timeout=constants.TELEMETRY_TIMEOUT, follow_redirects=True)
     if not response.is_success:
         logging.warning(
@@ -71,5 +71,5 @@ def emit_usage_metrics_if_enabled(event_type: str, additional_metrics: dict[str,
         is_success = emit_usage_metrics(metrics)
         return is_success
     else:
-        logging.info("Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True.")
+        logging.debug("Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True.")
         return False

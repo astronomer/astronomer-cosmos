@@ -21,28 +21,16 @@ DAG_RUN = "dag_run"
 
 
 def is_cosmos_dag(dag: DAG) -> bool:
-    import inspect
-
-    from cosmos.airflow.dag import DbtDag
-
-    dag_class = dag.__class__
-    dag_module = inspect.getmodule(dag_class)
-
-    logger.info(
-        f"is_cosmos_dag ({dag}, {DbtDag}, {dag_class and dag_class.__name__}, {dag_module and dag_module.__name__}): {isinstance(dag, DbtDag)}"
-    )
-    return True
-    if isinstance(dag, DbtDag):
+    if dag.__class__.__module__.startswith("cosmos."):
         return True
     return False
 
 
 def total_cosmos_task_groups(dag: DAG) -> int:
-    from cosmos.airflow.task_group import DbtTaskGroup
 
     cosmos_task_groups = 0
     for group_id, task_group in dag.task_group_dict.items():
-        if isinstance(task_group, DbtTaskGroup):
+        if task_group.__class__.__module__.startswith("cosmos."):
             cosmos_task_groups += 1
     return cosmos_task_groups
 

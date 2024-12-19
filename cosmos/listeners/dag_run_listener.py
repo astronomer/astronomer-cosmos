@@ -70,7 +70,7 @@ def uses_cosmos(dag: DAG) -> bool:
 @hookimpl
 def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.info("The on_dag_run_success was called")
-    print("The on_dag_run_success was called")
+
     dag = dag_run.get_dag()
     if not uses_cosmos(dag):
         return
@@ -86,12 +86,13 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
+    logger.info("Completed on_dag_run_success")
 
 
 @hookimpl
 def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
     logger.info("The on_dag_run_failed was called")
-    print("The on_dag_run_failed was called")
+
     dag = dag_run.get_dag()
     if not uses_cosmos(dag):
         return
@@ -107,3 +108,4 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
         }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
+    logger.info("Completed on_dag_run_failed")

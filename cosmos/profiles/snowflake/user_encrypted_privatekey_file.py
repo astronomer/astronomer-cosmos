@@ -77,11 +77,3 @@ class SnowflakeEncryptedPrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapp
         profile_vars = super().profile
         profile_vars["private_key_passphrase"] = self.get_env_var_format("private_key_passphrase")
         return self.filter_null(profile_vars)
-
-    def transform_account(self, account: str) -> str:
-        """Transform the account to the format <account>.<region> if it's not already."""
-        region = self.conn.extra_dejson.get("region")
-        if region and region not in account:
-            account = f"{account}.{region}"
-
-        return str(account)

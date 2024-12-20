@@ -218,7 +218,9 @@ def create_task_metadata(
         }
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "build", True)
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
+            )
         elif node.resource_type == DbtResourceType.MODEL:
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SOURCE:

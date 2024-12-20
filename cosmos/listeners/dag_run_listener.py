@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import functools
-
 from airflow.listeners import hookimpl
 from airflow.models.dag import DAG
 from airflow.models.dagrun import DagRun
@@ -27,7 +25,6 @@ def is_cosmos_dag(dag: DAG) -> bool:
 
 
 def total_cosmos_task_groups(dag: DAG) -> int:
-
     cosmos_task_groups = 0
     for group_id, task_group in dag.task_group_dict.items():
         if task_group.__class__.__module__.startswith("cosmos."):
@@ -45,7 +42,6 @@ def total_cosmos_tasks(dag: DAG) -> int:
     return cosmos_tasks
 
 
-@functools.lru_cache()
 def uses_cosmos(dag: DAG) -> bool:
     return bool(is_cosmos_dag(dag) or total_cosmos_task_groups(dag) or total_cosmos_tasks(dag))
 

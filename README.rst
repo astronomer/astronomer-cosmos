@@ -82,7 +82,9 @@ _______
 Privacy Notice
 ______________
 
-This project follows `Astronomer's Privacy Policy <https://www.astronomer.io/privacy/>`_
+The application and this website collect telemetry to support the project's development. These can be disabled by the end-users.
+
+Read the `Privacy Notice <https://github.com/astronomer/astronomer-cosmos/blob/main/PRIVACY_NOTICE.rst>`_ to learn more about it.
 
 .. Tracking pixel for Scarf
 

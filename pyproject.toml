@@ -186,6 +186,9 @@ markers = ["integration", "perf"]
 
 [tool.hatch.envs.docs]
 dependencies = [
+    "aenum",
+    "msgpack",
+    "apache-airflow",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",

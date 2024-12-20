@@ -1,3 +1,6 @@
+aenum
+msgpack
+apache-airflow
 pydata-sphinx-theme
 sphinx
 sphinx-autoapi

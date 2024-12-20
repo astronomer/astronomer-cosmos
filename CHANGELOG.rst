@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.8.0a4 (2024-12-19)
+1.8.0a5 (2024-12-20)
 --------------------
 
 New Features
@@ -14,7 +14,8 @@ New Features
 * Support rendering tasks with non-ASCII characters by @t0momi219 in #1278 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/task-display-name.html>`_.
 * Add warning callback on source freshness by @pankajastro in #1400 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/source-nodes-rendering.html#on-warning-callback-callback>`_.
 * Add Oracle Profile mapping by @slords and @pankajkoti in #1190 and #1404
-* Save tasks map as DbtToAirflowConverter property by @internetcoffeephone and @hheemskerk in #1362
+* Emit telemetry to Scarf during DAG run by @tatiana in #1397
+* Save tasks map as ``DbtToAirflowConverter`` property by @internetcoffeephone and @hheemskerk in #1362
 
 Bug Fixes
 
@@ -31,6 +32,7 @@ Enhancements
 * Improve dbt command execution logs to troubleshoot ``None`` values by @tatiana in #1392
 * Add logging of stdout to dbt graph run_command by @KarolGongola in #1390
 * Add ``profile_config`` for Docker by @andrewhlui in #1347
+* Support rendering build operator task-id with non-ASCII characters by @pankajastro in #1415
 
 Docs
 

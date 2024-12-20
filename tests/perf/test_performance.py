@@ -84,7 +84,7 @@ def generate_project(
     finally:
         # clean up the models in the project_path / models directory
         for model in models_dir.iterdir():
-           model.unlink()
+            model.unlink()
 
 
 @pytest.mark.perf

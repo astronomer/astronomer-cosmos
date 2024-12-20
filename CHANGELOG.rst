@@ -14,6 +14,7 @@ New Features
 * Support rendering tasks with non-ASCII characters by @t0momi219 in #1278 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/task-display-name.html>`_.
 * Add warning callback on source freshness by @pankajastro in #1400 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/source-nodes-rendering.html#on-warning-callback-callback>`_.
 * Add Oracle Profile mapping by @slords and @pankajkoti in #1190 and #1404
+* Save tasks map as DbtToAirflowConverter property by @internetcoffeephone and @hheemskerk in #1362
 
 Bug Fixes
 
@@ -23,12 +24,13 @@ Bug Fixes
 * Support building ``DbtDag`` without setting paths in ``ProjectConfig`` by @tatiana in #1307
 * Fix parsing dbt ls outputs that contain JSONs that are not dbt nodes by @tatiana in #1296
 * Fix Snowflake Profile mapping when using AWS default region by @tatiana in #1406
+* Fix dag rendering for taskflow + DbtTaskGroup combo by @pankajastro in #1360
 
 Enhancements
 
 * Improve dbt command execution logs to troubleshoot ``None`` values by @tatiana in #1392
 * Add logging of stdout to dbt graph run_command by @KarolGongola in #1390
-* Save tasks map as DbtToAirflowConverter property by @internetcoffeephone and @hheemskerk in #1362
+* Add ``profile_config`` for Docker by @andrewhlui in #1347
 
 Docs
 
@@ -65,6 +67,7 @@ Others
 * Increase performance tests models by @tatiana in #1403
 * Drop running 1000 models in the CI by @pankajkoti in #1411
 * Fix releasing package to PyPI by @tatiana in #1396
+* Address review comments on PR 1347 regarding profile_config for ExecutionMode.Docker by @pankajkoti in #1413
 * Pre-commit hook updates in #1394, #1373, #1358, #1340, #1331, #1314, #1301
 
 

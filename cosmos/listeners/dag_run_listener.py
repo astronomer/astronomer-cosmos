@@ -53,7 +53,6 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
 
     # The following is an airflow.serialization.serialized_objects.SerializedDAG instance
     serialized_dag = dag_run.get_dag()
-    serialized_dag
 
     logger.info(f"dir: {dir(serialized_dag)}")
     logger.info(f"1: {serialized_dag.fileloc}")
@@ -63,7 +62,7 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
 
     from airflow.models import DagBag
 
-    dag_bag = DagBag(dag_folder=dag.fileloc, include_examples=False)
+    dag_bag = DagBag(dag_folder=serialized_dag.fileloc, include_examples=False)
     dag = dag_bag.get_dag(dag_run.dag_id)
 
     if not uses_cosmos(dag):

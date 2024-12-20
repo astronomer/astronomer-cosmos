@@ -34,3 +34,16 @@ Example:
             source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
         )
     )
+
+
+on_warning_callback Callback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``on_warning_callback`` is a callback parameter available on the ``DbtSourceLocalOperator``. This callback is triggered when a warning occurs during the execution of the ``dbt source freshness`` command. The callback accepts the task context, which includes additional parameters: test_names and test_results
+
+Example:
+
+.. literalinclude:: ../../dev/dags/example_source_rendering.py/
+    :language: python
+    :start-after: [START cosmos_source_node_example]
+    :end-before: [END cosmos_source_node_example]

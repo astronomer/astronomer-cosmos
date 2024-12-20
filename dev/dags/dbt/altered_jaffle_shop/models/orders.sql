@@ -1,5 +1,5 @@
 {{ config(
-    materialized='view',
+    materialized='table',
     alias=var('orders_alias', 'orders')
    )
 }}

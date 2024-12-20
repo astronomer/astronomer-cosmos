@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from ..base import BaseProfileMapping
+from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
 if TYPE_CHECKING:
     from airflow.models import Connection
 
 
-class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
+class SnowflakeUserPasswordProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/password.
     https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
@@ -76,20 +76,7 @@ class SnowflakeUserPasswordProfileMapping(BaseProfileMapping):
     @property
     def profile(self) -> dict[str, Any | None]:
         """Gets profile."""
-        profile_vars = {
-            **self.mapped_params,
-            **self.profile_args,
-            # password should always get set as env var
-            "password": self.get_env_var_format("password"),
-        }
-
-        # remove any null values
+        profile_vars = super().profile
+        # password should always get set as env var
+        profile_vars["password"] = self.get_env_var_format("password")
         return self.filter_null(profile_vars)
-
-    def transform_account(self, account: str) -> str:
-        """Transform the account to the format <account>.<region> if it's not already."""
-        region = self.conn.extra_dejson.get("region")
-        if region and region not in account:
-            account = f"{account}.{region}"
-
-        return str(account)

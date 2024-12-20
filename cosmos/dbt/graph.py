@@ -180,7 +180,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
         )
 
     if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
-        details = stderr or stdout
+        details = f"stderr: {stderr}\nstdout: {stdout}"
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
 
     return stdout

@@ -132,6 +132,27 @@ def create_test_task_metadata(
     )
 
 
+def _get_task_id_and_args(
+    node: DbtNode,
+    args: dict[str, Any],
+    use_task_group: bool,
+    normalize_task_id: Callable[..., Any] | None,
+    resource_suffix: str,
+) -> tuple[str, dict[str, Any]]:
+    """
+    Generate task ID and update args with display name if needed.
+    """
+    args_update = args
+    if use_task_group:
+        task_id = resource_suffix
+    elif normalize_task_id:
+        task_id = normalize_task_id(node)
+        args_update["task_display_name"] = f"{node.name}_{resource_suffix}"
+    else:
+        task_id = f"{node.name}_{resource_suffix}"
+    return task_id, args_update
+
+
 def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
     """
     Return the map from dbt node type to Cosmos class prefix that should be used
@@ -164,7 +185,9 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
+    normalize_task_id: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
+    on_warning_callback: Callable[..., Any] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -176,6 +199,8 @@ def create_task_metadata(
     :param dbt_dag_task_group_identifier: Identifier to refer to the DbtDAG or DbtTaskGroup in the DAG.
     :param use_task_group: It determines whether to use the name as a prefix for the task id or not.
         If it is False, then use the name as a prefix for the task id, otherwise do not.
+    :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
+        and “test_results” of type List. This is param available for dbt test and dbt source freshness command.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
@@ -183,36 +208,39 @@ def create_task_metadata(
     args = {**args, **{"models": node.resource_name}}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
-        extra_context = {
+        extra_context: dict[str, Any] = {
             "dbt_node_config": node.context_dict,
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
         }
+
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             task_id = f"{node.name}_{node.resource_type.value}_build"
         elif node.resource_type == DbtResourceType.MODEL:
-            if use_task_group:
-                task_id = "run"
-            else:
-                task_id = f"{node.name}_run"
+            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SOURCE:
+            args["on_warning_callback"] = on_warning_callback
+
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
                 and node.has_freshness is False
                 and node.has_test is False
             ):
                 return None
-            task_id = f"{node.name}_source"
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
-            if use_task_group is True:
-                task_id = node.resource_type.value
+            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
-                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator")
+                # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
+                if "task_display_name" in args:
+                    args = {"task_display_name": args["task_display_name"]}
+                else:
+                    args = {}
+                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
         else:
-            task_id = f"{node.name}_{node.resource_type.value}"
-            if use_task_group is True:
-                task_id = node.resource_type.value
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, node.resource_type.value
+            )
 
         task_metadata = TaskMetadata(
             id=task_id,
@@ -244,6 +272,7 @@ def generate_task_or_group(
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
+    normalize_task_id: Callable[..., Any] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -261,7 +290,9 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
+        normalize_task_id=normalize_task_id,
         test_behavior=test_behavior,
+        on_warning_callback=on_warning_callback,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -364,6 +395,7 @@ def build_airflow_graph(
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
+    normalize_task_id = render_config.normalize_task_id
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -385,6 +417,7 @@ def build_airflow_graph(
             source_rendering_behavior=source_rendering_behavior,
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
+            normalize_task_id=normalize_task_id,
             node=node,
         )
         if task_or_group is not None:

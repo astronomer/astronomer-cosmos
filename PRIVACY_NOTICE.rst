@@ -27,16 +27,15 @@ As described in the `official documentation <https://docs.scarf.sh/gateway/#do-n
     SCARF_NO_ANALYTICS=True
 
 
-In addition to Scarf's default data collection, DAG Factory collects the following information:
+In addition to Scarf's default data collection, Cosmos collect the following information when running Cosmos-powered DAGs:
 
 - Cosmos version
 - Airflow version
 - Python version
 - Operating system & machine architecture
 - Event type
-- For DAGs that use Cosmos, the following information is also emitted:
-   - the DAG hash
-   - Total tasks
-   - Total Cosmos tasks
+- The DAG hash
+- Total tasks
+- Total Cosmos tasks
 
 No user-identifiable information (IP included) is stored in Scarf.

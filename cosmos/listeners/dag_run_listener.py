@@ -19,7 +19,7 @@ DAG_RUN = "dag_run"
 
 
 def is_cosmos_dag(dag: DAG) -> bool:
-    logger.info("is_cosmos_dag: {dag.__class__.__module__}")
+    logger.info(f"is_cosmos_dag: {dag.__class__.__module__}")
     if dag.__class__.__module__.startswith("cosmos."):
         return True
     return False
@@ -28,7 +28,7 @@ def is_cosmos_dag(dag: DAG) -> bool:
 def total_cosmos_task_groups(dag: DAG) -> int:
     cosmos_task_groups = 0
     for group_id, task_group in dag.task_group_dict.items():
-        logger.info("total_cosmos_task_groups: {task_group.__class__}")
+        logger.info(f"total_cosmos_task_groups: {task_group.__class__.__module__}")
         if task_group.__class__.__module__.startswith("cosmos."):
             cosmos_task_groups += 1
     return cosmos_task_groups
@@ -37,7 +37,7 @@ def total_cosmos_task_groups(dag: DAG) -> int:
 def total_cosmos_tasks(dag: DAG) -> int:
     cosmos_tasks = 0
     for task in dag.tasks:
-        logger.info("total_cosmos_task_groups: {task.__class__.__module__}")
+        logger.info(f"total_cosmos_task_groups: {task.__class__.__module__}")
         if task.__class__.__module__.startswith("cosmos."):
             cosmos_tasks += 1
     return cosmos_tasks

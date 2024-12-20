@@ -53,6 +53,12 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
 
     dag = dag_run.get_dag()
     logger.info(f"dir: {dir(dag)}")
+    logger.info(f"1: {dag.fileloc}")
+    logger.info(f"2:{dag.filepath}")
+    logger.info(f"3: {dag.task_dict}")
+    logger.info(f"4: {dag.task_group_dict}")
+    logger.info(f"5: {dag.serialize_to_json()}")
+    logger.info(f"6: {dag.deserialize_dag()}")
 
     if not uses_cosmos(dag):
         logger.info("The DAG does not use Cosmos")

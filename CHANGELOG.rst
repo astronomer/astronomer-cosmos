@@ -1,8 +1,80 @@
 Changelog
 =========
 
-1.7.1 (2024-10-29)
+1.8.0 (2024-12-20)
 --------------------
+
+New Features
+
+* Support customizing Airflow operator arguments per dbt node by @wornjs in #1339. `More information <https://astronomer.github.io/astronomer-cosmos/getting_started/custom-airflow-properties.html>`_.
+* Support uploading dbt artifacts to remote cloud storages via callback by @pankajkoti in #1389. `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_.
+* Add support to ``TestBehavior.BUILD`` by @tatiana in #1377. `Documentation <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
+* Add support for the "at" operator when using ``LoadMode.DBT_MANIFEST`` or ``CUSTOM`` by @benjy44 in #1372
+* Add dbt clone operator by @pankajastro in #1326, as documented in `here <https://astronomer.github.io/astronomer-cosmos/getting_started/operators.html>`_.
+* Support rendering tasks with non-ASCII characters by @t0momi219 in #1278 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/task-display-name.html>`_.
+* Add warning callback on source freshness by @pankajastro in #1400 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/source-nodes-rendering.html#on-warning-callback-callback>`_.
+* Add Oracle Profile mapping by @slords and @pankajkoti in #1190 and #1404
+* Emit telemetry to Scarf during DAG run by @tatiana in #1397
+* Save tasks map as ``DbtToAirflowConverter`` property by @internetcoffeephone and @hheemskerk in #1362
+
+Bug Fixes
+
+* Fix the mock value of port in ``TrinoBaseProfileMapping`` to be an integer by @dwolfeu #1322
+* Fix access to the ``dbt docs`` menu item outside of Astro cloud by @tatiana in #1312
+* Add missing ``DbtSourceGcpCloudRunJobOperator`` in module ``cosmos.operators.gcp_cloud_run_job`` by @anai-s in #1290
+* Support building ``DbtDag`` without setting paths in ``ProjectConfig`` by @tatiana in #1307
+* Fix parsing dbt ls outputs that contain JSONs that are not dbt nodes by @tatiana in #1296
+* Fix Snowflake Profile mapping when using AWS default region by @tatiana in #1406
+* Fix dag rendering for taskflow + DbtTaskGroup combo by @pankajastro in #1360
+
+Enhancements
+
+* Improve dbt command execution logs to troubleshoot ``None`` values by @tatiana in #1392
+* Add logging of stdout to dbt graph run_command by @KarolGongola in #1390
+* Add ``profile_config`` for Docker by @andrewhlui in #1347
+* Support rendering build operator task-id with non-ASCII characters by @pankajastro in #1415
+
+Docs
+
+* Remove extra ` char from docs by @pankajastro in #1345
+* Add limitation about copying target dir files to remote by @pankajkoti in #1305
+* Generalise example from README by @ReadytoRocc in #1311
+* Add security policy by @tatiana, @chaosmaw and @lzdanski in # 1385
+* Mention in documentation that the callback functionality is supported in ``ExecutionMode.VIRTUALENV`` by @pankajkoti in #1401
+
+Others
+
+* Restore Jaffle Shop so that ``basic_cosmos_dag`` works as documented by @tatiana in #1374
+* Remove Pytest durations from tests scripts by @tatiana in #1383
+* Remove typing-extensions as dependency by @pankajastro in #1381
+* Pin dbt-databricks version to < 1.9 by @pankajastro in #1376
+* Refactor ``dbt-sqlite`` tests to use ``dbt-postgres`` by @pankajastro in #1366
+* Remove 'dbt-core<1.8.9' pin by @tatiana in #1371
+* Remove dependency ``eval_type_backport`` by @tatiana in #1370
+* Enable kubernetes tests for dbt>=1.8 by @pankajastro #1364
+* CI Workaround: Pin dbt-core, Disable SQLite Tests, and Correctly Ignore Clone Test to Pass CI by @pankajastro in #1337
+* Enable Azure task in the remote store manifest example DAG by @pankajkoti in #1333
+* Enable GCP remote manifest task by @pankajastro in #1332
+* Add exempt label option in GH action stale job by @pankajastro in #1328
+* Add integration test for source node rendering by @pankajastro in #1327
+* Fix vulnerability issue on docs dependency by @tatiana in #1313
+* Add postgres pod status check for k8s tests in CI by @pankajkoti in #1320
+* [CI] Reduce the amount taking to run tests in the CI from 5h to 11min by @tatiana in #1297
+* Enable secret detection precommit check by @pankajastro in #1302
+* Fix security vulnerability, by not pinning Airflow 2.10.0 by @tatiana in #1298
+* Fix Netlify build timeouts by @tatiana in #1294
+* Add stalebot to label/close stale PRs and issues by @tatiana in #1288
+* Unpin dbt-databricks version by @pankajastro in #1409
+* Fix source resource type tests by @pankajastro in #1405
+* Increase performance tests models by @tatiana in #1403
+* Drop running 1000 models in the CI by @pankajkoti in #1411
+* Fix releasing package to PyPI by @tatiana in #1396
+* Address review comments on PR 1347 regarding profile_config for ExecutionMode.Docker by @pankajkoti in #1413
+* Pre-commit hook updates in #1394, #1373, #1358, #1340, #1331, #1314, #1301
+
+
+1.7.1 (2024-10-29)
+------------------
 
 Bug fixes
 

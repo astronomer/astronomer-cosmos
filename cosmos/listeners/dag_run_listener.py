@@ -61,14 +61,13 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.info(f"3: {serialized_dag.task_dict}")
     logger.info(f"4: {serialized_dag.task_group_dict}")
 
-    if not isinstance(serialized_dag, DAG):
-        from airflow.models import DagBag
+    from airflow.models import DagBag
 
-        logger.info("The DAG does not use Cosmos")
-        dag_bag = DagBag(dag_folder=dag.fileloc, include_examples=False)
-        dag = dag_bag.get_dag(dag_run.dag_id)
+    dag_bag = DagBag(dag_folder=dag.fileloc, include_examples=False)
+    dag = dag_bag.get_dag(dag_run.dag_id)
 
     if not uses_cosmos(dag):
+        logger.info("The DAG does not use Cosmos")
         logger.info(f"5: {serialized_dag.deserialize()}")
         return
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import platform
 from urllib import parse
 from urllib.parse import urlencode
@@ -10,6 +9,9 @@ from airflow import __version__ as airflow_version
 
 import cosmos
 from cosmos import constants, settings
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 
 def should_emit() -> bool:
@@ -44,10 +46,10 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
     telemetry_url = constants.TELEMETRY_URL.format(
         **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
     )
-    logging.info("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
+    logger.info("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
     response = httpx.get(telemetry_url, timeout=constants.TELEMETRY_TIMEOUT, follow_redirects=True)
     if not response.is_success:
-        logging.warning(
+        logger.warning(
             "Unable to emit usage metrics to %s. Status code: %s. Message: %s",
             telemetry_url,
             response.status_code,
@@ -71,5 +73,5 @@ def emit_usage_metrics_if_enabled(event_type: str, additional_metrics: dict[str,
         is_success = emit_usage_metrics(metrics)
         return is_success
     else:
-        logging.info("Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True.")
+        logger.info("Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True.")
         return False

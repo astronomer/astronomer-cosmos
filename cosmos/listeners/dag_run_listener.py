@@ -52,7 +52,7 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.info("The on_dag_run_success was called")
 
     dag = dag_run.get_dag()
-    dag_run.dag_id
+    logger.info(f"dir: {dir(dag)}")
 
     if not uses_cosmos(dag):
         logger.info("The DAG does not use Cosmos")

@@ -4,6 +4,7 @@ from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
 
+from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
@@ -42,8 +43,10 @@ class DbtDockerBaseOperator(AbstractDbtBaseOperator, DockerOperator):  # type: i
     def __init__(
         self,
         image: str,  # Make image a required argument since it's required by DockerOperator
+        profile_config: ProfileConfig | None = None,
         **kwargs: Any,
     ) -> None:
+        self.profile_config = profile_config
         super().__init__(image=image, **kwargs)
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:

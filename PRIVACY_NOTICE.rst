@@ -34,9 +34,9 @@ In addition to Scarf's default data collection, DAG Factory collects the followi
 - Python version
 - Operating system & machine architecture
 - Event type
-- DAG that uses Cosmos hash
-- Total tasks in DAGs that use Cosmos
-- Total Cosmos tasks
-- Total Cosmos task groups
+- For DAGs that use Cosmos, the following information is also emitted:
+   - the DAG hash
+   - Total tasks
+   - Total Cosmos tasks
 
 No user-identifiable information (IP included) is stored in Scarf.

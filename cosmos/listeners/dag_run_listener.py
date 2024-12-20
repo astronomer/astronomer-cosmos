@@ -36,8 +36,9 @@ def total_cosmos_task_groups(dag: DAG) -> int:
 
 def total_cosmos_tasks(dag: DAG) -> int:
     cosmos_tasks = 0
-    for task in dag.tasks:
+    for task in dag.task_dict.values():
         logger.info(f"total_cosmos_task_groups: {task.__class__}")
+        logger.info(f"type: {type(task)}")
         if task.__class__.__module__.startswith("cosmos."):
             cosmos_tasks += 1
     return cosmos_tasks

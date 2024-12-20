@@ -47,12 +47,9 @@ def uses_cosmos(dag: DAG) -> bool:
     return bool(is_cosmos_dag(dag) or total_cosmos_task_groups(dag) or total_cosmos_tasks(dag))
 
 
-from airflow.utils.session import provide_session
-
-
-@provide_session
+# @provide_session
 @hookimpl
-def on_dag_run_success(dag_run: DagRun, msg: str, session=None) -> None:
+def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
 
     logger.info(f"dir: {dir(dag_run.dag)}")
     logger.info("The on_dag_run_success was called")
@@ -66,11 +63,11 @@ def on_dag_run_success(dag_run: DagRun, msg: str, session=None) -> None:
     logger.info(f"3: {serialized_dag.task_dict}")
     logger.info(f"4: {serialized_dag.task_group_dict}")
 
-    from airflow.models import DagBag
+    # from airflow.models import DagBag
 
-    dag_bag = DagBag(dag_folder=serialized_dag.fileloc, include_examples=False)
-    dag = dag_bag.get_dag(dag_run.dag_id)
-    logger.info(f"dag: {dag}")
+    # dag_bag = DagBag(dag_folder=serialized_dag.fileloc, include_examples=False)
+    # dag = dag_bag.get_dag(dag_run.dag_id)
+    # logger.info(f"dag: {dag}")
 
     if not uses_cosmos(serialized_dag):
         logger.info("The DAG does not use Cosmos")

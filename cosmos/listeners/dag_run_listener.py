@@ -40,7 +40,9 @@ def total_cosmos_tasks(dag: DAG) -> int:
         logger.info(f"total_cosmos_task_groups: {task.__class__}")
         logger.info(f"type: {type(task)}")
         logger.info(f"__dict__: {task.__dict__}")
-        if task.__class__.__module__.startswith("cosmos."):
+        logger.info(f"dir: {dir(task)}")
+        task_module = getattr(task, "_task_module", None) or task.__class__.__module__
+        if task_module.startswith("cosmos."):
             cosmos_tasks += 1
     return cosmos_tasks
 

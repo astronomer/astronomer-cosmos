@@ -6,7 +6,7 @@ Changelog
 
 Bug Fixes
 
-* Add kwargs param in DocsOperator method upload_to_cloud_storage by @pankajastro in #1422
+* Add ``kwargs`` param in DocsOperator method ``upload_to_cloud_storage`` by @pankajastro in #1422
 
 1.8.0 (2024-12-20)
 --------------------

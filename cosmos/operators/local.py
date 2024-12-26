@@ -862,7 +862,7 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
         self.callback = self.upload_to_cloud_storage
 
     @abstractmethod
-    def upload_to_cloud_storage(self, project_dir: str) -> None:
+    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Abstract method to upload the generated documentation to cloud storage."""
 
 
@@ -893,7 +893,7 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
             kwargs["connection_id"] = aws_conn_id
         super().__init__(*args, **kwargs)
 
-    def upload_to_cloud_storage(self, project_dir: str) -> None:
+    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Uploads the generated documentation to S3."""
         self.log.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
@@ -959,7 +959,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
             kwargs["bucket_name"] = container_name
         super().__init__(*args, **kwargs)
 
-    def upload_to_cloud_storage(self, project_dir: str) -> None:
+    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Uploads the generated documentation to Azure Blob Storage."""
         self.log.info(
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
@@ -1003,7 +1003,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
     ui_color = "#4772d5"
 
-    def upload_to_cloud_storage(self, project_dir: str) -> None:
+    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Uploads the generated documentation to Google Cloud Storage"""
         self.log.info(
             'Attempting to upload generated docs to Storage using GCSHook(conn_id="%s")',

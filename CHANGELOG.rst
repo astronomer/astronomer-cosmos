@@ -1,6 +1,13 @@
 Changelog
 =========
 
+1.8.1a1 (2024-12-23)
+--------------------
+
+Bug Fixes
+
+* Add ``kwargs`` param in DocsOperator method ``upload_to_cloud_storage`` by @pankajastro in #1422
+
 1.8.0 (2024-12-20)
 --------------------
 

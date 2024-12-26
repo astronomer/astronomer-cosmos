@@ -11,9 +11,6 @@ import os
 from pathlib import Path
 
 from airflow import DAG
-from airflow.decorators import task
-from airflow.exceptions import AirflowNotFoundException
-from airflow.hooks.base import BaseHook
 from pendulum import datetime
 
 from cosmos import ProfileConfig
@@ -27,9 +24,9 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-S3_CONN_ID = "aws_docs"
-AZURE_CONN_ID = "azure_docs"
-GCS_CONN_ID = "gcs_docs"
+S3_CONN_ID = "aws_s3_conn"
+AZURE_CONN_ID = "azure_wasb_conn"
+GCS_CONN_ID = "gcp_gs_conn"
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -39,32 +36,6 @@ profile_config = ProfileConfig(
         profile_args={"schema": "public"},
     ),
 )
-
-
-@task.branch(task_id="which_upload")
-def which_upload():
-    """Only run the docs tasks if we have the proper connections set up"""
-    downstream_tasks_to_run = []
-
-    try:
-        BaseHook.get_connection(S3_CONN_ID)
-        downstream_tasks_to_run += ["generate_dbt_docs_aws"]
-    except AirflowNotFoundException:
-        pass
-
-    # if we have an AZURE_CONN_ID, check if it's valid
-    try:
-        BaseHook.get_connection(AZURE_CONN_ID)
-        downstream_tasks_to_run += ["generate_dbt_docs_azure"]
-    except AirflowNotFoundException:
-        pass
-    try:
-        BaseHook.get_connection(GCS_CONN_ID)
-        downstream_tasks_to_run += ["generate_dbt_docs_gcs"]
-    except AirflowNotFoundException:
-        pass
-
-    return downstream_tasks_to_run
 
 
 with DAG(
@@ -79,24 +50,22 @@ with DAG(
         task_id="generate_dbt_docs_aws",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
-        connection_id=S3_CONN_ID,
-        bucket_name="cosmos-docs",
+        connection_id="aws_s3_conn",
+        bucket_name="cosmos-ci-docs",
     )
 
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
         task_id="generate_dbt_docs_azure",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
-        connection_id=AZURE_CONN_ID,
-        bucket_name="$web",
+        connection_id="azure_wasb_conn",
+        bucket_name="cosmos-ci-docs",
     )
 
     generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
-        connection_id=GCS_CONN_ID,
-        bucket_name="cosmos-docs",
+        connection_id="gcp_gs_conn",
+        bucket_name="cosmos-ci-docs",
     )
-
-    which_upload() >> [generate_dbt_docs_aws, generate_dbt_docs_azure, generate_dbt_docs_gcs]

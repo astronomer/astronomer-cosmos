@@ -33,7 +33,7 @@ Additionally, since Cosmos uses the open-source `openlineage-integration-common 
 * Spark
 * SQLServer
 
-Contributions are also welcome in the `OpenLineage project <https://github.com/OpenLineage/OpenLineage/blob/main/integration/common/openlineage/common/provider/dbt/processor.py#L36C1-L47C22>`_ to support more adaptors. 
+Contributions are also welcome in the `OpenLineage project <https://github.com/OpenLineage/OpenLineage/blob/main/integration/common/openlineage/common/provider/dbt/processor.py#L36C1-L47C22>`_ to support more adaptors.
 
 Installation
 ------------

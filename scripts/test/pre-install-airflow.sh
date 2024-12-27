@@ -52,7 +52,7 @@ else
   # https://github.com/apache/airflow/pull/38102 and fixed in apache-airflow-providers-google==10.17.0. Consequently,
   # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
   # version does not meet our requirements.
-  uv pip install "apache-airflow-providers-google>=10.17.0"
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
 
   # The Airflow 2.8 constraints file at
   # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
@@ -60,7 +60,7 @@ else
   # previously led to authentication issues with this version. This issue got resolved in
   # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
   # and skipping installation with constraints, as the specified version does not meet our requirements.
-  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0"
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
 fi
 
 rm /tmp/constraint.txt

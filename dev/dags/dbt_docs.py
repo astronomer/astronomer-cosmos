@@ -49,6 +49,7 @@ with DAG(
         profile_config=profile_config,
         connection_id="aws_s3_conn",
         bucket_name="cosmos-ci-docs",
+        install_deps=True,
     )
 
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
@@ -57,6 +58,7 @@ with DAG(
         profile_config=profile_config,
         connection_id="azure_wasb_conn",
         bucket_name="cosmos-ci-docs",
+        install_deps=True,
     )
 
     generate_dbt_docs_gcs = DbtDocsGCSOperator(
@@ -65,4 +67,5 @@ with DAG(
         profile_config=profile_config,
         connection_id="gcp_gs_conn",
         bucket_name="cosmos-ci-docs",
+        install_deps=True,
     )

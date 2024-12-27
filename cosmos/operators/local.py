@@ -503,6 +503,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 self.store_freshness_json(tmp_project_dir, context)
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.upload_compiled_sql(tmp_project_dir, context)
+                print("Result is", result)
+                dirlist = os.listdir(tmp_project_dir)
+                print("Before: Files and directories in '", tmp_project_dir, "' :")
+                print("\t", dirlist)
                 if self.callback:
                     dirlist = os.listdir(f"{tmp_project_dir}/target")
                     print("Before: Files and directories in '", tmp_project_dir, "' :")

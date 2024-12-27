@@ -503,19 +503,9 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 self.store_freshness_json(tmp_project_dir, context)
                 self.store_compiled_sql(tmp_project_dir, context)
                 self.upload_compiled_sql(tmp_project_dir, context)
-                print("Result is", result)
-                dirlist = os.listdir(tmp_project_dir)
-                print("Before: Files and directories in '", tmp_project_dir, "' :")
-                print("\t", dirlist)
                 if self.callback:
-                    dirlist = os.listdir(f"{tmp_project_dir}/target")
-                    print("Before: Files and directories in '", tmp_project_dir, "' :")
-                    print("\t", dirlist)
                     self.callback_args.update({"context": context})
                     self.callback(tmp_project_dir, **self.callback_args)
-                    dirlist = os.listdir(f"{tmp_project_dir}/target")
-                    print("After: Files and directories in '", tmp_project_dir, "' :")
-                    print("\t", dirlist)
                 self.handle_exception(result)
 
                 return result
@@ -909,9 +899,6 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
             self.connection_id,
         )
-        dirlist = os.listdir(f"{project_dir}/target")
-        print("Files and directories in '", project_dir, "' :")
-        print("\t", dirlist)
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
@@ -978,9 +965,6 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
             self.connection_id,
         )
-        dirlist = os.listdir(f"{project_dir}/target")
-        print("Files and directories in '", project_dir, "' :")
-        print("\t", dirlist)
 
         from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 
@@ -1025,9 +1009,6 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
             'Attempting to upload generated docs to Storage using GCSHook(conn_id="%s")',
             self.connection_id,
         )
-        dirlist = os.listdir(f"{project_dir}/target")
-        print("Files and directories in '", project_dir, "' :")
-        print("\t", dirlist)
 
         from airflow.providers.google.cloud.hooks.gcs import GCSHook
 

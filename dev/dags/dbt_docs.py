@@ -24,9 +24,6 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-S3_CONN_ID = "aws_s3_conn"
-AZURE_CONN_ID = "azure_wasb_conn"
-GCS_CONN_ID = "gcp_gs_conn"
 
 profile_config = ProfileConfig(
     profile_name="default",

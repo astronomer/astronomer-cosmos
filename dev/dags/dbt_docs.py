@@ -56,7 +56,7 @@ with DAG(
         task_id="generate_dbt_docs_azure",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
-        connection_id="azure_wasb_conn",
+        connection_id="azure_abfs_conn",
         bucket_name="cosmos-ci-docs",
         install_deps=True,
     )

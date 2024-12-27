@@ -208,7 +208,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 @pytest.mark.integration
 def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     """
-    Validate topology of a project that uses the MULTIPLE_PARENTS_TEST_DBT_PROJECT project
+    Validate topology of a project that uses the MULTIPLE_PARENTS_TEST_DBT_PROJECT project and uses TestBehavior.BUILD
     """
     project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)

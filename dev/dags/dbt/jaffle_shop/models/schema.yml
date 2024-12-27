@@ -39,13 +39,14 @@ models:
           - not_null
         description: This is a unique identifier for an order
 
-      - name: customer_id
-        description: Foreign key to the customers table
-        tests:
-          - not_null
-          - relationships:
-              to: ref('customers')
-              field: customer_id
+      # Comment so we don't have a standalone test relationships_orders_customer_id__customer_id__ref_customers__test
+      #- name: customer_id
+      #  description: Foreign key to the customers table
+      #  tests:
+      #    - not_null
+      #    - relationships:
+      #        to: ref('customers')
+      #        field: customer_id
 
       - name: order_date
         description: Date (UTC) that the order was placed

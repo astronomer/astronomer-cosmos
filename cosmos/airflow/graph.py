@@ -342,6 +342,7 @@ def generate_task_or_group(
         normalize_task_id=normalize_task_id,
         test_behavior=test_behavior,
         on_warning_callback=on_warning_callback,
+        detached_from_parent=detached_from_parent,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task

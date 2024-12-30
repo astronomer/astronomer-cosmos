@@ -165,6 +165,9 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
         if not on_warning_callback:
             super().__init__(**kwargs)
         else:
+            # Make the following code independent of arguments being defaulted or not.
+            if "default_args" in kwargs.keys():
+                kwargs.update(kwargs.pop("default_args"))
             self.on_warning_callback = on_warning_callback
             self.is_delete_operator_pod_original = kwargs.get("is_delete_operator_pod", None)
             if self.is_delete_operator_pod_original is not None:

@@ -186,6 +186,26 @@ def test_dbt_kubernetes_build_command():
         ),
         ({"is_delete_operator_pod": None, "on_finish_action": "keep_pod"}, (1, 1, False, "keep_pod")),
         ({}, (1, 1, True, "delete_pod")),
+        (
+            {
+                "default_args": {
+                    "on_failure_callback": (lambda **kwargs: None),
+                    "is_delete_operator_pod": None,
+                },
+                "on_finish_action": "delete_pod",
+            },
+            (1, 2, True, "delete_pod"),
+        ),
+        (
+            {
+                "default_args": {
+                    "on_failure_callback": [(lambda **kwargs: None), (lambda **kwargs: None)],
+                    "is_delete_operator_pod": None,
+                },
+                "on_finish_action": "delete_succeeded_pod",
+            },
+            (1, 3, False, "delete_succeeded_pod"),
+        ),
     ],
 )
 @pytest.mark.skipif(

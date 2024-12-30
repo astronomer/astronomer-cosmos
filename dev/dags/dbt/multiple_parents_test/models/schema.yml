@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: model_a
+    description: "A simple model with user data"
+    tests:
+      - unique:
+          column_name: id
+
+  - name: model_b
+    description: "A simple model with date data"
+    tests:
+      - unique:
+          column_name: id
+
+  - name: combined_model
+    description: "Combines data from model_a and model_b"
+    columns:
+      - name: id
+        tests:
+          - not_null
+
+      - name: name
+        tests:
+          - not_null
+
+      - name: created_at
+        tests:
+          - not_null
+
+    tests:
+      - custom_test_combined_model: {}

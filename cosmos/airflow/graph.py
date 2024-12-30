@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
@@ -74,6 +75,26 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     return leaves
 
 
+def exclude_detached_tests_if_needed(
+    node: DbtNode,
+    task_args: dict[str, str],
+    detached_from_parent: dict[str, DbtNode] | None = None,
+) -> None:
+    """
+    Add exclude statements if there are tests associated to the model that should be run detached from the model/tests.
+
+    Change task_args in-place.
+    """
+    if detached_from_parent is None:
+        detached_from_parent = {}
+    exclude: list[str] = task_args.get("exclude", [])  # type: ignore
+    tests_detached_from_this_node: list[DbtNode] = detached_from_parent.get(node.unique_id, [])  # type: ignore
+    for test_node in tests_detached_from_this_node:
+        exclude.append(test_node.resource_name.split(".")[0])
+    if exclude:
+        task_args["exclude"] = exclude  # type: ignore
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
@@ -82,6 +103,7 @@ def create_test_task_metadata(
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
     render_config: RenderConfig | None = None,
+    detached_from_parent: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -92,11 +114,13 @@ def create_test_task_metadata(
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
     and “test_results” of type List.
     :param node: If the test relates to a specific node, the node reference
+    :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
     task_args["on_warning_callback"] = on_warning_callback
     extra_context = {}
+    detached_from_parent = detached_from_parent or {}
 
     task_owner = ""
     airflow_task_config = {}
@@ -118,6 +142,9 @@ def create_test_task_metadata(
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
+
+    if node:
+        exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
 
     return TaskMetadata(
         id=test_task_name,
@@ -192,6 +219,7 @@ def create_task_metadata(
     normalize_task_id: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
     on_warning_callback: Callable[..., Any] | None = None,
+    detached_from_parent: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -205,6 +233,7 @@ def create_task_metadata(
         If it is False, then use the name as a prefix for the task id, otherwise do not.
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
         and “test_results” of type List. This is param available for dbt test and dbt source freshness command.
+    :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
@@ -218,6 +247,7 @@ def create_task_metadata(
         }
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
                 node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
             )
@@ -268,6 +298,17 @@ def create_task_metadata(
         return None
 
 
+def is_detached_test(node: DbtNode) -> bool:
+    """
+    Identify if node should be rendered detached from the parent. Conditions that should be met:
+    * is a test
+    * has multiple parents
+    """
+    if node.resource_type == DbtResourceType.TEST and len(node.depends_on) > 1:
+        return True
+    return False
+
+
 def generate_task_or_group(
     dag: DAG,
     task_group: TaskGroup | None,
@@ -279,9 +320,11 @@ def generate_task_or_group(
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
     normalize_task_id: Callable[..., Any] | None = None,
+    detached_from_parent: dict[str, DbtNode] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
+    detached_from_parent = detached_from_parent or {}
 
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
@@ -299,12 +342,13 @@ def generate_task_or_group(
         normalize_task_id=normalize_task_id,
         test_behavior=test_behavior,
         on_warning_callback=on_warning_callback,
+        detached_from_parent=detached_from_parent,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
     # The exception are the test nodes, since it would be too slow to run test tasks individually.
     # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
-    if task_meta and node.resource_type != DbtResourceType.TEST:
+    if task_meta and not node.resource_type == DbtResourceType.TEST:
         if use_task_group:
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
                 task = create_airflow_task(task_meta, dag, task_group=model_task_group)
@@ -315,12 +359,14 @@ def generate_task_or_group(
                     task_args=task_args,
                     node=node,
                     on_warning_callback=on_warning_callback,
+                    detached_from_parent=detached_from_parent,
                 )
                 test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
                 task >> test_task
                 task_or_group = model_task_group
         else:
             task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+
     return task_or_group
 
 
@@ -405,6 +451,16 @@ def build_airflow_graph(
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
 
+    # Identify test nodes that should be run detached from the associated dbt resource nodes because they
+    # have multiple parents
+    detached_from_parent = defaultdict(list)
+    detached_nodes = {}
+    for node_id, node in nodes.items():
+        if is_detached_test(node):
+            detached_nodes[node_id] = node
+            for parent_id in node.depends_on:
+                detached_from_parent[parent_id].append(node)
+
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
@@ -425,10 +481,25 @@ def build_airflow_graph(
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
             node=node,
+            detached_from_parent=detached_from_parent,
         )
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
+
+    # Handle detached test nodes
+    for node_id, node in detached_nodes.items():
+        test_meta = create_test_task_metadata(
+            f"{node.resource_name.split('.')[0]}_test",
+            execution_mode,
+            test_indirect_selection,
+            task_args=task_args,
+            on_warning_callback=on_warning_callback,
+            render_config=render_config,
+            node=node,
+        )
+        test_task = create_airflow_task(test_meta, dag, task_group=task_group)
+        tasks_map[node_id] = test_task
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)

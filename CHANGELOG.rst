@@ -1,12 +1,25 @@
 Changelog
 =========
 
-1.8.1a1 (2024-12-23)
+1.8.1 (2024-12-30)
 --------------------
 
 Bug Fixes
 
+* Fix rendering dbt tests with multiple parents by @tatiana in #1433
 * Add ``kwargs`` param in DocsOperator method ``upload_to_cloud_storage`` by @pankajastro in #1422
+
+Docs
+
+* Improve OpenLineage documentation by @tatiana in #1431
+
+Others
+
+* Enable Docs DAG in CI leveraging existing CI connections by @pankajkoti in 1428
+* Install providers with airflow by @pankajkoti in #1432
+* Remove unused docs dependency by @pankajastro in #1414
+* Pre-commit hook updates in #1424
+
 
 1.8.0 (2024-12-20)
 --------------------

@@ -15,7 +15,7 @@ Docs
 
 Others
 
-* Enable Docs DAG in CI leveraging existing CI connections by @pankajkoti in 1428
+* Enable Docs DAG in CI leveraging existing CI connections by @pankajkoti in #1428
 * Install providers with airflow by @pankajkoti in #1432
 * Remove unused docs dependency by @pankajastro in #1414
 * Pre-commit hook updates in #1424

@@ -73,7 +73,7 @@ This example DAG:
 ..
    The following renders in Sphinx but not Github:
 
-.. literalinclude:: ./../dev/dags/basic_cosmos_dag.py
+.. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
     :language: python
     :start-after: [START local_example]
     :end-before: [END local_example]

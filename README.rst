@@ -46,7 +46,7 @@ https://github.com/astronomer/astronomer-cosmos/blob/24aa38e528e299ef51ca6baf32f
 
 This will generate an Airflow DAG that looks like this:
 
-.. figure:: /docs/_static/jaffle_shop_dag.png
+.. figure:: https://github.com/astronomer/astronomer-cosmos/blob/main/docs/_static/jaffle_shop_dag.png
 
 
 Community

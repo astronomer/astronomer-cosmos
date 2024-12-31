@@ -15,6 +15,7 @@
    GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
    dbt and Airflow Similar Concepts <dbt-airflow-concepts>
    Operators <operators>
+   Custom Airflow Properties <custom-airflow-properties>
 
 
 Getting Started

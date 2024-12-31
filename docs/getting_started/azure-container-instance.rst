@@ -3,6 +3,7 @@
 Azure Container Instance Execution Mode
 =======================================
 .. versionadded:: 1.4
+
 This tutorial will guide you through the steps required to use Azure Container Instance as the Execution Mode for your dbt code with Astronomer Cosmos. Schematically, the guide will walk you through the steps required to build the following architecture:
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_aci_schematic.png
@@ -54,6 +55,7 @@ You will need a postgres database running to be used as the database for the dbt
 In order to run a container in Azure Container Instance, it needs access to the container image. In our setup, we will use Azure Container Registry for this. To set an Azure Container Registry up, you can use the following bash command:
 
 .. code-block:: bash
+
     az acr create --name <<<YOUR_REGISTRY_NAME>>> --resource-group <<<YOUR_RG>>> --sku Basic --admin-enabled
 
 **Build the dbt Docker image**
@@ -82,6 +84,7 @@ After this, the image needs to be pushed to the registry of your choice. Note th
 
     You may need to ensure docker knows to use the right credentials. If using Azure Container Registry, this can be done by running the following command:
     .. code-block:: bash
+
         az acr login
 
 .. note::

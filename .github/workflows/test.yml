@@ -440,7 +440,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Create KinD cluster
-        uses: container-tools/kind-action@v1
+        uses: container-tools/kind-action@v2
 
       - name: Install packages and dependencies
         run: |

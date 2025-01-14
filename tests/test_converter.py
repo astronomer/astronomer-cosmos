@@ -203,6 +203,10 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
     assert args[1:] == ["test", "--select", "custom_test_combined_model_combined_model_.c6e4587380"]
+    assert (
+        tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].task_id
+        == "custom_test_combined_model_combined_model__test"
+    )
 
 
 @pytest.mark.integration

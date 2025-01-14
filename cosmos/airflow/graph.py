@@ -430,6 +430,13 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
+def calculate_detached_node_name(node: DbtNode) -> str:
+    """
+    Given a detached test node, calculate its name.
+    """
+    return f"{node.resource_name.split('.')[0]}_test"
+
+
 def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
@@ -503,6 +510,21 @@ def build_airflow_graph(
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
+
+    # Handle detached test nodes
+    for node_id, node in detached_nodes.items():
+        datached_node_name = calculate_detached_node_name(node)
+        test_meta = create_test_task_metadata(
+            datached_node_name,
+            execution_mode,
+            test_indirect_selection,
+            task_args=task_args,
+            on_warning_callback=on_warning_callback,
+            render_config=render_config,
+            node=node,
+        )
+        test_task = create_airflow_task(test_meta, dag, task_group=task_group)
+        tasks_map[node_id] = test_task
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)

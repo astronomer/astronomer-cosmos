@@ -183,6 +183,22 @@ def test_select_nodes_by_select_intersection_config_tag():
     assert selected == expected
 
 
+def test_select_nodes_by_select_intersection_config_graph_selector_includes_ancestors():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child,+sibling1"])
+    expected = {
+        grandparent_node.unique_id: grandparent_node,
+        another_grandparent_node.unique_id: another_grandparent_node,
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_select_intersection_config_graph_selector_none():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child,+orphaned"])
+    expected = {}
+    assert selected == expected
+
+
 def test_select_nodes_by_select_path():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models"])
     expected = {

@@ -409,14 +409,14 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
     return dag_task_group_identifier
 
 
-def calculate_detached_nodes(
+def identify_detached_nodes(
     nodes: dict[str, DbtNode],
     test_behavior: TestBehavior,
     detached_nodes: dict[str, DbtNode],
     detached_from_parent: dict[str, list[DbtNode]],
 ) -> None:
     """
-    Given the nodes that represent a dbt project and the test_behavior, calculate detached test nodes
+    Given the nodes that represent a dbt project and the test_behavior, identify the detached test nodes
     (test nodes that have multiple dependencies and should run independently).
 
     Change in-place the dictionaries detached_nodes (detached node ID : node) and detached_from_parent (parent node ID that
@@ -476,7 +476,7 @@ def build_airflow_graph(
     # have multiple parents
     detached_nodes: dict[str, DbtNode] = {}
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
-    calculate_detached_nodes(nodes, test_behavior, detached_nodes, detached_from_parent)
+    identify_detached_nodes(nodes, test_behavior, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)

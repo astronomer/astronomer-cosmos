@@ -46,7 +46,10 @@ else:
 if TYPE_CHECKING:
     from airflow.datasets import Dataset  # noqa: F811
     from dbt.cli.main import dbtRunner, dbtRunnerResult
-    from openlineage.client.event_v2 import RunEvent
+    try:
+        from openlineage.client.event_v2 import RunEvent
+    except ImportError:
+        from openlineage.client.run import RunEvent
 
 
 from sqlalchemy.orm import Session

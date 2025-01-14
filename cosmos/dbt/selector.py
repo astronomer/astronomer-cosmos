@@ -498,7 +498,6 @@ def select_nodes(
     exclude = exclude or []
     if not select and not exclude:
         return nodes
-
     validate_filters(exclude, select)
     subset_ids = apply_select_filter(nodes, project_dir, select)
     if select:

@@ -64,6 +64,15 @@ parent_node = DbtNode(
     config={"materialized": "view", "tags": ["has_child", "is_child"]},
 )
 
+parent_sibling_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent_sibling",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
+    file_path=SAMPLE_PROJ_PATH / "gen2/models/parent_sibling.sql",
+    tags=["is_adopted"],
+    config={"materialized": "view", "tags": ["is_adopted"]},
+)
+
 child_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
@@ -196,6 +205,15 @@ def test_select_nodes_by_select_intersection_config_graph_selector_includes_ance
 def test_select_nodes_by_select_intersection_config_graph_selector_none():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child,+orphaned"])
     expected = {}
+    assert selected == expected
+
+
+def test_select_nodes_by_tag_ancestry():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+tag:is_child,+tag:is_adopted"])
+    expected = {
+        grandparent_node.unique_id: grandparent_node,
+        another_grandparent_node.unique_id: another_grandparent_node,
+    }
     assert selected == expected
 
 

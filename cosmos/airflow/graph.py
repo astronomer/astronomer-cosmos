@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
+from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
@@ -430,11 +431,19 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
-def calculate_detached_node_name(node: DbtNode) -> str:
+def calculate_detached_node_name(node: DbtNode, counter: list[int] = [0]) -> str:
     """
-    Given a detached test node, calculate its name.
+    Given a detached test node, calculate its name. It will either be:
+     - the name of the test with a "_test" suffix, if this is smaller than 250
+     - or detached_{an incremental number}_test
     """
-    return f"{node.resource_name.split('.')[0]}_test"
+    node_name = f"{node.resource_name.split('.')[0]}_test"
+
+    if not len(node_name) < AIRFLOW_MAX_ID_LENGTH:
+        node_name = f"detached_{counter[0]}_test"
+        counter[0] += 1
+
+    return node_name
 
 
 def build_airflow_graph(
@@ -481,7 +490,7 @@ def build_airflow_graph(
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
-    detached_nodes: dict[str, DbtNode] = {}
+    detached_nodes: dict[str, DbtNode] = OrderedDict()
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, test_behavior, detached_nodes, detached_from_parent)
 

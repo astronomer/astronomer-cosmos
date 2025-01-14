@@ -13,6 +13,7 @@ from packaging import version
 from cosmos.airflow.graph import (
     _snake_case_to_camelcase,
     build_airflow_graph,
+    calculate_detached_node_name,
     calculate_leaves,
     calculate_operator_class,
     create_task_metadata,
@@ -76,6 +77,32 @@ child2_node = DbtNode(
 
 sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node]
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
+
+
+def test_calculate_datached_node_name_under_is_under_250():
+    node = DbtNode(
+        unique_id="model.my_dbt_project.a_very_short_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+    )
+    assert calculate_detached_node_name(node) == "a_very_short_name_test"
+
+    node = DbtNode(
+        unique_id="model.my_dbt_project." + "this_is_a_very_long_name" * 20,  # 24 x 20 = 480 characters
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+    )
+    assert calculate_detached_node_name(node) == "detached_0_test"
+
+    node = DbtNode(
+        unique_id="model.my_dbt_project." + "this_is_another_very_long_name" * 20,
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+    )
+    assert calculate_detached_node_name(node) == "detached_1_test"
 
 
 @pytest.mark.skipif(

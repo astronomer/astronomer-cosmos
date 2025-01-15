@@ -15,8 +15,11 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 
 - ``tag:my_tag``: include/exclude models with the tag ``my_tag``
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
-- ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory
+- ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory. In this example, `analytics/table` is a relative path, but absolute paths are also supported.
 - ``+node_name+1`` (graph operators): include/exclude the node with name ``node_name``, all its parents, and its first generation of children (`dbt graph selector docs <https://docs.getdbt.com/reference/node-selection/graph-operators>`_)
+- ``+/path/to/model_g+`` (graph operators): include/exclude all the nodes in the absolute path ``/path/to/model_g``, their parents and children. Relative paths are also supported.
+- ``+tag:nightly`` (graph operators): include/exclude all nodes that have tag ``nightly`` and their parents.
+- ``+config.materialized:view`` (graph operators): include/exclude all the nodes that have the materialization ``view`` and their parents
 - ``@node_name`` (@ operator): include/exclude the node with name ``node_name``, all its descendants, and all ancestors of those descendants. This is useful in CI environments where you want to build a model and all its descendants, but you need the ancestors of those descendants to exist first.
 - ``tag:my_tag,+node_name`` (intersection): include/exclude ``node_name`` and its parents if they have the tag ``my_tag`` (`dbt set operator docs <https://docs.getdbt.com/reference/node-selection/set-operators>`_)
 - ``['tag:first_tag', 'tag:second_tag']`` (union): include/exclude nodes that have either ``tag:first_tag`` or ``tag:second_tag``

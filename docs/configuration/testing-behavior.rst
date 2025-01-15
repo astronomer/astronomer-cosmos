@@ -125,7 +125,7 @@ As an example, if there is a test that depends on multiple models (``model_a`` a
 While the standard behavior of Cosmos works for many cases, there are a few scenarios when the test fails unless both models
 run. To overcome this issue, starting in Cosmos 1.8.2, we introduced the parameter
 ``should_detach_multiple_parents_tests`` in ``RenderConfig``. By default, it is ``False``. If it is set to ``True`` and
-``TestBehavior` is ``AFTER_EACH`` or ``BUILD``, Cosmos will identify all the test nodes that depend on multiple parents
+``TestBehavior`` is ``AFTER_EACH`` or ``BUILD``, Cosmos will identify all the test nodes that depend on multiple parents
 and will create a standalone test task for each of them.
 
 Cosmos will attempt to name this task after the test's original name. However, since some test names can exceed 250 characters and Airflow does not support IDs longer than this limit, Cosmos will assign names like “detached_0_test,” incrementing the number as needed.

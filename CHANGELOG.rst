@@ -1,6 +1,33 @@
 Changelog
 =========
 
+1.8.2 (2025-01-15)
+--------------------
+
+Bug Fixes
+
+* Fix ``httpx.get`` exception handling while emitting telemetry by @tatiana in #1439
+* Fix (not) rendering detached tests in ``TestBehavior.NONE`` and ``AFTER_ALL`` by @tatiana in #1463
+* Fix detached test tasks names so they do not exceed 250 chars by @tatiana in #1464
+
+Enhancement
+
+* Allow users to opt-in or out (default) of detached test nodes by @tatiana in #1470. Learn more about this `here <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
+
+Docs
+
+* Docs: Fix broken links and rendering by @pankajastro in #1437
+* Update ``operator args`` docs to include ``install_deps`` by @tatiana in #1456
+* Improve Cosmos ``select`` docs to include latest graph operator support by @tatiana in #1467
+
+Others
+
+* Upgrade GitHub action artifacts upload-artifact & download-artifact to v4  by @pankajkoti in #1445
+* Enable Depandabot to scan outdated Github Actions dependencies by @tatiana in #1446
+* Pre-commit hook updates in #1459, #1441
+* Dependabot Github action updates in #1451, #1452, #1453, #1454, #1455
+
+
 1.8.1 (2024-12-30)
 --------------------
 

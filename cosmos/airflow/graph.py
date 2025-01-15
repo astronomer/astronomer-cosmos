@@ -410,16 +410,19 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
     return dag_task_group_identifier
 
 
-def should_create_detached_nodes(test_behavior: TestBehavior) -> bool:
+def should_create_detached_nodes(render_config: RenderConfig) -> bool:
     """
     Decide if we should calculate / insert detached nodes into the graph.
     """
-    return test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH)
+    return render_config.should_detach_multiple_parents_tests and render_config.test_behavior in (
+        TestBehavior.BUILD,
+        TestBehavior.AFTER_EACH,
+    )
 
 
 def identify_detached_nodes(
     nodes: dict[str, DbtNode],
-    test_behavior: TestBehavior,
+    render_config: RenderConfig,
     detached_nodes: dict[str, DbtNode],
     detached_from_parent: dict[str, list[DbtNode]],
 ) -> None:
@@ -430,7 +433,7 @@ def identify_detached_nodes(
     Change in-place the dictionaries detached_nodes (detached node ID : node) and detached_from_parent (parent node ID that
     is upstream to this test and the test node).
     """
-    if should_create_detached_nodes(test_behavior):
+    if should_create_detached_nodes(render_config):
         for node_id, node in nodes.items():
             if is_detached_test(node):
                 detached_nodes[node_id] = node
@@ -504,7 +507,7 @@ def build_airflow_graph(
     # have multiple parents
     detached_nodes: dict[str, DbtNode] = OrderedDict()
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
-    identify_detached_nodes(nodes, test_behavior, detached_nodes, detached_from_parent)
+    identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)

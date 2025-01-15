@@ -172,6 +172,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
     """
     project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(should_detach_multiple_parents_tests=True)
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
@@ -183,7 +184,11 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
     )
     with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
         converter = DbtToAirflowConverter(
-            dag=dag, project_config=project_config, profile_config=profile_config, execution_config=execution_config
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
         )
     tasks = converter.tasks_map
 
@@ -210,13 +215,54 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 
 
 @pytest.mark.integration
+def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detach_multiple_parents_tests_false():
+    """
+    Validate topology of a project that uses the MULTIPLE_PARENTS_TEST_DBT_PROJECT project
+    """
+    project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(should_detach_multiple_parents_tests=False)
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="example_conn",
+            profile_args={"schema": "public"},
+            disable_event_tracking=True,
+        ),
+    )
+    with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
+        converter = DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+    tasks = converter.tasks_map
+
+    assert len(converter.tasks_map) == 3
+
+    # We exclude the test that depends on combined_model and model_a from their commands
+    args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
+    assert args[1:] == ["test", "--models", "combined_model"]
+
+    args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
+    assert args[1:] == ["test", "--models", "model_a"]
+
+    # The test for model_b should not be changed, since it is not a parent of this test
+    args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
+    assert args[1:] == ["test", "--models", "model_b"]
+
+
+@pytest.mark.integration
 def test_converter_creates_dag_with_test_with_multiple_parents_test_afterall():
     """
     Validate topology of a project that uses the MULTIPLE_PARENTS_TEST_DBT_PROJECT project
     """
     project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
-    render_config = RenderConfig(test_behavior=TestBehavior.AFTER_ALL)
+    render_config = RenderConfig(test_behavior=TestBehavior.AFTER_ALL, should_detach_multiple_parents_tests=True)
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
@@ -255,7 +301,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_none():
     """
     project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
-    render_config = RenderConfig(test_behavior=TestBehavior.NONE)
+    render_config = RenderConfig(test_behavior=TestBehavior.NONE, should_detach_multiple_parents_tests=True)
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
@@ -292,6 +338,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     """
     project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(test_behavior=TestBehavior.BUILD, should_detach_multiple_parents_tests=True)
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
@@ -307,7 +354,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
             project_config=project_config,
             profile_config=profile_config,
             execution_config=execution_config,
-            render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+            render_config=render_config,
         )
     tasks = converter.tasks_map
 

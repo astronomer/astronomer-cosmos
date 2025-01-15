@@ -15,7 +15,7 @@ default behavior, which runs all models and tests, and then reports all failures
 Cosmos supports the following test behaviors:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
-- ``build``: run dbt resources using the ``dbt build`` command, using a single task. This applies to dbt models, seeds and snapshots.
+- ``build``: (since Cosmos 1.8) run dbt resources using the ``dbt build`` command, using a single task. This applies to dbt models, seeds and snapshots.
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully
 - ``none``: don't include tests
 
@@ -40,7 +40,7 @@ Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
 .. image:: ../_static/test_behavior_after_all.png
 
 
-Finally, an example DAG and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD``:
+Finally, an example DAG and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD`` (available since Cosmos 1.8):
 
 .. literalinclude::  ../../dev/dags/example_cosmos_dbt_build.py
     :language: python
@@ -111,3 +111,75 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     If warnings that are not associated with tests occur (e.g. freshness warnings), they will still trigger the
     ``on_warning_callback`` method above. However, these warnings will not be included in the ``test_names`` and
     ``test_results`` context variables, which are specific to test-related warnings.
+
+
+Tests with Multiple Parents
+---------------------------
+
+It is common for dbt projects to define tests that rely on multiple upstream models, snapshots or seeds.
+By default, Cosmos will attempt to run these tests using the behavior defined using ``test_behavior`` as previously explained.
+
+As an example, if there is a test that depends on multiple models (``model_a`` and ``combined_model``), and the DAG uses
+``TestBehavior.AFTER_EACH``, Cosmos will attempt to run this test twice after each model run.
+
+While the standard behavior of Cosmos works for many cases, there are a few scenarios when the test fails unless both models
+run. To overcome this issue, starting in Cosmos 1.8.2, we introduced the parameter
+``should_detach_multiple_parents_tests`` in ``RenderConfig``. By default, it is ``False``. If it is set to ``True`` and
+``TestBehavior` is ``AFTER_EACH`` or ``BUILD``, Cosmos will identify all the test nodes that depend on multiple parents
+and will create a standalone test task for each of them.
+
+Cosmos will attempt to name this task after the test original name. Since some test names can be very long (over 250 characters)
+and Airflow does not support IDs longer than 250 characters; Cosmos will name them "detached_0_test", incrementing
+0 as needed.
+
+The DAG `example_tests_multiple_parents <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/example_tests_multiple_parents.py>`_ illustrates this behavior.
+It renders a dbt project named `multiple_parents_test <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags/dbt/multiple_parents_test>`_ that has a test called `custom_test_combined_model <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/dbt/multiple_parents_test/macros/custom_test_combined_model.sql>`_ that depends on two models:
+
+- **combined_model**
+- **model_a**
+
+By default, Cosmos will error:
+
+.. image:: ../_static/test_with_multiple_parents_failure.png
+
+.. code-block::
+
+    [2024-12-27T12:07:33.564+0000] {taskinstance.py:2905} ERROR - Task failed with exception
+    Traceback (most recent call last):
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/venvpy39/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 465, in _execute_task
+        result = _execute_callable(context=context, **execute_callable_kwargs)
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/venvpy39/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 432, in _execute_callable
+        return execute_callable(context=context, **execute_callable_kwargs)
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/venvpy39/lib/python3.9/site-packages/airflow/models/baseoperator.py", line 401, in wrapper
+        return func(self, *args, **kwargs)
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/cosmos/operators/local.py", line 796, in execute
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/cosmos/operators/local.py", line 654, in build_and_run_cmd
+        result = self.run_command(cmd=dbt_cmd, env=env, context=context)
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/cosmos/operators/local.py", line 509, in run_command
+        self.handle_exception(result)
+      File "/Users/tati/Code/cosmos-clean/astronomer-cosmos/cosmos/operators/local.py", line 237, in handle_exception_dbt_runner
+        raise AirflowException(f"dbt invocation completed with errors: {error_message}")
+    airflow.exceptions.AirflowException: dbt invocation completed with errors: custom_test_combined_model_combined_model_: Database Error in test custom_test_combined_model_combined_model_ (models/schema.yml)
+      relation "public.combined_model" does not exist
+      LINE 12:     SELECT id FROM "postgres"."public"."combined_model"
+                                  ^
+      compiled Code at target/run/my_dbt_project/models/schema.yml/custom_test_combined_model_combined_model_.sql
+
+
+However, if users set ``should_detach_multiple_parents_tests=True``, the test will be detached, as illustrated below.
+The test will only run once after both models run, leading the DAG to succeed:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+
+    example_multiple_parents_test = DbtDag(
+        ...,
+        render_config=RenderConfig(
+            should_detach_multiple_parents_tests=True,
+        ),
+    )
+
+.. image:: ../_static/test_with_multiple_parents_success.png

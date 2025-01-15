@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig
+from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -31,4 +31,5 @@ example_multiple_parents_test = DbtDag(
     # normal dag parameters
     start_date=datetime(2023, 1, 1),
     dag_id="example_multiple_parents_test",
+    render_config=RenderConfig(should_detach_multiple_parents_tests=True),
 )

@@ -410,6 +410,13 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
     return dag_task_group_identifier
 
 
+def should_create_detached_nodes(test_behavior: TestBehavior) -> bool:
+    """
+    Decide if we should calculate / insert detached nodes into the graph.
+    """
+    return test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH)
+
+
 def identify_detached_nodes(
     nodes: dict[str, DbtNode],
     test_behavior: TestBehavior,
@@ -423,7 +430,7 @@ def identify_detached_nodes(
     Change in-place the dictionaries detached_nodes (detached node ID : node) and detached_from_parent (parent node ID that
     is upstream to this test and the test node).
     """
-    if test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
+    if should_create_detached_nodes(test_behavior):
         for node_id, node in nodes.items():
             if is_detached_test(node):
                 detached_nodes[node_id] = node
@@ -525,21 +532,6 @@ def build_airflow_graph(
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
-    # Handle detached test nodes
-    for node_id, node in detached_nodes.items():
-        datached_node_name = calculate_detached_node_name(node)
-        test_meta = create_test_task_metadata(
-            datached_node_name,
-            execution_mode,
-            test_indirect_selection,
-            task_args=task_args,
-            on_warning_callback=on_warning_callback,
-            render_config=render_config,
-            node=node,
-        )
-        test_task = create_airflow_task(test_meta, dag, task_group=task_group)
-        tasks_map[node_id] = test_task
-
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
@@ -558,8 +550,9 @@ def build_airflow_graph(
     elif test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():
+            datached_node_name = calculate_detached_node_name(node)
             test_meta = create_test_task_metadata(
-                f"{node.resource_name.split('.')[0]}_test",
+                datached_node_name,
                 execution_mode,
                 test_indirect_selection,
                 task_args=task_args,

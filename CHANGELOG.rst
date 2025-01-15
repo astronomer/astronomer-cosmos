@@ -11,6 +11,7 @@ Bug Fixes
 * Fix detached test tasks names so they do not exceed 250 chars by @tatiana in #1464
 
 Enhancement
+
 * Allow users to opt-in or out (default) of detached test nodes by @tatiana in #1470. Learn more about this `here <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
 
 Docs

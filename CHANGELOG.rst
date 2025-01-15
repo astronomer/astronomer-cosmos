@@ -15,6 +15,7 @@ Enhancement
 * Allow users to opt-in or out (default) of detached test nodes by @tatiana in #1470. Learn more about this `here <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
 
 Docs
+
 * Docs: Fix broken links and rendering by @pankajastro in #1437
 * Update ``operator args`` docs to include ``install_deps`` by @tatiana in #1456
 * Improve Cosmos ``select`` docs to include latest graph operator support by @tatiana in #1467

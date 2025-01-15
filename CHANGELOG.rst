@@ -27,7 +27,6 @@ Others
 * Dependabot Github action updates in #1451, #1452, #1453, #1454, #1455
 
 
-
 1.8.1 (2024-12-30)
 --------------------
 

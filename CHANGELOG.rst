@@ -5,6 +5,7 @@ Changelog
 --------------------
 
 Bug Fixes
+
 * Fix ``httpx.get`` exception handling while emitting telemetry by @tatiana in #1439
 * Fix (not) rendering detached tests in ``TestBehavior.NONE`` and ``AFTER_ALL`` by @tatiana in #1463
 * Fix detached test tasks names so they do not exceed 250 chars by @tatiana in #1464

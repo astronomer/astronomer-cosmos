@@ -128,9 +128,7 @@ run. To overcome this issue, starting in Cosmos 1.8.2, we introduced the paramet
 ``TestBehavior` is ``AFTER_EACH`` or ``BUILD``, Cosmos will identify all the test nodes that depend on multiple parents
 and will create a standalone test task for each of them.
 
-Cosmos will attempt to name this task after the test original name. Since some test names can be very long (over 250 characters)
-and Airflow does not support IDs longer than 250 characters; Cosmos will name them "detached_0_test", incrementing
-0 as needed.
+Cosmos will attempt to name this task after the test's original name. However, since some test names can exceed 250 characters and Airflow does not support IDs longer than this limit, Cosmos will assign names like “detached_0_test,” incrementing the number as needed.
 
 The DAG `example_tests_multiple_parents <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/example_tests_multiple_parents.py>`_ illustrates this behavior.
 It renders a dbt project named `multiple_parents_test <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags/dbt/multiple_parents_test>`_ that has a test called `custom_test_combined_model <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/dbt/multiple_parents_test/macros/custom_test_combined_model.sql>`_ that depends on two models:

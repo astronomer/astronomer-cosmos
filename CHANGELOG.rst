@@ -21,6 +21,7 @@ Docs
 * Improve Cosmos ``select`` docs to include latest graph operator support by @tatiana in #1467
 
 Others
+
 * Upgrade GitHub action artifacts upload-artifact & download-artifact to v4  by @pankajkoti in #1445
 * Enable Depandabot to scan outdated Github Actions dependencies by @tatiana in #1446
 * Pre-commit hook updates in #1459, #1441

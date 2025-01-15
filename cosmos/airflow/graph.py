@@ -431,18 +431,23 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
-def calculate_detached_node_name(node: DbtNode, counter: list[int] = [0]) -> str:
+_counter = 0
+
+
+def calculate_detached_node_name(node: DbtNode) -> str:
     """
     Given a detached test node, calculate its name. It will either be:
      - the name of the test with a "_test" suffix, if this is smaller than 250
      - or detached_{an incremental number}_test
     """
+    # Note: this implementation currently relies on the fact that Airflow creates a new process
+    # to parse each DAG both in the scheduler and also in the worker nodes. We logged a ticket to improved this:
+    # https://github.com/astronomer/astronomer-cosmos/issues/1469
     node_name = f"{node.resource_name.split('.')[0]}_test"
-
     if not len(node_name) < AIRFLOW_MAX_ID_LENGTH:
-        node_name = f"detached_{counter[0]}_test"
-        counter[0] += 1
-
+        global _counter
+        node_name = f"detached_{_counter}_test"
+        _counter += 1
     return node_name
 
 

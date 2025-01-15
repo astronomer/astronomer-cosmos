@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
+from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
@@ -409,6 +410,13 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
     return dag_task_group_identifier
 
 
+def should_create_detached_nodes(test_behavior: TestBehavior) -> bool:
+    """
+    Decide if we should calculate / insert detached nodes into the graph.
+    """
+    return test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH)
+
+
 def identify_detached_nodes(
     nodes: dict[str, DbtNode],
     test_behavior: TestBehavior,
@@ -422,12 +430,32 @@ def identify_detached_nodes(
     Change in-place the dictionaries detached_nodes (detached node ID : node) and detached_from_parent (parent node ID that
     is upstream to this test and the test node).
     """
-    if test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
+    if should_create_detached_nodes(test_behavior):
         for node_id, node in nodes.items():
             if is_detached_test(node):
                 detached_nodes[node_id] = node
                 for parent_id in node.depends_on:
                     detached_from_parent[parent_id].append(node)
+
+
+_counter = 0
+
+
+def calculate_detached_node_name(node: DbtNode) -> str:
+    """
+    Given a detached test node, calculate its name. It will either be:
+     - the name of the test with a "_test" suffix, if this is smaller than 250
+     - or detached_{an incremental number}_test
+    """
+    # Note: this implementation currently relies on the fact that Airflow creates a new process
+    # to parse each DAG both in the scheduler and also in the worker nodes. We logged a ticket to improved this:
+    # https://github.com/astronomer/astronomer-cosmos/issues/1469
+    node_name = f"{node.resource_name.split('.')[0]}_test"
+    if not len(node_name) < AIRFLOW_MAX_ID_LENGTH:
+        global _counter
+        node_name = f"detached_{_counter}_test"
+        _counter += 1
+    return node_name
 
 
 def build_airflow_graph(
@@ -474,7 +502,7 @@ def build_airflow_graph(
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
-    detached_nodes: dict[str, DbtNode] = {}
+    detached_nodes: dict[str, DbtNode] = OrderedDict()
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, test_behavior, detached_nodes, detached_from_parent)
 
@@ -522,8 +550,9 @@ def build_airflow_graph(
     elif test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():
+            datached_node_name = calculate_detached_node_name(node)
             test_meta = create_test_task_metadata(
-                f"{node.resource_name.split('.')[0]}_test",
+                datached_node_name,
                 execution_mode,
                 test_indirect_selection,
                 task_args=task_args,

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
+from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
@@ -409,6 +410,57 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
     return dag_task_group_identifier
 
 
+def should_create_detached_nodes(render_config: RenderConfig) -> bool:
+    """
+    Decide if we should calculate / insert detached nodes into the graph.
+    """
+    return render_config.should_detach_multiple_parents_tests and render_config.test_behavior in (
+        TestBehavior.BUILD,
+        TestBehavior.AFTER_EACH,
+    )
+
+
+def identify_detached_nodes(
+    nodes: dict[str, DbtNode],
+    render_config: RenderConfig,
+    detached_nodes: dict[str, DbtNode],
+    detached_from_parent: dict[str, list[DbtNode]],
+) -> None:
+    """
+    Given the nodes that represent a dbt project and the test_behavior, identify the detached test nodes
+    (test nodes that have multiple dependencies and should run independently).
+
+    Change in-place the dictionaries detached_nodes (detached node ID : node) and detached_from_parent (parent node ID that
+    is upstream to this test and the test node).
+    """
+    if should_create_detached_nodes(render_config):
+        for node_id, node in nodes.items():
+            if is_detached_test(node):
+                detached_nodes[node_id] = node
+                for parent_id in node.depends_on:
+                    detached_from_parent[parent_id].append(node)
+
+
+_counter = 0
+
+
+def calculate_detached_node_name(node: DbtNode) -> str:
+    """
+    Given a detached test node, calculate its name. It will either be:
+     - the name of the test with a "_test" suffix, if this is smaller than 250
+     - or detached_{an incremental number}_test
+    """
+    # Note: this implementation currently relies on the fact that Airflow creates a new process
+    # to parse each DAG both in the scheduler and also in the worker nodes. We logged a ticket to improved this:
+    # https://github.com/astronomer/astronomer-cosmos/issues/1469
+    node_name = f"{node.resource_name.split('.')[0]}_test"
+    if not len(node_name) < AIRFLOW_MAX_ID_LENGTH:
+        global _counter
+        node_name = f"detached_{_counter}_test"
+        _counter += 1
+    return node_name
+
+
 def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
@@ -453,13 +505,9 @@ def build_airflow_graph(
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
-    detached_from_parent = defaultdict(list)
-    detached_nodes = {}
-    for node_id, node in nodes.items():
-        if is_detached_test(node):
-            detached_nodes[node_id] = node
-            for parent_id in node.depends_on:
-                detached_from_parent[parent_id].append(node)
+    detached_nodes: dict[str, DbtNode] = OrderedDict()
+    detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
+    identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
@@ -487,20 +535,6 @@ def build_airflow_graph(
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
-    # Handle detached test nodes
-    for node_id, node in detached_nodes.items():
-        test_meta = create_test_task_metadata(
-            f"{node.resource_name.split('.')[0]}_test",
-            execution_mode,
-            test_indirect_selection,
-            task_args=task_args,
-            on_warning_callback=on_warning_callback,
-            render_config=render_config,
-            node=node,
-        )
-        test_task = create_airflow_task(test_meta, dag, task_group=task_group)
-        tasks_map[node_id] = test_task
-
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
@@ -516,6 +550,21 @@ def build_airflow_graph(
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
+    elif test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
+        # Handle detached test nodes
+        for node_id, node in detached_nodes.items():
+            datached_node_name = calculate_detached_node_name(node)
+            test_meta = create_test_task_metadata(
+                datached_node_name,
+                execution_mode,
+                test_indirect_selection,
+                task_args=task_args,
+                on_warning_callback=on_warning_callback,
+                render_config=render_config,
+                node=node,
+            )
+            test_task = create_airflow_task(test_meta, dag, task_group=task_group)
+            tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
     _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)

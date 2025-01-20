@@ -166,7 +166,6 @@ class GraphSelector:
         """
         selected_nodes: set[str] = set()
         root_nodes: set[str] = set()
-
         # Index nodes by name, we can improve performance by doing this once
         # for multiple GraphSelectors
         if PATH_SELECTOR in self.node_name:
@@ -367,13 +366,16 @@ class NodeSelector:
         selected_nodes: set[str] = set()
         self.visited_nodes: set[str] = set()
 
-        for node_id, node in self.nodes.items():
-            if self._should_include_node(node_id, node):
-                selected_nodes.add(node_id)
-
         if self.config.graph_selectors:
-            nodes_by_graph_selector = self.select_by_graph_operator()
-            selected_nodes = selected_nodes.intersection(nodes_by_graph_selector)
+            graph_selected_nodes = self.select_by_graph_operator()
+            for node_id in graph_selected_nodes:
+                node = self.nodes[node_id]
+                if self._should_include_node(node_id, node):
+                    selected_nodes.add(node_id)
+        else:
+            for node_id, node in self.nodes.items():
+                if self._should_include_node(node_id, node):
+                    selected_nodes.add(node_id)
 
         self.selected_nodes = selected_nodes
         return selected_nodes

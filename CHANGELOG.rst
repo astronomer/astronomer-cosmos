@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.9.0a1 (2025-01-20)
+--------------------
+
+Bug Fixes
+
+* Fix select complex intersection of three tag-based graph selectors by @tatiana in #1466
+
+
 1.8.2 (2025-01-15)
 --------------------
 

@@ -243,6 +243,35 @@ def test_select_nodes_by_tag_ancestry():
     assert selected == expected
 
 
+def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
+    parent_sibling_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent_sibling",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
+        file_path="",
+        tags=["is_adopted"],
+        config={"materialized": "view", "tags": ["is_adopted"]},
+    )
+    test_node = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[parent_node.unique_id, parent_sibling_node.unique_id],
+        file_path="",
+        config={},
+    )
+    new_sample_nodes = dict(sample_nodes)
+    new_sample_nodes[parent_sibling_node.unique_id] = parent_sibling_node
+    new_sample_nodes[test_node.unique_id] = test_node
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=new_sample_nodes, select=["+tag:has_child"])
+    # Expected must not include `parent_sibling_node` nor `test_node`
+    expected = {
+        parent_node.unique_id: parent_node,
+        grandparent_node.unique_id: grandparent_node,
+        another_grandparent_node.unique_id: another_grandparent_node,
+    }
+    assert selected == expected
+
+
 def test_select_nodes_by_select_path():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models"])
     expected = {

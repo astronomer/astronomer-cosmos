@@ -166,7 +166,6 @@ class GraphSelector:
         """
         selected_nodes: set[str] = set()
         root_nodes: set[str] = set()
-
         # Index nodes by name, we can improve performance by doing this once
         # for multiple GraphSelectors
         if PATH_SELECTOR in self.node_name:
@@ -367,25 +366,36 @@ class NodeSelector:
         selected_nodes: set[str] = set()
         self.visited_nodes: set[str] = set()
 
-        for node_id, node in self.nodes.items():
-            if self._should_include_node(node_id, node):
-                selected_nodes.add(node_id)
-
         if self.config.graph_selectors:
-            nodes_by_graph_selector = self.select_by_graph_operator()
-            selected_nodes = selected_nodes.intersection(nodes_by_graph_selector)
+            graph_selected_nodes = self.select_by_graph_operator()
+            for node_id in graph_selected_nodes:
+                node = self.nodes[node_id]
+                # Since the method below changes the tags of test nodes, it can lead to incorrect
+                # results during the application of graph selectors. Therefore, it is being run within
+                # nodes previously selected
+                # This solves https://github.com/astronomer/astronomer-cosmos/pull/1466
+                if self._should_include_node(node_id, node):
+                    selected_nodes.add(node_id)
+        else:
+            for node_id, node in self.nodes.items():
+                if self._should_include_node(node_id, node):
+                    selected_nodes.add(node_id)
 
         self.selected_nodes = selected_nodes
         return selected_nodes
 
     def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
-        """Checks if a single node should be included. Only runs once per node with caching."""
+        """
+        Checks if a single node should be included. Only runs once per node with caching."""
         logger.debug("Inspecting if the node <%s> should be included.", node_id)
         if node_id in self.visited_nodes:
             return node_id in self.selected_nodes
 
         self.visited_nodes.add(node_id)
 
+        # Disclaimer: this method currently copies the tags from parent nodes to children nodes
+        # that are tests. This can lead to incorrect results in graph node selectors such as reported in
+        # https://github.com/astronomer/astronomer-cosmos/pull/1466
         if node.resource_type == DbtResourceType.TEST and node.depends_on and len(node.depends_on) > 0:
             node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
             logger.debug(
@@ -498,7 +508,6 @@ def select_nodes(
     exclude = exclude or []
     if not select and not exclude:
         return nodes
-
     validate_filters(exclude, select)
     subset_ids = apply_select_filter(nodes, project_dir, select)
     if select:

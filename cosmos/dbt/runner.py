@@ -26,8 +26,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
 
-# TODO: Change operators/local.py invoke_dbt to use this
-# TODO: Change operators/local.py _discover_invocation_mode to use this
 @cache
 def is_available() -> bool:
     """
@@ -40,7 +38,6 @@ def is_available() -> bool:
     return True
 
 
-# TODO: Change operators/local.py to use this in run_dbt_runner
 @cache
 def get_runner() -> dbtRunner:
     """
@@ -51,7 +48,6 @@ def get_runner() -> dbtRunner:
     return dbtRunner()
 
 
-# TODO: Change operators/local.py run_dbt_runner to use this
 def run_command(command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
     """
     Invokes the dbt command programmatically.
@@ -65,7 +61,6 @@ def run_command(command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerR
     return result
 
 
-# TODO: check any occurrences of extract_dbt_runner_issues and move it out from cosmos/dbt/parser/output.py
 def extract_message_by_status(
     result: dbtRunnerResult, status_levels: list[str] = ["warn"]
 ) -> tuple[list[str], list[str]]:
@@ -91,7 +86,6 @@ def extract_message_by_status(
     return node_names, node_results
 
 
-# TODO: check any occurrences of parse_number_of_warnings_dbt_runner and move it out from cosmos/dbt/parser/output.py
 def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
@@ -103,7 +97,6 @@ def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     return num
 
 
-# TODO: Change operators/local.py handle_exception_dbt_runner to use this
 def handle_exception_if_needed(result: dbtRunnerResult) -> None:
     """
     Given a dbtRunnerResult, identify if it failed and handle the exception, if necessary.

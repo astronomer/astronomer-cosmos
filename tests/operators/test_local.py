@@ -17,15 +17,15 @@ from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
 
+import cosmos.dbt.runner as dbt_runner
 from cosmos import cache
 from cosmos.config import ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
-    extract_dbt_runner_issues,
     parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.exceptions import CosmosValueError
+from cosmos.exceptions import CosmosValueError, CosmosDbtRunError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -290,24 +290,6 @@ def test_dbt_base_operator_run_dbt_runner(mock_chdir, mock_environ):
     assert mock_environ.update.call_args[0][0] == env_vars
 
 
-@patch("cosmos.dbt.project.os.chdir")
-def test_dbt_base_operator_run_dbt_runner_is_cached(mock_chdir):
-    """Tests that if run_dbt_runner is called multiple times a cached runner is used."""
-    dbt_base_operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="my-task",
-        project_dir="my/dir",
-        invocation_mode=InvocationMode.DBT_RUNNER,
-    )
-    mock_dbt = MagicMock()
-    with patch.dict(sys.modules, {"dbt.cli.main": mock_dbt}):
-        for _ in range(3):
-            dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")
-    mock_dbt_runner = mock_dbt.dbtRunner
-    assert mock_dbt_runner.call_count == 1
-    assert dbt_base_operator._dbt_runner is not None
-
-
 @pytest.mark.parametrize(
     ["skip_exception", "exception_code_returned", "expected_exception"],
     [
@@ -349,11 +331,11 @@ def test_dbt_base_operator_handle_exception_dbt_runner_unhandled_error():
     result.exception = "some exception"
     expected_error_message = "dbt invocation did not complete with unhandled error: some exception"
 
-    with pytest.raises(AirflowException, match=expected_error_message):
+    with pytest.raises(CosmosDbtRunError, match=expected_error_message):
         operator.handle_exception_dbt_runner(result)
 
 
-@patch("cosmos.operators.local.extract_dbt_runner_issues", return_value=(["node1", "node2"], ["error1", "error2"]))
+@patch("cosmos.dbt.runner.extract_message_by_status", return_value=(["node1", "node2"], ["error1", "error2"]))
 def test_dbt_base_operator_handle_exception_dbt_runner_handled_error(mock_extract_dbt_runner_issues):
     """Tests that an AirflowException is raised if the dbtRunner result is not successful and with handled errors."""
     operator = ConcreteDbtLocalBaseOperator(
@@ -367,7 +349,7 @@ def test_dbt_base_operator_handle_exception_dbt_runner_handled_error(mock_extrac
 
     expected_error_message = "dbt invocation completed with errors: node1: error1\nnode2: error2"
 
-    with pytest.raises(AirflowException, match=expected_error_message):
+    with pytest.raises(CosmosDbtRunError, match=expected_error_message):
         operator.handle_exception_dbt_runner(result)
 
     mock_extract_dbt_runner_issues.assert_called_once()
@@ -424,8 +406,8 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
         project_dir="my/dir",
     )
     operator._set_test_result_parsing_methods()
-    assert operator.extract_issues == extract_dbt_runner_issues
-    assert operator.parse_number_of_warnings == parse_number_of_warnings_dbt_runner
+    assert operator.extract_issues == dbt_runner.extract_message_by_status
+    assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
 @pytest.mark.skipif(
@@ -1162,8 +1144,8 @@ def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
 @pytest.mark.parametrize(
     "invocation_mode, expected_extract_function",
     [
-        (InvocationMode.SUBPROCESS, "extract_freshness_warn_msg"),
-        (InvocationMode.DBT_RUNNER, "extract_dbt_runner_issues"),
+        (InvocationMode.SUBPROCESS, "cosmos.operators.local.extract_freshness_warn_msg"),
+        (InvocationMode.DBT_RUNNER, "cosmos.dbt.runner.extract_message_by_status"),
     ],
 )
 def test_handle_warnings(invocation_mode, expected_extract_function, mock_context):
@@ -1177,7 +1159,7 @@ def test_handle_warnings(invocation_mode, expected_extract_function, mock_contex
         invocation_mode=invocation_mode,
     )
 
-    with patch(f"cosmos.operators.local.{expected_extract_function}") as mock_extract_issues, patch.object(
+    with patch(expected_extract_function) as mock_extract_issues, patch.object(
         instance, "on_warning_callback"
     ) as mock_on_warning_callback:
         mock_extract_issues.return_value = (["test_name1", "test_name2"], ["test_name1", "test_name2"])

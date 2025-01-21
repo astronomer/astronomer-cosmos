@@ -51,15 +51,14 @@ if TYPE_CHECKING:
 
 from sqlalchemy.orm import Session
 
+import cosmos.dbt.runner as dbt_runner
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
-    extract_dbt_runner_issues,
     extract_freshness_warn_msg,
     extract_log_issues,
-    parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
 from cosmos.dbt.project import change_working_directory, create_symlinks, environ
@@ -210,14 +209,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         be used since it is faster than subprocess. If dbtRunner is not available, it will fall back to subprocess.
         This method is called at runtime to work in the environment where the operator is running.
         """
-        try:
-            from dbt.cli.main import dbtRunner  # noqa
-        except ImportError:
-            self.invocation_mode = InvocationMode.SUBPROCESS
-            self.log.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
-        else:
+        if dbt_runner.is_available():
             self.invocation_mode = InvocationMode.DBT_RUNNER
             self.log.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
+        else:
+            self.invocation_mode = InvocationMode.SUBPROCESS
+            self.log.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
 
     def handle_exception_subprocess(self, result: FullOutputSubprocessResult) -> None:
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
@@ -228,13 +225,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
-        if not result.success:
-            if result.exception:
-                raise AirflowException(f"dbt invocation did not complete with unhandled error: {result.exception}")
-            else:
-                node_names, node_results = extract_dbt_runner_issues(result, ["error", "fail", "runtime error"])
-                error_message = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
-                raise AirflowException(f"dbt invocation completed with errors: {error_message}")
+        return dbt_runner.handle_exception_if_needed(result)
 
     @provide_session
     def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
@@ -393,24 +384,12 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
-        try:
-            from dbt.cli.main import dbtRunner
-        except ImportError:
+        if not dbt_runner.is_available():
             raise ImportError(
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        if self._dbt_runner is None:
-            self._dbt_runner = dbtRunner()
-
-        # Exclude the dbt executable path from the command
-        cli_args = command[1:]
-        self.log.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
-
-        with change_working_directory(cwd), environ(env):
-            result = self._dbt_runner.invoke(cli_args)
-
-        return result
+        return dbt_runner.run_command(command, env, cwd)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
@@ -723,7 +702,7 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             self.extract_issues = extract_freshness_warn_msg
         elif self.invocation_mode == InvocationMode.DBT_RUNNER:
-            self.extract_issues = extract_dbt_runner_issues
+            self.extract_issues = dbt_runner.extract_message_by_status
 
         test_names, test_results = self.extract_issues(result)
 
@@ -789,8 +768,8 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
             self.extract_issues = lambda result: extract_log_issues(result.full_output)
             self.parse_number_of_warnings = parse_number_of_warnings_subprocess
         elif self.invocation_mode == InvocationMode.DBT_RUNNER:
-            self.extract_issues = extract_dbt_runner_issues
-            self.parse_number_of_warnings = parse_number_of_warnings_dbt_runner
+            self.extract_issues = dbt_runner.extract_message_by_status
+            self.parse_number_of_warnings = dbt_runner.parse_number_of_warnings
 
     def execute(self, context: Context) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
@@ -1051,3 +1030,4 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+

@@ -464,6 +464,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 full_cmd = cmd + flags
 
+                self.log.debug("Using environment variables keys: %s", env.keys())
                 if return_sql and sql_context:
                     profile_type = sql_context["profile_type"]
                     mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP.get(profile_type)

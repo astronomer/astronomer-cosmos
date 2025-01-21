@@ -67,6 +67,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.log import get_logger
+from cosmos.mocked_dbt_adapters import PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
@@ -398,12 +399,21 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             if latest_package_lockfile:
                 _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
 
+    def _read_run_sql_from_target_dir(self, tmp_project_dir: str, sql_context: dict[str, Any]) -> str:
+        sql_relative_path = sql_context["dbt_node_config"]["file_path"].split(str(self.project_dir))[-1].lstrip("/")
+        run_sql_path = Path(tmp_project_dir) / "target/run" / Path(self.project_dir).name / sql_relative_path
+        with run_sql_path.open("r") as sql_file:
+            sql_content: str = sql_file.read()
+        return sql_content
+
     def run_command(
         self,
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
-    ) -> FullOutputSubprocessResult | dbtRunnerResult:
+        return_sql: bool = False,
+        sql_context: dict[str, Any] | None = None,
+    ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
@@ -454,8 +464,16 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
                 full_cmd = cmd + flags
 
-                self.log.debug("Using environment variables keys: %s", env.keys())
+                if return_sql and sql_context:
+                    profile_type = sql_context["profile_type"]
+                    mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP.get(profile_type)
+                    if not mock_adapter_callable:
+                        raise CosmosValueError(
+                            f"Mock adapter callable function not available for profile_type {profile_type}"
+                        )
+                    mock_adapter_callable()
 
+                self.log.debug("Using environment variables keys: %s", env.keys())
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
@@ -486,6 +504,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     self.callback_args.update({"context": context})
                     self.callback(tmp_project_dir, **self.callback_args)
                 self.handle_exception(result)
+
+                if return_sql and sql_context:
+                    sql_content = self._read_run_sql_from_target_dir(tmp_project_dir, sql_context)
+                    return sql_content
 
                 return result
 
@@ -626,11 +648,15 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         )
 
     def build_and_run_cmd(
-        self, context: Context, cmd_flags: list[str] | None = None
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        return_sql: bool = False,
+        sql_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
-        result = self.run_command(cmd=dbt_cmd, env=env, context=context)
+        result = self.run_command(cmd=dbt_cmd, env=env, context=context, return_sql=return_sql, sql_context=sql_context)
         return result
 
     def on_kill(self) -> None:

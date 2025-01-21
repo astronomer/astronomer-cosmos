@@ -174,8 +174,6 @@ class GraphSelector:
 
         elif TAG_SELECTOR in self.node_name:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
-            # The following normally wuld return 20
-            # now it is returning 210
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
 
         elif CONFIG_SELECTOR in self.node_name:

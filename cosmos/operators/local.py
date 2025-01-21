@@ -473,7 +473,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                         )
                     mock_adapter_callable()
 
-                self.log.debug("Using environment variables keys: %s", env.keys())
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,

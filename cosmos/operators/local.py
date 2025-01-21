@@ -61,7 +61,7 @@ from cosmos.dbt.parser.output import (
     extract_log_issues,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.dbt.project import change_working_directory, create_symlinks, environ
+from cosmos.dbt.project import create_symlinks
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
@@ -1030,4 +1030,3 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-

@@ -22,10 +22,9 @@ from cosmos import cache
 from cosmos.config import ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
-    parse_number_of_warnings_dbt_runner,
     parse_number_of_warnings_subprocess,
 )
-from cosmos.exceptions import CosmosValueError, CosmosDbtRunError
+from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
     DbtBuildLocalOperator,

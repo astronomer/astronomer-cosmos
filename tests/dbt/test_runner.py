@@ -107,4 +107,3 @@ def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
     expected2 = "stg_payments: Database Error in model stg_payments"
     assert expected1 in err_msg
     assert expected2 in err_msg
-

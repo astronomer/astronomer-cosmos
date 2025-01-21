@@ -116,4 +116,3 @@ def handle_exception_if_needed(result: dbtRunnerResult) -> None:
             node_names, node_results = extract_message_by_status(result, ["error", "fail", "runtime error"])
             error_message = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
             raise CosmosDbtRunError(f"dbt invocation completed with errors: {error_message}")
-

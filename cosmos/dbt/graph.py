@@ -198,6 +198,7 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path, env_vars: dic
         if response.exception:
             raise CosmosLoadDbtException(response.exception)
         elif response.result:
+            # TODO: check if the following works as expected
             stdout = "\n".join(response.result)
             node_names, node_results = dbt_runner.extract_message_by_status(response, ["err"])
             err_msgs = [f"Error processing node {node}: {msg}" for node, msg in zip(node_names, node_results)]

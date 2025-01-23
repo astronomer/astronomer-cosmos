@@ -22,6 +22,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
         async_args: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
+        if async_args is None:
+            async_args = {}
         self.project_dir = project_dir
         self.profile_config = profile_config
         self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore

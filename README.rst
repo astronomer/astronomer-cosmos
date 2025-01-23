@@ -51,7 +51,7 @@ This will generate an Airflow DAG that looks like this:
 
 Community
 _________
-- Join us on the Airflow `Slack <https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q>`_ at #airflow-dbt
+- Join us on the Airflow `Slack <https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q>`_ at #dbt-deployment-and-orchestration
 
 
 Changelog

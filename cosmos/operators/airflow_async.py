@@ -27,7 +27,8 @@ from airflow.models.baseoperator import BaseOperator
 
 class DbtBaseAirflowAsyncOperator(BaseOperator, metaclass=ABCMeta):
     def __init__(self, **kwargs) -> None:  # type: ignore
-        kwargs.pop("async_args")
+        if "async_args" in kwargs:
+            kwargs.pop("async_args")
         super().__init__(**kwargs)
 
 

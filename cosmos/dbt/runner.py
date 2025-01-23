@@ -52,7 +52,9 @@ def run_command(command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerR
     """
     Invokes the dbt command programmatically.
     """
-    # Exclude the dbt executable path from the command
+    # Exclude the dbt executable path from the command. This step is necessary because we are using the same
+    # command that is used by `InvocationMode.SUBPROCESS`, and in that scenario the first command is necessarily the path
+    # to the dbt executable.
     cli_args = command[1:]
     with change_working_directory(cwd), environ(env):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)

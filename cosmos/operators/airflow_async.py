@@ -57,11 +57,7 @@ class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalO
 
 class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator, DbtRunLocalOperator):  # type: ignore
 
-    template_fields: Sequence[str] = (
-        "full_refresh",
-        "project_dir",
-        "location",
-    )
+    template_fields: Sequence[str] = DbtRunLocalOperator.template_fields + ("full_refresh", "project_dir", "location")  # type: ignore[operator]
 
     def __init__(  # type: ignore
         self,
@@ -98,18 +94,12 @@ class DbtRunAirflowAsyncOperator(BigQueryInsertJobOperator, DbtRunLocalOperator)
             deferrable=True,
             **kwargs,
         )
-        self.extra_context = extra_context or {}
-        self.extra_context["profile_type"] = self.profile_type
+        self.async_context = extra_context or {}
+        self.async_context["profile_type"] = self.profile_type
+        self.async_context["async_operator"] = BigQueryInsertJobOperator
 
     def execute(self, context: Context) -> Any | None:
-        sql = self.build_and_run_cmd(context, return_sql=True, sql_context=self.extra_context)
-        self.configuration = {
-            "query": {
-                "query": sql,
-                "useLegacySql": False,
-            }
-        }
-        return super().execute(context)
+        return self.build_and_run_cmd(context, run_as_async=True, async_context=self.async_context)
 
 
 class DbtTestAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtTestLocalOperator):  # type: ignore

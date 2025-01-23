@@ -258,7 +258,13 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         return dbt_cmd, env
 
     @abstractmethod
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str]) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str],
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
     def execute(self, context: Context) -> Any | None:  # type: ignore

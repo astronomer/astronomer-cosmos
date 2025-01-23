@@ -67,7 +67,7 @@ from cosmos.hooks.subprocess import (
     FullOutputSubprocessResult,
 )
 from cosmos.log import get_logger
-from cosmos.mocked_dbt_adapters import PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP
+from cosmos.mocked_dbt_adapters import PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP, PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP
 from cosmos.operators.base import (
     AbstractDbtBaseOperator,
     DbtBuildMixin,
@@ -411,8 +411,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
-        return_sql: bool = False,
-        sql_context: dict[str, Any] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -465,8 +465,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 full_cmd = cmd + flags
 
                 self.log.debug("Using environment variables keys: %s", env.keys())
-                if return_sql and sql_context:
-                    profile_type = sql_context["profile_type"]
+                if run_as_async:
+                    if not async_context:
+                        raise CosmosValueError("async_context is necessary for running the model asynchronously.")
+                    profile_type = async_context["profile_type"]
                     mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP.get(profile_type)
                     if not mock_adapter_callable:
                         raise CosmosValueError(
@@ -505,9 +507,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     self.callback(tmp_project_dir, **self.callback_args)
                 self.handle_exception(result)
 
-                if return_sql and sql_context:
-                    sql_content = self._read_run_sql_from_target_dir(tmp_project_dir, sql_context)
-                    return sql_content
+                if run_as_async and async_context:
+                    sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
+                    PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP[profile_type](self, sql=sql)
+                    async_context["async_operator"].execute(self, context)
 
                 return result
 
@@ -651,12 +654,14 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-        return_sql: bool = False,
-        sql_context: dict[str, Any] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
-        result = self.run_command(cmd=dbt_cmd, env=env, context=context, return_sql=return_sql, sql_context=sql_context)
+        result = self.run_command(
+            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context
+        )
         return result
 
     def on_kill(self) -> None:

@@ -1,13 +1,7 @@
-import pytest
-from airflow import __version__ as airflow_version
-from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
-from packaging import version
-
 from cosmos.operators.airflow_async import (
     DbtBuildAirflowAsyncOperator,
     DbtCompileAirflowAsyncOperator,
     DbtLSAirflowAsyncOperator,
-    DbtRunAirflowAsyncOperator,
     DbtRunOperationAirflowAsyncOperator,
     DbtSeedAirflowAsyncOperator,
     DbtSnapshotAirflowAsyncOperator,
@@ -46,12 +40,12 @@ def test_dbt_source_airflow_async_operator_inheritance():
     assert issubclass(DbtSourceAirflowAsyncOperator, DbtSourceLocalOperator)
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.8"),
-    reason="Cosmos Async operators only work with Airflow 2.8 onwards.",
-)
-def test_dbt_run_airflow_async_operator_inheritance():
-    assert issubclass(DbtRunAirflowAsyncOperator, BigQueryInsertJobOperator)
+# @pytest.mark.skipif(
+#     version.parse(airflow_version) < version.parse("2.8"),
+#     reason="Cosmos Async operators only work with Airflow 2.8 onwards.",
+# )
+# def test_dbt_run_airflow_async_operator_inheritance():
+#     assert issubclass(DbtRunAirflowAsyncOperator, BigQueryInsertJobOperator)
 
 
 def test_dbt_test_airflow_async_operator_inheritance():

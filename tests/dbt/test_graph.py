@@ -1104,6 +1104,7 @@ def test_load_via_dbt_ls_file():
     ],
 )
 @patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_run_command(mock_popen, stdout, returncode):
     fake_command = ["fake", "command"]
     fake_dir = Path("fake_dir")
@@ -1122,6 +1123,7 @@ def test_run_command(mock_popen, stdout, returncode):
 
 
 @patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_run_command_none_argument(mock_popen, caplog):
     fake_command = ["invalid-cmd", None]
     fake_dir = Path("fake_dir")
@@ -1232,6 +1234,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_project_config_env_vars(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
@@ -1267,6 +1270,7 @@ def test_load_via_dbt_ls_project_config_env_vars(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_profile_created_correctly_with_profile_mapping(
     mock_validate,
     mock_update_nodes,
@@ -1300,6 +1304,7 @@ def test_profile_created_correctly_with_profile_mapping(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_project_config_dbt_vars(
     mock_validate, mock_update_nodes, mock_popen, mock_use_case, tmp_dbt_project_dir
 ):
@@ -1334,6 +1339,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
@@ -1370,6 +1376,7 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_render_config_no_partial_parse(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):

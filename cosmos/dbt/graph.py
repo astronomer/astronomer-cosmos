@@ -159,7 +159,7 @@ def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
     return False
 
 
-def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path) -> str:
+def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
     process = Popen(
         command,
@@ -184,7 +184,7 @@ def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dic
     return stdout
 
 
-def run_command_with_dbt_runner(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path) -> str:
+def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_vars: dict[str, str]) -> str:
     """Run a command with dbtRunner, returning the stdout."""
     response = dbt_runner.run_command(command=command, env=env_vars, cwd=str(tmp_dir))
 
@@ -215,7 +215,7 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path, env_vars: dic
     return stdout
 
 
-def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path) -> str:
+def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path | None = None) -> str:
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
     runner = "dbt Runner" if dbt_runner.is_available() else "Python subprocess"
@@ -224,18 +224,19 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log
     logger.debug("Environment variable keys: %s", env_vars.keys())
 
     if dbt_runner.is_available():
-        stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars, log_dir)
+        stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
     else:
-        stdout = run_command_with_subprocess(command, tmp_dir, env_vars, log_dir)
+        stdout = run_command_with_subprocess(command, tmp_dir, env_vars)
 
     logger.debug("dbt ls output: %s", stdout)
 
-    log_filepath = log_dir / DBT_LOG_FILENAME
-    logger.debug("dbt logs available in: %s", log_filepath)
-    if log_filepath.exists():
-        with open(log_filepath) as logfile:
-            for line in logfile:
-                logger.debug(line.strip())
+    if log_dir is not None:
+        log_filepath = log_dir / DBT_LOG_FILENAME
+        logger.debug("dbt logs available in: %s", log_filepath)
+        if log_filepath.exists():
+            with open(log_filepath) as logfile:
+                for line in logfile:
+                    logger.debug(line.strip())
 
     return stdout
 
@@ -642,10 +643,11 @@ class DbtGraph:
                     self.profile_config.target_name,
                 ]
 
-                self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
+
+                self.log_dir: Path = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     if is_cache_package_lockfile_enabled(project_path):

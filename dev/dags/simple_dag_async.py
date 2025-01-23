@@ -37,6 +37,6 @@ simple_dag_async = DbtDag(
     catchup=False,
     dag_id="simple_dag_async",
     tags=["simple"],
-    operator_args={"full_refresh": True, "location": "northamerica-northeast1"},
+    operator_args={"async_args": {"full_refresh": True, "location": "northamerica-northeast1"}},
 )
 # [END airflow_async_execution_mode_example]

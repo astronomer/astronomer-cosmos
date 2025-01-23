@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from typing import Any
+from typing import Any, Sequence
 
 from airflow.utils.context import Context
 
@@ -9,6 +9,9 @@ from cosmos.operators.local import DbtRunLocalOperator
 
 
 class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):  # type: ignore[misc]
+
+    template_fields: Sequence[str] = ("project_dir",)
+
     def __init__(self, project_dir: str, profile_config: ProfileConfig, **kwargs: Any):
         self.project_dir = project_dir
         self.profile_config = profile_config

@@ -54,14 +54,6 @@ class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalO
 
 class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ignore
 
-    # template_fields: Sequence[str] = (
-    #     "full_refresh",
-    #     "project_dir",
-    #     "gcp_project",
-    #     "dataset",
-    #     "location",
-    # )
-
     def __init__(  # type: ignore
         self,
         project_dir: str,

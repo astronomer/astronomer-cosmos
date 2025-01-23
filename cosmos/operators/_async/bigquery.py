@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence
 
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -14,6 +14,14 @@ from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ignore[misc]
+
+    template_fields: Sequence[str] = (
+        "full_refresh",
+        "gcp_project",
+        "dataset",
+        "location",
+    )
+
     def __init__(
         self,
         project_dir: str,

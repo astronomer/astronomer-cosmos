@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
+import cosmos.dbt.runner as dbt_runner
 from cosmos import cache, settings
 from cosmos.cache import (
     _configure_remote_cache_dir,
@@ -158,11 +159,8 @@ def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
     return False
 
 
-def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
+def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path) -> str:
     """Run a command in a subprocess, returning the stdout."""
-    command = [str(arg) if arg is not None else "<None>" for arg in command]
-    logger.info("Running command: `%s`", " ".join(command))
-    logger.debug("Environment variable keys: %s", env_vars.keys())
     process = Popen(
         command,
         stdout=PIPE,
@@ -182,6 +180,61 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
     if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
         details = f"stderr: {stderr}\nstdout: {stdout}"
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
+
+    return stdout
+
+
+def run_command_with_dbt_runner(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path) -> str:
+    """Run a command with dbtRunner, returning the stdout."""
+    response = dbt_runner.run_command(command=command, env=env_vars, cwd=str(tmp_dir))
+
+    stdout = ""
+    stderr = ""
+    if response.success:
+        if response.result:
+            stdout = "\n ".join(response.result)
+    else:
+        stdout = "Unable to run dbtRunner"
+        if response.exception:
+            raise CosmosLoadDbtException(response.exception)
+        elif response.result:
+            stdout = "\n".join(response.result)
+            node_names, node_results = dbt_runner.extract_message_by_status(response, ["err"])
+            err_msgs = [f"Error processing node {node}: {msg}" for node, msg in zip(node_names, node_results)]
+            stderr = "\n".join(err_msgs)
+
+    if 'Run "dbt deps" to install package dependencies' in stdout and command[1] == "ls":
+        raise CosmosLoadDbtException(
+            "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
+        )
+    elif stderr:
+        details = f"stderr: {stderr}\nstdout: {stdout}"
+        raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
+
+    return stdout
+
+
+def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path) -> str:
+    """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
+
+    runner = "dbt Runner" if dbt_runner.is_available() else "Python subprocess"
+    command = [str(arg) if arg is not None else "<None>" for arg in command]
+    logger.info("Running command with %s: `%s`", runner, " ".join(command))
+    logger.debug("Environment variable keys: %s", env_vars.keys())
+
+    if dbt_runner.is_available():
+        stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars, log_dir)
+    else:
+        stdout = run_command_with_subprocess(command, tmp_dir, env_vars, log_dir)
+
+    logger.debug("dbt ls output: %s", stdout)
+
+    log_filepath = log_dir / DBT_LOG_FILENAME
+    logger.debug("dbt logs available in: %s", log_filepath)
+    if log_filepath.exists():
+        with open(log_filepath) as logfile:
+            for line in logfile:
+                logger.debug(line.strip())
 
     return stdout
 
@@ -471,15 +524,7 @@ class DbtGraph:
         ls_command.extend(self.local_flags)
         ls_command.extend(ls_args)
 
-        stdout = run_command(ls_command, tmp_dir, env_vars)
-
-        logger.debug("dbt ls output: %s", stdout)
-        log_filepath = self.log_dir / DBT_LOG_FILENAME
-        logger.debug("dbt logs available in: %s", log_filepath)
-        if log_filepath.exists():
-            with open(log_filepath) as logfile:
-                for line in logfile:
-                    logger.debug(line.strip())
+        stdout = run_command(ls_command, tmp_dir, env_vars, self.log_dir)
 
         if self.should_use_dbt_ls_cache():
             self.save_dbt_ls_cache(stdout)
@@ -540,8 +585,7 @@ class DbtGraph:
         deps_command = [dbt_cmd, "deps"]
         deps_command.extend(self.local_flags)
         self._add_vars_arg(deps_command)
-        stdout = run_command(deps_command, dbt_project_path, env)
-        logger.debug("dbt deps output: %s", stdout)
+        run_command(deps_command, dbt_project_path, env, self.log_dir)
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """

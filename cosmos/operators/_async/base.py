@@ -7,6 +7,9 @@ from cosmos.config import ProfileConfig
 from cosmos.operators._async.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators.local import DbtRunLocalOperator
 
+# Register async operator here
+ASYNC_CLASS_MAP = {"bigquery": DbtRunAirflowAsyncBigqueryOperator}
+
 
 class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):  # type: ignore[misc]
 
@@ -21,21 +24,17 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):
 
         async_operator_class = self.create_async_operator()
 
-        if async_operator_class == DbtRunAirflowAsyncBigqueryOperator:
-            DbtRunAirflowAsyncFactoryOperator.__bases__ = (DbtRunAirflowAsyncBigqueryOperator,)
-            super().__init__(
-                project_dir=project_dir, profile_config=profile_config, async_args=self.async_args, **kwargs
-            )
+        DbtRunAirflowAsyncFactoryOperator.__bases__ = (async_operator_class,)
+        super().__init__(project_dir=project_dir, profile_config=profile_config, async_args=self.async_args, **kwargs)
 
     def create_async_operator(self) -> Any:
-        async_class_map = {"bigquery": DbtRunAirflowAsyncBigqueryOperator}
 
         profile_type = self.profile_config.get_profile_type()
 
-        if profile_type not in async_class_map:
+        if profile_type not in ASYNC_CLASS_MAP:
             raise Exception(f"Async operator not supported for profile {profile_type}")
 
-        return async_class_map.get(profile_type)
+        return ASYNC_CLASS_MAP[profile_type]
 
     def execute(self, context: Context) -> None:
         super().execute(context)

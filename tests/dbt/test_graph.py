@@ -1575,7 +1575,7 @@ def test_run_dbt_deps(run_command_mock):
     graph = DbtGraph(project=project_config)
     graph.local_flags = []
     graph.run_dbt_deps("dbt", "/some/path", {})
-    run_command_mock.assert_called_with(["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {})
+    run_command_mock.assert_called_with(["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {}, None)
 
 
 @pytest.fixture()

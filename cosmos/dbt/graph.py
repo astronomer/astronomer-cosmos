@@ -317,6 +317,7 @@ class DbtGraph:
             self.dbt_ls_cache_key = ""
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
+        self.log_dir: Path | None = None
 
     @cached_property
     def env_vars(self) -> dict[str, str]:
@@ -647,7 +648,7 @@ class DbtGraph:
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
-                self.log_dir: Path = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
+                self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     if is_cache_package_lockfile_enabled(project_path):

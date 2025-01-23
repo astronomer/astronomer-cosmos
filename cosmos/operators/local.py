@@ -31,7 +31,7 @@ from cosmos.cache import (
 from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
-from cosmos.exceptions import AirflowCompatibilityError, CosmosValueError
+from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 try:
@@ -385,7 +385,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
-            raise ImportError(
+            raise CosmosDbtRunError(
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 

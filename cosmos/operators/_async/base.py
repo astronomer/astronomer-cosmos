@@ -4,6 +4,7 @@ from typing import Any, Sequence
 from airflow.utils.context import Context
 
 from cosmos.config import ProfileConfig
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators._async.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators.local import DbtRunLocalOperator
 
@@ -24,6 +25,10 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):
 
         async_operator_class = self.create_async_operator()
 
+        # Dynamically modify the base classes.
+        # This is necessary because the async operator class is only known at runtime.
+        # When using composition instead of inheritance to initialize the async class and run its execute method,
+        # Airflow throws a `DuplicateTaskIdFound` error.
         DbtRunAirflowAsyncFactoryOperator.__bases__ = (async_operator_class,)
         super().__init__(project_dir=project_dir, profile_config=profile_config, async_args=self.async_args, **kwargs)
 
@@ -32,7 +37,7 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):
         profile_type = self.profile_config.get_profile_type()
 
         if profile_type not in ASYNC_CLASS_MAP:
-            raise Exception(f"Async operator not supported for profile {profile_type}")
+            raise CosmosValueError(f"Async operator not supported for profile {profile_type}")
 
         return ASYNC_CLASS_MAP[profile_type]
 

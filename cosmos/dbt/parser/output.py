@@ -4,9 +4,12 @@ import logging
 import re
 from typing import TYPE_CHECKING, List, Tuple
 
+import deprecation
+
 if TYPE_CHECKING:
     from dbt.cli.main import dbtRunnerResult
 
+from cosmos import __version__ as cosmos_version  # type: ignore[attr-defined]
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 DBT_NO_TESTS_MSG = "Nothing to do"
@@ -40,7 +43,14 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     return num
 
 
-def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
+# Python 3.13 exposes a deprecated operator, we can replace it in the future
+@deprecation.deprecated(
+    deprecated_in="1.9",
+    removed_in="2.0",
+    current_version=cosmos_version,
+    details="Use the `cosmos.dbt.runner.parse_number_of_warnings` instead.",
+)  # type: ignore[misc]
+def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:  # type: ignore[misc]
     """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
     """
@@ -105,9 +115,16 @@ def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
     return test_names, test_results
 
 
+# Python 3.13 exposes a deprecated operator, we can replace it in the future
+@deprecation.deprecated(
+    deprecated_in="1.9",
+    removed_in="2.0",
+    current_version=cosmos_version,
+    details="Use the `cosmos.dbt.runner.extract_message_by_status` instead.",
+)  # type: ignore[misc]
 def extract_dbt_runner_issues(
     result: dbtRunnerResult, status_levels: list[str] = ["warn"]
-) -> Tuple[List[str], List[str]]:
+) -> Tuple[List[str], List[str]]:  # type: ignore[misc]
     """
     Extracts messages from the dbt runner result and returns them as a formatted string.
 

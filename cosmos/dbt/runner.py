@@ -29,7 +29,7 @@ if TYPE_CHECKING:  # pragma: no cover
 @cache
 def is_available() -> bool:
     """
-    Checks if the dbt runner is available (if dbt-core is installed in the same Python virtualenv as Airflow."
+    Checks if the dbt runner is available (if dbt-core is installed in the same Python virtualenv as Airflow)."
     """
     try:
         from dbt.cli.main import dbtRunner  # noqa

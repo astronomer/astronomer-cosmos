@@ -8,19 +8,18 @@ from cosmos.operators._async.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators.local import DbtRunLocalOperator
 
 
-class DbtRunBaseAirflowAsyncOperator(DbtRunLocalOperator, metaclass=ABCMeta):  # type: ignore[misc]
+class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):  # type: ignore[misc]
     def __init__(self, project_dir: str, profile_config: ProfileConfig, **kwargs: Any):
-        self.kwargs = kwargs
         self.project_dir = project_dir
         self.profile_config = profile_config
         self.async_args = None
         if "async_args" in kwargs:
             self.async_args = kwargs.pop("async_args")
 
-        async_operator = self.create_async_operator()
+        async_operator_class = self.create_async_operator()
 
-        if async_operator == DbtRunAirflowAsyncBigqueryOperator:
-            DbtRunBaseAirflowAsyncOperator.__bases__ = (DbtRunAirflowAsyncBigqueryOperator,)
+        if async_operator_class == DbtRunAirflowAsyncBigqueryOperator:
+            DbtRunAirflowAsyncFactoryOperator.__bases__ = (DbtRunAirflowAsyncBigqueryOperator,)
             super().__init__(
                 project_dir=project_dir, profile_config=profile_config, async_args=self.async_args, **kwargs
             )

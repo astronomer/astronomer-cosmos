@@ -40,14 +40,6 @@ def test_dbt_source_airflow_async_operator_inheritance():
     assert issubclass(DbtSourceAirflowAsyncOperator, DbtSourceLocalOperator)
 
 
-# @pytest.mark.skipif(
-#     version.parse(airflow_version) < version.parse("2.8"),
-#     reason="Cosmos Async operators only work with Airflow 2.8 onwards.",
-# )
-# def test_dbt_run_airflow_async_operator_inheritance():
-#     assert issubclass(DbtRunAirflowAsyncOperator, BigQueryInsertJobOperator)
-
-
 def test_dbt_test_airflow_async_operator_inheritance():
     assert issubclass(DbtTestAirflowAsyncOperator, DbtTestLocalOperator)
 

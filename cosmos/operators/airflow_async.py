@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 
 from cosmos.config import ProfileConfig
-from cosmos.operators._async.base import DbtRunBaseAirflowAsyncOperator
+from cosmos.operators._async.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBaseOperator
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -52,7 +52,7 @@ class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalO
     pass
 
 
-class DbtRunAirflowAsyncOperator(DbtRunBaseAirflowAsyncOperator):  # type: ignore
+class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ignore
 
     # template_fields: Sequence[str] = (
     #     "full_refresh",
@@ -66,27 +66,11 @@ class DbtRunAirflowAsyncOperator(DbtRunBaseAirflowAsyncOperator):  # type: ignor
         self,
         project_dir: str,
         profile_config: ProfileConfig,
-        # location: str = "us",  # This is a mandatory parameter when using BigQueryInsertJobOperator with deferrable=True
-        # full_refresh: bool = False,
         extra_context: dict[str, object] | None = None,
-        # configuration: dict[str, object] | None = None,
         **kwargs,
     ) -> None:
-        # dbt task param
-        # self.project_dir = project_dir
-        # self.extra_context = extra_context or {}
-        # self.full_refresh = full_refresh
-        # self.profile_config = profile_config
-        # if not self.profile_config or not self.profile_config.profile_mapping:
-        #     raise CosmosValueError(f"Cosmos async support is only available when using ProfileMapping")
-        #
-        # self.profile_type: str = profile_config.get_profile_type()  # type: ignore
-        # if self.profile_type not in _SUPPORTED_DATABASES:
-        #     raise CosmosValueError(f"Async run are only supported: {_SUPPORTED_DATABASES}")
-        #
-        # # airflow task param
 
-        # Cosmos attempts to pass many kwargs that BigQueryInsertJobOperator simply does not accept.
+        # Cosmos attempts to pass many kwargs that async operator simply does not accept.
         # We need to pop them.
         clean_kwargs = {}
         non_async_args = set(inspect.signature(AbstractDbtBaseOperator.__init__).parameters.keys())
@@ -99,15 +83,10 @@ class DbtRunAirflowAsyncOperator(DbtRunBaseAirflowAsyncOperator):  # type: ignor
 
         # The following are the minimum required parameters to run BigQueryInsertJobOperator using the deferrable mode
         super().__init__(
-            # gcp_conn_id=self.gcp_conn_id,
-            # configuration=self.configuration,
-            # location=self.location,
-            # deferrable=True,
             project_dir=project_dir,
             profile_config=profile_config,
             extra_context=extra_context,
             **clean_kwargs,
-            # **kwargs
         )
 
 

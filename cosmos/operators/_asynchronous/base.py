@@ -14,6 +14,16 @@ log = logging.getLogger(__name__)
 
 
 def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
+    """
+    Dynamically constructs and returns an asynchronous operator class for the given profile type and DBT class name.
+
+    The function constructs a class path string for an asynchronous operator, based on the provided `profile_type` and
+    `dbt_class`. It attempts to import the corresponding class dynamically and return it. If the class cannot be found,
+    it falls back to returning the `DbtRunLocalOperator` class.
+
+    :param profile_type: The dbt profile type
+    :param dbt_class: The dbt class name. Example DbtRun, DbtTest.
+    """
     execution_mode = ExecutionMode.AIRFLOW_ASYNC.value
     class_path = f"cosmos.operators._asynchronous.{profile_type}.{dbt_class}{_snake_case_to_camelcase(execution_mode)}{profile_type.capitalize()}Operator"
     try:

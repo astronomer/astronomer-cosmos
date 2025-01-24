@@ -1,4 +1,3 @@
-# pragma: no cover
 # TODO: Implement it
 
 from typing import Any

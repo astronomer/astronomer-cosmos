@@ -5,7 +5,7 @@ from airflow.utils.context import Context
 
 from cosmos.config import ProfileConfig
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators._async.bigquery import DbtRunAirflowAsyncBigqueryOperator
+from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators.local import DbtRunLocalOperator
 
 # Register async operator here

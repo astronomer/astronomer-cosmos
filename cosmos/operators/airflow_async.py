@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 
 from cosmos.config import ProfileConfig
-from cosmos.operators._async.base import DbtRunAirflowAsyncFactoryOperator
+from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBaseOperator
 from cosmos.operators.local import (
     DbtBuildLocalOperator,

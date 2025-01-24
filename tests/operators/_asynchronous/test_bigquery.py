@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow import __version__ as airflow_version
+from packaging import version
 
 from cosmos import ProfileConfig
 from cosmos.exceptions import CosmosValueError
@@ -35,6 +37,10 @@ def test_get_remote_sql_airflow_io_unavailable(mock_bigquery_conn):
             operator.get_remote_sql()
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.8"),
+    reason="Airflow object storage supported  2.8 release",
+)
 def test_get_remote_sql_success(mock_bigquery_conn):
     profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,

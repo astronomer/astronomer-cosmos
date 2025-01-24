@@ -36,6 +36,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
         self.extra_context = extra_context or {}
+        self.full_refresh = None
         if "full_refresh" in kwargs:
             self.full_refresh = kwargs.pop("full_refresh")
         self.configuration: dict[str, Any] = {}
@@ -56,7 +57,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
 
         remote_target_path_str = str(remote_target_path).rstrip("/")
 
-        if TYPE_CHECKING:
+        if TYPE_CHECKING:  # pragma: no cover
             assert self.project_dir is not None
 
         project_dir_parent = str(Path(self.project_dir).parent)

@@ -11,6 +11,28 @@ from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 
+def test_bigquery_without_refresh(mock_bigquery_conn):
+    profile_mapping = get_automatic_profile_mapping(
+        mock_bigquery_conn.conn_id,
+        profile_args={
+            "dataset": "my_dataset",
+        },
+    )
+    bigquery_profile_config = ProfileConfig(
+        profile_name="my_profile", target_name="dev", profile_mapping=profile_mapping
+    )
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task", project_dir="/tmp", profile_config=bigquery_profile_config
+    )
+
+    operator.extra_context = {
+        "dbt_node_config": {"file_path": "/some/path/to/file.sql"},
+        "dbt_dag_task_group_identifier": "task_group_1",
+    }
+    with pytest.raises(CosmosValueError, match="The async execution only supported for full_refresh"):
+        operator.execute({})
+
+
 def test_get_remote_sql_airflow_io_unavailable(mock_bigquery_conn):
     profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn.conn_id,

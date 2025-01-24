@@ -39,13 +39,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
         self.extra_context = extra_context or {}
-        self.async_args = async_args
-        self.location = async_args.get("location")  # type: ignore
-        self.full_refresh = async_args.get("full_refresh")  # type: ignore
+        self.full_refresh = kwargs.pop("full_refresh")
         self.configuration: dict[str, Any] = {}
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
-            location=self.location,
             configuration=self.configuration,
             deferrable=True,
             **kwargs,

@@ -1,3 +1,6 @@
+# pragma: no cover
+# TODO: Implement it
+
 from typing import Any
 
 from airflow.models.baseoperator import BaseOperator

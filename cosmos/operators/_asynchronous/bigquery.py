@@ -84,7 +84,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
         hook.insert_job(configuration=self.configuration, location=self.location, project_id=self.gcp_project)
 
     def execute(self, context: Context) -> Any | None:
-        print("hello from bigquery")
+
         if not self.full_refresh:
             raise CosmosValueError("The async execution only supported for full_refresh")
         else:

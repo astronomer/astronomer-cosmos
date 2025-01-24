@@ -406,6 +406,82 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             sql_content: str = sql_file.read()
         return sql_content
 
+    def _clone_project(self, tmp_dir_path: Path) -> None:
+        self.log.info(
+            "Cloning project to writable temp directory %s from %s",
+            tmp_dir_path,
+            self.project_dir,
+        )
+        create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+
+    def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
+        if self.cache_dir is None:
+            return
+        latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
+        self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+        if latest_partial_parse is not None:
+            cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+
+    def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
+        return [
+            "--project-dir",
+            str(tmp_project_dir),
+            "--profiles-dir",
+            str(profile_path.parent),
+            "--profile",
+            self.profile_config.profile_name,
+            "--target",
+            self.profile_config.target_name,
+        ]
+
+    def _install_dependencies(
+        self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
+    ) -> None:
+        self._cache_package_lockfile(tmp_dir_path)
+        deps_command = [self.dbt_executable_path, "deps"] + flags
+        self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
+
+    @staticmethod
+    def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
+        if not async_context:
+            raise CosmosValueError("`async_context` is necessary for running the model asynchronously")
+        if "async_operator" not in async_context:
+            raise CosmosValueError("`async_operator` needs to be specified  in `async_context` when running as async")
+        if "profile_type" not in async_context:
+            raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
+        profile_type = async_context["profile_type"]
+        if profile_type not in PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP:
+            raise CosmosValueError(f"Mock adapter callable function not available for profile_type {profile_type}")
+        mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP[profile_type]
+        mock_adapter_callable()
+
+    def _handle_datasets(self, context: Context) -> None:
+        inlets = self.get_datasets("inputs")
+        outlets = self.get_datasets("outputs")
+        self.log.info("Inlets: %s", inlets)
+        self.log.info("Outlets: %s", outlets)
+        self.register_dataset(inlets, outlets, context)
+
+    def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
+        if self.cache_dir is None:
+            return
+        partial_parse_file = get_partial_parse_path(tmp_dir_path)
+        if partial_parse_file.exists():
+            cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
+
+    def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
+        self.store_freshness_json(tmp_project_dir, context)
+        self.store_compiled_sql(tmp_project_dir, context)
+        self.upload_compiled_sql(tmp_project_dir, context)
+        if self.callback:
+            self.callback_args.update({"context": context})
+            self.callback(tmp_project_dir, **self.callback_args)
+
+    def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
+        sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
+        PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP[async_context["profile_type"]](self, sql=sql)
+        async_context["async_operator"].execute(self, context)
+
     def run_command(
         self,
         cmd: list[str],
@@ -422,60 +498,27 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
 
-            self.log.info(
-                "Cloning project to writable temp directory %s from %s",
-                tmp_project_dir,
-                self.project_dir,
-            )
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
-            create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+            self._clone_project(tmp_dir_path)
 
-            if self.partial_parse and self.cache_dir is not None:
-                latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
-                self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
-                if latest_partial_parse is not None:
-                    cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+            if self.partial_parse:
+                self._handle_partial_parse(tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
                 env.update(env_vars)
+                self.log.debug("Using environment variables keys: %s", env.keys())
 
-                flags = [
-                    "--project-dir",
-                    str(tmp_project_dir),
-                    "--profiles-dir",
-                    str(profile_path.parent),
-                    "--profile",
-                    self.profile_config.profile_name,
-                    "--target",
-                    self.profile_config.target_name,
-                ]
+                flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
                 if self.install_deps:
-                    self._cache_package_lockfile(tmp_dir_path)
-                    deps_command = [self.dbt_executable_path, "deps"]
-                    deps_command.extend(flags)
-                    self.invoke_dbt(
-                        command=deps_command,
-                        env=env,
-                        cwd=tmp_project_dir,
-                    )
+                    self._install_dependencies(tmp_dir_path, flags, env)
+
+                if run_as_async:
+                    self._mock_dbt_adapter(async_context)
 
                 full_cmd = cmd + flags
-
-                self.log.debug("Using environment variables keys: %s", env.keys())
-                if run_as_async:
-                    if not async_context:
-                        raise CosmosValueError("async_context is necessary for running the model asynchronously.")
-                    profile_type = async_context["profile_type"]
-                    mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP.get(profile_type)
-                    if not mock_adapter_callable:
-                        raise CosmosValueError(
-                            f"Mock adapter callable function not available for profile_type {profile_type}"
-                        )
-                    mock_adapter_callable()
-
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
@@ -488,29 +531,16 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
 
                 if self.emit_datasets:
-                    inlets = self.get_datasets("inputs")
-                    outlets = self.get_datasets("outputs")
-                    self.log.info("Inlets: %s", inlets)
-                    self.log.info("Outlets: %s", outlets)
-                    self.register_dataset(inlets, outlets, context)
+                    self._handle_datasets(context)
 
-                if self.partial_parse and self.cache_dir:
-                    partial_parse_file = get_partial_parse_path(tmp_dir_path)
-                    if partial_parse_file.exists():
-                        cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
+                if self.partial_parse:
+                    self._update_partial_parse_cache(tmp_dir_path)
 
-                self.store_freshness_json(tmp_project_dir, context)
-                self.store_compiled_sql(tmp_project_dir, context)
-                self.upload_compiled_sql(tmp_project_dir, context)
-                if self.callback:
-                    self.callback_args.update({"context": context})
-                    self.callback(tmp_project_dir, **self.callback_args)
+                self._handle_post_execution(tmp_project_dir, context)
                 self.handle_exception(result)
 
                 if run_as_async and async_context:
-                    sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
-                    PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP[profile_type](self, sql=sql)
-                    async_context["async_operator"].execute(self, context)
+                    self._handle_async_execution(tmp_project_dir, context, async_context)
 
                 return result
 

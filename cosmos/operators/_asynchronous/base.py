@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
     """
-    Dynamically constructs and returns an asynchronous operator class for the given profile type and DBT class name.
+    Dynamically constructs and returns an asynchronous operator class for the given profile type and dbt class name.
 
     The function constructs a class path string for an asynchronous operator, based on the provided `profile_type` and
     `dbt_class`. It attempts to import the corresponding class dynamically and return it. If the class cannot be found,
@@ -38,7 +38,7 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
 
 class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = ("project_dir",)
+    template_fields: Sequence[str] = DbtRunLocalOperator.template_fields + ("project_dir",)  # type: ignore[operator]
 
     def __init__(self, project_dir: str, profile_config: ProfileConfig, **kwargs: Any):
         self.project_dir = project_dir

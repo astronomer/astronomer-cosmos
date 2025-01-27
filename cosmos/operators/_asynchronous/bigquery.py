@@ -93,6 +93,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
             # https://github.com/dbt-labs/dbt-core/blob/5e9f1b515f37dfe6cdae1ab1aa7d190b92490e24/core/dbt/context/base.py#L662-L666
             # https://docs.getdbt.com/reference/resource-configs/full_refresh#recommendation
             # We're emulating this behaviour here
+            # The compiled SQL has several limitations here, but these will be addressed in the PR: https://github.com/astronomer/astronomer-cosmos/pull/1474.
             self.drop_table_sql()
             sql = self.get_remote_sql()
             model_name = self.extra_context["dbt_node_config"]["resource_name"]  # type: ignore

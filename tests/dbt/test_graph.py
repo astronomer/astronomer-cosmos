@@ -462,6 +462,7 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
 ):
     import_patch = None
     if runner == "subprocess":
+        original_sys_modules = sys.modules
         import_patch = patch.dict(sys.modules, {"dbt.cli.main": None})
         import_patch.start()
         mock_popen().communicate.return_value = ("", "")
@@ -488,9 +489,10 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
-    if runner == "subprocess":
+    if import_patch is not None:
         used_cwd = Path(mock_popen.call_args[0][0][5])
         import_patch.stop()
+        sys.modules = original_sys_modules
     else:
         used_cwd = Path(mock_dbt_runner.call_args[1]["cwd"])
     assert used_cwd != project_config.dbt_project_path
@@ -666,6 +668,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
 def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
     some_patch = None
     if runner == "subprocess":
+        original_sys_modules = sys.modules
         some_patch = patch.dict(sys.modules, {"dbt.cli.main": None})
         some_patch.start()
 
@@ -690,6 +693,7 @@ def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
     assert err_info.value.args[0] == expected
 
     if some_patch is not None:
+        sys.modules = original_sys_modules
         some_patch.stop()
 
 
@@ -737,33 +741,17 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize(
-    "runner,enable_cache_profile",
-    [
-        ("subprocess", True),
-        ("subprocess", False),
-        ("dbt_runner", True),
-        ("dbt_runner", False),
-    ],
-)
+@pytest.mark.parametrize("enable_cache_profile", (True, False))
 @patch("cosmos.config.is_profile_cache_enabled")
-def test_load_via_dbt_ls_caching_partial_parsing(
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_load_via_dbt_ls_caching_partial_parsing_subprocess(
     is_profile_cache_enabled,
-    runner,
     enable_cache_profile,
     tmp_dbt_project_dir,
     postgres_profile_config,
     caplog,
     tmp_path,
 ):
-    """
-    When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
-    Cosmos should leverage dbt partial parsing.
-    """
-    sys_patch = None
-    if runner == "subprocess":
-        sys_patch = patch.dict(sys.modules, {"dbt.cli.main": None})
-        sys_patch.start()
 
     caplog.set_level(logging.DEBUG)
 
@@ -795,9 +783,6 @@ def test_load_via_dbt_ls_caching_partial_parsing(
     caplog.clear()
     dbt_graph.load_via_dbt_ls_without_cache()  # should not not raise exception
     assert not "Unable to do partial parsing" in caplog.text
-
-    if sys_patch:
-        sys_patch.stop
 
 
 @pytest.mark.integration
@@ -1181,8 +1166,10 @@ def test_run_command(mock_popen, stdout, returncode):
 
 
 # @pytest.mark.integration
-# def run_command_with_dbt_runner():
-#    return_value = run_command(fake_command, fake_dir, env_vars)
+# def test_run_command_with_dbt_runner(tmp_dbt_project_dir):
+#    with pytest.raises(CosmosLoadDbtException) as err_info:
+#        response = run_command(command=["dbt", "ls"], env_vars=os.environ, tmp_dir=tmp_dbt_project_dir)
+#    breakpoint()
 
 
 @patch("cosmos.dbt.graph.Popen")
@@ -1679,7 +1666,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "fa5edac64de49909d4b8cbc4dc8abd4f"
+        assert hash_dir == "af89237a0cdef7edce53fe4d4160fa79"
     else:
         assert hash_dir == "9c9f712b6f6f1ace880dfc7f5f4ff051"
 

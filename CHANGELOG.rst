@@ -4,13 +4,24 @@ Changelog
 1.9.0a2(2025-01-27)
 --------------------
 
+Features
+
+* Add structure to support multiple db for async operator execution by @pankajastro in #1483
+
 Bug Fixes
 
 * Fix select complex intersection of three tag-based graph selectors by @tatiana in #1466
 
 Enhancement
 
+* Fix OpenLineage deprecation warning by @CorsettiS in #1449
 * Support overriding the ``profile_name`` per node or folder using config by @tatiana in #1492
+* Move ``DbtRunner`` related functions into ``dbt/runner.py`` module by @tatiana in #1480
+
+Others
+
+* GitHub Actions Dependabot: #1487
+* Pre-commit updates: #1473
 
 
 1.8.2 (2025-01-15)

@@ -68,6 +68,7 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
         non_async_args = set(inspect.signature(AbstractDbtBaseOperator.__init__).parameters.keys())
         non_async_args |= set(inspect.signature(DbtLocalBaseOperator.__init__).parameters.keys())
         non_async_args -= {"task_id"}
+
         for arg_key, arg_value in kwargs.items():
             if arg_key not in non_async_args:
                 clean_kwargs[arg_key] = arg_value

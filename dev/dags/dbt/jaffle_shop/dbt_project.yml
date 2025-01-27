@@ -24,3 +24,11 @@ models:
       materialized: table
       staging:
         materialized: view
+
+
+seeds:
+  jaffle_shop:
+      +meta:
+        cosmos:
+          operator_kwargs:
+            profile_name: postgres_profile

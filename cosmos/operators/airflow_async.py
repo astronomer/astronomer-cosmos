@@ -11,7 +11,6 @@ from cosmos.operators.local import (
     DbtCompileLocalOperator,
     DbtLocalBaseOperator,
     DbtLSLocalOperator,
-    DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
     DbtSnapshotLocalOperator,

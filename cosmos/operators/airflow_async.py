@@ -61,6 +61,7 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
         extra_context: dict[str, object] | None = None,
         **kwargs,
     ) -> None:
+
         # Cosmos attempts to pass many kwargs that async operator simply does not accept.
         # We need to pop them.
         clean_kwargs = {}

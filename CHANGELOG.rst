@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.9.0a1 (2025-01-20)
+1.9.0a2(2025-01-27)
 --------------------
 
 Breaking changes
@@ -19,6 +19,10 @@ Features
 Bug Fixes
 
 * Fix select complex intersection of three tag-based graph selectors by @tatiana in #1466
+
+Enhancement
+
+* Support overriding the ``profile_name`` per node or folder using config by @tatiana
 
 
 1.8.2 (2025-01-15)

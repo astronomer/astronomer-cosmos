@@ -1165,11 +1165,29 @@ def test_run_command(mock_popen, stdout, returncode):
     assert return_value == stdout
 
 
-# @pytest.mark.integration
-# def test_run_command_with_dbt_runner(tmp_dbt_project_dir):
-#    with pytest.raises(CosmosLoadDbtException) as err_info:
-#        response = run_command(command=["dbt", "ls"], env_vars=os.environ, tmp_dir=tmp_dbt_project_dir)
-#    breakpoint()
+@pytest.mark.integration
+def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        run_command(command=["dbt", "ls"], env_vars=os.environ, tmp_dir=tmp_dbt_project_dir)
+    err_msg1 = "Unable to run ['dbt', 'ls']"
+    err_msg2 = "No dbt_project.yml"
+    assert err_msg1 in str(err_info.value)
+    assert err_msg2 in str(err_info.value)
+
+
+@pytest.mark.integration
+def test_run_command_with_dbt_runner_error(tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    file_to_be_deleted = project_dir / "packages.yml"
+    file_to_be_deleted.unlink()
+
+    file_to_be_changed = project_dir / "models/staging/stg_orders.sql"
+    with open(str(file_to_be_changed), "w") as fp:
+        fp.writelines("select 1 as id")
+
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        run_command(command=["dbt", "run"], env_vars=os.environ, tmp_dir=project_dir)
+    assert "Unable to run ['dbt', 'run']" in str(err_info.value)
 
 
 @patch("cosmos.dbt.graph.Popen")

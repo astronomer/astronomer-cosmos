@@ -190,8 +190,13 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
 
     stderr = ""
     stdout = ""
+    result_list = (
+        [json.dumps(item.to_dict()) if hasattr(item, "to_dict") else item for item in response.result]
+        if response.result
+        else []
+    )
     if response.result:
-        stdout = "\n ".join(response.result)
+        stdout = "\n".join(result_list)
 
     if not response.success:
         if response.exception:
@@ -200,14 +205,15 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
                 raise CosmosLoadDbtException(
                     "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
                 )
-            details = f"stderr: {stderr}\nstdout: {stdout}"
-            raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
         elif response.result:
-            # TODO: check if the following works as expected
-            stdout = "\n".join(response.result)
-            node_names, node_results = dbt_runner.extract_message_by_status(response, ["err"])
-            err_msgs = [f"Error processing node {node}: {msg}" for node, msg in zip(node_names, node_results)]
-            stderr = "\n".join(err_msgs)
+            node_names, node_results = dbt_runner.extract_message_by_status(
+                response, ["error", "fail", "runtime error"]
+            )
+            stderr = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
+
+    if stderr:
+        details = f"stderr: {stderr}\nstdout: {stdout}"
+        raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
 
     return stdout
 

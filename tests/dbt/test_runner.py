@@ -96,7 +96,7 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
 
 @pytest.mark.integration
 def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
-    # The following command
+    # The following command fails, but has no exceptions - only results
     response = dbt_runner.run_command(command=["dbt", "run"], env=os.environ, cwd=invalid_dbt_project_dir)
     assert not response.success
     assert response.exception is None

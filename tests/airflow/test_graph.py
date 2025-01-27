@@ -312,7 +312,6 @@ def test_build_airflow_graph_with_dbt_compile_task():
             "project_dir": SAMPLE_PROJ_PATH,
             "conn_id": "fake_conn",
             "profile_config": bigquery_profile_config,
-            "location": "",
         }
         render_config = RenderConfig(
             select=["tag:some"],

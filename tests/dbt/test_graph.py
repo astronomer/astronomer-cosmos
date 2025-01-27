@@ -17,7 +17,13 @@ from airflow.models import Variable
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode, SourceRenderingBehavior
+from cosmos.constants import (
+    DBT_LOG_FILENAME,
+    DBT_TARGET_DIR_NAME,
+    DbtResourceType,
+    ExecutionMode,
+    SourceRenderingBehavior,
+)
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
     DbtGraph,
@@ -1166,13 +1172,20 @@ def test_run_command(mock_popen, stdout, returncode):
 
 
 @pytest.mark.integration
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_run_command_success_with_log(tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    (project_dir / DBT_LOG_FILENAME).touch()
+    response = run_command(command=["dbt", "deps"], env_vars=os.environ, tmp_dir=project_dir)
+    assert "Installing dbt-labs/dbt_utils" in response
+
+
+@pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:
-        run_command(command=["dbt", "ls"], env_vars=os.environ, tmp_dir=tmp_dbt_project_dir)
-    err_msg1 = "Unable to run ['dbt', 'ls']"
-    err_msg2 = "No dbt_project.yml"
-    assert err_msg1 in str(err_info.value)
-    assert err_msg2 in str(err_info.value)
+        run_command(command=["dbt", "ls"], env_vars=os.environ, tmp_dir=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    err_msg = "Unable to run dbt ls command due to missing dbt_packages"
+    assert err_msg in str(err_info.value)
 
 
 @pytest.mark.integration

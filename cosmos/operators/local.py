@@ -118,8 +118,8 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
-    :param profile_name: A name to use for the dbt profile. If not provided, and no profile target is found
-        in your project's dbt_project.yml, "cosmos_profile" is used.
+    :param profile_config: ProfileConfig Object
+    :param profile_name: A name to use for the dbt profile. Overrides the profile_config profile name.
     :param install_deps: If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
@@ -142,6 +142,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self,
         task_id: str,
         profile_config: ProfileConfig,
+        profile_name: str = "",
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = False,
         callback: Callable[[str], None] | None = None,
@@ -152,6 +153,13 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
+
+        if profile_name:
+            from copy import deepcopy
+
+            profile_config = deepcopy(profile_config)
+            profile_config.profile_name = profile_name
+
         self.profile_config = profile_config
         self.callback = callback
         self.callback_args = callback_args or {}

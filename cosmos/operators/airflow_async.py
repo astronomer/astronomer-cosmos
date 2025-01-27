@@ -18,7 +18,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-_SUPPORTED_DATABASES = [BIGQUERY_PROFILE_TYPE]
+_SUPPORTED_DATABASES = ["bigquery"]
 
 from abc import ABCMeta
 

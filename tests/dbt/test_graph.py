@@ -1176,7 +1176,7 @@ def test_run_command(mock_popen, stdout, returncode):
 def test_run_command_success_with_log(tmp_dbt_project_dir):
     project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
     (project_dir / DBT_LOG_FILENAME).touch()
-    response = run_command(command=["dbt", "deps"], env_vars=os.environ, tmp_dir=project_dir)
+    response = run_command(command=["dbt", "deps"], env_vars=os.environ, tmp_dir=project_dir, log_dir=project_dir)
     assert "Installing dbt-labs/dbt_utils" in response
 
 

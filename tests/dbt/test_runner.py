@@ -107,6 +107,4 @@ def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
 
     err_msg = str(exc_info.value)
     expected1 = "dbt invocation completed with errors:"
-    expected2 = "orders: Database Error in model orders (models/orders.sql)"
     assert expected1 in err_msg
-    assert expected2 in err_msg

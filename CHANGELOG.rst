@@ -22,7 +22,7 @@ Bug Fixes
 
 Enhancement
 
-* Support overriding the ``profile_name`` per node or folder using config by @tatiana
+* Support overriding the ``profile_name`` per node or folder using config by @tatiana in #1492
 
 
 1.8.2 (2025-01-15)

@@ -9,13 +9,21 @@ from pathlib import Path
 from airflow.decorators import dag
 
 from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 PROJECT_DIR = DBT_ROOT_PATH / "jaffle_shop"
 
+
 profile_config = ProfileConfig(
-    profile_name="default", target_name="dev", profiles_yml_filepath=PROJECT_DIR / "profiles.yml"
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+        disable_event_tracking=True,
+    ),
 )
 
 
@@ -26,8 +34,22 @@ profile_config = ProfileConfig(
 )
 def basic_cosmos_task_group_different_owners() -> None:
     """
-    The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+    Example of how to override arguments / properties being run per Airflow task
+    using dbt YAML.
     """
+
+    # Considering the `dbt_project.yml` file contains the following:
+    # seeds:
+    #   jaffle_shop:
+    #     +meta:
+    #       cosmos:
+    #         profile_config:
+    #           profile_name: postgres_profile
+    #             profile_mapping:
+    #               threads: 2
+    # when we run the dbt seeds commands defined in this first TaskGroup, we expect:
+    # - profile_name "postgres_profile" to be used (instead of the "default")
+    # - 2 threads (defined within profile_mapping) instead of the default value
 
     non_models = DbtTaskGroup(
         group_id="seeds",

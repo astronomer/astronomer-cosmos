@@ -70,31 +70,50 @@ class DbtNode:
     has_test: bool = False
 
     @property
-    def airflow_task_config(self) -> Dict[str, Any]:
+    def meta(self) -> Dict[str, Any]:
         """
-        This method is designed to extend the dbt project's functionality by incorporating Airflow-related metadata into the dbt YAML configuration.
-        Since dbt projects are independent of Airflow, adding Airflow-specific information to the `meta` field within the dbt YAML allows Airflow tasks to
-        utilize this information during execution.
+        Extract node-specific configuration declared in the model dbt YAML configuration.
+        These will be used while instantiating Airflow tasks.
+        """
+        value = self.config.get("meta", {}).get("cosmos", {})
+        if not isinstance(value, dict):
+            raise CosmosLoadDbtException(
+                f"Error parsing {self.unique_id}. Invalid type: 'cosmos' in meta must be a dict."
+            )
+        return value
+
+    @property
+    def operator_kwargs_to_override(self) -> Dict[str, Any]:
+        """
+        Extract the configuration that will be used to override, at a node level, the keyword arguments passed to create
+        the correspondent Airflow task (named `operator_args` at the `DbtDag` or `DbtTaskGroup` level).
 
         Examples: pool, pool_slots, queue, ...
-        Returns:
-            Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
-        """
 
-        if "meta" in self.config:
-            meta = self.config["meta"]
-            if "cosmos" in meta:
-                cosmos = meta["cosmos"]
-                if isinstance(cosmos, dict):
-                    if "operator_kwargs" in cosmos:
-                        operator_kwargs = cosmos["operator_kwargs"]
-                        if isinstance(operator_kwargs, dict):
-                            return operator_kwargs
-                    else:
-                        logger.error(f"Invalid type: 'operator_kwargs' in meta.cosmos must be a dict.")
-                else:
-                    logger.error(f"Invalid type: 'cosmos' in meta must be a dict.")
-        return {}
+        :returns: A dictionary containing the Airflow task argument keys and values.
+        """
+        operator_kwargs = self.meta.get("operator_kwargs", {})
+        if not isinstance(operator_kwargs, dict):
+            raise CosmosLoadDbtException(
+                f"Error parsing {self.unique_id}. Invalid type: 'operator_kwargs' in meta.cosmos must be a dict."
+            )
+        return operator_kwargs
+
+    @property
+    def profile_config_to_override(self) -> Dict[str, Any]:
+        """
+        Extract the configuration that will be used to override, at a node level, the profile configuration.
+
+        Examples: `profile_name`, `target_name`, `profiles_yml_filepath`.
+
+        :returns: A dictionary containing the profile configuration that should be overridden at a task-level.
+        """
+        operator_kwargs = self.meta.get("profile_config", {})
+        if not isinstance(operator_kwargs, dict):
+            raise CosmosLoadDbtException(
+                f"Error parsing {self.unique_id}. Invalid type: 'profile_config' in meta.cosmos must be a dict."
+            )
+        return operator_kwargs
 
     @property
     def resource_name(self) -> str:

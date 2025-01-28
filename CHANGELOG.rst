@@ -16,6 +16,7 @@ Features
 * Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if dbt-core is available by @tatiana in #1484
 * Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484
 
 Bug Fixes
 
@@ -30,7 +31,7 @@ Enhancement
 Others
 
 * GitHub Actions Dependabot: #1487
-* Pre-commit updates: #1473
+* Pre-commit updates: #1473, #1493
 
 
 1.8.2 (2025-01-15)

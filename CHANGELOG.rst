@@ -7,6 +7,7 @@ Changelog
 Features
 
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484
 
 Bug Fixes
 
@@ -21,7 +22,7 @@ Enhancement
 Others
 
 * GitHub Actions Dependabot: #1487
-* Pre-commit updates: #1473
+* Pre-commit updates: #1473, #1493
 
 
 1.8.2 (2025-01-15)

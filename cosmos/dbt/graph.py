@@ -78,7 +78,7 @@ class DbtNode:
         value = self.config.get("meta", {}).get("cosmos", {})
         if not isinstance(value, dict):
             raise CosmosLoadDbtException(
-                f"Error parsing {self.unique_id}. Invalid type: 'cosmos' in meta must be a dict."
+                f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'cosmos' in meta must be a dict."
             )
         return value
 
@@ -95,7 +95,7 @@ class DbtNode:
         operator_kwargs = self.meta.get("operator_kwargs", {})
         if not isinstance(operator_kwargs, dict):
             raise CosmosLoadDbtException(
-                f"Error parsing {self.unique_id}. Invalid type: 'operator_kwargs' in meta.cosmos must be a dict."
+                f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'operator_kwargs' in meta.cosmos must be a dict."
             )
         return operator_kwargs
 
@@ -111,7 +111,7 @@ class DbtNode:
         operator_kwargs = self.meta.get("profile_config", {})
         if not isinstance(operator_kwargs, dict):
             raise CosmosLoadDbtException(
-                f"Error parsing {self.unique_id}. Invalid type: 'profile_config' in meta.cosmos must be a dict."
+                f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'profile_config' in meta.cosmos must be a dict."
             )
         return operator_kwargs
 

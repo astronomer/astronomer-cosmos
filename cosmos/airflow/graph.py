@@ -103,8 +103,9 @@ def override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_overr
     """
     if profile_kwargs_override:
         modified_profile_config = deepcopy(task_kwargs["profile_config"])
-        profile_mapping_override = profile_kwargs_override.pop("profile_mapping", {})
-        for key, value in profile_kwargs_override.items():
+        modified_profile_kwargs_override = deepcopy(profile_kwargs_override)
+        profile_mapping_override = modified_profile_kwargs_override.pop("profile_mapping", {})
+        for key, value in modified_profile_kwargs_override.items():
             setattr(modified_profile_config, key, value)
         if modified_profile_config.profile_mapping and profile_mapping_override:
             for key, value in profile_mapping_override.items():

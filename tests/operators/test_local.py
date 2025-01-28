@@ -34,7 +34,7 @@ from cosmos.operators.local import (
     DbtDocsGCSLocalOperator,
     DbtDocsLocalOperator,
     DbtDocsS3LocalOperator,
-    DbtLocalBaseOperator,
+    DbtLocalBase,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
@@ -82,7 +82,7 @@ def failing_test_dbt_project(tmp_path):
     tmp_dir.cleanup()
 
 
-class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
+class ConcreteDbtLocalBaseOperator(DbtLocalBase):
     base_cmd = ["cmd"]
 
 
@@ -1293,7 +1293,7 @@ def test_configure_remote_target_path(mock_object_storage_path):
     mock_object_storage_path.return_value.mkdir.assert_called_with(parents=True, exist_ok=True)
 
 
-@patch.object(DbtLocalBaseOperator, "_configure_remote_target_path")
+@patch.object(DbtLocalBase, "_configure_remote_target_path")
 def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target_path):
     operator = DbtSeedLocalOperator(
         task_id="fake-task",

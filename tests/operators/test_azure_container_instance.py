@@ -5,7 +5,7 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.operators.azure_container_instance import (
-    DbtAzureContainerInstanceBaseOperator,
+    DbtAzureContainerInstanceBase,
     DbtBuildAzureContainerInstanceOperator,
     DbtCloneAzureContainerInstanceOperator,
     DbtLSAzureContainerInstanceOperator,
@@ -15,7 +15,7 @@ from cosmos.operators.azure_container_instance import (
 )
 
 
-class ConcreteDbtAzureContainerInstanceOperator(DbtAzureContainerInstanceBaseOperator):
+class ConcreteDbtAzureContainerInstanceOperator(DbtAzureContainerInstanceBase):
     base_cmd = ["cmd"]
 
 

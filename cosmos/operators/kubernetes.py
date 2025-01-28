@@ -9,7 +9,7 @@ from airflow.utils.context import Context, context_merge
 from cosmos.config import ProfileConfig
 from cosmos.dbt.parser.output import extract_log_issues
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtLSMixin,
@@ -42,14 +42,14 @@ except ImportError:
         )
 
 
-class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):  # type: ignore
+class DbtKubernetesBase(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
+        list(AbstractDbtBase.template_fields) + list(KubernetesPodOperator.template_fields)
     )
 
     intercept_flag = False
@@ -102,18 +102,18 @@ class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):
         self.arguments = dbt_cmd
 
 
-class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBaseOperator):
+class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBase):
     """
     Executes a dbt core build command.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBase.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):
+class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBase):
     """
     Executes a dbt core ls command.
     """
@@ -122,18 +122,18 @@ class DbtLSKubernetesOperator(DbtLSMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedKubernetesOperator(DbtSeedMixin, DbtKubernetesBaseOperator):
+class DbtSeedKubernetesOperator(DbtSeedMixin, DbtKubernetesBase):
     """
     Executes a dbt core seed command.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBase.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator):
+class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBase):
     """
     Executes a dbt core snapshot command.
     """
@@ -142,7 +142,7 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
+class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBase):
     """
     Executes a dbt source freshness command.
     """
@@ -151,18 +151,18 @@ class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
+class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBase):
     """
     Executes a dbt core run command.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBase.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
+class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBase):
     """
     Executes a dbt core test command.
     """
@@ -258,18 +258,18 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
             task.cleanup(pod=task.pod, remote_pod=task.remote_pod)
 
 
-class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBaseOperator):
+class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBase):
     """
     Executes a dbt core run-operation command.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBase.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtCloneKubernetesOperator(DbtCloneMixin, DbtKubernetesBaseOperator):
+class DbtCloneKubernetesOperator(DbtCloneMixin, DbtKubernetesBase):
     """Executes a dbt core clone command."""
 
     def __init__(self, *args: Any, **kwargs: Any):

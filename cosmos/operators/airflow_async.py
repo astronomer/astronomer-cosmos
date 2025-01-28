@@ -3,8 +3,8 @@ from __future__ import annotations
 import inspect
 
 from cosmos.config import ProfileConfig
-from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
-from cosmos.operators.base import AbstractDbtBaseOperator
+from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
+from cosmos.operators.base import AbstractDbtBase
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtCloneLocalOperator,
@@ -52,7 +52,7 @@ class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalO
     pass
 
 
-class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ignore
+class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncBigqueryOperator):  # type: ignore
 
     def __init__(  # type: ignore
         self,
@@ -65,18 +65,26 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
         # Cosmos attempts to pass many kwargs that async operator simply does not accept.
         # We need to pop them.
         clean_kwargs = {}
-        non_async_args = set(inspect.signature(AbstractDbtBaseOperator.__init__).parameters.keys())
+        non_async_args = set(inspect.signature(AbstractDbtBase.__init__).parameters.keys())
         non_async_args |= set(inspect.signature(DbtLocalBaseOperator.__init__).parameters.keys())
-        non_async_args -= {"task_id"}
+        # non_async_args -= {"task_id"}
+
+        dbt_kwargs = {}
 
         for arg_key, arg_value in kwargs.items():
-            if arg_key not in non_async_args:
+            if arg_key == "task_id":
                 clean_kwargs[arg_key] = arg_value
+                dbt_kwargs[arg_key] = arg_value
+            elif arg_key not in non_async_args:
+                clean_kwargs[arg_key] = arg_value
+            else:
+                dbt_kwargs[arg_key] = arg_value
 
         super().__init__(
             project_dir=project_dir,
             profile_config=profile_config,
             extra_context=extra_context,
+            dbt_kwargs=dbt_kwargs,
             **clean_kwargs,
         )
 

@@ -11,7 +11,7 @@ try:
     from cosmos.operators.gcp_cloud_run_job import (
         DbtBuildGcpCloudRunJobOperator,
         DbtCloneGcpCloudRunJobOperator,
-        DbtGcpCloudRunJobBaseOperator,
+        DbtGcpCloudRunJobBase,
         DbtLSGcpCloudRunJobOperator,
         DbtRunGcpCloudRunJobOperator,
         DbtRunOperationGcpCloudRunJobOperator,
@@ -21,7 +21,7 @@ try:
         DbtTestGcpCloudRunJobOperator,
     )
 
-    class ConcreteDbtGcpCloudRunJobOperator(DbtGcpCloudRunJobBaseOperator):
+    class ConcreteDbtGcpCloudRunJobOperator(DbtGcpCloudRunJobBase):
         base_cmd = ["cmd"]
 
 except (ImportError, AttributeError):
@@ -49,7 +49,7 @@ def skip_on_empty_operator(test_func):
     It is required as some tests don't rely on those operators and in this case we need to avoid throwing an exception.
     """
     return pytest.mark.skipif(
-        DbtGcpCloudRunJobBaseOperator is None, reason="DbtGcpCloudRunJobBaseOperator could not be imported"
+        DbtGcpCloudRunJobBase is None, reason="DbtGcpCloudRunJobBaseOperator could not be imported"
     )(test_func)
 
 

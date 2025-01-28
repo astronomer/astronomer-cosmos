@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
 import yaml
-from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context, context_merge
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
@@ -14,7 +13,7 @@ from airflow.utils.strings import to_boolean
 from cosmos.dbt.executable import get_system_dbt
 
 
-class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
+class AbstractDbtBase:
     """
     Executes a dbt core cli command.
 
@@ -140,7 +139,7 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
-        super().__init__(**kwargs)
+        # super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """
@@ -372,7 +371,7 @@ class DbtRunMixin:
 
     def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
-        super().__init__(**kwargs)
+        # super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags = []

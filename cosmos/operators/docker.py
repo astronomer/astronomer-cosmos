@@ -7,7 +7,7 @@ from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtLSMixin,
@@ -29,15 +29,13 @@ except ImportError:
     )
 
 
-class DbtDockerBaseOperator(AbstractDbtBaseOperator, DockerOperator):  # type: ignore
+class DbtDockerBase(AbstractDbtBase, DockerOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Docker container.
 
     """
 
-    template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBaseOperator.template_fields) + list(DockerOperator.template_fields)
-    )
+    template_fields: Sequence[str] = tuple(list(AbstractDbtBase.template_fields) + list(DockerOperator.template_fields))
 
     intercept_flag = False
 
@@ -80,18 +78,18 @@ class DbtDockerBaseOperator(AbstractDbtBaseOperator, DockerOperator):  # type: i
         self.command: list[str] = dbt_cmd
 
 
-class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBaseOperator):
+class DbtBuildDockerOperator(DbtBuildMixin, DbtDockerBase):
     """
     Executes a dbt core build command.
     """
 
-    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDockerBase.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):
+class DbtLSDockerOperator(DbtLSMixin, DbtDockerBase):
     """
     Executes a dbt core ls command.
     """
@@ -100,20 +98,20 @@ class DbtLSDockerOperator(DbtLSMixin, DbtDockerBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedDockerOperator(DbtSeedMixin, DbtDockerBaseOperator):
+class DbtSeedDockerOperator(DbtSeedMixin, DbtDockerBase):
     """
     Executes a dbt core seed command.
 
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDockerBase.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotDockerOperator(DbtSnapshotMixin, DbtDockerBaseOperator):
+class DbtSnapshotDockerOperator(DbtSnapshotMixin, DbtDockerBase):
     """
     Executes a dbt core snapshot command.
     """
@@ -122,7 +120,7 @@ class DbtSnapshotDockerOperator(DbtSnapshotMixin, DbtDockerBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceDockerOperator(DbtSourceMixin, DbtDockerBaseOperator):
+class DbtSourceDockerOperator(DbtSourceMixin, DbtDockerBase):
     """
     Executes a dbt source freshness command.
     """
@@ -131,18 +129,18 @@ class DbtSourceDockerOperator(DbtSourceMixin, DbtDockerBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunDockerOperator(DbtRunMixin, DbtDockerBaseOperator):
+class DbtRunDockerOperator(DbtRunMixin, DbtDockerBase):
     """
     Executes a dbt core run command.
     """
 
-    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDockerBase.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtTestDockerOperator(DbtTestMixin, DbtDockerBaseOperator):
+class DbtTestDockerOperator(DbtTestMixin, DbtDockerBase):
     """
     Executes a dbt core test command.
     """
@@ -153,7 +151,7 @@ class DbtTestDockerOperator(DbtTestMixin, DbtDockerBaseOperator):
         self.on_warning_callback = on_warning_callback
 
 
-class DbtRunOperationDockerOperator(DbtRunOperationMixin, DbtDockerBaseOperator):
+class DbtRunOperationDockerOperator(DbtRunOperationMixin, DbtDockerBase):
     """
     Executes a dbt core run-operation command.
 
@@ -162,13 +160,13 @@ class DbtRunOperationDockerOperator(DbtRunOperationMixin, DbtDockerBaseOperator)
         selected macro.
     """
 
-    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDockerBase.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtCloneDockerOperator(DbtCloneMixin, DbtDockerBaseOperator):
+class DbtCloneDockerOperator(DbtCloneMixin, DbtDockerBase):
     """
     Executes a dbt core clone command.
     """

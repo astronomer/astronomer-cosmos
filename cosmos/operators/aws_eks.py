@@ -9,7 +9,7 @@ from airflow.utils.context import Context
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
     DbtCloneKubernetesOperator,
-    DbtKubernetesBaseOperator,
+    DbtKubernetesBase,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
     DbtRunOperationKubernetesOperator,
@@ -23,7 +23,7 @@ DEFAULT_CONN_ID = "aws_default"
 DEFAULT_NAMESPACE = "default"
 
 
-class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
+class DbtAwsEksBaseOperator(DbtKubernetesBase):
     template_fields: Sequence[str] = tuple(
         {
             "cluster_name",
@@ -33,7 +33,7 @@ class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
             "aws_conn_id",
             "region",
         }
-        | set(DbtKubernetesBaseOperator.template_fields)
+        | set(DbtKubernetesBase.template_fields)
     )
 
     def __init__(

@@ -15,6 +15,7 @@ import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
@@ -73,7 +74,7 @@ from cosmos.hooks.subprocess import (
 from cosmos.log import get_logger
 from cosmos.mocked_dbt_adapters import PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP, PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtCompileMixin,
@@ -113,7 +114,7 @@ except (ImportError, ModuleNotFoundError):
             job_facets: dict[str, str] = dict()
 
 
-class DbtLocalBaseOperator(AbstractDbtBaseOperator):
+class AbstractDbtLocalBase(AbstractDbtBase):
     """
     Executes a dbt core cli command locally.
 
@@ -133,7 +134,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
         "freshness": "json",
@@ -704,6 +705,10 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 self.subprocess_hook.send_sigint()
             else:
                 self.subprocess_hook.send_sigterm()
+
+
+class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
+    pass
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

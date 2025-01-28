@@ -33,9 +33,9 @@ def mock_kubernetes_execute():
 
 @pytest.fixture()
 def base_operator(mock_kubernetes_execute):
-    from cosmos.operators.kubernetes import DbtKubernetesBaseOperator
+    from cosmos.operators.kubernetes import DbtKubernetesBase
 
-    class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
+    class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBase):
         base_cmd = ["cmd"]
 
     return ConcreteDbtKubernetesBaseOperator

@@ -73,7 +73,6 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
             if arg_key not in non_async_args:
                 clean_kwargs[arg_key] = arg_value
 
-        # The following are the minimum required parameters to run BigQueryInsertJobOperator using the deferrable mode
         super().__init__(
             project_dir=project_dir,
             profile_config=profile_config,

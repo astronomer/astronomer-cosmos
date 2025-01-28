@@ -70,7 +70,13 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBaseOperator, CloudRunExecuteJobO
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         super().__init__(project_id=project_id, region=region, job_name=job_name, **kwargs)
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = CloudRunExecuteJobOperator.execute(self, context)

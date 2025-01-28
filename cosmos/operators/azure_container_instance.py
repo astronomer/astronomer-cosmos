@@ -63,7 +63,13 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBaseOperator, AzureContai
             **kwargs,
         )
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> None:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = AzureContainerInstancesOperator.execute(self, context)

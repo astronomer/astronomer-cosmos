@@ -96,6 +96,8 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         # No virtualenv_dir set, so create a temporary virtualenv
         if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:

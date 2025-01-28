@@ -70,6 +70,7 @@ class RenderConfig:
     emit_datasets: bool = True
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
+    invocation_mode: InvocationMode = InvocationMode.DBT_RUNNER
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
     selector: str | None = None

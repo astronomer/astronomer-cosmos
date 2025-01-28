@@ -28,8 +28,9 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     module = importlib.import_module(module_name)
     Operator = getattr(module, class_name)
 
-    task_kwargs = deepcopy(task.arguments)
+    task_kwargs = task.arguments
     if task.owner != "":
+        task_kwargs = deepcopy(task.arguments)
         task_kwargs["owner"] = task.owner
 
     airflow_task = Operator(

@@ -30,5 +30,7 @@ seeds:
   jaffle_shop:
       +meta:
         cosmos:
-          operator_kwargs:
+          profile_config:
             profile_name: postgres_profile
+            profile_mapping:
+              threads: 2

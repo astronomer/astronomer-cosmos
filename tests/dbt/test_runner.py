@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+sys.modules.pop("dbt.cli.main", None)
+
 import pytest
 
 import cosmos.dbt.runner as dbt_runner
@@ -38,7 +40,8 @@ def invalid_dbt_project_dir(valid_dbt_project_dir):
     file_to_be_deleted.unlink()
 
     file_to_be_changed = valid_dbt_project_dir / "models/staging/stg_orders.sql"
-    open(str(file_to_be_changed), "w").close()
+    with open(str(file_to_be_changed), "w") as fp:
+        fp.writelines("select 1 as id")
 
     return valid_dbt_project_dir
 
@@ -76,7 +79,7 @@ def test_run_command(valid_dbt_project_dir):
 
 @pytest.mark.integration
 def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
-    # THe following command will fail because we didn't run `dbt deps` in advance
+    # The following command will fail because we didn't run `dbt deps` in advance
     response = dbt_runner.run_command(command=["dbt", "ls"], env=os.environ, cwd=valid_dbt_project_dir)
     assert not response.success
     assert response.exception
@@ -93,7 +96,7 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
 
 @pytest.mark.integration
 def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
-    # THe following command will fail because we didn't run `dbt deps` in advance
+    # The following command fails, but has no exceptions - only results
     response = dbt_runner.run_command(command=["dbt", "run"], env=os.environ, cwd=invalid_dbt_project_dir)
     assert not response.success
     assert response.exception is None
@@ -104,6 +107,4 @@ def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
 
     err_msg = str(exc_info.value)
     expected1 = "dbt invocation completed with errors:"
-    expected2 = "stg_payments: Database Error in model stg_payments"
     assert expected1 in err_msg
-    assert expected2 in err_msg

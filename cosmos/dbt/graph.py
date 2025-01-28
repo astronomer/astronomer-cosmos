@@ -648,10 +648,10 @@ class DbtGraph:
                 ]
 
                 self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
-                env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
                 self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
+                env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     if is_cache_package_lockfile_enabled(project_path):

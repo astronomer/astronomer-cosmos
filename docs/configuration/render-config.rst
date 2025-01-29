@@ -36,13 +36,14 @@ In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Pytho
 
 Although ``InvocationMode.DBT_RUNNER`` is the default behaviour in Cosmos 1.9, users can still specify which mode they would like to use:
 
-1. ``InvocationMode.SUBPROCESS``: In this mode, Cosmos runs dbt cli commands using the Python ``subprocess`` module and parses the output to capture logs and to raise exceptions.
+1. ``InvocationMode.SUBPROCESS``: (behaviour before Cosmos 1.9) In this mode, Cosmos runs dbt cli commands using the Python ``subprocess`` module and parses the output to capture logs and to raise exceptions.
 
-2. ``InvocationMode.DBT_RUNNER``: In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
+2. ``InvocationMode.DBT_RUNNER``: (default since Cosmos 1.9) In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
    In order to use this mode, dbt must be installed in the same local environment. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and is faster than ``InvocationMode.SUBPROCESS``. \
    This mode requires dbt version 1.5.0 or higher. It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
 
-This may be particularly necessary in case users have multiple Python virtual environments with different versions of dbt and its adaptors.
+Users may opt to use ``InvocationMode.SUBPROCESS`` when they have multiple Python virtual environments with different versions of dbt and its adaptors,
+and do not want Cosmos to use the dbt version installed in the same Python Virtualenv as Airflow to parse the DAG.
 
 
 Customizing how nodes are rendered (experimental)

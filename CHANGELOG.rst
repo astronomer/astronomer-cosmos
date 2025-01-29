@@ -10,13 +10,14 @@ Breaking changes
   While this represents significant performance improvements (half the vCPU usage and some memory consumption improvement), this may not work in
   scenarios where users had multiple Python virtual environments to manage different versions of dbt and its adaptors. In those cases,
   please, set ``RenderConfig(invocation_mode=InvocationMode.SUBPROCESS)`` to have the same behaviour Cosmos had in previous versions.
+  Additional information `here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls>`_ and `here <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 
 Features
 
-* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484
-* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484. Additional information `here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls>`_.
+* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495. Check out the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
-* Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492
+* Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492. More information `here <https://astronomer.github.io/astronomer-cosmos/profiles/#profile-customise-per-node>`_.
 
 Bug Fixes
 

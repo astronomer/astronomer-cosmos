@@ -9,7 +9,7 @@
    {% endfor %}
 
 Profiles Overview
-==========================
+==================
 
 Cosmos supports two methods of authenticating with your database:
 
@@ -43,9 +43,30 @@ is set in the ``cosmos.config.ProfileConfig`` object, like so:
     dag = DbtDag(profile_config=profile_config, ...)
 
 
+Using your own profiles.yml file
+++++++++++++++++++++++++++++++++
+
+If you don't want to use Airflow connections, or if there's no readily-available profile mapping for your database,
+you can use your own dbt profiles.yml file. To do so, you'll need to pass the path to your profiles.yml file to the
+``profiles_yml_filepath`` argument in ``ProfileConfig``.
+
+For example, the code snippet below points Cosmos at a ``profiles.yml`` file and instructs Cosmos to use the
+``my_snowflake_profile`` profile and ``dev`` target:
+
+.. code-block:: python
+
+    from cosmos.config import ProfileConfig
+
+    profile_config = ProfileConfig(
+        profile_name="my_snowflake_profile",
+        target_name="dev",
+        profiles_yml_filepath="/path/to/profiles.yml",
+    )
+
+    dag = DbtDag(profile_config=profile_config, ...)
 
 Using a profile mapping
-++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++
 
 Profile mappings are utilities provided by Cosmos that translate Airflow connections to dbt profiles. This means that
 you can use the same connection objects you use in Airflow to authenticate with your database in dbt. To do so, there's
@@ -83,40 +104,58 @@ but override the ``database`` and ``schema`` values:
 Note that when using a profile mapping, the profiles.yml file gets generated with the profile name and target name
 you specify in ``ProfileConfig``.
 
-Disabling dbt event tracking
---------------------------------
+Customising the profile config per dbt node
++++++++++++++++++++++++++++++++++++++++++++
+.. versionadded:: 1.9.0
 
-.. note:
-   Deprecated in v.1.4 and will be removed in v2.0.0. Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.
-.. versionadded:: 1.3
 
-By default `dbt will track events <https://docs.getdbt.com/reference/global-configs/usage-stats>`_ by sending anonymous usage data
-when dbt commands are invoked. Users have an option to opt out of event tracking by updating their ``profiles.yml`` file.
+Since Cosmos 1.9.0, it is possible to customise which profile is used per dbt node. This works both when using a
+``profile_mapping`` class or when using ``profiles_yml_filepath``.
 
-If you'd like to disable this behavior in the Cosmos generated profile, you can pass ``disable_event_tracking=True`` to the profile mapping like in
-the example below:
+Let's say the user configures the profile at a ``DbtDag`` or ``DbtTaskGroup`` level as:
 
 .. code-block:: python
 
-    from cosmos.profiles import SnowflakeUserPasswordProfileMapping
+    from cosmos.profiles import PostgresUserPasswordProfileMapping
 
     profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profile_mapping=SnowflakeUserPasswordProfileMapping(
-            conn_id="my_snowflake_conn_id",
-            profile_args={
-                "database": "my_snowflake_database",
-                "schema": "my_snowflake_schema",
-            },
-            disable_event_tracking=True,
+        profile_name="default_profile",
+        target_name="default_target",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="default_conn",
+            profile_args={"schema": "default_schema"},
         ),
     )
 
-    dag = DbtDag(profile_config=profile_config, ...)
+But that for a specific node or group of nodes, the user would like to replace:
+
+* ``profile_name`` to be "non_default_profile" as opposed to "default_profile"
+* ``target_name`` to be "stage" as opposed to "default_target"
+* ``conn_id`` to be "non_default_connection" as opposed to "default_conn"
+* ``schema`` to be "non_default_schema" as opposed to "default_schema"
+
+They could apply this different configuration to all the project seeds by doing:
+
+.. code-block::
+
+    seeds:
+      my_dbt_project:
+        +meta:
+          cosmos:
+            profile_config:
+              profile_name: non_default_profile
+              target_name: stage
+              profile_mapping:
+                conn_id: non_default_connection
+                profile_args:
+                  schema: non_default_schema
+
+This same mechanism works per individual dbt nodes, as discussed in `the operator args <../configuration/operator-args.html>` for operator arguments,
+to subsets of nodes selected based on path or other criteria that dbt supports.
+
 
 Dbt profile config variables
---------------------------------
+----------------------------
 .. versionadded:: 1.4.0
 
 The parts of ``profiles.yml``, which aren't specific to a particular data platform `dbt docs <https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml>`_
@@ -153,26 +192,34 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
     dag = DbtDag(profile_config=profile_config, ...)
 
 
+Disabling dbt event tracking
+++++++++++++++++++++++++++++
 
+.. note:
+   Deprecated in v.1.4 and will be removed in v2.0.0. Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.
+.. versionadded:: 1.3
 
-Using your own profiles.yml file
-++++++++++++++++++++++++++++++++++++
+By default `dbt will track events <https://docs.getdbt.com/reference/global-configs/usage-stats>`_ by sending anonymous usage data
+when dbt commands are invoked. Users have an option to opt out of event tracking by updating their ``profiles.yml`` file.
 
-If you don't want to use Airflow connections, or if there's no readily-available profile mapping for your database,
-you can use your own dbt profiles.yml file. To do so, you'll need to pass the path to your profiles.yml file to the
-``profiles_yml_filepath`` argument in ``ProfileConfig``.
-
-For example, the code snippet below points Cosmos at a ``profiles.yml`` file and instructs Cosmos to use the
-``my_snowflake_profile`` profile and ``dev`` target:
+If you'd like to disable this behavior in the Cosmos generated profile, you can pass ``disable_event_tracking=True`` to the profile mapping like in
+the example below:
 
 .. code-block:: python
 
-    from cosmos.config import ProfileConfig
+    from cosmos.profiles import SnowflakeUserPasswordProfileMapping
 
     profile_config = ProfileConfig(
-        profile_name="my_snowflake_profile",
-        target_name="dev",
-        profiles_yml_filepath="/path/to/profiles.yml",
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profile_mapping=SnowflakeUserPasswordProfileMapping(
+            conn_id="my_snowflake_conn_id",
+            profile_args={
+                "database": "my_snowflake_database",
+                "schema": "my_snowflake_schema",
+            },
+            disable_event_tracking=True,
+        ),
     )
 
     dag = DbtDag(profile_config=profile_config, ...)

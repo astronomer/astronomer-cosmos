@@ -34,6 +34,7 @@ from cosmos.constants import (
     DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
     ExecutionMode,
+    InvocationMode,
     LoadMode,
     SourceRenderingBehavior,
 )
@@ -218,7 +219,13 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
     return stdout
 
 
-def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log_dir: Path | None = None) -> str:
+def run_command(
+    command: list[str],
+    tmp_dir: Path,
+    env_vars: dict[str, str],
+    invocation_mode: InvocationMode,
+    log_dir: Path | None = None,
+) -> str:
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
     runner = "dbt Runner" if dbt_runner.is_available() else "Python subprocess"
@@ -226,7 +233,7 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str], log
     logger.info("Running command with %s: `%s`", runner, " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
 
-    if dbt_runner.is_available():
+    if invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available():
         stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
     else:
         stdout = run_command_with_subprocess(command, tmp_dir, env_vars)
@@ -530,7 +537,7 @@ class DbtGraph:
         ls_command.extend(self.local_flags)
         ls_command.extend(ls_args)
 
-        stdout = run_command(ls_command, tmp_dir, env_vars, self.log_dir)
+        stdout = run_command(ls_command, tmp_dir, env_vars, self.render_config.invocation_mode, self.log_dir)
 
         if self.should_use_dbt_ls_cache():
             self.save_dbt_ls_cache(stdout)
@@ -591,7 +598,7 @@ class DbtGraph:
         deps_command = [dbt_cmd, "deps"]
         deps_command.extend(self.local_flags)
         self._add_vars_arg(deps_command)
-        run_command(deps_command, dbt_project_path, env, self.log_dir)
+        run_command(deps_command, dbt_project_path, env, self.render_config.invocation_mode, self.log_dir)
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """

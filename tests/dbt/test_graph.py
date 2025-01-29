@@ -22,6 +22,7 @@ from cosmos.constants import (
     DBT_TARGET_DIR_NAME,
     DbtResourceType,
     ExecutionMode,
+    InvocationMode,
     SourceRenderingBehavior,
 )
 from cosmos.dbt.graph import (
@@ -1162,7 +1163,7 @@ def test_run_command(mock_popen, stdout, returncode):
     mock_popen.return_value.communicate.return_value = (stdout, "")
     mock_popen.return_value.returncode = returncode
 
-    return_value = run_command(fake_command, fake_dir, env_vars)
+    return_value = run_command(fake_command, fake_dir, env_vars, InvocationMode.DBT_RUNNER)
     args, kwargs = mock_popen.call_args
     assert args[0] == fake_command
     assert kwargs["cwd"] == fake_dir
@@ -1176,14 +1177,55 @@ def test_run_command(mock_popen, stdout, returncode):
 def test_run_command_success_with_log(tmp_dbt_project_dir):
     project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
     (project_dir / DBT_LOG_FILENAME).touch()
-    response = run_command(command=["dbt", "deps"], env_vars=os.environ, tmp_dir=project_dir, log_dir=project_dir)
+    response = run_command(
+        command=["dbt", "deps"],
+        env_vars=os.environ,
+        tmp_dir=project_dir,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        log_dir=project_dir,
+    )
     assert "Installing dbt-labs/dbt_utils" in response
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner")
+def test_run_command_forcing_subprocess(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    run_command(
+        command=["dbt", "deps"],
+        env_vars=os.environ,
+        tmp_dir=project_dir,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        log_dir=project_dir,
+    )
+    assert mock_subprocess.called
+    assert not mock_dbt_runner.called
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner")
+def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    run_command(
+        command=["dbt", "deps"],
+        env_vars=os.environ,
+        tmp_dir=project_dir,
+        invocation_mode=InvocationMode.DBT_RUNNER,
+        log_dir=project_dir,
+    )
+    assert not mock_subprocess.called
+    assert mock_dbt_runner.called
 
 
 @pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:
-        run_command(command=["dbt", "ls"], env_vars=os.environ, tmp_dir=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+        run_command(
+            command=["dbt", "ls"],
+            env_vars=os.environ,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+            tmp_dir=tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        )
     err_msg = "Unable to run dbt ls command due to missing dbt_packages"
     assert err_msg in str(err_info.value)
 
@@ -1199,7 +1241,9 @@ def test_run_command_with_dbt_runner_error(tmp_dbt_project_dir):
         fp.writelines("select 1 as id")
 
     with pytest.raises(CosmosLoadDbtException) as err_info:
-        run_command(command=["dbt", "run"], env_vars=os.environ, tmp_dir=project_dir)
+        run_command(
+            command=["dbt", "run"], env_vars=os.environ, invocation_mode=InvocationMode.DBT_RUNNER, tmp_dir=project_dir
+        )
     assert "Unable to run ['dbt', 'run']" in str(err_info.value)
 
 
@@ -1212,7 +1256,7 @@ def test_run_command_none_argument(mock_popen, caplog):
 
     mock_popen.return_value.communicate.return_value = ("Invalid None argument", None)
     with pytest.raises(CosmosLoadDbtException) as exc_info:
-        run_command(fake_command, fake_dir, env_vars)
+        run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
 
     expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nstderr: None\nstdout: Invalid None argument"
     assert str(exc_info.value) == expected
@@ -1656,7 +1700,9 @@ def test_run_dbt_deps(run_command_mock):
     graph = DbtGraph(project=project_config)
     graph.local_flags = []
     graph.run_dbt_deps("dbt", "/some/path", {})
-    run_command_mock.assert_called_with(["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {}, None)
+    run_command_mock.assert_called_with(
+        ["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {}, InvocationMode.DBT_RUNNER, None
+    )
 
 
 @pytest.fixture()

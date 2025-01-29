@@ -103,9 +103,6 @@ If you don't have a ``manifest.json`` file, Cosmos will attempt to generate one 
 
 When Cosmos runs ``dbt ls``, it also passes your ``select`` and ``exclude`` arguments to the command. This means that Cosmos will only generate a manifest for the models you want to run.
 
-Starting in Cosmos 1.5, Cosmos will cache the output of the ``dbt ls`` command, to improve the performance of this
-parsing method. Learn more `here <./caching.html>`_.
-
 To use this:
 
 .. code-block:: python
@@ -116,6 +113,28 @@ To use this:
         )
         # ...,
     )
+
+Starting in Cosmos 1.5, Cosmos will cache the output of the ``dbt ls`` command, to improve the performance of this
+parsing method. Learn more `here <./caching.html>`_.
+
+Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
+This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
+In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Python ``subprocess`` module, which can lead to significant CPU and memory usage.
+
+Users can force Cosmos to run ``dbt ls`` with subprocess and not ``dbtRunner``, by setting:
+
+.. code-block:: python
+
+    DbtDag(
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_LS, invocation_mode=InvocationMode.SUBPROCESS
+        )
+        # ...,
+    )
+
+
+For more information, check the `RenderConfig docs <./render-config.html>`_.
+
 
 ``dbt_ls_file``
 ----------------

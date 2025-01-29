@@ -107,6 +107,78 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     assert node.resource_name == expected_select
 
 
+def test_dbt_node_meta():
+    valid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {}}},
+    )
+    assert valid_node.meta == {}
+
+    invalid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": ""}},
+    )
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        invalid_node.meta
+
+    error_msg = "Error parsing dbt node <some-id>. Invalid type: 'cosmos' in meta must be a dict."
+    assert error_msg in str(exc_info.value)
+
+
+def test_dbt_node_operator_kwargs_to_override():
+    valid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"operator_kwargs": {}}}},
+    )
+    assert valid_node.operator_kwargs_to_override == {}
+
+    invalid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"operator_kwargs": ""}}},
+    )
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        invalid_node.operator_kwargs_to_override
+
+    error_msg = "Error parsing dbt node <some-id>. Invalid type: 'operator_kwargs' in meta.cosmos must be a dict."
+    assert error_msg in str(exc_info.value)
+
+
+def test_dbt_profile_config_to_override():
+    valid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config": {}}}},
+    )
+    assert valid_node.profile_config_to_override == {}
+
+    invalid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config": ""}}},
+    )
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        invalid_node.profile_config_to_override
+
+    error_msg = "Error parsing dbt node <some-id>. Invalid type: 'profile_config' in meta.cosmos must be a dict."
+    assert error_msg in str(exc_info.value)
+
+
 @pytest.mark.parametrize(
     "unique_id,expected_dict",
     [
@@ -1743,9 +1815,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "af89237a0cdef7edce53fe4d4160fa79"
+        assert hash_dir == "afbced719302d5b1efdfb191c617e349"
     else:
-        assert hash_dir == "9c9f712b6f6f1ace880dfc7f5f4ff051"
+        assert hash_dir == "0148da6f5f7fd260c9fa55c3b3c45168"
 
 
 @pytest.mark.integration

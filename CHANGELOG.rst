@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.9.0a1 (2025-01-20)
+#1.9.0a4 (2025-01-29)
 --------------------
 
 Breaking changes
@@ -10,15 +10,28 @@ Breaking changes
   While this represents significant performance improvements (half the vCPU usage and some memory consumption improvement), this may not work in
   scenarios where users had multiple Python virtual environments to manage different versions of dbt and its adaptors. In those cases,
   please, set ``RenderConfig(invocation_mode=InvocationMode.SUBPROCESS)`` to have the same behaviour Cosmos had in previous versions.
+  Additional information `here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls>`_ and `here <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 
 Features
 
-* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if dbt-core is available by @tatiana in #1484
-* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484. Additional information `here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls>`_.
+* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495. Check out the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
+* Add structure to support multiple db for async operator execution by @pankajastro in #1483
+* Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492. More information `here <https://astronomer.github.io/astronomer-cosmos/profiles/#profile-customise-per-node>`_.
 
 Bug Fixes
 
 * Fix select complex intersection of three tag-based graph selectors by @tatiana in #1466
+
+Enhancement
+
+* Fix OpenLineage deprecation warning by @CorsettiS in #1449
+* Move ``DbtRunner`` related functions into ``dbt/runner.py`` module by @tatiana in #1480
+
+Others
+
+* GitHub Actions Dependabot: #1487
+* Pre-commit updates: #1473, #1493
 
 
 1.8.2 (2025-01-15)

@@ -48,10 +48,10 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[mi
         # When using composition instead of inheritance to initialize the async class and run its execute method,
         # Airflow throws a `DuplicateTaskIdFound` error.
         DbtRunAirflowAsyncFactoryOperator.__bases__ = (async_operator_class,)
-        super().__init__(project_dir=project_dir, profile_config=profile_config, dbt_kwargs=dbt_kwargs, **kwargs)
-        self.async_context = extra_context
-        self.async_context["profile_type"] = "bigquery"
-        self.async_context["async_operator"] = async_operator_class
+        super().__init__(project_dir=project_dir, profile_config=profile_config, extra_context=extra_context, dbt_kwargs=dbt_kwargs, **kwargs)
+        # self.async_context = extra_context
+        # self.async_context["profile_type"] = "bigquery"
+        # self.async_context["async_operator"] = async_operator_class
 
     def create_async_operator(self) -> Any:
 

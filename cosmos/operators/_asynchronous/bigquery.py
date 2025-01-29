@@ -37,19 +37,18 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if "full_refresh" in kwargs:
             self.full_refresh = kwargs.pop("full_refresh")
         self.configuration: dict[str, Any] = {}
+        task_id = dbt_kwargs.pop("task_id")
+        AbstractDbtLocalBase.__init__(
+            self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **dbt_kwargs
+        )
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
             configuration=self.configuration,
             deferrable=True,
             **kwargs,
         )
-        task_id = dbt_kwargs.pop("task_id")
         # DbtRunMixin.__init__(self, **dbt_kwargs)
         # breakpoint()
-
-        AbstractDbtLocalBase.__init__(
-            self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **dbt_kwargs
-        )
         self.dbt_kwargs = dbt_kwargs
         self.async_context = extra_context
         self.async_context["profile_type"] = self.profile_config.get_profile_type()

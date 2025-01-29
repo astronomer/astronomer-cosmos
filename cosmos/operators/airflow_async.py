@@ -4,6 +4,7 @@ import inspect
 
 from cosmos.config import ProfileConfig
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
+from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBase
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -40,8 +41,15 @@ class DbtLSAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtLSLocalOperator)
     pass
 
 
-class DbtSeedAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSeedLocalOperator):  # type: ignore
-    pass
+class DbtSeedAirflowAsyncOperator(DbtSeedLocalOperator):  # type: ignore
+    def __init__(self, *args, **kwargs) -> None:
+        clean_kwargs = {}
+        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                clean_kwargs[arg_key] = arg_value
+        BaseOperator.__init__(self, **clean_kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class DbtSnapshotAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSnapshotLocalOperator):  # type: ignore
@@ -52,7 +60,7 @@ class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalO
     pass
 
 
-class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncBigqueryOperator):  # type: ignore
+class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ignore
 
     def __init__(  # type: ignore
         self,
@@ -89,8 +97,15 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncBigqueryOperator):  # type: i
         )
 
 
-class DbtTestAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtTestLocalOperator):  # type: ignore
-    pass
+class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):  # type: ignore
+    def __init__(self, *args, **kwargs) -> None:
+        clean_kwargs = {}
+        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                clean_kwargs[arg_key] = arg_value
+        super().__init__(*args, **kwargs)
+        BaseOperator.__init__(self, **clean_kwargs)
 
 
 class DbtRunOperationAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtRunOperationLocalOperator):  # type: ignore

@@ -266,7 +266,7 @@ class AbstractDbtBase:
     ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
-    def execute(self, context: Context) -> Any | None:  # type: ignore
+    def execute(self, context: Context, **kwargs) -> Any | None:  # type: ignore
         if self.extra_context:
             context_merge(context, self.extra_context)
 
@@ -371,7 +371,7 @@ class DbtRunMixin:
 
     def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
-        # super().__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags = []

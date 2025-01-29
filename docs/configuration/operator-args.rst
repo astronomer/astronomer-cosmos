@@ -36,8 +36,12 @@ Example of setting a Cosmos-specific operator argument:
     )
 
 
+.. _operator-args-per-node:
+
 Overriding operator arguments per dbt node (or group of nodes)
 -------------------------------------------------------------
+
+.. versionadded:: 1.8.0
 
 Cosmos 1.8 introduced the capability for users to customise the operator arguments per dbt node, or per group of dbt nodes.
 This can be done by defining the arguments via a dbt meta property alongside other dbt project configurations.
@@ -69,9 +73,9 @@ While configuring in the ``dbt_project.yml`` a different behaviour for the model
                   pool: expensive-pool
 
 
-More information about this feature can be found in `custom Airflow properties documentation <../getting_started/custom-airflow-properties.html>`_.
+More information about this feature can be found in :ref:`custom-airflow-properties`.
 
-To learn how to customise the profile per dbt model or Cosmos task, check the `correspondent documentation <../profiles/index.html>`_.
+To learn how to customise the profile per dbt model or Cosmos task, check :ref:`profile-customise-per-node`.
 
 Summary of Cosmos-specific arguments
 ------------------------------------

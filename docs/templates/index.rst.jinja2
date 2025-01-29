@@ -104,6 +104,8 @@ but override the ``database`` and ``schema`` values:
 Note that when using a profile mapping, the profiles.yml file gets generated with the profile name and target name
 you specify in ``ProfileConfig``.
 
+.. _profile-customise-per-node:
+
 Customising the profile config per dbt node
 +++++++++++++++++++++++++++++++++++++++++++
 .. versionadded:: 1.9.0
@@ -150,7 +152,7 @@ They could apply this different configuration to all the project seeds by doing:
                 profile_args:
                   schema: non_default_schema
 
-This same mechanism works per individual dbt nodes, as discussed in `the operator args <../configuration/operator-args.html>` for operator arguments,
+This same mechanism works per individual dbt nodes, as discussed in :ref:`operator-args-per-node`,
 to subsets of nodes selected based on path or other criteria that dbt supports.
 
 

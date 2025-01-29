@@ -3,7 +3,6 @@ from __future__ import annotations
 import inspect
 
 from cosmos.config import ProfileConfig
-from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBase
 from cosmos.operators.local import (

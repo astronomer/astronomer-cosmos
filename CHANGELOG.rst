@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.9.0a3 (2025-01-27)
+1.9.0a4 (2025-01-27)
 --------------------
 
 Breaking changes
@@ -13,10 +13,10 @@ Breaking changes
 
 Features
 
-* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if dbt-core is available by @tatiana in #1484
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484
 * Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
-* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484
+* Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492
 
 Bug Fixes
 
@@ -25,7 +25,6 @@ Bug Fixes
 Enhancement
 
 * Fix OpenLineage deprecation warning by @CorsettiS in #1449
-* Support overriding the ``profile_name`` per node or folder using config by @tatiana in #1492
 * Move ``DbtRunner`` related functions into ``dbt/runner.py`` module by @tatiana in #1480
 
 Others

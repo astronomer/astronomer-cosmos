@@ -97,7 +97,7 @@ def exclude_detached_tests_if_needed(
         task_args["exclude"] = exclude  # type: ignore
 
 
-def override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
+def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
     """
     Changes in-place the profile configuration if it needs to be overridden.
     """
@@ -162,7 +162,7 @@ def create_test_task_metadata(
 
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
-        override_profile_if_needed(task_args, node.profile_config_to_override)
+        _override_profile_if_needed(task_args, node.profile_config_to_override)
 
     args_to_override: dict[str, Any] = {}
     if node:
@@ -299,7 +299,7 @@ def create_task_metadata(
                 node, args, use_task_group, normalize_task_id, node.resource_type.value
             )
 
-        override_profile_if_needed(args, node.profile_config_to_override)
+        _override_profile_if_needed(args, node.profile_config_to_override)
 
         task_metadata = TaskMetadata(
             id=task_id,

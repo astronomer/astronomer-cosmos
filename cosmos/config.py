@@ -51,6 +51,7 @@ class RenderConfig:
     dependencies. Defaults to True
     :param test_behavior: The behavior for running tests. Defaults to after each (model)
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
+    :param invocation_mode: If `LoadMode.DBT_LS` is used, define how dbt ls should be run: using dbtRunner (default) or Python subprocess.
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param selector: Name of a dbt YAML selector to use for parsing. Only supported when using ``load_method=LoadMode.DBT_LS``.

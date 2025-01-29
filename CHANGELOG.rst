@@ -4,6 +4,18 @@ Changelog
 1.9.0a1 (2025-01-20)
 --------------------
 
+Breaking changes
+
+* When using ``LoadMode.DBT_LS``, Cosmos will now attempt to use the ``dbtRunner`` as opposed to subprocess to run ``dbt ls``.
+  While this represents significant performance improvements (half the vCPU usage and some memory consumption improvement), this may not work in
+  scenarios where users had multiple Python virtual environments to manage different versions of dbt and its adaptors. In those cases,
+  please, set ``RenderConfig(invocation_mode=InvocationMode.SUBPROCESS)`` to have the same behaviour Cosmos had in previous versions.
+
+Features
+
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if dbt-core is available by @tatiana in #1484
+* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495
+
 Bug Fixes
 
 * Fix select complex intersection of three tag-based graph selectors by @tatiana in #1466

@@ -10,6 +10,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. Depends on `additional dependencies <lineage.html>`_. If a model in the project has a name containing multibyte characters, the dataset name will be URL-encoded.
 - ``test_behavior``: how to run tests. Defaults to running a model's tests immediately after the model is run. For more information, see the `Testing Behavior <testing-behavior.html>`_ section.
 - ``load_method``: how to load your dbt project. See `Parsing Methods <parsing-methods.html>`_ for more information.
+- ``invocation_mode``: (new in v1.9) how to run ``dbt ls``, when using ``LoadMode.DBT_LS``. Learn more about this below.
 - ``select`` and ``exclude``: which models to include or exclude from your DAGs. See `Selecting & Excluding <selecting-excluding.html>`_ for more information.
 - ``selector``: (new in v1.3) name of a dbt YAML selector to use for DAG parsing. Only supported when using ``load_method=LoadMode.DBT_LS``. See `Selecting & Excluding <selecting-excluding.html>`_ for more information.
 - ``dbt_deps``: A Boolean to run dbt deps when using dbt ls for dag parsing. Default True
@@ -22,6 +23,27 @@ The ``RenderConfig`` class takes the following arguments:
 - ``normalize_task_id``: A callable that takes a dbt node as input and returns the task ID. This function allows users to set a custom task_id independently of the model name, which can be specified as the task’s display_name. This way, task_id can be modified using a user-defined function, while the model name remains as the task’s display name. The display_name parameter is available in Airflow 2.9 and above. See `Task display name <./task-display-name.html>`_ for more information.
 - ``load_method``: how to load your dbt project. See `Parsing Methods <parsing-methods.html>`_ for more information.
 - ``should_detach_multiple_parents_tests``: A boolean to control if tests that depend on multiple parents should be run as standalone tasks. See `Parsing Methods <testing-behavior.html>`_ for more information.
+
+
+How to run dbt ls (invocation mode)
+-----------------------------------
+
+When using ``LoadMode.DBT_LS``, Cosmos runs ``dbt ls`` to parse the dbt project.
+
+Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
+This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
+In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Python ``subprocess`` module, which can lead to significant CPU and memory usage (including OOM errors), both in the scheduler and worker nodes.
+
+Although ``InvocationMode.DBT_RUNNER`` is the default behaviour in Cosmos 1.9, users can still specify which mode they would like to use:
+
+1. ``InvocationMode.SUBPROCESS``: In this mode, Cosmos runs dbt cli commands using the Python ``subprocess`` module and parses the output to capture logs and to raise exceptions.
+
+2. ``InvocationMode.DBT_RUNNER``: In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
+   In order to use this mode, dbt must be installed in the same local environment. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and is faster than ``InvocationMode.SUBPROCESS``. \
+   This mode requires dbt version 1.5.0 or higher. It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
+
+This may be particularly necessary in case users have multiple Python virtual environments with different versions of dbt and its adaptors.
+
 
 Customizing how nodes are rendered (experimental)
 -------------------------------------------------

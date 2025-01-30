@@ -53,16 +53,15 @@ class DbtAwsEcsBaseOperator(AbstractDbtBaseOperator, EcsRunTaskOperator):  # typ
         profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
         environment_variables: dict[str, Any] | None = None,
-        overrides: dict[str, Any] | None = {"containerOverrides": []},
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        # Override Ecs Task Run default arguments with dbt command
-        self.overrides = overrides
         self.container_name = container_name
-        super().__init__(aws_conn_id=aws_conn_id, task_definition=task_definition, cluster=cluster, **kwargs)
+        super().__init__(
+            aws_conn_id=aws_conn_id, task_definition=task_definition, cluster=cluster, overrides=None, **kwargs
+        )
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_command(context, cmd_flags)
@@ -78,6 +77,16 @@ class DbtAwsEcsBaseOperator(AbstractDbtBaseOperator, EcsRunTaskOperator):  # typ
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.environment_variables = {**env_vars, **self.environment_variables}
         self.command = dbt_cmd
+        # Override Ecs Task Run default arguments with dbt command
+        self.overrides = {
+            "containerOverrides": [
+                {
+                    "name": self.container_name,
+                    "command": self.command,
+                    "environment": [{"name": key, "value": value} for key, value in self.environment_variables.items()],
+                }
+            ]
+        }
 
 
 class DbtBuildAwsEcsOperator(DbtBuildMixin, DbtAwsEcsBaseOperator):

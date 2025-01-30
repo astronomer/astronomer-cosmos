@@ -41,7 +41,7 @@ except ImportError:
     )
 
 
-class DbtGcpCloudRunJobBase(AbstractDbtBase, CloudRunExecuteJobOperator):  # type: ignore
+class DbtGcpCloudRunJobBase(CloudRunExecuteJobOperator, AbstractDbtBase):  # type: ignore
     """
     Executes a dbt core cli command in a Cloud Run Job instance with dbt installed in it.
 

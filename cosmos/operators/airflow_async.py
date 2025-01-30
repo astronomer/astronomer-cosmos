@@ -47,7 +47,7 @@ class DbtSeedAirflowAsyncOperator(DbtSeedLocalOperator):  # type: ignore
         for arg_key, arg_value in kwargs.items():
             if arg_key in base_operator_args:
                 clean_kwargs[arg_key] = arg_value
-        BaseOperator.__init__(self, **clean_kwargs)
+        # BaseOperator.__init__(self, **clean_kwargs)
         super().__init__(*args, **kwargs)
 
 
@@ -104,7 +104,7 @@ class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):  # type: ignore
             if arg_key in base_operator_args:
                 clean_kwargs[arg_key] = arg_value
         super().__init__(*args, **kwargs)
-        BaseOperator.__init__(self, **clean_kwargs)
+        # BaseOperator.__init__(self, **clean_kwargs)
 
 
 class DbtRunOperationAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtRunOperationLocalOperator):  # type: ignore

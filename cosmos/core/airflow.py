@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
+from copy import deepcopy
 
 from airflow.models import BaseOperator
 from airflow.models.dag import DAG
@@ -28,20 +28,17 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     module = importlib.import_module(module_name)
     Operator = getattr(module, class_name)
 
-    task_kwargs: dict[str, Any] = {}
+    task_kwargs = task.arguments
     if task.owner != "":
+        task_kwargs = deepcopy(task.arguments)
         task_kwargs["owner"] = task.owner
-
-    for k, v in task.airflow_task_config.items():
-        task_kwargs[k] = v
 
     airflow_task = Operator(
         task_id=task.id,
         dag=dag,
         task_group=task_group,
-        **task_kwargs,
         **({} if class_name == "EmptyOperator" else {"extra_context": task.extra_context}),
-        **task.arguments,
+        **task_kwargs,
     )
 
     if not isinstance(airflow_task, BaseOperator):

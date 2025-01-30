@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
+from copy import deepcopy
 from typing import Any, Callable, Union
 
 from airflow.models import BaseOperator
@@ -95,6 +96,22 @@ def exclude_detached_tests_if_needed(
         task_args["exclude"] = exclude  # type: ignore
 
 
+def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
+    """
+    Changes in-place the profile configuration if it needs to be overridden.
+    """
+    if profile_kwargs_override:
+        modified_profile_config = deepcopy(task_kwargs["profile_config"])
+        modified_profile_kwargs_override = deepcopy(profile_kwargs_override)
+        profile_mapping_override = modified_profile_kwargs_override.pop("profile_mapping", {})
+        for key, value in modified_profile_kwargs_override.items():
+            setattr(modified_profile_config, key, value)
+        if modified_profile_config.profile_mapping and profile_mapping_override:
+            for key, value in profile_mapping_override.items():
+                setattr(modified_profile_config.profile_mapping, key, value)
+        task_kwargs["profile_config"] = modified_profile_config
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
@@ -123,7 +140,7 @@ def create_test_task_metadata(
     detached_from_parent = detached_from_parent or {}
 
     task_owner = ""
-    airflow_task_config = {}
+
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
@@ -136,7 +153,6 @@ def create_test_task_metadata(
 
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
-        airflow_task_config = node.airflow_task_config
 
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
@@ -145,16 +161,20 @@ def create_test_task_metadata(
 
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
+        _override_profile_if_needed(task_args, node.profile_config_to_override)
+
+    args_to_override: dict[str, Any] = {}
+    if node:
+        args_to_override = node.operator_kwargs_to_override
 
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
-        airflow_task_config=airflow_task_config,
         operator_class=calculate_operator_class(
             execution_mode=execution_mode,
             dbt_class="DbtTest",
         ),
-        arguments=task_args,
+        arguments={**task_args, **args_to_override},
         extra_context=extra_context,
     )
 
@@ -278,14 +298,15 @@ def create_task_metadata(
                 node, args, use_task_group, normalize_task_id, node.resource_type.value
             )
 
+        _override_profile_if_needed(args, node.profile_config_to_override)
+
         task_metadata = TaskMetadata(
             id=task_id,
             owner=node.owner,
-            airflow_task_config=node.airflow_task_config,
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),
-            arguments=args,
+            arguments={**args, **node.operator_kwargs_to_override},
             extra_context=extra_context,
         )
         return task_metadata

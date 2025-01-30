@@ -17,7 +17,14 @@ from airflow.models import Variable
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DBT_TARGET_DIR_NAME, DbtResourceType, ExecutionMode, SourceRenderingBehavior
+from cosmos.constants import (
+    DBT_LOG_FILENAME,
+    DBT_TARGET_DIR_NAME,
+    DbtResourceType,
+    ExecutionMode,
+    InvocationMode,
+    SourceRenderingBehavior,
+)
 from cosmos.dbt.graph import (
     CosmosLoadDbtException,
     DbtGraph,
@@ -98,6 +105,78 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
     assert node.name == expected_name
     assert node.resource_name == expected_select
+
+
+def test_dbt_node_meta():
+    valid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {}}},
+    )
+    assert valid_node.meta == {}
+
+    invalid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": ""}},
+    )
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        invalid_node.meta
+
+    error_msg = "Error parsing dbt node <some-id>. Invalid type: 'cosmos' in meta must be a dict."
+    assert error_msg in str(exc_info.value)
+
+
+def test_dbt_node_operator_kwargs_to_override():
+    valid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"operator_kwargs": {}}}},
+    )
+    assert valid_node.operator_kwargs_to_override == {}
+
+    invalid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"operator_kwargs": ""}}},
+    )
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        invalid_node.operator_kwargs_to_override
+
+    error_msg = "Error parsing dbt node <some-id>. Invalid type: 'operator_kwargs' in meta.cosmos must be a dict."
+    assert error_msg in str(exc_info.value)
+
+
+def test_dbt_profile_config_to_override():
+    valid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config": {}}}},
+    )
+    assert valid_node.profile_config_to_override == {}
+
+    invalid_node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config": ""}}},
+    )
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        invalid_node.profile_config_to_override
+
+    error_msg = "Error parsing dbt node <some-id>. Invalid type: 'profile_config' in meta.cosmos must be a dict."
+    assert error_msg in str(exc_info.value)
 
 
 @pytest.mark.parametrize(
@@ -439,15 +518,37 @@ def test_load(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@pytest.mark.parametrize(
+    "runner,enable_cache_profile",
+    [
+        ("subprocess", True),
+        ("subprocess", False),
+        ("dbt_runner", True),
+        ("dbt_runner", False),
+    ],
+)
 @patch("cosmos.config.is_profile_cache_enabled")
 @patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.dbt_runner.run_command")
 def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
-    mock_popen, is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config
+    mock_dbt_runner,
+    mock_popen,
+    is_profile_cache_enabled,
+    runner,
+    enable_cache_profile,
+    tmp_dbt_project_dir,
+    postgres_profile_config,
 ):
+    import_patch = None
+    if runner == "subprocess":
+        original_sys_modules = sys.modules
+        import_patch = patch.dict(sys.modules, {"dbt.cli.main": None})
+        import_patch.start()
+        mock_popen().communicate.return_value = ("", "")
+        mock_popen().returncode = 0
+
     is_profile_cache_enabled.return_value = enable_cache_profile
-    mock_popen().communicate.return_value = ("", "")
-    mock_popen().returncode = 0
+
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
@@ -467,7 +568,12 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
-    used_cwd = Path(mock_popen.call_args[0][0][5])
+    if import_patch is not None:
+        used_cwd = Path(mock_popen.call_args[0][0][5])
+        import_patch.stop()
+        sys.modules = original_sys_modules
+    else:
+        used_cwd = Path(mock_dbt_runner.call_args[1]["cwd"])
     assert used_cwd != project_config.dbt_project_path
     assert not used_cwd.exists()
 
@@ -637,7 +743,14 @@ def test_load_via_dbt_ls_with_sources(load_method):
 
 
 @pytest.mark.integration
-def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
+@pytest.mark.parametrize("runner", ("subprocess", "dbt_runner"))
+def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
+    some_patch = None
+    if runner == "subprocess":
+        original_sys_modules = sys.modules
+        some_patch = patch.dict(sys.modules, {"dbt.cli.main": None})
+        some_patch.start()
+
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
     render_config = RenderConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
@@ -657,6 +770,10 @@ def test_load_via_dbt_ls_without_dbt_deps(postgres_profile_config):
 
     expected = "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
     assert err_info.value.args[0] == expected
+
+    if some_patch is not None:
+        sys.modules = original_sys_modules
+        some_patch.stop()
 
 
 @pytest.mark.integration
@@ -703,15 +820,18 @@ def test_load_via_dbt_ls_without_dbt_deps_and_preinstalled_dbt_packages(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("enable_cache_profile", [True, False])
+@pytest.mark.parametrize("enable_cache_profile", (True, False))
 @patch("cosmos.config.is_profile_cache_enabled")
-def test_load_via_dbt_ls_caching_partial_parsing(
-    is_profile_cache_enabled, enable_cache_profile, tmp_dbt_project_dir, postgres_profile_config, caplog, tmp_path
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_load_via_dbt_ls_caching_partial_parsing_subprocess(
+    is_profile_cache_enabled,
+    enable_cache_profile,
+    tmp_dbt_project_dir,
+    postgres_profile_config,
+    caplog,
+    tmp_path,
 ):
-    """
-    When using RenderConfig.enable_mock_profile=False and defining DbtGraph.cache_dir,
-    Cosmos should leverage dbt partial parsing.
-    """
+
     caplog.set_level(logging.DEBUG)
 
     is_profile_cache_enabled.return_value = enable_cache_profile
@@ -822,6 +942,7 @@ def test_load_via_dbt_ls_with_zero_returncode_and_non_empty_stderr(
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_config):
     mock_popen().communicate.return_value = ("", "Some stderr message")
     mock_popen().returncode = 1
@@ -845,6 +966,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_c
 
 @pytest.mark.integration
 @patch("cosmos.dbt.graph.Popen.communicate", return_value=("Some Runtime Error", ""))
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, postgres_profile_config):
     # It may seem strange, but at least until dbt 1.6.0, there are circumstances when it outputs errors to stdout
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -1104,6 +1226,7 @@ def test_load_via_dbt_ls_file():
     ],
 )
 @patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_run_command(mock_popen, stdout, returncode):
     fake_command = ["fake", "command"]
     fake_dir = Path("fake_dir")
@@ -1112,7 +1235,7 @@ def test_run_command(mock_popen, stdout, returncode):
     mock_popen.return_value.communicate.return_value = (stdout, "")
     mock_popen.return_value.returncode = returncode
 
-    return_value = run_command(fake_command, fake_dir, env_vars)
+    return_value = run_command(fake_command, fake_dir, env_vars, InvocationMode.DBT_RUNNER)
     args, kwargs = mock_popen.call_args
     assert args[0] == fake_command
     assert kwargs["cwd"] == fake_dir
@@ -1121,7 +1244,83 @@ def test_run_command(mock_popen, stdout, returncode):
     assert return_value == stdout
 
 
+@pytest.mark.integration
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_run_command_success_with_log(tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    (project_dir / DBT_LOG_FILENAME).touch()
+    response = run_command(
+        command=["dbt", "deps"],
+        env_vars=os.environ,
+        tmp_dir=project_dir,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        log_dir=project_dir,
+    )
+    assert "Installing dbt-labs/dbt_utils" in response
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner")
+def test_run_command_forcing_subprocess(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    run_command(
+        command=["dbt", "deps"],
+        env_vars=os.environ,
+        tmp_dir=project_dir,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        log_dir=project_dir,
+    )
+    assert mock_subprocess.called
+    assert not mock_dbt_runner.called
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner")
+def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    run_command(
+        command=["dbt", "deps"],
+        env_vars=os.environ,
+        tmp_dir=project_dir,
+        invocation_mode=InvocationMode.DBT_RUNNER,
+        log_dir=project_dir,
+    )
+    assert not mock_subprocess.called
+    assert mock_dbt_runner.called
+
+
+@pytest.mark.integration
+def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        run_command(
+            command=["dbt", "ls"],
+            env_vars=os.environ,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+            tmp_dir=tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        )
+    err_msg = "Unable to run dbt ls command due to missing dbt_packages"
+    assert err_msg in str(err_info.value)
+
+
+@pytest.mark.integration
+def test_run_command_with_dbt_runner_error(tmp_dbt_project_dir):
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    file_to_be_deleted = project_dir / "packages.yml"
+    file_to_be_deleted.unlink()
+
+    file_to_be_changed = project_dir / "models/staging/stg_orders.sql"
+    with open(str(file_to_be_changed), "w") as fp:
+        fp.writelines("select 1 as id")
+
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        run_command(
+            command=["dbt", "run"], env_vars=os.environ, invocation_mode=InvocationMode.DBT_RUNNER, tmp_dir=project_dir
+        )
+    assert "Unable to run ['dbt', 'run']" in str(err_info.value)
+
+
 @patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_run_command_none_argument(mock_popen, caplog):
     fake_command = ["invalid-cmd", None]
     fake_dir = Path("fake_dir")
@@ -1129,7 +1328,7 @@ def test_run_command_none_argument(mock_popen, caplog):
 
     mock_popen.return_value.communicate.return_value = ("Invalid None argument", None)
     with pytest.raises(CosmosLoadDbtException) as exc_info:
-        run_command(fake_command, fake_dir, env_vars)
+        run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
 
     expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nstderr: None\nstdout: Invalid None argument"
     assert str(exc_info.value) == expected
@@ -1232,6 +1431,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_project_config_env_vars(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
@@ -1267,6 +1467,7 @@ def test_load_via_dbt_ls_project_config_env_vars(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_profile_created_correctly_with_profile_mapping(
     mock_validate,
     mock_update_nodes,
@@ -1300,6 +1501,7 @@ def test_profile_created_correctly_with_profile_mapping(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_project_config_dbt_vars(
     mock_validate, mock_update_nodes, mock_popen, mock_use_case, tmp_dbt_project_dir
 ):
@@ -1334,6 +1536,7 @@ def test_load_via_dbt_ls_project_config_dbt_vars(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
@@ -1370,6 +1573,7 @@ def test_load_via_dbt_ls_render_config_selector_arg_is_used(
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_render_config_no_partial_parse(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):
@@ -1568,7 +1772,9 @@ def test_run_dbt_deps(run_command_mock):
     graph = DbtGraph(project=project_config)
     graph.local_flags = []
     graph.run_dbt_deps("dbt", "/some/path", {})
-    run_command_mock.assert_called_with(["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {})
+    run_command_mock.assert_called_with(
+        ["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {}, InvocationMode.DBT_RUNNER, None
+    )
 
 
 @pytest.fixture()
@@ -1609,9 +1815,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "fa5edac64de49909d4b8cbc4dc8abd4f"
+        assert hash_dir == "afbced719302d5b1efdfb191c617e349"
     else:
-        assert hash_dir == "9c9f712b6f6f1ace880dfc7f5f4ff051"
+        assert hash_dir == "0148da6f5f7fd260c9fa55c3b3c45168"
 
 
 @pytest.mark.integration

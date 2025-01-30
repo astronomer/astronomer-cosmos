@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
+import cosmos.dbt.runner as dbt_runner
 from cosmos import cache, settings
 from cosmos.cache import (
     _configure_remote_cache_dir,
@@ -33,6 +34,7 @@ from cosmos.constants import (
     DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
     ExecutionMode,
+    InvocationMode,
     LoadMode,
     SourceRenderingBehavior,
 )
@@ -68,31 +70,50 @@ class DbtNode:
     has_test: bool = False
 
     @property
-    def airflow_task_config(self) -> Dict[str, Any]:
+    def meta(self) -> Dict[str, Any]:
         """
-        This method is designed to extend the dbt project's functionality by incorporating Airflow-related metadata into the dbt YAML configuration.
-        Since dbt projects are independent of Airflow, adding Airflow-specific information to the `meta` field within the dbt YAML allows Airflow tasks to
-        utilize this information during execution.
+        Extract node-specific configuration declared in the model dbt YAML configuration.
+        These will be used while instantiating Airflow tasks.
+        """
+        value = self.config.get("meta", {}).get("cosmos", {})
+        if not isinstance(value, dict):
+            raise CosmosLoadDbtException(
+                f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'cosmos' in meta must be a dict."
+            )
+        return value
+
+    @property
+    def operator_kwargs_to_override(self) -> Dict[str, Any]:
+        """
+        Extract the configuration that will be used to override, at a node level, the keyword arguments passed to create
+        the correspondent Airflow task (named `operator_args` at the `DbtDag` or `DbtTaskGroup` level).
 
         Examples: pool, pool_slots, queue, ...
-        Returns:
-            Dict[str, Any]: A dictionary containing custom metadata configurations for integration with Airflow.
-        """
 
-        if "meta" in self.config:
-            meta = self.config["meta"]
-            if "cosmos" in meta:
-                cosmos = meta["cosmos"]
-                if isinstance(cosmos, dict):
-                    if "operator_kwargs" in cosmos:
-                        operator_kwargs = cosmos["operator_kwargs"]
-                        if isinstance(operator_kwargs, dict):
-                            return operator_kwargs
-                    else:
-                        logger.error(f"Invalid type: 'operator_kwargs' in meta.cosmos must be a dict.")
-                else:
-                    logger.error(f"Invalid type: 'cosmos' in meta must be a dict.")
-        return {}
+        :returns: A dictionary containing the Airflow task argument keys and values.
+        """
+        operator_kwargs = self.meta.get("operator_kwargs", {})
+        if not isinstance(operator_kwargs, dict):
+            raise CosmosLoadDbtException(
+                f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'operator_kwargs' in meta.cosmos must be a dict."
+            )
+        return operator_kwargs
+
+    @property
+    def profile_config_to_override(self) -> Dict[str, Any]:
+        """
+        Extract the configuration that will be used to override, at a node level, the profile configuration.
+
+        Examples: `profile_name`, `target_name`, `profiles_yml_filepath`.
+
+        :returns: A dictionary containing the profile configuration that should be overridden at a task-level.
+        """
+        operator_kwargs = self.meta.get("profile_config", {})
+        if not isinstance(operator_kwargs, dict):
+            raise CosmosLoadDbtException(
+                f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'profile_config' in meta.cosmos must be a dict."
+            )
+        return operator_kwargs
 
     @property
     def resource_name(self) -> str:
@@ -158,11 +179,8 @@ def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
     return False
 
 
-def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
+def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
-    command = [str(arg) if arg is not None else "<None>" for arg in command]
-    logger.info("Running command: `%s`", " ".join(command))
-    logger.debug("Environment variable keys: %s", env_vars.keys())
     process = Popen(
         command,
         stdout=PIPE,
@@ -182,6 +200,72 @@ def run_command(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> 
     if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
         details = f"stderr: {stderr}\nstdout: {stdout}"
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
+
+    return stdout
+
+
+def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_vars: dict[str, str]) -> str:
+    """Run a command with dbtRunner, returning the stdout."""
+    response = dbt_runner.run_command(command=command, env=env_vars, cwd=str(tmp_dir))
+
+    stderr = ""
+    stdout = ""
+    result_list = (
+        [json.dumps(item.to_dict()) if hasattr(item, "to_dict") else item for item in response.result]
+        if response.result
+        else []
+    )
+    if response.result:
+        stdout = "\n".join(result_list)
+
+    if not response.success:
+        if response.exception:
+            stderr = str(response.exception)
+            if 'Run "dbt deps" to install package dependencies' in stderr and command[1] == "ls":
+                raise CosmosLoadDbtException(
+                    "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
+                )
+        elif response.result:
+            node_names, node_results = dbt_runner.extract_message_by_status(
+                response, ["error", "fail", "runtime error"]
+            )
+            stderr = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
+
+    if stderr:
+        details = f"stderr: {stderr}\nstdout: {stdout}"
+        raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
+
+    return stdout
+
+
+def run_command(
+    command: list[str],
+    tmp_dir: Path,
+    env_vars: dict[str, str],
+    invocation_mode: InvocationMode,
+    log_dir: Path | None = None,
+) -> str:
+    """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
+
+    runner = "dbt Runner" if dbt_runner.is_available() else "Python subprocess"
+    command = [str(arg) if arg is not None else "<None>" for arg in command]
+    logger.info("Running command with %s: `%s`", runner, " ".join(command))
+    logger.debug("Environment variable keys: %s", env_vars.keys())
+
+    if invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available():
+        stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
+    else:
+        stdout = run_command_with_subprocess(command, tmp_dir, env_vars)
+
+    logger.debug("dbt ls output: %s", stdout)
+
+    if log_dir is not None:
+        log_filepath = log_dir / DBT_LOG_FILENAME
+        logger.debug("dbt logs available in: %s", log_filepath)
+        if log_filepath.exists():
+            with open(log_filepath) as logfile:
+                for line in logfile:
+                    logger.debug(line.strip())
 
     return stdout
 
@@ -262,6 +346,7 @@ class DbtGraph:
             self.dbt_ls_cache_key = ""
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
+        self.log_dir: Path | None = None
 
     @cached_property
     def env_vars(self) -> dict[str, str]:
@@ -471,15 +556,7 @@ class DbtGraph:
         ls_command.extend(self.local_flags)
         ls_command.extend(ls_args)
 
-        stdout = run_command(ls_command, tmp_dir, env_vars)
-
-        logger.debug("dbt ls output: %s", stdout)
-        log_filepath = self.log_dir / DBT_LOG_FILENAME
-        logger.debug("dbt logs available in: %s", log_filepath)
-        if log_filepath.exists():
-            with open(log_filepath) as logfile:
-                for line in logfile:
-                    logger.debug(line.strip())
+        stdout = run_command(ls_command, tmp_dir, env_vars, self.render_config.invocation_mode, self.log_dir)
 
         if self.should_use_dbt_ls_cache():
             self.save_dbt_ls_cache(stdout)
@@ -540,8 +617,7 @@ class DbtGraph:
         deps_command = [dbt_cmd, "deps"]
         deps_command.extend(self.local_flags)
         self._add_vars_arg(deps_command)
-        stdout = run_command(deps_command, dbt_project_path, env)
-        logger.debug("dbt deps output: %s", stdout)
+        run_command(deps_command, dbt_project_path, env, self.render_config.invocation_mode, self.log_dir)
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """
@@ -597,10 +673,11 @@ class DbtGraph:
                     self.profile_config.target_name,
                 ]
 
-                self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
-                env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
+
+                self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
+                env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
 
                 if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     if is_cache_package_lockfile_enabled(project_path):

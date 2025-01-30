@@ -41,6 +41,16 @@ parent_seed = DbtNode(
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
+    config={
+        "meta": {
+            "cosmos": {
+                "profile_config": {
+                    "profile_name": "new_profile",
+                    "profile_mapping": {"profile_args": {"schema": "different"}},
+                }
+            }
+        }
+    },
 )
 parent_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent",
@@ -295,6 +305,46 @@ def test_build_airflow_graph_with_build():
     assert len(dag.leaves) == 2
     assert dag.leaves[0].task_id in ("child_model_build", "child2_v2_model_build")
     assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4"),
+    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
+)
+@pytest.mark.integration
+def test_build_airflow_graph_with_override_profile_config():
+    nodes_subset = {parent_seed.unique_id: parent_seed, parent_node.unique_id: parent_node}
+
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=nodes_subset,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            dbt_project_name="astro_shop",
+            render_config=RenderConfig(),
+        )
+
+    generated_seed_profile_config = dag.task_dict["seed_parent_seed"].profile_config
+    assert generated_seed_profile_config.profile_name == "new_profile"  # overridden via config
+    assert generated_seed_profile_config.profile_mapping.profile_args["schema"] == "different"  # overridden via config
+
+    generated_parent_profile_config = dag.task_dict["parent.run"].profile_config
+    assert generated_parent_profile_config.profile_name == "default"
+    assert generated_parent_profile_config.profile_mapping.profile_args["schema"] == "public"
 
 
 @pytest.mark.integration

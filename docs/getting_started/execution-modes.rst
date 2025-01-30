@@ -101,7 +101,7 @@ Also similar to the ``local`` execution mode, Cosmos will by default attempt to 
 Some drawbacks of this approach:
 
 - It is slower than ``local`` because it creates a new Python virtual environment for each Cosmos dbt task run.
-- If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, users must use a `parsing method <parsing-methods.html>`_  that does not rely on dbt, such as ``LoadMode.MANIFEST``.
+- If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, users must use a :ref:`parsing-methods` that does not rely on dbt, such as ``LoadMode.MANIFEST``.
 - Only ``InvocationMode.SUBPROCESS`` is supported currently, attempt to use ``InvocationMode.DBT_RUNNER`` will raise error.
 
 Example of how to use:
@@ -121,7 +121,7 @@ The user has better environment isolation than when using ``local`` or ``virtual
 The other challenge with the ``docker`` approach is if the Airflow worker is already running in Docker, which sometimes can lead to challenges running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
 
 This approach can be significantly slower than ``virtualenv`` since it may have to build the ``Docker`` container, which is slower than creating a Virtualenv with ``dbt-core``.
-If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, users must use a `parsing method <parsing-methods.html>`_  that does not rely on dbt, such as ``LoadMode.MANIFEST``.
+If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, users must use a :ref:`parsing-methods` that does not rely on dbt, such as ``LoadMode.MANIFEST``.
 
 Check the step-by-step guide on using the ``docker`` execution mode at :ref:`docker`.
 

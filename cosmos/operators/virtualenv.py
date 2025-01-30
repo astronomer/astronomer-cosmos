@@ -19,7 +19,7 @@ from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtCloneLocalOperator,
     DbtDocsLocalOperator,
-    DbtLocalBase,
+    DbtLocalBaseOperator,
     DbtLSLocalOperator,
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
@@ -47,7 +47,7 @@ def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], A
     return wrapper
 
 
-class DbtVirtualenvBaseOperator(DbtLocalBase):
+class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     """
     Executes a dbt core cli command within a Python Virtual Environment, that is created before running the dbt command
     and deleted at the end of the operator execution.
@@ -62,7 +62,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBase):
     :param is_virtualenv_dir_temporary: Tells Cosmos if virtualenv should be persisted or not.
     """
 
-    template_fields = DbtLocalBase.template_fields + ("virtualenv_dir", "is_virtualenv_dir_temporary")  # type: ignore[operator]
+    template_fields = DbtLocalBaseOperator.template_fields + ("virtualenv_dir", "is_virtualenv_dir_temporary")  # type: ignore[operator]
 
     def __init__(
         self,

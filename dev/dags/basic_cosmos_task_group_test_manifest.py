@@ -9,7 +9,7 @@ from pathlib import Path
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, LoadMode
+from cosmos import DbtTaskGroup, ExecutionConfig, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import InvocationMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -48,7 +48,7 @@ def basic_cosmos_task_group_test_manifest() -> None:
             select=["path:seeds/raw_customers.csv"],
             enable_mock_profile=False,
             env_vars={"PURGE": os.getenv("PURGE", "0")},
-            airflow_vars_to_purge_dbt_ls_cache=["purge"], 
+            airflow_vars_to_purge_dbt_ls_cache=["purge"],
         ),
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
@@ -58,9 +58,11 @@ def basic_cosmos_task_group_test_manifest() -> None:
 
     customers_ods = DbtTaskGroup(
         group_id="customers_ods",
-        project_config=ProjectConfig((DBT_ROOT_PATH / "altered_jaffle_shop").as_posix(), 
-                                     manifest_path = os.path.join(DBT_ROOT_PATH, "altered_jaffle_shop", 'target', 'manifest.json'),
-                                     dbt_vars={"var": "2"}),
+        project_config=ProjectConfig(
+            (DBT_ROOT_PATH / "altered_jaffle_shop").as_posix(),
+            manifest_path=os.path.join(DBT_ROOT_PATH, "altered_jaffle_shop", "target", "manifest.json"),
+            dbt_vars={"var": "2"},
+        ),
         render_config=RenderConfig(
             select=["+public.customer2"],
             load_method=LoadMode.DBT_MANIFEST,

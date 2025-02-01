@@ -708,7 +708,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
 
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
-    def __init__(self, *args, **kwargs):
+
+    template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         abstract_dbt_local_base_kwargs = {}
         base_operator_kwargs = {}
         abstract_dbt_local_base_args_keys = (
@@ -741,6 +744,8 @@ class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
     Executes a dbt core ls command.
     """
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
@@ -761,6 +766,8 @@ class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     Executes a dbt core snapshot command.
     """
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
@@ -769,6 +776,8 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -796,7 +805,7 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
 
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context, **kwargs: Any) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         if self.on_warning_callback:
             self._handle_warnings(result, context)
@@ -819,6 +828,8 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(
         self,
@@ -855,7 +866,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
             self.extract_issues = dbt_runner.extract_message_by_status
             self.parse_number_of_warnings = dbt_runner.parse_number_of_warnings
 
-    def execute(self, context: Context, **kwargs) -> None:
+    def execute(self, context: Context, **kwargs: Any) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         self._set_test_result_parsing_methods()
         number_of_warnings = self.parse_number_of_warnings(result)  # type: ignore
@@ -884,6 +895,8 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     Use the `callback` parameter to specify a callback function to run after the command completes.
     """
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     ui_color = "#8194E0"
     required_files = ["index.html", "manifest.json", "catalog.json"]
     base_cmd = ["docs", "generate"]
@@ -906,6 +919,8 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
     """
     Abstract class for operators that upload the generated documentation to cloud storage.
     """
+
+    template_fields: Sequence[str] = DbtDocsLocalOperator.template_fields  # type: ignore[operator]
 
     def __init__(
         self,
@@ -1102,6 +1117,8 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
 
 class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["should_upload_compiled_sql"] = True
         super().__init__(*args, **kwargs)
@@ -1111,6 +1128,8 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core clone command.
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

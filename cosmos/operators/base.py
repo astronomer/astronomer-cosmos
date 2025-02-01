@@ -139,7 +139,6 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
-        # super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """

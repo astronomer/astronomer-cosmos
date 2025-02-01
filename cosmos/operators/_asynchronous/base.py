@@ -37,7 +37,14 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[mi
 
     # template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields + ("project_dir",)  # type: ignore[operator]
 
-    def __init__(self, project_dir: str, profile_config: ProfileConfig, extra_context={}, dbt_kwargs={}, **kwargs: Any):
+    def __init__(
+        self,
+        project_dir: str,
+        profile_config: ProfileConfig,
+        extra_context: dict[str, object] | None = None,
+        dbt_kwargs: dict[str, object] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.project_dir = project_dir
         self.profile_config = profile_config
 
@@ -55,9 +62,6 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[mi
             dbt_kwargs=dbt_kwargs,
             **kwargs,
         )
-        # self.async_context = extra_context
-        # self.async_context["profile_type"] = "bigquery"
-        # self.async_context["async_operator"] = async_operator_class
 
     def create_async_operator(self) -> Any:
 

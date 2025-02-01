@@ -5,7 +5,7 @@ import shutil
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import psutil
 from airflow.utils.python_virtualenv import prepare_virtualenv
@@ -130,7 +130,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.log.info(f"Deleting the Python virtualenv {self.virtualenv_dir}")
             shutil.rmtree(str(self.virtualenv_dir), ignore_errors=True)
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context, **kwargs: Any) -> None:
         try:
             output = super().execute(context)
             self.log.info(output)
@@ -217,6 +217,8 @@ class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
     and deleted just after.
     """
 
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
@@ -237,6 +239,8 @@ class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalO
     command and deleted just after.
     """
 
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
@@ -246,6 +250,8 @@ class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOpera
     Executes `dbt source freshness` command within a Python Virtual Environment, that is created before running the dbt
     command and deleted just after.
     """
+
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -267,6 +273,8 @@ class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator)
     and deleted just after.
     """
 
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
@@ -287,6 +295,8 @@ class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator)
     command and deleted just after.
     """
 
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
@@ -295,6 +305,8 @@ class DbtCloneVirtualenvOperator(DbtVirtualenvBaseOperator, DbtCloneLocalOperato
     """
     Executes a dbt core clone command.
     """
+
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

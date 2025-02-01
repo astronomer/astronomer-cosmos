@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from typing import Any, Sequence
 
 from cosmos.config import ProfileConfig
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
@@ -41,13 +42,12 @@ class DbtLSAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtLSLocalOperator)
 
 
 class DbtSeedAirflowAsyncOperator(DbtSeedLocalOperator):  # type: ignore
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         clean_kwargs = {}
         base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
         for arg_key, arg_value in kwargs.items():
             if arg_key in base_operator_args:
                 clean_kwargs[arg_key] = arg_value
-        # BaseOperator.__init__(self, **clean_kwargs)
         super().__init__(*args, **kwargs)
 
 
@@ -97,14 +97,13 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
 
 
 class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):  # type: ignore
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         clean_kwargs = {}
         base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
         for arg_key, arg_value in kwargs.items():
             if arg_key in base_operator_args:
                 clean_kwargs[arg_key] = arg_value
         super().__init__(*args, **kwargs)
-        # BaseOperator.__init__(self, **clean_kwargs)
 
 
 class DbtRunOperationAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtRunOperationLocalOperator):  # type: ignore
@@ -116,4 +115,6 @@ class DbtCompileAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtCompileLoca
 
 
 class DbtCloneAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtCloneLocalOperator):
+    template_fields: Sequence[str] = DbtCloneLocalOperator.template_fields  # type: ignore[operator]
+
     pass

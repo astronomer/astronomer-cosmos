@@ -26,9 +26,9 @@ def mock_docker_execute():
 
 @pytest.fixture()
 def base_operator(mock_docker_execute):
-    from cosmos.operators.docker import DbtDockerBase
+    from cosmos.operators.docker import DbtDockerBaseOperator
 
-    class ConcreteDbtDockerBaseOperator(DbtDockerBase):
+    class ConcreteDbtDockerBaseOperator(DbtDockerBaseOperator):
         base_cmd = ["cmd"]
 
     return ConcreteDbtDockerBaseOperator

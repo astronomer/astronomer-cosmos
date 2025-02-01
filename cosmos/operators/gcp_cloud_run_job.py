@@ -41,7 +41,7 @@ except ImportError:
     )
 
 
-class DbtGcpCloudRunJobBase(CloudRunExecuteJobOperator, AbstractDbtBase):  # type: ignore
+class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Cloud Run Job instance with dbt installed in it.
 
@@ -69,6 +69,22 @@ class DbtGcpCloudRunJobBase(CloudRunExecuteJobOperator, AbstractDbtBase):  # typ
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         super().__init__(project_id=project_id, region=region, job_name=job_name, **kwargs)
+        kwargs.update(
+            {
+                "project_id": project_id,
+                "region": region,
+                "job_name": job_name,
+                "command": command,
+                "environment_variables": environment_variables,
+            }
+        )
+        base_operator_args = set(inspect.signature(CloudRunExecuteJobOperator.__init__).parameters.keys())
+        base_kwargs = {}
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                base_kwargs[arg_key] = arg_value
+        base_kwargs["task_id"] = kwargs["task_id"]
+        CloudRunExecuteJobOperator.__init__(self, **base_kwargs)
 
     def build_and_run_cmd(
         self,
@@ -101,18 +117,18 @@ class DbtGcpCloudRunJobBase(CloudRunExecuteJobOperator, AbstractDbtBase):  # typ
         }
 
 
-class DbtBuildGcpCloudRunJobOperator(DbtBuildMixin, DbtGcpCloudRunJobBase):
+class DbtBuildGcpCloudRunJobOperator(DbtBuildMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core build command.
     """
 
-    template_fields: Sequence[str] = DbtGcpCloudRunJobBase.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtLSGcpCloudRunJobOperator(DbtLSMixin, DbtGcpCloudRunJobBase):
+class DbtLSGcpCloudRunJobOperator(DbtLSMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core ls command.
     """
@@ -121,20 +137,20 @@ class DbtLSGcpCloudRunJobOperator(DbtLSMixin, DbtGcpCloudRunJobBase):
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedGcpCloudRunJobOperator(DbtSeedMixin, DbtGcpCloudRunJobBase):
+class DbtSeedGcpCloudRunJobOperator(DbtSeedMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core seed command.
 
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    template_fields: Sequence[str] = DbtGcpCloudRunJobBase.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotGcpCloudRunJobOperator(DbtSnapshotMixin, DbtGcpCloudRunJobBase):
+class DbtSnapshotGcpCloudRunJobOperator(DbtSnapshotMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core snapshot command.
     """
@@ -143,7 +159,7 @@ class DbtSnapshotGcpCloudRunJobOperator(DbtSnapshotMixin, DbtGcpCloudRunJobBase)
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceGcpCloudRunJobOperator(DbtSourceMixin, DbtGcpCloudRunJobBase):
+class DbtSourceGcpCloudRunJobOperator(DbtSourceMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core source freshness command.
     """
@@ -152,18 +168,18 @@ class DbtSourceGcpCloudRunJobOperator(DbtSourceMixin, DbtGcpCloudRunJobBase):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunGcpCloudRunJobOperator(DbtRunMixin, DbtGcpCloudRunJobBase):
+class DbtRunGcpCloudRunJobOperator(DbtRunMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core run command.
     """
 
-    template_fields: Sequence[str] = DbtGcpCloudRunJobBase.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtTestGcpCloudRunJobOperator(DbtTestMixin, DbtGcpCloudRunJobBase):
+class DbtTestGcpCloudRunJobOperator(DbtTestMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core test command.
     """
@@ -174,7 +190,7 @@ class DbtTestGcpCloudRunJobOperator(DbtTestMixin, DbtGcpCloudRunJobBase):
         self.on_warning_callback = on_warning_callback
 
 
-class DbtRunOperationGcpCloudRunJobOperator(DbtRunOperationMixin, DbtGcpCloudRunJobBase):
+class DbtRunOperationGcpCloudRunJobOperator(DbtRunOperationMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core run-operation command.
 
@@ -183,13 +199,13 @@ class DbtRunOperationGcpCloudRunJobOperator(DbtRunOperationMixin, DbtGcpCloudRun
         selected macro.
     """
 
-    template_fields: Sequence[str] = DbtGcpCloudRunJobBase.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtCloneGcpCloudRunJobOperator(DbtCloneMixin, DbtGcpCloudRunJobBase):
+class DbtCloneGcpCloudRunJobOperator(DbtCloneMixin, DbtGcpCloudRunJobBaseOperator):
     """
     Executes a dbt core clone command.
     """

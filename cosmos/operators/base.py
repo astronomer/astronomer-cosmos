@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
@@ -13,7 +13,7 @@ from airflow.utils.strings import to_boolean
 from cosmos.dbt.executable import get_system_dbt
 
 
-class AbstractDbtBase:
+class AbstractDbtBase(metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
 

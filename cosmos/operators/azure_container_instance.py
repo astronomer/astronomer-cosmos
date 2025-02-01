@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
@@ -51,17 +52,26 @@ class DbtAzureContainerInstanceBase(AbstractDbtBase, AzureContainerInstancesOper
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
-        super().__init__(
-            ci_conn_id=ci_conn_id,
-            resource_group=resource_group,
-            name=name,
-            image=image,
-            region=region,
-            remove_on_error=remove_on_error,
-            fail_if_exists=fail_if_exists,
-            registry_conn_id=registry_conn_id,
-            **kwargs,
+        kwargs.update(
+            {
+                "ci_conn_id": ci_conn_id,
+                "resource_group": resource_group,
+                "name": name,
+                "image": image,
+                "region": region,
+                "remove_on_error": remove_on_error,
+                "fail_if_exists": fail_if_exists,
+                "registry_conn_id": registry_conn_id,
+            }
         )
+        super().__init__(**kwargs)
+        base_operator_args = set(inspect.signature(AzureContainerInstancesOperator.__init__).parameters.keys())
+        base_kwargs = {}
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                base_kwargs[arg_key] = arg_value
+        base_kwargs["task_id"] = kwargs["task_id"]
+        AzureContainerInstancesOperator.__init__(self, **base_kwargs)
 
     def build_and_run_cmd(
         self,

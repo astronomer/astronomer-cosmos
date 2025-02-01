@@ -33,9 +33,9 @@ def mock_kubernetes_execute():
 
 @pytest.fixture()
 def base_operator(mock_kubernetes_execute):
-    from cosmos.operators.kubernetes import DbtKubernetesBase
+    from cosmos.operators.kubernetes import DbtKubernetesBaseOperator
 
-    class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBase):
+    class ConcreteDbtKubernetesBaseOperator(DbtKubernetesBaseOperator):
         base_cmd = ["cmd"]
 
     return ConcreteDbtKubernetesBaseOperator
@@ -195,7 +195,6 @@ def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_re
     test_operator = DbtTestKubernetesOperator(
         on_warning_callback=(lambda **kwargs: None), **additional_kwargs, **base_kwargs
     )
-
     print(additional_kwargs, test_operator.__dict__)
 
     assert isinstance(test_operator.on_success_callback, list)

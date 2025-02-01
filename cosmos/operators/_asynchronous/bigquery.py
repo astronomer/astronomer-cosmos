@@ -47,8 +47,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             deferrable=True,
             **kwargs,
         )
-        # DbtRunMixin.__init__(self, **dbt_kwargs)
-        # breakpoint()
         self.dbt_kwargs = dbt_kwargs
         self.async_context = extra_context
         self.async_context["profile_type"] = self.profile_config.get_profile_type()

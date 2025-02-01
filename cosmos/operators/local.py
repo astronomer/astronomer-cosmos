@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import tempfile
@@ -708,8 +709,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
     def __init__(self, *args, **kwargs):
-        import inspect
-
         abstract_dbt_local_base_kwargs = {}
         base_operator_kwargs = {}
         abstract_dbt_local_base_args_keys = (
@@ -717,21 +716,12 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             + inspect.getfullargspec(AbstractDbtLocalBase.__init__).args
         )
         base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
-        # breakpoint()
         for arg_key, arg_value in kwargs.items():
             if arg_key in abstract_dbt_local_base_args_keys:
                 abstract_dbt_local_base_kwargs[arg_key] = arg_value
             if arg_key in base_operator_args:
                 base_operator_kwargs[arg_key] = arg_value
-        # breakpoint()
-
-        # super().__init__(*args, **kwargs)
-        task_id = kwargs.pop("task_id")
-        # kwargs.pop("extra_context", None)
-        # project_dir = kwargs.pop("project_dir")
-        # AbstractDbtLocalBase.__init__(self, task_id=task_id, **abstract_dbt_local_base_kwargs)
         AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
-        kwargs["task_id"] = task_id
         BaseOperator.__init__(self, **base_operator_kwargs)
 
 

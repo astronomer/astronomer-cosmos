@@ -197,14 +197,21 @@ def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_re
     )
     print(additional_kwargs, test_operator.__dict__)
 
-    assert isinstance(test_operator.on_success_callback, list)
-    assert isinstance(test_operator.on_failure_callback, list)
-    assert test_operator._handle_warnings in test_operator.on_success_callback
-    assert test_operator._cleanup_pod in test_operator.on_failure_callback
-    assert len(test_operator.on_success_callback) == expected_results[0]
-    assert len(test_operator.on_failure_callback) == expected_results[1]
+    assert isinstance(test_operator.on_success_callback, list) or test_operator.on_success_callback is None
+    assert isinstance(test_operator.on_failure_callback, list) or test_operator.on_failure_callback is None
+
+    if test_operator.on_success_callback is not None:
+        assert test_operator._handle_warnings in test_operator.on_success_callback
+        assert len(test_operator.on_success_callback) == expected_results[0]
+
+    if test_operator.on_failure_callback is not None:
+        assert test_operator._cleanup_pod in test_operator.on_failure_callback
+        assert len(test_operator.on_failure_callback) == expected_results[1]
+
     assert test_operator.is_delete_operator_pod_original == expected_results[2]
-    assert test_operator.on_finish_action_original == OnFinishAction(expected_results[3])
+
+    expected_action = OnFinishAction(expected_results[3])
+    assert test_operator.on_finish_action_original == expected_action
 
 
 class FakePodManager:

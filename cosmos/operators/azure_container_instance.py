@@ -29,7 +29,7 @@ except ImportError:
     )
 
 
-class DbtAzureContainerInstanceBase(AbstractDbtBase, AzureContainerInstancesOperator):  # type: ignore
+class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInstancesOperator):  # type: ignore
     """
     Executes a dbt core cli command in an Azure Container Instance
     """
@@ -95,18 +95,18 @@ class DbtAzureContainerInstanceBase(AbstractDbtBase, AzureContainerInstancesOper
         self.command: list[str] = dbt_cmd
 
 
-class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBase):  # type: ignore
+class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
     """
     Executes a dbt core build command.
     """
 
-    template_fields: Sequence[str] = DbtAzureContainerInstanceBase.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBase):  # type: ignore
+class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
     """
     Executes a dbt core ls command.
     """
@@ -115,20 +115,20 @@ class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceB
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBase):  # type: ignore
+class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
     """
     Executes a dbt core seed command.
 
     :param full_refresh: dbt optional arg - dbt will treat incremental models as table models
     """
 
-    template_fields: Sequence[str] = DbtAzureContainerInstanceBase.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBase):  # type: ignore
+class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
     """
     Executes a dbt core snapshot command.
 
@@ -138,7 +138,7 @@ class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContai
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceAzureContainerInstanceOperator(DbtSourceMixin, DbtAzureContainerInstanceBase):
+class DbtSourceAzureContainerInstanceOperator(DbtSourceMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt source freshness command.
     """
@@ -147,18 +147,18 @@ class DbtSourceAzureContainerInstanceOperator(DbtSourceMixin, DbtAzureContainerI
         super().__init__(*args, **kwargs)
 
 
-class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBase):  # type: ignore
+class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
     """
     Executes a dbt core run command.
     """
 
-    template_fields: Sequence[str] = DbtAzureContainerInstanceBase.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBase):  # type: ignore
+class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
     """
     Executes a dbt core test command.
     """
@@ -169,7 +169,7 @@ class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInsta
         self.on_warning_callback = on_warning_callback
 
 
-class DbtRunOperationAzureContainerInstanceOperator(DbtRunOperationMixin, DbtAzureContainerInstanceBase):
+class DbtRunOperationAzureContainerInstanceOperator(DbtRunOperationMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core run-operation command.
 
@@ -179,14 +179,14 @@ class DbtRunOperationAzureContainerInstanceOperator(DbtRunOperationMixin, DbtAzu
     """
 
     template_fields: Sequence[str] = (
-        DbtAzureContainerInstanceBase.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
+        DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtCloneAzureContainerInstanceOperator(DbtCloneMixin, DbtAzureContainerInstanceBase):
+class DbtCloneAzureContainerInstanceOperator(DbtCloneMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core clone command.
     """

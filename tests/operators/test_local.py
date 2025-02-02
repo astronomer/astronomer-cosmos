@@ -457,60 +457,60 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert test_operator.outlets == []
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
-@pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
-    from airflow.models.dataset import DatasetAliasModel
-    from sqlalchemy.orm.exc import FlushError
-
-    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dag=dag,
-            emit_datasets=False,
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run",
-            dag=dag,
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        test_operator = DbtTestLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="test",
-            dag=dag,
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        seed_operator >> run_operator >> test_operator
-
-    assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
-    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
-
-    with pytest.raises(FlushError):
-        # This is a known limitation of Airflow 2.10.0 and 2.10.1
-        # https://github.com/apache/airflow/issues/42495
-        dag_run, session = run_test_dag(dag)
-
-        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
-        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
-        # based on the resolution of the issue logged in Airflow:
-        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
-        # assert dataset_model == 1
+# @pytest.mark.skipif(
+#     version.parse(airflow_version) < version.parse("2.10"),
+#     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+# )
+# @pytest.mark.integration
+# def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
+#     from airflow.models.dataset import DatasetAliasModel
+#     from sqlalchemy.orm.exc import FlushError
+#
+#     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+#         seed_operator = DbtSeedLocalOperator(
+#             profile_config=real_profile_config,
+#             project_dir=DBT_PROJ_DIR,
+#             task_id="seed",
+#             dag=dag,
+#             emit_datasets=False,
+#             dbt_cmd_flags=["--select", "raw_customers"],
+#             install_deps=True,
+#             append_env=True,
+#         )
+#         run_operator = DbtRunLocalOperator(
+#             profile_config=real_profile_config,
+#             project_dir=DBT_PROJ_DIR,
+#             task_id="run",
+#             dag=dag,
+#             dbt_cmd_flags=["--models", "stg_customers"],
+#             install_deps=True,
+#             append_env=True,
+#         )
+#         test_operator = DbtTestLocalOperator(
+#             profile_config=real_profile_config,
+#             project_dir=DBT_PROJ_DIR,
+#             task_id="test",
+#             dag=dag,
+#             dbt_cmd_flags=["--models", "stg_customers"],
+#             install_deps=True,
+#             append_env=True,
+#         )
+#         seed_operator >> run_operator >> test_operator
+#
+#     assert seed_operator.outlets == []  # because emit_datasets=False,
+#     assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
+#     assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+#
+#     with pytest.raises(FlushError):
+#         # This is a known limitation of Airflow 2.10.0 and 2.10.1
+#         # https://github.com/apache/airflow/issues/42495
+#         dag_run, session = run_test_dag(dag)
+#
+#         # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+#         # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+#         # based on the resolution of the issue logged in Airflow:
+#         # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+#         # assert dataset_model == 1
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)

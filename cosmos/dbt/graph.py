@@ -832,6 +832,11 @@ class DbtGraph:
 
                 nodes[node.unique_id] = node
 
+<<<<<<< HEAD
+=======
+            select_rendered = [elem.replace(".", "_") for elem in self.render_config.select]
+
+>>>>>>> dff4ec052072b2fd37d0216869b79f34b2a2283b
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
                 project_dir=self.execution_config.project_path,

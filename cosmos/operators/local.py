@@ -274,7 +274,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
             # delete the old records
             session.query(RenderedTaskInstanceFields).filter(
-                RenderedTaskInstanceFields.dag_id == self.dag_id,
+                RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
                 RenderedTaskInstanceFields.task_id == self.task_id,
                 RenderedTaskInstanceFields.run_id == ti.run_id,
             ).delete()
@@ -633,17 +633,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
-                self.outlets.extend(new_outlets)
-                self.inlets.extend(new_inlets)
-                for task in self.dag.tasks:
+                self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
+                self.inlets.extend(new_inlets)  # type: ignore[attr-defined]
+                for task in self.dag.tasks:  # type: ignore[attr-defined]
                     if task.task_id == self.task_id:
                         task.outlets.extend(new_outlets)
                         task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)
+                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined]
                 session.commit()
         else:
             logger.info("Assigning inlets/outlets with DatasetAlias")
-            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
+            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
             for outlet in new_outlets:
                 context["outlet_events"][dataset_alias_name].add(outlet)
 

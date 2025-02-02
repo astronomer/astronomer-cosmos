@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
@@ -188,6 +189,10 @@ class AbstractDbtBase(metaclass=ABCMeta):
                     )
 
         return filtered_env
+
+    @property
+    def log(self) -> logging.Logger:
+        raise NotImplementedError()
 
     def add_global_flags(self) -> list[str]:
         flags = []

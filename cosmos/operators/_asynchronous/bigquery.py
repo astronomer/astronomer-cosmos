@@ -23,7 +23,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         project_dir: str,
         profile_config: ProfileConfig,
         extra_context: dict[str, Any] | None = None,
-        dbt_kwargs={},
+        dbt_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         self.project_dir = project_dir
@@ -37,9 +37,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if "full_refresh" in kwargs:
             self.full_refresh = kwargs.pop("full_refresh")
         self.configuration: dict[str, Any] = {}
-        task_id = dbt_kwargs.pop("task_id")
+        self.dbt_kwargs = dbt_kwargs or {}
+        task_id = self.dbt_kwargs.pop("task_id")
         AbstractDbtLocalBase.__init__(
-            self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **dbt_kwargs
+            self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
@@ -47,8 +48,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             deferrable=True,
             **kwargs,
         )
-        self.dbt_kwargs = dbt_kwargs
-        self.async_context = extra_context
+        self.async_context = extra_context or {}
         self.async_context["profile_type"] = self.profile_config.get_profile_type()
         self.async_context["async_operator"] = BigQueryInsertJobOperator
 
@@ -56,7 +56,5 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def base_cmd(self) -> list[str]:
         return ["run"]
 
-    def execute(self, context: Context) -> None:
-
+    def execute(self, context: Context, **kwargs: Any) -> None:
         self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
-        # super().execute(context)

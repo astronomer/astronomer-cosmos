@@ -12,6 +12,7 @@ from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
+from cosmos.log import get_logger
 
 
 class AbstractDbtBase(metaclass=ABCMeta):
@@ -192,7 +193,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
     @property
     def log(self) -> logging.Logger:
-        raise NotImplementedError()
+        return get_logger(__name__)
 
     def add_global_flags(self) -> list[str]:
         flags = []

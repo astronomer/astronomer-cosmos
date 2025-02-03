@@ -14,6 +14,7 @@ from cosmos.operators.kubernetes import (
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
     DbtSeedKubernetesOperator,
+    DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
 )
 
@@ -118,10 +119,8 @@ base_kwargs = {
     "no_version_check": True,
 }
 
-
 if version.parse(airflow_version) == version.parse("2.4"):
     base_kwargs["name"] = "some-pod-name"
-
 
 result_map = {
     "ls": DbtLSKubernetesOperator(**base_kwargs),
@@ -208,6 +207,62 @@ def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_re
     assert test_operator.on_finish_action_original == OnFinishAction(expected_results[3])
 
 
+@pytest.mark.parametrize(
+    "additional_kwargs,expected_results",
+    [
+        ({"on_success_callback": None, "is_delete_operator_pod": True}, (1, 1, True, "delete_pod")),
+        (
+            {"on_success_callback": (lambda **kwargs: None), "is_delete_operator_pod": False},
+            (2, 1, False, "keep_pod"),
+        ),
+        (
+            {"on_success_callback": [(lambda **kwargs: None), (lambda **kwargs: None)], "is_delete_operator_pod": None},
+            (3, 1, True, "delete_pod"),
+        ),
+        (
+            {"on_failure_callback": None, "is_delete_operator_pod": True, "on_finish_action": "keep_pod"},
+            (1, 1, True, "delete_pod"),
+        ),
+        (
+            {
+                "on_failure_callback": (lambda **kwargs: None),
+                "is_delete_operator_pod": None,
+                "on_finish_action": "delete_pod",
+            },
+            (1, 2, True, "delete_pod"),
+        ),
+        (
+            {
+                "on_failure_callback": [(lambda **kwargs: None), (lambda **kwargs: None)],
+                "is_delete_operator_pod": None,
+                "on_finish_action": "delete_succeeded_pod",
+            },
+            (1, 3, False, "delete_succeeded_pod"),
+        ),
+        ({"is_delete_operator_pod": None, "on_finish_action": "keep_pod"}, (1, 1, False, "keep_pod")),
+        ({}, (1, 1, True, "delete_pod")),
+    ],
+)
+@pytest.mark.skipif(
+    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
+)
+def test_dbt_source_kubernetes_operator_constructor(additional_kwargs, expected_results):
+    source_operator = DbtSourceKubernetesOperator(
+        on_warning_callback=(lambda **kwargs: None), **additional_kwargs, **base_kwargs
+    )
+
+    print(additional_kwargs, source_operator.__dict__)
+
+    assert isinstance(source_operator.on_success_callback, list)
+    assert isinstance(source_operator.on_failure_callback, list)
+    assert source_operator._handle_warnings in source_operator.on_success_callback
+    assert source_operator._cleanup_pod in source_operator.on_failure_callback
+    assert len(source_operator.on_success_callback) == expected_results[0]
+    assert len(source_operator.on_failure_callback) == expected_results[1]
+    assert source_operator.is_delete_operator_pod_original == expected_results[2]
+    assert source_operator.on_finish_action_original == OnFinishAction(expected_results[3])
+
+
 class FakePodManager:
     def read_pod_logs(self, pod, container):
         assert pod == "pod"
@@ -246,6 +301,31 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
         assert pod == remote_pod
 
     test_operator = DbtTestKubernetesOperator(
+        is_delete_operator_pod=True, on_warning_callback=on_warning_callback, **base_kwargs
+    )
+    task_instance = TaskInstance(test_operator)
+    task_instance.task.pod_manager = FakePodManager()
+    task_instance.task.pod = task_instance.task.remote_pod = "pod"
+    task_instance.task.cleanup = cleanup
+
+    context = Context()
+    context_merge(context, task_instance=task_instance)
+
+    test_operator._handle_warnings(context)
+
+
+@pytest.mark.skipif(
+    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
+)
+def test_dbt_source_kubernetes_operator_handle_warnings_and_cleanup_pod():
+    def on_warning_callback(context: Context):
+        assert context["test_names"] == ["dbt_utils_accepted_range_table_col__12__0"]
+        assert context["test_results"] == ["Got 252 results, configured to warn if >0"]
+
+    def cleanup(pod: str, remote_pod: str):
+        assert pod == remote_pod
+
+    test_operator = DbtSourceKubernetesOperator(
         is_delete_operator_pod=True, on_warning_callback=on_warning_callback, **base_kwargs
     )
     task_instance = TaskInstance(test_operator)

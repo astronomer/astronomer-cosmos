@@ -37,8 +37,6 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
 
 class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[misc]
 
-    # template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields + ("project_dir",)  # type: ignore[operator]
-
     def __init__(
         self,
         project_dir: str,

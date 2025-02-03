@@ -1,8 +1,10 @@
+import inspect
 import sys
 from datetime import datetime
 from unittest.mock import patch
 
 import pytest
+from airflow.models import BaseOperator
 from airflow.utils.context import Context
 
 from cosmos.operators.base import (
@@ -173,5 +175,21 @@ def test_dbt_mixin_add_cmd_flags_run_operator(args, expected_flags):
 
 def test_abstract_dbt_base_operator_append_env_is_false_by_default():
     """Tests that the append_env attribute is set to False by default."""
+    AbstractDbtBase.__abstractmethods__ = set()
     base_operator = AbstractDbtBase(task_id="fake_task", project_dir="fake_dir")
     assert base_operator.append_env is False
+
+
+def test_abstract_dbt_base_is_not_airflow_base_operator():
+    AbstractDbtBase.__abstractmethods__ = set()
+    base_operator = AbstractDbtBase(task_id="fake_task", project_dir="fake_dir")
+    assert not isinstance(base_operator, BaseOperator)
+
+
+def test_abstract_dbt_base_init_no_super():
+    """Test that super().__init__ is not called in AbstractDbtBase"""
+    init_method = getattr(AbstractDbtBase, "__init__", None)
+    assert init_method is not None
+
+    source = inspect.getsource(init_method)
+    assert "super().__init__" not in source

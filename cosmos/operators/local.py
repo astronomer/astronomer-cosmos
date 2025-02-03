@@ -451,7 +451,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not async_context:
             raise CosmosValueError("`async_context` is necessary for running the model asynchronously")
         if "async_operator" not in async_context:
-            raise CosmosValueError("`async_operator` needs to be specified  in `async_context` when running as async")
+            raise CosmosValueError("`async_operator` needs to be specified in `async_context` when running as async")
         if "profile_type" not in async_context:
             raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
         profile_type = async_context["profile_type"]
@@ -712,6 +712,12 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them here by segregating the required arguments for each parent class.
         abstract_dbt_local_base_kwargs = {}
         base_operator_kwargs = {}
         abstract_dbt_local_base_args_keys = (

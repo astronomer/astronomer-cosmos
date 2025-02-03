@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import inspect
+
+from abc import ABC
+
 from os import PathLike
 from typing import Any, Callable, Sequence
 
@@ -150,31 +153,7 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
-    """
-    Executes a dbt source freshness command.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-
-
-class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
-    """
-    Executes a dbt core run command.
-    """
-
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-
-
-class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
-    """
-    Executes a dbt core test command.
-    """
-
+class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
     def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         if not on_warning_callback:
             super().__init__(**kwargs)
@@ -195,7 +174,7 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
             kwargs["is_delete_operator_pod"] = False
             kwargs["on_finish_action"] = OnFinishAction.KEEP_POD
 
-            # Add an additional callback to both success and failure callbacks.
+            # Add a callback to both success and failure callbacks.
             # In case of success, check for a warning in the logs and clean up the pod.
             self.on_success_callback = kwargs.get("on_success_callback", None) or []
             if isinstance(self.on_success_callback, list):
@@ -222,7 +201,10 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
         """
         if not (
             isinstance(context["task_instance"], TaskInstance)
-            and isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
+            and (
+                isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
+                or isinstance(context["task_instance"].task, DbtSourceKubernetesOperator)
+            )
         ):
             return
         task = context["task_instance"].task
@@ -257,13 +239,45 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
         """
         if not (
             isinstance(context["task_instance"], TaskInstance)
-            and isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
+            and (
+                isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
+                or isinstance(context["task_instance"].task, DbtSourceKubernetesOperator)
+            )
         ):
             return
         task = context["task_instance"].task
         if task.pod:
             task.on_finish_action = self.on_finish_action_original
             task.cleanup(pod=task.pod, remote_pod=task.remote_pod)
+
+
+class DbtTestKubernetesOperator(DbtTestMixin, DbtWarningKubernetesOperator):
+    """
+    Executes a dbt core test command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSourceKubernetesOperator(DbtSourceMixin, DbtWarningKubernetesOperator):
+    """
+    Executes a dbt source freshness command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
+    """
+    Executes a dbt core run command.
+    """
+
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBaseOperator):

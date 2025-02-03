@@ -177,6 +177,12 @@ class GraphSelector:
         elif TAG_SELECTOR in self.node_name:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
+        
+        elif SOURCE_SELECTOR in self.node_name:
+            source_selection = self.node_name[len(SOURCE_SELECTOR) :]
+            
+            # match node.resource_type == SOURCE, node.name == source_selection
+            root_nodes.update({node_id for node_id, node in nodes.items() if node.resource_type == DbtResourceType.SOURCE and node.name == source_selection})
 
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
@@ -353,7 +359,7 @@ class SelectorConfig:
         self.sources.append(source_name)
 
     def __repr__(self) -> str:
-        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other}, graph_selectors={self.graph_selectors})"
+        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, sources={self.sources}, resource={self.resource_types}, other={self.other}, graph_selectors={self.graph_selectors})"
 
 
 class NodeSelector:

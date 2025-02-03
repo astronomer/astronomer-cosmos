@@ -19,6 +19,8 @@ SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
+SOURCE_SELECTOR = 'source:'
+RESOURCE_TYPE_SELECTOR = 'resource_type:'
 PLUS_SELECTOR = "+"
 AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
@@ -270,6 +272,8 @@ class SelectorConfig:
         self.config: dict[str, str] = {}
         self.other: list[str] = []
         self.graph_selectors: list[GraphSelector] = []
+        self.sources: list[str] = []
+        self.resource_types: list[str] = []
         self.load_from_statement(statement)
 
     @property
@@ -305,6 +309,10 @@ class SelectorConfig:
                     self._parse_tag_selector(item)
                 elif node_name.startswith(CONFIG_SELECTOR):
                     self._parse_config_selector(item)
+                elif node_name.startswith(SOURCE_SELECTOR):
+                    self._parse_source_selector(item)
+                elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
+                    self._parse_resource_type_selector(item)
                 else:
                     self._parse_unknown_selector(item)
 
@@ -333,6 +341,16 @@ class SelectorConfig:
             self.paths.append(self.project_dir / Path(item[index:]))
         else:
             self.paths.append(Path(item[index:]))
+
+    def _parse_resource_type_selector(self, item: str) -> None:
+        index = len(RESOURCE_TYPE_SELECTOR)
+        resource_type_value = item[index:].strip()
+        self.resource_types.append(resource_type_value)
+
+    def _parse_source_selector(self, item: str) -> None:
+        index = len(SOURCE_SELECTOR)
+        source_name = item[index:].strip()
+        self.sources.append(source_name)
 
     def __repr__(self) -> str:
         return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other}, graph_selectors={self.graph_selectors})"
@@ -423,6 +441,17 @@ class NodeSelector:
             return False
 
         if self.config.paths and not self._is_path_matching(node):
+            return False
+
+        if self.config.resource_types:
+            if node.resource_type.value not in self.config.resource_types:
+                return False
+
+        if self.config.sources:
+            if node.resource_type != DbtResourceType.SOURCE:
+                return False
+
+        if node.name not in self.config.sources:
             return False
 
         return True

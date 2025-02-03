@@ -55,6 +55,12 @@ class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
             )
 
         super().__init__(image=image, **kwargs)
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         kwargs["image"] = image
         base_operator_args = set(inspect.signature(DockerOperator.__init__).parameters.keys())
         base_kwargs = {}

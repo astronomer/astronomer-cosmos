@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+import airflow
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.context import Context
+from packaging.version import Version
 
+from cosmos import settings
 from cosmos.config import ProfileConfig
+from cosmos.dataset import get_dataset_alias_name
 from cosmos.operators.local import AbstractDbtLocalBase
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
@@ -38,6 +44,16 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+            from airflow.datasets import DatasetAlias
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            kwargs["outlets"] = [
+                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+            ]  # type: ignore
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
             configuration=self.configuration,

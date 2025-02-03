@@ -165,17 +165,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
 
-        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
-            from airflow.datasets import DatasetAlias
-
-            # ignoring the type because older versions of Airflow raise the follow error in mypy
-            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
-            dag_id = kwargs.get("dag")
-            task_group_id = kwargs.get("task_group")
-            kwargs["outlets"] = [
-                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, task_id))
-            ]  # type: ignore
-
         super().__init__(task_id=task_id, **kwargs)
 
         # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
@@ -717,7 +706,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
-        # initialize them here by segregating the required arguments for each parent class.
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         abstract_dbt_local_base_kwargs = {}
         base_operator_kwargs = {}
         abstract_dbt_local_base_args_keys = (
@@ -731,6 +720,16 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             if arg_key in base_operator_args:
                 base_operator_kwargs[arg_key] = arg_value
         AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+            from airflow.datasets import DatasetAlias
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            base_operator_kwargs["outlets"] = [
+                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+            ]  # type: ignore
         BaseOperator.__init__(self, **base_operator_kwargs)
 
 

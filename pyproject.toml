@@ -177,6 +177,7 @@ test-performance-setup = 'sh scripts/test/performance-setup.sh'
 type-check = "pre-commit run mypy --files cosmos/**/*"
 
 [tool.pytest.ini_options]
+addopts = "--ignore-glob=**/dbt_packages/*"
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
 markers = ["integration", "perf"]

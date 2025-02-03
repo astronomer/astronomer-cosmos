@@ -68,12 +68,12 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
 from cosmos.dbt.project import create_symlinks
+from cosmos.dbt_adapters import PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP, associate_async_operator_args
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
 from cosmos.log import get_logger
-from cosmos.mocked_dbt_adapters import PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP, PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -484,7 +484,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
-        PROFILE_TYPE_ASSOCIATE_ARGS_CALLABLE_MAP[async_context["profile_type"]](self, sql=sql)
+        associate_async_operator_args(self, async_context["profile_type"], sql=sql)
         async_context["async_operator"].execute(self, context)
 
     def run_command(

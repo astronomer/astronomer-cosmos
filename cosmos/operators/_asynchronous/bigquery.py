@@ -33,9 +33,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
         self.extra_context = extra_context or {}
-        self.full_refresh = None
-        if "full_refresh" in kwargs:
-            self.full_refresh = kwargs.pop("full_refresh")
         self.configuration: dict[str, Any] = {}
         self.dbt_kwargs = dbt_kwargs or {}
         task_id = self.dbt_kwargs.pop("task_id")

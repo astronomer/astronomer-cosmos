@@ -1,6 +1,11 @@
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from cosmos.operators._asynchronous.base import _create_async_operator_class
+from cosmos.config import ProfileConfig
+from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators.local import DbtRunLocalOperator
 
@@ -19,3 +24,47 @@ def test_create_async_operator_class_success(profile_type, dbt_class, expected_o
     operator_class = _create_async_operator_class(profile_type, dbt_class)
 
     assert operator_class == expected_operator_class
+
+
+@pytest.fixture
+def profile_config_mock():
+    """Fixture to create a mock ProfileConfig."""
+    mock_config = MagicMock(spec=ProfileConfig)
+    mock_config.get_profile_type.return_value = "bigquery"
+    return mock_config
+
+
+def test_create_async_operator_class_valid():
+    """Test _create_async_operator_class returns the correct async operator class if available."""
+    with patch("cosmos.operators._asynchronous.base.importlib.import_module") as mock_import:
+        mock_class = MagicMock()
+        mock_import.return_value = MagicMock()
+        setattr(mock_import.return_value, "DbtRunAirflowAsyncBigqueryOperator", mock_class)
+
+        result = _create_async_operator_class("bigquery", "DbtRun")
+        assert result == mock_class
+
+
+def test_create_async_operator_class_fallback():
+    """Test _create_async_operator_class falls back to DbtRunLocalOperator when import fails."""
+    with patch("cosmos.operators._asynchronous.base.importlib.import_module", side_effect=ModuleNotFoundError):
+        result = _create_async_operator_class("bigquery", "DbtRun")
+        assert result == DbtRunLocalOperator
+
+
+class MockAsyncOperator(DbtRunLocalOperator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+@patch("cosmos.operators._asynchronous.base._create_async_operator_class", return_value=MockAsyncOperator)
+def test_dbt_run_airflow_async_factory_operator_init(mock_create_class, profile_config_mock):
+
+    operator = DbtRunAirflowAsyncFactoryOperator(
+        task_id="test_task",
+        project_dir="some/path",
+        profile_config=profile_config_mock,
+    )
+
+    assert operator is not None
+    assert isinstance(operator, MockAsyncOperator)

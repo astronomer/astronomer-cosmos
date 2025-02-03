@@ -26,7 +26,6 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
         project_dir="/path/to/project",
         profile_config=profile_config_mock,
         dbt_kwargs={"task_id": "test_task"},
-        full_refresh=True,
     )
 
     assert isinstance(operator, DbtRunAirflowAsyncBigqueryOperator)

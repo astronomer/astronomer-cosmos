@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 import pytest
-from dbt.adapters.bigquery.connections import BigQueryConnectionManager
 
 from cosmos.dbt_adapters.bigquery import _associate_bigquery_async_op_args, _mock_bigquery_adapter
 from cosmos.exceptions import CosmosValueError
@@ -15,8 +14,11 @@ def async_operator_mock():
     return Mock()
 
 
+@pytest.mark.integration
 def test_mock_bigquery_adapter():
     """Test _mock_bigquery_adapter to verify it modifies BigQueryConnectionManager.execute."""
+    from dbt.adapters.bigquery.connections import BigQueryConnectionManager
+
     _mock_bigquery_adapter()
 
     assert hasattr(BigQueryConnectionManager, "execute")

@@ -43,6 +43,8 @@ class GraphSelector:
         path:/path/to/model_h+
         +tag:nightly
         +config.materialized:view
+        resource_type:resource_name
+        source:source_name
 
     https://docs.getdbt.com/reference/node-selection/graph-operators
     """

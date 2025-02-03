@@ -17,8 +17,9 @@ from airflow.utils.task_group import TaskGroup
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode
+from cosmos.constants import ExecutionMode, LoadMode
 from cosmos.dbt.graph import DbtGraph
+from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -67,11 +68,11 @@ def airflow_kwargs(**kwargs: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_arguments(
-    select: list[str],
-    exclude: list[str],
+    render_config: RenderConfig,
     profile_config: ProfileConfig,
     task_args: dict[str, Any],
-    execution_mode: ExecutionMode,
+    execution_config: ExecutionConfig,
+    project_config: ProjectConfig,
 ) -> None:
     """
     Validate that mutually exclusive selectors filters have not been given.
@@ -84,8 +85,8 @@ def validate_arguments(
     :param execution_mode: the current execution mode
     """
     for field in ("tags", "paths"):
-        select_items = retrieve_by_label(select, field)
-        exclude_items = retrieve_by_label(exclude, field)
+        select_items = retrieve_by_label(render_config.select, field)
+        exclude_items = retrieve_by_label(render_config.exclude, field)
         intersection = {str(item) for item in set(select_items).intersection(exclude_items)}
         if intersection:
             raise CosmosValueError(f"Can't specify the same {field[:-1]} in `select` and `exclude`: " f"{intersection}")
@@ -96,8 +97,21 @@ def validate_arguments(
         if profile_config.profile_mapping:
             profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
 
-    if execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
+    if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
         profile_config.validate_profiles_yml()
+        has_non_empty_dependencies = execution_config.project_path and has_non_empty_dependencies_file(
+            execution_config.project_path
+        )
+        if (
+            has_non_empty_dependencies
+            and (
+                render_config.load_method == LoadMode.DBT_LS
+                or (render_config.load_method == LoadMode.AUTOMATIC and not project_config.is_manifest_available())
+            )
+            and (render_config.dbt_deps != task_args.get("install_deps", True))
+        ):
+            err_msg = f"When using `LoadMode.DBT_LS` and {execution_config.execution_mode}, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
+            raise CosmosValueError(err_msg)
 
 
 def validate_initial_user_config(
@@ -283,12 +297,13 @@ class DbtToAirflowConverter:
             task_args["invocation_mode"] = execution_config.invocation_mode
 
         validate_arguments(
-            render_config.select,
-            render_config.exclude,
-            profile_config,
-            task_args,
-            execution_mode=execution_config.execution_mode,
+            execution_config=execution_config,
+            profile_config=profile_config,
+            render_config=render_config,
+            task_args=task_args,
+            project_config=project_config,
         )
+
         if execution_config.execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             task_args["virtualenv_dir"] = execution_config.virtualenv_dir
 

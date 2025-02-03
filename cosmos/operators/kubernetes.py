@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import inspect
-
 from abc import ABC
-
 from os import PathLike
 from typing import Any, Callable, Sequence
 

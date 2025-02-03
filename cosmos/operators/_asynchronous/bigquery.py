@@ -12,7 +12,6 @@ from cosmos.operators.local import AbstractDbtLocalBase
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
     template_fields: Sequence[str] = (
-        "full_refresh",
         "gcp_project",
         "dataset",
         "location",

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Sequence
+from typing import Any
 
 from cosmos.config import ProfileConfig
+from cosmos.constants import BIGQUERY_PROFILE_TYPE
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBase
 from cosmos.operators.local import (
@@ -19,54 +20,37 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-_SUPPORTED_DATABASES = ["bigquery"]
-
-from abc import ABCMeta
-
-from airflow.models.baseoperator import BaseOperator
+_SUPPORTED_DATABASES = [BIGQUERY_PROFILE_TYPE]
 
 
-class DbtBaseAirflowAsyncOperator(BaseOperator, metaclass=ABCMeta):
-    def __init__(self, **kwargs) -> None:  # type: ignore
-        if "location" in kwargs:
-            kwargs.pop("location")
-        super().__init__(**kwargs)
-
-
-class DbtBuildAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtBuildLocalOperator):  # type: ignore
+class DbtBuildAirflowAsyncOperator(DbtBuildLocalOperator):
     pass
 
 
-class DbtLSAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtLSLocalOperator):  # type: ignore
+class DbtLSAirflowAsyncOperator(DbtLSLocalOperator):
     pass
 
 
-class DbtSeedAirflowAsyncOperator(DbtSeedLocalOperator):  # type: ignore
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        clean_kwargs = {}
-        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in base_operator_args:
-                clean_kwargs[arg_key] = arg_value
-        super().__init__(*args, **kwargs)
-
-
-class DbtSnapshotAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSnapshotLocalOperator):  # type: ignore
+class DbtSeedAirflowAsyncOperator(DbtSeedLocalOperator):
     pass
 
 
-class DbtSourceAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtSourceLocalOperator):  # type: ignore
+class DbtSnapshotAirflowAsyncOperator(DbtSnapshotLocalOperator):
     pass
 
 
-class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ignore
+class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
+    pass
 
-    def __init__(  # type: ignore
+
+class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):
+
+    def __init__(
         self,
         project_dir: str,
         profile_config: ProfileConfig,
         extra_context: dict[str, object] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
 
         # Cosmos attempts to pass many kwargs that async operator simply does not accept.
@@ -74,7 +58,6 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
         clean_kwargs = {}
         non_async_args = set(inspect.signature(AbstractDbtBase.__init__).parameters.keys())
         non_async_args |= set(inspect.signature(DbtLocalBaseOperator.__init__).parameters.keys())
-        # non_async_args -= {"task_id"}
 
         dbt_kwargs = {}
 
@@ -96,25 +79,17 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):  # type: ig
         )
 
 
-class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):  # type: ignore
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        clean_kwargs = {}
-        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in base_operator_args:
-                clean_kwargs[arg_key] = arg_value
-        super().__init__(*args, **kwargs)
-
-
-class DbtRunOperationAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtRunOperationLocalOperator):  # type: ignore
+class DbtTestAirflowAsyncOperator(DbtTestLocalOperator):
     pass
 
 
-class DbtCompileAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtCompileLocalOperator):  # type: ignore
+class DbtRunOperationAirflowAsyncOperator(DbtRunOperationLocalOperator):
     pass
 
 
-class DbtCloneAirflowAsyncOperator(DbtBaseAirflowAsyncOperator, DbtCloneLocalOperator):
-    template_fields: Sequence[str] = DbtCloneLocalOperator.template_fields  # type: ignore[operator]
+class DbtCompileAirflowAsyncOperator(DbtCompileLocalOperator):
+    pass
 
+
+class DbtCloneAirflowAsyncOperator(DbtCloneLocalOperator):
     pass

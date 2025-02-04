@@ -92,6 +92,15 @@ sibling2_node = DbtNode(
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test2"]},
 )
 
+sibling3_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.public.sibling3",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[parent_node.unique_id],
+    file_path=SAMPLE_PROJ_PATH / "gen3/models/public.sibling3.sql",
+    tags=["nightly", "deprecated", "test3"],
+    config={"materialized": "table", "tags": ["nightly", "deprecated", "test3"]},
+)
+
 orphaned_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.orphaned",
     resource_type=DbtResourceType.MODEL,
@@ -108,6 +117,7 @@ sample_nodes = {
     child_node.unique_id: child_node,
     sibling1_node.unique_id: sibling1_node,
     sibling2_node.unique_id: sibling2_node,
+    sibling3_node.unique_id: sibling3_node,
     orphaned_node.unique_id: orphaned_node,
 }
 
@@ -124,6 +134,7 @@ def test_select_nodes_by_select_config():
         child_node.unique_id: child_node,
         sibling1_node.unique_id: sibling1_node,
         sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
     }
     assert selected == expected
 
@@ -296,6 +307,7 @@ def test_select_nodes_by_select_union():
         child_node.unique_id: child_node,
         sibling1_node.unique_id: sibling1_node,
         sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
     }
     assert selected == expected
 
@@ -311,6 +323,7 @@ def test_select_nodes_by_exclude_tag():
         child_node.unique_id: child_node,
         sibling1_node.unique_id: sibling1_node,
         sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
         another_grandparent_node.unique_id: another_grandparent_node,
         orphaned_node.unique_id: orphaned_node,
     }
@@ -341,6 +354,7 @@ def test_select_nodes_by_exclude_union_config_test_tags():
         parent_node.unique_id: parent_node,
         child_node.unique_id: child_node,
         orphaned_node.unique_id: orphaned_node,
+        sibling3_node.unique_id: sibling3_node,
     }
     assert selected == expected
 
@@ -351,6 +365,7 @@ def test_select_nodes_by_path_dir():
         child_node.unique_id: child_node,
         sibling1_node.unique_id: sibling1_node,
         sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
         orphaned_node.unique_id: orphaned_node,
     }
     assert selected == expected
@@ -431,6 +446,7 @@ def test_select_node_by_descendants():
         "model.dbt-proj.child",
         "model.dbt-proj.grandparent",
         "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
         "model.dbt-proj.sibling1",
         "model.dbt-proj.sibling2",
     ]
@@ -452,6 +468,7 @@ def test_select_node_by_descendants_union():
         "model.dbt-proj.child",
         "model.dbt-proj.grandparent",
         "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
         "model.dbt-proj.sibling1",
         "model.dbt-proj.sibling2",
     ]
@@ -489,6 +506,7 @@ def test_exclude_by_graph_selector():
     expected = [
         "model.dbt-proj.child",
         "model.dbt-proj.orphaned",
+        "model.dbt-proj.public.sibling3",
         "model.dbt-proj.sibling1",
         "model.dbt-proj.sibling2",
     ]
@@ -547,6 +565,7 @@ def test_should_include_node_without_depends_on(selector_config):
             [
                 "model.dbt-proj.child",
                 "model.dbt-proj.parent",
+                "model.dbt-proj.public.sibling3",
                 "model.dbt-proj.sibling1",
                 "model.dbt-proj.sibling2",
             ],
@@ -556,6 +575,7 @@ def test_should_include_node_without_depends_on(selector_config):
             [
                 "model.dbt-proj.child",
                 "model.dbt-proj.parent",
+                "model.dbt-proj.public.sibling3",
                 "model.dbt-proj.sibling1",
                 "model.dbt-proj.sibling2",
             ],
@@ -572,6 +592,7 @@ def test_should_include_node_without_depends_on(selector_config):
             ["1+tag:deprecated"],
             [
                 "model.dbt-proj.parent",
+                "model.dbt-proj.public.sibling3",
                 "model.dbt-proj.sibling1",
                 "model.dbt-proj.sibling2",
             ],
@@ -580,6 +601,7 @@ def test_should_include_node_without_depends_on(selector_config):
             ["1+config.tags:deprecated"],
             [
                 "model.dbt-proj.parent",
+                "model.dbt-proj.public.sibling3",
                 "model.dbt-proj.sibling1",
                 "model.dbt-proj.sibling2",
             ],
@@ -588,6 +610,7 @@ def test_should_include_node_without_depends_on(selector_config):
             ["config.materialized:table+"],
             [
                 "model.dbt-proj.child",
+                "model.dbt-proj.public.sibling3",
                 "model.dbt-proj.sibling1",
                 "model.dbt-proj.sibling2",
             ],
@@ -607,6 +630,7 @@ def test_select_nodes_by_at_operator():
         "model.dbt-proj.child",
         "model.dbt-proj.grandparent",
         "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
         "model.dbt-proj.sibling1",
         "model.dbt-proj.sibling2",
     ]
@@ -633,6 +657,7 @@ def test_select_nodes_by_at_operator_root_node():
         "model.dbt-proj.child",
         "model.dbt-proj.grandparent",
         "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
         "model.dbt-proj.sibling1",
         "model.dbt-proj.sibling2",
     ]
@@ -659,6 +684,7 @@ def test_select_nodes_by_at_operator_with_path():
         "model.dbt-proj.child",
         "model.dbt-proj.grandparent",
         "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
         "model.dbt-proj.sibling1",
         "model.dbt-proj.sibling2",
     ]
@@ -676,4 +702,58 @@ def test_exclude_with_at_operator():
     """Test excluding nodes selected by @ operator"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["@parent"])
     expected = ["model.dbt-proj.orphaned"]
+    assert sorted(selected.keys()) == expected
+
+def test_select_nodes_with_period():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["public.sibling3"])
+    expected = ["model.dbt-proj.public.sibling3"]
+    assert sorted(selected.keys()) == expected
+
+def test_exclude_nodes_with_period():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["public.sibling3"])
+    expected = ["model.dbt-proj.another_grandparent_node", 
+                "model.dbt-proj.child", 
+                "model.dbt-proj.grandparent", 
+                "model.dbt-proj.orphaned", 
+                "model.dbt-proj.parent", 
+                "model.dbt-proj.sibling1", 
+                "model.dbt-proj.sibling2"]
+    assert sorted(selected.keys()) == expected
+
+def test_select_nodes_with_period_by_graph():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+public.sibling3"])
+    expected = ["model.dbt-proj.another_grandparent_node", 
+                "model.dbt-proj.grandparent", 
+                "model.dbt-proj.parent", 
+                "model.dbt-proj.public.sibling3"]
+    assert sorted(selected.keys()) == expected
+
+def test_exclude_nodes_with_period_by_graph():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["+public.sibling3"])
+    expected = ["model.dbt-proj.child", 
+                "model.dbt-proj.orphaned", 
+                "model.dbt-proj.sibling1", 
+                "model.dbt-proj.sibling2"]
+    assert sorted(selected.keys()) == expected
+
+def test_select_nodes_with_period_with_at_operator():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@public.sibling3"])
+    expected = ["model.dbt-proj.another_grandparent_node", 
+                "model.dbt-proj.grandparent", 
+                "model.dbt-proj.parent", 
+                "model.dbt-proj.public.sibling3"]
+    assert sorted(selected.keys()) == expected
+
+def test_exclude_nodes_with_period_with_at_operator():
+    """Test @ operator with a node that doesn't exist"""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["@public.sibling3"])
+    expected = ["model.dbt-proj.child", 
+                "model.dbt-proj.orphaned", 
+                "model.dbt-proj.sibling1", 
+                "model.dbt-proj.sibling2"]
     assert sorted(selected.keys()) == expected

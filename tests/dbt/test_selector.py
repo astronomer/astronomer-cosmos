@@ -704,56 +704,62 @@ def test_exclude_with_at_operator():
     expected = ["model.dbt-proj.orphaned"]
     assert sorted(selected.keys()) == expected
 
+
 def test_select_nodes_with_period():
     """Test @ operator with a node that doesn't exist"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["public.sibling3"])
     expected = ["model.dbt-proj.public.sibling3"]
     assert sorted(selected.keys()) == expected
 
+
 def test_exclude_nodes_with_period():
     """Test @ operator with a node that doesn't exist"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["public.sibling3"])
-    expected = ["model.dbt-proj.another_grandparent_node", 
-                "model.dbt-proj.child", 
-                "model.dbt-proj.grandparent", 
-                "model.dbt-proj.orphaned", 
-                "model.dbt-proj.parent", 
-                "model.dbt-proj.sibling1", 
-                "model.dbt-proj.sibling2"]
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.child",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.orphaned",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.sibling1",
+        "model.dbt-proj.sibling2",
+    ]
     assert sorted(selected.keys()) == expected
+
 
 def test_select_nodes_with_period_by_graph():
     """Test @ operator with a node that doesn't exist"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+public.sibling3"])
-    expected = ["model.dbt-proj.another_grandparent_node", 
-                "model.dbt-proj.grandparent", 
-                "model.dbt-proj.parent", 
-                "model.dbt-proj.public.sibling3"]
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
+    ]
     assert sorted(selected.keys()) == expected
+
 
 def test_exclude_nodes_with_period_by_graph():
     """Test @ operator with a node that doesn't exist"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["+public.sibling3"])
-    expected = ["model.dbt-proj.child", 
-                "model.dbt-proj.orphaned", 
-                "model.dbt-proj.sibling1", 
-                "model.dbt-proj.sibling2"]
+    expected = ["model.dbt-proj.child", "model.dbt-proj.orphaned", "model.dbt-proj.sibling1", "model.dbt-proj.sibling2"]
     assert sorted(selected.keys()) == expected
+
 
 def test_select_nodes_with_period_with_at_operator():
     """Test @ operator with a node that doesn't exist"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["@public.sibling3"])
-    expected = ["model.dbt-proj.another_grandparent_node", 
-                "model.dbt-proj.grandparent", 
-                "model.dbt-proj.parent", 
-                "model.dbt-proj.public.sibling3"]
+    expected = [
+        "model.dbt-proj.another_grandparent_node",
+        "model.dbt-proj.grandparent",
+        "model.dbt-proj.parent",
+        "model.dbt-proj.public.sibling3",
+    ]
     assert sorted(selected.keys()) == expected
+
 
 def test_exclude_nodes_with_period_with_at_operator():
     """Test @ operator with a node that doesn't exist"""
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["@public.sibling3"])
-    expected = ["model.dbt-proj.child", 
-                "model.dbt-proj.orphaned", 
-                "model.dbt-proj.sibling1", 
-                "model.dbt-proj.sibling2"]
+    expected = ["model.dbt-proj.child", "model.dbt-proj.orphaned", "model.dbt-proj.sibling1", "model.dbt-proj.sibling2"]
     assert sorted(selected.keys()) == expected

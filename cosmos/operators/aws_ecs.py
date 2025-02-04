@@ -55,13 +55,13 @@ class DbtAwsEcsBaseOperator(AbstractDbtBaseOperator, EcsRunTaskOperator):  # typ
         environment_variables: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
+        super().__init__(
+            aws_conn_id=aws_conn_id, task_definition=task_definition, cluster=cluster, overrides=None, **kwargs
+        )
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         self.container_name = container_name
-        super().__init__(
-            aws_conn_id=aws_conn_id, task_definition=task_definition, cluster=cluster, overrides=None, **kwargs
-        )
 
     def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
         self.build_command(context, cmd_flags)

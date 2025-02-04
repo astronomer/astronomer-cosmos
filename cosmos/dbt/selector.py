@@ -209,7 +209,7 @@ class GraphSelector:
             for node_id, node in nodes.items():
                 node_by_name[node.name] = node_id
 
-            node_name_patched = self.node_name.replace('.', '_')
+            node_name_patched = self.node_name.replace(".", "_")
 
             if node_name_patched in node_by_name:
                 root_id = node_by_name[node_name_patched]

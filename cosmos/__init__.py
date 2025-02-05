@@ -180,24 +180,34 @@ try:
         DbtRunOperationAwsEcsOperator,
         DbtSeedAwsEcsOperator,
         DbtSnapshotAwsEcsOperator,
+        DbtSourceAwsEcsOperator,
         DbtTestAwsEcsOperator,
     )
 except ImportError:
     DbtBuildAwsEcsOperator = MissingPackage(
         "cosmos.operators.aws_ecs.DbtBuildAwsEcsOperator", "aws-ecs"
-    )
-    DbtLSAwsEcsOperator = MissingPackage("cosmos.operators.aws_ecs.DbtLSAwsEcsOperator", "aws-ecs")
-    DbtRunAwsEcsOperator = MissingPackage("cosmos.operators.aws_ecs.DbtRunAwsEcsOperator", "aws-ecs")
+    )  # pragma: no cover
+    DbtLSAwsEcsOperator = MissingPackage("cosmos.operators.aws_ecs.DbtLSAwsEcsOperator", "aws-ecs")  # pragma: no cover
+    DbtRunAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtRunAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
     DbtRunOperationAwsEcsOperator = MissingPackage(
         "cosmos.operators.aws_ecs.DbtRunOperationAwsEcsOperator",
         "aws-ecs",
-    )
-    DbtSeedAwsEcsOperator = MissingPackage("cosmos.operators.aws_ecs.DbtSeedAwsEcsOperator", "aws-ecs")
+    )  # pragma: no cover
+    DbtSeedAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtSeedAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
     DbtSnapshotAwsEcsOperator = MissingPackage(
         "cosmos.operators.aws_ecs.DbtSnapshotAwsEcsOperator",
         "aws-ecs",
-    )
-    DbtTestAwsEcsOperator = MissingPackage("cosmos.operators.aws_ecs.DbtTestAwsEcsOperator", "aws-ecs")
+    )  # pragma: no cover
+    DbtTestAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtTestAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
+    DbtSourceAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtSourceAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
 
 
 try:
@@ -303,6 +313,7 @@ __all__ = [
     "DbtSeedAwsEcsOperator",
     "DbtSnapshotAwsEcsOperator",
     "DbtTestAwsEcsOperator",
+    "DbtSourceAwsEcsOperator",
     # GCP Cloud Run Job Execution Mode
     "DbtBuildGcpCloudRunJobOperator",
     "DbtCloneGcpCloudRunJobOperator",

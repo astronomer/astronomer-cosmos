@@ -39,18 +39,18 @@ Create a python virtualenv, activate it, upgrade pip to the latest version and i
 
 **Set up your ECR**
 
-1. **Set your secrets**  
+1. **Set your secrets**
    On the `cosmos-examples <https://github.com/astronomer/cosmos-example.git>`_ repository, you can find a ready-to-use Docker image for the AWS ECS service. Just replace your secrets, or you can create your own.
 
-2. **AWS CLI login**  
-   Before building and pushing your image, you first need to log in to the AWS service using the AWS CLI tool.  
+2. **AWS CLI login**
+   Before building and pushing your image, you first need to log in to the AWS service using the AWS CLI tool.
    Use the following command:
 
    .. code-block:: bash
 
       aws ecr-public get-login-password --region <YOUR_REGION> | docker login --username AWS --password-stdin <YOUR_ECS_PASSWORD>
 
-3. **Build and tag your image**  
+3. **Build and tag your image**
    Once you have your image ready, run the following commands:
 
    .. code-block:: bash
@@ -58,7 +58,7 @@ Create a python virtualenv, activate it, upgrade pip to the latest version and i
       docker build -f Dockerfile.aws_ecs . --platform=linux/amd64 -t <LOCAL_IMAGE_NAME>
       docker tag <YOUR_LOCAL_IMAGE_NAME> <YOUR_ECR_REPOSITORY_URI>
 
-4. **Push your image**  
+4. **Push your image**
 
    .. code-block:: bash
 
@@ -172,4 +172,3 @@ By following this guide, you can deploy Astronomer Cosmos jobs on AWS ECS using 
 For more detailed information on AWS ECS, please refer to the `AWS ECS Developer Guide <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html>`_.
 
 Happy deploying! :rocket:
-

@@ -764,6 +764,7 @@ def test_exclude_nodes_with_period_with_at_operator():
     expected = ["model.dbt-proj.child", "model.dbt-proj.orphaned", "model.dbt-proj.sibling1", "model.dbt-proj.sibling2"]
     assert sorted(selected.keys()) == expected
 
+
 def test_select_nodes_by_resource_type_source():
     """
     Test that 'resource_type:source' picks up only nodes with resource_type == SOURCE,
@@ -799,6 +800,8 @@ def test_select_nodes_by_resource_type_source():
         source_node.unique_id: source_node,
     }
     assert selected == expected
+
+
 def test_select_nodes_by_source_name():
     """
     Test selecting a single source node by exact name 'source:my_source.my_table'.
@@ -823,6 +826,8 @@ def test_select_nodes_by_source_name():
     )
     expected = {source_node.unique_id: source_node}
     assert selected == expected
+
+
 def test_exclude_nodes_by_resource_type_source():
     """
     Test excluding any seed node via 'resource_type:seed'.

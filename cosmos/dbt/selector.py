@@ -19,8 +19,8 @@ SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
-SOURCE_SELECTOR = 'source:'
-RESOURCE_TYPE_SELECTOR = 'resource_type:'
+SOURCE_SELECTOR = "source:"
+RESOURCE_TYPE_SELECTOR = "resource_type:"
 PLUS_SELECTOR = "+"
 AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
@@ -179,12 +179,18 @@ class GraphSelector:
         elif TAG_SELECTOR in self.node_name:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
-        
+
         elif SOURCE_SELECTOR in self.node_name:
             source_selection = self.node_name[len(SOURCE_SELECTOR) :]
-            
+
             # match node.resource_type == SOURCE, node.name == source_selection
-            root_nodes.update({node_id for node_id, node in nodes.items() if node.resource_type == DbtResourceType.SOURCE and node.name == source_selection})
+            root_nodes.update(
+                {
+                    node_id
+                    for node_id, node in nodes.items()
+                    if node.resource_type == DbtResourceType.SOURCE and node.name == source_selection
+                }
+            )
 
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
@@ -288,7 +294,15 @@ class SelectorConfig:
 
     @property
     def is_empty(self) -> bool:
-        return not (self.paths or self.tags or self.config or self.graph_selectors or self.other or self.sources or self.resource_types)
+        return not (
+            self.paths
+            or self.tags
+            or self.config
+            or self.graph_selectors
+            or self.other
+            or self.sources
+            or self.resource_types
+        )
 
     def load_from_statement(self, statement: str) -> None:
         """

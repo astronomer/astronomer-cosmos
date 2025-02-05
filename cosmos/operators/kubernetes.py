@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from abc import ABC
 from os import PathLike
 from typing import Any, Callable, Sequence
@@ -10,7 +11,7 @@ from airflow.utils.context import Context, context_merge
 from cosmos.config import ProfileConfig
 from cosmos.dbt.parser.output import extract_log_issues
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtLSMixin,
@@ -43,14 +44,14 @@ except ImportError:
         )
 
 
-class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):  # type: ignore
+class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBaseOperator.template_fields) + list(KubernetesPodOperator.template_fields)
+        list(AbstractDbtBase.template_fields) + list(KubernetesPodOperator.template_fields)
     )
 
     intercept_flag = False
@@ -58,6 +59,19 @@ class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):
     def __init__(self, profile_config: ProfileConfig | None = None, **kwargs: Any) -> None:
         self.profile_config = profile_config
         super().__init__(**kwargs)
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
+        base_operator_args = set(inspect.signature(KubernetesPodOperator.__init__).parameters.keys())
+        base_kwargs = {}
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                base_kwargs[arg_key] = arg_value
+        base_kwargs["task_id"] = kwargs["task_id"]
+        KubernetesPodOperator.__init__(self, **base_kwargs)
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
         env_vars_dict: dict[str, str] = dict()
@@ -69,7 +83,13 @@ class DbtKubernetesBaseOperator(AbstractDbtBaseOperator, KubernetesPodOperator):
 
         self.env_vars: list[Any] = convert_env_vars(env_vars_dict)
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
         result = KubernetesPodOperator.execute(self, context)

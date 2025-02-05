@@ -27,6 +27,7 @@ from cosmos.dbt.parser.output import (
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
+    AbstractDbtLocalBase,
     DbtBuildLocalOperator,
     DbtCloneLocalOperator,
     DbtCompileLocalOperator,
@@ -776,47 +777,89 @@ def test_store_compiled_sql() -> None:
         (
             DbtSeedLocalOperator,
             {"full_refresh": True},
-            {"context": {}, "env": {}, "cmd_flags": ["seed", "--full-refresh"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["seed", "--full-refresh"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtBuildLocalOperator,
             {"full_refresh": True},
-            {"context": {}, "env": {}, "cmd_flags": ["build", "--full-refresh"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["build", "--full-refresh"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtRunLocalOperator,
             {"full_refresh": True},
-            {"context": {}, "env": {}, "cmd_flags": ["run", "--full-refresh"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["run", "--full-refresh"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtCloneLocalOperator,
             {"full_refresh": True},
-            {"context": {}, "env": {}, "cmd_flags": ["clone", "--full-refresh"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["clone", "--full-refresh"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtTestLocalOperator,
             {},
-            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test"], "run_as_async": False, "async_context": None},
         ),
         (
             DbtTestLocalOperator,
             {"select": []},
-            {"context": {}, "env": {}, "cmd_flags": ["test"]},
+            {"context": {}, "env": {}, "cmd_flags": ["test"], "run_as_async": False, "async_context": None},
         ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
-            {"context": {}, "env": {}, "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtTestLocalOperator,
             {"full_refresh": True, "selector": "nightly_snowplow"},
-            {"context": {}, "env": {}, "cmd_flags": ["test", "--selector", "nightly_snowplow"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["test", "--selector", "nightly_snowplow"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtRunOperationLocalOperator,
             {"args": {"days": 7, "dry_run": True}, "macro_name": "bla"},
-            {"context": {}, "env": {}, "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"]},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
     ],
 )
@@ -1317,3 +1360,92 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
             expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
             mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)
+
+
+MOCK_ADAPTER_CALLABLE_MAP = {
+    "snowflake": MagicMock(),
+    "bigquery": MagicMock(),
+}
+
+
+@pytest.fixture
+def mock_adapter_map(monkeypatch):
+    monkeypatch.setattr(
+        "cosmos.operators.local.PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP",
+        MOCK_ADAPTER_CALLABLE_MAP,
+    )
+
+
+def test_mock_dbt_adapter_valid_context(mock_adapter_map):
+    """
+    Test that the _mock_dbt_adapter method calls the correct mock adapter function
+    when provided with a valid async_context.
+    """
+    async_context = {
+        "async_operator": MagicMock(),
+        "profile_type": "bigquery",
+    }
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
+    operator._mock_dbt_adapter(async_context)
+
+    MOCK_ADAPTER_CALLABLE_MAP["bigquery"].assert_called_once()
+
+
+def test_mock_dbt_adapter_missing_async_context():
+    """
+    Test that the _mock_dbt_adapter method raises a CosmosValueError
+    when async_context is None.
+    """
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
+    with pytest.raises(CosmosValueError, match="`async_context` is necessary for running the model asynchronously"):
+        operator._mock_dbt_adapter(None)
+
+
+def test_mock_dbt_adapter_missing_async_operator():
+    """
+    Test that the _mock_dbt_adapter method raises a CosmosValueError
+    when async_operator is missing in async_context.
+    """
+    async_context = {
+        "profile_type": "snowflake",
+    }
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
+    with pytest.raises(
+        CosmosValueError, match="`async_operator` needs to be specified in `async_context` when running as async"
+    ):
+        operator._mock_dbt_adapter(async_context)
+
+
+def test_mock_dbt_adapter_missing_profile_type():
+    """
+    Test that the _mock_dbt_adapter method raises a CosmosValueError
+    when profile_type is missing in async_context.
+    """
+    async_context = {
+        "async_operator": MagicMock(),
+    }
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
+    with pytest.raises(CosmosValueError, match="`profile_type` needs to be specified in `async_context`"):
+        operator._mock_dbt_adapter(async_context)
+
+
+def test_mock_dbt_adapter_unsupported_profile_type(mock_adapter_map):
+    """
+    Test that the _mock_dbt_adapter method raises a CosmosValueError
+    when the profile_type is not supported.
+    """
+    async_context = {
+        "async_operator": MagicMock(),
+        "profile_type": "unsupported_profile",
+    }
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
+    with pytest.raises(
+        CosmosValueError,
+        match="Mock adapter callable function not available for profile_type unsupported_profile",
+    ):
+        operator._mock_dbt_adapter(async_context)

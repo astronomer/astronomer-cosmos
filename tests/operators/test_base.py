@@ -1,12 +1,14 @@
+import inspect
 import sys
 from datetime import datetime
 from unittest.mock import patch
 
 import pytest
+from airflow.models import BaseOperator
 from airflow.utils.context import Context
 
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCompileMixin,
     DbtLSMixin,
@@ -22,13 +24,13 @@ from cosmos.operators.base import (
     (sys.version_info.major, sys.version_info.minor) == (3, 12),
     reason="The error message for the abstract class instantiation seems to have changed between Python 3.11 and 3.12",
 )
-def test_dbt_base_operator_is_abstract():
+def test_dbt_base_is_abstract():
     """Tests that the abstract base operator cannot be instantiated since the base_cmd is not defined."""
     expected_error = (
-        "Can't instantiate abstract class AbstractDbtBaseOperator with abstract methods base_cmd, build_and_run_cmd"
+        "Can't instantiate abstract class AbstractDbtBase with abstract methods base_cmd, build_and_run_cmd"
     )
     with pytest.raises(TypeError, match=expected_error):
-        AbstractDbtBaseOperator()
+        AbstractDbtBase(project_dir="project_dir")
 
 
 @pytest.mark.skipif(
@@ -38,21 +40,21 @@ def test_dbt_base_operator_is_abstract():
 def test_dbt_base_operator_is_abstract_py12():
     """Tests that the abstract base operator cannot be instantiated since the base_cmd is not defined."""
     expected_error = (
-        "Can't instantiate abstract class AbstractDbtBaseOperator without an implementation for abstract methods "
+        "Can't instantiate abstract class AbstractDbtBase without an implementation for abstract methods "
         "'base_cmd', 'build_and_run_cmd'"
     )
     with pytest.raises(TypeError, match=expected_error):
-        AbstractDbtBaseOperator()
+        AbstractDbtBase(project_dir="project_dir")
 
 
 @pytest.mark.parametrize("cmd_flags", [["--some-flag"], []])
-@patch("cosmos.operators.base.AbstractDbtBaseOperator.build_and_run_cmd")
+@patch("cosmos.operators.base.AbstractDbtBase.build_and_run_cmd")
 def test_dbt_base_operator_execute(mock_build_and_run_cmd, cmd_flags, monkeypatch):
     """Tests that the base operator execute method calls the build_and_run_cmd method with the expected arguments."""
-    monkeypatch.setattr(AbstractDbtBaseOperator, "add_cmd_flags", lambda _: cmd_flags)
-    AbstractDbtBaseOperator.__abstractmethods__ = set()
+    monkeypatch.setattr(AbstractDbtBase, "add_cmd_flags", lambda _: cmd_flags)
+    AbstractDbtBase.__abstractmethods__ = set()
 
-    base_operator = AbstractDbtBaseOperator(task_id="fake_task", project_dir="fake_dir")
+    base_operator = AbstractDbtBase(task_id="fake_task", project_dir="fake_dir")
 
     base_operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=cmd_flags)
@@ -61,7 +63,7 @@ def test_dbt_base_operator_execute(mock_build_and_run_cmd, cmd_flags, monkeypatc
 @patch("cosmos.operators.base.context_merge")
 def test_dbt_base_operator_context_merge_called(mock_context_merge):
     """Tests that the base operator execute method calls the context_merge method with the expected arguments."""
-    base_operator = AbstractDbtBaseOperator(
+    base_operator = AbstractDbtBase(
         task_id="fake_task",
         project_dir="fake_dir",
         extra_context={"extra": "extra"},
@@ -125,7 +127,7 @@ def test_dbt_base_operator_context_merge(
     expected_context,
 ):
     """Tests that the base operator execute method calls and update context"""
-    base_operator = AbstractDbtBaseOperator(
+    base_operator = AbstractDbtBase(
         task_id="fake_task",
         project_dir="fake_dir",
         extra_context=extra_context,
@@ -173,5 +175,21 @@ def test_dbt_mixin_add_cmd_flags_run_operator(args, expected_flags):
 
 def test_abstract_dbt_base_operator_append_env_is_false_by_default():
     """Tests that the append_env attribute is set to False by default."""
-    base_operator = AbstractDbtBaseOperator(task_id="fake_task", project_dir="fake_dir")
+    AbstractDbtBase.__abstractmethods__ = set()
+    base_operator = AbstractDbtBase(task_id="fake_task", project_dir="fake_dir")
     assert base_operator.append_env is False
+
+
+def test_abstract_dbt_base_is_not_airflow_base_operator():
+    AbstractDbtBase.__abstractmethods__ = set()
+    base_operator = AbstractDbtBase(task_id="fake_task", project_dir="fake_dir")
+    assert not isinstance(base_operator, BaseOperator)
+
+
+def test_abstract_dbt_base_init_no_super():
+    """Test that super().__init__ is not called in AbstractDbtBase"""
+    init_method = getattr(AbstractDbtBase, "__init__", None)
+    assert init_method is not None
+
+    source = inspect.getsource(init_method)
+    assert "super().__init__" not in source

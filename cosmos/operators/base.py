@@ -1,20 +1,21 @@
 from __future__ import annotations
 
+import logging
 import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
 import yaml
-from airflow.models.baseoperator import BaseOperator
 from airflow.utils.context import Context, context_merge
 from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
+from cosmos.log import get_logger
 
 
-class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
+class AbstractDbtBase(metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
 
@@ -140,7 +141,6 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
-        super().__init__(**kwargs)
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """
@@ -190,6 +190,10 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
                     )
 
         return filtered_env
+
+    @property
+    def log(self) -> logging.Logger:
+        return get_logger(__name__)
 
     def add_global_flags(self) -> list[str]:
         flags = []
@@ -258,10 +262,16 @@ class AbstractDbtBaseOperator(BaseOperator, metaclass=ABCMeta):
         return dbt_cmd, env
 
     @abstractmethod
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str]) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str],
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
-    def execute(self, context: Context) -> Any | None:  # type: ignore
+    def execute(self, context: Context, **kwargs) -> Any | None:  # type: ignore
         if self.extra_context:
             context_merge(context, self.extra_context)
 

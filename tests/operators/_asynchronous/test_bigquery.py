@@ -1,96 +1,71 @@
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow import __version__ as airflow_version
-from packaging import version
+from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
-from cosmos import ProfileConfig
-from cosmos.exceptions import CosmosValueError
+from cosmos.config import ProfileConfig
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
-from cosmos.profiles import get_automatic_profile_mapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 
-def test_bigquery_without_refresh(mock_bigquery_conn):
-    profile_mapping = get_automatic_profile_mapping(
-        mock_bigquery_conn.conn_id,
-        profile_args={
-            "dataset": "my_dataset",
+@pytest.fixture
+def profile_config_mock():
+    """Fixture to create a mock ProfileConfig."""
+    mock_config = MagicMock(spec=ProfileConfig)
+    mock_config.get_profile_type.return_value = "bigquery"
+    mock_config.profile_mapping.conn_id = "google_cloud_default"
+    mock_config.profile_mapping.profile = {"project": "test_project", "dataset": "test_dataset"}
+    return mock_config
+
+
+def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
+    """Test DbtRunAirflowAsyncBigqueryOperator initializes with correct attributes."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    assert isinstance(operator, DbtRunAirflowAsyncBigqueryOperator)
+    assert isinstance(operator, BigQueryInsertJobOperator)
+    assert operator.project_dir == "/path/to/project"
+    assert operator.profile_config == profile_config_mock
+    assert operator.gcp_conn_id == "google_cloud_default"
+    assert operator.gcp_project == "test_project"
+    assert operator.dataset == "test_dataset"
+
+
+def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
+    """Test base_cmd property returns the correct dbt command."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    assert operator.base_cmd == ["run"]
+
+
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
+def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd, profile_config_mock):
+    """Test execute calls build_and_run_cmd with correct parameters."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    mock_context = MagicMock()
+    operator.execute(mock_context)
+
+    mock_build_and_run_cmd.assert_called_once_with(
+        context=mock_context,
+        run_as_async=True,
+        async_context={
+            "profile_type": "bigquery",
+            "async_operator": BigQueryInsertJobOperator,
         },
     )
-    bigquery_profile_config = ProfileConfig(
-        profile_name="my_profile", target_name="dev", profile_mapping=profile_mapping
-    )
-    operator = DbtRunAirflowAsyncBigqueryOperator(
-        task_id="test_task", project_dir="/tmp", profile_config=bigquery_profile_config
-    )
-
-    operator.extra_context = {
-        "dbt_node_config": {"file_path": "/some/path/to/file.sql"},
-        "dbt_dag_task_group_identifier": "task_group_1",
-    }
-    with pytest.raises(CosmosValueError, match="The async execution only supported for full_refresh"):
-        operator.execute({})
-
-
-def test_get_remote_sql_airflow_io_unavailable(mock_bigquery_conn):
-    profile_mapping = get_automatic_profile_mapping(
-        mock_bigquery_conn.conn_id,
-        profile_args={
-            "dataset": "my_dataset",
-        },
-    )
-    bigquery_profile_config = ProfileConfig(
-        profile_name="my_profile", target_name="dev", profile_mapping=profile_mapping
-    )
-    operator = DbtRunAirflowAsyncBigqueryOperator(
-        task_id="test_task", project_dir="/tmp", profile_config=bigquery_profile_config
-    )
-
-    operator.extra_context = {
-        "dbt_node_config": {"file_path": "/some/path/to/file.sql"},
-        "dbt_dag_task_group_identifier": "task_group_1",
-    }
-
-    if not AIRFLOW_IO_AVAILABLE:
-        with pytest.raises(
-            CosmosValueError, match="Cosmos async support is only available starting in Airflow 2.8 or later."
-        ):
-            operator.get_remote_sql()
-
-
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.8"),
-    reason="Airflow object storage supported  2.8 release",
-)
-def test_get_remote_sql_success(mock_bigquery_conn):
-    profile_mapping = get_automatic_profile_mapping(
-        mock_bigquery_conn.conn_id,
-        profile_args={
-            "dataset": "my_dataset",
-        },
-    )
-    bigquery_profile_config = ProfileConfig(
-        profile_name="my_profile", target_name="dev", profile_mapping=profile_mapping
-    )
-    operator = DbtRunAirflowAsyncBigqueryOperator(
-        task_id="test_task", project_dir="/tmp", profile_config=bigquery_profile_config
-    )
-
-    operator.extra_context = {
-        "dbt_node_config": {"file_path": "/some/path/to/file.sql"},
-        "dbt_dag_task_group_identifier": "task_group_1",
-    }
-    operator.project_dir = "/tmp"
-
-    mock_object_storage_path = MagicMock()
-    mock_file = MagicMock()
-    mock_file.read.return_value = "SELECT * FROM table"
-
-    mock_object_storage_path.open.return_value.__enter__.return_value = mock_file
-
-    with patch("airflow.io.path.ObjectStoragePath", return_value=mock_object_storage_path):
-        remote_sql = operator.get_remote_sql()
-
-    assert remote_sql == "SELECT * FROM table"
-    mock_object_storage_path.open.assert_called_once()

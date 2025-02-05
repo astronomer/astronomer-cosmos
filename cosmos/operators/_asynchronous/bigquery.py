@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import Any, Sequence
 
-from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
+import airflow
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.context import Context
+from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
-from cosmos.exceptions import CosmosValueError
-from cosmos.settings import remote_target_path, remote_target_path_conn_id
+from cosmos.dataset import get_dataset_alias_name
+from cosmos.operators.local import AbstractDbtLocalBase
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 
-class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ignore[misc]
+class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
     template_fields: Sequence[str] = (
-        "full_refresh",
         "gcp_project",
         "dataset",
         "location",
@@ -27,6 +28,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
         project_dir: str,
         profile_config: ProfileConfig,
         extra_context: dict[str, Any] | None = None,
+        dbt_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         self.project_dir = project_dir
@@ -36,73 +38,35 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator):  # type: ig
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
         self.extra_context = extra_context or {}
-        self.full_refresh = None
-        if "full_refresh" in kwargs:
-            self.full_refresh = kwargs.pop("full_refresh")
         self.configuration: dict[str, Any] = {}
+        self.dbt_kwargs = dbt_kwargs or {}
+        task_id = self.dbt_kwargs.pop("task_id")
+        AbstractDbtLocalBase.__init__(
+            self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
+        )
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+            from airflow.datasets import DatasetAlias
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            kwargs["outlets"] = [
+                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+            ]  # type: ignore
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
             configuration=self.configuration,
             deferrable=True,
             **kwargs,
         )
+        self.async_context = extra_context or {}
+        self.async_context["profile_type"] = self.profile_config.get_profile_type()
+        self.async_context["async_operator"] = BigQueryInsertJobOperator
 
-    def get_remote_sql(self) -> str:
-        if not settings.AIRFLOW_IO_AVAILABLE:
-            raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
-        from airflow.io.path import ObjectStoragePath
+    @property
+    def base_cmd(self) -> list[str]:
+        return ["run"]
 
-        file_path = self.extra_context["dbt_node_config"]["file_path"]  # type: ignore
-        dbt_dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
-
-        remote_target_path_str = str(remote_target_path).rstrip("/")
-
-        if TYPE_CHECKING:  # pragma: no cover
-            assert self.project_dir is not None
-
-        project_dir_parent = str(Path(self.project_dir).parent)
-        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/compiled/{relative_file_path}"
-
-        object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
-        with object_storage_path.open() as fp:  # type: ignore
-            return fp.read()  # type: ignore
-
-    def drop_table_sql(self) -> None:
-        model_name = self.extra_context["dbt_node_config"]["resource_name"]  # type: ignore
-        sql = f"DROP TABLE IF EXISTS {self.gcp_project}.{self.dataset}.{model_name};"
-
-        hook = BigQueryHook(
-            gcp_conn_id=self.gcp_conn_id,
-            impersonation_chain=self.impersonation_chain,
-        )
-        self.configuration = {
-            "query": {
-                "query": sql,
-                "useLegacySql": False,
-            }
-        }
-        hook.insert_job(configuration=self.configuration, location=self.location, project_id=self.gcp_project)
-
-    def execute(self, context: Context) -> Any | None:
-
-        if not self.full_refresh:
-            raise CosmosValueError("The async execution only supported for full_refresh")
-        else:
-            # It may be surprising to some, but the dbt-core --full-refresh argument fully drops the table before populating it
-            # https://github.com/dbt-labs/dbt-core/blob/5e9f1b515f37dfe6cdae1ab1aa7d190b92490e24/core/dbt/context/base.py#L662-L666
-            # https://docs.getdbt.com/reference/resource-configs/full_refresh#recommendation
-            # We're emulating this behaviour here
-            # The compiled SQL has several limitations here, but these will be addressed in the PR: https://github.com/astronomer/astronomer-cosmos/pull/1474.
-            self.drop_table_sql()
-            sql = self.get_remote_sql()
-            model_name = self.extra_context["dbt_node_config"]["resource_name"]  # type: ignore
-            # prefix explicit create command to create table
-            sql = f"CREATE TABLE {self.gcp_project}.{self.dataset}.{model_name} AS  {sql}"
-            self.configuration = {
-                "query": {
-                    "query": sql,
-                    "useLegacySql": False,
-                }
-            }
-            return super().execute(context)
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)

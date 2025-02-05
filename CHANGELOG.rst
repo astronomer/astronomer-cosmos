@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.9.0a4 (2025-01-29)
+1.9.0a5 (2025-02-03)
 --------------------
 
 Breaking changes
@@ -18,6 +18,7 @@ Features
 * Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495. Check out the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
 * Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492. More information `here <https://astronomer.github.io/astronomer-cosmos/profiles/#profile-customise-per-node>`_.
+* Create and run accurate SQL statements when using ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti, @tatiana and @pankajastro in #1474
 
 Bug Fixes
 
@@ -27,9 +28,12 @@ Enhancement
 
 * Fix OpenLineage deprecation warning by @CorsettiS in #1449
 * Move ``DbtRunner`` related functions into ``dbt/runner.py`` module by @tatiana in #1480
+* Add ``on_warning_callback`` to ``DbtSourceKubernetesOperator`` and refactor previous operators by @LuigiCerone in #1501
+
 
 Others
 
+* Ignore dbt package tests when running Cosmos tests by @tatiana in #1502
 * GitHub Actions Dependabot: #1487
 * Pre-commit updates: #1473, #1493
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
@@ -63,6 +64,29 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         self.container_name = container_name
+
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
+        kwargs.update(
+            {
+                "cluster": cluster,
+                "container_name": container_name,
+                "task_definition": task_definition,
+                "overrides": None,
+            }
+        )
+        base_operator_args = set(inspect.signature(EcsRunTaskOperator.__init__).parameters.keys())
+        base_kwargs = {}
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                base_kwargs[arg_key] = arg_value
+        base_kwargs["task_id"] = kwargs["task_id"]
+        base_kwargs["aws_conn_id"] = aws_conn_id
+        EcsRunTaskOperator.__init__(self, **base_kwargs)
 
     def build_and_run_cmd(
         self,

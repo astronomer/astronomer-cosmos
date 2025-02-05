@@ -327,7 +327,7 @@ class SelectorConfig:
                     self._parse_unknown_selector(item)
                 else:
                     self._handle_no_precursors_or_descendants(item, node_name)
-    
+
     def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:
         if node_name.startswith(PATH_SELECTOR):
             self._parse_path_selector(item)
@@ -472,7 +472,7 @@ class NodeSelector:
             return False
 
         if self.config.resource_types and not self._is_resource_type_matching(node):
-                return False
+            return False
 
         if self.config.sources and not self._is_source_matching(node):
             return False
@@ -484,7 +484,7 @@ class NodeSelector:
         if node.resource_type.value not in self.config.resource_types:
             return False
         return True
-    
+
     def _is_source_matching(self, node: DbtNode) -> bool:
         """Checks if the node's source is a subset of the config's source."""
         if node.resource_type != DbtResourceType.SOURCE:

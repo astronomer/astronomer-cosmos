@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
@@ -7,7 +8,7 @@ from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtLSMixin,
@@ -29,15 +30,13 @@ except ImportError:
     )
 
 
-class DbtDockerBaseOperator(AbstractDbtBaseOperator, DockerOperator):  # type: ignore
+class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Docker container.
 
     """
 
-    template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBaseOperator.template_fields) + list(DockerOperator.template_fields)
-    )
+    template_fields: Sequence[str] = tuple(list(AbstractDbtBase.template_fields) + list(DockerOperator.template_fields))
 
     intercept_flag = False
 
@@ -56,8 +55,28 @@ class DbtDockerBaseOperator(AbstractDbtBaseOperator, DockerOperator):  # type: i
             )
 
         super().__init__(image=image, **kwargs)
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
+        kwargs["image"] = image
+        base_operator_args = set(inspect.signature(DockerOperator.__init__).parameters.keys())
+        base_kwargs = {}
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                base_kwargs[arg_key] = arg_value
+        base_kwargs["task_id"] = kwargs["task_id"]
+        DockerOperator.__init__(self, **base_kwargs)
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = DockerOperator.execute(self, context)

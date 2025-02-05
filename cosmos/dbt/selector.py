@@ -219,8 +219,10 @@ class GraphSelector:
             for node_id, node in nodes.items():
                 node_by_name[node.name] = node_id
 
-            if self.node_name in node_by_name:
-                root_id = node_by_name[self.node_name]
+            node_name_patched = self.node_name.replace(".", "_")
+
+            if node_name_patched in node_by_name:
+                root_id = node_by_name[node_name_patched]
                 root_nodes.add(root_id)
             else:
                 logger.warning(f"Selector {self.node_name} not found.")

@@ -38,7 +38,6 @@ def test_dbt_kubernetes_build_command():
     Since we know that the KubernetesOperator is tested, we can just test that the
     command is built correctly and added to the "arguments" parameter.
     """
-
     result_map = {
         "ls": DbtLSAwsEksOperator(**base_kwargs),
         "run": DbtRunAwsEksOperator(**base_kwargs),

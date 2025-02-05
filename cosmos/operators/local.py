@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import tempfile
@@ -15,6 +16,7 @@ import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
@@ -66,13 +68,14 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
 from cosmos.dbt.project import create_symlinks
+from cosmos.dbt_adapters import PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP, associate_async_operator_args
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
 )
 from cosmos.log import get_logger
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtCompileMixin,
@@ -112,7 +115,7 @@ except (ImportError, ModuleNotFoundError):
             job_facets: dict[str, str] = dict()
 
 
-class DbtLocalBaseOperator(AbstractDbtBaseOperator):
+class AbstractDbtLocalBase(AbstractDbtBase):
     """
     Executes a dbt core cli command locally.
 
@@ -131,7 +134,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBaseOperator.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
         "freshness": "json",
@@ -161,17 +164,6 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
-
-        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
-            from airflow.datasets import DatasetAlias
-
-            # ignoring the type because older versions of Airflow raise the follow error in mypy
-            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
-            dag_id = kwargs.get("dag")
-            task_group_id = kwargs.get("task_group")
-            kwargs["outlets"] = [
-                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, task_id))
-            ]  # type: ignore
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -271,7 +263,7 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
             # delete the old records
             session.query(RenderedTaskInstanceFields).filter(
-                RenderedTaskInstanceFields.dag_id == self.dag_id,
+                RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
                 RenderedTaskInstanceFields.task_id == self.task_id,
                 RenderedTaskInstanceFields.run_id == ti.run_id,
             ).delete()
@@ -401,12 +393,97 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
             if latest_package_lockfile:
                 _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
 
+    def _read_run_sql_from_target_dir(self, tmp_project_dir: str, sql_context: dict[str, Any]) -> str:
+        sql_relative_path = sql_context["dbt_node_config"]["file_path"].split(str(self.project_dir))[-1].lstrip("/")
+        run_sql_path = Path(tmp_project_dir) / "target/run" / Path(self.project_dir).name / sql_relative_path
+        with run_sql_path.open("r") as sql_file:
+            sql_content: str = sql_file.read()
+        return sql_content
+
+    def _clone_project(self, tmp_dir_path: Path) -> None:
+        self.log.info(
+            "Cloning project to writable temp directory %s from %s",
+            tmp_dir_path,
+            self.project_dir,
+        )
+        create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+
+    def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
+        if self.cache_dir is None:
+            return
+        latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
+        self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+        if latest_partial_parse is not None:
+            cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+
+    def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
+        return [
+            "--project-dir",
+            str(tmp_project_dir),
+            "--profiles-dir",
+            str(profile_path.parent),
+            "--profile",
+            self.profile_config.profile_name,
+            "--target",
+            self.profile_config.target_name,
+        ]
+
+    def _install_dependencies(
+        self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
+    ) -> None:
+        self._cache_package_lockfile(tmp_dir_path)
+        deps_command = [self.dbt_executable_path, "deps"] + flags
+        self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
+
+    @staticmethod
+    def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
+        if not async_context:
+            raise CosmosValueError("`async_context` is necessary for running the model asynchronously")
+        if "async_operator" not in async_context:
+            raise CosmosValueError("`async_operator` needs to be specified in `async_context` when running as async")
+        if "profile_type" not in async_context:
+            raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
+        profile_type = async_context["profile_type"]
+        if profile_type not in PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP:
+            raise CosmosValueError(f"Mock adapter callable function not available for profile_type {profile_type}")
+        mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP[profile_type]
+        mock_adapter_callable()
+
+    def _handle_datasets(self, context: Context) -> None:
+        inlets = self.get_datasets("inputs")
+        outlets = self.get_datasets("outputs")
+        self.log.info("Inlets: %s", inlets)
+        self.log.info("Outlets: %s", outlets)
+        self.register_dataset(inlets, outlets, context)
+
+    def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
+        if self.cache_dir is None:
+            return
+        partial_parse_file = get_partial_parse_path(tmp_dir_path)
+        if partial_parse_file.exists():
+            cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
+
+    def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
+        self.store_freshness_json(tmp_project_dir, context)
+        self.store_compiled_sql(tmp_project_dir, context)
+        self.upload_compiled_sql(tmp_project_dir, context)
+        if self.callback:
+            self.callback_args.update({"context": context})
+            self.callback(tmp_project_dir, **self.callback_args)
+
+    def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
+        sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
+        associate_async_operator_args(self, async_context["profile_type"], sql=sql)
+        async_context["async_operator"].execute(self, context)
+
     def run_command(
         self,
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
-    ) -> FullOutputSubprocessResult | dbtRunnerResult:
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """
@@ -415,50 +492,27 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
 
-            self.log.info(
-                "Cloning project to writable temp directory %s from %s",
-                tmp_project_dir,
-                self.project_dir,
-            )
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
-            create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+            self._clone_project(tmp_dir_path)
 
-            if self.partial_parse and self.cache_dir is not None:
-                latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
-                self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
-                if latest_partial_parse is not None:
-                    cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+            if self.partial_parse:
+                self._handle_partial_parse(tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
                 env.update(env_vars)
-
-                flags = [
-                    "--project-dir",
-                    str(tmp_project_dir),
-                    "--profiles-dir",
-                    str(profile_path.parent),
-                    "--profile",
-                    self.profile_config.profile_name,
-                    "--target",
-                    self.profile_config.target_name,
-                ]
-
-                if self.install_deps:
-                    self._cache_package_lockfile(tmp_dir_path)
-                    deps_command = [self.dbt_executable_path, "deps"]
-                    deps_command.extend(flags)
-                    self.invoke_dbt(
-                        command=deps_command,
-                        env=env,
-                        cwd=tmp_project_dir,
-                    )
-
-                full_cmd = cmd + flags
-
                 self.log.debug("Using environment variables keys: %s", env.keys())
 
+                flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
+
+                if self.install_deps:
+                    self._install_dependencies(tmp_dir_path, flags, env)
+
+                if run_as_async:
+                    self._mock_dbt_adapter(async_context)
+
+                full_cmd = cmd + flags
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
@@ -471,24 +525,16 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                     ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
 
                 if self.emit_datasets:
-                    inlets = self.get_datasets("inputs")
-                    outlets = self.get_datasets("outputs")
-                    self.log.info("Inlets: %s", inlets)
-                    self.log.info("Outlets: %s", outlets)
-                    self.register_dataset(inlets, outlets, context)
+                    self._handle_datasets(context)
 
-                if self.partial_parse and self.cache_dir:
-                    partial_parse_file = get_partial_parse_path(tmp_dir_path)
-                    if partial_parse_file.exists():
-                        cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
+                if self.partial_parse:
+                    self._update_partial_parse_cache(tmp_dir_path)
 
-                self.store_freshness_json(tmp_project_dir, context)
-                self.store_compiled_sql(tmp_project_dir, context)
-                self.upload_compiled_sql(tmp_project_dir, context)
-                if self.callback:
-                    self.callback_args.update({"context": context})
-                    self.callback(tmp_project_dir, **self.callback_args)
+                self._handle_post_execution(tmp_project_dir, context)
                 self.handle_exception(result)
+
+                if run_as_async and async_context:
+                    self._handle_async_execution(tmp_project_dir, context, async_context)
 
                 return result
 
@@ -576,17 +622,17 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
-                self.outlets.extend(new_outlets)
-                self.inlets.extend(new_inlets)
-                for task in self.dag.tasks:
+                self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
+                self.inlets.extend(new_inlets)  # type: ignore[attr-defined]
+                for task in self.dag.tasks:  # type: ignore[attr-defined]
                     if task.task_id == self.task_id:
                         task.outlets.extend(new_outlets)
                         task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)
+                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined]
                 session.commit()
         else:
             logger.info("Assigning inlets/outlets with DatasetAlias")
-            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
+            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
             for outlet in new_outlets:
                 context["outlet_events"][dataset_alias_name].add(outlet)
 
@@ -629,11 +675,17 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
         )
 
     def build_and_run_cmd(
-        self, context: Context, cmd_flags: list[str] | None = None
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
-        result = self.run_command(cmd=dbt_cmd, env=env, context=context)
+        result = self.run_command(
+            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context
+        )
         return result
 
     def on_kill(self) -> None:
@@ -642,6 +694,43 @@ class DbtLocalBaseOperator(AbstractDbtBaseOperator):
                 self.subprocess_hook.send_sigint()
             else:
                 self.subprocess_hook.send_sigterm()
+
+
+class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
+
+    template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
+        abstract_dbt_local_base_kwargs = {}
+        base_operator_kwargs = {}
+        abstract_dbt_local_base_args_keys = (
+            inspect.getfullargspec(AbstractDbtBase.__init__).args
+            + inspect.getfullargspec(AbstractDbtLocalBase.__init__).args
+        )
+        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in abstract_dbt_local_base_args_keys:
+                abstract_dbt_local_base_kwargs[arg_key] = arg_value
+            if arg_key in base_operator_args:
+                base_operator_kwargs[arg_key] = arg_value
+        AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+            from airflow.datasets import DatasetAlias
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            base_operator_kwargs["outlets"] = [
+                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+            ]  # type: ignore
+        BaseOperator.__init__(self, **base_operator_kwargs)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -659,6 +748,8 @@ class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core ls command.
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -680,6 +771,8 @@ class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     Executes a dbt core snapshot command.
     """
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
@@ -688,6 +781,8 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -715,7 +810,7 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
 
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context, **kwargs: Any) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         if self.on_warning_callback:
             self._handle_warnings(result, context)
@@ -738,6 +833,8 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(
         self,
@@ -774,7 +871,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
             self.extract_issues = dbt_runner.extract_message_by_status
             self.parse_number_of_warnings = dbt_runner.parse_number_of_warnings
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context, **kwargs: Any) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         self._set_test_result_parsing_methods()
         number_of_warnings = self.parse_number_of_warnings(result)  # type: ignore
@@ -803,6 +900,8 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     Use the `callback` parameter to specify a callback function to run after the command completes.
     """
 
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     ui_color = "#8194E0"
     required_files = ["index.html", "manifest.json", "catalog.json"]
     base_cmd = ["docs", "generate"]
@@ -825,6 +924,8 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
     """
     Abstract class for operators that upload the generated documentation to cloud storage.
     """
+
+    template_fields: Sequence[str] = DbtDocsLocalOperator.template_fields  # type: ignore[operator]
 
     def __init__(
         self,
@@ -1021,6 +1122,8 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
 
 class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["should_upload_compiled_sql"] = True
         super().__init__(*args, **kwargs)
@@ -1030,6 +1133,8 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
     """
     Executes a dbt core clone command.
     """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

@@ -1,9 +1,8 @@
+from __future__ import annotations
+
 import importlib
 import logging
-from abc import ABCMeta
-from typing import Any, Sequence
-
-from airflow.utils.context import Context
+from typing import Any
 
 from cosmos.airflow.graph import _snake_case_to_camelcase
 from cosmos.config import ProfileConfig
@@ -36,11 +35,16 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
         return DbtRunLocalOperator
 
 
-class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):  # type: ignore[misc]
+class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = DbtRunLocalOperator.template_fields + ("project_dir",)  # type: ignore[operator]
-
-    def __init__(self, project_dir: str, profile_config: ProfileConfig, **kwargs: Any):
+    def __init__(
+        self,
+        project_dir: str,
+        profile_config: ProfileConfig,
+        extra_context: dict[str, object] | None = None,
+        dbt_kwargs: dict[str, object] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.project_dir = project_dir
         self.profile_config = profile_config
 
@@ -51,7 +55,13 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):
         # When using composition instead of inheritance to initialize the async class and run its execute method,
         # Airflow throws a `DuplicateTaskIdFound` error.
         DbtRunAirflowAsyncFactoryOperator.__bases__ = (async_operator_class,)
-        super().__init__(project_dir=project_dir, profile_config=profile_config, **kwargs)
+        super().__init__(
+            project_dir=project_dir,
+            profile_config=profile_config,
+            extra_context=extra_context,
+            dbt_kwargs=dbt_kwargs,
+            **kwargs,
+        )
 
     def create_async_operator(self) -> Any:
 
@@ -60,6 +70,3 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator, metaclass=ABCMeta):
         async_class_operator = _create_async_operator_class(profile_type, "DbtRun")
 
         return async_class_operator
-
-    def execute(self, context: Context) -> None:
-        super().execute(context)

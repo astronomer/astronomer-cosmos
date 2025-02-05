@@ -8,7 +8,7 @@ from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtCloneMixin,
     DbtLSMixin,
@@ -41,14 +41,14 @@ except ImportError:
     )
 
 
-class DbtGcpCloudRunJobBaseOperator(AbstractDbtBaseOperator, CloudRunExecuteJobOperator):  # type: ignore
+class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator):  # type: ignore
     """
     Executes a dbt core cli command in a Cloud Run Job instance with dbt installed in it.
 
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBaseOperator.template_fields) + list(CloudRunExecuteJobOperator.template_fields)
+        list(AbstractDbtBase.template_fields) + list(CloudRunExecuteJobOperator.template_fields)
     )
 
     intercept_flag = False
@@ -69,8 +69,36 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBaseOperator, CloudRunExecuteJobO
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         super().__init__(project_id=project_id, region=region, job_name=job_name, **kwargs)
+        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
+        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
+        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
+        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
+        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
+        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
+        kwargs.update(
+            {
+                "project_id": project_id,
+                "region": region,
+                "job_name": job_name,
+                "command": command,
+                "environment_variables": environment_variables,
+            }
+        )
+        base_operator_args = set(inspect.signature(CloudRunExecuteJobOperator.__init__).parameters.keys())
+        base_kwargs = {}
+        for arg_key, arg_value in kwargs.items():
+            if arg_key in base_operator_args:
+                base_kwargs[arg_key] = arg_value
+        base_kwargs["task_id"] = kwargs["task_id"]
+        CloudRunExecuteJobOperator.__init__(self, **base_kwargs)
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = CloudRunExecuteJobOperator.execute(self, context)

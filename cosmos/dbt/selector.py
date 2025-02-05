@@ -474,9 +474,8 @@ class NodeSelector:
         if self.config.sources:
             if node.resource_type != DbtResourceType.SOURCE:
                 return False
-
-        if node.resource_name not in self.config.sources:
-            return False
+            if node.resource_name not in self.config.sources:
+                return False
 
         return True
 

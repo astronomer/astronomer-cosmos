@@ -325,20 +325,24 @@ class SelectorConfig:
                     ...
                 elif precursors or descendants:
                     self._parse_unknown_selector(item)
-                elif node_name.startswith(PATH_SELECTOR):
-                    self._parse_path_selector(item)
-                elif "/" in node_name:
-                    self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
-                elif node_name.startswith(TAG_SELECTOR):
-                    self._parse_tag_selector(item)
-                elif node_name.startswith(CONFIG_SELECTOR):
-                    self._parse_config_selector(item)
-                elif node_name.startswith(SOURCE_SELECTOR):
-                    self._parse_source_selector(item)
-                elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
-                    self._parse_resource_type_selector(item)
                 else:
-                    self._parse_unknown_selector(item)
+                    self._handle_no_precursors_or_descendants(item, node_name)
+    
+    def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:
+        if node_name.startswith(PATH_SELECTOR):
+            self._parse_path_selector(item)
+        elif "/" in node_name:
+            self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
+        elif node_name.startswith(TAG_SELECTOR):
+            self._parse_tag_selector(item)
+        elif node_name.startswith(CONFIG_SELECTOR):
+            self._parse_config_selector(item)
+        elif node_name.startswith(SOURCE_SELECTOR):
+            self._parse_source_selector(item)
+        elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
+            self._parse_resource_type_selector(item)
+        else:
+            self._parse_unknown_selector(item)
 
     def _parse_unknown_selector(self, item: str) -> None:
         if item:
@@ -467,16 +471,26 @@ class NodeSelector:
         if self.config.paths and not self._is_path_matching(node):
             return False
 
-        if self.config.resource_types:
-            if node.resource_type.value not in self.config.resource_types:
+        if self.config.resource_types and not self._is_resource_type_matching(node):
                 return False
 
-        if self.config.sources:
-            if node.resource_type != DbtResourceType.SOURCE:
-                return False
-            if node.resource_name not in self.config.sources:
-                return False
+        if self.config.sources and not self._is_source_matching(node):
+            return False
 
+        return True
+
+    def _is_resource_type_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's resource type is a subset of the config's resource type."""
+        if node.resource_type.value not in self.config.resource_types:
+            return False
+        return True
+    
+    def _is_source_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's source is a subset of the config's source."""
+        if node.resource_type != DbtResourceType.SOURCE:
+            return False
+        if node.resource_name not in self.config.sources:
+            return False
         return True
 
     def _is_tags_subset(self, node: DbtNode) -> bool:

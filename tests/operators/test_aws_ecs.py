@@ -5,13 +5,14 @@ from airflow.utils.context import Context
 from pendulum import datetime
 
 from cosmos.operators.aws_ecs import (
-    DbtBuildAwsEcsOperator,
     DbtAwsEcsBaseOperator,
+    DbtBuildAwsEcsOperator,
     DbtLSAwsEcsOperator,
     DbtRunAwsEcsOperator,
     DbtRunOperationAwsEcsOperator,
     DbtSeedAwsEcsOperator,
     DbtSnapshotAwsEcsOperator,
+    DbtSourceAwsEcsOperator,
     DbtTestAwsEcsOperator,
 )
 
@@ -127,6 +128,7 @@ result_map = {
     "ls": DbtLSAwsEcsOperator(**base_kwargs),
     "run": DbtRunAwsEcsOperator(**base_kwargs),
     "test": DbtTestAwsEcsOperator(**base_kwargs),
+    "source": DbtSourceAwsEcsOperator(**base_kwargs),
     "seed": DbtSeedAwsEcsOperator(**base_kwargs),
     "build": DbtBuildAwsEcsOperator(**base_kwargs),
     "snapshot": DbtSnapshotAwsEcsOperator(**base_kwargs),
@@ -140,10 +142,20 @@ def test_dbt_aws_ecs_build_command():
     """
     for command_name, command_operator in result_map.items():
         command_operator.build_command(context=MagicMock(), cmd_flags=MagicMock())
-        if command_name != "run-operation":
+        if command_name not in {"run-operation", "source"}:
             assert command_operator.command == [
                 "dbt",
                 command_name,
+                "--vars",
+                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "--no-version-check",
+            ]
+        elif command_name == "source":
+            assert command_operator.command == [
+                "dbt",
+                command_name,
+                "freshness",
                 "--vars",
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",

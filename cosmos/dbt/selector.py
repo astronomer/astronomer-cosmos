@@ -183,12 +183,12 @@ class GraphSelector:
         elif SOURCE_SELECTOR in self.node_name:
             source_selection = self.node_name[len(SOURCE_SELECTOR) :]
 
-            # match node.resource_type == SOURCE, node.name == source_selection
+            # match node.resource_type == SOURCE, node.resource_name == source_selection
             root_nodes.update(
                 {
                     node_id
                     for node_id, node in nodes.items()
-                    if node.resource_type == DbtResourceType.SOURCE and node.name == source_selection
+                    if node.resource_type == DbtResourceType.SOURCE and node.resource_name == source_selection
                 }
             )
 
@@ -475,7 +475,7 @@ class NodeSelector:
             if node.resource_type != DbtResourceType.SOURCE:
                 return False
 
-        if node.name not in self.config.sources:
+        if node.resource_name not in self.config.sources:
             return False
 
         return True

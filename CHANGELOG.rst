@@ -18,7 +18,7 @@ Features
 * Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495. Check out the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
 * Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492. More information `here <https://astronomer.github.io/astronomer-cosmos/profiles/#profile-customise-per-node>`_.
-* Create and run accurate SQL statements when using `ExecutionMode.AIRFLOW_ASYNC` by @pankajkoti in #1474
+* Create and run accurate SQL statements when using ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti in #1474
 
 Bug Fixes
 

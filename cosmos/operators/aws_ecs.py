@@ -14,6 +14,7 @@ from cosmos.operators.base import (
     DbtRunOperationMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
+    DbtSourceMixin,
     DbtTestMixin,
 )
 
@@ -125,6 +126,15 @@ class DbtSeedAwsEcsOperator(DbtSeedMixin, DbtAwsEcsBaseOperator):
 class DbtSnapshotAwsEcsOperator(DbtSnapshotMixin, DbtAwsEcsBaseOperator):
     """
     Executes a dbt core snapshot command.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSourceAwsEcsOperator(DbtSourceMixin, DbtAwsEcsBaseOperator):
+    """
+    Executes a dbt source freshness command.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

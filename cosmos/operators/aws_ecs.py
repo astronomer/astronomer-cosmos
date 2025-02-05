@@ -7,7 +7,7 @@ from airflow.utils.context import Context
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
-    AbstractDbtBaseOperator,
+    AbstractDbtBase,
     DbtBuildMixin,
     DbtLSMixin,
     DbtRunMixin,
@@ -31,14 +31,14 @@ except ImportError:
     )
 
 
-class DbtAwsEcsBaseOperator(AbstractDbtBaseOperator, EcsRunTaskOperator):  # type: ignore
+class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore
     """
     Executes a dbt core cli command in an ECS Task instance with dbt installed in it.
 
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBaseOperator.template_fields) + list(EcsRunTaskOperator.template_fields)
+        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields)
     )
 
     intercept_flag = False
@@ -64,10 +64,18 @@ class DbtAwsEcsBaseOperator(AbstractDbtBaseOperator, EcsRunTaskOperator):  # typ
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         self.container_name = container_name
 
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str] | None = None) -> Any:
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
+
         result = EcsRunTaskOperator.execute(self, context)
+
         logger.info(result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:

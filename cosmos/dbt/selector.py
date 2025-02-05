@@ -288,7 +288,7 @@ class SelectorConfig:
 
     @property
     def is_empty(self) -> bool:
-        return not (self.paths or self.tags or self.config or self.graph_selectors or self.other)
+        return not (self.paths or self.tags or self.config or self.graph_selectors or self.other or self.sources or self.resource_types)
 
     def load_from_statement(self, statement: str) -> None:
         """

@@ -763,3 +763,82 @@ def test_exclude_nodes_with_period_with_at_operator():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["@public.sibling3"])
     expected = ["model.dbt-proj.child", "model.dbt-proj.orphaned", "model.dbt-proj.sibling1", "model.dbt-proj.sibling2"]
     assert sorted(selected.keys()) == expected
+
+def test_select_nodes_by_resource_type_source():
+    """
+    Test that 'resource_type:source' picks up only nodes with resource_type == SOURCE,
+    excluding any models or other resource types.
+    """
+    local_nodes = dict(sample_nodes)
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+        name="my_source.my_table",
+    )
+    local_nodes[source_node.unique_id] = source_node
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_from_source",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[source_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        tags=["depends_on_source"],
+        config={"materialized": "table", "tags": ["depends_on_source"]},
+        name="model_from_source",
+    )
+    local_nodes[model_node.unique_id] = model_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["resource_type:source"],
+    )
+    expected = {
+        source_node.unique_id: source_node,
+    }
+    assert selected == expected
+def test_select_nodes_by_source_name():
+    """
+    Test selecting a single source node by exact name 'source:my_source.my_table'.
+    The code in _should_include_node requires node.resource_type == SOURCE
+    AND node.name == "my_source.my_table".
+    """
+    local_nodes = dict(sample_nodes)
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+        name="my_source.my_table",
+    )
+    local_nodes[source_node.unique_id] = source_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["source:my_source.my_table"],
+    )
+    expected = {source_node.unique_id: source_node}
+    assert selected == expected
+def test_exclude_nodes_by_resource_type_source():
+    """
+    Test excluding any seed node via 'resource_type:seed'.
+    """
+    local_nodes = dict(sample_nodes)
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.{SAMPLE_PROJ_PATH.stem}.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        tags=[],
+        config={},
+        file_path=SAMPLE_PROJ_PATH / "seeds/seed.yml",
+        name="my_seed",
+    )
+    local_nodes[source_node.unique_id] = source_node
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, exclude=["resource_type:seed"])
+    assert source_node.unique_id not in selected
+    for model_id in sample_nodes.keys():
+        assert model_id in selected

@@ -780,7 +780,7 @@ def test_select_nodes_by_resource_type_source():
         config={},
     )
     source_node.name = "my_source.my_table"
-    
+
     local_nodes[source_node.unique_id] = source_node
     model_node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_from_source",
@@ -791,7 +791,7 @@ def test_select_nodes_by_resource_type_source():
         config={"materialized": "table", "tags": ["depends_on_source"]},
     )
     model_node.name = "model_from_source"
-    
+
     local_nodes[model_node.unique_id] = model_node
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH,
@@ -820,7 +820,7 @@ def test_select_nodes_by_source_name():
         config={},
     )
     source_node.name = "my_source.my_table"
-    
+
     local_nodes[source_node.unique_id] = source_node
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH,
@@ -845,7 +845,7 @@ def test_exclude_nodes_by_resource_type_source():
         file_path=SAMPLE_PROJ_PATH / "seeds/seed.yml",
     )
     seed_node.name = "my_seed"
-    
+
     local_nodes[seed_node.unique_id] = seed_node
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, exclude=["resource_type:seed"])
     assert seed_node.unique_id not in selected

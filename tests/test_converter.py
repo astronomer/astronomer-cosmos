@@ -67,7 +67,7 @@ def test_validate_arguments_exception():
             render_config=render_config,
             task_args=task_args,
         )
-    expected = "When using `LoadMode.DBT_LS` and ExecutionMode.LOCAL, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
+    expected = "When using `LoadMode.DBT_LS` and `ExecutionMode.LOCAL`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
     assert err.value.args[0] == expected
 
 

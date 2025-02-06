@@ -110,7 +110,7 @@ def validate_arguments(
             )
             and (render_config.dbt_deps != task_args.get("install_deps", True))
         ):
-            err_msg = f"When using `LoadMode.DBT_LS` and {execution_config.execution_mode}, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
+            err_msg = f"When using `LoadMode.DBT_LS` and `{execution_config.execution_mode}`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
             raise CosmosValueError(err_msg)
 
 

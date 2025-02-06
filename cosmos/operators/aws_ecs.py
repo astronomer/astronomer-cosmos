@@ -25,11 +25,11 @@ DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
     from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
-except ImportError:
+except ImportError:  # pragma: no cover
     raise ImportError(
         "Could not import EcsRunTaskOperator. Ensure you've installed the Amazon Web Services provider "
         "separately or with `pip install astronomer-cosmos[...,aws-ecs]`."
-    )
+    )  # pragma: no cover
 
 
 class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore

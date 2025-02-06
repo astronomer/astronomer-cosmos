@@ -37,6 +37,7 @@ def test_is_cosmos_dag_is_true():
         profile_config=profile_config,
         start_date=datetime(2023, 1, 1),
         dag_id="basic_cosmos_dag",
+        operator_args={"install_dep": True},
     )
     assert total_cosmos_tasks(dag) == 13
 

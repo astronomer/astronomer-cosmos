@@ -57,28 +57,25 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         environment_variables: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(
-            aws_conn_id=aws_conn_id, task_definition=task_definition, cluster=cluster, overrides=None, **kwargs
-        )
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         self.container_name = container_name
-
+        kwargs.update(
+            {
+                "aws_conn_id": aws_conn_id,
+                "task_definition": task_definition,
+                "cluster": cluster,
+                "overrides": None,
+            }
+        )
+        super().__init__(**kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
-        kwargs.update(
-            {
-                "cluster": cluster,
-                "container_name": container_name,
-                "task_definition": task_definition,
-                "overrides": None,
-            }
-        )
         base_operator_args = set(inspect.signature(EcsRunTaskOperator.__init__).parameters.keys())
         base_kwargs = {}
         for arg_key, arg_value in kwargs.items():

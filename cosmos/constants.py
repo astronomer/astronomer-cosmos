@@ -93,6 +93,7 @@ class ExecutionMode(Enum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     AWS_EKS = "aws_eks"
+    AWS_ECS = "aws_ecs"
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"

@@ -12,7 +12,8 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 5. **aws_eks**: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos (requires a pre-existing Docker image)
 6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 7. **gcp_cloud_run_job**: Run ``dbt`` commands from GCP Cloud Run Job instances managed by Cosmos (requires a pre-existing Docker image)
-8. **airflow_async**: (Experimental and introduced since Cosmos 1.7.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
+8. **aws_ecs**: Run ``dbt`` commands from AWS ECS instances managed by Cosmos (requires a pre-existing Docker image)
+9. **airflow_async**: (Experimental and introduced since Cosmos 1.7.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -50,6 +51,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - High
      - No
    * - GCP Cloud Run Job Instance
+     - Slow
+     - High
+     - No
+   * - AWS ECS
      - Slow
      - High
      - No
@@ -243,6 +248,40 @@ Each task will create a new Cloud Run Job execution, giving full isolation. The 
         },
     )
 
+
+AWS ECS
+---------
+.. versionadded:: 1.9.0
+
+Using ``AWS Elastic Container Service (ECS)`` as the execution mode provides an isolated and scalable way to run ``dbt`` tasks within an AWS ECS service. This execution mode ensures that each ``dbt`` run is performed inside a dedicated container running in an ECS task.
+
+This execution mode requires the user to have an AWS environment configured to run ECS tasks (see :ref:``aws-ecs`` for more details on the exact requirements). Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+
+Each task will create a new ECS task execution, providing full isolation. However, this separation introduces some overhead in execution time due to container startup and provisioning. For users who require faster execution times, configuring appropriate ECS task definitions and cluster optimizations can help mitigate these delays.
+
+Please refer to the step-by-step guide for using AWS ECS as the execution mode.
+
+.. code-block:: python
+
+    aws_ecs_cosmos_dag = DbtDag(
+        # ...
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.AWS_ECS),
+        operator_args={
+            "aws_conn_id": "aws_default",
+            "cluster": "my-ecs-cluster",
+            "task_definition": "my-dbt-task",
+            "container_name": "dbt-container",
+            "launch_type": "FARGATE",
+            "deferrable": True,
+            "network_configuration": {
+                "awsvpcConfiguration": {
+                    "subnets": ["<<<YOUR SUBNET ID>>>"],
+                    "assignPublicIp": "ENABLED",
+                },
+            },
+            "environment_variables": {"DBT_PROFILE_NAME": "default"},
+        },
+    )
 
 Airflow Async (experimental)
 ----------------------------

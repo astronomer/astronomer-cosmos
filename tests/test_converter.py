@@ -17,22 +17,57 @@ SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
 SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
 MULTIPLE_PARENTS_TEST_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt/multiple_parents_test/"
+DBT_PROJECTS_PROJ_WITH_DEPS_DIR = Path(__file__).parent.parent / "dev/dags/dbt" / "jaffle_shop"
 
 
 @pytest.mark.parametrize("argument_key", ["tags", "paths"])
 def test_validate_arguments_tags(argument_key):
     selector_name = argument_key[:-1]
-    select = [f"{selector_name}:a,{selector_name}:b"]
-    exclude = [f"{selector_name}:b,{selector_name}:c"]
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="xubiru")
+    render_config = RenderConfig(
+        select=[f"{selector_name}:a,{selector_name}:b"], exclude=[f"{selector_name}:b,{selector_name}:c"]
+    )
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
     )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
     task_args = {}
     with pytest.raises(CosmosValueError) as err:
-        validate_arguments(select, exclude, profile_config, task_args, execution_mode=ExecutionMode.LOCAL)
+        validate_arguments(
+            execution_config=execution_config,
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=render_config,
+            task_args=task_args,
+        )
     expected = f"Can't specify the same {selector_name} in `select` and `exclude`: {{'b'}}"
+    assert err.value.args[0] == expected
+
+
+def test_validate_arguments_exception():
+    render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=False)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
+    )
+    project_config = ProjectConfig()
+
+    task_args = {"install_deps": True}  # this has to be the opposite of RenderConfig.dbt_deps
+    with pytest.raises(CosmosValueError) as err:
+        validate_arguments(
+            execution_config=execution_config,
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=render_config,
+            task_args=task_args,
+        )
+    expected = "When using `LoadMode.DBT_LS` and `ExecutionMode.LOCAL`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
     assert err.value.args[0] == expected
 
 
@@ -110,14 +145,21 @@ def test_validate_user_config_fails_project_config_render_config_env_vars():
 
 
 def test_validate_arguments_schema_in_task_args():
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL, dbt_project_path="/tmp/project-dir")
+    render_config = RenderConfig()
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
         profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
     )
     task_args = {"schema": "abcd"}
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="something")
     validate_arguments(
-        select=[], exclude=[], profile_config=profile_config, task_args=task_args, execution_mode=ExecutionMode.LOCAL
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        task_args=task_args,
+        project_config=project_config,
     )
     assert profile_config.profile_mapping.profile_args["schema"] == "abcd"
 

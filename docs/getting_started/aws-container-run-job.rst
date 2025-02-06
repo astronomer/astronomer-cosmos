@@ -4,6 +4,10 @@ Getting Started with Astronomer Cosmos on AWS ECS
 ==================================================
 
 Astronomer Cosmos provides a unified way to run containerized workloads across multiple cloud providers. In this guide, you’ll learn how to deploy and run a Cosmos job on AWS Elastic Container Service (ECS) using Fargate.
+Schematically, the guide will walk you through the steps required to build the following architecture:
+
+.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_aws_ecs_schematic.png
+    :width: 800
 
 Prerequisites
 +++++++++++++
@@ -149,6 +153,16 @@ For example:
         --task-definition cosmos-job \
         --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678,subnet-87654321],securityGroups=[sg-abcdef12],assignPublicIp=ENABLED}"
 
+   Once the test is ok, we are able to run the dbt commands in our Cosmos DAG:
+
+   .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run.png
+    :width: 800
+
+   .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run_logs.png
+    :width: 800
+
+   Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!
+
 
 **Monitor and Debug Your Job**
 
@@ -172,3 +186,6 @@ By following this guide, you can deploy Astronomer Cosmos jobs on AWS ECS using 
 For more detailed information on AWS ECS, please refer to the `AWS ECS Developer Guide <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html>`_.
 
 Happy deploying! :rocket:
+
+
+Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!

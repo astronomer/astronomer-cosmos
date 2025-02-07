@@ -405,15 +405,20 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
 
 
 def _add_dbt_compile_task(
-    nodes: dict[str, DbtNode],
     dag: DAG,
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
+    render_config: RenderConfig | None = None,
 ) -> None:
     if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
         return
+
+    if render_config is not None:  # TestBehavior.AFTER_ALL
+        task_args["select"] = render_config.select
+        task_args["selector"] = render_config.selector
+        task_args["exclude"] = render_config.exclude
 
     compile_task_metadata = TaskMetadata(
         id=DBT_COMPILE_TASK_ID,
@@ -587,7 +592,7 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
+    _add_dbt_compile_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
     return tasks_map
 
 

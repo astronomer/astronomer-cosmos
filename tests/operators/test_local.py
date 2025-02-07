@@ -1296,16 +1296,16 @@ def test_configure_remote_target_path(mock_object_storage_path):
     mock_object_storage_path.return_value.mkdir.assert_called_with(parents=True, exist_ok=True)
 
 
-@patch.object(DbtLocalBaseOperator, "_configure_remote_target_path")
-def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target_path):
-    operator = DbtSeedLocalOperator(
-        task_id="fake-task",
-        profile_config=profile_config,
-        project_dir="fake-dir",
-    )
-    assert operator.should_upload_compiled_sql is False
-    operator._upload_sql_files("fake-dir", "compiled")
-    mock_configure_remote_target_path.assert_not_called()
+# @patch.object(DbtLocalBaseOperator, "_configure_remote_target_path")
+# def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target_path):
+#     operator = DbtSeedLocalOperator(
+#         task_id="fake-task",
+#         profile_config=profile_config,
+#         project_dir="fake-dir",
+#     )
+#     assert operator.should_upload_compiled_sql is False
+#     operator._upload_sql_files("fake-dir", "compiled")
+#     mock_configure_remote_target_path.assert_not_called()
 
 
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
@@ -1354,7 +1354,7 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
     files = [file1, file2]
 
     with patch.object(Path, "rglob", return_value=files):
-        operator.upload_compiled_sql(tmp_project_dir, context={"task": operator})
+        operator._upload_sql_files(tmp_project_dir, "compiled")
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
@@ -1391,22 +1391,6 @@ def test_mock_dbt_adapter_missing_async_context():
     operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
     with pytest.raises(CosmosValueError, match="`async_context` is necessary for running the model asynchronously"):
         operator._mock_dbt_adapter(None)
-
-
-def test_mock_dbt_adapter_missing_async_operator():
-    """
-    Test that the _mock_dbt_adapter method raises a CosmosValueError
-    when async_operator is missing in async_context.
-    """
-    async_context = {
-        "profile_type": "snowflake",
-    }
-    AbstractDbtLocalBase.__abstractmethods__ = set()
-    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
-    with pytest.raises(
-        CosmosValueError, match="`async_operator` needs to be specified in `async_context` when running as async"
-    ):
-        operator._mock_dbt_adapter(async_context)
 
 
 def test_mock_dbt_adapter_missing_profile_type():

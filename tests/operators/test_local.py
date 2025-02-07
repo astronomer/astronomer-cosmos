@@ -1296,18 +1296,6 @@ def test_configure_remote_target_path(mock_object_storage_path):
     mock_object_storage_path.return_value.mkdir.assert_called_with(parents=True, exist_ok=True)
 
 
-# @patch.object(DbtLocalBaseOperator, "_configure_remote_target_path")
-# def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target_path):
-#     operator = DbtSeedLocalOperator(
-#         task_id="fake-task",
-#         profile_config=profile_config,
-#         project_dir="fake-dir",
-#     )
-#     assert operator.should_upload_compiled_sql is False
-#     operator._upload_sql_files("fake-dir", "compiled")
-#     mock_configure_remote_target_path.assert_not_called()
-
-
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
 def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
     operator = DbtCompileLocalOperator(

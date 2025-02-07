@@ -847,3 +847,46 @@ def test_exclude_nodes_by_resource_type_seed():
     assert seed_node.unique_id not in selected
     for model_id in sample_nodes.keys():
         assert model_id in selected
+
+def test_source_selector():
+    """
+    Covers:
+    1) source_selection = self.node_name[len(SOURCE_SELECTOR):]
+    2) root_nodes.update(...) in that source logic
+    3) __repr__ for SelectorConfig
+    4) the line 'if node.resource_name not in self.config.sources: return False'
+    """
+    local_nodes = dict(sample_nodes)
+
+    source_node_match = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+    )
+    source_node_mismatch = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.another_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/another_source.yml",
+        tags=[],
+        config={},
+    )
+    local_nodes[source_node_match.unique_id] = source_node_match
+    local_nodes[source_node_mismatch.unique_id] = source_node_mismatch
+
+    select_statement = ["source:my_source"]
+
+    config = SelectorConfig(SAMPLE_PROJ_PATH, select_statement[0])
+
+    config_repr = repr(config)
+    assert "my_source" in config_repr, "Expected 'my_source' to appear in the config repr"
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, select=select_statement)
+
+    expected = {
+        source_node_match.unique_id: source_node_match,
+    }
+    assert selected == expected, f"Expected only {source_node_match.unique_id} to match"

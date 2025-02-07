@@ -9,7 +9,12 @@ from cosmos.settings import enable_setup_task
 
 
 class SetupAsyncOperator(DbtRunOperator):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
     def execute(self, context: Context, **kwargs: Any) -> None:
         # TODO: Fix hardcoded values
         async_context = {"enable_setup_task": enable_setup_task, "profile_type": "bigquery"}
-        self.build_and_run_cmd(context=context, run_as_async=True, async_context=async_context)
+        self.build_and_run_cmd(
+            context=context, cmd_flags=self.dbt_cmd_flags, run_as_async=True, async_context=async_context
+        )

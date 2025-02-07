@@ -642,7 +642,7 @@ class DbtGraph:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
             tmpdir_path = Path(tmpdir)
 
-            create_symlinks(project_path, tmpdir_path, self.render_config.dbt_deps)
+            create_symlinks(project_path, tmpdir_path, bool(self.render_config.dbt_deps))
 
             latest_partial_parse = None
             if self.project.partial_parse:

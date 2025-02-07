@@ -1304,7 +1304,7 @@ def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target
         project_dir="fake-dir",
     )
     assert operator.should_upload_compiled_sql is False
-    operator.upload_compiled_sql("fake-dir", MagicMock())
+    operator._upload_sql_files("fake-dir", "compiled")
     mock_configure_remote_target_path.assert_not_called()
 
 
@@ -1319,10 +1319,9 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
     mock_configure_remote.return_value = (None, None)
 
     tmp_project_dir = "/fake/tmp/project"
-    context = {"dag": MagicMock(dag_id="test_dag")}
 
     with pytest.raises(CosmosValueError, match="remote target path is not configured"):
-        operator.upload_compiled_sql(tmp_project_dir, context)
+        operator._upload_sql_files(tmp_project_dir, "compiled")
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")

@@ -19,6 +19,8 @@ SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
+SOURCE_SELECTOR = "source:"
+RESOURCE_TYPE_SELECTOR = "resource_type:"
 PLUS_SELECTOR = "+"
 AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
@@ -41,6 +43,8 @@ class GraphSelector:
         path:/path/to/model_h+
         +tag:nightly
         +config.materialized:view
+        resource_type:resource_name
+        source:source_name
 
     https://docs.getdbt.com/reference/node-selection/graph-operators
     """
@@ -176,6 +180,18 @@ class GraphSelector:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
 
+        elif SOURCE_SELECTOR in self.node_name:
+            source_selection = self.node_name[len(SOURCE_SELECTOR) :]
+
+            # match node.resource_type == SOURCE, node.resource_name == source_selection
+            root_nodes.update(
+                {
+                    node_id
+                    for node_id, node in nodes.items()
+                    if node.resource_type == DbtResourceType.SOURCE and node.resource_name == source_selection
+                }
+            )
+
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
             if config_selection_key not in SUPPORTED_CONFIG:
@@ -272,11 +288,21 @@ class SelectorConfig:
         self.config: dict[str, str] = {}
         self.other: list[str] = []
         self.graph_selectors: list[GraphSelector] = []
+        self.sources: list[str] = []
+        self.resource_types: list[str] = []
         self.load_from_statement(statement)
 
     @property
     def is_empty(self) -> bool:
-        return not (self.paths or self.tags or self.config or self.graph_selectors or self.other)
+        return not (
+            self.paths
+            or self.tags
+            or self.config
+            or self.graph_selectors
+            or self.other
+            or self.sources
+            or self.resource_types
+        )
 
     def load_from_statement(self, statement: str) -> None:
         """
@@ -299,16 +325,24 @@ class SelectorConfig:
                     ...
                 elif precursors or descendants:
                     self._parse_unknown_selector(item)
-                elif node_name.startswith(PATH_SELECTOR):
-                    self._parse_path_selector(item)
-                elif "/" in node_name:
-                    self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
-                elif node_name.startswith(TAG_SELECTOR):
-                    self._parse_tag_selector(item)
-                elif node_name.startswith(CONFIG_SELECTOR):
-                    self._parse_config_selector(item)
                 else:
-                    self._parse_unknown_selector(item)
+                    self._handle_no_precursors_or_descendants(item, node_name)
+
+    def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:
+        if node_name.startswith(PATH_SELECTOR):
+            self._parse_path_selector(item)
+        elif "/" in node_name:
+            self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
+        elif node_name.startswith(TAG_SELECTOR):
+            self._parse_tag_selector(item)
+        elif node_name.startswith(CONFIG_SELECTOR):
+            self._parse_config_selector(item)
+        elif node_name.startswith(SOURCE_SELECTOR):
+            self._parse_source_selector(item)
+        elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
+            self._parse_resource_type_selector(item)
+        else:
+            self._parse_unknown_selector(item)
 
     def _parse_unknown_selector(self, item: str) -> None:
         if item:
@@ -336,8 +370,18 @@ class SelectorConfig:
         else:
             self.paths.append(Path(item[index:]))
 
+    def _parse_resource_type_selector(self, item: str) -> None:
+        index = len(RESOURCE_TYPE_SELECTOR)
+        resource_type_value = item[index:].strip()
+        self.resource_types.append(resource_type_value)
+
+    def _parse_source_selector(self, item: str) -> None:
+        index = len(SOURCE_SELECTOR)
+        source_name = item[index:].strip()
+        self.sources.append(source_name)
+
     def __repr__(self) -> str:
-        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, other={self.other}, graph_selectors={self.graph_selectors})"
+        return f"SelectorConfig(paths={self.paths}, tags={self.tags}, config={self.config}, sources={self.sources}, resource={self.resource_types}, other={self.other}, graph_selectors={self.graph_selectors})"
 
 
 class NodeSelector:
@@ -427,6 +471,26 @@ class NodeSelector:
         if self.config.paths and not self._is_path_matching(node):
             return False
 
+        if self.config.resource_types and not self._is_resource_type_matching(node):
+            return False
+
+        if self.config.sources and not self._is_source_matching(node):
+            return False
+
+        return True
+
+    def _is_resource_type_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's resource type is a subset of the config's resource type."""
+        if node.resource_type.value not in self.config.resource_types:
+            return False
+        return True
+
+    def _is_source_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's source is a subset of the config's source."""
+        if node.resource_type != DbtResourceType.SOURCE:
+            return False
+        if node.resource_name not in self.config.sources:
+            return False
         return True
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
@@ -554,6 +618,8 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
             if (
                 filter_parameter.startswith(PATH_SELECTOR)
                 or filter_parameter.startswith(TAG_SELECTOR)
+                or filter_parameter.startswith(RESOURCE_TYPE_SELECTOR)
+                or filter_parameter.startswith(SOURCE_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
                 or any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG])
             ):

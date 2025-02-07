@@ -763,3 +763,131 @@ def test_exclude_nodes_with_period_with_at_operator():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["@public.sibling3"])
     expected = ["model.dbt-proj.child", "model.dbt-proj.orphaned", "model.dbt-proj.sibling1", "model.dbt-proj.sibling2"]
     assert sorted(selected.keys()) == expected
+
+
+def test_select_nodes_by_resource_type_source():
+    """
+    Test that 'resource_type:source' picks up only nodes with resource_type == SOURCE,
+    excluding any models or other resource types.
+    """
+    local_nodes = dict(sample_nodes)
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+    )
+
+    local_nodes[source_node.unique_id] = source_node
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_from_source",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[source_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        tags=["depends_on_source"],
+        config={"materialized": "table", "tags": ["depends_on_source"]},
+    )
+
+    local_nodes[model_node.unique_id] = model_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["resource_type:source"],
+    )
+    expected = {
+        source_node.unique_id: source_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_source_name():
+    """
+    Test selecting a single source node by exact name 'source:my_source.my_table'.
+    The code in _should_include_node requires node.resource_type == SOURCE
+    AND node.name == "my_source.my_table".
+    """
+    local_nodes = dict(sample_nodes)
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+    )
+
+    local_nodes[source_node.unique_id] = source_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["source:my_source.my_table"],
+    )
+    expected = {source_node.unique_id: source_node}
+    assert selected == expected
+
+
+def test_exclude_nodes_by_resource_type_seed():
+    """
+    Test excluding any seed node via 'resource_type:seed'.
+    """
+    local_nodes = dict(sample_nodes)
+    seed_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.{SAMPLE_PROJ_PATH.stem}.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        tags=[],
+        config={},
+        file_path=SAMPLE_PROJ_PATH / "seeds/seed.yml",
+    )
+
+    local_nodes[seed_node.unique_id] = seed_node
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, exclude=["resource_type:seed"])
+    assert seed_node.unique_id not in selected
+    for model_id in sample_nodes.keys():
+        assert model_id in selected
+
+
+def test_source_selector():
+    """
+    Covers:
+    1) source_selection = self.node_name[len(SOURCE_SELECTOR):]
+    2) root_nodes.update(...) in that source logic
+    3) __repr__ for SelectorConfig
+    4) the line 'if node.resource_name not in self.config.sources: return False'
+    """
+    local_nodes = dict(sample_nodes)
+
+    source_node_match = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+    )
+    source_node_mismatch = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.another_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/another_source.yml",
+        tags=[],
+        config={},
+    )
+    local_nodes[source_node_match.unique_id] = source_node_match
+    local_nodes[source_node_mismatch.unique_id] = source_node_mismatch
+
+    select_statement = ["source:my_source"]
+
+    config = SelectorConfig(SAMPLE_PROJ_PATH, select_statement[0])
+
+    config_repr = repr(config)
+    assert "my_source" in config_repr, "Expected 'my_source' to appear in the config repr"
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, select=select_statement)
+
+    expected = {
+        source_node_match.unique_id: source_node_match,
+    }
+    assert selected == expected, f"Expected only {source_node_match.unique_id} to match"

@@ -139,7 +139,6 @@ def create_test_task_metadata(
     task_args["on_warning_callback"] = on_warning_callback
     extra_context = {}
     detached_from_parent = detached_from_parent or {}
-
     task_owner = ""
 
     if test_indirect_selection != TestIndirectSelection.EAGER:

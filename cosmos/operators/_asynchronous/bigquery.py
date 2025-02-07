@@ -104,9 +104,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
         from airflow.io.path import ObjectStoragePath
 
-        # TODO: FixMe
-        file_path = self.extra_context["dbt_node_config"]["file_path"]  # type: ignore
-        dbt_dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+        file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
+        dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
 
         remote_target_path_str = str(remote_target_path).rstrip("/")
 

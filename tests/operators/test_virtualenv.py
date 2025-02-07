@@ -50,8 +50,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
         return ["cmd"]
 
 
-# @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
-# @patch("cosmos.operators.local.AbstractDbtLocalBase._clone_project")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
@@ -65,8 +64,7 @@ def test_run_command_without_virtualenv_dir(
     mock_store_compiled_sql,
     mock_calculate_openlineage_events_completes,
     mock_execute,
-    # _clone_project,
-    # _upload_sql_files,
+    _upload_sql_files,
 ):
     mock_get_connection.return_value = Connection(
         conn_id="fake_conn",

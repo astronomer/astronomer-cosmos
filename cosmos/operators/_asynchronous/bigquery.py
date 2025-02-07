@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Sequence
 
 import airflow
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -10,7 +11,9 @@ from packaging.version import Version
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.dataset import get_dataset_alias_name
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
+from cosmos.settings import enable_setup_task, remote_target_path, remote_target_path_conn_id
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
@@ -68,5 +71,36 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def base_cmd(self) -> list[str]:
         return ["run"]
 
+    def get_remote_sql(self) -> str:
+        if not settings.AIRFLOW_IO_AVAILABLE:
+            raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
+        from airflow.io.path import ObjectStoragePath
+
+        # TODO: FixMe
+        file_path = self.extra_context["dbt_node_config"]["file_path"]  # type: ignore
+        dbt_dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+
+        remote_target_path_str = str(remote_target_path).rstrip("/")
+
+        if TYPE_CHECKING:  # pragma: no cover
+            assert self.project_dir is not None
+
+        project_dir_parent = str(Path(self.project_dir).parent)
+        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/run/{relative_file_path}"
+
+        object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
+        with object_storage_path.open() as fp:  # type: ignore
+            return fp.read()  # type: ignore
+
     def execute(self, context: Context, **kwargs: Any) -> None:
-        self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
+        if enable_setup_task:
+            self.configuration = {
+                "query": {
+                    "query": self.get_remote_sql(),
+                    "useLegacySql": False,
+                }
+            }
+            super().execute(context=context)
+        else:
+            self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)

@@ -11,6 +11,7 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos.config import RenderConfig
 from cosmos.constants import (
+    DBT_COMPILE_TASK_ID,
     DEFAULT_DBT_RESOURCES,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
@@ -455,6 +456,32 @@ def calculate_detached_node_name(node: DbtNode) -> str:
     return node_name
 
 
+def _add_dbt_compile_task(
+    nodes: dict[str, DbtNode],
+    dag: DAG,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+    task_group: TaskGroup | None,
+) -> None:
+    if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
+        return
+
+    compile_task_metadata = TaskMetadata(
+        id=DBT_COMPILE_TASK_ID,
+        operator_class="cosmos.operators._asynchronous.SetupAsyncOperator",
+        arguments=task_args,
+        extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
+    )
+    compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=task_group)
+
+    for task_id, task in tasks_map.items():
+        if not task.upstream_list:
+            compile_airflow_task >> task
+
+    tasks_map[DBT_COMPILE_TASK_ID] = compile_airflow_task
+
+
 def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
@@ -561,6 +588,7 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
+    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
     return tasks_map
 
 

@@ -852,6 +852,7 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         test_task_name="test_no_nulls",
         execution_mode=ExecutionMode.LOCAL,
         test_indirect_selection=test_indirect_selection,
+        dbt_dag_task_group_identifier="test_tg",
         task_args={"task_arg": "value"},
         on_warning_callback=True,
         node=sample_node,

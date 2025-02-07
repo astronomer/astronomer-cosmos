@@ -983,6 +983,7 @@ def test_dbt_docs_gcs_local_operator():
         mock_hook.upload.assert_has_calls(expected_upload_calls)
 
 
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
@@ -997,6 +998,7 @@ def test_operator_execute_deps_parameters(
     mock_ensure_profile,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_upload_sql_files,
     invocation_mode,
     tmp_path,
 ):

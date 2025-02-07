@@ -588,6 +588,7 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
+    _add_dbt_compile_task(nodes, dag, execution_mode, task_args, tasks_map, task_group)
     return tasks_map
 
 

@@ -430,8 +430,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
         if not async_context:
             raise CosmosValueError("`async_context` is necessary for running the model asynchronously")
-        if "async_operator" not in async_context:
-            raise CosmosValueError("`async_operator` needs to be specified in `async_context` when running as async")
+        # if "async_operator" not in async_context:
+        #     raise CosmosValueError("`async_operator` needs to be specified in `async_context` when running as async")
         if "profile_type" not in async_context:
             raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
         profile_type = async_context["profile_type"]

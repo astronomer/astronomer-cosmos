@@ -207,8 +207,8 @@ def override_configuration(
     project_config: ProjectConfig, render_config: RenderConfig, execution_config: ExecutionConfig, operator_args: dict
 ) -> None:
     """
-    If users set configuration at the ProjectConfig level, they should override others.
-    This function changes, in place, render_config, execution_config and operator_args depending on the values of project_config.
+    There are a few scenarios where a configuration should override another one.
+    This function changes, in place, render_config, execution_config and operator_args depending on other configurations.
     """
     if project_config.dbt_project_path:
         render_config.project_path = project_config.dbt_project_path
@@ -217,7 +217,13 @@ def override_configuration(
     if render_config.dbt_deps is None:
         render_config.dbt_deps = project_config.install_dbt_deps
 
-    if "install_deps" in operator_args:
+    if execution_config.dbt_executable_path:
+        operator_args["dbt_executable_path"] = execution_config.dbt_executable_path
+
+    if execution_config.invocation_mode:
+        operator_args["invocation_mode"] = execution_config.invocation_mode
+
+    if "install_deps" not in operator_args:
         operator_args["install_deps"] = project_config.install_dbt_deps
 
 
@@ -252,9 +258,9 @@ class DbtToAirflowConverter:
 
         # We copy the configuration so the changes introduced in this method, such as override_configuration,
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration
-        execution_config = copy.deepcopy(execution_config) or ExecutionConfig()
-        render_config = copy.deepcopy(render_config) or RenderConfig()
-        operator_args = operator_args or {}
+        execution_config = copy.deepcopy(execution_config) if execution_config is not None else ExecutionConfig()
+        render_config = copy.deepcopy(render_config) if render_config is not None else RenderConfig()
+        operator_args = copy.deepcopy(operator_args) if operator_args is not None else {}
 
         project_config.validate_project()
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
@@ -306,10 +312,6 @@ class DbtToAirflowConverter:
             "vars": dbt_vars,
             "cache_dir": cache_dir,
         }
-        if execution_config.dbt_executable_path:
-            task_args["dbt_executable_path"] = execution_config.dbt_executable_path
-        if execution_config.invocation_mode:
-            task_args["invocation_mode"] = execution_config.invocation_mode
 
         validate_arguments(
             execution_config=execution_config,

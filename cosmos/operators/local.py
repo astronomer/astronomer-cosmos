@@ -25,6 +25,7 @@ from attr import define
 from packaging.version import Version
 
 from cosmos import cache, settings
+from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
@@ -68,7 +69,6 @@ from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
 from cosmos.dbt.project import create_symlinks
-from cosmos.dbt_adapters import PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP, associate_async_operator_args
 from cosmos.hooks.subprocess import (
     FullOutputSubprocessHook,
     FullOutputSubprocessResult,
@@ -444,9 +444,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if "profile_type" not in async_context:
             raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
         profile_type = async_context["profile_type"]
-        if profile_type not in PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP:
-            raise CosmosValueError(f"Mock adapter callable function not available for profile_type {profile_type}")
-        mock_adapter_callable = PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP[profile_type]
+        module_path = f"cosmos.operators._asynchronous.{profile_type}"
+        method_name = f"_mock_{profile_type}_adapter"
+        mock_adapter_callable = load_method_from_module(module_path, method_name)
         mock_adapter_callable()
 
     def _handle_datasets(self, context: Context) -> None:
@@ -473,7 +473,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
-        associate_async_operator_args(self, async_context["profile_type"], sql=sql)
+        profile_type = async_context["profile_type"]
+        module_path = f"cosmos.operators._asynchronous.{profile_type}"
+        method_name = f"_configure_{profile_type}_async_op_args"
+        async_op_configurator = load_method_from_module(module_path, method_name)
+        async_op_configurator(self, sql=sql)
         async_context["async_operator"].execute(self, context)
 
     def run_command(

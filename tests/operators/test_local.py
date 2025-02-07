@@ -1362,21 +1362,7 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)
 
 
-MOCK_ADAPTER_CALLABLE_MAP = {
-    "snowflake": MagicMock(),
-    "bigquery": MagicMock(),
-}
-
-
-@pytest.fixture
-def mock_adapter_map(monkeypatch):
-    monkeypatch.setattr(
-        "cosmos.operators.local.PROFILE_TYPE_MOCK_ADAPTER_CALLABLE_MAP",
-        MOCK_ADAPTER_CALLABLE_MAP,
-    )
-
-
-def test_mock_dbt_adapter_valid_context(mock_adapter_map):
+def test_mock_dbt_adapter_valid_context():
     """
     Test that the _mock_dbt_adapter method calls the correct mock adapter function
     when provided with a valid async_context.
@@ -1387,9 +1373,12 @@ def test_mock_dbt_adapter_valid_context(mock_adapter_map):
     }
     AbstractDbtLocalBase.__abstractmethods__ = set()
     operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
-    operator._mock_dbt_adapter(async_context)
+    with patch("cosmos.operators.local.load_method_from_module") as mock_load_method:
+        operator._mock_dbt_adapter(async_context)
 
-    MOCK_ADAPTER_CALLABLE_MAP["bigquery"].assert_called_once()
+    expected_module_path = "cosmos.operators._asynchronous.bigquery"
+    expected_method_name = "_mock_bigquery_adapter"
+    mock_load_method.assert_called_once_with(expected_module_path, expected_method_name)
 
 
 def test_mock_dbt_adapter_missing_async_context():
@@ -1433,7 +1422,7 @@ def test_mock_dbt_adapter_missing_profile_type():
         operator._mock_dbt_adapter(async_context)
 
 
-def test_mock_dbt_adapter_unsupported_profile_type(mock_adapter_map):
+def test_mock_dbt_adapter_unsupported_profile_type():
     """
     Test that the _mock_dbt_adapter method raises a CosmosValueError
     when the profile_type is not supported.
@@ -1445,7 +1434,7 @@ def test_mock_dbt_adapter_unsupported_profile_type(mock_adapter_map):
     AbstractDbtLocalBase.__abstractmethods__ = set()
     operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
     with pytest.raises(
-        CosmosValueError,
-        match="Mock adapter callable function not available for profile_type unsupported_profile",
+        ModuleNotFoundError,
+        match="Module cosmos.operators._asynchronous.unsupported_profile not found",
     ):
         operator._mock_dbt_adapter(async_context)

@@ -25,6 +25,7 @@ from attr import define
 from packaging.version import Version
 
 from cosmos import cache, settings
+from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
@@ -34,7 +35,6 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
-from cosmos.helpers import load_method_from_module
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 try:

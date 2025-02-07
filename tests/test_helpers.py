@@ -3,7 +3,7 @@ import types
 
 import pytest
 
-from cosmos.helpers import load_method_from_module
+from cosmos._utils.importer import load_method_from_module
 
 dummy_module_text = """
 def dummy_method():

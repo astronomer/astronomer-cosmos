@@ -95,7 +95,7 @@ Below, find an example of a callback method that raises an exception if the quer
                 run_results = json.load(fp)
                 node_name = run_results["unique_id"]
                 execution_time = run_results["execution_time"]
-                if execution_time > run_results_path:
+                if execution_time > slow_query_threshold:
                     raise TimeoutError(
                         f"The query for the node {node_name} took too long: {execution_time}"
                     )

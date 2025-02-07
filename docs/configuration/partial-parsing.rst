@@ -53,14 +53,16 @@ It is possible to disable caching or override the directory that Cosmos uses cac
 
     [cosmos]
     cache_dir = path/to/docs/here  # to override default caching directory (by default, uses the system temporary directory)
-    enable_cache = False  # to disable caching (enabled by default)
+    enable_cache_partial_parse = False  # to disable caching (enabled by default)
 
 Or environment variable:
 
 .. code-block:: cfg
 
     AIRFLOW__COSMOS__CACHE_DIR="path/to/docs/here"  # to override default caching directory (by default, uses the system temporary directory)
-    AIRFLOW__COSMOS__ENABLE_CACHE="False"  # to disable caching (enabled by default)
+    AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE="False"  # to disable caching (enabled by default)
+
+Learn more about `caching <./caching.html>`_ and `Cosmos Airflow configurations<./cosmos-conf.html>`_.
 
 Disabling
 ---------

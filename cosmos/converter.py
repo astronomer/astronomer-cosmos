@@ -223,8 +223,9 @@ def override_configuration(
     if execution_config.invocation_mode:
         operator_args["invocation_mode"] = execution_config.invocation_mode
 
-    if "install_deps" not in operator_args:
-        operator_args["install_deps"] = project_config.install_dbt_deps
+    if execution_config in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
+        if "install_deps" not in operator_args:
+            operator_args["install_deps"] = project_config.install_dbt_deps
 
 
 class DbtToAirflowConverter:

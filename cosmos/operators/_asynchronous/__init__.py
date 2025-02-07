@@ -5,7 +5,6 @@ from typing import Any
 from airflow.utils.context import Context
 
 from cosmos.operators.local import DbtRunLocalOperator as DbtRunOperator
-from cosmos.settings import enable_setup_task
 
 
 class SetupAsyncOperator(DbtRunOperator):
@@ -13,8 +12,7 @@ class SetupAsyncOperator(DbtRunOperator):
         super().__init__(*args, **kwargs)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        # TODO: Fix hardcoded values
-        async_context = {"enable_setup_task": enable_setup_task, "profile_type": "bigquery"}
+        async_context = {"profile_type": self.profile_config.get_profile_type()}
         self.build_and_run_cmd(
             context=context, cmd_flags=self.dbt_cmd_flags, run_as_async=True, async_context=async_context
         )

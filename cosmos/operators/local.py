@@ -35,7 +35,7 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
-from cosmos.settings import remote_target_path, remote_target_path_conn_id
+from cosmos.settings import enable_setup_task, remote_target_path, remote_target_path_conn_id
 
 try:
     from airflow.datasets import Dataset
@@ -430,8 +430,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
         if not async_context:
             raise CosmosValueError("`async_context` is necessary for running the model asynchronously")
-        # if "async_operator" not in async_context:
-        #     raise CosmosValueError("`async_operator` needs to be specified in `async_context` when running as async")
         if "profile_type" not in async_context:
             raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
         profile_type = async_context["profile_type"]
@@ -463,7 +461,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        if async_context.get("enable_setup_task"):
+        if enable_setup_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)

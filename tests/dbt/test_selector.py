@@ -848,6 +848,7 @@ def test_exclude_nodes_by_resource_type_seed():
     for model_id in sample_nodes.keys():
         assert model_id in selected
 
+
 def test_source_selector():
     """
     Covers:

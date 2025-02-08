@@ -152,6 +152,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID``
 
+.. _enable_setup_task:
+
+`enable_setup_task`_:
+    (Introduced in Cosmos 1.9.0): Enables a setup task for ``ExecutionMode.AIRFLOW_ASYNC`` to generate SQL files and upload them to a remote location (S3/GCS), preventing the ``run`` command from being executed on every node.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_SETUP_TASK``
+
 [openlineage]
 ~~~~~~~~~~~~~
 

@@ -1411,3 +1411,21 @@ def test_mock_dbt_adapter_unsupported_profile_type():
         match="Module cosmos.operators._asynchronous.unsupported_profile not found",
     ):
         operator._mock_dbt_adapter(async_context)
+
+
+@patch("airflow.providers.google.cloud.operators.bigquery.BigQueryInsertJobOperator.execute")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._read_run_sql_from_target_dir")
+def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monkeypatch):
+    from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+
+    monkeypatch.setattr("cosmos.operators.local.enable_setup_task", False)
+    mock_read_sql.return_value = "select * from 1;"
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    operator._handle_async_execution(
+        "/tmp", {}, {"profile_type": "bigquery", "async_operator": BigQueryInsertJobOperator}
+    )
+    mock_bq_execute.assert_called_once()

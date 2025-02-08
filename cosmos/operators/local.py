@@ -455,7 +455,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
-        if self.should_upload_compiled_sql:
+        if self.should_upload_compiled_sql:  # pragma: no cover
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
             self.callback_args.update({"context": context})

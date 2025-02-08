@@ -25,6 +25,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
+from cosmos.settings import enable_setup_task
 
 logger = get_logger(__name__)
 
@@ -599,7 +600,8 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    _add_dbt_compile_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
+    if enable_setup_task:
+        _add_dbt_compile_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
     return tasks_map
 
 

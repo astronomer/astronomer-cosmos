@@ -1,3 +1,5 @@
+pip install dbt-bigquery
+
 pytest \
     -vv \
     --cov=cosmos \

@@ -1,6 +1,8 @@
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.operators.airflow_async import (
     DbtBuildAirflowAsyncOperator,
@@ -28,6 +30,7 @@ DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "original_jaffle_shop"
 
 
+@pytest.mark.integration
 def test_airflow_async_operator_init(mock_bigquery_conn):
     """Test that Airflow can correctly parse an async operator with operator args"""
     profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})

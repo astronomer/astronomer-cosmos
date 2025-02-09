@@ -1,5 +1,3 @@
-pip install dbt-bigquery
-
 pytest \
     -vv \
     -m "not (integration or perf)" \

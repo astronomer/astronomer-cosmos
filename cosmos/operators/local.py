@@ -332,6 +332,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 
+    def _delete_sql_files(self, tmp_project_dir: Path, resource_type: str) -> None:
+        dest_target_dir, dest_conn_id = self._configure_remote_target_path()
+        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
+        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        from airflow.io.path import ObjectStoragePath
+
+        for file_path in files:
+            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)  # type: ignore
+            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
+            dest_object_storage_path.unlink()
+            self.log.info("Copied %s to %s", file_path, dest_object_storage_path)
+
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
         """
@@ -462,6 +474,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
+        if async_context.get("teardown_task"):
+            self._delete_sql_files(Path(tmp_project_dir), "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]

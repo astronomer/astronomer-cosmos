@@ -45,6 +45,9 @@ AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
 
+# Related to async operators
+enable_setup_task = conf.getboolean("cosmos", "enable_setup_task", fallback=True)
+
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
 except airflow.exceptions.AirflowConfigException:

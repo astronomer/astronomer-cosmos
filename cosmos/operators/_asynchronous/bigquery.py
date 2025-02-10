@@ -10,9 +10,38 @@ from packaging.version import Version
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.dataset import get_dataset_alias_name
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 
 AIRFLOW_VERSION = Version(airflow.__version__)
+
+
+def _mock_bigquery_adapter() -> None:
+    from typing import Optional, Tuple
+
+    import agate
+    from dbt.adapters.bigquery.connections import BigQueryAdapterResponse, BigQueryConnectionManager
+    from dbt_common.clients.agate_helper import empty_table
+
+    def execute(  # type: ignore[no-untyped-def]
+        self, sql, auto_begin=False, fetch=None, limit: Optional[int] = None
+    ) -> Tuple[BigQueryAdapterResponse, agate.Table]:
+        return BigQueryAdapterResponse("mock_bigquery_adapter_response"), empty_table()
+
+    BigQueryConnectionManager.execute = execute
+
+
+def _configure_bigquery_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
+    sql = kwargs.get("sql")
+    if not sql:
+        raise CosmosValueError("Keyword argument 'sql' is required for BigQuery Async operator")
+    async_op_obj.configuration = {
+        "query": {
+            "query": sql,
+            "useLegacySql": False,
+        }
+    }
+    return async_op_obj
 
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]

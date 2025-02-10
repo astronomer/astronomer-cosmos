@@ -12,6 +12,7 @@ Profile configuration
 ---------------------
 
 To respect the dbt requirement of having the same profile to benefit from partial parsing, Cosmos users should either:
+
 * If using Cosmos profile mapping (``ProfileConfig(profile_mapping=...``), disable using mocked profile mappings by setting ``render_config=RenderConfig(enable_mock_profile=False)``
 * Declare their own ``profiles.yml`` file, via ``ProfileConfig(profiles_yml_filepath=...)``
 
@@ -53,14 +54,16 @@ It is possible to disable caching or override the directory that Cosmos uses cac
 
     [cosmos]
     cache_dir = path/to/docs/here  # to override default caching directory (by default, uses the system temporary directory)
-    enable_cache = False  # to disable caching (enabled by default)
+    enable_cache_partial_parse = False  # to disable caching (enabled by default)
 
 Or environment variable:
 
 .. code-block:: cfg
 
     AIRFLOW__COSMOS__CACHE_DIR="path/to/docs/here"  # to override default caching directory (by default, uses the system temporary directory)
-    AIRFLOW__COSMOS__ENABLE_CACHE="False"  # to disable caching (enabled by default)
+    AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE="False"  # to disable caching (enabled by default)
+
+Learn more about `caching <./caching.html>`_ and `Cosmos Airflow configurations <./cosmos-conf.html>`_.
 
 Disabling
 ---------

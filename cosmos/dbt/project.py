@@ -25,16 +25,13 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     :returns: True or False
     """
     project_dir = Path(project_path)
-    has_deps = False
     for filename in DBT_DEPENDENCIES_FILE_NAMES:
         filepath = project_dir / filename
         if filepath.exists() and filepath.stat().st_size > 0:
-            has_deps = True
-            break
+            return True
 
-    if not has_deps:
-        logger.info(f"Project {project_path} does not have {DBT_DEPENDENCIES_FILE_NAMES}")
-    return has_deps
+    logger.info(f"Project {project_path} does not have {DBT_DEPENDENCIES_FILE_NAMES}")
+    return False
 
 
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:

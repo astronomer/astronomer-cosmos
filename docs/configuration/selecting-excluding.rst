@@ -3,7 +3,7 @@
 Selecting & Excluding
 =======================
 
-Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select `` and ``exclude`` parameters in the ``RenderConfig`` class.
+Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select`` and ``exclude`` parameters in the ``RenderConfig`` class.
 
  Since Cosmos 1.3, the ``selector`` parameter is also available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
 
@@ -23,6 +23,10 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``@node_name`` (@ operator): include/exclude the node with name ``node_name``, all its descendants, and all ancestors of those descendants. This is useful in CI environments where you want to build a model and all its descendants, but you need the ancestors of those descendants to exist first.
 - ``tag:my_tag,+node_name`` (intersection): include/exclude ``node_name`` and its parents if they have the tag ``my_tag`` (`dbt set operator docs <https://docs.getdbt.com/reference/node-selection/set-operators>`_)
 - ``['tag:first_tag', 'tag:second_tag']`` (union): include/exclude nodes that have either ``tag:first_tag`` or ``tag:second_tag``
+- ``resource_type:<resource>``: include/exclude nodes with the resource type ``seed, snapshots, model, test, source``. For example, ``resource_type:source`` returns only nodes where resource_type == SOURCE
+- ``source:my_source``: include/exclude nodes that have the source ``my_source`` and are of resource_type ``source``
+- ``source:my_source+``: include/exclude nodes that have the source ``my_source`` and their children
+- ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
 
 .. note::
 

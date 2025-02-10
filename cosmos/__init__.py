@@ -173,6 +173,44 @@ except ImportError:
 
 
 try:
+    from cosmos.operators.aws_ecs import (
+        DbtBuildAwsEcsOperator,
+        DbtLSAwsEcsOperator,
+        DbtRunAwsEcsOperator,
+        DbtRunOperationAwsEcsOperator,
+        DbtSeedAwsEcsOperator,
+        DbtSnapshotAwsEcsOperator,
+        DbtSourceAwsEcsOperator,
+        DbtTestAwsEcsOperator,
+    )
+except ImportError:
+    DbtBuildAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtBuildAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
+    DbtLSAwsEcsOperator = MissingPackage("cosmos.operators.aws_ecs.DbtLSAwsEcsOperator", "aws-ecs")  # pragma: no cover
+    DbtRunAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtRunAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
+    DbtRunOperationAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtRunOperationAwsEcsOperator",
+        "aws-ecs",
+    )  # pragma: no cover
+    DbtSeedAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtSeedAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
+    DbtSnapshotAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtSnapshotAwsEcsOperator",
+        "aws-ecs",
+    )  # pragma: no cover
+    DbtTestAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtTestAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
+    DbtSourceAwsEcsOperator = MissingPackage(
+        "cosmos.operators.aws_ecs.DbtSourceAwsEcsOperator", "aws-ecs"
+    )  # pragma: no cover
+
+
+try:
     from cosmos.operators.gcp_cloud_run_job import (
         DbtBuildGcpCloudRunJobOperator,
         DbtCloneGcpCloudRunJobOperator,
@@ -267,6 +305,15 @@ __all__ = [
     "DbtSeedAwsEksOperator",
     "DbtSnapshotAwsEksOperator",
     "DbtTestAwsEksOperator",
+    # AWS ECS Task Run Execution Mode
+    "DbtBuildAwsEcsOperator",
+    "DbtLSAwsEcsOperator",
+    "DbtRunAwsEcsOperator",
+    "DbtRunOperationAwsEcsOperator",
+    "DbtSeedAwsEcsOperator",
+    "DbtSnapshotAwsEcsOperator",
+    "DbtTestAwsEcsOperator",
+    "DbtSourceAwsEcsOperator",
     # GCP Cloud Run Job Execution Mode
     "DbtBuildGcpCloudRunJobOperator",
     "DbtCloneGcpCloudRunJobOperator",

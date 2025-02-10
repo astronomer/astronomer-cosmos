@@ -99,6 +99,9 @@ kubernetes = [
 aws_eks = [
     "apache-airflow-providers-amazon>=8.0.0",
 ]
+aws-ecs = [
+    "apache-airflow-providers-amazon>=8.0.0",
+]
 azure-container-instance = [
     "apache-airflow-providers-microsoft-azure>=8.5.0",
 ]

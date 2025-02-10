@@ -8,6 +8,7 @@ from cosmos.constants import BIGQUERY_PROFILE_TYPE
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBase
 from cosmos.operators.local import (
+    AbstractDbtLocalBase,
     DbtBuildLocalOperator,
     DbtCloneLocalOperator,
     DbtCompileLocalOperator,
@@ -58,6 +59,7 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):
         clean_kwargs = {}
         non_async_args = set(inspect.signature(AbstractDbtBase.__init__).parameters.keys())
         non_async_args |= set(inspect.signature(DbtLocalBaseOperator.__init__).parameters.keys())
+        non_async_args |= set(inspect.signature(AbstractDbtLocalBase.__init__).parameters.keys())
 
         dbt_kwargs = {}
 

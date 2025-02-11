@@ -155,7 +155,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _enable_setup_async_task:
 
 `enable_setup_async_task`_:
-    (Introduced in Cosmos 1.9.0): Enables a setup task for ``ExecutionMode.AIRFLOW_ASYNC`` to generate SQL files and upload them to a remote location (S3/GCS), preventing the ``run`` command from being executed on every node.
+    (Introduced in Cosmos 1.9.0): Enables a setup task for ``ExecutionMode.AIRFLOW_ASYNC`` to generate SQL files and upload them to a remote location (S3/GCS), preventing the ``run`` command from being executed on every node. You need to specify ``remote_target_path_conn_id`` and ``remote_target_path`` configuration to upload the artifact to the remote location.
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK``

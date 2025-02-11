@@ -13,7 +13,7 @@ from cosmos.config import ProfileConfig
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
-from cosmos.settings import enable_setup_task, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
@@ -121,7 +121,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return fp.read()  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        if enable_setup_task:
+        if enable_setup_async_task:
             self.configuration = {
                 "query": {
                     "query": self.get_remote_sql(),

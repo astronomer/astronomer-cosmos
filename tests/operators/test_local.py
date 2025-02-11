@@ -1227,6 +1227,22 @@ def test_dbt_compile_local_operator_initialisation():
     assert "compile" in operator.base_cmd
 
 
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_files):
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+
+    operator._handle_post_execution("fake-dir", {})
+
+    assert operator.should_upload_compiled_sql is True
+    _upload_sql_files.assert_called_once()
+    store_compiled_sql.assert_called_once()
+
+
 def test_dbt_clone_local_operator_initialisation():
     operator = DbtCloneLocalOperator(
         profile_config=profile_config,

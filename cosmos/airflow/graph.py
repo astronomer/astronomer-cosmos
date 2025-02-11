@@ -11,7 +11,7 @@ from airflow.utils.task_group import TaskGroup
 
 from cosmos.config import RenderConfig
 from cosmos.constants import (
-    DBT_COMPILE_TASK_ID,
+    DBT_SETUP_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
@@ -25,7 +25,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import enable_setup_task
+from cosmos.settings import enable_setup_async_task
 
 logger = get_logger(__name__)
 
@@ -405,7 +405,7 @@ def _get_dbt_dag_task_group_identifier(dag: DAG, task_group: TaskGroup | None) -
     return dag_task_group_identifier
 
 
-def _add_dbt_compile_task(
+def _add_dbt_setup_async_task(
     dag: DAG,
     execution_mode: ExecutionMode,
     task_args: dict[str, Any],
@@ -416,24 +416,24 @@ def _add_dbt_compile_task(
     if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
         return
 
-    if render_config is not None:  # TestBehavior.AFTER_ALL
+    if render_config is not None:
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
 
-    compile_task_metadata = TaskMetadata(
-        id=DBT_COMPILE_TASK_ID,
+    setup_task_metadata = TaskMetadata(
+        id=DBT_SETUP_ASYNC_TASK_ID,
         operator_class="cosmos.operators._asynchronous.SetupAsyncOperator",
         arguments=task_args,
         extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
     )
-    compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=task_group)
+    setup_airflow_task = create_airflow_task(setup_task_metadata, dag, task_group=task_group)
 
     for task_id, task in tasks_map.items():
         if not task.upstream_list:
-            compile_airflow_task >> task
+            setup_airflow_task >> task
 
-    tasks_map[DBT_COMPILE_TASK_ID] = compile_airflow_task
+    tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
@@ -593,8 +593,8 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    if enable_setup_task:
-        _add_dbt_compile_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
+    if enable_setup_async_task:
+        _add_dbt_setup_async_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
     return tasks_map
 
 

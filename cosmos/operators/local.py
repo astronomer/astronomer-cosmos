@@ -35,7 +35,7 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
-from cosmos.settings import enable_setup_task, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
 
 try:
     from airflow.datasets import Dataset
@@ -320,9 +320,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
 
         if not dest_target_dir:
-            raise CosmosValueError(
-                "You're trying to upload run SQL files, but the remote target path is not configured. "
-            )
+            raise CosmosValueError("You're trying to upload SQL files, but the remote target path is not configured. ")
 
         from airflow.io.path import ObjectStoragePath
 
@@ -455,14 +453,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
-        if self.should_upload_compiled_sql:  # pragma: no cover
+        if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
             self.callback_args.update({"context": context})
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        if enable_setup_task:
+        if enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)

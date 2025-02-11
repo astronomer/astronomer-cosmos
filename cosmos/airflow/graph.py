@@ -118,7 +118,6 @@ def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
     test_indirect_selection: TestIndirectSelection,
-    dbt_dag_task_group_identifier: str,
     task_args: dict[str, Any],
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
@@ -153,10 +152,7 @@ def create_test_task_metadata(
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
 
-        extra_context = {
-            "dbt_node_config": node.context_dict,
-            "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
-        }
+        extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
 
     elif render_config is not None:  # TestBehavior.AFTER_ALL
@@ -382,7 +378,6 @@ def generate_task_or_group(
                     "test",
                     execution_mode,
                     test_indirect_selection,
-                    dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
                     task_args=task_args,
                     node=node,
                     on_warning_callback=on_warning_callback,
@@ -573,7 +568,6 @@ def build_airflow_graph(
             f"{dbt_project_name}_test",
             execution_mode,
             test_indirect_selection,
-            dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
             task_args=task_args,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
@@ -590,7 +584,6 @@ def build_airflow_graph(
                 datached_node_name,
                 execution_mode,
                 test_indirect_selection,
-                dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
                 task_args=task_args,
                 on_warning_callback=on_warning_callback,
                 render_config=render_config,

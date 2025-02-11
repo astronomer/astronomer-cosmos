@@ -983,6 +983,7 @@ def test_dbt_docs_gcs_local_operator():
         mock_hook.upload.assert_has_calls(expected_upload_calls)
 
 
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
@@ -997,6 +998,7 @@ def test_operator_execute_deps_parameters(
     mock_ensure_profile,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_upload_sql_files,
     invocation_mode,
     tmp_path,
 ):
@@ -1225,6 +1227,22 @@ def test_dbt_compile_local_operator_initialisation():
     assert "compile" in operator.base_cmd
 
 
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_files):
+    operator = DbtCompileLocalOperator(
+        task_id="fake-task",
+        profile_config=profile_config,
+        project_dir="fake-dir",
+    )
+
+    operator._handle_post_execution("fake-dir", {})
+
+    assert operator.should_upload_compiled_sql is True
+    _upload_sql_files.assert_called_once()
+    store_compiled_sql.assert_called_once()
+
+
 def test_dbt_clone_local_operator_initialisation():
     operator = DbtCloneLocalOperator(
         profile_config=profile_config,
@@ -1294,18 +1312,6 @@ def test_configure_remote_target_path(mock_object_storage_path):
     mock_object_storage_path.return_value.mkdir.assert_called_with(parents=True, exist_ok=True)
 
 
-@patch.object(DbtLocalBaseOperator, "_configure_remote_target_path")
-def test_no_compiled_sql_upload_for_other_operators(mock_configure_remote_target_path):
-    operator = DbtSeedLocalOperator(
-        task_id="fake-task",
-        profile_config=profile_config,
-        project_dir="fake-dir",
-    )
-    assert operator.should_upload_compiled_sql is False
-    operator.upload_compiled_sql("fake-dir", MagicMock())
-    mock_configure_remote_target_path.assert_not_called()
-
-
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
 def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
     operator = DbtCompileLocalOperator(
@@ -1317,10 +1323,9 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
     mock_configure_remote.return_value = (None, None)
 
     tmp_project_dir = "/fake/tmp/project"
-    context = {"dag": MagicMock(dag_id="test_dag")}
 
     with pytest.raises(CosmosValueError, match="remote target path is not configured"):
-        operator.upload_compiled_sql(tmp_project_dir, context)
+        operator._upload_sql_files(tmp_project_dir, "compiled")
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
@@ -1353,7 +1358,7 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
     files = [file1, file2]
 
     with patch.object(Path, "rglob", return_value=files):
-        operator.upload_compiled_sql(tmp_project_dir, context={"task": operator})
+        operator._upload_sql_files(tmp_project_dir, "compiled")
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
@@ -1392,22 +1397,6 @@ def test_mock_dbt_adapter_missing_async_context():
         operator._mock_dbt_adapter(None)
 
 
-def test_mock_dbt_adapter_missing_async_operator():
-    """
-    Test that the _mock_dbt_adapter method raises a CosmosValueError
-    when async_operator is missing in async_context.
-    """
-    async_context = {
-        "profile_type": "snowflake",
-    }
-    AbstractDbtLocalBase.__abstractmethods__ = set()
-    operator = AbstractDbtLocalBase(task_id="test_task", project_dir="test_project", profile_config=MagicMock())
-    with pytest.raises(
-        CosmosValueError, match="`async_operator` needs to be specified in `async_context` when running as async"
-    ):
-        operator._mock_dbt_adapter(async_context)
-
-
 def test_mock_dbt_adapter_missing_profile_type():
     """
     Test that the _mock_dbt_adapter method raises a CosmosValueError
@@ -1438,3 +1427,21 @@ def test_mock_dbt_adapter_unsupported_profile_type():
         match="Module cosmos.operators._asynchronous.unsupported_profile not found",
     ):
         operator._mock_dbt_adapter(async_context)
+
+
+@patch("airflow.providers.google.cloud.operators.bigquery.BigQueryInsertJobOperator.execute")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._read_run_sql_from_target_dir")
+def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monkeypatch):
+    from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+
+    monkeypatch.setattr("cosmos.operators.local.enable_setup_async_task", False)
+    mock_read_sql.return_value = "select * from 1;"
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    operator._handle_async_execution(
+        "/tmp", {}, {"profile_type": "bigquery", "async_operator": BigQueryInsertJobOperator}
+    )
+    mock_bq_execute.assert_called_once()

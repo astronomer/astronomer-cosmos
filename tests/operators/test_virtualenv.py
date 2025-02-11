@@ -50,6 +50,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
         return ["cmd"]
 
 
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
@@ -63,6 +64,7 @@ def test_run_command_without_virtualenv_dir(
     mock_store_compiled_sql,
     mock_calculate_openlineage_events_completes,
     mock_execute,
+    _upload_sql_files,
 ):
     mock_get_connection.return_value = Connection(
         conn_id="fake_conn",
@@ -107,6 +109,7 @@ def test_run_command_without_virtualenv_dir(
     assert len(cosmos_venv_dirs) == 0
 
 
+@patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
 @patch("time.sleep")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
@@ -126,6 +129,7 @@ def test_run_command_with_virtualenv_dir(
     mock_release_venv_lock,
     mock_sleep,
     mock_is_lock_available,
+    _upload_sql_files,
     caplog,
 ):
     mock_is_lock_available.side_effect = [False, False, True]

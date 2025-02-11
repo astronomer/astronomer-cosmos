@@ -161,7 +161,7 @@ SUPPORTED_BUILD_RESOURCES = [
 # https://docs.getdbt.com/reference/commands/test
 TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
 
-DBT_COMPILE_TASK_ID = "dbt_compile"
+DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 
 TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}"
 TELEMETRY_VERSION = "v1"

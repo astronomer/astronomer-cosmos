@@ -295,11 +295,11 @@ This execution mode could be preferred when you've long running resources and yo
 leveraging Airflow's deferrable operators. With that, you would be able to potentially observe higher throughput of tasks
 as more dbt nodes will be run in parallel since they won't be blocking Airflow's worker slots.
 
-In this mode, Cosmos adds a new operator, ``DbtCompileAirflowAsyncOperator``, as a root task in the DbtDag or DbtTaskGroup. The task runs
-the ``dbt compile`` command on your dbt project which then outputs compiled SQLs in the project's target directory.
+In this mode, Cosmos adds a new operator, ``SetupAsyncOperator``, as a root task in the DbtDag or DbtTaskGroup. The task runs
+the mocked ``dbt run`` command on your dbt project which then outputs compiled SQLs in the project's target directory.
 As part of the same task run, these compiled SQLs are then stored remotely to a remote path set using the
 :ref:`remote_target_path` configuration. The remote path is then used by the subsequent tasks in the DAG to
-fetch (from the remote path) and run the compiled SQLs asynchronously using e.g. the ``DbtRunAirflowAsyncOperator``.
+fetch (from the remote path) and run the compiled SQLs asynchronously using e.g. the ``SetupAsyncOperator``.
 You may observe that the compile task takes a bit longer to run due to the latency of storing the compiled SQLs
 remotely (e.g. for the classic ``jaffle_shop`` dbt project, upon compiling it produces about 31 files measuring about 124KB in total, but on a local
 machine it took approximately 25 seconds for the task to compile & upload the compiled SQLs to the remote path).,
@@ -312,9 +312,7 @@ Note that currently, the ``airflow_async`` execution mode has the following limi
 2. **Limited to dbt models**: Only dbt resource type models are run asynchronously using Airflow deferrable operators. Other resource types are executed synchronously, similar to the local execution mode.
 3. **BigQuery support only**: This mode only supports BigQuery as the target database. If a different target is specified, Cosmos will throw an error indicating the target database is unsupported in this mode.
 4. **ProfileMapping parameter required**: You need to specify the ``ProfileMapping`` parameter in the ``ProfileConfig`` for your DAG. Refer to the example DAG below for details on setting this parameter.
-5. **Supports only full_refresh models**: Currently, only ``full_refresh`` models are supported. To enable this, pass ``full_refresh=True`` in the ``operator_args`` of the ``DbtDag`` or ``DbtTaskGroup``. Refer to the example DAG below for details on setting this parameter.
 6. **location parameter required**: You must specify the location of the BigQuery dataset in the ``operator_args`` of the ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
-7. **No dataset emission**: The async run operators do not currently emit datasets, meaning that :ref:`data-aware-scheduling` is not supported at this time. Future releases will address this limitation.
 
 To start leveraging async execution mode that is currently supported for the BigQuery profile type targets you need to install Cosmos with the below additional dependencies:
 

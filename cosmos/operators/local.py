@@ -35,7 +35,7 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
-from cosmos.settings import remote_target_path, remote_target_path_conn_id
+from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
 
 try:
     from airflow.datasets import Dataset
@@ -305,10 +305,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return _configured_target_path, remote_conn_id
 
     def _construct_dest_file_path(
-        self,
-        dest_target_dir: Path,
-        file_path: str,
-        source_compiled_dir: Path,
+        self, dest_target_dir: Path, file_path: str, source_compiled_dir: Path, resource_type: str
     ) -> str:
         """
         Construct the destination path for the compiled SQL files to be uploaded to the remote store.
@@ -317,28 +314,20 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
 
-        return f"{dest_target_dir_str}/{dag_task_group_identifier}/compiled/{rel_path}"
+        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{resource_type}/{rel_path}"
 
-    def upload_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
-        """
-        Uploads the compiled SQL files from the dbt compile output to the remote store.
-        """
-        if not self.should_upload_compiled_sql:
-            return
-
+    def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
 
         if not dest_target_dir:
-            raise CosmosValueError(
-                "You're trying to upload compiled SQL files, but the remote target path is not configured. "
-            )
+            raise CosmosValueError("You're trying to upload SQL files, but the remote target path is not configured. ")
 
         from airflow.io.path import ObjectStoragePath
 
-        source_compiled_dir = Path(tmp_project_dir) / "target" / "compiled"
-        files = [str(file) for file in source_compiled_dir.rglob("*") if file.is_file()]
+        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
+        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
         for file_path in files:
-            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir)
+            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
@@ -439,8 +428,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
         if not async_context:
             raise CosmosValueError("`async_context` is necessary for running the model asynchronously")
-        if "async_operator" not in async_context:
-            raise CosmosValueError("`async_operator` needs to be specified in `async_context` when running as async")
         if "profile_type" not in async_context:
             raise CosmosValueError("`profile_type` needs to be specified in `async_context` when running as async")
         profile_type = async_context["profile_type"]
@@ -466,19 +453,23 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
-        self.upload_compiled_sql(tmp_project_dir, context)
+        if self.should_upload_compiled_sql:
+            self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
             self.callback_args.update({"context": context})
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
-        profile_type = async_context["profile_type"]
-        module_path = f"cosmos.operators._asynchronous.{profile_type}"
-        method_name = f"_configure_{profile_type}_async_op_args"
-        async_op_configurator = load_method_from_module(module_path, method_name)
-        async_op_configurator(self, sql=sql)
-        async_context["async_operator"].execute(self, context)
+        if enable_setup_async_task:
+            self._upload_sql_files(tmp_project_dir, "run")
+        else:
+            sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
+            profile_type = async_context["profile_type"]
+            module_path = f"cosmos.operators._asynchronous.{profile_type}"
+            method_name = f"_configure_{profile_type}_async_op_args"
+            async_op_configurator = load_method_from_module(module_path, method_name)
+            async_op_configurator(self, sql=sql)
+            async_context["async_operator"].execute(self, context)
 
     def run_command(
         self,

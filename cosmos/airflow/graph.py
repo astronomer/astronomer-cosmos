@@ -12,6 +12,7 @@ from airflow.utils.task_group import TaskGroup
 from cosmos.config import RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
+    DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
@@ -25,7 +26,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import enable_setup_async_task
+from cosmos.settings import enable_setup_async_task, enable_teardown_task
 
 logger = get_logger(__name__)
 
@@ -498,24 +499,24 @@ def _add_teardown_task(
     if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
         return
 
-    if render_config is not None:  # TestBehavior.AFTER_ALL
+    if render_config is not None:
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
 
-    compile_task_metadata = TaskMetadata(
-        id="teardown",
+    teardown_task_metadata = TaskMetadata(
+        id=DBT_TEARDOWN_ASYNC_TASK_ID,
         operator_class="cosmos.operators._asynchronous.TeardownAsyncOperator",
         arguments=task_args,
         extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
     )
-    compile_airflow_task = create_airflow_task(compile_task_metadata, dag, task_group=task_group)
+    teardown_airflow_task = create_airflow_task(teardown_task_metadata, dag, task_group=task_group)
 
     for task_id, task in tasks_map.items():
         if len(task.downstream_list) == 0:
-            task >> compile_airflow_task
+            task >> teardown_airflow_task
 
-    tasks_map["teardown"] = compile_airflow_task
+    tasks_map[DBT_TEARDOWN_ASYNC_TASK_ID] = teardown_airflow_task
 
 
 def build_airflow_graph(
@@ -626,6 +627,7 @@ def build_airflow_graph(
     create_airflow_task_dependencies(nodes, tasks_map)
     if enable_setup_async_task:
         _add_dbt_setup_async_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
+    if enable_teardown_task:
         _add_teardown_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
     return tasks_map
 

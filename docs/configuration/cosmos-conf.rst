@@ -160,6 +160,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK``
 
+.. _enable_teardown_async_task:
+
+`enable_teardown_async_task`_:
+    (Introduced in Cosmos 1.9.0): Enables a teardown task for ``ExecutionMode.AIRFLOW_ASYNC`` to delete the SQL files from remote location (S3/GCS). You need to specify ``remote_target_path_conn_id`` and ``remote_target_path`` configuration to delete the artifact from the remote location.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK``
+
 [openlineage]
 ~~~~~~~~~~~~~
 

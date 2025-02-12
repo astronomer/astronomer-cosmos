@@ -26,7 +26,7 @@ from cosmos.core.airflow import get_airflow_task as create_airflow_task
 from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.settings import enable_setup_async_task, enable_teardown_task
+from cosmos.settings import enable_setup_async_task, enable_teardown_async_task
 
 logger = get_logger(__name__)
 
@@ -627,7 +627,7 @@ def build_airflow_graph(
     create_airflow_task_dependencies(nodes, tasks_map)
     if enable_setup_async_task:
         _add_dbt_setup_async_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
-    if enable_teardown_task:
+    if enable_teardown_async_task:
         _add_teardown_task(dag, execution_mode, task_args, tasks_map, task_group, render_config=render_config)
     return tasks_map
 

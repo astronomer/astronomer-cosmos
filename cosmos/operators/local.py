@@ -37,7 +37,7 @@ from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencie
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     enable_setup_async_task,
-    enable_teardown_task,
+    enable_teardown_async_task,
     remote_target_path,
     remote_target_path_conn_id,
 )
@@ -477,7 +477,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        if async_context.get("teardown_task") and enable_teardown_task:
+        if async_context.get("teardown_task") and enable_teardown_async_task:
             self._delete_sql_files(Path(tmp_project_dir), "run")
             return
 

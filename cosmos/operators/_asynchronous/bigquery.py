@@ -150,6 +150,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         if not enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
+            return
         sql = self.get_remote_sql().strip()
         self.log.info("Executed SQL is: %s", sql)
         self.compiled_sql = sql

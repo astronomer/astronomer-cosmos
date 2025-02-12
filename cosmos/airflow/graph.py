@@ -27,7 +27,6 @@ from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from cosmos.settings import enable_setup_async_task
 
-
 logger = get_logger(__name__)
 
 

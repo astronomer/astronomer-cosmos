@@ -35,7 +35,12 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
-from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import (
+    enable_setup_async_task,
+    enable_teardown_task,
+    remote_target_path,
+    remote_target_path_conn_id,
+)
 
 try:
     from airflow.datasets import Dataset
@@ -342,7 +347,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)  # type: ignore
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             dest_object_storage_path.unlink()
-            self.log.info("Copied %s to %s", file_path, dest_object_storage_path)
+            self.log.debug("Deleted %s to %s", file_path, dest_object_storage_path)
 
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
@@ -472,10 +477,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
+        if async_context.get("teardown_task") and enable_teardown_task:
+            self._delete_sql_files(Path(tmp_project_dir), "run")
+            return
+
         if enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
-        if async_context.get("teardown_task"):
-            self._delete_sql_files(Path(tmp_project_dir), "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]

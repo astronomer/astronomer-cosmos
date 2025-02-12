@@ -1329,7 +1329,6 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("airflow.io.path.ObjectStoragePath.copy")
 @patch("airflow.io.path.ObjectStoragePath")
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
@@ -1448,6 +1447,7 @@ def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monk
     mock_bq_execute.assert_called_once()
 
 
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("pathlib.Path.rglob")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
 @patch("airflow.io.path.ObjectStoragePath.unlink")

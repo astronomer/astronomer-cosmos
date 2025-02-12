@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 import airflow
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.utils.context import Context
+from airflow.utils.session import NEW_SESSION, provide_session
 from packaging.version import Version
 
 from cosmos import settings
@@ -15,6 +16,9 @@ from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
@@ -49,11 +53,10 @@ def _configure_bigquery_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = (
-        "gcp_project",
-        "dataset",
-        "location",
-    )
+    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql")
+    template_fields_renderers = {
+        "compiled_sql": "sql",
+    }
 
     def __init__(
         self,
@@ -95,6 +98,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.async_context = extra_context or {}
         self.async_context["profile_type"] = self.profile_config.get_profile_type()
         self.async_context["async_operator"] = BigQueryInsertJobOperator
+        self.compiled_sql = ""
 
     @property
     def base_cmd(self) -> list[str]:
@@ -137,3 +141,47 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             super().execute(context=context)
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
+        self._store_compiled_sql(context=context)
+
+    @provide_session
+    def _store_compiled_sql(self, context: Context, session: Session = NEW_SESSION) -> None:
+        from airflow.models.renderedtifields import RenderedTaskInstanceFields
+        from airflow.models.taskinstance import TaskInstance
+
+        if not enable_setup_async_task:
+            self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
+        sql = self.get_remote_sql().strip()
+        self.log.info("Executed SQL is: %s", sql)
+        self.compiled_sql = sql
+
+        # need to refresh the rendered task field record in the db because Airflow only does this
+        # before executing the task, not after
+        ti = context["ti"]
+
+        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
+            if TYPE_CHECKING:
+                assert ti.task is not None
+            ti.task.template_fields = self.template_fields
+            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
+
+            # delete the old records
+            session.query(RenderedTaskInstanceFields).filter(
+                RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
+                RenderedTaskInstanceFields.task_id == self.task_id,
+                RenderedTaskInstanceFields.run_id == ti.run_id,
+            ).delete()
+            session.add(rtif)
+        else:
+            self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+
+    def execute_complete(self, context: Context, event: dict[str, Any]) -> Any:
+        """
+        Act as a callback for when the trigger fires.
+
+        This returns immediately. It relies on trigger to throw an exception,
+        otherwise it assumes execution was successful.
+        """
+        job_id = super().execute_complete(context=context, event=event)
+        self.log.info("Configuration is %s", str(self.configuration))
+        self._store_compiled_sql(context=context)
+        return job_id

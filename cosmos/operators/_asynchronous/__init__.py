@@ -21,6 +21,7 @@ class SetupAsyncOperator(DbtRunOperator):
 
 class TeardownAsyncOperator(DbtRunOperator):
     def __init__(self, *args: Any, **kwargs: Any):
+        kwargs["emit_datasets"] = False
         super().__init__(*args, **kwargs)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:

@@ -1445,3 +1445,17 @@ def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monk
         "/tmp", {}, {"profile_type": "bigquery", "async_operator": BigQueryInsertJobOperator}
     )
     mock_bq_execute.assert_called_once()
+
+
+@patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
+@patch("airflow.io.path.ObjectStoragePath.unlink")
+def test_async_execution_teardown_delete_files(unlink, _construct_dest_file_path):
+
+    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=project_dir,
+        profile_config=profile_config,
+    )
+    operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
+    unlink.assert_called()

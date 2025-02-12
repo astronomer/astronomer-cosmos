@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import TestBehavior
 from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -28,10 +29,7 @@ simple_dag_async = DbtDag(
         execution_mode=ExecutionMode.AIRFLOW_ASYNC,
         async_py_requirements=["dbt-bigquery"],
     ),
-    render_config=RenderConfig(
-        select=["path:models"],
-        # test_behavior=TestBehavior.NONE
-    ),
+    render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
     # normal dag parameters
     schedule_interval=None,
     start_date=datetime(2023, 1, 1),

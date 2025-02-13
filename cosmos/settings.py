@@ -39,6 +39,7 @@ remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fa
 
 # Related to async operators
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
+enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
 AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 

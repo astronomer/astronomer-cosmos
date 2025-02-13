@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from cosmos.config import ProfileConfig
+from cosmos.operators._asynchronous import TeardownAsyncOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators.local import DbtRunLocalOperator
@@ -68,3 +69,14 @@ def test_dbt_run_airflow_async_factory_operator_init(mock_create_class, profile_
 
     assert operator is not None
     assert isinstance(operator, MockAsyncOperator)
+
+
+@patch("cosmos.operators.local.DbtRunLocalOperator.build_and_run_cmd")
+def test_teardown_execute(mock_build_and_run_cmd):
+    operator = TeardownAsyncOperator(
+        task_id="fake-task",
+        profile_config=Mock(),
+        project_dir="fake-dir",
+    )
+    operator.execute({})
+    mock_build_and_run_cmd.assert_called_once()

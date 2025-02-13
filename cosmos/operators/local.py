@@ -36,7 +36,12 @@ from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, Invocation
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
-from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import (
+    enable_setup_async_task,
+    enable_teardown_async_task,
+    remote_target_path,
+    remote_target_path_conn_id,
+)
 
 try:
     from airflow.datasets import Dataset
@@ -338,6 +343,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
+    def _delete_sql_files(self, tmp_project_dir: Path, resource_type: str) -> None:
+        dest_target_dir, dest_conn_id = self._configure_remote_target_path()
+        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
+        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        from airflow.io.path import ObjectStoragePath
+
+        for file_path in files:
+            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)  # type: ignore
+            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
+            dest_object_storage_path.unlink()
+            self.log.debug("Deleted %s to %s", file_path, dest_object_storage_path)
+
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
         """
@@ -466,6 +483,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
+        if async_context.get("teardown_task") and enable_teardown_async_task:
+            self._delete_sql_files(Path(tmp_project_dir), "run")
+            return
+
         if enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:

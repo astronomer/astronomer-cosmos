@@ -11,8 +11,6 @@ from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOp
 from cosmos.operators._asynchronous.databricks import DbtRunAirflowAsyncDatabricksOperator
 from cosmos.operators.local import DbtRunLocalOperator
 
-_ASYNC_PROFILE = ["bigquery", "databricks"]
-
 
 @pytest.mark.parametrize(
     "profile_type, dbt_class, expected_operator_class",

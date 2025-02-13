@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
@@ -100,6 +101,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         return ["run"]
 
     def get_remote_sql(self) -> str:
+        start_time = time.time()
+
         if not settings.AIRFLOW_IO_AVAILABLE:  # pragma: no cover
             raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
         from airflow.io.path import ObjectStoragePath
@@ -118,7 +121,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
         with object_storage_path.open() as fp:  # type: ignore
-            return fp.read()  # type: ignore
+            sql = fp.read()
+            elapsed_time = time.time() - start_time
+            self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
+            return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
         if enable_setup_async_task:

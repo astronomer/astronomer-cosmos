@@ -4,6 +4,7 @@ import inspect
 import json
 import os
 import tempfile
+import time
 import urllib.parse
 import warnings
 from abc import ABC, abstractmethod
@@ -317,6 +318,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return f"{dest_target_dir_str}/{dag_task_group_identifier}/{resource_type}/{rel_path}"
 
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
+        start_time = time.time()
+
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
 
         if not dest_target_dir:
@@ -331,6 +334,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:

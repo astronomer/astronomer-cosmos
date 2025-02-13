@@ -112,3 +112,49 @@ def test_configure_bigquery_async_op_args_missing_sql(async_operator_mock):
     """Test _configure_bigquery_async_op_args raises CosmosValueError when 'sql' is missing."""
     with pytest.raises(CosmosValueError, match="Keyword argument 'sql' is required for BigQuery Async operator"):
         _configure_bigquery_async_op_args(async_operator_mock)
+
+
+@patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator.get_remote_sql")
+@patch("airflow.models.renderedtifields.RenderedTaskInstanceFields")
+def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_config_mock):
+    from airflow.models.taskinstance import TaskInstance
+    from sqlalchemy.orm import Session
+
+    mock_get_remote_sql.return_value = "SELECT * FROM test_table;"
+
+    mock_context = {"ti": MagicMock(spec=TaskInstance)}
+    mock_session = MagicMock(spec=Session)
+
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    operator._store_compiled_sql(mock_context, session=mock_session)
+
+    assert operator.compiled_sql == "SELECT * FROM test_table;"
+    mock_rendered_ti.assert_called_once()
+    mock_session.add.assert_called_once()
+    mock_session.query().filter().delete.assert_called_once()
+
+
+@patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._store_compiled_sql")
+def test_execute_complete(mock_store_sql, profile_config_mock):
+    mock_context = Mock()
+    mock_event = {"job_id": "test_job"}
+
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    with patch.object(BigQueryInsertJobOperator, "execute_complete", return_value="test_job") as mock_super_execute:
+        result = operator.execute_complete(mock_context, mock_event)
+
+    assert result == "test_job"
+    mock_super_execute.assert_called_once_with(context=mock_context, event=mock_event)
+    mock_store_sql.assert_called_once_with(context=mock_context)

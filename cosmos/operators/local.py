@@ -339,7 +339,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
-        
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 

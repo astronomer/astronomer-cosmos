@@ -336,7 +336,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 
         elapsed_time = time.time() - start_time
-        self.log.info("SQL file upload completed in %.2f seconds.", elapsed_time)
+        self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
     @provide_session
     def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:

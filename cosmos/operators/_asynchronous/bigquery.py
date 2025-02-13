@@ -17,7 +17,7 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.orm import Session
 
 AIRFLOW_VERSION = Version(airflow.__version__)
@@ -160,7 +160,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         ti = context["ti"]
 
         if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
-            if TYPE_CHECKING:
+            if TYPE_CHECKING:  # pragma: no cover
                 assert ti.task is not None
             ti.task.template_fields = self.template_fields
             rtif = RenderedTaskInstanceFields(ti, render_templates=False)
@@ -172,7 +172,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
                 RenderedTaskInstanceFields.run_id == ti.run_id,
             ).delete()
             session.add(rtif)
-        else:
+        else:  # pragma: no cover
             self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> Any:

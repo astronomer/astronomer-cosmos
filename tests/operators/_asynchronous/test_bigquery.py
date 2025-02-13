@@ -122,7 +122,6 @@ def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_confi
 
     mock_get_remote_sql.return_value = "SELECT * FROM test_table;"
 
-    mock_context = {"ti": MagicMock(spec=TaskInstance)}
     mock_session = MagicMock(spec=Session)
 
     operator = DbtRunAirflowAsyncBigqueryOperator(
@@ -131,6 +130,9 @@ def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_confi
         profile_config=profile_config_mock,
         dbt_kwargs={"task_id": "test_task"},
     )
+    mock_task_instance = Mock(spec=TaskInstance)
+    mock_task_instance.task = operator
+    mock_context = {"ti": mock_task_instance}
 
     operator._store_compiled_sql(mock_context, session=mock_session)
 

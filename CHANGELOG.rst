@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.9.0a5 (2025-02-03)
+1.9.0 (2025-02-14)
 --------------------
 
 Breaking changes
@@ -19,23 +19,40 @@ Features
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
 * Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492. More information `here <https://astronomer.github.io/astronomer-cosmos/profiles/#profile-customise-per-node>`_.
 * Create and run accurate SQL statements when using ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti, @tatiana and @pankajastro in #1474
+* Add AWS ECS task run execution mode by @CarlosGitto and @aoelvp94 in #1507
+* Add support for running ``DbtSourceOperator`` individually by @victormacaubas in #1510
+* Add setup task for async executions by @pankajastro in #1518
+* Add teardown task for async executions by @pankajastro in #1529
 
 Bug Fixes
 
 * Fix select complex intersection of three tag-based graph selectors by @tatiana in #1466
+* Fix custom selector behaviour when the model name contains periods by @yakovlevvs and @60098727 in #1499
+* Filter dbt and non-dbt kwargs correctly for async operator by @pankajastro in #1526
 
 Enhancement
 
 * Fix OpenLineage deprecation warning by @CorsettiS in #1449
 * Move ``DbtRunner`` related functions into ``dbt/runner.py`` module by @tatiana in #1480
 * Add ``on_warning_callback`` to ``DbtSourceKubernetesOperator`` and refactor previous operators by @LuigiCerone in #1501
+* Gracefully error when users set incompatible ``RenderConfig.dbt_deps`` and ``operator_args`` ``install_deps`` by @tatiana in #1505
+* Store compiled SQL as template field for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti in #1534
 
+Docs
+
+* Improve ``RenderConfig`` arguments documentation by @tatiana in #1514
+* Improve callback documentation by @tatiana in #1516
+* Improve partial parsing docs by @tatiana in #1520
+* Fix typo in selecting & excluding docs by @pankajastro in #1523
 
 Others
 
 * Ignore dbt package tests when running Cosmos tests by @tatiana in #1502
+* Refactor to consolidate async dbt adapter code by @pankajkoti in #1509
+* Log elapsed time for sql file(s) upload/download by @pankajastro in #1536
+* Remove the fallback operator for async task by @pankajastro in #1538
 * GitHub Actions Dependabot: #1487
-* Pre-commit updates: #1473, #1493
+* Pre-commit updates: #1473, #1493, #1503, #1531
 
 
 1.8.2 (2025-01-15)

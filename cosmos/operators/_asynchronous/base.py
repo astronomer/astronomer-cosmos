@@ -18,7 +18,7 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
 
     The function constructs a class path string for an asynchronous operator, based on the provided `profile_type` and
     `dbt_class`. It attempts to import the corresponding class dynamically and return it. If the class cannot be found,
-    it falls back to returning the `DbtRunLocalOperator` class.
+    it raises an error.
 
     :param profile_type: The dbt profile type
     :param dbt_class: The dbt class name. Example DbtRun, DbtTest.
@@ -30,9 +30,8 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
         module = importlib.import_module(module_path)
         operator_class = getattr(module, class_name)
         return operator_class
-    except (ModuleNotFoundError, AttributeError):
-        log.info("Error in loading class: %s. falling back to DbtRunLocalOperator", class_path)
-        return DbtRunLocalOperator
+    except (ModuleNotFoundError, AttributeError) as e:
+        raise ImportError(f"Error in loading class: {class_path}. Unable to find the specified operator class.") from e
 
 
 class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[misc]

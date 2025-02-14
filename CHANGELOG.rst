@@ -23,6 +23,7 @@ Features
 * Add support for running ``DbtSourceOperator`` individually by @victormacaubas in #1510
 * Add setup task for async executions by @pankajastro in #1518
 * Add teardown task for async executions by @pankajastro in #1529
+* Add ``ProjectConfig.install_dbt_deps`` & change operator ``install_deps=True`` as default by @tatiana in #1521
 
 Bug Fixes
 

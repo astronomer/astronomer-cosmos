@@ -24,6 +24,7 @@ variables that should be used for rendering and execution. It takes the followin
   will only be rendered at execution time, not at render time.
 - ``env_vars``: (new in v1.3) A dictionary of environment variables used for rendering and execution. Rendering with
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
+- ``install_dbt_deps``: (new in v1.9) Run dbt deps during DAG parsing and task execution if True (default).
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
   execution modes. Due to the way that dbt `partial parsing works <https://docs.getdbt.com/reference/parsing#known-limitations>`_, it does not work with Cosmos profile mapping classes. To benefit from this feature, users have to set the ``profiles_yml_filepath`` argument in ``ProfileConfig``.

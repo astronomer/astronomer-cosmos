@@ -128,7 +128,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
-    :param install_deps: If true, install dependencies before running the command
+    :param install_deps (deprecated): If true, install dependencies before running the command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -151,7 +151,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = False,
+        install_deps: bool = True,
         callback: Callable[[str], None] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,

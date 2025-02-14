@@ -347,6 +347,9 @@ class DbtGraph:
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
         self.log_dir: Path | None = None
+        self.should_install_dbt_deps = (
+            self.render_config.dbt_deps if isinstance(self.render_config.dbt_deps, bool) else True
+        )
 
     @cached_property
     def env_vars(self) -> dict[str, str]:
@@ -642,7 +645,7 @@ class DbtGraph:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
             tmpdir_path = Path(tmpdir)
 
-            create_symlinks(project_path, tmpdir_path, self.render_config.dbt_deps)
+            create_symlinks(project_path, tmpdir_path, self.should_install_dbt_deps)
 
             latest_partial_parse = None
             if self.project.partial_parse:
@@ -679,7 +682,7 @@ class DbtGraph:
                 self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
 
-                if self.render_config.dbt_deps and has_non_empty_dependencies_file(self.project_path):
+                if self.should_install_dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     if is_cache_package_lockfile_enabled(project_path):
                         latest_package_lockfile = _get_latest_cached_package_lockfile(project_path)
                         if latest_package_lockfile:

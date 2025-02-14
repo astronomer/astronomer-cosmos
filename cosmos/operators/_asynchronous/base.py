@@ -18,7 +18,7 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
 
     The function constructs a class path string for an asynchronous operator, based on the provided `profile_type` and
     `dbt_class`. It attempts to import the corresponding class dynamically and return it. If the class cannot be found,
-    it raise an error.
+    it raises an error.
 
     :param profile_type: The dbt profile type
     :param dbt_class: The dbt class name. Example DbtRun, DbtTest.

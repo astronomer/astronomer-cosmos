@@ -378,6 +378,8 @@ class DbtGraph:
         """
         if self.project.dbt_vars:
             cmd_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+        elif self.dbt_vars:
+            cmd_args.extend(["--vars", json.dumps(self.dbt_vars, sort_keys=True)])
 
     @cached_property
     def dbt_ls_args(self) -> list[str]:

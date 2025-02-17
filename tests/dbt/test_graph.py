@@ -1537,6 +1537,41 @@ def test_load_via_dbt_ls_project_config_dbt_vars(
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
 @patch("cosmos.config.RenderConfig.validate_dbt_command")
 @patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_load_via_dbt_ls_dbt_graph_dbt_vars(
+    mock_validate, mock_update_nodes, mock_popen, mock_use_case, tmp_dbt_project_dir
+):
+    """Tests that the dbt ls command in the subprocess has "--vars" with the DbtGraph dbt_vars."""
+    mock_popen().communicate.return_value = ("", "")
+    mock_popen().returncode = 0
+    dbt_vars = {"my_var3": "my_value3"}
+    render_config = RenderConfig(
+        dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME,
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=tmp_dbt_project_dir / DBT_PROJECT_NAME)
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(),
+        render_config=render_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        dbt_vars=dbt_vars,
+    )
+    dbt_graph.load_via_dbt_ls()
+    ls_command = mock_popen.call_args.args[0]
+    assert "--vars" in ls_command
+    assert ls_command[ls_command.index("--vars") + 1] == json.dumps(dbt_vars, sort_keys=True)
+
+
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
+@patch("cosmos.dbt.graph.Popen")
+@patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")
+@patch("cosmos.config.RenderConfig.validate_dbt_command")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_load_via_dbt_ls_render_config_selector_arg_is_used(
     mock_validate, mock_update_nodes, mock_popen, mock_enable_cache, tmp_dbt_project_dir
 ):

@@ -46,6 +46,7 @@ def test_airflow_async_operator_init(mock_bigquery_conn):
         profile_config=profile_config,
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+            async_py_requirements=["dbt-bigquery"],
         ),
         schedule_interval=None,
         start_date=datetime(2023, 1, 1),

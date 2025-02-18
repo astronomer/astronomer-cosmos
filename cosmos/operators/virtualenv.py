@@ -105,7 +105,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
                 self.virtualenv_dir = Path(tempdir)
                 self._py_bin = self._prepare_virtualenv()
-                return super().run_command(cmd, env, context)
+                return super().run_command(cmd, env, context, run_as_async=run_as_async, async_context=async_context)
 
         try:
             self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
@@ -117,7 +117,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.log.info("Acquiring the virtualenv lock")
             self._acquire_venv_lock()
             self._py_bin = self._prepare_virtualenv()
-            return super().run_command(cmd, env, context)
+            return super().run_command(cmd, env, context, run_as_async=run_as_async, async_context=async_context)
         finally:
             self.log.info("Releasing virtualenv lock")
             self._release_venv_lock()

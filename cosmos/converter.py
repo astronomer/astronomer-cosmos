@@ -335,6 +335,7 @@ class DbtToAirflowConverter:
             dbt_project_name=render_config.project_name,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
+            async_py_requirements=execution_config.async_py_requirements,
         )
 
         current_time = time.perf_counter()

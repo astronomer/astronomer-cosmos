@@ -26,6 +26,7 @@ simple_dag_async = DbtDag(
     profile_config=profile_config,
     execution_config=ExecutionConfig(
         execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+        async_py_requirements=["dbt-bigquery"],
     ),
     render_config=RenderConfig(
         select=["path:models"],
@@ -37,6 +38,6 @@ simple_dag_async = DbtDag(
     catchup=False,
     dag_id="simple_dag_async",
     tags=["simple"],
-    operator_args={"location": "northamerica-northeast1", "install_deps": True},
+    operator_args={"location": "US", "install_deps": True},
 )
 # [END airflow_async_execution_mode_example]

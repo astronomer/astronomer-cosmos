@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
@@ -11,6 +11,7 @@ from airflow.utils.task_group import TaskGroup
 from packaging import version
 
 from cosmos.airflow.graph import (
+    _add_teardown_task,
     _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_detached_node_name,
@@ -30,6 +31,7 @@ from cosmos.constants import (
 )
 from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosValueError
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -982,3 +984,17 @@ def test_custom_meta():
                 assert task.queue == "custom_queue"
             else:
                 assert task.queue == "default"
+
+
+def test_add_teardown_task_raises_error_without_async_py_requirements():
+    """Test that an error is raised if async_py_requirements is not provided."""
+    task_args = {}
+
+    sample_dag = DAG(dag_id="test_dag")
+    sample_tasks_map = {
+        "task_1": Mock(downstream_list=[]),
+        "task_2": Mock(downstream_list=[]),
+    }
+
+    with pytest.raises(CosmosValueError, match="ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set"):
+        _add_teardown_task(sample_dag, ExecutionMode.AIRFLOW_ASYNC, task_args, sample_tasks_map, None, None)

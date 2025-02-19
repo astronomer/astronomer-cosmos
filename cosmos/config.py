@@ -389,17 +389,17 @@ class ProfileConfig:
 @dataclass
 class ExecutionConfig:
     """
-    Contains configuration about how to execute dbt.
+        Contains configuration about how to execute dbt.
 
-    :param execution_mode: The execution mode for dbt. Defaults to local
-    :param invocation_mode: The invocation mode for the dbt command. This is only configurable for ExecutionMode.LOCAL.
-    :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
-    :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
-    :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
-    :param virtualenv_dir: Directory path to locate the (cached) virtual env that
-    should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
-    :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`. 
-Example: `["dbt-postgres==1.5.0"]` 
+        :param execution_mode: The execution mode for dbt. Defaults to local
+        :param invocation_mode: The invocation mode for the dbt command. This is only configurable for ExecutionMode.LOCAL.
+        :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
+        :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
+        :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
+        :param virtualenv_dir: Directory path to locate the (cached) virtual env that
+        should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
+        :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
+    Example: `["dbt-postgres==1.5.0"]`
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL

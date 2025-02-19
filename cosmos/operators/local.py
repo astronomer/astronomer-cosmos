@@ -531,6 +531,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 if self.install_deps:
                     self._install_dependencies(tmp_dir_path, flags, env)
 
+                if run_as_async and not enable_setup_async_task:
+                    self._mock_dbt_adapter(async_context)
+
                 full_cmd = cmd + flags
                 result = self.invoke_dbt(
                     command=full_cmd,

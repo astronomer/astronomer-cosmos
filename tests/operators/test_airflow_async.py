@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.airflow_async import (
     DbtBuildAirflowAsyncOperator,
     DbtCompileAirflowAsyncOperator,
@@ -54,6 +55,32 @@ def test_airflow_async_operator_init(mock_bigquery_conn):
         dag_id="simple_dag_async",
         operator_args={"location": "us", "install_deps": True},
     )
+
+
+@pytest.mark.integration
+def test_airflow_async_operator_init_no_async_py_requirements_raises_error(mock_bigquery_conn):
+    """Test that Airflow can correctly parse an async operator with operator args"""
+    profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})
+
+    profile_config = ProfileConfig(
+        profile_name="airflow_db",
+        target_name="bq",
+        profile_mapping=profile_mapping,
+    )
+
+    with pytest.raises(CosmosValueError, match="ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set"):
+        DbtDag(
+            project_config=ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME),
+            profile_config=profile_config,
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+            ),
+            schedule_interval=None,
+            start_date=datetime(2023, 1, 1),
+            catchup=False,
+            dag_id="simple_dag_async",
+            operator_args={"location": "us", "install_deps": True},
+        )
 
 
 def test_dbt_build_airflow_async_operator_inheritance():

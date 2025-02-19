@@ -24,6 +24,7 @@ Features
 * Add setup task for async executions by @pankajastro in #1518
 * Add teardown task for async executions by @pankajastro in #1529
 * Add ``ProjectConfig.install_dbt_deps`` & change operator ``install_deps=True`` as default by @tatiana in #1521
+* Extend Virtualenv operator and mock dbt adapters for setup & teardown tasks in ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti, @tatiana and @pankajastro in #1544
 
 Bug Fixes
 
@@ -45,6 +46,7 @@ Docs
 * Improve callback documentation by @tatiana in #1516
 * Improve partial parsing docs by @tatiana in #1520
 * Fix typo in selecting & excluding docs by @pankajastro in #1523
+* Document ``async_py_requirements`` added in ``ExecutionConfig`` for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti in #1545
 
 Others
 

@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.9.1a1 (2025-02-20)
+--------------------
+
+Bug Fixes
+
+* Fix import error in dbt bigquery adapter mock for ``dbt-bigquery<1.8`` for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti in #1548
+
+
 1.9.0 (2025-02-19)
 --------------------
 

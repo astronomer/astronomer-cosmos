@@ -28,7 +28,11 @@ def _mock_bigquery_adapter() -> None:
 
     import agate
     from dbt.adapters.bigquery.connections import BigQueryAdapterResponse, BigQueryConnectionManager
-    from dbt_common.clients.agate_helper import empty_table
+
+    try:
+        from dbt_common.clients.agate_helper import empty_table
+    except (ModuleNotFoundError, ImportError):  # pragma: no cover
+        from dbt.clients.agate_helper import empty_table
 
     def execute(  # type: ignore[no-untyped-def]
         self, sql, auto_begin=False, fetch=None, limit: Optional[int] = None

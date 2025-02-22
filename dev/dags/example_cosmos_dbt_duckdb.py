@@ -13,7 +13,7 @@ DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 profile_config = ProfileConfig(
-    profile_name="default",
+    profile_name="jaffle_shop",
     target_name="dev",
     profile_mapping=DuckDBUserPasswordProfileMapping(
         conn_id="duckdb",

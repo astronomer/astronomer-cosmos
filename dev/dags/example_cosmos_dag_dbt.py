@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmos import DbtDag, ProfileConfig, ProjectConfig
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import DuckDBUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -15,8 +15,8 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
+    profile_mapping=DuckDBUserPasswordProfileMapping(
+        conn_id="duckdb",
         profile_args={"schema": "public"},
         disable_event_tracking=True,
     ),

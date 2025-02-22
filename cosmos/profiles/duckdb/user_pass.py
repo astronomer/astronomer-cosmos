@@ -1,4 +1,4 @@
-"""Maps Airflow DuckDB connections using user + password authentication to dbt profiles."""
+"""Maps Airflow DuckDB connections using local path mapping to dbt profiles."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ..base import BaseProfileMapping
 
 class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
     """
-    Maps Airflow DuckDB connections using user + password authentication to dbt profiles.
+    Maps Airflow DuckDB connections using local path mapping to dbt profiles.
     https://docs.getdbt.com/docs/core/connect-data-platform/duckdb-setup
     https://github.com/astronomer/airflow-provider-duckdb
     """

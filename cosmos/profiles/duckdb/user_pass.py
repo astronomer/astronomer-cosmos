@@ -17,11 +17,10 @@ class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
     airflow_connection_type: str = "duckdb"
     dbt_profile_type: str = "duckdb"
 
+    # Without this path variable, its required to find the right local db connection
     required_fields = ["path"]
 
-    airflow_param_mapping = {
-        "path": "path",
-    }
+    airflow_param_mapping = {"path": "path"}
 
     @property
     def profile(self) -> dict[str, Any | None]:

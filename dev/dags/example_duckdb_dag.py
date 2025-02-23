@@ -18,7 +18,7 @@ profile_config = ProfileConfig(
     profile_mapping=DuckDBUserPasswordProfileMapping(
         conn_id="duckdb_default",
         profile_args={"path": "jaffle_shop.duck_db"},
-        # disable_event_tracking=True,
+        disable_event_tracking=True,
     ),
 )
 

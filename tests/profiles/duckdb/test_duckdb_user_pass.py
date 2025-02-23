@@ -12,37 +12,13 @@ from cosmos.profiles.duckdb.user_pass import (
 
 
 @pytest.fixture()
-def mock_postgres_conn():  # type: ignore
+def mock_duckdb_conn():  # type: ignore
     """
     Sets the connection as an environment variable.
     """
     conn = Connection(
-        conn_id="my_postgres_connection",
-        conn_type="postgres",
-        host="my_host",
-        login="my_user",
-        password="my_password",
-        port=5432,
-        schema="my_database",
-    )
-
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        yield conn
-
-
-@pytest.fixture()
-def mock_postgres_conn_custom_port():  # type: ignore
-    """
-    Sets the connection as an environment variable.
-    """
-    conn = Connection(
-        conn_id="my_postgres_connection",
-        conn_type="postgres",
-        host="my_host",
-        login="my_user",
-        password="my_password",
-        port=7472,
-        schema="my_database",
+        conn_id="duckdb",
+        conn_type="duckdb",
     )
 
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
@@ -54,126 +30,56 @@ def test_connection_claiming() -> None:
     Tests that the postgres profile mapping claims the correct connection type.
     """
     # should only claim when:
-    # - conn_type == postgres
-    # and the following exist:
-    # - host
-    # - user
-    # - password
-    # - port
-    # - dbname or database
-    # - schema
-    potential_values = {
-        "conn_type": "postgres",
-        "host": "my_host",
-        "login": "my_user",
-        "password": "my_password",
-        "schema": "my_database",
+    # - conn_type == duckdb
+    # and the following exist
+    # - path
+    required_values = {
+        "conn_type": "duckdb",
     }
 
-    # if we're missing any of the values, it shouldn't claim
-    for key in potential_values:
-        values = potential_values.copy()
-        del values[key]
-        conn = Connection(**values)  # type: ignore
-
-        print("testing with", values)
-
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-            profile_mapping = DuckDBUserPasswordProfileMapping(conn, {"schema": "my_schema"})
-            assert not profile_mapping.can_claim_connection()
-
-    # also test when there's no schema
-    conn = Connection(**{k: v for k, v in potential_values.items() if k != "schema"})
+    # if we have the conn type of duckdb, it should claim
+    conn = Connection(**required_values)  # type: ignore
     with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = DuckDBUserPasswordProfileMapping(conn, {"schema": None})
-        assert not profile_mapping.can_claim_connection()
-
-    # if we have them all, it should claim
-    conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = DuckDBUserPasswordProfileMapping(conn, {"schema": "my_schema"})
+        profile_mapping = DuckDBUserPasswordProfileMapping(conn, profile_args={"path": "jaffle_shop.duck_db"})
         assert profile_mapping.can_claim_connection()
 
 
 def test_profile_mapping_selected(
-    mock_postgres_conn: Connection,
+    mock_duckdb_conn: Connection,
 ) -> None:
     """
     Tests that the correct profile mapping is selected.
     """
     profile_mapping = get_automatic_profile_mapping(
-        mock_postgres_conn.conn_id,
-        {"schema": "my_schema"},
+        mock_duckdb_conn.conn_id, profile_args={"path": "jaffle_shop.duck_db"}
     )
     assert isinstance(profile_mapping, DuckDBUserPasswordProfileMapping)
 
 
-def test_profile_mapping_keeps_custom_port(mock_postgres_conn_custom_port: Connection) -> None:
-    profile = DuckDBUserPasswordProfileMapping(mock_postgres_conn_custom_port.conn_id, {"schema": "my_schema"})
-    assert profile.profile["port"] == 7472
-
-
 def test_profile_args(
-    mock_postgres_conn: Connection,
+    mock_duckdb_conn: Connection,
 ) -> None:
     """
     Tests that the profile values get set correctly.
     """
     profile_mapping = get_automatic_profile_mapping(
-        mock_postgres_conn.conn_id,
-        profile_args={"schema": "my_schema"},
+        mock_duckdb_conn.conn_id, profile_args={"path": "jaffle_shop.duck_db"}
     )
-    assert profile_mapping.profile_args == {
-        "schema": "my_schema",
-    }
+    assert profile_mapping.profile_args == {"path": "jaffle_shop.duck_db"}
 
-    assert profile_mapping.profile == {
-        "type": mock_postgres_conn.conn_type,
-        "host": mock_postgres_conn.host,
-        "user": mock_postgres_conn.login,
-        "password": "{{ env_var('COSMOS_CONN_POSTGRES_PASSWORD') }}",
-        "port": mock_postgres_conn.port,
-        "dbname": mock_postgres_conn.schema,
-        "schema": "my_schema",
-    }
+    assert profile_mapping.profile == {"type": mock_duckdb_conn.conn_type, "path": "jaffle_shop.duck_db"}
 
 
 def test_profile_args_overrides(
-    mock_postgres_conn: Connection,
+    mock_duckdb_conn: Connection,
 ) -> None:
     """
     Tests that you can override the profile values.
     """
     profile_mapping = get_automatic_profile_mapping(
-        mock_postgres_conn.conn_id,
-        profile_args={"schema": "my_schema", "dbname": "my_db_override"},
+        mock_duckdb_conn.conn_id,
+        profile_args={"path": "jaffle_shop_override.duck_db"},
     )
-    assert profile_mapping.profile_args == {
-        "schema": "my_schema",
-        "dbname": "my_db_override",
-    }
+    assert profile_mapping.profile_args == {"path": "jaffle_shop_override.duck_db"}
 
-    assert profile_mapping.profile == {
-        "type": mock_postgres_conn.conn_type,
-        "host": mock_postgres_conn.host,
-        "user": mock_postgres_conn.login,
-        "password": "{{ env_var('COSMOS_CONN_POSTGRES_PASSWORD') }}",
-        "port": mock_postgres_conn.port,
-        "dbname": "my_db_override",
-        "schema": "my_schema",
-    }
-
-
-def test_profile_env_vars(
-    mock_postgres_conn: Connection,
-) -> None:
-    """
-    Tests that the environment variables get set correctly.
-    """
-    profile_mapping = get_automatic_profile_mapping(
-        mock_postgres_conn.conn_id,
-        profile_args={"schema": "my_schema"},
-    )
-    assert profile_mapping.env_vars == {
-        "COSMOS_CONN_POSTGRES_PASSWORD": mock_postgres_conn.password,
-    }
+    assert profile_mapping.profile == {"type": mock_duckdb_conn.conn_type, "path": "jaffle_shop_override.duck_db"}

@@ -572,6 +572,7 @@ def build_airflow_graph(
     normalize_task_id = render_config.normalize_task_id
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
+    task_groups = {}
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
@@ -580,6 +581,17 @@ def build_airflow_graph(
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
+
+        model_parent_group = task_group or None
+        node_file_path_parts = str(node.file_path).split('/')[6:-1]
+        for node_file_path_part in node_file_path_parts:
+            if node_file_path_part in task_groups:
+                model_task_group = task_groups[node_file_path_part]
+            else:
+                model_task_group = TaskGroup(dag=dag, group_id=node_file_path_part, parent_group=model_parent_group)
+                task_groups[node_file_path_part] = model_task_group
+            model_parent_group = model_task_group
+        
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
             logger.warning(
@@ -589,7 +601,7 @@ def build_airflow_graph(
         logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
         task_or_group = conversion_function(  # type: ignore
             dag=dag,
-            task_group=task_group,
+            task_group=model_task_group,
             dbt_project_name=dbt_project_name,
             execution_mode=execution_mode,
             task_args=task_args,

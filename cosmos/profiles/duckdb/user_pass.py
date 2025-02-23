@@ -17,9 +17,8 @@ class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
     airflow_connection_type: str = "duckdb"
     dbt_profile_type: str = "duckdb"
 
-    required_fields = [
-        "path"
-    ]
+    required_fields = ["path"]
+
     airflow_param_mapping = {
         "path": "path",
     }
@@ -27,14 +26,7 @@ class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
     @property
     def profile(self) -> dict[str, Any | None]:
         """Gets profile. The password is stored in an environment variable."""
-        profile = {
-            **self.mapped_params,
-            **self.profile_args
-        }
-
-        if "schema" in self.profile_args:
-            profile["schema"] = self.profile_args["schema"]
-
+        profile = {**self.mapped_params, **self.profile_args}
         return self.filter_null(profile)
 
     @property
@@ -43,7 +35,4 @@ class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
         profile_dict = {
             **super().mock_profile,
         }
-        user_defined_schema = self.profile_args.get("schema")
-        if user_defined_schema:
-            profile_dict["schema"] = user_defined_schema
         return profile_dict

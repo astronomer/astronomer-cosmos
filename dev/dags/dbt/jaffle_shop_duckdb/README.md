@@ -2,6 +2,9 @@
 
 `jaffle_shop` is a fictional ecommerce store. This dbt project transforms raw data from an app database into a customers and orders model ready for analytics.
 
+> [!NOTE]
+> This project has been modified to be used in the astronomer-cosmos repo the original repo is here [jaffle_shop_duckdb](https://github.com/dbt-labs/jaffle_shop_duckdb)
+
 <details>
 <summary>
 
@@ -50,7 +53,7 @@ If you want an adrenaline rush from a process that used to take dbt newcomers `1
 [Verified GitHub Action on dbt Performance](https://github.com/dbt-labs/jaffle_shop_duckdb/runs/7141529753?check_suite_focus=true#step:4:306)
 
 ## Running this project
-Prerequisities: Python >= 3.5
+Prerequisites: Python >= 3.5
 
 ### Mach Speed: No explanation needed
 
@@ -299,7 +302,7 @@ To get up and running with this project:
     </details>
 
 
-  
+
     *Why a 2nd activation of the virtual environment?*
     <details>
     <summary>This may not be necessary for many users, but might be for some. Read on for a first-person report from @dbeatty10.</summary>
@@ -367,7 +370,7 @@ To get up and running with this project:
       - duckdb:   1.1.3 - Up to date!
     ```
 
-    ✅ This is what we want -- the 2nd reactivation worked. 😎 
+    ✅ This is what we want -- the 2nd reactivation worked. 😎
     </details>
 
 1. Ensure your [profile](https://docs.getdbt.com/reference/profiles.yml) is setup correctly from the command line:

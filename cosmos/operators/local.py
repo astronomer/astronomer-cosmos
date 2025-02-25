@@ -929,8 +929,10 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
             result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         except CosmosDbtRunError as e:
             if self.no_retries_on_test_failure:
-                self.log.error("DBT test failed and `no_retries_on_test_failure=True`, "
-                               "raising AirflowFailException to prevent retries.")
+                self.log.error(
+                    "DBT test failed and `no_retries_on_test_failure=True`, "
+                    "raising AirflowFailException to prevent retries."
+                )
                 raise AirflowFailException(e)
             raise
 

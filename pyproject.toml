@@ -153,6 +153,7 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "dbt-core",
+    "methodtools",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

@@ -101,7 +101,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
-        original_file_path="",  
+        original_file_path="",
     )
     assert calculate_detached_node_name(node) == "a_very_short_name_test"
 
@@ -169,7 +169,10 @@ def test_build_airflow_graph_with_after_each():
     assert len(task_groups) == 4
 
     assert task_groups["gen2.models.parent"].upstream_task_ids == {"seed_parent_seed"}
-    assert list(task_groups["gen2.models.parent"].children.keys()) == ["gen2.models.parent.run", "gen2.models.parent.test"]
+    assert list(task_groups["gen2.models.parent"].children.keys()) == [
+        "gen2.models.parent.run",
+        "gen2.models.parent.test",
+    ]
 
     assert len(dag.leaves) == 2
     assert dag.leaves[0].task_id == "gen2.models.child_run"
@@ -263,7 +266,13 @@ def test_build_airflow_graph_with_after_all():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed", "gen2.models.parent_run", "gen2.models.child_run", "gen2.models.child2_v2_run", "astro_shop_test"]
+    expected_sort = [
+        "seed_parent_seed",
+        "gen2.models.parent_run",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
+        "astro_shop_test",
+    ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
@@ -306,7 +315,12 @@ def test_build_airflow_graph_with_build():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed_build", "gen2.models.parent_model_build", "gen2.models.child_model_build", "gen2.models.child2_v2_model_build"]
+    expected_sort = [
+        "seed_parent_seed_build",
+        "gen2.models.parent_model_build",
+        "gen2.models.child_model_build",
+        "gen2.models.child2_v2_model_build",
+    ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
@@ -631,7 +645,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         resource_type=DbtResourceType.SEED,
         depends_on=[],
         file_path="",
-        original_file_path="",  
+        original_file_path="",
         tags=[],
         config={},
     )

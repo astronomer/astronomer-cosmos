@@ -474,6 +474,28 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
+def generate_parent_task_group(
+    dag: DAG,
+    node: DbtNode,
+    task_group: TaskGroup,
+    task_groups: dict[str, TaskGroup]
+    ) -> TaskGroup | None:
+    """
+    Generate the parent task group for the given node based on the node's file path. If a TaskGroup is given, it will
+    be used as the parent group.
+    """
+    node_parent_group = task_group or None
+    node_file_path_parts = str(node.original_file_path).split('/')[:-1]
+    for node_file_path_part in node_file_path_parts:
+        if node_file_path_part in task_groups:
+            task_group = task_groups[node_file_path_part]
+        else:
+            task_group = TaskGroup(dag=dag, group_id=node_file_path_part, parent_group=node_parent_group)
+            task_groups[node_file_path_part] = task_group
+        node_parent_group = task_group
+    return task_group
+
+
 _counter = 0
 
 
@@ -581,17 +603,7 @@ def build_airflow_graph(
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
-
-        model_parent_group = task_group or None
-        node_file_path_parts = str(node.original_file_path).split('/')[:-1]
-        for node_file_path_part in node_file_path_parts:
-            if node_file_path_part in task_groups:
-                model_task_group = task_groups[node_file_path_part]
-            else:
-                model_task_group = TaskGroup(dag=dag, group_id=node_file_path_part, parent_group=model_parent_group)
-                task_groups[node_file_path_part] = model_task_group
-            model_parent_group = model_task_group
-        
+        node_task_group = generate_parent_task_group(dag, node, task_group, task_groups)
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
             logger.warning(
@@ -601,7 +613,7 @@ def build_airflow_graph(
         logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
         task_or_group = conversion_function(  # type: ignore
             dag=dag,
-            task_group=model_task_group,
+            task_group=node_task_group,
             dbt_project_name=dbt_project_name,
             execution_mode=execution_mode,
             task_args=task_args,

@@ -101,7 +101,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
-        origin_file_path="",  
+        origin_file_path="",
     )
     assert calculate_detached_node_name(node) == "a_very_short_name_test"
 
@@ -623,7 +623,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         resource_type=DbtResourceType.SEED,
         depends_on=[],
         file_path="",
-        origin_file_path="",  
+        origin_file_path="",
         tags=[],
         config={},
     )

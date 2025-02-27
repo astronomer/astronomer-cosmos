@@ -102,7 +102,9 @@ def postgres_profile_config() -> ProfileConfig:
     ],
 )
 def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
-    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", origin_file_path="")
+    node = DbtNode(
+        unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", origin_file_path=""
+    )
     assert node.name == expected_name
     assert node.resource_name == expected_select
 
@@ -224,7 +226,9 @@ def test_dbt_node_context_dict(
     unique_id,
     expected_dict,
 ):
-    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", origin_file_path="")
+    node = DbtNode(
+        unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", origin_file_path=""
+    )
     assert node.context_dict == expected_dict
 
 

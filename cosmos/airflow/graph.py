@@ -583,7 +583,7 @@ def build_airflow_graph(
     for node_id, node in nodes.items():
 
         model_parent_group = task_group or None
-        node_file_path_parts = str(node.original_file_path).split('/')[:-1]
+        node_file_path_parts = str(node.original_file_path).split("/")[:-1]
         for node_file_path_part in node_file_path_parts:
             if node_file_path_part in task_groups:
                 model_task_group = task_groups[node_file_path_part]
@@ -591,7 +591,7 @@ def build_airflow_graph(
                 model_task_group = TaskGroup(dag=dag, group_id=node_file_path_part, parent_group=model_parent_group)
                 task_groups[node_file_path_part] = model_task_group
             model_parent_group = model_task_group
-        
+
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
             logger.warning(

@@ -42,7 +42,7 @@ parent_seed = DbtNode(
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
-    origin_file_path="",
+    original_file_path="",
     config={
         "meta": {
             "cosmos": {
@@ -59,7 +59,7 @@ parent_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_seed.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
-    origin_file_path="gen2/models/parent.sql",
+    original_file_path="gen2/models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
@@ -69,14 +69,14 @@ test_parent_node = DbtNode(
     resource_type=DbtResourceType.TEST,
     depends_on=[parent_node.unique_id],
     file_path="",
-    origin_file_path="",
+    original_file_path="",
 )
 child_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
-    origin_file_path="gen3/models/child.sql",
+    original_file_path="gen3/models/child.sql",
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"queue": "custom_queue"}}}},
 )
@@ -86,7 +86,7 @@ child2_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
-    origin_file_path="gen3/models/child2_v2.sql",
+    original_file_path="gen3/models/child2_v2.sql",
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
 )
@@ -101,7 +101,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
-        origin_file_path="",  
+        original_file_path="",  
     )
     assert calculate_detached_node_name(node) == "a_very_short_name_test"
 
@@ -110,7 +110,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
-        origin_file_path="",
+        original_file_path="",
     )
     assert calculate_detached_node_name(node) == "detached_0_test"
 
@@ -119,7 +119,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
-        origin_file_path="",
+        original_file_path="",
     )
     assert calculate_detached_node_name(node) == "detached_1_test"
 
@@ -198,7 +198,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
             unique_id=f"{node_type.value}.{SAMPLE_PROJ_PATH.stem}.dbt_node",
             resource_type=node_type,
             file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
-            origin_file_path="gen2/models/parent.sql",
+            original_file_path="gen2/models/parent.sql",
             tags=["has_child"],
             config={"materialized": "view"},
             depends_on=[],
@@ -367,7 +367,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandparent",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        origin_file_path="",
+        file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -375,7 +376,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent1",
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id],
-        origin_file_path="",
+        file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -383,7 +385,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent2",
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent1_node.unique_id],
-        origin_file_path="",
+        file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -391,7 +394,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent1_node.unique_id, parent2_node.unique_id],
-        origin_file_path="",
+        file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -409,7 +413,8 @@ def test_create_task_metadata_unsupported(caplog):
         unique_id=f"unsupported.{SAMPLE_PROJ_PATH.stem}.unsupported",
         resource_type="unsupported",
         depends_on=[],
-        origin_file_path="",
+        file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -438,6 +443,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "model",
                     "depends_on": [],
                     "file_path": ".",
+                    "original_file_path": ".",
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -458,6 +464,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "source",
                     "depends_on": [],
                     "file_path": ".",
+                    "original_file_path": ".",
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -479,6 +486,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "snapshot",
                     "depends_on": [],
                     "file_path": ".",
+                    "original_file_path": ".",
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -503,7 +511,7 @@ def test_create_task_metadata_model(
         resource_type=resource_type,
         depends_on=[],
         file_path=Path(""),
-        origin_file_path=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
         has_freshness=True,
@@ -525,7 +533,7 @@ def test_create_task_metadata_model_with_versions(caplog):
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
-        origin_file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -543,7 +551,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path=Path(""),
-        origin_file_path=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
     )
@@ -598,7 +606,7 @@ def test_create_task_metadata_source_with_rendering_options(
         resource_type=resource_type,
         depends_on=[],
         file_path=Path(""),
-        origin_file_path=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
         has_freshness=has_freshness,
@@ -623,7 +631,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         resource_type=DbtResourceType.SEED,
         depends_on=[],
         file_path="",
-        origin_file_path="",  
+        original_file_path="",  
         tags=[],
         config={},
     )
@@ -655,7 +663,7 @@ def test_create_task_metadata_snapshot(caplog):
         resource_type=DbtResourceType.SNAPSHOT,
         depends_on=[],
         file_path="",
-        origin_file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -800,7 +808,7 @@ def test_create_task_metadata_normalize_task_id(
         resource_type=node_type,
         depends_on=[],
         file_path="",
-        origin_file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -863,7 +871,7 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         resource_type=node_type,
         depends_on=[],
         file_path="",
-        origin_file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -933,7 +941,7 @@ def test_owner(dbt_extra_config, expected_owner):
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
             file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
-            origin_file_path="gen2/models/parent.sql",
+            original_file_path="gen2/models/parent.sql",
             tags=["has_child"],
             config={"materialized": "view", **dbt_extra_config},
             depends_on=[],

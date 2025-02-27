@@ -475,17 +475,14 @@ def identify_detached_nodes(
 
 
 def generate_parent_task_group(
-    dag: DAG,
-    node: DbtNode,
-    task_group: TaskGroup,
-    task_groups: dict[str, TaskGroup]
-    ) -> TaskGroup | None:
+    dag: DAG, node: DbtNode, task_group: TaskGroup, task_groups: dict[str, TaskGroup]
+) -> TaskGroup | None:
     """
     Generate the parent task group for the given node based on the node's file path. If a TaskGroup is given, it will
     be used as the parent group.
     """
     node_parent_group = task_group or None
-    node_file_path_parts = str(node.original_file_path).split('/')[:-1]
+    node_file_path_parts = str(node.original_file_path).split("/")[:-1]
     for node_file_path_part in node_file_path_parts:
         if node_file_path_part in task_groups:
             task_group = task_groups[node_file_path_part]

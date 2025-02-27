@@ -42,6 +42,7 @@ grandparent_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/grandparent.sql",
+    origin_file_path="gen1/models/grandparent.sql",
     tags=["has_child"],
     config={"materialized": "view", "tags": ["has_child"]},
 )
@@ -51,6 +52,7 @@ another_grandparent_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/another_grandparent_node.sql",
+    origin_file_path="gen1/models/another_grandparent_node.sql",
     tags=[],
     config={},
 )
@@ -60,6 +62,7 @@ parent_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+    origin_file_path="gen2/models/parent.sql",
     tags=["has_child", "is_child"],
     config={"materialized": "view", "tags": ["has_child", "is_child"]},
 )
@@ -70,6 +73,7 @@ child_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
+    origin_file_path="gen3/models/child.sql",
     tags=["nightly", "is_child"],
     config={"materialized": "table", "tags": ["nightly", "is_child"]},
 )
@@ -79,6 +83,7 @@ sibling1_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/sibling1.sql",
+    origin_file_path="gen3/models/sibling1.sql",
     tags=["nightly", "deprecated", "test"],
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test"]},
 )
@@ -88,6 +93,7 @@ sibling2_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/sibling2.sql",
+    origin_file_path="gen3/models/sibling2.sql",
     tags=["nightly", "deprecated", "test2"],
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test2"]},
 )
@@ -97,6 +103,7 @@ sibling3_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/public.sibling3.sql",
+    origin_file_path="gen3/models/public.sibling3.sql",
     tags=["nightly", "deprecated", "test3"],
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test3"]},
 )
@@ -106,6 +113,7 @@ orphaned_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/orphaned.sql",
+    origin_file_path="gen3/models/orphaned.sql",
     tags=[],
     config={},
 )
@@ -217,6 +225,7 @@ def test_select_nodes_by_intersection_and_tag_ancestry():
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
         file_path=SAMPLE_PROJ_PATH / "gen2/models/parent_sibling.sql",
+        origin_file_path="gen2/models/parent_sibling.sql",
         tags=["is_adopted"],
         config={"materialized": "view", "tags": ["is_adopted"]},
     )
@@ -238,6 +247,7 @@ def test_select_nodes_by_tag_ancestry():
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
         file_path=SAMPLE_PROJ_PATH / "gen2/models/parent_sibling.sql",
+        origin_file_path="gen2/models/parent_sibling.sql",
         tags=["is_adopted"],
         config={"materialized": "view", "tags": ["is_adopted"]},
     )
@@ -260,6 +270,7 @@ def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
         file_path="",
+        origin_file_path="",
         tags=["is_adopted"],
         config={"materialized": "view", "tags": ["is_adopted"]},
     )
@@ -268,6 +279,7 @@ def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
         resource_type=DbtResourceType.TEST,
         depends_on=[parent_node.unique_id, parent_sibling_node.unique_id],
         file_path="",
+        origin_file_path="",
         config={},
     )
     new_sample_nodes = dict(sample_nodes)
@@ -530,6 +542,7 @@ def test_node_without_depends_on_with_tag_selector_should_not_raise_exception():
         tags=[],
         config={},
         file_path=SAMPLE_PROJ_PATH / "tests/generic/builtin.sql",
+        origin_file_path="tests/generic/builtin.sql",
     )
     nodes = {standalone_test_node.unique_id: standalone_test_node}
     assert not select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["tag:some-tag"])
@@ -543,6 +556,7 @@ def test_should_include_node_without_depends_on(selector_config):
         tags=[],
         config={},
         file_path=SAMPLE_PROJ_PATH / "tests/generic/builtin.sql",
+        origin_file_path="tests/generic/builtin.sql",
     )
     selector = NodeSelector({}, selector_config)
     selector.visited_nodes = set()
@@ -776,6 +790,7 @@ def test_select_nodes_by_resource_type_source():
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
         file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        origin_file_path="sources/my_source.yml",
         tags=[],
         config={},
     )
@@ -786,6 +801,7 @@ def test_select_nodes_by_resource_type_source():
         resource_type=DbtResourceType.MODEL,
         depends_on=[source_node.unique_id],
         file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        origin_file_path="models/model_from_source.sql",
         tags=["depends_on_source"],
         config={"materialized": "table", "tags": ["depends_on_source"]},
     )
@@ -814,6 +830,7 @@ def test_select_nodes_by_source_name():
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
         file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        origin_file_path="sources/my_source.yml",
         tags=[],
         config={},
     )
@@ -840,6 +857,7 @@ def test_exclude_nodes_by_resource_type_seed():
         tags=[],
         config={},
         file_path=SAMPLE_PROJ_PATH / "seeds/seed.yml",
+        origin_file_path="seeds/seed.yml",
     )
 
     local_nodes[seed_node.unique_id] = seed_node
@@ -864,6 +882,7 @@ def test_source_selector():
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
         file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        origin_file_path="sources/my_source.yml",
         tags=[],
         config={},
     )
@@ -872,6 +891,7 @@ def test_source_selector():
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
         file_path=SAMPLE_PROJ_PATH / "sources/another_source.yml",
+        origin_file_path="sources/another_source.yml",
         tags=[],
         config={},
     )

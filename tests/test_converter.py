@@ -169,6 +169,7 @@ parent_seed = DbtNode(
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
+    origin_file_path="",
 )
 nodes = {"seed_parent": parent_seed}
 

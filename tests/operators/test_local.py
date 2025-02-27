@@ -664,7 +664,17 @@ def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_proje
             on_warning_callback=on_warning_callback,
             invocation_mode=invocation_mode,
         )
-        run_operator >> test_operator
+
+        build_operator = DbtBuildLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="build",
+            append_env=True,
+            on_warning_callback=on_warning_callback,
+            invocation_mode=invocation_mode,
+        )
+       
+        run_operator >> build_operator >> test_operator
     run_test_dag(dag)
     assert on_warning_callback.called
 

@@ -139,6 +139,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore
     SEED = "seed"
     TEST = "test"
     SOURCE = "source"
+    EXPOSURE = "exposure"
 
     @classmethod
     def _missing_value_(cls, value):  # type: ignore

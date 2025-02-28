@@ -762,8 +762,36 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self.on_warning_callback = on_warning_callback
+        self.extract_issues: Callable[..., tuple[list[str], list[str]]]
+
+    def _handle_warnings(self, result: FullOutputSubprocessResult | dbtRunnerResult, context: Context) -> None:
+        """
+         Handles warnings by extracting log issues, creating additional context, and calling the
+         on_warning_callback with the updated context.
+
+        :param result: The result object from the build and run command.
+        :param context: The original airflow context in which the build and run command was executed.
+        """
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.extract_issues = extract_freshness_warn_msg
+        elif self.invocation_mode == InvocationMode.DBT_RUNNER:
+            self.extract_issues = dbt_runner.extract_message_by_status
+
+        test_names, test_results = self.extract_issues(result)
+
+        warning_context = dict(context)
+        warning_context["test_names"] = test_names
+        warning_context["test_results"] = test_results
+
+        self.on_warning_callback and self.on_warning_callback(warning_context)
+
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        if self.on_warning_callback:
+            self._handle_warnings(result, context)
 
 
 class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):

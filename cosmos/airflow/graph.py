@@ -590,8 +590,8 @@ def build_airflow_graph(
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
+    task_groups: dict[str, TaskGroup] = {}
     task_or_group: TaskGroup | BaseOperator
-    task_groups = {}
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents

@@ -28,6 +28,15 @@ def test_init_with_project_path_only():
     assert project_config.snapshots_path == Path("path/to/dbt/project/snapshots")
     assert project_config.project_name == "project"
     assert project_config.manifest_path is None
+    assert project_config.install_dbt_deps is True
+
+
+def test_init_with_project_path_and_install_dbt_deps_succeeds():
+    """
+    Passing only dbt_project_path and install_dbt_deps should succeed and set install_dbt_deps to the value defined
+    """
+    project_config = ProjectConfig(dbt_project_path="path/to/dbt/project", install_dbt_deps=False)
+    assert project_config.install_dbt_deps is False
 
 
 def test_init_with_manifest_path_and_project_path_succeeds():

@@ -774,6 +774,7 @@ class DbtGraph:
                         self.render_config.project_path.as_posix(), self.execution_config.project_path.as_posix()
                     )
                 ),
+                original_file_path=model.path.relative_to(self.render_config.project_path),
                 tags=tags or [],
                 config=config,
             )

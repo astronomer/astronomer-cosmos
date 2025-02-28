@@ -152,6 +152,7 @@ class ProjectConfig:
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
     snapshots
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
+    :param manifest_conn_id: Name of the Airflow connection used to access the manifest file if it is not stored locally. Defaults to None
     :param project_name: Allows the user to define the project name.
     Required if dbt_project_path is not defined. Defaults to the folder name of dbt_project_path.
     :param env_vars: Dictionary of environment variables that are used for both rendering and execution. Rendering with
@@ -175,6 +176,7 @@ class ProjectConfig:
     def __init__(
         self,
         dbt_project_path: str | Path | None = None,
+        install_dbt_deps: bool = True,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",
@@ -228,6 +230,7 @@ class ProjectConfig:
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars
         self.partial_parse = partial_parse
+        self.install_dbt_deps = install_dbt_deps
 
     def validate_project(self) -> None:
         """

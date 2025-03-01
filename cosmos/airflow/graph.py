@@ -603,8 +603,11 @@ def build_airflow_graph(
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
-        if enable_resource_grouping:
-            task_group = generate_resource_task_group(dag, node, parent_task_group, task_groups)
+        task_group = (
+            generate_resource_task_group(dag, node, parent_task_group, task_groups)
+            if enable_resource_grouping
+            else task_group
+        )
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
             logger.warning(

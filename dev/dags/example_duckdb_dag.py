@@ -16,9 +16,7 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=DuckDBUserPasswordProfileMapping(
-        conn_id="duckdb_default",
-        profile_args={"path": "jaffle_shop.duck_db"},
-        disable_event_tracking=True,
+        conn_id="duckdb_default", profile_args={"path": "jaffle_shop.duck_db"}, disable_event_tracking=True
     ),
 )
 
@@ -26,7 +24,7 @@ profile_config = ProfileConfig(
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop_duckdb",
+        DBT_ROOT_PATH / "jaffle_shop",
     ),
     profile_config=profile_config,
     operator_args={

@@ -16,6 +16,7 @@ class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
 
     airflow_connection_type: str = "duckdb"
     dbt_profile_type: str = "duckdb"
+    is_community: bool = True
 
     # Without this path variable, its required to find the right local db connection
     required_fields = ["path"]

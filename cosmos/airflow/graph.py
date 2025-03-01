@@ -475,22 +475,22 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
-def generate_parent_task_group(
-    dag: DAG, node: DbtNode, task_group: TaskGroup | None, task_groups: dict[str, TaskGroup]
+def generate_resource_task_group(
+    dag: DAG, node: DbtNode, parent_task_group: TaskGroup | None, task_groups: dict[str, TaskGroup]
 ) -> TaskGroup | None:
     """
     Generate the parent task group for the given node based on the node's file path. If a TaskGroup is given, it will
     be used as the parent group.
     """
-    node_parent_group = task_group or None
-    node_file_path_parts = str(node.original_file_path).split("/")[:-1]
-    for node_file_path_part in node_file_path_parts:
-        if node_file_path_part in task_groups:
-            task_group = task_groups[node_file_path_part]
+    task_group = None
+    resource_file_path_parts = str(node.original_file_path).split("/")[:-1]
+    for resource_file_path_part in resource_file_path_parts:
+        if resource_file_path_part in task_groups:
+            task_group = task_groups[resource_file_path_part]
         else:
-            task_group = TaskGroup(dag=dag, group_id=node_file_path_part, parent_group=node_parent_group)
-            task_groups[node_file_path_part] = task_group
-        node_parent_group = task_group
+            task_group = TaskGroup(dag=dag, group_id=resource_file_path_part, parent_group=parent_task_group)
+            task_groups[resource_file_path_part] = task_group
+        parent_task_group = task_group
     return task_group
 
 
@@ -588,11 +588,13 @@ def build_airflow_graph(
     """
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
+    enable_resource_grouping = render_config.enable_resource_grouping
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_groups: dict[str, TaskGroup] = {}
     task_or_group: TaskGroup | BaseOperator
+    parent_task_group = task_group
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
@@ -601,7 +603,8 @@ def build_airflow_graph(
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
-        node_task_group = generate_parent_task_group(dag, node, task_group, task_groups)
+        if enable_resource_grouping:
+            task_group = generate_resource_task_group(dag, node, parent_task_group, task_groups)
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
             logger.warning(
@@ -611,7 +614,7 @@ def build_airflow_graph(
         logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
         task_or_group = conversion_function(  # type: ignore
             dag=dag,
-            task_group=node_task_group,
+            task_group=task_group,
             dbt_project_name=dbt_project_name,
             execution_mode=execution_mode,
             task_args=task_args,
@@ -626,6 +629,7 @@ def build_airflow_graph(
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
+        task_group = parent_task_group
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)

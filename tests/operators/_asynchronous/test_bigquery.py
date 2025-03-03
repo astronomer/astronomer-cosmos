@@ -132,7 +132,7 @@ def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_confi
     mock_task_instance.task = operator
     mock_context = {"ti": mock_task_instance}
 
-    operator._store_compiled_sql(mock_context, session=mock_session)
+    operator._store_template_fields(mock_context, session=mock_session)
 
     assert operator.compiled_sql == "SELECT * FROM test_table;"
     mock_rendered_ti.assert_called_once()
@@ -140,7 +140,7 @@ def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_confi
     mock_session.query().filter().delete.assert_called_once()
 
 
-@patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._store_compiled_sql")
+@patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._store_template_fields")
 def test_execute_complete(mock_store_sql, profile_config_mock):
     mock_context = Mock()
     mock_event = {"job_id": "test_job"}

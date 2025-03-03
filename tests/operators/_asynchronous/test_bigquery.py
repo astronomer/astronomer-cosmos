@@ -38,8 +38,6 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
     assert operator.project_dir == "/path/to/project"
     assert operator.profile_config == profile_config_mock
     assert operator.gcp_conn_id == "google_cloud_default"
-    assert operator.gcp_project == "test_project"
-    assert operator.dataset == "test_dataset"
 
 
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):

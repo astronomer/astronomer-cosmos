@@ -376,8 +376,8 @@ class DbtGraph:
         """
         Change args list in-place so they include dbt vars, if they are set.
         """
-        if self.project.dbt_vars:
-            cmd_args.extend(["--vars", json.dumps(self.project.dbt_vars, sort_keys=True)])
+        if self.dbt_vars:
+            cmd_args.extend(["--vars", json.dumps(self.dbt_vars, sort_keys=True)])
 
     @cached_property
     def dbt_ls_args(self) -> list[str]:

@@ -1,4 +1,4 @@
-"""Tests for the postgres profile."""
+"""Tests for the duckdb profile."""
 
 from unittest.mock import patch
 
@@ -27,7 +27,7 @@ def mock_duckdb_conn():  # type: ignore
 
 def test_connection_claiming() -> None:
     """
-    Tests that the postgres profile mapping claims the correct connection type.
+    Tests that the duckdb profile mapping claims the correct connection type.
     """
     # should only claim when:
     # - conn_type == duckdb

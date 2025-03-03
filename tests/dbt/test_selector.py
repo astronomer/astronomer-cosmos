@@ -829,6 +829,7 @@ def test_select_nodes_by_exclude_resource_type_model():
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
         file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        original_file_path="sources/my_source.yml",
         tags=[],
         config={},
     )
@@ -839,6 +840,7 @@ def test_select_nodes_by_exclude_resource_type_model():
         resource_type=DbtResourceType.MODEL,
         depends_on=[source_node.unique_id],
         file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        original_file_path="models/model_from_source.sql",
         tags=["depends_on_source"],
         config={"materialized": "table", "tags": ["depends_on_source"]},
     )
@@ -917,6 +919,7 @@ def test_exclude_nodes_by_exclude_resource_type_seed():
         tags=[],
         config={},
         file_path=SAMPLE_PROJ_PATH / "models/my_seed.yml",
+        original_file_path="models/my_seed.yml",
     )
 
     local_nodes[seed_node.unique_id] = seed_node

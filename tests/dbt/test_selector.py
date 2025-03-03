@@ -818,6 +818,44 @@ def test_select_nodes_by_resource_type_source():
     assert selected == expected
 
 
+def test_select_nodes_by_exclude_resource_type_model():
+    """
+    Test that 'exclude_resource_type:model' picks up only nodes with resource_type != MODEL,
+    including any resources except models.
+    """
+    local_nodes = dict(sample_nodes)
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        tags=[],
+        config={},
+    )
+
+    local_nodes[source_node.unique_id] = source_node
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_from_source",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[source_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        tags=["depends_on_source"],
+        config={"materialized": "table", "tags": ["depends_on_source"]},
+    )
+
+    local_nodes[model_node.unique_id] = model_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["exclude_resource_type:model"],
+    )
+
+    assert source_node.unique_id in selected
+    assert model_node.unique_id not in selected
+    for model_id in sample_nodes.keys():
+        assert model_id not in selected
+
+
 def test_select_nodes_by_source_name():
     """
     Test selecting a single source node by exact name 'source:my_source.my_table'.
@@ -865,6 +903,27 @@ def test_exclude_nodes_by_resource_type_seed():
     assert seed_node.unique_id not in selected
     for model_id in sample_nodes.keys():
         assert model_id in selected
+
+
+def test_exclude_nodes_by_exclude_resource_type_seed():
+    """
+    Test keeping any seed node via 'exclude_resource_type:seed'.
+    """
+    local_nodes = dict(sample_nodes)
+    seed_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.{SAMPLE_PROJ_PATH.stem}.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        tags=[],
+        config={},
+        file_path=SAMPLE_PROJ_PATH / "models/my_seed.yml",
+    )
+
+    local_nodes[seed_node.unique_id] = seed_node
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, exclude=["exclude_resource_type:seed"])
+    assert seed_node.unique_id in selected
+    for model_id in sample_nodes.keys():
+        assert model_id not in selected
 
 
 def test_source_selector():

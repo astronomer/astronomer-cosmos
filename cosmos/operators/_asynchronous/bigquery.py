@@ -57,7 +57,7 @@ def _configure_bigquery_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql")
+    template_fields: Sequence[str] = ("location", "compiled_sql")
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -73,9 +73,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.project_dir = project_dir
         self.profile_config = profile_config
         self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
-        profile = self.profile_config.profile_mapping.profile  # type: ignore
-        self.gcp_project = profile["project"]
-        self.dataset = profile["dataset"]
         self.extra_context = extra_context or {}
         self.configuration: dict[str, Any] = {}
         self.dbt_kwargs = dbt_kwargs or {}

@@ -73,9 +73,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.project_dir = project_dir
         self.profile_config = profile_config
         self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
-        profile = self.profile_config.profile_mapping.profile  # type: ignore
-        self.gcp_project = profile["project"]
-        self.dataset = profile["dataset"]
         self.extra_context = extra_context or {}
         self.configuration: dict[str, Any] = {}
         self.dbt_kwargs = dbt_kwargs or {}
@@ -103,6 +100,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.async_context["profile_type"] = self.profile_config.get_profile_type()
         self.async_context["async_operator"] = BigQueryInsertJobOperator
         self.compiled_sql = ""
+        self.gcp_project = ""
+        self.dataset = ""
 
     @property
     def base_cmd(self) -> list[str]:
@@ -145,10 +144,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             super().execute(context=context)
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
-        self._store_compiled_sql(context=context)
+        self._store_template_fields(context=context)
 
     @provide_session
-    def _store_compiled_sql(self, context: Context, session: Session = NEW_SESSION) -> None:
+    def _store_template_fields(self, context: Context, session: Session = NEW_SESSION) -> None:
         from airflow.models.renderedtifields import RenderedTaskInstanceFields
         from airflow.models.taskinstance import TaskInstance
 
@@ -158,6 +157,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         sql = self.get_remote_sql().strip()
         self.log.debug("Executed SQL is: %s", sql)
         self.compiled_sql = sql
+
+        profile = self.profile_config.profile_mapping.profile
+        self.gcp_project = profile["project"]
+        self.dataset = profile["dataset"]
 
         # need to refresh the rendered task field record in the db because Airflow only does this
         # before executing the task, not after
@@ -188,5 +191,5 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         """
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
-        self._store_compiled_sql(context=context)
+        self._store_template_fields(context=context)
         return job_id

@@ -38,8 +38,6 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
     assert operator.project_dir == "/path/to/project"
     assert operator.profile_config == profile_config_mock
     assert operator.gcp_conn_id == "google_cloud_default"
-    assert operator.gcp_project == "test_project"
-    assert operator.dataset == "test_dataset"
 
 
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
@@ -134,15 +132,19 @@ def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_confi
     mock_task_instance.task = operator
     mock_context = {"ti": mock_task_instance}
 
-    operator._store_compiled_sql(mock_context, session=mock_session)
+    operator._store_template_fields(mock_context, session=mock_session)
+    # check if gcp_project and dataset are set after the tasks gets executed
 
     assert operator.compiled_sql == "SELECT * FROM test_table;"
+    assert operator.dataset == "test_dataset"
+    assert operator.gcp_project == "test_project"
+
     mock_rendered_ti.assert_called_once()
     mock_session.add.assert_called_once()
     mock_session.query().filter().delete.assert_called_once()
 
 
-@patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._store_compiled_sql")
+@patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._store_template_fields")
 def test_execute_complete(mock_store_sql, profile_config_mock):
     mock_context = Mock()
     mock_event = {"job_id": "test_job"}

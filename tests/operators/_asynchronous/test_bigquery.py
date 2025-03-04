@@ -133,8 +133,12 @@ def test_store_compiled_sql(mock_rendered_ti, mock_get_remote_sql, profile_confi
     mock_context = {"ti": mock_task_instance}
 
     operator._store_template_fields(mock_context, session=mock_session)
+    # check if gcp_project and dataset are set after the tasks gets executed
 
     assert operator.compiled_sql == "SELECT * FROM test_table;"
+    assert operator.dataset == "test_dataset"
+    assert operator.gcp_project == "test_project"
+
     mock_rendered_ti.assert_called_once()
     mock_session.add.assert_called_once()
     mock_session.query().filter().delete.assert_called_once()

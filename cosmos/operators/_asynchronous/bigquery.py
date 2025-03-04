@@ -158,7 +158,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.log.debug("Executed SQL is: %s", sql)
         self.compiled_sql = sql
 
-        profile = self.profile_config.profile_mapping.profile  # type: ignore
+        profile = self.profile_config.profile_mapping.profile
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
 

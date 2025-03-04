@@ -102,7 +102,9 @@ def postgres_profile_config() -> ProfileConfig:
     ],
 )
 def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
-    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    node = DbtNode(
+        unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", original_file_path=""
+    )
     assert node.name == expected_name
     assert node.resource_name == expected_select
 
@@ -113,6 +115,7 @@ def test_dbt_node_meta():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         config={"meta": {"cosmos": {}}},
     )
     assert valid_node.meta == {}
@@ -122,6 +125,7 @@ def test_dbt_node_meta():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         config={"meta": {"cosmos": ""}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -137,6 +141,7 @@ def test_dbt_node_operator_kwargs_to_override():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         config={"meta": {"cosmos": {"operator_kwargs": {}}}},
     )
     assert valid_node.operator_kwargs_to_override == {}
@@ -146,6 +151,7 @@ def test_dbt_node_operator_kwargs_to_override():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         config={"meta": {"cosmos": {"operator_kwargs": ""}}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -161,6 +167,7 @@ def test_dbt_profile_config_to_override():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         config={"meta": {"cosmos": {"profile_config": {}}}},
     )
     assert valid_node.profile_config_to_override == {}
@@ -170,6 +177,7 @@ def test_dbt_profile_config_to_override():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         config={"meta": {"cosmos": {"profile_config": ""}}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -189,6 +197,7 @@ def test_dbt_profile_config_to_override():
                 "resource_type": "model",
                 "depends_on": [],
                 "file_path": "",
+                "original_file_path": "",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -203,6 +212,7 @@ def test_dbt_profile_config_to_override():
                 "resource_type": "model",
                 "depends_on": [],
                 "file_path": "",
+                "original_file_path": "",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -216,7 +226,9 @@ def test_dbt_node_context_dict(
     unique_id,
     expected_dict,
 ):
-    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    node = DbtNode(
+        unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", original_file_path=""
+    )
     assert node.context_dict == expected_dict
 
 
@@ -1350,6 +1362,7 @@ Values returned by mac_get_values:
             unique_id="model.some_package.some_model",
             resource_type=DbtResourceType.MODEL,
             file_path=Path("fake-project/models/some_model.sql"),
+            original_file_path="models/some_model.sql",
             tags=[],
             config={
                 "access": "protected",
@@ -1399,6 +1412,7 @@ def test_parse_dbt_ls_output():
             unique_id="fake-unique-id",
             resource_type=DbtResourceType.MODEL,
             file_path=Path("fake-project/fake-file-path.sql"),
+            original_file_path="fake-file-path.sql",
             tags=[],
             config={},
             depends_on=[],
@@ -1417,6 +1431,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
             unique_id="some-unique-id",
             resource_type=DbtResourceType.MODEL,
             file_path=Path("some-project/some-file-path.sql"),
+            original_file_path="some-file-path.sql",
             tags=[],
             config={},
             depends_on=[],

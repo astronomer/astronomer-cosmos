@@ -64,6 +64,7 @@ class DbtNode:
     resource_type: DbtResourceType
     depends_on: list[str]
     file_path: Path
+    package_name: str | None = None
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
@@ -273,6 +274,7 @@ def run_command(
 def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, DbtNode]:
     """Parses the output of `dbt ls` into a dictionary of `DbtNode` instances."""
     nodes = {}
+    base_project_path = project_path.parent  # type: ignore
     for line in ls_stdout.split("\n"):
         try:
             node_dict = json.loads(line.strip())
@@ -282,9 +284,10 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
+                    package_name=node_dict["package_name"],
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=project_path / node_dict["original_file_path"],
+                    file_path=base_project_path / node_dict["package_name"] / node_dict["original_file_path"],
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(

@@ -287,7 +287,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
-                    package_name=node_dict["package_name"],
+                    package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=base_path / node_dict["original_file_path"],

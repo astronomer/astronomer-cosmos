@@ -279,7 +279,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         try:
             node_dict = json.loads(line.strip())
         except json.decoder.JSONDecodeError:
-            logger.debug("Skipped dbt ls line: %s", line)
+            logger.info("Skipped dbt ls line: %s", line)
         else:
             try:
                 node = DbtNode(

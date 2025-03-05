@@ -52,9 +52,12 @@ body:
       label: ExecutionMode
       description: Which ExecutionMode are you using?
       options:
+        - "AIRFLOW_ASYNC"
+        - "AWS_ECS"
         - "AWS_EKS"
         - "AZURE_CONTAINER_INSTANCE"
         - "DOCKER"
+        - "GCP_CLOUD_RUN_JOB"
         - "KUBERNETES"
         - "LOCAL"
         - "VIRTUALENV"

@@ -81,8 +81,8 @@ def get_dag_bag() -> DagBag:
         if DBT_VERSION < Version("1.5.0"):
             file.writelines(["example_source_rendering.py\n"])
 
-        # TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/1568
-        file.writelines("example_cosmos_dbt_build.py\n")
+        if AIRFLOW_VERSION < Version("2.8.0"):
+            file.writelines("example_cosmos_dbt_build.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

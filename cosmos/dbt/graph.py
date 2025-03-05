@@ -824,6 +824,7 @@ class DbtGraph:
             for unique_id, node_dict in resources.items():
                 node = DbtNode(
                     unique_id=unique_id,
+                    package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / Path(node_dict["original_file_path"]),

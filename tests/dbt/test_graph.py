@@ -1349,7 +1349,7 @@ Values returned by mac_get_values:
         "model.some_package.some_model": DbtNode(
             unique_id="model.some_package.some_model",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("fake-project/models/some_model.sql"),
+            file_path=Path("some_package/models/some_model.sql"),
             tags=[],
             config={
                 "access": "protected",
@@ -1383,6 +1383,7 @@ Values returned by mac_get_values:
                 "unique_key": None,
             },
             depends_on=["source.some_source"],
+            package_name="some_package",
         ),
     }
     nodes = parse_dbt_ls_output(Path("fake-project"), dbt_ls_output)
@@ -1392,7 +1393,7 @@ Values returned by mac_get_values:
 
 
 def test_parse_dbt_ls_output():
-    fake_ls_stdout = '{"resource_type": "model", "name": "fake-name", "original_file_path": "fake-file-path.sql", "unique_id": "fake-unique-id", "tags": [], "config": {}}'
+    fake_ls_stdout = '{"resource_type": "model", "name": "fake-name", "package_name": "fake-project", "original_file_path": "fake-file-path.sql", "unique_id": "fake-unique-id", "tags": [], "config": {}}'
 
     expected_nodes = {
         "fake-unique-id": DbtNode(
@@ -1402,6 +1403,7 @@ def test_parse_dbt_ls_output():
             tags=[],
             config={},
             depends_on=[],
+            package_name="fake-project",
         ),
     }
     nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
@@ -1410,7 +1412,7 @@ def test_parse_dbt_ls_output():
 
 
 def test_parse_dbt_ls_output_with_json_without_tags_or_config():
-    some_ls_stdout = '{"resource_type": "model", "name": "some-name", "original_file_path": "some-file-path.sql", "unique_id": "some-unique-id", "config": {}}'
+    some_ls_stdout = '{"resource_type": "model", "name": "some-name", "package_name": "some-project", "original_file_path": "some-file-path.sql", "unique_id": "some-unique-id", "config": {}}'
 
     expected_nodes = {
         "some-unique-id": DbtNode(
@@ -1420,6 +1422,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
             tags=[],
             config={},
             depends_on=[],
+            package_name="some-project",
         ),
     }
     nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)

@@ -21,6 +21,7 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
+DEFAULT_CONN_ID = "aws_default"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
@@ -47,11 +48,11 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     def __init__(
         self,
         # arguments required by EcsRunTaskOperator
-        aws_conn_id: str,
         cluster: str,
         task_definition: str,
         container_name: str,
         #
+        aws_conn_id: str = DEFAULT_CONN_ID,
         profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
         environment_variables: dict[str, Any] | None = None,
@@ -69,7 +70,9 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "overrides": None,
             }
         )
-        super().__init__(**kwargs)
+        super().__init__(
+            container_name=self.container_name,
+            **kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -103,6 +106,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # For the first round, we're going to assume that the command is dbt
         # This means that we don't have openlineage support, but we will create a ticket
         # to add that in the future
+        logger.info('Container name: {}'.format(self.container_name))
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.environment_variables = {**env_vars, **self.environment_variables}
@@ -117,7 +121,6 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 }
             ]
         }
-
 
 class DbtBuildAwsEcsOperator(DbtBuildMixin, DbtAwsEcsBaseOperator):
     """

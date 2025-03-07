@@ -50,7 +50,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # arguments required by EcsRunTaskOperator
         cluster: str,
         task_definition: str,
-        container_name: str,
+        dbt_container_name: str,
         #
         aws_conn_id: str = DEFAULT_CONN_ID,
         profile_config: ProfileConfig | None = None,
@@ -61,7 +61,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        self.container_name = container_name
+        self.dbt_container_name = dbt_container_name
         kwargs.update(
             {
                 "aws_conn_id": aws_conn_id,
@@ -70,9 +70,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "overrides": None,
             }
         )
-        logger.info('Container name: {}'.format(self.container_name))
-        super().__init__(
-            **kwargs)
+        super().__init__(**kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -106,7 +104,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # For the first round, we're going to assume that the command is dbt
         # This means that we don't have openlineage support, but we will create a ticket
         # to add that in the future
-        logger.info('Container name: {}'.format(self.container_name))
+        logger.info('Container name: {}'.format(self.dbt_container_name))
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.environment_variables = {**env_vars, **self.environment_variables}
@@ -115,7 +113,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.overrides = {
             "containerOverrides": [
                 {
-                    "name": self.container_name or 'main',
+                    "name": self.dbt_container_name,
                     "command": self.command,
                     "environment": [{"name": key, "value": value} for key, value in self.environment_variables.items()],
                 }

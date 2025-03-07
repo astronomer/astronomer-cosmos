@@ -21,6 +21,7 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
+DEFAULT_CONN_ID = "aws_default"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
@@ -39,7 +40,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields)
+        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields) + list("dbt_container_name")
     )
 
     intercept_flag = False
@@ -47,11 +48,11 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     def __init__(
         self,
         # arguments required by EcsRunTaskOperator
-        aws_conn_id: str,
         cluster: str,
         task_definition: str,
-        container_name: str,
+        dbt_container_name: str,
         #
+        aws_conn_id: str = DEFAULT_CONN_ID,
         profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
         environment_variables: dict[str, Any] | None = None,
@@ -60,7 +61,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        self.container_name = container_name
+        self.dbt_container_name = dbt_container_name
         kwargs.update(
             {
                 "aws_conn_id": aws_conn_id,
@@ -111,7 +112,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.overrides = {
             "containerOverrides": [
                 {
-                    "name": self.container_name,
+                    "name": self.dbt_container_name,
                     "command": self.command,
                     "environment": [{"name": key, "value": value} for key, value in self.environment_variables.items()],
                 }

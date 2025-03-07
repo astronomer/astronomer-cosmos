@@ -30,7 +30,7 @@ def test_dbt_aws_ecs_operator_add_global_flags() -> None:
         aws_conn_id="my-aws-conn-id",
         cluster="my-ecs-cluster",
         task_definition="my-dbt-task-definition",
-        container_name="my-dbt-container-name",
+        dbt_container_name="my-dbt-container-name",
         project_dir="my/dir",
         vars={
             "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
@@ -185,6 +185,7 @@ def test_dbt_aes_ecs_overrides_parameter():
 
     assert "containerOverrides" in actual_overrides
     actual_container_overrides = actual_overrides["containerOverrides"][0]
+    assert actual_container_overrides["name"] == "my-dbt-container-name"
     assert isinstance(actual_container_overrides["command"], list), "`command` should be of type list"
 
     assert "environment" in actual_container_overrides

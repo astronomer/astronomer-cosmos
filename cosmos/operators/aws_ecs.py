@@ -40,7 +40,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields) + 'dbt_container_name'
+        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields) + list("dbt_container_name")
     )
 
     intercept_flag = False
@@ -50,7 +50,6 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # arguments required by EcsRunTaskOperator
         cluster: str,
         task_definition: str,
-
         dbt_container_name: str,
         #
         aws_conn_id: str = DEFAULT_CONN_ID,
@@ -105,7 +104,6 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # For the first round, we're going to assume that the command is dbt
         # This means that we don't have openlineage support, but we will create a ticket
         # to add that in the future
-        logger.debug('Container name: {}'.format(self.dbt_container_name))
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
         self.environment_variables = {**env_vars, **self.environment_variables}
@@ -120,6 +118,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 }
             ]
         }
+
 
 class DbtBuildAwsEcsOperator(DbtBuildMixin, DbtAwsEcsBaseOperator):
     """

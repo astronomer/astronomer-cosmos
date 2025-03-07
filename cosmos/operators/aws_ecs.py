@@ -72,7 +72,6 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         )
         logger.info('Container name: {}'.format(self.container_name))
         super().__init__(
-            container_name=self.container_name,
             **kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
@@ -116,7 +115,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.overrides = {
             "containerOverrides": [
                 {
-                    "name": self.container_name,
+                    "name": self.container_name or 'main',
                     "command": self.command,
                     "environment": [{"name": key, "value": value} for key, value in self.environment_variables.items()],
                 }

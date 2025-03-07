@@ -70,6 +70,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "overrides": None,
             }
         )
+        logger.info('Container name: {}'.format(self.container_name))
         super().__init__(
             container_name=self.container_name,
             **kwargs)

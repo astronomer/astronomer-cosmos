@@ -133,3 +133,37 @@ def test_example_dag(session, dag_id: str):
                 )
     else:
         test_utils.run_dag(dag)
+
+
+async_dag_ids = ["simple_dag_async"]
+
+
+@pytest.mark.integration
+def test_async_example_dag_without_setup_task(session, monkeypatch):
+    monkeypatch.setattr("cosmos.setting.enable_setup_async_task", False)
+    monkeypatch.setattr("cosmos.setting.enable_setup_async_task", False)
+    dag_bag = get_dag_bag()
+    for dag_id in async_dag_ids:
+        dag = dag_bag.get_dag(dag_id)
+        if AIRFLOW_VERSION >= Version("2.5"):
+            if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
+                dag.test()
+            else:
+                # This is a work around until we fix the issue in Airflow:
+                # https://github.com/apache/airflow/issues/42495
+                """
+                FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
+                This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
+                Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
+                FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
+                FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
+                FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
+                """
+                try:
+                    dag.test()
+                except sqlalchemy.exc.PendingRollbackError:
+                    warnings.warn(
+                        "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
+                    )
+        else:
+            test_utils.run_dag(dag)

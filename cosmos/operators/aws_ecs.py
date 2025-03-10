@@ -40,7 +40,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     """
 
     template_fields: Sequence[str] = tuple(
-        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields) + list("dbt_container_name")
+        list(AbstractDbtBase.template_fields) + list(EcsRunTaskOperator.template_fields)
     )
 
     intercept_flag = False
@@ -66,8 +66,8 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "aws_conn_id": aws_conn_id,
                 "task_definition": task_definition,
                 "cluster": cluster,
-                "overrides": None,
                 "container_name": container_name,
+                "overrides": None,
             }
         )
         super().__init__(**kwargs)

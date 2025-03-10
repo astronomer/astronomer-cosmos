@@ -50,7 +50,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # arguments required by EcsRunTaskOperator
         cluster: str,
         task_definition: str,
-        dbt_container_name: str,
+        container_name: str,
         #
         aws_conn_id: str = DEFAULT_CONN_ID,
         profile_config: ProfileConfig | None = None,
@@ -61,13 +61,13 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        self.dbt_container_name = dbt_container_name
         kwargs.update(
             {
                 "aws_conn_id": aws_conn_id,
                 "task_definition": task_definition,
                 "cluster": cluster,
                 "overrides": None,
+                "container_name": container_name,
             }
         )
         super().__init__(**kwargs)
@@ -112,7 +112,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.overrides = {
             "containerOverrides": [
                 {
-                    "name": self.dbt_container_name,
+                    "name": self.container_name,
                     "command": self.command,
                     "environment": [{"name": key, "value": value} for key, value in self.environment_variables.items()],
                 }

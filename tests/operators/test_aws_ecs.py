@@ -30,7 +30,7 @@ def test_dbt_aws_ecs_operator_add_global_flags() -> None:
         aws_conn_id="my-aws-conn-id",
         cluster="my-ecs-cluster",
         task_definition="my-dbt-task-definition",
-        dbt_container_name="my-dbt-container-name",
+        container_name="my-dbt-container-name",
         project_dir="my/dir",
         vars={
             "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",

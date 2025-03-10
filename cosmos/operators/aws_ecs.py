@@ -21,6 +21,7 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
+DEFAULT_CONN_ID = "aws_default"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
@@ -47,11 +48,11 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     def __init__(
         self,
         # arguments required by EcsRunTaskOperator
-        aws_conn_id: str,
         cluster: str,
         task_definition: str,
         container_name: str,
         #
+        aws_conn_id: str = DEFAULT_CONN_ID,
         profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
         environment_variables: dict[str, Any] | None = None,
@@ -60,12 +61,12 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        self.container_name = container_name
         kwargs.update(
             {
                 "aws_conn_id": aws_conn_id,
                 "task_definition": task_definition,
                 "cluster": cluster,
+                "container_name": container_name,
                 "overrides": None,
             }
         )

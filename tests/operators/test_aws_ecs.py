@@ -185,6 +185,7 @@ def test_dbt_aes_ecs_overrides_parameter():
 
     assert "containerOverrides" in actual_overrides
     actual_container_overrides = actual_overrides["containerOverrides"][0]
+    assert actual_container_overrides["name"] == "my-dbt-container-name"
     assert isinstance(actual_container_overrides["command"], list), "`command` should be of type list"
 
     assert "environment" in actual_container_overrides

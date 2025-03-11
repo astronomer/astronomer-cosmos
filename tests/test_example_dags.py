@@ -97,15 +97,7 @@ def get_dag_ids() -> list[str]:
     return dag_bag.dag_ids
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
-)
-@pytest.mark.integration
-@pytest.mark.parametrize("dag_id", get_dag_ids())
-def test_example_dag(session, dag_id: str):
-    if dag_id in KUBERNETES_DAGS:
-        return
+def run_dag(dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
 
@@ -135,35 +127,29 @@ def test_example_dag(session, dag_id: str):
         test_utils.run_dag(dag)
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
+)
+@pytest.mark.integration
+@pytest.mark.parametrize("dag_id", get_dag_ids())
+def test_example_dag(session, dag_id: str):
+    if dag_id in KUBERNETES_DAGS:
+        return
+    run_dag(dag_id)
+
+
 async_dag_ids = ["simple_dag_async"]
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.8"),
+    reason="See issue: https://github.com/astronomer/issues-airflow/issues/288",
+)
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):
-    monkeypatch.setattr("cosmos.setting.enable_setup_async_task", False)
-    monkeypatch.setattr("cosmos.setting.enable_setup_async_task", False)
-    dag_bag = get_dag_bag()
+    monkeypatch.setattr("cosmos.operators.local.settings.enable_setup_async_task", False)
+    monkeypatch.setattr("cosmos.operators.local.settings.enable_teardown_async_task", False)
+    monkeypatch.setattr("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
     for dag_id in async_dag_ids:
-        dag = dag_bag.get_dag(dag_id)
-        if AIRFLOW_VERSION >= Version("2.5"):
-            if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-                dag.test()
-            else:
-                # This is a work around until we fix the issue in Airflow:
-                # https://github.com/apache/airflow/issues/42495
-                """
-                FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
-                This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
-                Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
-                FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
-                FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
-                FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
-                """
-                try:
-                    dag.test()
-                except sqlalchemy.exc.PendingRollbackError:
-                    warnings.warn(
-                        "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
-                    )
-        else:
-            test_utils.run_dag(dag)
+        run_dag(dag_id)

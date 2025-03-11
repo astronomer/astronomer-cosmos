@@ -74,7 +74,9 @@ openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]
-google = ["apache-airflow-providers-google>=10.17.0"]
+
+# Due to issue https://github.com/fsspec/gcsfs/issues/664
+google = ["apache-airflow-providers-google>=10.17.0", "gcsfs<2025.3.0"]
 microsoft = ["apache-airflow-providers-microsoft-azure>=8.5.0"]
 all = [
     "astronomer-cosmos[dbt-all]",

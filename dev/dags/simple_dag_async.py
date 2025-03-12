@@ -9,6 +9,8 @@ from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
+DBT_ADAPTER_VERSION = os.getenv("DBT_ADAPTER_VERSION", "1.9")
+
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
@@ -27,7 +29,7 @@ simple_dag_async = DbtDag(
     profile_config=profile_config,
     execution_config=ExecutionConfig(
         execution_mode=ExecutionMode.AIRFLOW_ASYNC,
-        async_py_requirements=["dbt-bigquery"],
+        async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
     ),
     render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
     # normal dag parameters

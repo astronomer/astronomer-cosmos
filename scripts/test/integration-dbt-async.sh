@@ -14,6 +14,12 @@ export SOURCE_RENDERING_BEHAVIOR=all
 rm -rf airflow.*; \
 airflow db init; \
 
+if [ "$DBT_VERSION" = "1.7" ]; then
+    # Otherwise, we will get the following error:
+    # stderr: MessageToJson() got an unexpected keyword argument 'including_default_value_fields'
+    echo "DBT version is 1.7 — Installing protobuf==4.25.6..."
+    pip install protobuf==4.25.6
+fi
 
 rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \

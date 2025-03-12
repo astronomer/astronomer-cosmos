@@ -144,7 +144,7 @@ async_dag_ids = ["simple_dag_async"]
 
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.8"),
-    reason="See issue: https://github.com/astronomer/issues-airflow/issues/288",
+    reason="See PR: https://github.com/apache/airflow/pull/34585",
 )
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):

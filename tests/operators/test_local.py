@@ -5,7 +5,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 from airflow import DAG
@@ -1464,3 +1464,19 @@ def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_
     )
     operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
     mock_unlink.assert_called()
+
+
+def test_read_run_sql_from_target_dir():
+    tmp_project_dir = "/tmp/project"
+    sql_context = {"dbt_node_config": {"file_path": "/path/to/file.sql"}, "package_name": "package_name"}
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+
+    expected_sql_content = "SELECT * FROM my_table;"
+    with patch("pathlib.Path.open", new_callable=mock_open, read_data=expected_sql_content):
+        result = operator._read_run_sql_from_target_dir(tmp_project_dir, sql_context)
+        assert result == expected_sql_content

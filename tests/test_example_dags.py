@@ -143,8 +143,8 @@ async_dag_ids = ["simple_dag_async"]
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.8"),
-    reason="See PR: https://github.com/apache/airflow/pull/34585",
+    AIRFLOW_VERSION < Version("2.8") or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
 )
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):

@@ -1,0 +1,8 @@
+name: 'my_dbt_project'
+version: '1.0.0'
+profile: 'default'
+
+models:
+  my_dbt_project:
+    example:
+      materialized: table

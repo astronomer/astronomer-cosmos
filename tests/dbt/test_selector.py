@@ -284,9 +284,28 @@ def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
 
 
 def test_select_nodes_by_select_path():
+    # Path without star or graph selector
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models"])
     expected = {
         parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+    # Path with star
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/*"])
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+    # Path with star and graph selector that retrieves descendants
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/*+"])
+    expected = {
+        child_node.unique_id: child_node,
+        parent_node.unique_id: parent_node,
+        sibling1_node.unique_id: sibling1_node,
+        sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
     }
     assert selected == expected
 

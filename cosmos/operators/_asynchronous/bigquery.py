@@ -5,7 +5,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 import airflow
-from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+
+try:
+    from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+except ImportError:
+    raise ImportError(
+        "Could not import BigQueryInsertJobOperator. Ensure you've installed the Google Cloud provider separately or "
+        "with with `pip install apache-airflow-providers-google`."
+    )
+
 from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, provide_session
 from packaging.version import Version
@@ -15,7 +23,7 @@ from cosmos.config import ProfileConfig
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
-from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.orm import Session
@@ -134,7 +142,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        if enable_setup_async_task:
+        if settings.enable_setup_async_task:
             self.configuration = {
                 "query": {
                     "query": self.get_remote_sql(),
@@ -151,14 +159,19 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         from airflow.models.renderedtifields import RenderedTaskInstanceFields
         from airflow.models.taskinstance import TaskInstance
 
-        if not enable_setup_async_task:
+        if not settings.enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
         sql = self.get_remote_sql().strip()
         self.log.debug("Executed SQL is: %s", sql)
         self.compiled_sql = sql
 
-        profile = self.profile_config.profile_mapping.profile
+        if self.profile_config.profile_mapping is not None:
+            profile = self.profile_config.profile_mapping.profile
+        else:
+            raise CosmosValueError(
+                "The `profile_config.profile`_mapping attribute must be defined to use `ExecutionMode.AIRFLOW_ASYNC`"
+            )
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
 

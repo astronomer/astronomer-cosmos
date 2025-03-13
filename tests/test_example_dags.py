@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from functools import cache
@@ -97,15 +98,7 @@ def get_dag_ids() -> list[str]:
     return dag_bag.dag_ids
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
-)
-@pytest.mark.integration
-@pytest.mark.parametrize("dag_id", get_dag_ids())
-def test_example_dag(session, dag_id: str):
-    if dag_id in KUBERNETES_DAGS:
-        return
+def run_dag(dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
 
@@ -133,3 +126,31 @@ def test_example_dag(session, dag_id: str):
                 )
     else:
         test_utils.run_dag(dag)
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
+)
+@pytest.mark.integration
+@pytest.mark.parametrize("dag_id", get_dag_ids())
+def test_example_dag(session, dag_id: str):
+    if dag_id in KUBERNETES_DAGS:
+        return
+    run_dag(dag_id)
+
+
+async_dag_ids = ["simple_dag_async"]
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.8") or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
+)
+@pytest.mark.integration
+@patch("cosmos.operators.local.settings.enable_setup_async_task", False)
+@patch("cosmos.operators.local.settings.enable_teardown_async_task", False)
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_async_example_dag_without_setup_task(session):
+    for dag_id in async_dag_ids:
+        run_dag(dag_id)

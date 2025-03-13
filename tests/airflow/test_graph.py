@@ -435,6 +435,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_name": "my_model",
                     "name": "my_model",
                 },
+                "package_name": None,
             },
         ),
         (
@@ -476,6 +477,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_name": "my_snapshot",
                     "name": "my_snapshot",
                 },
+                "package_name": None,
             },
         ),
     ],

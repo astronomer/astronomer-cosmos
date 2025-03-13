@@ -37,8 +37,6 @@ from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
-    enable_setup_async_task,
-    enable_teardown_async_task,
     remote_target_path,
     remote_target_path_conn_id,
 )
@@ -406,8 +404,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmp_project_dir)
 
     def _read_run_sql_from_target_dir(self, tmp_project_dir: str, sql_context: dict[str, Any]) -> str:
-        sql_relative_path = sql_context["dbt_node_config"]["file_path"].split(str(self.project_dir))[-1].lstrip("/")
-        run_sql_path = Path(tmp_project_dir) / "target/run" / Path(self.project_dir).name / sql_relative_path
+        package_name = sql_context.get("package_name") or Path(self.project_dir).name
+        sql_relative_path = sql_context["dbt_node_config"]["file_path"].split(package_name)[-1].lstrip("/")
+        run_sql_path = Path(tmp_project_dir) / "target/run" / Path(package_name).name / sql_relative_path
+
         with run_sql_path.open("r") as sql_file:
             sql_content: str = sql_file.read()
         return sql_content
@@ -483,11 +483,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        if async_context.get("teardown_task") and enable_teardown_async_task:
+        if async_context.get("teardown_task") and settings.enable_teardown_async_task:
             self._delete_sql_files(Path(tmp_project_dir), "run")
             return
 
-        if enable_setup_async_task:
+        if settings.enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
@@ -531,7 +531,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 if self.install_deps:
                     self._install_dependencies(tmp_dir_path, flags, env)
 
-                if run_as_async and not enable_setup_async_task:
+                if run_as_async and not settings.enable_setup_async_task:
                     self._mock_dbt_adapter(async_context)
 
                 full_cmd = cmd + flags

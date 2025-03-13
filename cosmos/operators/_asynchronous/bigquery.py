@@ -11,7 +11,7 @@ try:
 except ImportError:
     raise ImportError(
         "Could not import BigQueryInsertJobOperator. Ensure you've installed the Google Cloud provider separately or "
-        "with with `pip install apache-airflow-providers-bigquery`."
+        "with with `pip install apache-airflow-providers-google`."
     )
 
 from airflow.utils.context import Context

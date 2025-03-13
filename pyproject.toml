@@ -162,6 +162,7 @@ pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow}
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10"]
+dbt = ["1.5", "1.6", "1.7", "1.8", "1.9"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
@@ -176,6 +177,7 @@ test-integration = 'sh scripts/test/integration.sh'
 test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
 test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh"
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
+test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh  {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-integration-setup = 'sh scripts/test/integration-setup.sh'
 test-performance = 'sh scripts/test/performance.sh'

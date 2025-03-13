@@ -52,8 +52,8 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         cluster: str,
         task_definition: str,
         container_name: str = DEFAULT_CONTAINER_NAME,
-        #
         aws_conn_id: str = DEFAULT_CONN_ID,
+        #
         profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
         environment_variables: dict[str, Any] | None = None,

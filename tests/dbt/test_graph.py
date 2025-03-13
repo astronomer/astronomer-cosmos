@@ -41,6 +41,7 @@ DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 ALTERED_DBT_PROJECT_NAME = "altered_jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
+SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
@@ -261,6 +262,31 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
         "model.jaffle_shop.stg_payments",
     ]
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
+
+
+def test_load_via_manifest_with_ms_windows_manifest_and_star_selector():
+    # This test is based on a real user-case that in 1.9.0 and before would return an empty list of filtered nodes
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR,  # this value is not used in DAG rendering when the manifest is given
+        manifest_path=SAMPLE_SMALL_MANIFEST,
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(select=["path:models/edr*+"])
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    assert len(dbt_graph.nodes) == 1
+    assert len(dbt_graph.filtered_nodes) == 1
 
 
 @pytest.mark.parametrize(

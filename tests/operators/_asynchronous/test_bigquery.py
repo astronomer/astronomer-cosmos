@@ -52,9 +52,9 @@ def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
 
 
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
-def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd, profile_config_mock, monkeypatch):
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd, profile_config_mock):
     """Test execute calls build_and_run_cmd with correct parameters."""
-    monkeypatch.setattr("cosmos.operators._asynchronous.bigquery.enable_setup_async_task", False)
     operator = DbtRunAirflowAsyncBigqueryOperator(
         task_id="test_task",
         project_dir="/path/to/project",

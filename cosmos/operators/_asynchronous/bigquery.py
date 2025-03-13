@@ -23,7 +23,7 @@ from cosmos.config import ProfileConfig
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
-from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
+from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.orm import Session
@@ -142,7 +142,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        if enable_setup_async_task:
+        if settings.enable_setup_async_task:
             self.configuration = {
                 "query": {
                     "query": self.get_remote_sql(),
@@ -159,7 +159,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         from airflow.models.renderedtifields import RenderedTaskInstanceFields
         from airflow.models.taskinstance import TaskInstance
 
-        if not enable_setup_async_task:
+        if not settings.enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
         sql = self.get_remote_sql().strip()

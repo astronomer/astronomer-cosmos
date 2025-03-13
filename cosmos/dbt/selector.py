@@ -175,7 +175,7 @@ class GraphSelector:
         # Index nodes by name, we can improve performance by doing this once
         # for multiple GraphSelectors
         if PATH_SELECTOR in self.node_name:
-            path_selection = self.node_name[len(PATH_SELECTOR) :]
+            path_selection = self.node_name[len(PATH_SELECTOR) :].rstrip("*")
             root_nodes.update({node_id for node_id, node in nodes.items() if path_selection in str(node.file_path)})
 
         elif TAG_SELECTOR in self.node_name:
@@ -372,7 +372,7 @@ class SelectorConfig:
     def _parse_path_selector(self, item: str) -> None:
         index = len(PATH_SELECTOR)
         if self.project_dir:
-            self.paths.append(self.project_dir / Path(item[index:]))
+            self.paths.append(self.project_dir / Path(item[index:].rstrip("*")))
         else:
             self.paths.append(Path(item[index:]))
 

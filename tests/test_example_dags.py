@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from functools import cache
@@ -147,9 +148,9 @@ async_dag_ids = ["simple_dag_async"]
     reason="See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
 )
 @pytest.mark.integration
-def test_async_example_dag_without_setup_task(session, monkeypatch):
-    monkeypatch.setattr("cosmos.operators.local.settings.enable_setup_async_task", False)
-    monkeypatch.setattr("cosmos.operators.local.settings.enable_teardown_async_task", False)
-    monkeypatch.setattr("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+@patch("cosmos.operators.local.settings.enable_setup_async_task", False)
+@patch("cosmos.operators.local.settings.enable_teardown_async_task", False)
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_async_example_dag_without_setup_task(session):
     for dag_id in async_dag_ids:
         run_dag(dag_id)

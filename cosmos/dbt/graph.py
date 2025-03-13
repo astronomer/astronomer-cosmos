@@ -530,7 +530,7 @@ class DbtGraph:
         self.update_node_dependency()
 
         logger.info("Total nodes: %i", len(self.nodes))
-        logger.info("Total filtered nodes: %i", len(self.nodes))
+        logger.info("Total filtered nodes: %i", len(self.filtered_nodes))
 
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]

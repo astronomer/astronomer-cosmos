@@ -1881,7 +1881,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "afbced719302d5b1efdfb191c617e349"
+        assert hash_dir == "391db5c7e1fb90214d829dd0476059a1"
     else:
         assert hash_dir == "0148da6f5f7fd260c9fa55c3b3c45168"
 

@@ -1,0 +1,27 @@
+{
+  "nodes": {
+    "model.elementary.model_run_results": {
+      "alias": "model_run_results",
+      "checksum": {
+        "checksum": "99fba47e42516fbdc31e2546f687e3f780f21eaa5ac303e1ed22d23262ac5ec9",
+        "name": "sha256"
+      },
+      "config": {},
+      "database": "FDH_DEV_DB",
+      "fqn": [
+        "elementary",
+        "edr",
+        "run_results",
+        "model_run_results"
+      ],
+      "name": "model_run_results",
+      "original_file_path": "models\\edr\\run_results\\model_run_results.sql",
+      "package_name": "elementary",
+      "path": "edr\\run_results\\model_run_results.sql",
+      "resource_type": "model",
+      "schema": "MONITORING",
+      "tags": [],
+      "unique_id": "model.elementary.model_run_results"
+    }
+  }
+}

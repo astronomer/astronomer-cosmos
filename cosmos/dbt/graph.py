@@ -64,6 +64,7 @@ class DbtNode:
     resource_type: DbtResourceType
     depends_on: list[str]
     file_path: Path
+    package_name: str | None = None
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
@@ -279,12 +280,17 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
+            base_path = (
+                project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore
+            )
+
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
+                    package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=project_path / node_dict["original_file_path"],
+                    file_path=base_path / node_dict["original_file_path"],
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(
@@ -821,6 +827,7 @@ class DbtGraph:
             for unique_id, node_dict in resources.items():
                 node = DbtNode(
                     unique_id=unique_id,
+                    package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / Path(node_dict["original_file_path"]),

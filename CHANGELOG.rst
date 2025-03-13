@@ -18,6 +18,7 @@ Bug Fixes
 * Fix log that prints 'Total filtered nodes' by @tatiana in #1603
 * Fix select behaviour using ``LoadMode.MANIFEST`` and a path with star by @tatiana in #1602
 * Support ``on_warning_callback`` with ``TestBehavior.BUILD`` and ``ExecutionMode.LOCAL`` by @corsettigyg in #1571
+* Fix ``DbtRunLocalOperator.partial()`` support by @tatiana in #1609
 
 Docs
 
@@ -32,6 +33,7 @@ Others
 * Run async DAG in DAG without setup/teardown task by @pankajastro in #1599
 * Add test case that fully covers recent select issue by @tatiana in #1604
 * Add CI job to test multiple dbt versions for the async DAG by @pankajkoti in #1535
+* Improve unit tests speed from 89s to 14s by @tatiana in #1600
 * Pre-commit updates: #1560, #1583, #1596
 
 

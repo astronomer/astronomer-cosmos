@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 from cosmos import settings
 from cosmos.constants import DEFAULT_TARGET_PATH, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP
 from cosmos.exceptions import CosmosValueError
-from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 
 def upload_to_aws_s3(
@@ -136,14 +135,14 @@ def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
     """Configure the remote target path if it is provided."""
     from airflow.version import version as airflow_version
 
-    if not remote_target_path:
+    if not settings.remote_target_path:
         return None, None
 
     _configured_target_path = None
 
-    target_path_str = str(remote_target_path)
+    target_path_str = str(settings.remote_target_path)
 
-    remote_conn_id = remote_target_path_conn_id
+    remote_conn_id = settings.remote_target_path_conn_id
     if not remote_conn_id:
         target_path_schema = urlparse(target_path_str).scheme
         remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]

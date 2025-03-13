@@ -46,6 +46,13 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
+def _normalize_path(path: str) -> str:
+    """
+    Converts a potentially Windows path string into a Posix-friendly path.
+    """
+    return Path(path.replace("\\", "/")).as_posix()
+
+
 class CosmosLoadDbtException(Exception):
     """
     Exception raised while trying to load a `dbt` project as a `DbtGraph` instance.
@@ -823,7 +830,7 @@ class DbtGraph:
                     unique_id=unique_id,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / Path(node_dict["original_file_path"]),
+                    file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                     has_freshness=(

@@ -66,7 +66,6 @@ def test_upload_artifacts_to_azure_wasb(dummy_kwargs):
         assert hook_instance.load_file.call_count == 2
 
 
-@pytest.mark.integration
 @patch("cosmos.io.settings.remote_target_path", None)
 @patch("cosmos.io.settings.remote_target_path_conn_id", None)
 def test_configure_remote_target_path_no_remote_target():

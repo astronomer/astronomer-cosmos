@@ -62,6 +62,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
+        self.container_name = container_name
         kwargs.update(
             {
                 "aws_conn_id": aws_conn_id,

@@ -30,6 +30,7 @@ from cosmos.dbt.graph import (
     DbtGraph,
     DbtNode,
     LoadMode,
+    _normalize_path,
     parse_dbt_ls_output,
     run_command,
 )
@@ -2026,3 +2027,13 @@ def test_get_dbt_ls_cache_remote_cache_dir(
     }
 
     assert result == expected_result
+
+
+def test__normalize_path():
+    """
+    This normalizes the path (e.g. declared inside a manifest.json file) when it was created using MS Windows instead
+    of GNU Linux.
+    """
+    original_value = "seeds\\seed_ifs_util_manual_event_id.csv"
+    expected_value = "seeds/seed_ifs_util_manual_event_id.csv"
+    assert _normalize_path(original_value) == expected_value

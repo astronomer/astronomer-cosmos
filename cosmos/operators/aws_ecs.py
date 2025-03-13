@@ -22,6 +22,7 @@ from cosmos.operators.base import (
 logger = get_logger(__name__)
 
 DEFAULT_CONN_ID = "aws_default"
+DEFAULT_CONTAINER_NAME = "dbt"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
@@ -50,7 +51,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # arguments required by EcsRunTaskOperator
         cluster: str,
         task_definition: str,
-        container_name: str,
+        container_name: str = DEFAULT_CONTAINER_NAME,
         #
         aws_conn_id: str = DEFAULT_CONN_ID,
         profile_config: ProfileConfig | None = None,

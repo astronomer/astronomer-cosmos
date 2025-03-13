@@ -66,6 +66,7 @@ def test_upload_artifacts_to_azure_wasb(dummy_kwargs):
         assert hook_instance.load_file.call_count == 2
 
 
+@pytest.mark.integration
 def test_configure_remote_target_path_no_remote_target():
     """Test _configure_remote_target_path when no remote target path is set."""
     with patch("cosmos.settings.remote_target_path", None):
@@ -119,6 +120,7 @@ def test_upload_artifacts_to_cloud_storage_success(dummy_kwargs):
         assert mock_copy.call_count == 2
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.io.remote_target_path")
 def test_configure_remote_target_path_no_conn_id(mock_remote_target_path):
@@ -135,6 +137,7 @@ def test_configure_remote_target_path_no_conn_id(mock_remote_target_path):
             assert result == (mock_object_storage.return_value, _default_s3_conn)
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.io.remote_target_path")
 def test_configure_remote_target_path_conn_id_is_none(mock_remote_target_path):

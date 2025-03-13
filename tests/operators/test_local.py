@@ -1457,6 +1457,7 @@ def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monk
     mock_bq_execute.assert_called_once()
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("pathlib.Path.rglob")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")

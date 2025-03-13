@@ -19,6 +19,7 @@ Bug Fixes
 * Fix select behaviour using ``LoadMode.MANIFEST`` and a path with star by @tatiana in #1602
 * Support ``on_warning_callback`` with ``TestBehavior.BUILD`` and ``ExecutionMode.LOCAL`` by @corsettigyg in #1571
 * Fix ``DbtRunLocalOperator.partial()`` support by @tatiana in #1609
+* fix: ``container_name`` is null for ecs integration by @nicor88 in #1592
 
 Docs
 

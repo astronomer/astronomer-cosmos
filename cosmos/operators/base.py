@@ -151,8 +151,8 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if param.name != "self" and param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
     }
 
-    def __init_subclass__(cls, **kwargs):  # type: ignore
-        super().__init_subclass__(**kwargs)
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
         # The following is necessary so that dynamic mapped classes work since Cosmos 1.9.0 subclass changes
         # Since this class is subclassed by all Cosmos operators, to do this here allows to avoid to have this
         # logic explicitly in all subclasses

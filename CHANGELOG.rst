@@ -17,6 +17,7 @@ Bug Fixes
 * Fix path selector when ``manifest.json`` is created using MS Windows by @tatiana in #1601
 * Fix log that prints 'Total filtered nodes' by @tatiana in #1603
 * Fix select behaviour using ``LoadMode.MANIFEST`` and a path with star by @tatiana in #1602
+* Support ``on_warning_callback`` with ``TestBehavior.BUILD`` and ``ExecutionMode.LOCAL`` by @corsettigyg in #1571
 
 Docs
 

@@ -1,3 +1,11 @@
+# We already have tests/test_example_dags.py, but it doesn’t run against multiple dbt versions in CI.
+# Some dbt versions have shown parsing issues with certain example DAGs — something we may need to address over time.
+# With PR #1535, the goal is to test the async example DAG across multiple dbt versions. To prevent the CI job from
+# failing early due to unrelated DAG parsing errors, PR #1535 introduces this new test_async_example_dag.py file.
+# This file replicates tests/test_example_dags.py but excludes all DAGs except simple_async_dag by adding them to
+# .airflowignore. This ensures the CI job focuses solely on testing simple_async_dag over multiple dbt versions
+# without being disrupted by other DAG parsing issues.
+
 from __future__ import annotations
 
 from pathlib import Path

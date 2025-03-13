@@ -1,12 +1,37 @@
 Changelog
 =========
 
-1.9.1a1 (2025-02-20)
+1.9.1a3 (2025-03-13)
 --------------------
 
 Bug Fixes
 
 * Fix import error in dbt bigquery adapter mock for ``dbt-bigquery<1.8`` for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti in #1548
+* Fix ``operator_args`` override configuration by @ghjklw in #1558
+* Fix missing ``install_dbt_deps`` in ``ProjectConfig`` ``__init__`` method by @ghjklw in #1556
+* Fix dbt project parsing ``dbt_vars`` behavior passed via ``operator_args`` by @AlexandrKhabarov in #1543
+* Avoid reading the connection during DAG parsing of the async BigQuery operator by @joppevos in #1582
+* Fix: Workaround to incorrectly raised ``gcsfs.retry.HttpError`` (Invalid Credentials, 401) by @tatiana in #1598
+* Fix the async execution mode read sql files for dbt packages by @pankajastro in #1588
+* Improve BQ async error handling by @tatiana in #1597
+* Fix path selector when ``manifest.json`` is created using MS Windows by @tatiana in #1601
+* Fix log that prints 'Total filtered nodes' by @tatiana in #1603
+* Fix select behaviour using ``LoadMode.MANIFEST`` and a path with star by @tatiana in #1602
+
+Docs
+
+* Improve MWAA getting-started docs by removing unused imports by @jx2lee in #1562
+
+Others
+
+* Disable ``example_cosmos_dbt_build.py`` DAG in CI by @pankajastro in #1567
+* Upgrade GitHub Actions Ubuntu version by @tatiana in #1561
+* Update GitHub bug issue template by @pankajastro in #1586
+* Enable DAG ``example_cosmos_dbt_build.py`` in CI by @pankajastro in #1573
+* Run async DAG in DAG without setup/teardown task by @pankajastro in #1599
+* Add test case that fully covers recent select issue by @tatiana in #1604
+* Add CI job to test multiple dbt versions for the async DAG by @pankajkoti in #1535
+* Pre-commit updates: #1560, #1583, #1596
 
 
 1.9.0 (2025-02-19)

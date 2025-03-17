@@ -91,7 +91,7 @@ We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distr
 
 The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
-For instance, to run the tests using Python 3.10, `Apache Airflow® <https://airflow.apache.org/>`_ 2.5 and `dbt-core <https://github.com/dbt-labs/dbt-core/>` 1.9, use the following:
+For instance, to run the tests using Python 3.10, `Apache Airflow® <https://airflow.apache.org/>`_ 2.5 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
 

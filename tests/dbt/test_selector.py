@@ -214,6 +214,15 @@ def test_select_nodes_by_select_union_config_test_tags():
     assert selected == expected
 
 
+def test_select_nodes_by_invalid_config(caplog):
+    select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        select=["config.invalid_config:test+"],
+    )
+    assert "Unsupported config key selector: invalid_config" in caplog.messages
+
+
 def test_select_nodes_by_select_intersection_tag():
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["tag:is_child,config.materialized:view"]

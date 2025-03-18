@@ -231,9 +231,9 @@ class GraphSelector:
 
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
-            # currently tags, materialized, and schema are the only supported config keys
+            # currently tags, materialized, schema and meta are the only supported config keys
             # logic is separated into two conditions because the config 'tags' contains a
-            # list of tags, but the config 'materialized', and 'schema' contain strings
+            # list of tags, the config 'materialized' & 'schema' contain strings and meta contains dictionaries
             if config_selection_key == "tags":
                 root_nodes.update(
                     {

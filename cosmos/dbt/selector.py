@@ -504,7 +504,7 @@ class NodeSelector:
                 config.pop(key)
         return True
 
-    def _should_include_based_on_config(self, node: DbtNode, config: dict[Any, Any]) -> bool:
+    def _should_include_based_on_non_meta_and_non_tag_config(self, node: DbtNode, config: dict[Any, Any]) -> bool:
         node_non_meta_or_tag_config = {
             key: value
             for key, value in node.config.items()
@@ -548,9 +548,9 @@ class NodeSelector:
         config_copy.pop("tags", None)
 
         # Handle other config attributes, including meta and general config
-        if not self._should_include_based_on_meta(node, config_copy) or not self._should_include_based_on_config(
+        if not self._should_include_based_on_meta(
             node, config_copy
-        ):
+        ) or not self._should_include_based_on_non_meta_and_non_tag_config(node, config_copy):
             return False
 
         if self.config.paths and not self._is_path_matching(node):

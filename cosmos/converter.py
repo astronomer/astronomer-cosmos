@@ -268,9 +268,6 @@ class DbtToAirflowConverter:
         override_configuration(project_config, render_config, execution_config, operator_args)
         validate_changed_config_paths(execution_config, project_config, render_config)
 
-        env_vars = project_config.env_vars or operator_args.get("env")
-        dbt_vars = project_config.dbt_vars or operator_args.get("vars")
-
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             logger.warning(
                 "`ExecutionConfig.virtualenv_dir` is only supported when \
@@ -291,7 +288,7 @@ class DbtToAirflowConverter:
             profile_config=profile_config,
             cache_dir=cache_dir,
             cache_identifier=cache_identifier,
-            dbt_vars=dbt_vars,
+            dbt_vars=project_config.dbt_vars,
             airflow_metadata=cache._get_airflow_metadata(dag, task_group),
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
@@ -303,6 +300,8 @@ class DbtToAirflowConverter:
         )
         previous_time = current_time
 
+        env_vars = project_config.env_vars or operator_args.get("env")
+        dbt_vars = project_config.dbt_vars or operator_args.get("vars")
         task_args = {
             **operator_args,
             "project_dir": execution_config.project_path,

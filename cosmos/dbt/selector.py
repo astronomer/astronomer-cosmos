@@ -55,12 +55,13 @@ def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
 
     current: dict[Any, Any] | str = dict_
     for key in keys_values:
-        if isinstance(current, dict) and key in current:
-            current = current[key]
-        elif isinstance(current, str) and current == expected_value:
-            return True
+        if isinstance(current, dict):
+            if key in current:
+                current = current[key]
+            else:
+                return False  # Key path doesn't exist
 
-    return False  # Key path doesn't exist or doesn't have the expected value
+    return current == expected_value
 
 
 @dataclass
@@ -503,6 +504,20 @@ class NodeSelector:
                 config.pop(key)
         return True
 
+    def _should_include_based_on_config(self, node: DbtNode, config: dict[Any, Any]) -> bool:
+        node_non_meta_or_tag_config = {
+            key: value
+            for key, value in node.config.items()
+            if key in SUPPORTED_CONFIG and key != "tag" and not key.startswith(CONFIG_META_PATH)
+        }
+
+        if not (config.items() <= node_non_meta_or_tag_config.items()):
+            return False
+
+        if not self._is_config_subset(node_non_meta_or_tag_config):
+            return False
+        return True
+
     def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
         """
         Checks if a single node should be included. Only runs once per node with caching."""
@@ -532,17 +547,10 @@ class NodeSelector:
         config_copy = copy.deepcopy(self.config.config)
         config_copy.pop("tags", None)
 
-        if not self._should_include_based_on_meta(node, config_copy):
-            return False
-
-        # Handle config that is not tags nor meta
-        node_non_meta_or_tag_config = {
-            key: value
-            for key, value in node.config.items()
-            if key in SUPPORTED_CONFIG and key != "tag" and not key.startswith(CONFIG_META_PATH)
-        }
-
-        if not (config_copy.items() <= node_non_meta_or_tag_config.items()):
+        # Handle other config attributes, including meta and general config
+        if not self._should_include_based_on_meta(node, config_copy) or not self._should_include_based_on_config(
+            node, config_copy
+        ):
             return False
 
         if self.config.paths and not self._is_path_matching(node):
@@ -581,11 +589,13 @@ class NodeSelector:
         """Checks if the node's tags are a subset of the config's tags."""
         if not (set(self.config.tags) <= set(node.tags)):
             return False
+        return True
 
+    def _is_config_subset(self, node_config: dict[str, Any]) -> bool:
+        """Checks if the node's config is a subset of the config's config."""
         config_tags = self.config.config.get("tags")
-        if config_tags and not set(config_tags) <= set(node.config.get("tags", [])):
+        if config_tags and config_tags not in node_config.get("tags", []):
             return False
-
         return True
 
     def _is_path_matching(self, node: DbtNode) -> bool:

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, call, mock_open, patch
 import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowFailException, AirflowSkipException
 from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
@@ -703,6 +703,23 @@ def test_run_test_operator_without_callback(invocation_mode):
         run_operator >> test_operator
     run_test_dag(dag)
     assert not on_warning_callback.called
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
+def test_run_test_operator_with_no_retries_on_failure(invocation_mode, failing_test_dbt_project):
+    with DAG("test-id-4", start_date=datetime(2025, 1, 1)) as dag:
+        _ = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="test",
+            append_env=True,
+            invocation_mode=invocation_mode,
+            no_retries_on_test_failure=True,
+        )
+
+    with pytest.raises(AirflowFailException):
+        run_test_dag(dag)
 
 
 @pytest.mark.integration

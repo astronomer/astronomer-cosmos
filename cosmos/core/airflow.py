@@ -7,6 +7,7 @@ from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos.constants import AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH
 from cosmos.core.graph.entities import Task
 from cosmos.log import get_logger
 
@@ -37,7 +38,11 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
         task_id=task.id,
         dag=dag,
         task_group=task_group,
-        **({} if class_name == "EmptyOperator" else {"extra_context": task.extra_context}),
+        **(
+            {}
+            if class_name == AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH.split(".")[-1]
+            else {"extra_context": task.extra_context}
+        ),
         **task_kwargs,
     )
 

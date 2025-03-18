@@ -6,6 +6,7 @@ from typing import Callable, Dict
 import aenum
 from packaging.version import Version
 
+AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH = "airflow.operators.empty.EmptyOperator"
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"

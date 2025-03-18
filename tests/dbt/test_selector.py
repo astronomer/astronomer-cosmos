@@ -52,7 +52,7 @@ another_grandparent_node = DbtNode(
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/another_grandparent_node.sql",
     tags=[],
-    config={},
+    config={"meta": {"frequency": "daily"}},
 )
 
 parent_node = DbtNode(
@@ -136,6 +136,12 @@ def test_select_nodes_by_select_config():
         sibling2_node.unique_id: sibling2_node,
         sibling3_node.unique_id: sibling3_node,
     }
+    assert selected == expected
+
+
+def test_select_nodes_by_select_config_meta_nested_property():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.meta.frequency:daily"])
+    expected = {another_grandparent_node.unique_id: another_grandparent_node}
     assert selected == expected
 
 

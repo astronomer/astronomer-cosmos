@@ -1,6 +1,23 @@
 Changelog
 =========
 
+1.9.2 (2025-03-18)
+------------------
+
+Bug Fixes
+
+* Detach dbt vars used to render DAGs from the operator args' by @tatiana in #1616
+
+Enhancements
+
+* Support filtering by config meta nested properties by @tatiana in #1617
+
+Others
+
+* Update contributing.rst to latest test matrix by @tatiana in #1614
+* Pre-commit updates: #1615
+
+
 1.9.1 (2025-03-13)
 --------------------
 

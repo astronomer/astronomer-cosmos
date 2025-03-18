@@ -14,6 +14,7 @@ Using ``select`` and ``exclude``
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
 - ``tag:my_tag``: include/exclude models with the tag ``my_tag``
+- ``config.meta.some_key:some_value``: include/exclude models with ``config.meta_some_key: some_value``
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
 - ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory. In this example, ``analytics/table`` is a relative path, but absolute paths are also supported.
 - ``+node_name+1`` (graph operators): include/exclude the node with name ``node_name``, all its parents, and its first generation of children (`dbt graph selector docs <https://docs.getdbt.com/reference/node-selection/graph-operators>`_)

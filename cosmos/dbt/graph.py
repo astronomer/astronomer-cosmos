@@ -864,9 +864,13 @@ class DbtGraph:
         Updates in-place:
         * self.filtered_nodes
         """
+        from cosmos.airflow.graph import is_detached_test, should_create_detached_nodes  # to bypass cyclic import
+
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
-                for node_id in node.depends_on:
-                    if node_id in self.filtered_nodes:
-                        self.filtered_nodes[node_id].has_test = True
+                for upstream_node_id in node.depends_on:
+                    if upstream_node_id in self.filtered_nodes and (
+                        should_create_detached_nodes(self.render_config) and not is_detached_test(node)
+                    ):
+                        self.filtered_nodes[upstream_node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node

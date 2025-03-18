@@ -145,6 +145,39 @@ def test_select_nodes_by_select_config_meta_nested_property():
     assert selected == expected
 
 
+def test_select_nodes_by_select_config_meta_nested_property_with_children():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.meta.frequency:daily+"])
+    expected = {
+        another_grandparent_node.unique_id: another_grandparent_node,
+        parent_node.unique_id: parent_node,
+        child_node.unique_id: child_node,
+        sibling1_node.unique_id: sibling1_node,
+        sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_select_config_meta_nested_property_two_meta_values():
+    local_nodes = dict(sample_nodes)
+    someone_else_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.someone_else",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "gen1/models/someone_else.sql",
+        tags=[],
+        config={"meta": {"frequency": "daily", "dbt_environment": "dev"}},
+    )
+    local_nodes[someone_else_node.unique_id] = someone_else_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["config.meta.frequency:daily,config.meta.dbt_environment:dev"],
+    )
+    expected = {someone_else_node.unique_id: someone_else_node}
+    assert selected == expected
+
+
 def test_select_nodes_by_select_config_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child"])
     expected = {

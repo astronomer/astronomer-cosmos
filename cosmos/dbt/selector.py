@@ -258,7 +258,7 @@ class GraphSelector:
                     {
                         node_id
                         for node_id, node in nodes.items()
-                        if _check_nested_value_in_dict(node.config, config_selection_key)
+                        if _check_nested_value_in_dict(node.config, f"{config_selection_key}:{config_selection_value}")
                     }
                 )
             else:

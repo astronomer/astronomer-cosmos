@@ -303,7 +303,10 @@ def create_task_metadata(
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
-            if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
+            if node.has_freshness is False and (
+                source_rendering_behavior == SourceRenderingBehavior.ALL
+                or (SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS and node.has_test is True)
+            ):
                 # render sources without freshness as empty operators
                 return _create_empty_operator_task_metadata(task_id, args)
         else:

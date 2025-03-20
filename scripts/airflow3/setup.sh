@@ -5,15 +5,15 @@ set -e
 
 # Create a UV virtual environment named 'env' (you can change this as needed)
 echo "Creating UV virtual environment at $(pwd)/tools"
-uv venv airflow3-env --directory "$(pwd)/tools"
+uv venv venv --directory "$(pwd)/scripts/airflow3"
 
 # Activate the virtual environment
 echo "Activating virtual environment..."
-source "$(pwd)/tools/airflow3-env/bin/activate"
+source "$(pwd)/scripts/airflow3/venv/bin/activate"
 
 # Install dependencies in the virtual environment
 echo "Installing dependencies..."
-uv pip install -r tools/requirements.txt
+uv pip install -r "$(pwd)/scripts/airflow3/requirements.txt"
 
 # Optional: Install additional dependencies
 uv pip install astronomer-cosmos

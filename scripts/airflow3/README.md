@@ -2,7 +2,7 @@
 
 This guide walks you through setting up Apache Airflow 3 locally using Hatch and a Postgres container. You'll run a Postgres container to use it as a backend database for Airflow and set up the necessary environment to run Airflow.
 
-## 1. Setup Postgres Container
+## 1. Setup Postgres Container (Optional)
 
 We'll use PostgreSQL as the backend. The following command will pull the official Postgres image, create a container named postgres, and expose the necessary ports.
 
@@ -35,13 +35,13 @@ With your Postgres container running and your database set up, you need to confi
 This will export the AIRFLOW related env like AIRFLOW_HOME etc
 
 ```commandline
-source tools/env.sh
+source scripts/airflow3/env.sh
 ```
 
 ### Install Dependency
 
 ```commandline
-sh tools/setup.sh
+sh scripts/airflow3/setup.sh
 ```
 
 ## 5. Run Airflow in Standalone Mode
@@ -49,7 +49,7 @@ sh tools/setup.sh
 Activate the virtual env created in previous step and run airflow
 
 ```commandline
-source "$(pwd)/tools/airflow3-env/bin/activate"
+source "$(pwd)/scripts/airflow3/venv/bin/activate"
 
 airflow standalone
 ```
@@ -65,11 +65,11 @@ This command will:
 Once Airflow is running, you can also run tests.
 
 ```commandline
-source tools/env.sh
+source scripts/airflow3/env.sh
 
-source "$(pwd)/tools/airflow3-env/bin/activate"
+source "$(pwd)/scripts/airflow3/venv/bin/activate"
 
-sh tools/tests.sh
+sh scripts/airflow3/tests.sh
 ```
 
 ## 4. Access the Airflow Web Interface

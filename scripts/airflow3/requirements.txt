@@ -1,0 +1,9 @@
+--find-links https://dist.apache.org/repos/dist/dev/airflow/3.0.0b2/
+apache-airflow==3.0.0b2
+apache-airflow-task-sdk==1.0.0b2
+apache-airflow-providers-standard==1.0.0b2
+apache-airflow-providers-fab==2.0.0b2
+apache-airflow-providers-celery==3.11.0b2
+apache-airflow-providers-cncf-kubernetes==10.4.0b2
+psycopg2
+asyncpg

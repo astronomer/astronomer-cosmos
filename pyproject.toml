@@ -134,25 +134,6 @@ packages = ["/cosmos"]
 ######################################
 # TESTING
 ######################################
-
-[tool.hatch.envs.airflow3]
-dependencies = [
-    "apache-airflow==3.0.0b2",
-    "apache-airflow-task-sdk==1.0.0b2",
-    "apache-airflow-providers-standard==1.0.0b2",
-    "apache-airflow-providers-fab==2.0.0b2",
-    "apache-airflow-providers-celery==3.11.0b2",
-    "apache-airflow-providers-cncf-kubernetes==10.4.0b2",
-    "psycopg2",
-    "asyncpg"
-]
-
-
-[tool.hatch.envs.airflow3.scripts]
-standalone = 'sh dev_af3/standalone.sh'
-tests = 'sh dev_af3/tests.sh'
-
-
 [tool.hatch.envs.tests]
 dependencies = [
     # do not install Airflow dependencies here!

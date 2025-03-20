@@ -26,14 +26,32 @@ Once you're inside the psql interactive terminal, you can create a new database 
 CREATE DATABASE airflow_db;
 ```
 
-## 3. Setup Hatch Environment for Airflow3
+## 3. Setup Virtual Environment for Airflow3
 
-With your Postgres container running and your database set up, you need to configure the Hatch environment for Airflow3.
+With your Postgres container running and your database set up, you need to configure the virtual environment for Airflow3.
 
-### Run Airflow in Standalone Mode
+### Export ENV
+
+This will export the AIRFLOW related env like AIRFLOW_HOME etc
 
 ```commandline
-hatch run airflow3:standalone
+source tools/env.sh
+```
+
+### Install Dependency
+
+```commandline
+sh tools/setup.sh
+```
+
+## 5. Run Airflow in Standalone Mode
+
+Activate the virtual env created in previous step and run airflow
+
+```commandline
+source "$(pwd)/tools/airflow3-env/bin/activate"
+
+airflow standalone
 ```
 
 This command will:
@@ -47,7 +65,11 @@ This command will:
 Once Airflow is running, you can also run tests.
 
 ```commandline
-hatch run airflow3:tests
+source tools/env.sh
+
+source "$(pwd)/tools/airflow3-env/bin/activate"
+
+sh tools/tests.sh
 ```
 
 ## 4. Access the Airflow Web Interface

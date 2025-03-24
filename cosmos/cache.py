@@ -2,25 +2,24 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import json
 import os
 import shutil
 import tempfile
 import time
-from collections import defaultdict
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import msgpack
 import yaml
-from airflow.models import DagRun, Variable
+
+# from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
-from airflow.utils.session import provide_session
+
+# from airflow.utils.session import provide_session
 from airflow.utils.task_group import TaskGroup
 from airflow.version import version as airflow_version
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
+# from sqlalchemy import select
+# from sqlalchemy.orm import Session
 from cosmos import settings
 from cosmos.constants import (
     DBT_MANIFEST_FILE_NAME,
@@ -332,141 +331,141 @@ def was_project_modified(previous_version: str, current_version: str) -> bool:
     return previous_version != current_version
 
 
-@provide_session
-def delete_unused_dbt_ls_cache(
-    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
-) -> int:
-    """
-    Delete Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
-
-    Example usage:
-
-    There are three Cosmos cache Airflow Variables:
-    1. ``cache cosmos_cache__basic_cosmos_dag``
-    2. ``cosmos_cache__basic_cosmos_task_group__orders``
-    3. ``cosmos_cache__basic_cosmos_task_group__customers``
-
-    The first relates to the ``DbtDag`` ``basic_cosmos_dag`` and the two last ones relate to the DAG
-    ``basic_cosmos_task_group`` that has two ``DbtTaskGroups``: ``orders`` and ``customers``.
-
-    Let's assume the last DAG run of ``basic_cosmos_dag`` was a week ago and the last DAG run of
-    ``basic_cosmos_task_group`` was an hour ago.
-
-    To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 5 days ago:
-
-    ..code: python
-        >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5))
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_dag
-
-    To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 minutes ago:
-
-    ..code: python
-        >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=10))
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_dag
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_task_group__orders
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_task_group__orders
-
-    To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 days ago
-
-    ..code: python
-        >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=10))
-
-    In this last example, nothing is deleted.
-    """
-    if session is None:
-        return 0
-
-    logger.info(f"Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  {max_age_last_usage}")
-    cosmos_dags_ids = defaultdict(list)
-    all_variables = session.scalars(select(Variable)).all()
-    total_cosmos_variables = 0
-    deleted_cosmos_variables = 0
-
-    # Identify Cosmos-related cache in Airflow variables
-    for var in all_variables:
-        if var.key.startswith(VAR_KEY_CACHE_PREFIX):
-            var_value = json.loads(var.val)
-            cosmos_dags_ids[var_value["dag_id"]].append(var.key)
-            total_cosmos_variables += 1
-
-    # Delete DAGs that have not been run in the last X time
-    for dag_id, vars_keys in cosmos_dags_ids.items():
-        last_dag_run = (
-            session.query(DagRun)
-            .filter(
-                DagRun.dag_id == dag_id,
-            )
-            .order_by(DagRun.execution_date.desc())
-            .first()
-        )
-        if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
-            for var_key in vars_keys:
-                logger.info(f"Removing the dbt ls cache {var_key}")
-                Variable.delete(var_key)
-                deleted_cosmos_variables += 1
-
-    logger.info(
-        f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
-    )
-    return deleted_cosmos_variables
-
-
-# TODO: Add integration tests once remote cache is supported in the CI pipeline
-@provide_session
-def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
-    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
-) -> int:
-    """
-    Delete Cosmos cache stored in remote storage based on the last execution of their associated DAGs.
-    """
-    if session is None:
-        return 0
-
-    logger.info(f"Delete the Cosmos cache stored remotely that hasn't been used for  {max_age_last_usage}")
-    cosmos_dags_ids_remote_cache_files = defaultdict(list)
-
-    configured_remote_cache_dir = _configure_remote_cache_dir()
-    if not configured_remote_cache_dir:
-        logger.info(
-            "No remote cache directory configured. Skipping the deletion of the dbt ls cache files in remote storage."
-        )
-        return 0
-
-    dirs = [obj for obj in configured_remote_cache_dir.iterdir() if obj.is_dir()]
-    files = [f for label in dirs for f in label.iterdir() if f.is_file()]
-
-    total_cosmos_remote_cache_files = 0
-    for file in files:
-        prefix_path = (configured_remote_cache_dir / VAR_KEY_CACHE_PREFIX).as_uri()
-        if file.as_uri().startswith(prefix_path):
-            with file.open("r") as fp:
-                cache_dict = json.load(fp)
-            cosmos_dags_ids_remote_cache_files[cache_dict["dag_id"]].append(file)
-            total_cosmos_remote_cache_files += 1
-
-    deleted_cosmos_remote_cache_files = 0
-
-    for dag_id, files in cosmos_dags_ids_remote_cache_files.items():
-        last_dag_run = (
-            session.query(DagRun)
-            .filter(
-                DagRun.dag_id == dag_id,
-            )
-            .order_by(DagRun.execution_date.desc())
-            .first()
-        )
-        if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
-            for file in files:
-                logger.info(f"Removing the dbt ls cache remote file {file}")
-                file.unlink()
-                deleted_cosmos_remote_cache_files += 1
-    logger.info(
-        "Deleted %s/%s dbt ls cache files in remote storage.",
-        deleted_cosmos_remote_cache_files,
-        total_cosmos_remote_cache_files,
-    )
-
-    return deleted_cosmos_remote_cache_files
+# @provide_session
+# def delete_unused_dbt_ls_cache(
+#     max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+# ) -> int:
+#     """
+#     Delete Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
+#
+#     Example usage:
+#
+#     There are three Cosmos cache Airflow Variables:
+#     1. ``cache cosmos_cache__basic_cosmos_dag``
+#     2. ``cosmos_cache__basic_cosmos_task_group__orders``
+#     3. ``cosmos_cache__basic_cosmos_task_group__customers``
+#
+#     The first relates to the ``DbtDag`` ``basic_cosmos_dag`` and the two last ones relate to the DAG
+#     ``basic_cosmos_task_group`` that has two ``DbtTaskGroups``: ``orders`` and ``customers``.
+#
+#     Let's assume the last DAG run of ``basic_cosmos_dag`` was a week ago and the last DAG run of
+#     ``basic_cosmos_task_group`` was an hour ago.
+#
+#     To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 5 days ago:
+#
+#     ..code: python
+#         >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5))
+#         INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_dag
+#
+#     To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 minutes ago:
+#
+#     ..code: python
+#         >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=10))
+#         INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_dag
+#         INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_task_group__orders
+#         INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_task_group__orders
+#
+#     To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 days ago
+#
+#     ..code: python
+#         >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=10))
+#
+#     In this last example, nothing is deleted.
+#     """
+#     if session is None:
+#         return 0
+#
+#     logger.info(f"Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  {max_age_last_usage}")
+#     cosmos_dags_ids = defaultdict(list)
+#     all_variables = session.scalars(select(Variable)).all()
+#     total_cosmos_variables = 0
+#     deleted_cosmos_variables = 0
+#
+#     # Identify Cosmos-related cache in Airflow variables
+#     for var in all_variables:
+#         if var.key.startswith(VAR_KEY_CACHE_PREFIX):
+#             var_value = json.loads(var.val)
+#             cosmos_dags_ids[var_value["dag_id"]].append(var.key)
+#             total_cosmos_variables += 1
+#
+#     # Delete DAGs that have not been run in the last X time
+#     for dag_id, vars_keys in cosmos_dags_ids.items():
+#         last_dag_run = (
+#             session.query(DagRun)
+#             .filter(
+#                 DagRun.dag_id == dag_id,
+#             )
+#             .order_by(DagRun.execution_date.desc())
+#             .first()
+#         )
+#         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
+#             for var_key in vars_keys:
+#                 logger.info(f"Removing the dbt ls cache {var_key}")
+#                 Variable.delete(var_key)
+#                 deleted_cosmos_variables += 1
+#
+#     logger.info(
+#         f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
+#     )
+#     return deleted_cosmos_variables
+#
+#
+# # TODO: Add integration tests once remote cache is supported in the CI pipeline
+# @provide_session
+# def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
+#     max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+# ) -> int:
+#     """
+#     Delete Cosmos cache stored in remote storage based on the last execution of their associated DAGs.
+#     """
+#     if session is None:
+#         return 0
+#
+#     logger.info(f"Delete the Cosmos cache stored remotely that hasn't been used for  {max_age_last_usage}")
+#     cosmos_dags_ids_remote_cache_files = defaultdict(list)
+#
+#     configured_remote_cache_dir = _configure_remote_cache_dir()
+#     if not configured_remote_cache_dir:
+#         logger.info(
+#             "No remote cache directory configured. Skipping the deletion of the dbt ls cache files in remote storage."
+#         )
+#         return 0
+#
+#     dirs = [obj for obj in configured_remote_cache_dir.iterdir() if obj.is_dir()]
+#     files = [f for label in dirs for f in label.iterdir() if f.is_file()]
+#
+#     total_cosmos_remote_cache_files = 0
+#     for file in files:
+#         prefix_path = (configured_remote_cache_dir / VAR_KEY_CACHE_PREFIX).as_uri()
+#         if file.as_uri().startswith(prefix_path):
+#             with file.open("r") as fp:
+#                 cache_dict = json.load(fp)
+#             cosmos_dags_ids_remote_cache_files[cache_dict["dag_id"]].append(file)
+#             total_cosmos_remote_cache_files += 1
+#
+#     deleted_cosmos_remote_cache_files = 0
+#
+#     for dag_id, files in cosmos_dags_ids_remote_cache_files.items():
+#         last_dag_run = (
+#             session.query(DagRun)
+#             .filter(
+#                 DagRun.dag_id == dag_id,
+#             )
+#             .order_by(DagRun.execution_date.desc())
+#             .first()
+#         )
+#         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
+#             for file in files:
+#                 logger.info(f"Removing the dbt ls cache remote file {file}")
+#                 file.unlink()
+#                 deleted_cosmos_remote_cache_files += 1
+#     logger.info(
+#         "Deleted %s/%s dbt ls cache files in remote storage.",
+#         deleted_cosmos_remote_cache_files,
+#         total_cosmos_remote_cache_files,
+#     )
+#
+#     return deleted_cosmos_remote_cache_files
 
 
 def is_profile_cache_enabled() -> bool:

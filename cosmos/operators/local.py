@@ -775,6 +775,8 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 base_operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
+        if "task_id" in base_operator_kwargs:
+            base_operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **base_operator_kwargs)
 
 

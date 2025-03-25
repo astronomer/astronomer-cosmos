@@ -388,7 +388,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             else:
                 self.freshness = ""
 
-            _store_freshness_json()
+        _store_freshness_json()
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)

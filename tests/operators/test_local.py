@@ -1153,7 +1153,7 @@ def test_store_freshness_json(mock_path_class, mock_context, mock_session):
     expected_freshness = json.dumps({"key": "value"}, indent=4)
 
     # Call the method under test
-    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context)
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == expected_freshness
@@ -1174,7 +1174,7 @@ def test_store_freshness_json_no_file(mock_path_class, mock_context, mock_sessio
     mock_sources_json_path.exists.return_value = False
 
     # Call the method under test
-    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context)
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == ""
@@ -1189,7 +1189,7 @@ def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
     )
 
     # Call the method under test
-    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context)
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == ""

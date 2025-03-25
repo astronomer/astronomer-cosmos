@@ -66,3 +66,5 @@ def convert_to_boolean(value: str | None) -> bool:
 enable_telemetry = conf.getboolean("cosmos", "enable_telemetry", fallback=True)
 do_not_track = convert_to_boolean(os.getenv("DO_NOT_TRACK"))
 no_analytics = convert_to_boolean(os.getenv("SCARF_NO_ANALYTICS"))
+
+_AIRFLOW3_VERSION = Version("3.0.0a1")

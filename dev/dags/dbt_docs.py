@@ -41,11 +41,13 @@ with DAG(
     schedule_interval="@daily",
     doc_md=__doc__,
     catchup=False,
-    default_args={"retries": 2},
+    default_args={
+        "retries": 2,
+        "project_dir": DBT_ROOT_PATH / "jaffle_shop",
+    },
 ) as dag:
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
-        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         profile_config=profile_config,
         connection_id="aws_s3_conn",
         bucket_name="cosmos-ci-docs",

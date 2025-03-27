@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import airflow
 import jinja2
 from airflow import DAG
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowFailException, AirflowSkipException
 from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
@@ -906,6 +906,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     Executes a dbt core test command.
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
+    :param no_retries_on_test_failure: If True, raises AirflowFailException on test failure to prevent retries.
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
@@ -913,10 +914,12 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     def __init__(
         self,
         on_warning_callback: Callable[..., Any] | None = None,
+        no_retries_on_test_failure: bool = True,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.on_warning_callback = on_warning_callback
+        self.no_retries_on_test_failure = no_retries_on_test_failure
         self.extract_issues: Callable[..., tuple[list[str], list[str]]]
         self.parse_number_of_warnings: Callable[..., int]
 
@@ -946,7 +949,17 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
             self.parse_number_of_warnings = dbt_runner.parse_number_of_warnings
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        try:
+            result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        except CosmosDbtRunError as e:
+            if self.no_retries_on_test_failure:
+                self.log.error(
+                    "DBT test failed and `no_retries_on_test_failure=True`, "
+                    "raising AirflowFailException to prevent retries."
+                )
+                raise AirflowFailException(e)
+            raise
+
         self._set_test_result_parsing_methods()
         number_of_warnings = self.parse_number_of_warnings(result)  # type: ignore
         if self.on_warning_callback and number_of_warnings > 0:

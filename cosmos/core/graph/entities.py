@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
+from cosmos.constants import AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -58,6 +59,6 @@ class Task(CosmosEntity):
     """
 
     owner: str = ""
-    operator_class: str = "airflow.operators.empty.EmptyOperator"
+    operator_class: str = AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH
     arguments: Dict[str, Any] = field(default_factory=dict)
     extra_context: Dict[str, Any] = field(default_factory=dict)

@@ -5,7 +5,7 @@ from abc import ABC
 from os import PathLike
 from typing import Any, Callable, Sequence
 
-from airflow.models import TaskInstance, BaseOperator
+from airflow.models import BaseOperator, TaskInstance
 from airflow.utils.context import Context, context_merge
 
 from cosmos.config import ProfileConfig
@@ -75,10 +75,10 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
 
         AbstractDbtBase.__init__(self, **base_args)
         operator_args = {}
-        for arg in set((
+        for arg in {
             *inspect.signature(KubernetesPodOperator.__init__).parameters.keys(),
-            *inspect.signature(BaseOperator.__init__).parameters.keys()
-        )):
+            *inspect.signature(BaseOperator.__init__).parameters.keys(),
+        }:
             if arg in kwargs:
                 operator_args[arg] = kwargs[arg]
 

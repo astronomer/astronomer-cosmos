@@ -6,6 +6,7 @@ set -v
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
 
+
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
 if [ "$GITHUB_ACTIONS" = "true" ] && [ -z "${VIRTUAL_ENV}" ]; then
@@ -26,9 +27,13 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install pip --upgrade
 
-uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
-uv pip install apache-airflow-providers-docker --constraint /tmp/constraint.txt
-uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.txt
+if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+  uv pip install -r "$(pwd)/../airflow3/requirements.txt"
+else
+  uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
+  uv pip install apache-airflow-providers-docker --constraint /tmp/constraint.txt
+  uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.txt
+fi
 
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 uv pip install "gcsfs<2025.3.0"
@@ -44,6 +49,14 @@ elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install  "apache-airflow-providers-google>10.11" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
+elif [ "$AIRFLOW_VERSION" = "3.0"] ; then
+  uv pip install "apache-airflow-providers-docker"
+  uv pip install "apache-airflow-providers-postgres"
+  uv pip install "apache-airflow-providers-amazon[s3fs]"
+  uv pip install "apache-airflow-providers-cncf-kubernetes"
+  uv pip install "apache-airflow-providers-google>=10.17.0"
+  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0"
+  uv pip install "apache-airflow==3.0.0b2" --find-links https://dist.apache.org/repos/dist/dev/airflow/3.0.0b2/
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt

@@ -46,7 +46,7 @@ def test_dbt_run_airflow_async_snowflake_operator_init(profile_config_mock):
     assert operator.sql is None
 
 
-def test_configure_bigquery_async_op_args_missing_sql(async_operator_mock):
+def test_configure_snowflake_async_op_args_missing_sql(async_operator_mock):
     """Test _configure_bigquery_async_op_args raises CosmosValueError when 'sql' is missing."""
     with pytest.raises(CosmosValueError, match="Keyword argument 'sql' is required for Snowflake Async operator"):
         _configure_snowflake_async_op_args(async_operator_mock)

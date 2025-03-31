@@ -15,7 +15,7 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=SnowflakeUserPasswordProfileMapping(
-        conn_id="snowflake_conn_id", profile_args={"dataset": "release_17"}
+        conn_id="snowflake_default",
     ),
 )
 
@@ -24,7 +24,7 @@ profile_config = ProfileConfig(
 simple_dag_async = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "simple",
+        DBT_ROOT_PATH / "original_jaffle_shop",
     ),
     profile_config=profile_config,
     execution_config=ExecutionConfig(
@@ -34,10 +34,9 @@ simple_dag_async = DbtDag(
     render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
     # normal dag parameters
     schedule_interval=None,
-    start_date=datetime(2023, 1, 1),
+    start_date=datetime(2025, 1, 1),
     catchup=False,
     dag_id="example_cosmos_snowflake_async",
-    tags=["simple"],
-    operator_args={"location": "US", "install_deps": True},
+    tags=["async"],
+    # operator_args={"install_deps": True},
 )
-# [END airflow_async_execution_mode_example]

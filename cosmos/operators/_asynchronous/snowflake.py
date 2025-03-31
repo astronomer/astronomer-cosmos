@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import logging
-import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 import airflow
@@ -13,10 +10,9 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
-from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
+from cosmos.operators._asynchronous.base import configure_datasets, get_remote_sql
 from cosmos.operators.local import AbstractDbtLocalBase
-from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -39,7 +35,7 @@ def _mock_snowflake_adapter() -> None:
         self, sql, auto_begin=False, fetch=None, limit: Optional[int] = None
     ) -> Tuple[AdapterResponse, agate.Table]:
         # Note that in the dbt-snowflake repository, there is no SnowflakeAdapterResponse (the way that there is
-        # something similar for BigQuery.
+        # something similar for BigQuery).
         return AdapterResponse("mock_snowflake_adapter_response"), empty_table()
 
     SnowflakeConnectionManager.execute = execute
@@ -62,80 +58,17 @@ def _configure_snowflake_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
         raise CosmosValueError("Keyword argument 'sql' is required for Snowflake Async operator.")
 
     async_op_obj.sql = sql
-
     return async_op_obj
-
-
-class DbtRunAirflowAsyncOperatorMixin:
-    """Ideally, this logic should be put somewhere else. But it's here for now."""
-
-    @staticmethod
-    def configure_datasets(operator_kwargs: dict[str, Any], task_id: str) -> dict[str, Any]:
-        """
-        _configure_datasets
-
-        :param operator_kwargs: (dict[str, Any])
-        :param task_id: (str)
-        :return: (dict)
-        """
-        from airflow.datasets import DatasetAlias
-
-        # ignoring the type because older versions of Airflow raise the follow error in mypy
-        # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
-        dag_id = operator_kwargs.get("dag")
-        task_group_id = operator_kwargs.get("task_group")
-        operator_kwargs["outlets"] = [DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, task_id))]  # type: ignore
-
-        return operator_kwargs
-
-    @staticmethod
-    def get_remote_sql(async_context: dict[str, Any], project_dir: str) -> str:
-        # For logging
-        log = logging.getLogger(__name__)
-        start_time = time.time()
-
-        if not settings.AIRFLOW_IO_AVAILABLE:  # pragma: no cover
-            raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
-
-        from airflow.io.path import ObjectStoragePath
-
-        # file_path: None
-        # dbt_dag_task_group_identifier: for DAG/TaskGroup Cosmos builds, pull the ID
-        # remote: target_path_str: storage location for compiled SQL
-        file_path = async_context["dbt_node_config"]["file_path"]  # type: ignore
-        dbt_dag_task_group_identifier = async_context["dbt_dag_task_group_identifier"]
-        remote_target_path_str = str(remote_target_path).rstrip("/")
-
-        if TYPE_CHECKING:  # pragma: no cover
-            assert project_dir is not None
-
-        # project_dir_parent: None
-        # relative_file_path: None
-        # remote_model_path: str path to be used when configuring the ObjectStoragePath
-        # object_storage_path: ObjectStoragePath where compiled SQL/models are stored
-        project_dir_parent = str(Path(project_dir).parent)
-        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/run/{relative_file_path}"
-        object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
-
-        with object_storage_path.open() as fp:  # type: ignore
-            sql = fp.read()
-            elapsed_time = time.time() - start_time
-            log.info("SQL file download completed in %.2f seconds.", elapsed_time)
-            return sql  # type: ignore
 
 
 # This is no longer a SnowflakeOperator, meaning the SQLExecuteQueryOperator needs to be used. Does this make this
 # approach more widely applicable?
 
+
 # The SnowflakeOperator does not have deferrable support. We'll need to figure out another way to do this.
-
-
 class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLocalBase):  # type: ignore[misc]
-    template_fields: Sequence[str] = ("dataset", "compiled_sql")  # BigQuery included: gcp_project and location
-    template_fields_renderers = {
-        "compiled_sql": "sql",
-    }
+    template_fields: Sequence[str] = ("compiled_sql", "freshness")
+    template_fields_renderers = {"compiled_sql": "sql", "freshness": "json"}
 
     def __init__(
         self,
@@ -164,7 +97,7 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
 
         # Configure datasets. This uses the task_id set by AbstractDbtLocalBase
         if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
-            kwargs = DbtRunAirflowAsyncOperatorMixin.configure_datasets(operator_kwargs=kwargs, task_id=self.task_id)
+            kwargs = configure_datasets(operator_kwargs=kwargs, task_id=self.task_id)
 
         super().__init__(
             snowflake_conn_id=self.snowflake_conn_id,
@@ -177,8 +110,6 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
         self.async_context["profile_type"] = self.profile_config.get_profile_type()
         self.async_context["async_operator"] = SnowflakeSqlApiOperator
 
-        self.dataset: str = ""  # TODO: Why are we doing this
-
     @property
     def base_cmd(self) -> list[str]:
         return ["run"]
@@ -187,9 +118,7 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
         if settings.enable_setup_async_task:
             # sql is a required parameter for the SnowflakeSqlApiOperator, so this needs to be set. However, there are
             # no other required fields. The assumption is that this will be passed in via the connection
-            self.sql = DbtRunAirflowAsyncOperatorMixin.get_remote_sql(
-                async_context=self.async_context, project_dir=self.project_dir
-            )
+            self.sql = get_remote_sql(async_context=self.async_context, project_dir=self.project_dir)
             super().execute(context, **kwargs)
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
@@ -208,23 +137,17 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
 
-        # TODO: We'd need to figure this out
-        sql = DbtRunAirflowAsyncOperatorMixin.get_remote_sql(
-            async_context=self.async_context, project_dir=self.project_dir  # These would need to be passed in
-        ).strip()
+        sql = get_remote_sql(async_context=self.async_context, project_dir=self.project_dir).strip()
 
         self.log.debug("Executed SQL is: %s", sql)
-        self.compiled_sql = sql
+        self.compiled_sql = sql  # TODO: What is this being used for?
 
-        if self.profile_config.profile_mapping is not None:
-            profile = self.profile_config.profile_mapping.profile
-        else:
+        if not self.profile_config.profile_mapping:
             raise CosmosValueError(
                 "The `profile_config.profile`_mapping attribute must be defined to use `ExecutionMode.AIRFLOW_ASYNC`"
             )
 
         # self.gcp_project = profile["project"]  # This should only needed for BigQuery
-        self.dataset = profile["dataset"]  # TODO: Figure this out
         self._refresh_template_fields(context=context, session=session)
 
 

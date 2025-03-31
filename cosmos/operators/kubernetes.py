@@ -67,9 +67,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         default_args = kwargs.get("default_args", {})
         base_args = {}
-        for arg in {
-            *inspect.signature(AbstractDbtBase.__init__).parameters.keys()
-        }:
+        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
             try:
                 base_args[arg] = kwargs[arg]
             except KeyError:

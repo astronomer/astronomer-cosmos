@@ -20,7 +20,6 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
-from airflow.utils.session import NEW_SESSION, create_session, provide_session
 from airflow.version import version as airflow_version
 from attr import define
 from packaging.version import Version
@@ -32,7 +31,7 @@ from cosmos.cache import (
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
 )
-from cosmos.constants import FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
+from cosmos.constants import _AIRFLOW3_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
@@ -255,27 +254,35 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
         """
-        if not self.should_store_compiled_sql:
-            return
 
-        compiled_queries = {}
-        # dbt compiles sql files and stores them in the target directory
-        for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
-            for file_path in file_paths:
-                if not file_path.endswith(".sql"):
-                    continue
+        from airflow.utils.session import NEW_SESSION, provide_session
 
-                compiled_sql_path = Path(os.path.join(folder_path, file_path))
-                compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
+        @provide_session
+        def _store_compiled_sql(session: Session = NEW_SESSION) -> None:
 
-                relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
-                compiled_queries[relative_path] = compiled_sql.strip()
+            if not self.should_store_compiled_sql:
+                return
 
-        for name, query in compiled_queries.items():
-            self.compiled_sql += f"-- {name}\n{query}\n\n"
+            compiled_queries = {}
+            # dbt compiles sql files and stores them in the target directory
+            for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
+                for file_path in file_paths:
+                    if not file_path.endswith(".sql"):
+                        continue
 
-        self.compiled_sql = self.compiled_sql.strip()
-        self._refresh_template_fields(context)
+                    compiled_sql_path = Path(os.path.join(folder_path, file_path))
+                    compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
+
+                    relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
+                    compiled_queries[relative_path] = compiled_sql.strip()
+
+            for name, query in compiled_queries.items():
+                self.compiled_sql += f"-- {name}\n{query}\n\n"
+
+            self.compiled_sql = self.compiled_sql.strip()
+            self._refresh_template_fields(context)
+
+        _store_compiled_sql()
 
     @staticmethod
     def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
@@ -355,28 +362,33 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_object_storage_path.unlink()
             self.log.debug("Deleted %s to %s", file_path, dest_object_storage_path)
 
-    @provide_session
-    def store_freshness_json(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
+    def store_freshness_json(self, tmp_project_dir: str, context: Context) -> None:
         """
         Takes the compiled sources.json file from the dbt source freshness and stores it in the freshness rendered template.
         Gets called after every dbt run / source freshness.
         """
-        if not self.should_store_compiled_sql:
-            return
+        from airflow.utils.session import NEW_SESSION, provide_session
 
-        sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+        @provide_session
+        def _store_freshness_json(session: Session = NEW_SESSION) -> None:
+            if not self.should_store_compiled_sql:
+                return
 
-        if sources_json_path.exists():
-            sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+            sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
 
-            sources_data = json.loads(sources_json_content)
+            if sources_json_path.exists():
+                sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
 
-            formatted_sources_json = json.dumps(sources_data, indent=4)
+                sources_data = json.loads(sources_json_content)
 
-            self.freshness = formatted_sources_json
+                formatted_sources_json = json.dumps(sources_data, indent=4)
 
-        else:
-            self.freshness = ""
+                self.freshness = formatted_sources_json
+
+            else:
+                self.freshness = ""
+
+        _store_freshness_json()
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
@@ -466,7 +478,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         outlets = self.get_datasets("outputs")
         self.log.info("Inlets: %s", inlets)
         self.log.info("Outlets: %s", outlets)
-        self.register_dataset(inlets, outlets, context)
+        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+            self.register_dataset(inlets, outlets, context)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -476,8 +489,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
     def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
-        self.store_freshness_json(tmp_project_dir, context)
-        self.store_compiled_sql(tmp_project_dir, context)
+        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+            self.store_freshness_json(tmp_project_dir, context)
+            self.store_compiled_sql(tmp_project_dir, context)
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
@@ -643,6 +657,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
+        from airflow.utils.session import create_session
+
         if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
@@ -744,17 +760,24 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             if arg_key in base_operator_args:
                 base_operator_kwargs[arg_key] = arg_value
         AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
-        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
-            from airflow.datasets import DatasetAlias
+        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+            if (
+                kwargs.get("emit_datasets", True)
+                and settings.enable_dataset_alias
+                and AIRFLOW_VERSION >= Version("2.10")
+            ):
+                from airflow.datasets import DatasetAlias
 
-            # ignoring the type because older versions of Airflow raise the follow error in mypy
-            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
-            dag_id = kwargs.get("dag")
-            task_group_id = kwargs.get("task_group")
-            base_operator_kwargs["outlets"] = [
-                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
-            ]  # type: ignore
-        BaseOperator.__init__(self, **base_operator_kwargs)
+                # ignoring the type because older versions of Airflow raise the follow error in mypy
+                # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+                dag_id = kwargs.get("dag")
+                task_group_id = kwargs.get("task_group")
+                base_operator_kwargs["outlets"] = [
+                    DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+                ]  # type: ignore
+        if "task_id" in base_operator_kwargs:
+            base_operator_kwargs.pop("task_id")
+        BaseOperator.__init__(self, task_id=self.task_id, **base_operator_kwargs)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

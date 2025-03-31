@@ -167,3 +167,5 @@ DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}"
 TELEMETRY_VERSION = "v1"
 TELEMETRY_TIMEOUT = 1.0
+
+_AIRFLOW3_VERSION = Version("3.0.0a1")

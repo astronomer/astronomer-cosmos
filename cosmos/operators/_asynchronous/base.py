@@ -63,9 +63,12 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[mi
         )
 
     def create_async_operator(self) -> Any:
+        """
+        create_async_operator parses the profile_config and loads in the appropriate asynchronous class.
 
+        :return: (Any) The asynchronous operator class
+        """
         profile_type = self.profile_config.get_profile_type()
+        async_operator_class = _create_async_operator_class(profile_type, "DbtRun")
 
-        async_class_operator = _create_async_operator_class(profile_type, "DbtRun")
-
-        return async_class_operator
+        return async_operator_class

@@ -227,7 +227,30 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return dbt_runner.handle_exception_if_needed(result)
 
     @provide_session
-    def store_compiled_sql(self, tmp_project_dir: str, context: Context, session: Session = NEW_SESSION) -> None:
+    def _refresh_template_fields(self, context: Context, session: Session = NEW_SESSION) -> None:
+        from airflow.models.renderedtifields import RenderedTaskInstanceFields
+
+        # need to refresh the rendered task field record in the db because Airflow only does this
+        # before executing the task, not after
+        ti = context["ti"]
+
+        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
+            if TYPE_CHECKING:  # pragma: no cover
+                assert ti.task is not None
+            ti.task.template_fields = self.template_fields
+            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
+
+            # delete the old records
+            session.query(RenderedTaskInstanceFields).filter(
+                RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
+                RenderedTaskInstanceFields.task_id == self.task_id,
+                RenderedTaskInstanceFields.run_id == ti.run_id,
+            ).delete()
+            session.add(rtif)
+        else:  # pragma: no cover
+            self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+
+    def store_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
         """
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
@@ -252,28 +275,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.compiled_sql += f"-- {name}\n{query}\n\n"
 
         self.compiled_sql = self.compiled_sql.strip()
-
-        # need to refresh the rendered task field record in the db because Airflow only does this
-        # before executing the task, not after
-        from airflow.models.renderedtifields import RenderedTaskInstanceFields
-
-        ti = context["ti"]
-
-        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
-            if TYPE_CHECKING:
-                assert ti.task is not None
-            ti.task.template_fields = self.template_fields
-            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
-            # delete the old records
-            session.query(RenderedTaskInstanceFields).filter(
-                RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
-                RenderedTaskInstanceFields.task_id == self.task_id,
-                RenderedTaskInstanceFields.run_id == ti.run_id,
-            ).delete()
-            session.add(rtif)
-        else:
-            self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+        self._refresh_template_fields(context)
 
     @staticmethod
     def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:

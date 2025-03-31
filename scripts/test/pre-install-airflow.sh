@@ -37,12 +37,14 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFL
   uv pip install "apache-airflow-providers-amazon" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
   uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
+  # TODO: Include Snowflake version
   uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install pyopenssl --upgrade
 elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install  "apache-airflow-providers-google>10.11" "apache-airflow==$AIRFLOW_VERSION"
+  # TODO: Include Snowflake version
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
@@ -56,6 +58,7 @@ else
   # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
   # version does not meet our requirements.
   uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install "apache-airflow-providers-snowflake>=6.1.1" "apache-airflow==$AIRFLOW_VERSION"
 
   # The Airflow 2.8 constraints file at
   # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt

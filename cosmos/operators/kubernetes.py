@@ -77,8 +77,8 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
                     base_args[arg] = default_args[arg]
                 except KeyError:
                     pass
-
         AbstractDbtBase.__init__(self, **base_args)
+
         operator_args = {}
         for arg in {
             *inspect.signature(KubernetesPodOperator.__init__).parameters.keys(),

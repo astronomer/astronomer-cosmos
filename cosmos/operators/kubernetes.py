@@ -65,29 +65,25 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
-        default_args = kwargs.get("default_args", {})
-        base_args = {}
-        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
-            try:
-                base_args[arg] = kwargs[arg]
-            except KeyError:
-                try:
-                    base_args[arg] = default_args[arg]
-                except KeyError:
-                    pass
-        AbstractDbtBase.__init__(self, **base_args)
-
-        operator_args = {}
-        for arg in {
+        operator_args = {
             *inspect.signature(KubernetesPodOperator.__init__).parameters.keys(),
             *inspect.signature(BaseOperator.__init__).parameters.keys(),
-        }:
-            try:
-                operator_args[arg] = kwargs[arg]
-            except KeyError:
-                pass
+        }
+        operator_kwargs = {}
 
-        KubernetesPodOperator.__init__(self, **operator_args)
+        adb_args = {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}
+        adb_kwargs = {}
+
+        for arg, value in kwargs.items():
+            adb_arg = arg in adb_args
+            if adb_arg:
+                adb_kwargs[arg] = value
+            if not adb_arg or arg in operator_args:
+                operator_kwargs[arg] = value
+
+        AbstractDbtBase.__init__(self, **adb_kwargs)
+        KubernetesPodOperator.__init__(self, **operator_kwargs)
+
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
         env_vars_dict: dict[str, str] = dict()

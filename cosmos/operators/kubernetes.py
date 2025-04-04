@@ -66,24 +66,27 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         default_args = kwargs.get("default_args", {})
-        operator_kwargs = {**kwargs}
-        operator_args = {
-            *inspect.signature(KubernetesPodOperator.__init__).parameters.keys(),
-            *inspect.signature(BaseOperator.__init__).parameters.keys(),
-        }
 
         base_kwargs = {}
         for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
             try:
                 base_kwargs[arg] = kwargs[arg]
-                if arg not in operator_args:
-                    operator_kwargs.pop(arg)
             except KeyError:
                 try:
                     base_kwargs[arg] = default_args[arg]
                 except KeyError:
                     pass
         AbstractDbtBase.__init__(self, **base_kwargs)
+
+        operator_kwargs = {}
+        for arg in {
+            *inspect.signature(KubernetesPodOperator.__init__).parameters.keys(),
+            *inspect.signature(BaseOperator.__init__).parameters.keys(),
+        }:
+            try:
+                operator_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                pass
         KubernetesPodOperator.__init__(self, **operator_kwargs)
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:

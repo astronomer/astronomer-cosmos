@@ -84,7 +84,6 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         AbstractDbtBase.__init__(self, **adb_kwargs)
         KubernetesPodOperator.__init__(self, **operator_kwargs)
 
-
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
         env_vars_dict: dict[str, str] = dict()
 

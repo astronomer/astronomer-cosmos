@@ -74,7 +74,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         adb_args = {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}
         adb_kwargs = {}
 
-        for arg, value in kwargs.items():
+        for arg, value in {**kwargs.get("default_args", {}), **kwargs}.items():
             adb_arg = arg in adb_args
             if adb_arg:
                 adb_kwargs[arg] = value

@@ -12,8 +12,8 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 DBT_ADAPTER_VERSION = os.getenv("DBT_ADAPTER_VERSION", "1.9")
 
 profile_config = ProfileConfig(
-    profile_name="default",
-    target_name="dev",
+    profile_name="default",  # TODO: Figure this out
+    target_name="dev",  # TODO: Figure this out
     profile_mapping=SnowflakeUserPasswordProfileMapping(
         conn_id="snowflake_default",
     ),
@@ -38,5 +38,5 @@ simple_dag_async = DbtDag(
     catchup=False,
     dag_id="example_cosmos_snowflake_async",
     tags=["async"],
-    # operator_args={"install_deps": True},
+    operator_args={"install_deps": True},
 )

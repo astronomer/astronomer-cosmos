@@ -10,8 +10,9 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
+from cosmos.dataset import configure_datasets
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators._asynchronous.base import configure_datasets, get_remote_sql
+from cosmos.io import get_remote_sql
 from cosmos.operators.local import AbstractDbtLocalBase
 
 if TYPE_CHECKING:
@@ -58,14 +59,11 @@ def _configure_snowflake_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
         raise CosmosValueError("Keyword argument 'sql' is required for Snowflake Async operator.")
 
     async_op_obj.sql = sql
+
     return async_op_obj
 
 
-# This is no longer a SnowflakeOperator, meaning the SQLExecuteQueryOperator needs to be used. Does this make this
-# approach more widely applicable?
-
-
-# The SnowflakeOperator does not have deferrable support. We'll need to figure out another way to do this.
+# This is no longer a SnowflakeOperator, meaning the SQLExecuteQueryOperator needs to be used.
 class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLocalBase):  # type: ignore[misc]
     template_fields: Sequence[str] = ("compiled_sql", "freshness")
     template_fields_renderers = {"compiled_sql": "sql", "freshness": "json"}
@@ -97,7 +95,7 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
 
         # Configure datasets. This uses the task_id set by AbstractDbtLocalBase
         if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
-            kwargs = configure_datasets(operator_kwargs=kwargs, task_id=self.task_id)
+            configure_datasets(operator_kwargs=kwargs, task_id=self.task_id)
 
         super().__init__(
             snowflake_conn_id=self.snowflake_conn_id,
@@ -140,7 +138,7 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
         sql = get_remote_sql(async_context=self.async_context, project_dir=self.project_dir).strip()
 
         self.log.debug("Executed SQL is: %s", sql)
-        self.compiled_sql = sql  # TODO: What is this being used for?
+        self.compiled_sql = sql
 
         if not self.profile_config.profile_mapping:
             raise CosmosValueError(

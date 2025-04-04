@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
 import os
+import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from cosmos import settings
 from cosmos.constants import DEFAULT_TARGET_PATH, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP
 from cosmos.exceptions import CosmosValueError
+from cosmos.settings import AIRFLOW_IO_AVAILABLE, remote_target_path, remote_target_path_conn_id
+
+log = logging.getLogger(__name__)
 
 
 def upload_to_aws_s3(
@@ -214,3 +219,44 @@ def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARG
         )
         dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
         ObjectStoragePath(file_path).copy(dest_object_storage_path)
+
+
+def get_remote_sql(async_context: dict[str, Any], project_dir: str) -> str:
+    """
+    Fetches remote SQL from the remote_target_path.
+
+    :param async_context: (dict[str, Any])
+    :param project_dir: (str)
+    :return: (str)
+    """
+    start_time = time.time()
+
+    if not AIRFLOW_IO_AVAILABLE:  # pragma: no cover
+        raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
+
+    from airflow.io.path import ObjectStoragePath
+
+    # file_path: None
+    # dbt_dag_task_group_identifier: for DAG/TaskGroup Cosmos builds, pull the ID
+    # remote: target_path_str: storage location for compiled SQL
+    file_path = async_context["dbt_node_config"]["file_path"]  # type: ignore
+    dbt_dag_task_group_identifier = async_context["dbt_dag_task_group_identifier"]
+    remote_target_path_str = str(remote_target_path).rstrip("/")
+
+    if TYPE_CHECKING:  # pragma: no cover
+        assert project_dir is not None
+
+    # project_dir_parent: str path for the parent of the project_dir
+    # relative_file_path: pull the relative path for file_path
+    # remote_model_path: str path to be used when configuring the ObjectStoragePath
+    # object_storage_path: ObjectStoragePath where compiled SQL/models are stored
+    project_dir_parent = str(Path(project_dir).parent)
+    relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+    remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/run/{relative_file_path}"
+    object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
+
+    with object_storage_path.open() as fp:  # type: ignore
+        sql = fp.read()
+        elapsed_time = time.time() - start_time
+        log.info("SQL file download completed in %.2f seconds.", elapsed_time)
+        return sql  # type: ignore

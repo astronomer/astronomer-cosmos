@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 
@@ -31,3 +33,23 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     identifiers_list.append(task_id.split(".")[-1])
 
     return "__".join(identifiers_list)
+
+
+# TODO: This should live somewhere else...
+def configure_datasets(operator_kwargs: dict[str, Any], task_id: str) -> None:
+    """
+    Sets the outlets for the operator by creating a DatasetAlias.
+
+    :param operator_kwargs: (dict[str, Any])
+    :param task_id: (str)
+    :return: None
+    """
+    from airflow.datasets import DatasetAlias
+
+    # ignoring the type because older versions of Airflow raise the follow error in mypy
+    # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+    dag_id = operator_kwargs.get("dag")
+    task_group_id = operator_kwargs.get("task_group")
+    operator_kwargs["outlets"] = [
+        DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, task_id))
+    ]  # type: ignore

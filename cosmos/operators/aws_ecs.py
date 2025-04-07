@@ -87,7 +87,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         operator_args = {
             *inspect.signature(EcsRunTaskOperator.__init__).parameters.keys(),
             *inspect.signature(EcsBaseOperator.__init__).parameters.keys(),
-            *inspect.signature(AwsBaseOperator[EcsHook]).parameters.keys(),
+            *inspect.signature(AwsBaseOperator[EcsHook].__init__).parameters.keys(),
             *inspect.signature(BaseOperator.__init__).parameters.keys(),
         }
 

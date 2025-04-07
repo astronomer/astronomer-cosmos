@@ -28,9 +28,9 @@ DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 from airflow.models import BaseOperator
 
 try:
-    from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator, EcsBaseOperator
     from airflow.providers.amazon.aws.hooks.ecs import EcsHook
     from airflow.providers.amazon.aws.operators.base_aws import AwsBaseOperator
+    from airflow.providers.amazon.aws.operators.ecs import EcsBaseOperator, EcsRunTaskOperator
 except ImportError:  # pragma: no cover
     raise ImportError(
         "Could not import EcsRunTaskOperator. Ensure you've installed the Amazon Web Services provider "

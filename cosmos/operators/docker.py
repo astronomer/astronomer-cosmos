@@ -20,6 +20,7 @@ from cosmos.operators.base import (
     DbtTestMixin,
 )
 
+from airflow.models import BaseOperator
 # docker is an optional dependency, so we need to check if it's installed
 try:
     from airflow.providers.docker.operators.docker import DockerOperator
@@ -54,7 +55,6 @@ class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
                 "Airflow connections are not available in the Docker container for the mapping to work."
             )
 
-        super().__init__(image=image, **kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -62,13 +62,27 @@ class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         kwargs["image"] = image
-        base_operator_args = set(inspect.signature(DockerOperator.__init__).parameters.keys())
+
+        default_args = kwargs.get("default_args", {})
+        operator_kwargs = {**kwargs}
+        operator_args = {
+            *inspect.signature(DockerOperator.__init__).parameters.keys(),
+            *inspect.signature(BaseOperator.__init__).parameters.keys(),
+        }
+
         base_kwargs = {}
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in base_operator_args:
-                base_kwargs[arg_key] = arg_value
-        base_kwargs["task_id"] = kwargs["task_id"]
-        DockerOperator.__init__(self, **base_kwargs)
+        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
+            try:
+                base_kwargs[arg] = kwargs[arg]
+                if arg not in operator_args:
+                    operator_kwargs.pop(arg)
+            except KeyError:
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
+        AbstractDbtBase.__init__(self, **base_kwargs)
+        DockerOperator.__init__(self, **operator_kwargs)
 
     def build_and_run_cmd(
         self,

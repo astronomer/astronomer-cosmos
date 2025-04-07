@@ -747,17 +747,25 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         abstract_dbt_local_base_kwargs = {}
-        base_operator_kwargs = {}
-        abstract_dbt_local_base_args_keys = (
-            inspect.getfullargspec(AbstractDbtBase.__init__).args
-            + inspect.getfullargspec(AbstractDbtLocalBase.__init__).args
-        )
-        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in abstract_dbt_local_base_args_keys:
-                abstract_dbt_local_base_kwargs[arg_key] = arg_value
-            if arg_key in base_operator_args:
-                base_operator_kwargs[arg_key] = arg_value
+        base_operator_kwargs = {**kwargs}
+        base_operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
+
+        default_args = kwargs.get("default_args", {})
+
+        for arg in {
+            *inspect.getfullargspec(AbstractDbtBase.__init__).args
+            *inspect.getfullargspec(AbstractDbtLocalBase.__init__).args
+        }:
+            try:
+                abstract_dbt_local_base_kwargs[arg] = kwargs[arg]
+                if arg not in base_operator_args:
+                    base_operator_kwargs.pop(arg)
+            except KeyError:
+                try:
+                    abstract_dbt_local_base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
+
         AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
         if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
             if (

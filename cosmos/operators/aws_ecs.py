@@ -25,6 +25,7 @@ DEFAULT_CONN_ID = "aws_default"
 DEFAULT_CONTAINER_NAME = "dbt"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
+from airflow.models import BaseOperator
 try:
     from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 except ImportError:  # pragma: no cover
@@ -72,21 +73,32 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "overrides": None,
             }
         )
-        super().__init__(**kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
-        base_operator_args = set(inspect.signature(EcsRunTaskOperator.__init__).parameters.keys())
+        default_args = kwargs.get("default_args", {})
+        operator_kwargs = {**kwargs}
+        operator_args = {
+            *inspect.signature(EcsRunTaskOperator.__init__).parameters.keys(),
+            *inspect.signature(BaseOperator.__init__).parameters.keys(),
+        }
+
         base_kwargs = {}
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in base_operator_args:
-                base_kwargs[arg_key] = arg_value
-        base_kwargs["task_id"] = kwargs["task_id"]
-        base_kwargs["aws_conn_id"] = aws_conn_id
-        EcsRunTaskOperator.__init__(self, **base_kwargs)
+        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
+            try:
+                base_kwargs[arg] = kwargs[arg]
+                if arg not in operator_args:
+                    operator_kwargs.pop(arg)
+            except KeyError:
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
+        AbstractDbtBase.__init__(self, **base_kwargs)
+        EcsRunTaskOperator.__init__(self, **operator_kwargs)
 
     def build_and_run_cmd(
         self,

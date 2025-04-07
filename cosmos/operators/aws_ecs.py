@@ -26,6 +26,7 @@ DEFAULT_CONTAINER_NAME = "dbt"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 from airflow.models import BaseOperator
+
 try:
     from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 except ImportError:  # pragma: no cover

@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable, Sequence
 
+from airflow.models import BaseOperator
 from airflow.utils.context import Context
 
 from cosmos.config import ProfileConfig
@@ -19,7 +20,6 @@ from cosmos.operators.base import (
     DbtTestMixin,
 )
 
-from airflow.models import BaseOperator
 # ACI is an optional dependency, so we need to check if it's installed
 try:
     from airflow.providers.microsoft.azure.operators.container_instances import AzureContainerInstancesOperator
@@ -92,7 +92,6 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
                     pass
         AbstractDbtBase.__init__(self, **base_kwargs)
         AzureContainerInstancesOperator.__init__(self, **operator_kwargs)
-
 
     def build_and_run_cmd(
         self,

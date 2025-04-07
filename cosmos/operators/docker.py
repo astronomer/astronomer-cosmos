@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable, Sequence
 
+from airflow.models import BaseOperator
 from airflow.utils.context import Context
 
 from cosmos.config import ProfileConfig
@@ -20,7 +21,6 @@ from cosmos.operators.base import (
     DbtTestMixin,
 )
 
-from airflow.models import BaseOperator
 # docker is an optional dependency, so we need to check if it's installed
 try:
     from airflow.providers.docker.operators.docker import DockerOperator

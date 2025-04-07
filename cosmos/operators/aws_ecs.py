@@ -31,6 +31,7 @@ try:
     from airflow.providers.amazon.aws.hooks.ecs import EcsHook
     from airflow.providers.amazon.aws.operators.base_aws import AwsBaseOperator
     from airflow.providers.amazon.aws.operators.ecs import EcsBaseOperator, EcsRunTaskOperator
+    from airflow.providers.amazon import __version__ as provider_version
 except ImportError:  # pragma: no cover
     raise ImportError(
         "Could not import EcsRunTaskOperator. Ensure you've installed the Amazon Web Services provider "
@@ -72,10 +73,13 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "aws_conn_id": aws_conn_id,
                 "task_definition": task_definition,
                 "cluster": cluster,
-                "container_name": container_name,
                 "overrides": None,
             }
         )
+
+        if provider_version >= "9.3.0":
+            kwargs['container_name'] = container_name
+
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit

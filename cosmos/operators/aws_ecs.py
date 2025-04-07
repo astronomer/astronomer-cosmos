@@ -30,7 +30,6 @@ from airflow.models import BaseOperator
 try:
     from airflow.providers.amazon import __version__ as provider_version
     from airflow.providers.amazon.aws.hooks.ecs import EcsHook
-    from airflow.providers.amazon.aws.operators.base_aws import AwsBaseOperator
     from airflow.providers.amazon.aws.operators.ecs import EcsBaseOperator, EcsRunTaskOperator
 except ImportError:  # pragma: no cover
     raise ImportError(
@@ -38,6 +37,10 @@ except ImportError:  # pragma: no cover
         "separately or with `pip install astronomer-cosmos[...,aws-ecs]`."
     )  # pragma: no cover
 
+try:
+    from airflow.providers.amazon.aws.operators.base_aws import AwsBaseOperator
+except ImportError:
+    AwsBaseOperator = None
 
 class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore
     """
@@ -91,7 +94,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         operator_args = {
             *inspect.signature(EcsRunTaskOperator.__init__).parameters.keys(),
             *inspect.signature(EcsBaseOperator.__init__).parameters.keys(),
-            *inspect.signature(AwsBaseOperator[EcsHook].__init__).parameters.keys(),
+            *(inspect.signature(AwsBaseOperator[EcsHook].__init__).parameters.keys() if AwsBaseOperator else {}),
             *inspect.signature(BaseOperator.__init__).parameters.keys(),
         }
 

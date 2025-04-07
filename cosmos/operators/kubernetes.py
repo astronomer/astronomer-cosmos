@@ -73,7 +73,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         }
 
         base_kwargs = {}
-        for arg in {"full_refresh", *inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
+        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
             try:
                 base_kwargs[arg] = kwargs[arg]
                 if arg not in operator_args:

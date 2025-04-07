@@ -753,8 +753,8 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         default_args = kwargs.get("default_args", {})
 
         for arg in {
-            *inspect.getfullargspec(AbstractDbtBase.__init__).args
-            * inspect.getfullargspec(AbstractDbtLocalBase.__init__).args
+            *inspect.getfullargspec(AbstractDbtBase.__init__).args,
+            *inspect.getfullargspec(AbstractDbtLocalBase.__init__).args,
         }:
             try:
                 abstract_dbt_local_base_kwargs[arg] = kwargs[arg]

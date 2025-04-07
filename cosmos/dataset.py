@@ -35,7 +35,6 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
-# TODO: This should live somewhere else...
 def configure_datasets(operator_kwargs: dict[str, Any], task_id: str) -> None:
     """
     Sets the outlets for the operator by creating a DatasetAlias.

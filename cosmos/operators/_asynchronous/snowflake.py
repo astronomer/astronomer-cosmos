@@ -59,11 +59,9 @@ def _configure_snowflake_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
         raise CosmosValueError("Keyword argument 'sql' is required for Snowflake Async operator.")
 
     async_op_obj.sql = sql
-
     return async_op_obj
 
 
-# This is no longer a SnowflakeOperator, meaning the SQLExecuteQueryOperator needs to be used.
 class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLocalBase):  # type: ignore[misc]
     template_fields: Sequence[str] = ("compiled_sql", "freshness")
     template_fields_renderers = {"compiled_sql": "sql", "freshness": "json"}
@@ -145,7 +143,6 @@ class DbtRunAirflowAsyncSnowflakeOperator(SnowflakeSqlApiOperator, AbstractDbtLo
                 "The `profile_config.profile`_mapping attribute must be defined to use `ExecutionMode.AIRFLOW_ASYNC`"
             )
 
-        # self.gcp_project = profile["project"]  # This should only needed for BigQuery
         self._refresh_template_fields(context=context, session=session)
 
 

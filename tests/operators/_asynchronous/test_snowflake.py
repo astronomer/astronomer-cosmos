@@ -18,7 +18,6 @@ def profile_config_mock():
     mock_config = MagicMock(spec=ProfileConfig)
     mock_config.get_profile_type.return_value = "snowflake"
     mock_config.profile_mapping.conn_id = "snowflake_default"
-    mock_config.profile_mapping.profile = {"dataset": "test_dataset"}
     return mock_config
 
 
@@ -38,12 +37,16 @@ def test_dbt_run_airflow_async_snowflake_operator_init(profile_config_mock):
 
     assert isinstance(operator, DbtRunAirflowAsyncSnowflakeOperator)
     assert isinstance(operator, SnowflakeSqlApiOperator)
+
     assert operator.project_dir == "/path/to/project"
     assert operator.profile_config == profile_config_mock
     assert operator.snowflake_conn_id == "snowflake_default"
 
     # This should start as None
     assert operator.sql is None
+
+    assert operator.async_context["profile_type"] == "snowflake"
+    assert operator.async_context["async_operator"] == SnowflakeSqlApiOperator
 
 
 def test_configure_snowflake_async_op_args_missing_sql(async_operator_mock):

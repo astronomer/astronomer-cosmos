@@ -39,7 +39,7 @@ from cosmos.constants import (
     SourceRenderingBehavior,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import copy_dbt_packages, create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
@@ -522,7 +522,7 @@ class DbtGraph:
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_LS_FILE: self.load_via_dbt_ls_file,
-            LoadMode.DBT_LS_CACHE: self.load_via_dbt_ls_cache,
+            LoadMode.DBT_LS_CACHE: self.load_via_dbt_ls,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
 
@@ -658,7 +658,53 @@ class DbtGraph:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
             tmpdir_path = Path(tmpdir)
 
-            create_symlinks(project_path, tmpdir_path, self.should_install_dbt_deps)
+            """
+            Cosmos 1.9.2:
+            
+            true 10 s / 2 s
+            dbt deps - render 1 + NT
+            dbt deps - task - NT
+            dbt deps - 1 + 2NT
+            
+            1 + 2NT -> 10 + 100*2*10 = 2010
+                    -> 2 + 100*2*2 = 402
+            
+            
+            1. Creates the temporary folder and it IGNORES the dbt_packages folder
+               - not symbolic linked
+               - not copied
+            
+            dbt deps
+            - craetes a folder dbt_packages <- all the dependencies are downloaded/mounted here
+            - cached file with the state of the dbt packages
+            
+            
+            
+            
+            Scenarios:
+            
+            The value of ignore_dbt_packages tells the function `create_symlinks` that we should not create a symbolic
+            lynk for the `dbt_packages` folder. This can be desired in one or more of the two circumstances:
+            1. If we want to freshly install dbt packages (install_dbt_deps = True)
+            2. If we want to copy the dbt_packages folder instead of creating a symbolic link (copy_dbt_packages = True)
+            
+            | install_dbt_deps | copy_dbt_packages | create_symlinks.ignore_dbt_packages | what happens            |
+            --------------------------------------------------------------------------------------------------------
+            | False            | False             | False                               | will create symlink     |
+            | True             | False             | True                                | will not create symlink |
+          ? | False            | True              | True                                | will not create symlink |
+          * | True             | True              | True                                | will not create symlink |
+            """
+            breakpoint()
+
+            create_symlinks(
+                project_path,
+                tmpdir_path,
+                ignore_dbt_packages=self.should_install_dbt_deps or self.project.copy_dbt_packages
+            )
+
+            if self.project.copy_dbt_packages:
+                copy_dbt_packages(project_path, tmpdir_path)
 
             latest_partial_parse = None
             if self.project.partial_parse:

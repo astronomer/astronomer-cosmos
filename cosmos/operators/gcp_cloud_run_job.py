@@ -81,8 +81,6 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
                 "project_id": project_id,
                 "region": region,
                 "job_name": job_name,
-                "command": command,
-                "environment_variables": environment_variables,
             }
         )
 

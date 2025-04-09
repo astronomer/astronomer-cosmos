@@ -49,7 +49,7 @@ sh scripts/airflow3/setup.sh
 Activate the virtual env created in previous step and run airflow
 
 ```commandline
-source "$(pwd)/scripts/airflow3/venv/bin/activate"
+source "$(pwd)/scripts/airflow3/venv-af3/bin/activate"
 
 airflow standalone
 ```
@@ -67,7 +67,7 @@ Once Airflow is running, you can also run tests.
 ```commandline
 source scripts/airflow3/env.sh
 
-source "$(pwd)/scripts/airflow3/venv/bin/activate"
+source "$(pwd)/scripts/airflow3/venv-af3/bin/activate"
 
 sh scripts/airflow3/tests.sh
 ```

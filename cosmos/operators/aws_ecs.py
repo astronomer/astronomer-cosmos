@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
         "separately or with `pip install astronomer-cosmos[...,aws-ecs]`."
     )  # pragma: no cover
 
+
 class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore
     """
     Executes a dbt core cli command in an ECS Task instance with dbt installed in it.

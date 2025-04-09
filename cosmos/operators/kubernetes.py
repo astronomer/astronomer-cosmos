@@ -69,7 +69,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         operator_kwargs = {**kwargs}
         operator_args = set()
         for clazz in KubernetesPodOperator.__mro__:
-            operator_args.update(inspect.signature(clazz).parameters.keys())
+            operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
             if clazz == BaseOperator:
                 break
 

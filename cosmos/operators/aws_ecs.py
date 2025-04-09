@@ -29,19 +29,12 @@ from airflow.models import BaseOperator
 
 try:
     from airflow.providers.amazon import __version__ as provider_version
-    from airflow.providers.amazon.aws.hooks.ecs import EcsHook
-    from airflow.providers.amazon.aws.operators.ecs import EcsBaseOperator, EcsRunTaskOperator
+    from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 except ImportError:  # pragma: no cover
     raise ImportError(
         "Could not import EcsRunTaskOperator. Ensure you've installed the Amazon Web Services provider "
         "separately or with `pip install astronomer-cosmos[...,aws-ecs]`."
     )  # pragma: no cover
-
-try:
-    from airflow.providers.amazon.aws.operators.base_aws import AwsBaseOperator
-except ImportError:
-    AwsBaseOperator = None
-
 
 class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore
     """
@@ -92,12 +85,12 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         default_args = kwargs.get("default_args", {})
         operator_kwargs = {**kwargs}
-        operator_args = {
-            *inspect.signature(EcsRunTaskOperator.__init__).parameters.keys(),
-            *inspect.signature(EcsBaseOperator.__init__).parameters.keys(),
-            *(inspect.signature(AwsBaseOperator[EcsHook].__init__).parameters.keys() if AwsBaseOperator else []),
-            *inspect.signature(BaseOperator.__init__).parameters.keys(),
-        }
+
+        operator_args = set()
+        for clazz in EcsRunTaskOperator.__mro__:
+            operator_args.update(inspect.signature(clazz).parameters.keys())
+            if clazz == BaseOperator:
+                break
 
         base_kwargs = {}
         for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:

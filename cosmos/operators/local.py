@@ -17,7 +17,11 @@ import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.models import BaseOperator
+
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.version import version as airflow_version
@@ -735,7 +739,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.subprocess_hook.send_sigterm()
 
 
-class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
+class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
 
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
 

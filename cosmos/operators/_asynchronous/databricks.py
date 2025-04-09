@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from airflow.models.baseoperator import BaseOperator
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
 from airflow.utils.context import Context
 
 
-class DbtRunAirflowAsyncDatabricksOperator(BaseOperator):
+class DbtRunAirflowAsyncDatabricksOperator(BaseOperator):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 

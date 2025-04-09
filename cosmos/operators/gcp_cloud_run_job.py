@@ -86,7 +86,7 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
 
         default_args = kwargs.get("default_args", {})
         operator_kwargs = {**kwargs}
-        operator_args = set()
+        operator_args: set[str] = set()
         for clazz in CloudRunExecuteJobOperator.__mro__:
             operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
             if clazz == BaseOperator:

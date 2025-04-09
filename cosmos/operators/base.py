@@ -7,19 +7,14 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
-import airflow
 import yaml
 from airflow.utils.context import Context, context_merge
-from packaging.version import Version
 
-from cosmos.constants import _AIRFLOW3_VERSION
-
-AIRFLOW_VERSION = Version(airflow.__version__)
-
-if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+try:
     from airflow.utils.operator_helpers import context_to_airflow_vars
-else:
+except ImportError:  # pragma: no cover
     from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore
+
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt

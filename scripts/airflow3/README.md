@@ -85,19 +85,25 @@ After running the standalone command, you can access the Airflow web interface t
 
 If you want to install Airflow from the main branch, follow the steps from sections 1, 2, and 3 above. Then, proceed with the following steps:
 
-### 7.1 Activate the Virtual Environment
+### 7.1 Set ENV AIRFLOW_REPO_DIR
+
+Set ENV `AIRFLOW_REPO_DIR` in scripts/airflow3/env.sh pointing to Airflow repository
+
+### 7.2 Activate the Virtual Environment
 
 ```commandline
+source scripts/airflow3/env.sh
+
 source "$(pwd)/scripts/airflow3/venv-af3/bin/activate"
 ```
 
-### 7.2 Install Airflow from the Main Branch
+### 7.3 Install Airflow from the Main Branch
 
 ```commandline
 sh scripts/airflow3/install_from_main.sh
 ```
 
-### 7.3 Run Airflow standalone
+### 7.4 Run Airflow standalone
 
 Finally, run Airflow in standalone mode again:
 

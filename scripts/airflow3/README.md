@@ -4,7 +4,7 @@ This guide will walk you through the process of setting up Apache Airflow 3 loca
 
 ## 1. Setup Postgres Container
 
-By default, SQLite will be used unless you update the AIRFLOW__DATABASE__SQL_ALCHEMY_CONN environment variable to point to PostgreSQL. The following command will pull the official Postgres image, create a container named postgres, and expose the required ports.
+By default, SQLite will be used as Airflow metadata database unless you update the AIRFLOW__DATABASE__SQL_ALCHEMY_CONN environment variable to point to PostgreSQL. We spawn Postgres container to use Postgres profile in Cosmos DAGs. The following command will pull the official Postgres image , create a container named postgres, and expose the required ports.
 
 ### 1.1 Pull Postgres Image
 
@@ -30,7 +30,7 @@ CREATE DATABASE airflow_db;
 
 ## 2. Setup Virtual Environment for Airflow3
 
-With your Postgres container running and your database set up, you need to configure the virtual environment for Airflow3.
+You need to configure the virtual environment for Airflow3.
 
 ### 2.1 Export ENV
 
@@ -87,7 +87,7 @@ If you want to install Airflow from the main branch, follow the steps from secti
 
 ### 7.1 Set ENV AIRFLOW_REPO_DIR
 
-Set ENV `AIRFLOW_REPO_DIR` in scripts/airflow3/env.sh pointing to Airflow repository
+Set ENV `AIRFLOW_REPO_DIR` in scripts/airflow3/env.sh pointing to the path where your Airflow repository is cloned.
 
 ### 7.2 Activate the Virtual Environment
 

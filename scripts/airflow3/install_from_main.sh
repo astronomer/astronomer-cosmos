@@ -7,6 +7,8 @@ set -e
 : "${AIRFLOW_REPO_DIR:?Environment variable AIRFLOW_REPO_DIR is not set}"
 echo "AIRFLOW_REPO_DIR is set to '$AIRFLOW_REPO_DIR'"
 
+COSMOS_ROOT="$PWD"
+
 cd "$AIRFLOW_REPO_DIR"
 git checkout main && git pull
 
@@ -34,3 +36,5 @@ uv build --package apache-airflow-task-sdk --wheel
 cd ..
 
 pip install dist/*
+
+cd "$COSMOS_ROOT"

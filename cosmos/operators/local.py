@@ -234,58 +234,26 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
         """
+        if not self.should_store_compiled_sql:
+            return
 
-        from airflow.utils.session import NEW_SESSION, provide_session
+        compiled_queries = {}
+        # dbt compiles sql files and stores them in the target directory
+        for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
+            for file_path in file_paths:
+                if not file_path.endswith(".sql"):
+                    continue
 
-        @provide_session
-        def _store_compiled_sql(session: Session = NEW_SESSION) -> None:
+                compiled_sql_path = Path(os.path.join(folder_path, file_path))
+                compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
 
-            if not self.should_store_compiled_sql:
-                return
+                relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
+                compiled_queries[relative_path] = compiled_sql.strip()
 
-            compiled_queries = {}
-            # dbt compiles sql files and stores them in the target directory
-            for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
-                for file_path in file_paths:
-                    if not file_path.endswith(".sql"):
-                        continue
+        for name, query in compiled_queries.items():
+            self.compiled_sql += f"-- {name}\n{query}\n\n"
 
-                    compiled_sql_path = Path(os.path.join(folder_path, file_path))
-                    compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
-
-                    relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
-                    compiled_queries[relative_path] = compiled_sql.strip()
-
-            for name, query in compiled_queries.items():
-                self.compiled_sql += f"-- {name}\n{query}\n\n"
-
-            self.compiled_sql = self.compiled_sql.strip()
-
-            # need to refresh the rendered task field record in the db because Airflow only does this
-            # before executing the task, not after
-            from airflow.models.renderedtifields import RenderedTaskInstanceFields
-
-            ti = context["ti"]
-
-            if isinstance(
-                ti, TaskInstance
-            ):  # verifies ti is a TaskInstance in order to access and use the "task" field
-                if TYPE_CHECKING:
-                    assert ti.task is not None
-                ti.task.template_fields = self.template_fields
-                rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
-                # delete the old records
-                session.query(RenderedTaskInstanceFields).filter(
-                    RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
-                    RenderedTaskInstanceFields.task_id == self.task_id,
-                    RenderedTaskInstanceFields.run_id == ti.run_id,
-                ).delete()
-                session.add(rtif)
-            else:
-                self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
-
-        _store_compiled_sql()
+        self.compiled_sql = self.compiled_sql.strip()
 
     @staticmethod
     def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
@@ -370,28 +338,53 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Takes the compiled sources.json file from the dbt source freshness and stores it in the freshness rendered template.
         Gets called after every dbt run / source freshness.
         """
+        if not self.should_store_compiled_sql:
+            return
+
+        sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+        if sources_json_path.exists():
+            sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+            sources_data = json.loads(sources_json_content)
+            formatted_sources_json = json.dumps(sources_data, indent=4)
+            self.freshness = formatted_sources_json
+        else:
+            self.freshness = ""
+
+    def _override_rtif(self, context: Context) -> None:
+        if AIRFLOW_VERSION.major == _AIRFLOW3_VERSION.major:
+            self.overwrite_rtif_after_execution = True
+            return
+
+        # Block to override the RTIFs in Airflow 2.x
         from airflow.utils.session import NEW_SESSION, provide_session
 
         @provide_session
-        def _store_freshness_json(session: Session = NEW_SESSION) -> None:
-            if not self.should_store_compiled_sql:
-                return
+        def _override_rtif_airflow_2_x(session: Session = NEW_SESSION) -> None:
+            # need to refresh the rendered task field record in the db because Airflow only does this
+            # before executing the task, not after
+            from airflow.models.renderedtifields import RenderedTaskInstanceFields
 
-            sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+            ti = context["ti"]
 
-            if sources_json_path.exists():
-                sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+            if isinstance(
+                ti, TaskInstance
+            ):  # verifies ti is a TaskInstance in order to access and use the "task" field
+                if TYPE_CHECKING:
+                    assert ti.task is not None
+                ti.task.template_fields = self.template_fields
+                rtif = RenderedTaskInstanceFields(ti, render_templates=False)
 
-                sources_data = json.loads(sources_json_content)
-
-                formatted_sources_json = json.dumps(sources_data, indent=4)
-
-                self.freshness = formatted_sources_json
-
+                # delete the old records
+                session.query(RenderedTaskInstanceFields).filter(
+                    RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
+                    RenderedTaskInstanceFields.task_id == self.task_id,
+                    RenderedTaskInstanceFields.run_id == ti.run_id,
+                ).delete()
+                session.add(rtif)
             else:
-                self.freshness = ""
+                self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
-        _store_freshness_json()
+        _override_rtif_airflow_2_x()
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
@@ -492,9 +485,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
     def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
-        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
-            self.store_freshness_json(tmp_project_dir, context)
-            self.store_compiled_sql(tmp_project_dir, context)
+        self.store_freshness_json(tmp_project_dir, context)
+        self.store_compiled_sql(tmp_project_dir, context)
+        self._override_rtif(context)
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:

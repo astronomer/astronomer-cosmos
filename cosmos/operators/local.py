@@ -559,7 +559,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     env=env,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available:
+                if is_openlineage_available and AIRFLOW_VERSION.major < _AIRFLOW3_VERSION.major:
+                    # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance. The
+                    # support for this is expected to be worked upon while addressing issue:
+                    # https://github.com/astronomer/astronomer-cosmos/issues/1635
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
                     context[
                         "task_instance"

@@ -107,6 +107,7 @@ services:
       - |
         exec /entrypoint bash -c "
           airflow db upgrade && \
+          airflow sync-perm && \
           airflow users create -r Admin -u admin -e admin -f admin -l admin -p admin && \
           airflow version"
     # yamllint enable rule:line-length

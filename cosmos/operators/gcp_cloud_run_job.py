@@ -24,6 +24,8 @@ logger = get_logger(__name__)
 
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
+from airflow.models import BaseOperator
+
 try:
     from airflow.providers.google.cloud.operators.cloud_run import CloudRunExecuteJobOperator
 
@@ -68,7 +70,6 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        super().__init__(project_id=project_id, region=region, job_name=job_name, **kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -80,17 +81,30 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
                 "project_id": project_id,
                 "region": region,
                 "job_name": job_name,
-                "command": command,
-                "environment_variables": environment_variables,
             }
         )
-        base_operator_args = set(inspect.signature(CloudRunExecuteJobOperator.__init__).parameters.keys())
+
+        default_args = kwargs.get("default_args", {})
+        operator_kwargs = {**kwargs}
+        operator_args: set[str] = set()
+        for clazz in CloudRunExecuteJobOperator.__mro__:
+            operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
+            if clazz == BaseOperator:
+                break
+
         base_kwargs = {}
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in base_operator_args:
-                base_kwargs[arg_key] = arg_value
-        base_kwargs["task_id"] = kwargs["task_id"]
-        CloudRunExecuteJobOperator.__init__(self, **base_kwargs)
+        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
+            try:
+                base_kwargs[arg] = kwargs[arg]
+                if arg not in operator_args:
+                    operator_kwargs.pop(arg)
+            except KeyError:
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
+        AbstractDbtBase.__init__(self, **base_kwargs)
+        CloudRunExecuteJobOperator.__init__(self, **operator_kwargs)
 
     def build_and_run_cmd(
         self,

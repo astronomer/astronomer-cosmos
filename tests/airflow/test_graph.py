@@ -841,8 +841,9 @@ def test_build_airflow_graph_with_build_and_buildable_indirect_selection():
     assert topological_sort == expected_sort
 
     for task in dag.tasks:
-        if hasattr(task, 'indirect_selection'):
+        if hasattr(task, "indirect_selection"):
             assert task.indirect_selection == TestIndirectSelection.BUILDABLE.value
+
 
 @pytest.mark.parametrize(
     "node_type,node_unique_id,test_indirect_selection,additional_arguments",

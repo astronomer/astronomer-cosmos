@@ -231,6 +231,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
         }
     return dbt_resource_to_class
 
+
 def create_task_metadata(
     node: DbtNode,
     execution_mode: ExecutionMode,

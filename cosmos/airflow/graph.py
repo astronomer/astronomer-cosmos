@@ -240,7 +240,7 @@ def create_task_metadata(
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
-    test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,  # Add this parameter
+    test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata | None:

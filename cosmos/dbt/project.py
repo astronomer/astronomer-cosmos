@@ -36,14 +36,14 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return False
 
 
-def copy_dbt_packages(source_folder: Path, target_folder: Path):
+def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
     """
     Copies the dbt packages related files and directories from source_folder to target_folder.
 
     :param: source_folder: The base directory where paths are sourced from.
     :param: target_folder: The directory where paths will be copied to.
     """
-    logger.debug("Copying dbt packages to temporary folder...")
+    logger.info("Copying dbt packages to temporary folder...")
     dbt_packages_paths = [DBT_PACKAGES_FOLDER, PACKAGE_LOCKFILE_YML]
 
     for relative_path in dbt_packages_paths:
@@ -52,12 +52,12 @@ def copy_dbt_packages(source_folder: Path, target_folder: Path):
 
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
 
-        if os.path.isdir(src_path):
+        if src_path.is_dir():
             shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
         else:
             shutil.copy2(src_path, dst_path)
 
-    logger.debug("Completed copying dbt packages to temporary folder.")
+    logger.info("Completed copying dbt packages to temporary folder.")
 
 
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:

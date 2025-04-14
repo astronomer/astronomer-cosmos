@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtDag, ProfileConfig, ProjectConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -24,10 +24,7 @@ profile_config = ProfileConfig(
 
 dbt_deps_example_dag = DbtDag(
     # dbt/cosmos-specific parameters
-    project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop",
-        copy_dbt_packages=True
-    ),
+    project_config=ProjectConfig(DBT_ROOT_PATH / "simple", copy_dbt_packages=True),
     profile_config=profile_config,
     # normal dag parameters
     schedule_interval="@daily",

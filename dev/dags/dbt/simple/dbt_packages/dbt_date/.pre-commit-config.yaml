@@ -1,0 +1,27 @@
+---
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-json
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+        args: [--unsafe]
+      - id: debug-statements
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: macros/calendar_date/week_of_year.sql
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: "v3.1.0"
+    hooks:
+      - id: prettier
+        types_or: [json, markdown, yaml]
+  - repo: https://github.com/tconbeer/sqlfmt
+    rev: v0.26.0
+    hooks:
+      - id: sqlfmt
+        language_version: python
+        additional_dependencies: [".[jinjafmt]"]

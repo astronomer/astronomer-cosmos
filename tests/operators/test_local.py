@@ -751,14 +751,14 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     mock_log_info.assert_called_with("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
 
-def test_store_compiled_sql() -> None:
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
+def test_store_compiled_sql_airflow2() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
         should_store_compiled_sql=False,
     )
-
     # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
         tmp_project_dir="my/dir",
@@ -771,14 +771,47 @@ def test_store_compiled_sql() -> None:
         project_dir="my/dir",
         should_store_compiled_sql=True,
     )
-
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
     # here we call the method and see if it tries to access the context["ti"]
     # it should, and it should raise a KeyError because we didn't pass in a ti
     with pytest.raises(KeyError):
-        dbt_base_operator.store_compiled_sql(
-            tmp_project_dir="my/dir",
+        dbt_base_operator._override_rtif(
             context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
         )
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
+def test_store_compiled_sql_airflow3() -> None:
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    # here we just need to call the method to make sure it doesn't raise an exception
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=True,
+    )
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    # Test Airflow 3 behavior - should set flag
+    dbt_base_operator._override_rtif(
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    assert dbt_base_operator.overwrite_rtif_after_execution is True
 
 
 @pytest.mark.parametrize(
@@ -994,7 +1027,7 @@ def test_dbt_docs_gcs_local_operator():
 
 
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
-@patch("cosmos.operators.local.DbtLocalBaseOperator.store_compiled_sql")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.run_subprocess")
@@ -1007,7 +1040,7 @@ def test_operator_execute_deps_parameters(
     mock_subprocess,
     mock_ensure_profile,
     mock_exception_handling,
-    mock_store_compiled_sql,
+    mock_override_rtif,
     mock_upload_sql_files,
     invocation_mode,
     tmp_path,
@@ -1237,9 +1270,10 @@ def test_dbt_compile_local_operator_initialisation():
     assert "compile" in operator.base_cmd
 
 
+@patch("cosmos.operators.local.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
-def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_files):
+def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_files, mock_override_rtif):
     operator = DbtCompileLocalOperator(
         task_id="fake-task",
         profile_config=profile_config,
@@ -1251,6 +1285,7 @@ def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_file
     assert operator.should_upload_compiled_sql is True
     _upload_sql_files.assert_called_once()
     store_compiled_sql.assert_called_once()
+    mock_override_rtif.assert_called_once()
 
 
 def test_dbt_clone_local_operator_initialisation():

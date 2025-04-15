@@ -3,12 +3,12 @@ default:
   outputs:
     dev:
       type: postgres
-      host: localhost # "{{ env_var('POSTGRES_HOST') }}"
-      user: postgres # "{{ env_var('POSTGRES_USER') }}"
-      password: postgres # "{{ env_var('POSTGRES_PASSWORD') }}"
-      port: 5432 # "{{ env_var('POSTGRES_PORT') | int }}"
-      dbname: airflow_db1 # "{{ env_var('POSTGRES_DB') }}"
-      schema: public # "{{ env_var('POSTGRES_SCHEMA') }}"
+      host: "{{ env_var('POSTGRES_HOST') }}"
+      user: "{{ env_var('POSTGRES_USER') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      port: "{{ env_var('POSTGRES_PORT') | int }}"
+      dbname: "{{ env_var('POSTGRES_DB') }}"
+      schema: "{{ env_var('POSTGRES_SCHEMA') }}"
       threads: 4
 
 postgres_profile:
@@ -16,10 +16,9 @@ postgres_profile:
   outputs:
     dev:
       type: postgres
-      host: localhost # "{{ env_var('POSTGRES_HOST') }}"
-      user: postgres # "{{ env_var('POSTGRES_USER') }}"
-      password: postgres # "{{ env_var('POSTGRES_PASSWORD') }}"
-      port: 5432 # "{{ env_var('POSTGRES_PORT') | int }}"
-      dbname: airflow_db1 # "{{ env_var('POSTGRES_DB') }}"
-      schema: public # "{{ env_var('POSTGRES_SCHEMA') }}"
-      threads: 4
+      dbname: "{{ env_var('POSTGRES_DB') }}"
+      host: "{{ env_var('POSTGRES_HOST') }}"
+      pass: "{{ env_var('POSTGRES_PASSWORD') }}"
+      port: 5432 # "{{ env_var('POSTGRES_PORT') | as_number }}"
+      schema: "{{ env_var('POSTGRES_SCHEMA') }}"
+      user: "{{ env_var('POSTGRES_USER') }}"

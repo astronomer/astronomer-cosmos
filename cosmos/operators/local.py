@@ -35,7 +35,7 @@ from cosmos.cache import (
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
 )
-from cosmos.constants import _AIRFLOW3_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
@@ -474,7 +474,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         outlets = self.get_datasets("outputs")
         self.log.info("Inlets: %s", inlets)
         self.log.info("Outlets: %s", outlets)
-        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
             self.register_dataset(inlets, outlets, context)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
@@ -488,6 +488,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
         self._override_rtif(context)
+
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
@@ -552,7 +553,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     env=env,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available and AIRFLOW_VERSION.major < _AIRFLOW3_VERSION.major:
+                if is_openlineage_available and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
                     # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance. The
                     # support for this is expected to be worked upon while addressing issue:
                     # https://github.com/astronomer/astronomer-cosmos/issues/1635
@@ -759,7 +760,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
             if arg_key in base_operator_args:
                 base_operator_kwargs[arg_key] = arg_value
         AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
-        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
             if (
                 kwargs.get("emit_datasets", True)
                 and settings.enable_dataset_alias

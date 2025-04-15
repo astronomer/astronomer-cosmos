@@ -351,7 +351,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.freshness = ""
 
     def _override_rtif(self, context: Context) -> None:
-        if AIRFLOW_VERSION.major == _AIRFLOW3_VERSION.major:
+        if AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION:
             self.overwrite_rtif_after_execution = True
             return
 

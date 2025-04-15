@@ -30,6 +30,7 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 
+
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 AIRFLOW_PROJECT_DIR = DBT_ROOT_PATH / "jaffle_shop"
 
@@ -94,7 +95,7 @@ with DAG(
                 },
             ),
         ),
-        render_config=RenderConfig(dbt_project_path=AIRFLOW_PROJECT_DIR),
+        render_config=RenderConfig(dbt_project_path=K8S_PROJECT_DIR),
         execution_config=ExecutionConfig(execution_mode=ExecutionMode.KUBERNETES, dbt_project_path=K8S_PROJECT_DIR),
         operator_args={
             "image": DBT_IMAGE,

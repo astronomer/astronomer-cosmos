@@ -436,7 +436,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
         if self.copy_dbt_packages:
+            self.log.info("Copying dbt packages to temporary folder.")
             copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            self.log.info("Completed copying dbt packages to temporary folder.")
 
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:

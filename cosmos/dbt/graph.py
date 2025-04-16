@@ -667,7 +667,7 @@ class DbtGraph:
         dbt project paths and this is cheaper than copying those folders.
 
         The current settings make sense for Cosmos 1.x and allow users to set things in different ways, while being backwards
-        compatible. We should review thisf or Cosmos 2.x.
+        compatible. We should review this for Cosmos 2.x.
         """
 
         should_not_create_dbt_deps_symbolic_link = self.should_install_dbt_deps or self.project.copy_dbt_packages

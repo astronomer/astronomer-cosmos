@@ -528,7 +528,7 @@ class DbtGraph:
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
             LoadMode.DBT_LS_FILE: self.load_via_dbt_ls_file,
-            LoadMode.DBT_LS_CACHE: self.load_via_dbt_ls,
+            LoadMode.DBT_LS_CACHE: self.load_via_dbt_ls_cache,
             LoadMode.DBT_MANIFEST: self.load_from_dbt_manifest,
         }
 

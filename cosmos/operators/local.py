@@ -37,7 +37,7 @@ from cosmos.cache import (
 )
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
 from cosmos.dataset import get_dataset_alias_name
-from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import copy_dbt_packages, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
@@ -130,6 +130,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
     :param install_deps (deprecated): If true, install dependencies before running the command
+    :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -153,6 +154,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
+        copy_dbt_packages: bool = settings.default_copy_dbt_packages_value,
         callback: Callable[[str], None] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
@@ -182,6 +184,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         # We should not spend time trying to install deps if the project doesn't have any dependencies
         self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        self.copy_dbt_packages = copy_dbt_packages
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -428,7 +431,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        create_symlinks(
+            Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
+        )
+        if self.copy_dbt_packages:
+            self.log.info("Copying dbt packages to temporary folder.")
+            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            self.log.info("Completed copying dbt packages to temporary folder.")
 
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:

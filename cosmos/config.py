@@ -168,7 +168,7 @@ class ProjectConfig:
 
     dbt_project_path: Path | None = None
     install_dbt_deps: bool = True
-    copy_dbt_packages: bool = settings.default_copy_dbt_packages_value
+    copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
@@ -179,7 +179,7 @@ class ProjectConfig:
         self,
         dbt_project_path: str | Path | None = None,
         install_dbt_deps: bool = True,
-        copy_dbt_packages: bool = settings.default_copy_dbt_packages_value,
+        copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",

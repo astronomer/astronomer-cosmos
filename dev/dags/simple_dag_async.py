@@ -6,7 +6,7 @@ from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, Projec
 from cosmos.constants import TestBehavior
 from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
-DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 DBT_ADAPTER_VERSION = os.getenv("DBT_ADAPTER_VERSION", "1.9")
@@ -24,7 +24,7 @@ profile_config = ProfileConfig(
 simple_dag_async = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "original_jaffle_shop",
+        DBT_ROOT_PATH / "jaffle_shop",
     ),
     profile_config=profile_config,
     execution_config=ExecutionConfig(
@@ -33,7 +33,7 @@ simple_dag_async = DbtDag(
     ),
     render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
     # normal dag parameters
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="simple_dag_async",

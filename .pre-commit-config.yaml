@@ -91,6 +91,7 @@ repos:
             apache-airflow,
           ]
         files: ^cosmos
+exclude: "dev/dags/dbt/simple/dbt_packages/.*"
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks

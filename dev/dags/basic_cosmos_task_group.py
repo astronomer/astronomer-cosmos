@@ -11,18 +11,16 @@ from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import InvocationMode
-from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+DBT_PROJ_DIR = DBT_ROOT_PATH / "jaffle_shop"
+DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
-        profile_args={"schema": "public"},
-    ),
+    profiles_yml_filepath=DBT_PROFILE_PATH,
 )
 
 shared_execution_config = ExecutionConfig(
@@ -31,7 +29,7 @@ shared_execution_config = ExecutionConfig(
 
 
 @dag(
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )

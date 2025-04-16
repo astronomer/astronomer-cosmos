@@ -55,7 +55,7 @@ def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
         if src_path.is_dir():
             shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
         else:
-            shutil.copy(src_path, dst_path)
+            shutil.copy2(src_path, dst_path)
 
     logger.info("Completed copying dbt packages to temporary folder.")
 

@@ -147,7 +147,7 @@ class ProjectConfig:
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
     :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True.
-    :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages_value (False by default).
+    :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to

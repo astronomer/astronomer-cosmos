@@ -13,6 +13,7 @@ from typing import Any, Callable, Iterator
 import yaml
 from airflow.version import version as airflow_version
 
+from cosmos import settings
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
     DEFAULT_PROFILES_FILE_NAME,
@@ -29,7 +30,6 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.profiles import BaseProfileMapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 logger = get_logger(__name__)
 
@@ -147,6 +147,7 @@ class ProjectConfig:
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
     :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True.
+    :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages_value (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
@@ -167,6 +168,7 @@ class ProjectConfig:
 
     dbt_project_path: Path | None = None
     install_dbt_deps: bool = True
+    copy_dbt_packages: bool = settings.default_copy_dbt_packages_value
     manifest_path: Path | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
@@ -177,6 +179,7 @@ class ProjectConfig:
         self,
         dbt_project_path: str | Path | None = None,
         install_dbt_deps: bool = True,
+        copy_dbt_packages: bool = settings.default_copy_dbt_packages_value,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",
@@ -213,14 +216,14 @@ class ProjectConfig:
                 # Use the default Airflow connection ID for the scheme if it is not provided.
                 manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, lambda: None)()
 
-            if manifest_conn_id is not None and not AIRFLOW_IO_AVAILABLE:
+            if manifest_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
                 raise CosmosValueError(
                     f"The manifest path {manifest_path_str} uses a remote file scheme, but the required Object "
                     f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
                     f"Airflow 2.8 or later."
                 )
 
-            if AIRFLOW_IO_AVAILABLE:
+            if settings.AIRFLOW_IO_AVAILABLE:
                 from airflow.io.path import ObjectStoragePath
 
                 self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
@@ -231,6 +234,7 @@ class ProjectConfig:
         self.dbt_vars = dbt_vars
         self.partial_parse = partial_parse
         self.install_dbt_deps = install_dbt_deps
+        self.copy_dbt_packages = copy_dbt_packages
 
     def validate_project(self) -> None:
         """

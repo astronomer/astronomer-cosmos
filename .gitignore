@@ -3,7 +3,7 @@
 docs/profiles/*
 
 # dbt_packages is a directory that gets created when you run dbt deps
-dbt_packages/
+dev/dags/dbt/jaffle_shop/dbt_packages/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,0 +1,58 @@
+integration_tests:
+  outputs:
+    postgres:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST') }}"
+      user: "{{ env_var('POSTGRES_TEST_USER') }}"
+      pass: "{{ env_var('POSTGRES_TEST_PASSWORD') }}"
+      port: "{{ env_var('POSTGRES_TEST_PORT') | as_number }}"
+      dbname: "{{ env_var('POSTGRES_TEST_DATABASE') }}"
+      schema: "{{ env_var('POSTGRES_TEST_SCHEMA') }}"
+      threads: 5
+
+    bigquery:
+      type: bigquery
+      method: service-account
+      keyfile: "{{ env_var('BIGQUERY_SERVICE_KEY_PATH') }}"
+      project: "{{ env_var('BIGQUERY_TEST_DATABASE') }}"
+      schema: "{{ env_var('BIGQUERY_TEST_SCHEMA') }}"
+      threads: 10
+
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_TEST_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_TEST_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_TEST_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_TEST_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_TEST_WAREHOUSE') }}"
+      schema: "{{ env_var('SNOWFLAKE_TEST_SCHEMA') }}"
+      threads: 10
+
+    duckdb:
+      type: duckdb
+      path: ":memory:"
+
+    spark:
+      type: spark
+      method: thrift
+      host: 127.0.0.1
+      port: 10000
+      user: dbt
+      schema: analytics
+      connect_retries: 5
+      connect_timeout: 60
+      retry_all: true
+
+    trino:
+      type: trino
+      method: none
+      host: localhost
+      port: 8080
+      user: admin
+      catalog: memory
+      schema: default
+      timezone: UTC
+      threads: 4
+
+  target: postgres

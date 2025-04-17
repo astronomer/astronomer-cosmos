@@ -28,7 +28,7 @@ from cosmos.operators.local import (
 from cosmos.profiles import get_automatic_profile_mapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
-DBT_PROJECT_NAME = "original_jaffle_shop"
+DBT_PROJECT_NAME = "jaffle_shop"
 
 
 @pytest.mark.integration

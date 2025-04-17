@@ -8,7 +8,11 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import psutil
-from airflow.utils.python_virtualenv import prepare_virtualenv
+
+try:  # Airflow 3
+    from airflow.providers.standard.utils.python_virtualenv import prepare_virtualenv
+except ImportError:  # Airflow 2
+    from airflow.utils.python_virtualenv import prepare_virtualenv
 
 from cosmos import settings
 from cosmos.constants import InvocationMode

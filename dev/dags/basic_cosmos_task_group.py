@@ -15,8 +15,6 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-DBT_PROJ_DIR = DBT_ROOT_PATH / "jaffle_shop"
-DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 
 profile_config = ProfileConfig(
     profile_name="default",

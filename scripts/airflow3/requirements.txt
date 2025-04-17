@@ -6,3 +6,5 @@ apache-airflow-providers-cncf-kubernetes
 psycopg2
 asyncpg
 dbt-postgres
+dbt-bigquery
+apache-airflow-providers-google

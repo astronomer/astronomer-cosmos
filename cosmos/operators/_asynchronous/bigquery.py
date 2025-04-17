@@ -94,6 +94,12 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             kwargs["outlets"] = [
                 DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
             ]  # type: ignore
+
+        # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
+        # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include
+        # BigQueryInsertJobOperator parameters and hence fails to initialise the operator due to missing arguments.
+        # To fix this, we temporarily set the base class to only BigQueryInsertJobOperator during initialization,
+        # then restore the full inheritance chain afterward.
         DbtRunAirflowAsyncBigqueryOperator.__bases__ = (BigQueryInsertJobOperator,)
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
@@ -107,6 +113,11 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.compiled_sql = ""
         self.gcp_project = ""
         self.dataset = ""
+
+        # Restore the full inheritance chain after initialization that was temporarily set to BigQueryInsertJobOperator
+        # above for adding compatibility with Airflow 3 operator initialisation. This ensures that:
+        # 1. Subsequent class initializations have access to AbstractDbtLocalBase methods
+        # 2. Operator instances can properly access AbstractDbtLocalBase functionality during execution
         DbtRunAirflowAsyncBigqueryOperator.__bases__ = (
             BigQueryInsertJobOperator,
             AbstractDbtLocalBase,

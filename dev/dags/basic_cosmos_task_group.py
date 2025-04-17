@@ -11,6 +11,7 @@ from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import InvocationMode
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -20,7 +21,10 @@ DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profiles_yml_filepath=DBT_PROFILE_PATH,
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+    ),
 )
 
 shared_execution_config = ExecutionConfig(

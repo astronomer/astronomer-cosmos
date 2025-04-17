@@ -4,7 +4,14 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.dbt.project import change_working_directory, create_symlinks, environ, has_non_empty_dependencies_file
+from cosmos.constants import DBT_PACKAGES_FOLDER, PACKAGE_LOCKFILE_YML
+from cosmos.dbt.project import (
+    change_working_directory,
+    copy_dbt_packages,
+    create_symlinks,
+    environ,
+    has_non_empty_dependencies_file,
+)
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
@@ -69,3 +76,25 @@ def test_has_non_empty_dependencies_file_is_false(tmpdir, filename):
 
 def test_has_non_empty_dependencies_file_is_false_in_empty_dir(tmpdir):
     assert not has_non_empty_dependencies_file(tmpdir)
+
+
+@patch("cosmos.dbt.project.shutil.copy2")
+@patch("cosmos.dbt.project.shutil.copytree")
+@patch("cosmos.dbt.project.os.makedirs")
+@patch("cosmos.dbt.project.Path.is_dir", side_effect=[True, False])
+@patch("cosmos.dbt.project.logger")
+def test_copy_dbt_packages_all_cases(mock_logger, mock_dir, mock_makedirs, mock_copytree, mock_copy2):
+    source_folder = Path("/fake/source")
+    target_folder = Path("/fake/target")
+
+    copy_dbt_packages(source_folder, target_folder)
+
+    assert mock_makedirs.call_count == 2
+
+    mock_copytree.assert_called_once_with(
+        source_folder / DBT_PACKAGES_FOLDER, target_folder / DBT_PACKAGES_FOLDER, dirs_exist_ok=True
+    )
+    mock_copy2.assert_called_once_with(source_folder / PACKAGE_LOCKFILE_YML, target_folder / PACKAGE_LOCKFILE_YML)
+
+    mock_logger.info.assert_any_call("Copying dbt packages to temporary folder...")
+    mock_logger.info.assert_any_call("Completed copying dbt packages to temporary folder.")

@@ -9,7 +9,12 @@ from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.utils.context import Context, context_merge
-from airflow.utils.operator_helpers import context_to_airflow_vars
+
+try:
+    from airflow.utils.operator_helpers import context_to_airflow_vars
+except ImportError:  # pragma: no cover
+    from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore
+
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt

@@ -23,6 +23,7 @@ DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
 DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 PACKAGE_LOCKFILE_YML = "package-lock.yml"
+DBT_PACKAGES_FOLDER = "dbt_packages"
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
@@ -168,4 +169,4 @@ TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetr
 TELEMETRY_VERSION = "v1"
 TELEMETRY_TIMEOUT = 1.0
 
-_AIRFLOW3_VERSION = Version("3.0.0a1")
+_AIRFLOW3_MAJOR_VERSION = 3

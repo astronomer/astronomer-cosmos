@@ -1,0 +1,181 @@
+version: 2.1
+
+jobs:
+  integration-tests-core:
+    docker:
+      - image: cimg/python:3.9.9
+      - image: cimg/postgres:14.0
+
+    resource_class: small
+
+    environment:
+      DBT_PROFILES_DIR: ./integration_tests/ci
+      DBT_PROJECT_DIR: ./integration_tests
+      BIGQUERY_SERVICE_KEY_PATH: "/home/circleci/bigquery-service-key.json"
+      DBT_VERSION: 1.8.*
+
+    steps:
+      - checkout
+      - run: &pip-install-core
+          name: Install core Python packages & dbt-core
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -U pip setuptools wheel
+            pip install "dbt-core==$DBT_VERSION"
+
+      - run:
+          name: Install dbt adapter packages
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install "dbt-postgres==$DBT_VERSION" "dbt-bigquery==$DBT_VERSION" "dbt-snowflake==$DBT_VERSION"
+            pip install "dbt-duckdb==$DBT_VERSION"
+
+      - run: &dbt-deps
+          name: Install dbt dependencies
+          command: |
+            . venv/bin/activate
+              dbt deps --project-dir $DBT_PROJECT_DIR
+
+      - run:
+          name: "Run Tests - Postgres"
+          environment:
+            POSTGRES_HOST: localhost
+            POSTGRES_TEST_USER: postgres
+            POSTGRES_TEST_PASSWORD: ""
+            POSTGRES_TEST_PORT: 5432
+            POSTGRES_TEST_DATABASE: circle_test
+            POSTGRES_TEST_SCHEMA: dbt_date_integration_tests
+          command: |
+            . venv/bin/activate
+            dbt build -t postgres --project-dir $DBT_PROJECT_DIR
+
+      - run:
+          name: "Set up GCP credentials"
+          command: |
+            echo "Writing to $BIGQUERY_SERVICE_KEY_PATH"
+            echo $BIGQUERY_SERVICE_KEY > $BIGQUERY_SERVICE_KEY_PATH
+            FILESIZE=$(stat -c%s "$BIGQUERY_SERVICE_KEY_PATH")
+            echo "Size of $BIGQUERY_SERVICE_KEY_PATH = $FILESIZE bytes."
+            echo "BIGQUERY_TEST_DATABASE = $BIGQUERY_TEST_DATABASE"
+
+      - run:
+          name: "Run Tests - BigQuery"
+          command: |
+            . venv/bin/activate
+            dbt build -t bigquery --project-dir $DBT_PROJECT_DIR
+
+      - run:
+          name: "Run Tests - Snowflake"
+          command: |
+            . venv/bin/activate
+            dbt build -t snowflake --project-dir $DBT_PROJECT_DIR
+
+      - run:
+          name: "Run Tests - DuckDB"
+          command: |
+            . venv/bin/activate
+            dbt build -t duckdb --project-dir $DBT_PROJECT_DIR
+
+      - store_artifacts:
+          path: ./logs
+
+  integration-tests-spark-thrift:
+    docker:
+      - image: cimg/python:3.9.9
+      - image: godatadriven/spark:3.1.1
+        environment:
+          WAIT_FOR: localhost:5432
+        command: >
+          --class org.apache.spark.sql.hive.thriftserver.HiveThriftServer2
+          --name Thrift JDBC/ODBC Server
+      - image: postgres:9.6.17-alpine
+        environment:
+          POSTGRES_USER: dbt
+          POSTGRES_PASSWORD: dbt
+          POSTGRES_DB: metastore
+
+    resource_class: small
+
+    environment:
+      DBT_PROFILES_DIR: ./integration_tests/ci
+      DBT_PROJECT_DIR: ./integration_tests
+      DBT_VERSION: 1.8.*
+
+    steps:
+      - checkout
+      - run:
+          name: Install Ubuntu packages
+          command: |
+            sudo apt-get update
+            sudo apt-get install libsasl2-dev libsasl2-2
+      - run: *pip-install-core
+      - run:
+          name: Install dbt adapter packages
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install "dbt-spark==$DBT_VERSION" "dbt-spark[PyHive]==$DBT_VERSION"
+      - run: *dbt-deps
+      - run:
+          name: Wait for Spark-Thrift
+          command: dockerize -wait tcp://localhost:10000 -timeout 15m -wait-retry-interval 5s
+      - run:
+          name: "Run Tests - Spark"
+          command: |
+            . venv/bin/activate
+            dbt build -t spark --project-dir $DBT_PROJECT_DIR
+
+      - store_artifacts:
+          path: ./logs
+
+  integration-tests-trino:
+    docker:
+      - image: cimg/python:3.11
+      - image: trinodb/trino:431
+
+    resource_class: small
+
+    environment:
+      DBT_PROFILES_DIR: ./integration_tests/ci
+      DBT_PROJECT_DIR: ./integration_tests
+      DBT_VERSION: 1.8.*
+
+    steps:
+      - checkout
+      - run: *pip-install-core
+      - run:
+          name: Install dbt adapter packages
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install "dbt-trino==$DBT_VERSION"
+      - run: *dbt-deps
+      - setup_remote_docker
+      - run:
+          name: Run Trino server
+          command: |
+            docker run --name trino -p 8080:8080 -d -v `pwd`/integration_tests/docker/trino/catalog:/etc/trino/catalog trinodb/trino:431
+            timeout 5m bash -c -- 'while ! docker logs trino 2>&1 | tail -n 1 | grep "SERVER STARTED"; do sleep 2; done'
+      - run:
+          name: "Run Tests - Trino"
+          command: |
+            . venv/bin/activate
+            dbt build -t trino --project-dir $DBT_PROJECT_DIR
+
+workflows:
+  version: 2
+  test-all:
+    jobs:
+      - hold:
+          type: approval
+      - integration-tests-core:
+          requires:
+            - hold
+      - integration-tests-spark-thrift:
+          requires:
+            - hold
+      - integration-tests-trino:
+          requires:
+            - hold

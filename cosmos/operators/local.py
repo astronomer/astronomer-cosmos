@@ -17,7 +17,11 @@ import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.models import BaseOperator
+
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.version import version as airflow_version
@@ -31,9 +35,9 @@ from cosmos.cache import (
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
 )
-from cosmos.constants import _AIRFLOW3_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
 from cosmos.dataset import get_dataset_alias_name
-from cosmos.dbt.project import get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import copy_dbt_packages, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
@@ -126,6 +130,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
     :param install_deps (deprecated): If true, install dependencies before running the command
+    :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -149,6 +154,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
+        copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         callback: Callable[[str], None] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
@@ -178,6 +184,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         # We should not spend time trying to install deps if the project doesn't have any dependencies
         self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        self.copy_dbt_packages = copy_dbt_packages
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -230,58 +237,26 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Takes the compiled SQL files from the dbt run and stores them in the compiled_sql rendered template.
         Gets called after every dbt run.
         """
+        if not self.should_store_compiled_sql:
+            return
 
-        from airflow.utils.session import NEW_SESSION, provide_session
+        compiled_queries = {}
+        # dbt compiles sql files and stores them in the target directory
+        for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
+            for file_path in file_paths:
+                if not file_path.endswith(".sql"):
+                    continue
 
-        @provide_session
-        def _store_compiled_sql(session: Session = NEW_SESSION) -> None:
+                compiled_sql_path = Path(os.path.join(folder_path, file_path))
+                compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
 
-            if not self.should_store_compiled_sql:
-                return
+                relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
+                compiled_queries[relative_path] = compiled_sql.strip()
 
-            compiled_queries = {}
-            # dbt compiles sql files and stores them in the target directory
-            for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
-                for file_path in file_paths:
-                    if not file_path.endswith(".sql"):
-                        continue
+        for name, query in compiled_queries.items():
+            self.compiled_sql += f"-- {name}\n{query}\n\n"
 
-                    compiled_sql_path = Path(os.path.join(folder_path, file_path))
-                    compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
-
-                    relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
-                    compiled_queries[relative_path] = compiled_sql.strip()
-
-            for name, query in compiled_queries.items():
-                self.compiled_sql += f"-- {name}\n{query}\n\n"
-
-            self.compiled_sql = self.compiled_sql.strip()
-
-            # need to refresh the rendered task field record in the db because Airflow only does this
-            # before executing the task, not after
-            from airflow.models.renderedtifields import RenderedTaskInstanceFields
-
-            ti = context["ti"]
-
-            if isinstance(
-                ti, TaskInstance
-            ):  # verifies ti is a TaskInstance in order to access and use the "task" field
-                if TYPE_CHECKING:
-                    assert ti.task is not None
-                ti.task.template_fields = self.template_fields
-                rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
-                # delete the old records
-                session.query(RenderedTaskInstanceFields).filter(
-                    RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
-                    RenderedTaskInstanceFields.task_id == self.task_id,
-                    RenderedTaskInstanceFields.run_id == ti.run_id,
-                ).delete()
-                session.add(rtif)
-            else:
-                self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
-
-        _store_compiled_sql()
+        self.compiled_sql = self.compiled_sql.strip()
 
     @staticmethod
     def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
@@ -366,28 +341,53 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Takes the compiled sources.json file from the dbt source freshness and stores it in the freshness rendered template.
         Gets called after every dbt run / source freshness.
         """
+        if not self.should_store_compiled_sql:
+            return
+
+        sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+        if sources_json_path.exists():
+            sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+            sources_data = json.loads(sources_json_content)
+            formatted_sources_json = json.dumps(sources_data, indent=4)
+            self.freshness = formatted_sources_json
+        else:
+            self.freshness = ""
+
+    def _override_rtif(self, context: Context) -> None:
+        if AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION:
+            self.overwrite_rtif_after_execution = True
+            return
+
+        # Block to override the RTIFs in Airflow 2.x
         from airflow.utils.session import NEW_SESSION, provide_session
 
         @provide_session
-        def _store_freshness_json(session: Session = NEW_SESSION) -> None:
-            if not self.should_store_compiled_sql:
-                return
+        def _override_rtif_airflow_2_x(session: Session = NEW_SESSION) -> None:
+            # need to refresh the rendered task field record in the db because Airflow only does this
+            # before executing the task, not after
+            from airflow.models.renderedtifields import RenderedTaskInstanceFields
 
-            sources_json_path = Path(os.path.join(tmp_project_dir, "target", "sources.json"))
+            ti = context["ti"]
 
-            if sources_json_path.exists():
-                sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
+            if isinstance(
+                ti, TaskInstance
+            ):  # verifies ti is a TaskInstance in order to access and use the "task" field
+                if TYPE_CHECKING:
+                    assert ti.task is not None
+                ti.task.template_fields = self.template_fields
+                rtif = RenderedTaskInstanceFields(ti, render_templates=False)
 
-                sources_data = json.loads(sources_json_content)
-
-                formatted_sources_json = json.dumps(sources_data, indent=4)
-
-                self.freshness = formatted_sources_json
-
+                # delete the old records
+                session.query(RenderedTaskInstanceFields).filter(
+                    RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
+                    RenderedTaskInstanceFields.task_id == self.task_id,
+                    RenderedTaskInstanceFields.run_id == ti.run_id,
+                ).delete()
+                session.add(rtif)
             else:
-                self.freshness = ""
+                self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
-        _store_freshness_json()
+        _override_rtif_airflow_2_x()
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
         self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
@@ -431,7 +431,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        create_symlinks(Path(self.project_dir), tmp_dir_path, self.install_deps)
+        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        create_symlinks(
+            Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
+        )
+        if self.copy_dbt_packages:
+            self.log.info("Copying dbt packages to temporary folder.")
+            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            self.log.info("Completed copying dbt packages to temporary folder.")
 
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -477,7 +484,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         outlets = self.get_datasets("outputs")
         self.log.info("Inlets: %s", inlets)
         self.log.info("Outlets: %s", outlets)
-        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
             self.register_dataset(inlets, outlets, context)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
@@ -488,9 +495,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
     def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
-        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
-            self.store_freshness_json(tmp_project_dir, context)
-            self.store_compiled_sql(tmp_project_dir, context)
+        self.store_freshness_json(tmp_project_dir, context)
+        self.store_compiled_sql(tmp_project_dir, context)
+        self._override_rtif(context)
+
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
@@ -555,7 +563,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     env=env,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available:
+                if is_openlineage_available and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+                    # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance. The
+                    # support for this is expected to be worked upon while addressing issue:
+                    # https://github.com/astronomer/astronomer-cosmos/issues/1635
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
                     context[
                         "task_instance"
@@ -735,7 +746,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.subprocess_hook.send_sigterm()
 
 
-class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
+class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
 
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
 
@@ -767,7 +778,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                     pass
 
         AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
-        if AIRFLOW_VERSION < _AIRFLOW3_VERSION:
+        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
             if (
                 kwargs.get("emit_datasets", True)
                 and settings.enable_dataset_alias

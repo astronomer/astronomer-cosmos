@@ -241,6 +241,7 @@ def create_task_metadata(
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
+    test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata | None:
@@ -271,6 +272,8 @@ def create_task_metadata(
         }
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            if test_indirect_selection != TestIndirectSelection.EAGER:
+                args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
@@ -367,6 +370,7 @@ def generate_task_or_group(
         source_rendering_behavior=source_rendering_behavior,
         normalize_task_id=normalize_task_id,
         test_behavior=test_behavior,
+        test_indirect_selection=test_indirect_selection,
         on_warning_callback=on_warning_callback,
         detached_from_parent=detached_from_parent,
     )

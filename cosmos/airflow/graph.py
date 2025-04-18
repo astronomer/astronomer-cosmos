@@ -151,6 +151,8 @@ def create_test_task_metadata(
             task_args["models"] = node.resource_name
         elif node.resource_type == DbtResourceType.SOURCE:
             task_args["select"] = f"source:{node.resource_name}"
+        elif is_detached_test(node):
+            task_args["select"] = node.resource_name.split(".")[0]
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
 

@@ -1,6 +1,41 @@
 Changelog
 =========
 
+1.10.0a1 (2025-04-16)
+---------------------
+
+Features
+
+* (WIP) Airflow 3 support
+* Support running ``dbt deps`` incrementally to pre-defined ``dbt_packages`` by @tatiana in #1668 and #1670
+
+Bug Fixes
+
+* Fix ``test_indirect_selection`` flag to be propagated in case of ``TestBehavior.BUILD`` by @corsettigyg in #1663
+
+Enhancements
+
+* Refactor Rendered Task Instance Fields (RTIF) handling for Airflow 2.x and 3.x by @pankajkoti in #1661
+* Support rendering DbtDag in Airflow 3 by @tatiana and @ashb in #1657
+* Run cosmos operator in Airflow 3 by @pankajastro in #1642
+
+Documentation
+
+* Add documentation related to ``copy_dbt_packages`` by @tatiana in #1671
+
+Others
+
+* Add sample ``dbt_packages`` to validate incremental ``dbt deps`` by @tatiana in #1669
+* Add kubernetes execution mode example in Airflow 3 by @pankajastro in #1667
+* Check only major version until Airflow 3 stable release by @pankajastro in #1665
+* Install Airflow from main branch by @pankajastro in #1660
+* Add dev tool for Airflow 3 by @pankajastro and @tatiana in #1627
+* Improve Airflow 3 tooling by @pankajastro in #1656
+* Skip associating ``openlineage_events_completes`` to ``ti`` in Airflow 3 by @pankajkoti in #1662
+* Add .gitignore file for the scripts/airflow3 directory by @pankajkoti in #1658
+* Pre-commit updates: #1666, #1653, #1641
+
+
 1.9.2 (2025-03-18)
 ------------------
 
@@ -16,7 +51,6 @@ Others
 
 * Update contributing.rst to latest test matrix by @tatiana in #1614
 * Pre-commit updates: #1615
-
 
 1.9.1 (2025-03-13)
 --------------------

@@ -90,13 +90,13 @@ docs = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
 kubernetes = [
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
 aws_eks = [
     "apache-airflow-providers-amazon>=8.0.0",

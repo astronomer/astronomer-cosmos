@@ -209,7 +209,12 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
         if on_warning_callback:
             test_warning_handler = DbtTestWarningHandler(on_warning_callback)
-            self.callbacks += [test_warning_handler]
+            if isinstance(self.callbacks, list):
+                self.callbacks += [test_warning_handler]
+            elif self.callbacks is not None:
+                self.callbacks = [self.callbacks, test_warning_handler]
+            else:
+                self.callbacks = [test_warning_handler]
 
 
 class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
@@ -221,7 +226,12 @@ class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
         if on_warning_callback:
             test_warning_handler = DbtTestWarningHandler(on_warning_callback)
-            self.callbacks += [test_warning_handler]
+            if isinstance(self.callbacks, list):
+                self.callbacks += [test_warning_handler]
+            elif self.callbacks is not None:
+                self.callbacks = [self.callbacks, test_warning_handler]
+            else:
+                self.callbacks = [test_warning_handler]
 
 
 class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):

@@ -30,7 +30,6 @@ try:
         convert_env_vars,
     )
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-    from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
 except ImportError:
     try:
         # apache-airflow-providers-cncf-kubernetes < 7.4.0

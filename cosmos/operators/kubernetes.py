@@ -160,11 +160,11 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
         self.on_warning_callback = on_warning_callback
 
     def on_pod_completion(
-            self,
-            *,
-            context: Context,
-            operator: KubernetesPodOperator,
-            **kwargs,
+        self,
+        *,
+        context: Context,
+        operator: KubernetesPodOperator,
+        **kwargs,
     ) -> None:
         """
         Handles warnings by extracting log issues, creating additional context, and calling the
@@ -183,12 +183,11 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
             return
         task = context["task_instance"].task
         logs = [
-            log.decode("utf-8") for log in task.pod_manager.read_pod_logs(task.pod, "base") if
-            log.decode("utf-8") != ""
+            log.decode("utf-8") for log in task.pod_manager.read_pod_logs(task.pod, "base") if log.decode("utf-8") != ""
         ]
 
-        warn_count_pattern = re.compile(r'Done\. (?:\w+=\d )*WARN=(\d)(?: \w+=\d)*')
-        warn_count = warn_count_pattern.search('\n'.join(logs))
+        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d )*WARN=(\d)(?: \w+=\d)*")
+        warn_count = warn_count_pattern.search("\n".join(logs))
         if not warn_count:
             operator.log.warning(
                 "Failed to scrape warning count from the pod logs. Potential warning callbacks could not be triggered."

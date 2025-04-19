@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
@@ -16,7 +16,7 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
-    DbtTestWarningHandler
+    DbtTestWarningHandler,
 )
 
 try:
@@ -154,16 +154,12 @@ def test_dbt_kubernetes_build_command():
 
 
 def test_dbt_test_kubernetes_operator_constructor():
-    test_operator = DbtTestKubernetesOperator(
-        on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs
-    )
+    test_operator = DbtTestKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
     assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
 
 
 def test_dbt_source_kubernetes_operator_constructor():
-    test_operator = DbtSourceKubernetesOperator(
-        on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs
-    )
+    test_operator = DbtSourceKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
     assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
 
 
@@ -180,7 +176,8 @@ class FakePodManager:
 @pytest.mark.parametrize(
     ("log_string", "should_call"),
     (
-        ("""
+        (
+            """
         19:48:25  Concurrency: 4 threads (target='target')
         19:48:25
         19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
@@ -200,8 +197,11 @@ class FakePodManager:
         19:48:27  Done. PASS=1 WARN=1 ERROR=0 SKIP=0 TOTAL=2
         19:48:27  Command `dbt test` succeeded at 07:50:02.340364 after 43.98 seconds
         19:48:27  Flushing usage events
-        """, True),
-        ("""
+        """,
+            True,
+        ),
+        (
+            """
         19:48:25  Concurrency: 4 threads (target='target')
         19:48:25
         19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
@@ -212,11 +212,16 @@ class FakePodManager:
         19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
         19:48:27
         19:48:27  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 TOTAL=2
-        """, False),
-        ("""
+        """,
+            False,
+        ),
+        (
+            """
         gibberish
-        """, False)
-    )
+        """,
+            False,
+        ),
+    ),
 )
 @pytest.mark.skipif(
     not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"

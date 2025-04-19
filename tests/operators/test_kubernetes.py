@@ -19,13 +19,6 @@ from cosmos.operators.kubernetes import (
     DbtTestWarningHandler,
 )
 
-try:
-    from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
-
-    module_available = True
-except ImportError:
-    module_available = False
-
 
 @pytest.fixture()
 def mock_kubernetes_execute():
@@ -222,9 +215,6 @@ class FakePodManager:
             False,
         ),
     ),
-)
-@pytest.mark.skipif(
-    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
 )
 def test_dbt_kubernetes_operator_handle_warnings(caplog, log_string, should_call):
     mock_warning_callback = Mock()

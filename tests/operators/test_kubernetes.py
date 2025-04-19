@@ -157,20 +157,14 @@ def test_dbt_test_kubernetes_operator_constructor():
     test_operator = DbtTestKubernetesOperator(
         on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs
     )
-    if isinstance(test_operator.callbacks, list):
-        assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
-    else:
-        assert isinstance(test_operator.callbacks, DbtTestWarningHandler)
+    assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
 
 
 def test_dbt_source_kubernetes_operator_constructor():
     test_operator = DbtSourceKubernetesOperator(
         on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs
     )
-    if isinstance(test_operator.callbacks, list):
-        assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
-    else:
-        assert isinstance(test_operator.callbacks, DbtTestWarningHandler)
+    assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
 
 
 class FakePodManager:
@@ -187,42 +181,47 @@ class FakePodManager:
     ("log_string", "should_call"),
     (
         ("""
-19:48:25  Concurrency: 4 threads (target='target')
-19:48:25
-19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
-19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
-19:48:27  1 of 2 WARN 252 dbt_utils_accepted_range_table_col__12__0 ..................... [WARN 117 in 1.83s]
-19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
-19:48:27
-19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
-19:48:27
-19:48:27  Completed with 1 warning:
-19:48:27
-19:48:27  Warning in test dbt_utils_accepted_range_table_col__12__0 (models/ads/ads.yaml)
-19:48:27  Got 252 results, configured to warn if >0
-19:48:27
-19:48:27    compiled Code at target/compiled/model/models/table/table.yaml/dbt_utils_accepted_range_table_col__12__0.sql
-19:48:27
-19:48:27  Done. PASS=1 WARN=1 ERROR=0 SKIP=0 TOTAL=2
-""", True),
+        19:48:25  Concurrency: 4 threads (target='target')
+        19:48:25
+        19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
+        19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
+        19:48:27  1 of 2 WARN 252 dbt_utils_accepted_range_table_col__12__0 ..................... [WARN 117 in 1.83s]
+        19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
+        19:48:27
+        19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
+        19:48:27
+        19:48:27  Completed with 1 warning:
+        19:48:27
+        19:48:27  Warning in test dbt_utils_accepted_range_table_col__12__0 (models/ads/ads.yaml)
+        19:48:27  Got 252 results, configured to warn if >0
+        19:48:27
+        19:48:27    compiled Code at target/compiled/model/models/table/table.yaml/dbt_utils_accepted_range_table_col__12__0.sql
+        19:48:27
+        19:48:27  Done. PASS=1 WARN=1 ERROR=0 SKIP=0 TOTAL=2
+        19:48:27  Command `dbt test` succeeded at 07:50:02.340364 after 43.98 seconds
+        19:48:27  Flushing usage events
+        """, True),
         ("""
-19:48:25  Concurrency: 4 threads (target='target')
-19:48:25
-19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
-19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
-19:48:27  1 of 2 PASS 252 dbt_utils_accepted_range_table_col__12__0 ..................... [PASS in 1.83s]
-19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
-19:48:27
-19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
-19:48:27
-19:48:27  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 TOTAL=2
-""", False)
+        19:48:25  Concurrency: 4 threads (target='target')
+        19:48:25
+        19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
+        19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
+        19:48:27  1 of 2 PASS 252 dbt_utils_accepted_range_table_col__12__0 ..................... [PASS in 1.83s]
+        19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
+        19:48:27
+        19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
+        19:48:27
+        19:48:27  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 TOTAL=2
+        """, False),
+        ("""
+        gibberish
+        """, False)
     )
 )
 @pytest.mark.skipif(
     not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
 )
-def test_dbt_kubernetes_operator_handle_warnings(log_string, should_call):
+def test_dbt_kubernetes_operator_handle_warnings(caplog, log_string, should_call):
     mock_warning_callback = Mock()
 
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
@@ -240,13 +239,16 @@ def test_dbt_kubernetes_operator_handle_warnings(log_string, should_call):
             client=None,
             mode=None,
             context=context,
-            operator=None,
+            operator=test_operator,
         )
 
     if should_call:
         mock_warning_callback.assert_called_once()
     else:
         mock_warning_callback.assert_not_called()
+
+    if "gibberish" in log_string:
+        assert "Failed to scrape warning count" in caplog.text
 
 
 def test_created_pod():

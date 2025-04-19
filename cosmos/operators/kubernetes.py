@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from abc import ABC
+import re
 from os import PathLike
 from typing import Any, Callable, Sequence
 
@@ -23,9 +23,6 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
 )
-
-DBT_NO_TESTS_MSG = "Nothing to do"
-DBT_WARN_MSG = "WARN"
 
 try:
     # apache-airflow-providers-cncf-kubernetes >= 7.4.0
@@ -166,6 +163,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
             self,
             *,
             context: Context,
+            operator: KubernetesPodOperator,
             **kwargs,
     ) -> None:
         """
@@ -173,6 +171,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
         on_warning_callback with the updated context.
 
         :param context: The original airflow context in which the build and run command was executed.
+        :param operator: The original pod operator instance.
         """
         if not (
             isinstance(context["task_instance"], TaskInstance)
@@ -188,20 +187,18 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
             log.decode("utf-8") != ""
         ]
 
-        should_trigger_callback = all(
-            [
-                logs,
-                DBT_NO_TESTS_MSG not in logs[-1],
-                DBT_WARN_MSG in logs[-1],
-            ]
-        )
+        warn_count_pattern = re.compile(r'Done\. (?:\w+=\d )*WARN=(\d)(?: \w+=\d)*')
+        warn_count = warn_count_pattern.search('\n'.join(logs))
+        if not warn_count:
+            operator.log.warning(
+                "Failed to scrape warning count from the pod logs. Potential warning callbacks could not be triggered."
+            )
+            return
 
-        if should_trigger_callback:
-            warnings = int(logs[-1].split(f"{DBT_WARN_MSG}=")[1].split()[0])
-            if warnings > 0:
-                test_names, test_results = extract_log_issues(logs)
-                context_merge(context, test_names=test_names, test_results=test_results)
-                self.on_warning_callback(context)
+        if int(warn_count.group(1)) > 0:
+            test_names, test_results = extract_log_issues(logs)
+            context_merge(context, test_names=test_names, test_results=test_results)
+            self.on_warning_callback(context)
 
 
 class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
@@ -213,12 +210,7 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
         if on_warning_callback:
             test_warning_handler = DbtTestWarningHandler(on_warning_callback)
-            if isinstance(self.callbacks, list):
-                self.callbacks += [test_warning_handler]
-            elif self.callbacks is not None:
-                self.callbacks = [self.callbacks, test_warning_handler]
-            else:
-                self.callbacks = test_warning_handler
+            self.callbacks += [test_warning_handler]
 
 
 class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
@@ -230,12 +222,7 @@ class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
         if on_warning_callback:
             test_warning_handler = DbtTestWarningHandler(on_warning_callback)
-            if isinstance(self.callbacks, list):
-                self.callbacks += [test_warning_handler]
-            elif self.callbacks is not None:
-                self.callbacks = [self.callbacks, test_warning_handler]
-            else:
-                self.callbacks = test_warning_handler
+            self.callbacks += [test_warning_handler]
 
 
 class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):

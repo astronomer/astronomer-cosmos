@@ -185,7 +185,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
             log.decode("utf-8") for log in task.pod_manager.read_pod_logs(task.pod, "base") if log.decode("utf-8") != ""
         ]
 
-        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d )*WARN=(\d)(?: \w+=\d)*")
+        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
         warn_count = warn_count_pattern.search("\n".join(logs))
         if not warn_count:
             operator.log.warning(

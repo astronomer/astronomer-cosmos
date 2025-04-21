@@ -158,12 +158,14 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
     def __init__(self, on_warning_callback: Callable[..., Any]) -> None:
         self.on_warning_callback = on_warning_callback
 
-    def on_pod_completion(
+    # Although the parent class defines these as staticmethods, overriding them with instance methods is valid here.
+    # We ensure DbtTestWarningHandler is instantiated before use, so the method is still callable in the expected way.
+    def on_pod_completion(  # type: ignore[override]
         self,
         *,
         context: Context,
         operator: KubernetesPodOperator,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         Handles warnings by extracting log issues, creating additional context, and calling the
@@ -209,7 +211,7 @@ class DbtTestKubernetesOperator(DbtTestMixin, DbtKubernetesBaseOperator):
         if on_warning_callback:
             test_warning_handler = DbtTestWarningHandler(on_warning_callback)
             if isinstance(self.callbacks, list):
-                self.callbacks += [test_warning_handler]
+                self.callbacks += [test_warning_handler]  # type: ignore[list-item]
             elif self.callbacks is not None:
                 self.callbacks = [self.callbacks, test_warning_handler]
             else:
@@ -226,7 +228,7 @@ class DbtSourceKubernetesOperator(DbtSourceMixin, DbtKubernetesBaseOperator):
         if on_warning_callback:
             test_warning_handler = DbtTestWarningHandler(on_warning_callback)
             if isinstance(self.callbacks, list):
-                self.callbacks += [test_warning_handler]
+                self.callbacks += [test_warning_handler]  # type: ignore[list-item]
             elif self.callbacks is not None:
                 self.callbacks = [self.callbacks, test_warning_handler]
             else:

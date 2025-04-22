@@ -8,7 +8,11 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import psutil
-from airflow.utils.python_virtualenv import prepare_virtualenv
+
+try:
+    from airflow.providers.standard.utils.python_virtualenv import prepare_virtualenv
+except ImportError:
+    from airflow.utils.python_virtualenv import prepare_virtualenv
 
 from cosmos import settings
 from cosmos.constants import InvocationMode
@@ -142,7 +146,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     def _prepare_virtualenv(self) -> str:
         self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
-        py_bin = prepare_virtualenv(
+        py_bin: str = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,

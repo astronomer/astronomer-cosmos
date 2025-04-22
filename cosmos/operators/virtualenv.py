@@ -146,7 +146,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     def _prepare_virtualenv(self) -> Any:
         self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
-        py_bin: str = prepare_virtualenv(
+        py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,
             system_site_packages=self.py_system_site_packages,

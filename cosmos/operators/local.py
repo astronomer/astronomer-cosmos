@@ -154,7 +154,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
-        copy_dbt_packages: bool = settings.default_copy_dbt_packages_value,
+        copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         callback: Callable[[str], None] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,

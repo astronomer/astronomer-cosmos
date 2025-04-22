@@ -5,13 +5,19 @@ import logging
 import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import Any, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Sequence, Tuple
 
 import yaml
-from airflow.utils.context import Context, context_merge
+from airflow.utils.context import context_merge
+
+if TYPE_CHECKING:
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 try:
-    from airflow.utils.operator_helpers import context_to_airflow_vars
+    from airflow.utils.operator_helpers import context_to_airflow_vars  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover
     from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore
 

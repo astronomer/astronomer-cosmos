@@ -12,7 +12,7 @@ import psutil
 try:  # Airflow 3
     from airflow.providers.standard.utils.python_virtualenv import prepare_virtualenv
 except ImportError:  # Airflow 2
-    from airflow.utils.python_virtualenv import prepare_virtualenv
+    from airflow.utils.python_virtualenv import prepare_virtualenv  # type: ignore[no-redef]
 
 from cosmos import settings
 from cosmos.constants import InvocationMode
@@ -34,7 +34,11 @@ from cosmos.operators.local import (
 )
 
 if TYPE_CHECKING:
-    from airflow.utils.context import Context  # pragma: no cover
+    if TYPE_CHECKING:
+        try:
+            from airflow.sdk.definitions.context import Context
+        except ImportError:
+            from airflow.utils.context import Context  # type: ignore[attr-defined]
     from dbt.cli.main import dbtRunnerResult  # pragma: no cover
 
 PY_INTERPRETER = "python3"

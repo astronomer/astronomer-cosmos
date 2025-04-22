@@ -96,11 +96,9 @@ def test_validate_initial_user_config_expects_profile(execution_mode):
     assert validate_initial_user_config(execution_config, profile_config, project_config, None, {}) is None
 
 
-@pytest.mark.parametrize(
-    "operator_args", [{"env": {"key": "value"}}, {"vars": {"key": "value"}}, {"install_deps": {"key": "value"}}]
-)
+@pytest.mark.parametrize("operator_args", [{"env": {"key": "value"}}, {"install_deps": {"key": "value"}}])
 def test_validate_user_config_operator_args_deprecated(operator_args):
-    """Deprecating warnings should be raised when using operator_args with "vars", "env" or "install_deps"."""
+    """Deprecating warnings should be raised when using operator_args with "env" or "install_deps"."""
     project_config = ProjectConfig()
     execution_config = ExecutionConfig()
     render_config = RenderConfig()
@@ -110,23 +108,22 @@ def test_validate_user_config_operator_args_deprecated(operator_args):
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
 
-@pytest.mark.parametrize("project_config_arg, operator_arg", [("dbt_vars", "vars"), ("env_vars", "env")])
-def test_validate_user_config_fails_project_config_and_operator_args_overlap(project_config_arg, operator_arg):
+def test_validate_user_config_fails_project_config_and_operator_args_overlap():
     """
-    The validation should fail if a user specifies both a ProjectConfig and operator_args with dbt_vars/vars or env_vars/env
+    The validation should fail if a user specifies both a ProjectConfig and operator_args with env_vars/env
     that overlap.
     """
     project_config = ProjectConfig(
-        project_name="fake-project",
-        dbt_project_path="/some/project/path",
-        **{project_config_arg: {"key": "value"}},  # type: ignore
+        project_name="fake-project", dbt_project_path="/some/project/path", env_vars={"key": "value"}
     )
     execution_config = ExecutionConfig()
     render_config = RenderConfig()
     profile_config = MagicMock()
-    operator_args = {operator_arg: {"key": "value"}}
+    operator_args = {"env": {"key": "value"}}
 
-    expected_error_msg = f"ProjectConfig.{project_config_arg} and operator_args with '{operator_arg}' are mutually exclusive and only one can be used."
+    expected_error_msg = (
+        "ProjectConfig.env_vars and operator_args with 'env' are mutually exclusive and only one can be used."
+    )
     with pytest.raises(CosmosValueError, match=expected_error_msg):
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
@@ -645,14 +642,14 @@ def test_converter_project_config_dbt_vars_with_custom_load_mode(
 
 @patch("cosmos.config.ProjectConfig.validate_project")
 @patch("cosmos.converter.build_airflow_graph")
-@patch("cosmos.converter.DbtGraph.load")
-def test_converter_multiple_calls_same_operator_args(
-    mock_dbt_graph_load, mock_validate_project, mock_build_airflow_graph
-):
+@patch("cosmos.converter.DbtGraph")
+def test_converter_multiple_calls_same_operator_args(mock_dbt_graph, mock_build_airflow_graph, mock_validate_project):
     """Tests if the DbttoAirflowConverter is called more than once with the same operator_args, the
     operator_args are not modified.
     """
-    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    project_config = ProjectConfig(
+        project_name="fake-project", dbt_project_path="/some/project/path", dbt_vars={"a-key": "a-value"}
+    )
     execution_config = ExecutionConfig()
     render_config = RenderConfig()
     profile_config = MagicMock()
@@ -674,6 +671,8 @@ def test_converter_multiple_calls_same_operator_args(
                 operator_args=operator_args,
             )
     assert operator_args == original_operator_args
+    assert mock_build_airflow_graph.call_args.kwargs["task_args"]["vars"] == {"key": "value"}
+    assert mock_dbt_graph.call_args.kwargs["dbt_vars"] == {"a-key": "a-value"}
 
 
 @patch("cosmos.config.ProjectConfig.validate_project")

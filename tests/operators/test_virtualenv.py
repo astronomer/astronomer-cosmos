@@ -53,6 +53,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
@@ -62,6 +63,7 @@ def test_run_command_without_virtualenv_dir(
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_override_rtif,
     mock_calculate_openlineage_events_completes,
     mock_execute,
     _upload_sql_files,
@@ -115,6 +117,7 @@ def test_run_command_without_virtualenv_dir(
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
 @patch("airflow.utils.python_virtualenv.execute_in_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
@@ -124,6 +127,7 @@ def test_run_command_with_virtualenv_dir(
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_override_rtif,
     mock_calculate_openlineage_events_completes,
     mock_execute,
     mock_release_venv_lock,

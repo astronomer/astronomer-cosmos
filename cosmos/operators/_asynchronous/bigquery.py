@@ -5,9 +5,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 import airflow
-from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+
+try:
+    from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+except ImportError:
+    raise ImportError(
+        "Could not import BigQueryInsertJobOperator. Ensure you've installed the Google Cloud provider separately or "
+        "with with `pip install apache-airflow-providers-google`."
+    )
+
 from airflow.utils.context import Context
-from airflow.utils.session import NEW_SESSION, provide_session
 from packaging.version import Version
 
 from cosmos import settings
@@ -15,10 +22,7 @@ from cosmos.config import ProfileConfig
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
-from cosmos.settings import enable_setup_async_task, remote_target_path, remote_target_path_conn_id
-
-if TYPE_CHECKING:  # pragma: no cover
-    from sqlalchemy.orm import Session
+from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
@@ -90,6 +94,13 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             kwargs["outlets"] = [
                 DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
             ]  # type: ignore
+
+        # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
+        # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include
+        # BigQueryInsertJobOperator parameters and hence fails to initialise the operator due to missing arguments.
+        # To fix this, we temporarily set the base class to only BigQueryInsertJobOperator during initialization,
+        # then restore the full inheritance chain afterward.
+        DbtRunAirflowAsyncBigqueryOperator.__bases__ = (BigQueryInsertJobOperator,)
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
             configuration=self.configuration,
@@ -102,6 +113,15 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.compiled_sql = ""
         self.gcp_project = ""
         self.dataset = ""
+
+        # Restore the full inheritance chain after initialization that was temporarily set to BigQueryInsertJobOperator
+        # above for adding compatibility with Airflow 3 operator initialisation. This ensures that:
+        # 1. Subsequent class initializations have access to AbstractDbtLocalBase methods
+        # 2. Operator instances can properly access AbstractDbtLocalBase functionality during execution
+        DbtRunAirflowAsyncBigqueryOperator.__bases__ = (
+            BigQueryInsertJobOperator,
+            AbstractDbtLocalBase,
+        )
 
     @property
     def base_cmd(self) -> list[str]:
@@ -134,7 +154,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        if enable_setup_async_task:
+        if settings.enable_setup_async_task:
             self.configuration = {
                 "query": {
                     "query": self.get_remote_sql(),
@@ -146,41 +166,24 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
         self._store_template_fields(context=context)
 
-    @provide_session
-    def _store_template_fields(self, context: Context, session: Session = NEW_SESSION) -> None:
-        from airflow.models.renderedtifields import RenderedTaskInstanceFields
-        from airflow.models.taskinstance import TaskInstance
-
-        if not enable_setup_async_task:
+    def _store_template_fields(self, context: Context) -> None:
+        if not settings.enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
         sql = self.get_remote_sql().strip()
         self.log.debug("Executed SQL is: %s", sql)
         self.compiled_sql = sql
 
-        profile = self.profile_config.profile_mapping.profile
+        if self.profile_config.profile_mapping is not None:
+            profile = self.profile_config.profile_mapping.profile
+        else:
+            raise CosmosValueError(
+                "The `profile_config.profile`_mapping attribute must be defined to use `ExecutionMode.AIRFLOW_ASYNC`"
+            )
         self.gcp_project = profile["project"]
         self.dataset = profile["dataset"]
 
-        # need to refresh the rendered task field record in the db because Airflow only does this
-        # before executing the task, not after
-        ti = context["ti"]
-
-        if isinstance(ti, TaskInstance):  # verifies ti is a TaskInstance in order to access and use the "task" field
-            if TYPE_CHECKING:  # pragma: no cover
-                assert ti.task is not None
-            ti.task.template_fields = self.template_fields
-            rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
-            # delete the old records
-            session.query(RenderedTaskInstanceFields).filter(
-                RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
-                RenderedTaskInstanceFields.task_id == self.task_id,
-                RenderedTaskInstanceFields.run_id == ti.run_id,
-            ).delete()
-            session.add(rtif)
-        else:  # pragma: no cover
-            self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+        self._override_rtif(context=context)
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> Any:
         """

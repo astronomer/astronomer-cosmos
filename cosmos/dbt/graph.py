@@ -39,11 +39,24 @@ from cosmos.constants import (
     SourceRenderingBehavior,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
-from cosmos.dbt.project import create_symlinks, environ, get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import (
+    copy_dbt_packages,
+    create_symlinks,
+    environ,
+    get_partial_parse_path,
+    has_non_empty_dependencies_file,
+)
 from cosmos.dbt.selector import select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+
+def _normalize_path(path: str) -> str:
+    """
+    Converts a potentially Windows path string into a Posix-friendly path.
+    """
+    return Path(path.replace("\\", "/")).as_posix()
 
 
 class CosmosLoadDbtException(Exception):
@@ -64,6 +77,7 @@ class DbtNode:
     resource_type: DbtResourceType
     depends_on: list[str]
     file_path: Path
+    package_name: str | None = None
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
@@ -279,12 +293,17 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
+            base_path = (
+                project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore
+            )
+
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
+                    package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=project_path / node_dict["original_file_path"],
+                    file_path=base_path / node_dict["original_file_path"],
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(
@@ -530,7 +549,7 @@ class DbtGraph:
         self.update_node_dependency()
 
         logger.info("Total nodes: %i", len(self.nodes))
-        logger.info("Total filtered nodes: %i", len(self.nodes))
+        logger.info("Total filtered nodes: %i", len(self.filtered_nodes))
 
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
@@ -622,6 +641,59 @@ class DbtGraph:
         self._add_vars_arg(deps_command)
         run_command(deps_command, dbt_project_path, env, self.render_config.invocation_mode, self.log_dir)
 
+    def _copy_or_create_symbolic_links(self, source_dir_path: Path, dest_dir_path: Path) -> None:
+        """
+        This method handles creating symbolic links and/or copying files from the original file to a destination folder.
+
+        Create symbolic links related to:
+        * overall dbt project
+
+        Handle dbt deps related packages. This may involve:
+        * creating a symbolic link
+        * copying the dbt deps related files (dbt packages folder and symbolic link)
+        * doing nothing
+
+        All these cases may seem counter-intuitive, but they were necessary given the following
+        * Running dbt deps can be an expensive operation, specially considering it may run every time a DAG is parsed
+        (during scheduling and each time a task is executed). To not run it in a 50 dbt node DAG can save 3 minutes of
+        processing in the DAG run.
+        * Some users prefer to run `dbt deps` in the CI and "cache it" so Cosmos never runs `dbt deps`
+        * Some users want to use the "cached" dbt deps - but they would also like Cosmos to refresh the dependencies,
+        so they don't need to deploy Cosmos again.
+        * From an operating system perspective, to copy files takes more time than to create symbolic links.
+
+        Also, historically:
+        * Cosmos creates symbolic links to files/folders that are not updated by users, since this is compatible with read-only
+        dbt project paths and this is cheaper than copying those folders.
+
+        The current settings make sense for Cosmos 1.x and allow users to set things in different ways, while being backwards
+        compatible. We should review this for Cosmos 2.x.
+        """
+
+        should_not_create_dbt_deps_symbolic_link = self.should_install_dbt_deps or self.project.copy_dbt_packages
+
+        # The value of ignore_dbt_packages tells the function `create_symlinks` that we should not create a symbolic
+        # link for the `dbt_packages` folder. This can be desired in one or more of the two circumstances:
+        # 1. If we want to freshly install dbt packages (install_dbt_deps = True)
+        # 2. If we want to copy the dbt_packages folder instead of creating a symbolic link (copy_dbt_packages = True)
+        #
+        #  | Use case  | install_dbt_deps | copy_dbt_packages | create_symlinks.ignore_dbt_packages | what happens                 |
+        #  | A         | False            | False             | False                               | should create symlink        |
+        #  | B         | True             | False             | True                                | should run `dbt deps`        |
+        #  | C         | False            | True              | True                                | should copy dbt deps files   |
+        #  | D         | True             | True              | True                                | should copy & run `dbt deps` |
+        #
+        # Use cases description:
+        # A. High performance and deps may become outdated: Users run `dbt deps` outside of Cosmos and give pre-generated dbt packages. Dependencies may become outdated.
+        # B. Low performance and up-to-date deps: Cosmos always run `dbt deps` from scratch, every time the DAG is parsed (every time the DAG is parsed).
+        # C. (Non-practical) Middle performance and deps may become outdated: Users manage `dbt deps` outside of Cosmos and give pre-generated dbt packages. Dependencies may become outdated. More expensive than A, similar behaviour.
+        # D. Middle performance and up-to-date deps: Users run `dbt deps` outside of Cosmos and give pre-generated dbt packages. Cosmos runs dbt deps taking into account those user-generated files.
+
+        create_symlinks(source_dir_path, dest_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
+
+        if self.project.copy_dbt_packages:
+            copy_dbt_packages(source_dir_path, dest_dir_path)
+
     def load_via_dbt_ls_without_cache(self) -> None:
         """
         This is the most accurate way of loading `dbt` projects and filtering them out, since it uses the `dbt` command
@@ -645,7 +717,7 @@ class DbtGraph:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
             tmpdir_path = Path(tmpdir)
 
-            create_symlinks(project_path, tmpdir_path, self.should_install_dbt_deps)
+            self._copy_or_create_symbolic_links(project_path, tmpdir_path)
 
             latest_partial_parse = None
             if self.project.partial_parse:
@@ -821,9 +893,10 @@ class DbtGraph:
             for unique_id, node_dict in resources.items():
                 node = DbtNode(
                     unique_id=unique_id,
+                    package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / Path(node_dict["original_file_path"]),
+                    file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                     has_freshness=(

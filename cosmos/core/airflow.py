@@ -3,7 +3,10 @@ from __future__ import annotations
 import importlib
 from copy import deepcopy
 
-from airflow.models import BaseOperator
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 

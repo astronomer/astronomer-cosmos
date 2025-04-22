@@ -19,5 +19,6 @@ pytest -vv \
     --cov-report=xml \
     -m 'integration'  \
     --ignore=tests/perf \
+    --ignore=tests/test_async_example_dag.py \
     --ignore=tests/test_example_k8s_dags.py \
     -k 'not ( example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes)'

@@ -3,7 +3,10 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable, Sequence
 
-from airflow.models import BaseOperator
+try:
+    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator # Airflow 2
 from airflow.utils.context import Context
 
 from cosmos.config import ProfileConfig

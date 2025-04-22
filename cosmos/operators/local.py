@@ -17,11 +17,6 @@ import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
-
-try:  # Airflow 3
-    from airflow.sdk.bases.operator import BaseOperator
-except ImportError:  # Airflow 2
-    from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from airflow.version import version as airflow_version
@@ -43,6 +38,11 @@ from cosmos.settings import (
     remote_target_path,
     remote_target_path_conn_id,
 )
+
+try:
+    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator # Airflow 2
 
 try:
     from airflow.datasets import Dataset

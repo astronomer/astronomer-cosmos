@@ -24,7 +24,10 @@ logger = get_logger(__name__)
 
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
-from airflow.models import BaseOperator
+try:
+    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator # Airflow 2
 
 try:
     from airflow.providers.google.cloud.operators.cloud_run import CloudRunExecuteJobOperator

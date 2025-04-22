@@ -5,7 +5,7 @@ from abc import ABC
 from os import PathLike
 from typing import Any, Callable, Sequence
 
-from airflow.models import BaseOperator, TaskInstance
+from airflow.models import TaskInstance
 from airflow.utils.context import Context, context_merge
 
 from cosmos.config import ProfileConfig
@@ -22,6 +22,11 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
 )
+
+try:
+    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator # Airflow 2
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"

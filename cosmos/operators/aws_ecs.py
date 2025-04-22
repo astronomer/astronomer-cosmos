@@ -25,7 +25,10 @@ DEFAULT_CONN_ID = "aws_default"
 DEFAULT_CONTAINER_NAME = "dbt"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
-from airflow.models import BaseOperator
+try:
+    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator # Airflow 2
 
 try:
     from airflow.providers.amazon import __version__ as provider_version

@@ -32,7 +32,7 @@ jobs:
           architecture: "x64"
 
       - run: pip3 install hatch
-      - run: hatch run tests.py3.9-2.8-1.9:type-check
+      - run: hatch run tests.py3.9-2.10-1.9:type-check
 
   Run-Unit-Tests:
     runs-on: ubuntu-latest

@@ -18,7 +18,12 @@ import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.context import Context
+
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 from airflow.version import version as airflow_version
 from attr import define
 from packaging.version import Version
@@ -678,13 +683,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     if task.task_id == self.task_id:
                         task.outlets.extend(new_outlets)
                         task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined]
+                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
                 session.commit()
         else:
             logger.info("Assigning inlets/outlets with DatasetAlias")
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
             for outlet in new_outlets:
-                context["outlet_events"][dataset_alias_name].add(outlet)
+                context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """

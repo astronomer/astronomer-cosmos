@@ -758,10 +758,16 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         abstract_dbt_local_base_kwargs = {}
-        base_operator_kwargs = {**kwargs}
-        base_operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
+        operator_kwargs = {}
+        operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
 
         default_args = kwargs.get("default_args", {})
+
+        for arg in operator_args:
+            try:
+                operator_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                pass
 
         for arg in {
             *inspect.getfullargspec(AbstractDbtBase.__init__).args,
@@ -769,8 +775,6 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
         }:
             try:
                 abstract_dbt_local_base_kwargs[arg] = kwargs[arg]
-                if arg not in base_operator_args:
-                    base_operator_kwargs.pop(arg)
             except KeyError:
                 try:
                     abstract_dbt_local_base_kwargs[arg] = default_args[arg]
@@ -790,12 +794,12 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
                 dag_id = kwargs.get("dag")
                 task_group_id = kwargs.get("task_group")
-                base_operator_kwargs["outlets"] = [
+                operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
-        if "task_id" in base_operator_kwargs:
-            base_operator_kwargs.pop("task_id")
-        BaseOperator.__init__(self, task_id=self.task_id, **base_operator_kwargs)
+        if "task_id" in operator_kwargs:
+            operator_kwargs.pop("task_id")
+        BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

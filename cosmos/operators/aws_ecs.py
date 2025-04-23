@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from typing import Any, Callable, Sequence
+from packaging.version import Version
 
 from airflow.utils.context import Context
 
@@ -78,7 +79,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
             }
         )
 
-        if provider_version >= "9.3.0":
+        if Version(provider_version) >= Version("9.3.0"):
             kwargs["container_name"] = container_name
 
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
@@ -88,20 +89,23 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
         default_args = kwargs.get("default_args", {})
-        operator_kwargs = {**kwargs}
+        operator_kwargs = {}
 
         operator_args: set[str] = set()
         for clazz in EcsRunTaskOperator.__mro__:
             operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
             if clazz == BaseOperator:
                 break
+        for arg in operator_args:
+            try:
+                operator_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                pass
 
         base_kwargs = {}
         for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
             try:
                 base_kwargs[arg] = kwargs[arg]
-                if arg not in operator_args:
-                    operator_kwargs.pop(arg)
             except KeyError:
                 try:
                     base_kwargs[arg] = default_args[arg]

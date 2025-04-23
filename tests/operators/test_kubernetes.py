@@ -491,7 +491,7 @@ def test_kubernetes_task_group():
             execution_config=ExecutionConfig(
                 execution_mode=ExecutionMode.KUBERNETES,
             ),
-            profile_config=profile_config
+            profile_config=profile_config,
         )
 
     tg_tasks = [t for t in task_group.iter_tasks()]

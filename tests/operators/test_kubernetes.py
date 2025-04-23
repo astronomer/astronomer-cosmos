@@ -39,6 +39,7 @@ def base_operator(mock_kubernetes_execute):
 def kubernetes_pod_operator_callback():
     try:
         from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback
+
         return KubernetesPodOperatorCallback
     except ImportError:
         pytest.skip("Skipping: airflow.providers.cncf.kubernetes.callbacks not available")

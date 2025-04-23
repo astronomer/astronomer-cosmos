@@ -12,7 +12,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
-        
+
 from cosmos.config import ProfileConfig
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.base import (

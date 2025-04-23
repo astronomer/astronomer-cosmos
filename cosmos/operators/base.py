@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence, Tuple
 
 import yaml
-
 from airflow.utils.context import context_merge
 
 if TYPE_CHECKING:  # pragma: no cover

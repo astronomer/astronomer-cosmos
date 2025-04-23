@@ -3,26 +3,25 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
-from airflow.models import TaskInstance, DAG
+from airflow.models import DAG, TaskInstance
 from airflow.utils.context import Context, context_merge
 from packaging import version
 from pendulum import datetime
 
-from cosmos import ProfileConfig, ProjectConfig, ExecutionConfig, ExecutionMode
+from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.airflow.task_group import DbtTaskGroup
-from cosmos.profiles import PostgresUserPasswordProfileMapping
-
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
     DbtCloneKubernetesOperator,
+    DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
+    DbtRunOperationKubernetesOperator,
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
-    DbtRunOperationKubernetesOperator,
-    DbtKubernetesBaseOperator,
 )
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 try:
     from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
@@ -466,8 +465,6 @@ DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 
 
-
-
 @pytest.mark.integration
 def test_kubernetes_task_group():
     profile_config = ProfileConfig(
@@ -506,7 +503,6 @@ def test_kubernetes_task_group():
     assert [t.image == image for t in (t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator))]
 
 
-
 @pytest.mark.integration
 def test_kubernetes_default_args():
     profile_config = ProfileConfig(
@@ -520,11 +516,7 @@ def test_kubernetes_default_args():
     image = "test_image"
     with DAG(
         "test-id-dbt-compile",
-        default_args={
-            "project_dir": DBT_ROOT_PATH / "jaffle_shop",
-            "image": image,
-            "profile_config": profile_config
-        },
+        default_args={"project_dir": DBT_ROOT_PATH / "jaffle_shop", "image": image, "profile_config": profile_config},
     ) as dag:
         dbt_run_operation = DbtRunOperationKubernetesOperator(
             task_id="run_macro_command",

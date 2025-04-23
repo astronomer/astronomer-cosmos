@@ -779,9 +779,12 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
             *inspect.getfullargspec(AbstractDbtLocalBase.__init__).args,
         }:
             try:
-                base_kwargs[arg] = kwargs.get(arg) or default_args[arg]
+                base_kwargs[arg] = kwargs[arg]
             except KeyError:
-                pass
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
 
         AbstractDbtLocalBase.__init__(self, **base_kwargs)
         if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:

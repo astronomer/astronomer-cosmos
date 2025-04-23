@@ -105,9 +105,12 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
         base_kwargs = {}
         for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
             try:
-                base_kwargs[arg] = kwargs.get(arg) or default_args[arg]
+                base_kwargs[arg] = kwargs[arg]
             except KeyError:
-                pass
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
         AbstractDbtBase.__init__(self, **base_kwargs)
         EcsRunTaskOperator.__init__(self, **operator_kwargs)
 

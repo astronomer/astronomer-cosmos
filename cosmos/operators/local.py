@@ -24,7 +24,7 @@ except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 
-if TYPE_CHECKING:  # pragma: no-cover
+if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:

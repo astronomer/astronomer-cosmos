@@ -33,12 +33,12 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-if TYPE_CHECKING:  # pragma: no-cover
+if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
-    from dbt.cli.main import dbtRunnerResult  # pragma: no cover
+    from dbt.cli.main import dbtRunnerResult
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"

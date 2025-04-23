@@ -54,7 +54,7 @@ def test_create_async_operator_class_valid():
 
 
 class MockAsyncOperator(DbtRunLocalOperator):
-    def __init__(self, *args, dbt_kwargs, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
 

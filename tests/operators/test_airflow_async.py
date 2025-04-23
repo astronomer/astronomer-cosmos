@@ -43,10 +43,7 @@ def test_airflow_async_operator_init(mock_bigquery_conn):
     )
 
     DbtDag(
-        project_config=ProjectConfig(
-            dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-            install_dbt_deps=True
-        ),
+        project_config=ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME),
         profile_config=profile_config,
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.AIRFLOW_ASYNC,
@@ -56,8 +53,9 @@ def test_airflow_async_operator_init(mock_bigquery_conn):
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="simple_dag_async",
-        default_args={"location": "us"},
+        operator_args={"location": "us", "install_deps": True},
     )
+
 
 @pytest.mark.integration
 def test_airflow_async_operator_init_no_async_py_requirements_raises_error(mock_bigquery_conn):
@@ -72,10 +70,7 @@ def test_airflow_async_operator_init_no_async_py_requirements_raises_error(mock_
 
     with pytest.raises(CosmosValueError, match="ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set"):
         DbtDag(
-            project_config=ProjectConfig(
-                dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-                install_dbt_deps=True,
-            ),
+            project_config=ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME),
             profile_config=profile_config,
             execution_config=ExecutionConfig(
                 execution_mode=ExecutionMode.AIRFLOW_ASYNC,
@@ -84,7 +79,7 @@ def test_airflow_async_operator_init_no_async_py_requirements_raises_error(mock_
             start_date=datetime(2023, 1, 1),
             catchup=False,
             dag_id="simple_dag_async",
-            default_args={"location": "us"},
+            operator_args={"location": "us", "install_deps": True},
         )
 
 

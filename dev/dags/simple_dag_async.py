@@ -25,7 +25,6 @@ simple_dag_async = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "original_jaffle_shop",
-        install_dbt_deps=True,
     ),
     profile_config=profile_config,
     execution_config=ExecutionConfig(
@@ -39,6 +38,6 @@ simple_dag_async = DbtDag(
     catchup=False,
     dag_id="simple_dag_async",
     tags=["simple"],
-    default_args={"location": "US"},
+    operator_args={"location": "US", "install_deps": True},
 )
 # [END airflow_async_execution_mode_example]

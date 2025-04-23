@@ -9,12 +9,7 @@ from typing import Any, Sequence, Tuple
 
 import yaml
 from airflow.utils.context import Context, context_merge
-
-try:
-    from airflow.utils.operator_helpers import context_to_airflow_vars
-except ImportError:  # pragma: no cover
-    from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore
-
+from airflow.utils.operator_helpers import context_to_airflow_vars
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
@@ -117,7 +112,6 @@ class AbstractDbtBase(metaclass=ABCMeta):
         dbt_cmd_global_flags: list[str] | None = None,
         cache_dir: Path | None = None,
         extra_context: dict[str, Any] | None = None,
-        full_refresh: Any = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -147,6 +141,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
+        kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
 
     # The following is necessary so that dynamic mapped classes work since Cosmos 1.9.0 subclass changes
     # Bug report: https://github.com/astronomer/astronomer-cosmos/issues/1546

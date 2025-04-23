@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import inspect
 from typing import Any, Callable, Sequence
-from packaging.version import Version
 
 from airflow.utils.context import Context
+from packaging.version import Version
 
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
@@ -27,9 +27,9 @@ DEFAULT_CONTAINER_NAME = "dbt"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
-    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
-    from airflow.models import BaseOperator # Airflow 2
+    from airflow.models import BaseOperator  # Airflow 2
 
 try:
     from airflow.providers.amazon import __version__ as provider_version

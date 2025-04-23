@@ -24,9 +24,9 @@ from cosmos.operators.base import (
 )
 
 try:
-    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
-    from airflow.models import BaseOperator # Airflow 2
+    from airflow.models import BaseOperator  # Airflow 2
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"

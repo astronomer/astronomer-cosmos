@@ -40,9 +40,9 @@ from cosmos.settings import (
 )
 
 try:
-    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
-    from airflow.models import BaseOperator # Airflow 2
+    from airflow.models import BaseOperator  # Airflow 2
 
 try:
     from airflow.datasets import Dataset

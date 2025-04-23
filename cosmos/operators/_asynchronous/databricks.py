@@ -6,9 +6,10 @@ from typing import Any
 from airflow.utils.context import Context
 
 try:
-    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
-    from airflow.models import BaseOperator # Airflow 2
+    from airflow.models import BaseOperator  # Airflow 2
+
 
 class DbtRunAirflowAsyncDatabricksOperator(BaseOperator):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any):

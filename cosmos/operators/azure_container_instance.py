@@ -4,9 +4,9 @@ import inspect
 from typing import Any, Callable, Sequence
 
 try:
-    from airflow.sdk.bases.operator import BaseOperator # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
-    from airflow.models import BaseOperator # Airflow 2
+    from airflow.models import BaseOperator  # Airflow 2
 from airflow.utils.context import Context
 
 from cosmos.config import ProfileConfig

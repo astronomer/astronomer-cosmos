@@ -23,7 +23,12 @@ try:  # Airflow 3
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+if TYPE_CHECKING:  # pragma: no-cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 from airflow.version import version as airflow_version
 from attr import define
 from packaging.version import Version

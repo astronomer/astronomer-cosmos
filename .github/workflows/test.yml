@@ -121,6 +121,8 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
+          - python-version: "3.8"
+            airflow-version: "3.0"
     services:
       postgres:
         image: postgres

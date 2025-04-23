@@ -3,14 +3,20 @@ from __future__ import annotations
 import inspect
 import re
 from os import PathLike
-from typing import Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 from airflow.models import TaskInstance
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
     convert_env_vars,
 )
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from airflow.utils.context import Context, context_merge
+from airflow.utils.context import context_merge
+
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
 from cosmos.dbt.parser.output import extract_log_issues

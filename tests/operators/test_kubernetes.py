@@ -3,10 +3,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
-from airflow.models import TaskInstance
+from airflow.models import TaskInstance, DAG
 from airflow.utils.context import Context, context_merge
 from packaging import version
 from pendulum import datetime
+
+from cosmos import ProfileConfig, ProjectConfig, ExecutionConfig, ExecutionMode
+from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
@@ -16,6 +20,8 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
+    DbtRunOperationKubernetesOperator,
+    DbtKubernetesBaseOperator,
 )
 
 try:
@@ -454,3 +460,78 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
     pod_args = get_or_create_pod.call_args.kwargs["pod_request_obj"].to_dict()["spec"]["containers"][0]["args"]
 
     assert expected_cmd == pod_args
+
+
+DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+DBT_PROJECT_NAME = "jaffle_shop"
+
+
+
+
+@pytest.mark.integration
+def test_kubernetes_task_group():
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="example_conn",
+            profile_args={"schema": "public"},
+            disable_event_tracking=True,
+        ),
+    )
+
+    group_id = "test_group"
+    image = "test_image"
+    with DAG(
+        "test-id-dbt-compile",
+        start_date=datetime(2022, 1, 1),
+        default_args={
+            "image": image,
+        },
+    ) as dag:
+        task_group = DbtTaskGroup(
+            group_id=group_id,
+            project_config=ProjectConfig(
+                DBT_ROOT_PATH / "jaffle_shop",
+            ),
+            profile_config=profile_config,
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.KUBERNETES,
+            ),
+        )
+
+    tg_tasks = [t for t in task_group.iter_tasks()]
+    assert all(t.task_id.startswith(f"{group_id}.") for t in tg_tasks)
+    assert len(dag.tasks) == len(tg_tasks)
+    assert [t.image == image for t in (t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator))]
+
+
+
+@pytest.mark.integration
+def test_kubernetes_default_args():
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="example_conn",
+        ),
+    )
+
+    image = "test_image"
+    with DAG(
+        "test-id-dbt-compile",
+        default_args={
+            "project_dir": DBT_ROOT_PATH / "jaffle_shop",
+            "image": image,
+            "profile_config": profile_config
+        },
+    ) as dag:
+        dbt_run_operation = DbtRunOperationKubernetesOperator(
+            task_id="run_macro_command",
+            # profile_config=profile_config,
+            macro_name="macro",
+        )
+
+    assert dbt_run_operation.image == image
+    assert dbt_run_operation.project_dir == DBT_ROOT_PATH / "jaffle_shop"
+    assert dbt_run_operation.profile_config.target_name == profile_config.target_name

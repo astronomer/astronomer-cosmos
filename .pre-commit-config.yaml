@@ -88,7 +88,6 @@ repos:
             types-pytz,
             types-requests,
             types-python-dateutil,
-            apache-airflow,
           ]
         files: ^cosmos
 exclude: "dev/dags/dbt/simple/dbt_packages/.*"

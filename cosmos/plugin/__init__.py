@@ -199,7 +199,7 @@ iframe_script = """
 """
 
 
-class DbtDocsView(AirflowBaseView):
+class DbtDocsView(AirflowBaseView):  # type: ignore
     default_view = "dbt_docs"
     route_base = "/cosmos"
     template_folder = op.join(op.dirname(__file__), "templates")
@@ -212,14 +212,14 @@ class DbtDocsView(AirflowBaseView):
         return super().create_blueprint(appbuilder, endpoint=endpoint, static_folder=self.static_folder)  # type: ignore[no-any-return]
 
     @expose("/dbt_docs")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def dbt_docs(self) -> str:
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
@@ -234,7 +234,7 @@ class DbtDocsView(AirflowBaseView):
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
     @expose("/catalog.json")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
@@ -246,7 +246,7 @@ class DbtDocsView(AirflowBaseView):
             return data, 200, {"Content-Type": "application/json"}
 
     @expose("/manifest.json")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)

@@ -472,8 +472,6 @@ def test_kubernetes_task_group():
         target_name="dev",
         profile_mapping=PostgresUserPasswordProfileMapping(
             conn_id="example_conn",
-            profile_args={"schema": "public"},
-            disable_event_tracking=True,
         ),
     )
 
@@ -481,7 +479,6 @@ def test_kubernetes_task_group():
     image = "test_image"
     with DAG(
         "test-id-dbt-compile",
-        start_date=datetime(2022, 1, 1),
         default_args={
             "image": image,
         },
@@ -491,16 +488,17 @@ def test_kubernetes_task_group():
             project_config=ProjectConfig(
                 DBT_ROOT_PATH / "jaffle_shop",
             ),
-            profile_config=profile_config,
             execution_config=ExecutionConfig(
                 execution_mode=ExecutionMode.KUBERNETES,
             ),
+            profile_config=profile_config
         )
 
     tg_tasks = [t for t in task_group.iter_tasks()]
     assert all(t.task_id.startswith(f"{group_id}.") for t in tg_tasks)
     assert len(dag.tasks) == len(tg_tasks)
-    assert [t.image == image for t in (t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator))]
+    assert any(t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator))
+    assert all(t.image == image for t in (t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator)))
 
 
 @pytest.mark.integration
@@ -520,7 +518,6 @@ def test_kubernetes_default_args():
     ):
         dbt_run_operation = DbtRunOperationKubernetesOperator(
             task_id="run_macro_command",
-            # profile_config=profile_config,
             macro_name="macro",
         )
 

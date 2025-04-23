@@ -517,7 +517,7 @@ def test_kubernetes_default_args():
     with DAG(
         "test-id-dbt-compile",
         default_args={"project_dir": DBT_ROOT_PATH / "jaffle_shop", "image": image, "profile_config": profile_config},
-    ) as dag:
+    ):
         dbt_run_operation = DbtRunOperationKubernetesOperator(
             task_id="run_macro_command",
             # profile_config=profile_config,

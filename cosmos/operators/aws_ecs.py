@@ -32,7 +32,6 @@ except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
 
 try:
-    from airflow.providers.amazon import __version__ as provider_version
     from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 except ImportError:  # pragma: no cover
     raise ImportError(
@@ -75,12 +74,11 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "aws_conn_id": aws_conn_id,
                 "task_definition": task_definition,
                 "cluster": cluster,
+                "container_name": container_name,
                 "overrides": None,
             }
         )
 
-        if Version(provider_version) >= Version("9.3.0"):
-            kwargs["container_name"] = container_name
 
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class

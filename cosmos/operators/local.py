@@ -762,7 +762,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
-        abstract_dbt_local_base_kwargs = {}
+        base_kwargs = {}
         operator_kwargs = {}
         operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
 
@@ -779,14 +779,11 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
             *inspect.getfullargspec(AbstractDbtLocalBase.__init__).args,
         }:
             try:
-                abstract_dbt_local_base_kwargs[arg] = kwargs[arg]
+                base_kwargs[arg] = kwargs.get(arg) or default_args[arg]
             except KeyError:
-                try:
-                    abstract_dbt_local_base_kwargs[arg] = default_args[arg]
-                except KeyError:
-                    pass
+                pass
 
-        AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
+        AbstractDbtLocalBase.__init__(self, **base_kwargs)
         if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
             if (
                 kwargs.get("emit_datasets", True)

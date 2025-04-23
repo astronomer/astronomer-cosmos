@@ -107,12 +107,9 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         base_kwargs = {}
         for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
             try:
-                base_kwargs[arg] = kwargs[arg]
+                base_kwargs[arg] = kwargs.get(arg) or default_args[arg]
             except KeyError:
-                try:
-                    base_kwargs[arg] = default_args[arg]
-                except KeyError:
-                    pass
+                pass
         AbstractDbtBase.__init__(self, **base_kwargs)
         CloudRunExecuteJobOperator.__init__(self, **operator_kwargs)
 

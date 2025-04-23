@@ -16,7 +16,6 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
-    DbtTestWarningHandler,
 )
 
 
@@ -34,6 +33,15 @@ def base_operator(mock_kubernetes_execute):
         base_cmd = ["cmd"]
 
     return ConcreteDbtKubernetesBaseOperator
+
+
+@pytest.fixture
+def kubernetes_pod_operator_callback():
+    try:
+        from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback
+        return KubernetesPodOperatorCallback
+    except ImportError:
+        pytest.skip("Skipping: airflow.providers.cncf.kubernetes.callbacks not available")
 
 
 def test_dbt_kubernetes_operator_add_global_flags(base_operator) -> None:
@@ -146,14 +154,14 @@ def test_dbt_kubernetes_build_command():
         ]
 
 
-def test_dbt_test_kubernetes_operator_constructor():
+def test_dbt_test_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
     test_operator = DbtTestKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
-    assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
+    assert any([issubclass(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
 
 
-def test_dbt_source_kubernetes_operator_constructor():
+def test_dbt_source_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
     test_operator = DbtSourceKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
-    assert any([isinstance(cb, DbtTestWarningHandler) for cb in test_operator.callbacks])
+    assert any([issubclass(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
 
 
 class FakePodManager:
@@ -216,7 +224,7 @@ class FakePodManager:
         ),
     ),
 )
-def test_dbt_kubernetes_operator_handle_warnings(caplog, log_string, should_call):
+def test_dbt_kubernetes_operator_handle_warnings(caplog, kubernetes_pod_operator_callback, log_string, should_call):
     mock_warning_callback = Mock()
 
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)

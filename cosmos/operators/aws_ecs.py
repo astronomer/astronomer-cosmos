@@ -4,7 +4,6 @@ import inspect
 from typing import Any, Callable, Sequence
 
 from airflow.utils.context import Context
-from packaging.version import Version
 
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
@@ -78,7 +77,6 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "overrides": None,
             }
         )
-
 
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class

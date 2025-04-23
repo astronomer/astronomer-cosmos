@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence
 from airflow.models import TaskInstance
 from airflow.utils.context import context_merge
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no-cover
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:

@@ -33,7 +33,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no-cover
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:

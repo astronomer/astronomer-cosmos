@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from airflow.utils.context import Context
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import (

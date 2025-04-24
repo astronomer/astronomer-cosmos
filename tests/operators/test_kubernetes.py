@@ -157,12 +157,18 @@ def test_dbt_kubernetes_build_command():
 
 def test_dbt_test_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
     test_operator = DbtTestKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
-    assert any([issubclass(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
+    if isinstance(test_operator.callbacks, list):
+        assert any([isinstance(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
+    else:
+        assert isinstance(test_operator.callbacks, kubernetes_pod_operator_callback)
 
 
 def test_dbt_source_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
     test_operator = DbtSourceKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
-    assert any([issubclass(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
+    if isinstance(test_operator.callbacks, list):
+        assert any([isinstance(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
+    else:
+        assert isinstance(test_operator.callbacks, kubernetes_pod_operator_callback)
 
 
 class FakePodManager:
@@ -237,13 +243,21 @@ def test_dbt_kubernetes_operator_handle_warnings(caplog, kubernetes_pod_operator
     context = Context()
     context_merge(context, task_instance=task_instance)
 
-    for callback in test_operator.callbacks:
-        callback.on_pod_completion(
-            pod=None,
+    test_operator.warning_handler.context = context
+    test_operator.warning_handler.pod_manager = task_instance.task.pod_manager
+
+    if isinstance(test_operator.callbacks, list):
+        for callback in test_operator.callbacks:
+            callback.on_pod_completion(
+                pod=task_instance.task.remote_pod,
+                client=None,
+                mode=None,
+            )
+    else:
+        test_operator.callbacks.on_pod_completion(
+            pod=task_instance.task.remote_pod,
             client=None,
             mode=None,
-            context=context,
-            operator=test_operator,
         )
 
     if should_call:

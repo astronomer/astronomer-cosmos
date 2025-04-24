@@ -102,6 +102,76 @@ Below, find an example of a callback method that raises an exception if the quer
 
 Users can use the same approach to call the data observability platform `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_ or other services.
 
+.. code-block:: python
+
+    from pycarlo.core import Client, Session, Query
+    from pycarlo.features.dbt.dbt_importer import DbtImporter
+    from cosmos.log import get_logger
+    from cosmos.exceptions import CosmosValueError
+
+    logger = get_logger(__name__)
+
+    def get_resource_id(client):
+        """Get the resource ID of the first warehouse connected to the user's account"""
+        query = Query()
+        query.get_user().account.warehouses.__fields__("name", "connection_type", "uuid")
+        warehouses = client(query).get_user.account.warehouses
+        warehouse_list = []
+        if len(warehouses) > 0:
+            for val in warehouses:
+                warehouse_list.append(val.uuid)
+        else:
+            logger.error("no warehouses connected ! Please check your Monte Carlo account.")
+        return warehouse_list
+
+    def montecarlo_import_artifacts(
+            project_dir: str,
+            mcd_id: str,
+            mcd_token: str,
+            job_name: str,
+            project_name: str = "default-project",
+            resource_id: str = None,
+            **kwargs
+    ):
+        """
+         An example of a custom callback that import dbt artifacts to Monte Carlo.
+
+        Args:
+        :param project_dir: Path of the project directory used by Cosmos to run the dbt command
+        :param mcd_id: Monte Carlo token user ID
+        :param mcd_token: Monte Carlo token value
+        :param job_name: Job name (required - perhaps a logical sequence of dbt executions)
+        :param project_name: Project name (perhaps a logical group of dbt models)
+        :param resource_id: UUID of the warehouse as described by MonteCarlo. If not specified, the
+                    first warehouse connected to the user's account will be used
+        """
+
+        if not mcd_id or not mcd_token:
+            raise CosmosValueError("Monte Carlo credentials are required to authenticate with MonteCarlo!")
+
+        # create a client with the provided credentials
+        client = Client(session=Session(mcd_id=mcd_id, mcd_token=mcd_token))
+
+        dbt_importer = DbtImporter(mc_client=client)
+
+        target_path = f"{project_dir}/target"
+
+        import_options = {
+            "manifest_path": f"{target_path}/manifest.json",
+            "run_results_path": f"{target_path}/run_results.json",
+            "project_name": project_name,
+            "job_name": job_name
+        }
+
+        if resource_id:
+            import_options["resource_id"] = resource_id
+        else:
+            first_resource_id = get_resource_id(client)[0]
+            import_options["resource_id"] = first_resource_id
+
+        dbt_importer.import_run(**import_options)
+        logger.info("Successfully sent dbt run artifacts to Monte Carlo")
+
 Limitations and Contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

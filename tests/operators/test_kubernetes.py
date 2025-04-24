@@ -481,6 +481,7 @@ def test_kubernetes_task_group():
     image = "test_image"
     with DAG(
         "test-id-dbt-compile",
+        start_date=datetime(2022, 1, 1),
         default_args={
             "image": image,
         },
@@ -518,6 +519,7 @@ def test_kubernetes_default_args():
     image = "test_image"
     with DAG(
         "test-id-dbt-compile",
+        start_date=datetime(2022, 1, 1),
         default_args={"project_dir": DBT_ROOT_PATH / "jaffle_shop", "image": image, "profile_config": profile_config},
     ):
         dbt_run_operation = DbtRunOperationKubernetesOperator(

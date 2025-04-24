@@ -166,11 +166,8 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
 
 
 class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
-    def __init__(
-        self, on_warning_callback: Callable[..., Any], pod_manager: PodManager, operator: KubernetesPodOperator
-    ) -> None:
+    def __init__(self, on_warning_callback: Callable[..., Any], operator: KubernetesPodOperator) -> None:
         self.on_warning_callback = on_warning_callback
-        self.pod_manager = pod_manager
         self.operator = operator
         self.context: Optional[Context] = None
 
@@ -194,7 +191,11 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         :param client: the Kubernetes client that can be used in the callback.
         :param mode: the current execution mode, it's one of (`sync`, `async`).
         """
-        logs = [log.decode("utf-8") for log in self.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]
+        if not self.context:
+            return
+
+        task = self.context["task_instance"].task
+        logs = [log.decode("utf-8") for log in task.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]
 
         warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
         warn_count = warn_count_pattern.search("\n".join(logs))
@@ -220,7 +221,7 @@ class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
         super().__init__(*args, **kwargs)
         self.warning_handler = None
         if on_warning_callback:
-            self.warning_handler = DbtTestWarningHandler(on_warning_callback, self.pod_manager, self)
+            self.warning_handler = DbtTestWarningHandler(on_warning_callback, operator=self)
             # Support for handling multiple operator callbacks via self.callbacks was added in provider version 10.2.0
             if isinstance(self.callbacks, list):  # type: ignore[has-type]
                 self.callbacks.append(self.warning_handler)  # type: ignore[has-type,arg-type]

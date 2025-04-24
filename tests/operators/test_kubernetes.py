@@ -244,7 +244,6 @@ def test_dbt_kubernetes_operator_handle_warnings(caplog, kubernetes_pod_operator
     context_merge(context, task_instance=task_instance)
 
     test_operator.warning_handler.context = context
-    test_operator.warning_handler.pod_manager = task_instance.task.pod_manager
 
     if isinstance(test_operator.callbacks, list):
         for callback in test_operator.callbacks:

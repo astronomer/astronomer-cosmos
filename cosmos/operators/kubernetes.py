@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, Union
 
 import kubernetes.client as k8s
 import kubernetes_asyncio.client as async_k8s
+from airflow.models import TaskInstance
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
     convert_env_vars,
 )
@@ -194,6 +195,9 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
             return
 
         task = self.context["task_instance"].task
+        if not (isinstance(task, DbtTestKubernetesOperator) or isinstance(task, DbtSourceKubernetesOperator)):
+            return
+
         logs = [log.decode("utf-8") for log in task.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]
 
         warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
@@ -205,7 +209,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
             )
             return
 
-        if int(warn_count.group(1)) > 0 and self.context:
+        if int(warn_count.group(1)) > 0:
             test_names, test_results = extract_log_issues(logs)
             context_merge(self.context, test_names=test_names, test_results=test_results)
             self.on_warning_callback(self.context)
@@ -227,13 +231,18 @@ class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
             else:
                 self.callbacks = self.warning_handler  # type: ignore[assignment]
 
-    def execute(self, context: Context, **kwargs) -> Any | None:  # type: ignore
-        if self.extra_context:
-            context_merge(context, self.extra_context)
-
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
         if self.warning_handler:
             self.warning_handler.context = context
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        super().build_and_run_cmd(
+            context=context, cmd_flags=cmd_flags, run_as_async=run_as_async, async_context=async_context
+        )
 
 
 class DbtTestKubernetesOperator(DbtTestMixin, DbtWarningKubernetesOperator):

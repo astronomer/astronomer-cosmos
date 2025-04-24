@@ -508,7 +508,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
             self.callback_args.update({"context": context})
-            # handle the scenario where callback is a list of functions instead of a single function
             if isinstance(self.callback, list):
                 for callback_fn in self.callback:
                     callback_fn(tmp_project_dir, **self.callback_args)

@@ -9,6 +9,10 @@ After generating the dbt docs, you can host them natively within Airflow via the
 
 Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
+.. note::
+    The CosmosPlugin is not available for Airflow 3 yet as the compatibility is still being worked on. Hence, the dbt docs cannot be hosted and used in Airflow 3 yet.
+
+
 Cosmos offers two pre-built ways of generating and uploading dbt docs and a fallback option to run custom code after the docs are generated:
 
 - :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.

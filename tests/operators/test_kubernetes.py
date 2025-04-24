@@ -472,6 +472,8 @@ def test_kubernetes_task_group():
         target_name="dev",
         profile_mapping=PostgresUserPasswordProfileMapping(
             conn_id="example_conn",
+            profile_args={"schema": "public"},
+            disable_event_tracking=True,
         ),
     )
 
@@ -508,6 +510,8 @@ def test_kubernetes_default_args():
         target_name="dev",
         profile_mapping=PostgresUserPasswordProfileMapping(
             conn_id="example_conn",
+            profile_args={"schema": "public"},
+            disable_event_tracking=True,
         ),
     )
 

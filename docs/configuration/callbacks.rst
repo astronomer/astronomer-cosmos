@@ -138,7 +138,7 @@ Users can use the same approach to call the data observability platform `monteca
                     warehouse_list.append(val.uuid)
             else:
                 raise Exception("no warehouses connected ! Please check your Monte Carlo account.")
-            return warehouse_list
+            return warehouse_list[0]
 
         if not mcd_id or not mcd_token:
             raise Exception("Monte Carlo credentials are required to authenticate with MonteCarlo!")
@@ -159,7 +159,7 @@ Users can use the same approach to call the data observability platform `monteca
         if resource_id:
             import_options["resource_id"] = resource_id
         else:
-            first_resource_id = get_resource_id(client)[0]
+            first_resource_id = get_resource_id(client)
             import_options["resource_id"] = first_resource_id
 
         dbt_importer.import_run(**import_options)

@@ -160,7 +160,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
-        callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
+        callback: Callable[[str], None] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
@@ -508,11 +508,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self._upload_sql_files(tmp_project_dir, "compiled")
         if self.callback:
             self.callback_args.update({"context": context})
-            if isinstance(self.callback, list):
-                for callback_fn in self.callback:
-                    callback_fn(tmp_project_dir, **self.callback_args)
-            else:
-                self.callback(tmp_project_dir, **self.callback_args)
+            self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if async_context.get("teardown_task") and settings.enable_teardown_async_task:

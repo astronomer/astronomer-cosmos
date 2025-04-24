@@ -104,13 +104,13 @@ Users can use the same approach to call the data observability platform `monteca
 
 .. code-block:: python
     def montecarlo_import_artifacts(
-            project_dir: str,
-            mcd_id: str,
-            mcd_token: str,
-            job_name: str,
-            project_name: str = "default-project",
-            resource_id: str = None,
-            **kwargs
+        project_dir: str,
+        mcd_id: str,
+        mcd_token: str,
+        job_name: str,
+        project_name: str = "default-project",
+        resource_id: str = None,
+        **kwargs,
     ):
         """
          An example of a custom callback that import dbt artifacts to Monte Carlo.
@@ -128,20 +128,26 @@ Users can use the same approach to call the data observability platform `monteca
         from pycarlo.features.dbt.dbt_importer import DbtImporter
 
         def get_resource_id(client):
-        """Get the resource ID of the first warehouse connected to the user's account"""
+            """Get the resource ID of the first warehouse connected to the user's account"""
             query = Query()
-            query.get_user().account.warehouses.__fields__("name", "connection_type", "uuid")
+            query.get_user().account.warehouses.__fields__(
+                "name", "connection_type", "uuid"
+            )
             warehouses = client(query).get_user.account.warehouses
             warehouse_list = []
             if len(warehouses) > 0:
                 for val in warehouses:
                     warehouse_list.append(val.uuid)
             else:
-                raise Exception("no warehouses connected ! Please check your Monte Carlo account.")
+                raise Exception(
+                    "no warehouses connected ! Please check your Monte Carlo account."
+                )
             return warehouse_list[0]
 
         if not mcd_id or not mcd_token:
-            raise Exception("Monte Carlo credentials are required to authenticate with MonteCarlo!")
+            raise Exception(
+                "Monte Carlo credentials are required to authenticate with MonteCarlo!"
+            )
 
         client = Client(session=Session(mcd_id=mcd_id, mcd_token=mcd_token))
 
@@ -153,7 +159,7 @@ Users can use the same approach to call the data observability platform `monteca
             "manifest_path": f"{target_path}/manifest.json",
             "run_results_path": f"{target_path}/run_results.json",
             "project_name": project_name,
-            "job_name": job_name
+            "job_name": job_name,
         }
 
         if resource_id:

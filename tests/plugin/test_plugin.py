@@ -1,3 +1,18 @@
+from airflow import __version__ as airflow_version
+from packaging import version
+
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
+
+# The Cosmos plugin is only loaded if the Airflow version is less than 3.0. This is because the plugin is incompatible
+# with Airflow 3.0 and above. Once the compatibility issue is resolved as part of
+# https://github.com/astronomer/astronomer-cosmos/issues/1587, we can remove this check and run the tests on
+# Airflow 3.0+.
+if version.parse(airflow_version).major >= _AIRFLOW3_MAJOR_VERSION:
+    import pytest
+
+    pytest.skip("Skipping plugin tests on Airflow 3.0+", allow_module_level=True)
+
+
 # dbt-core relies on Jinja2>3, whereas Flask<2 relies on an incompatible version of Jinja2.
 #
 # This discrepancy causes the automated integration tests to fail, as dbt-core is installed in the same

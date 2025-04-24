@@ -103,27 +103,6 @@ Below, find an example of a callback method that raises an exception if the quer
 Users can use the same approach to call the data observability platform `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_ or other services.
 
 .. code-block:: python
-
-    from pycarlo.core import Client, Session, Query
-    from pycarlo.features.dbt.dbt_importer import DbtImporter
-    from cosmos.log import get_logger
-    from cosmos.exceptions import CosmosValueError
-
-    logger = get_logger(__name__)
-
-    def get_resource_id(client):
-        """Get the resource ID of the first warehouse connected to the user's account"""
-        query = Query()
-        query.get_user().account.warehouses.__fields__("name", "connection_type", "uuid")
-        warehouses = client(query).get_user.account.warehouses
-        warehouse_list = []
-        if len(warehouses) > 0:
-            for val in warehouses:
-                warehouse_list.append(val.uuid)
-        else:
-            logger.error("no warehouses connected ! Please check your Monte Carlo account.")
-        return warehouse_list
-
     def montecarlo_import_artifacts(
             project_dir: str,
             mcd_id: str,
@@ -145,11 +124,25 @@ Users can use the same approach to call the data observability platform `monteca
         :param resource_id: UUID of the warehouse as described by MonteCarlo. If not specified, the
                     first warehouse connected to the user's account will be used
         """
+        from pycarlo.core import Client, Session, Query
+        from pycarlo.features.dbt.dbt_importer import DbtImporter
+
+        def get_resource_id(client):
+        """Get the resource ID of the first warehouse connected to the user's account"""
+            query = Query()
+            query.get_user().account.warehouses.__fields__("name", "connection_type", "uuid")
+            warehouses = client(query).get_user.account.warehouses
+            warehouse_list = []
+            if len(warehouses) > 0:
+                for val in warehouses:
+                    warehouse_list.append(val.uuid)
+            else:
+                raise Exception("no warehouses connected ! Please check your Monte Carlo account.")
+            return warehouse_list
 
         if not mcd_id or not mcd_token:
-            raise CosmosValueError("Monte Carlo credentials are required to authenticate with MonteCarlo!")
+            raise Exception("Monte Carlo credentials are required to authenticate with MonteCarlo!")
 
-        # create a client with the provided credentials
         client = Client(session=Session(mcd_id=mcd_id, mcd_token=mcd_token))
 
         dbt_importer = DbtImporter(mc_client=client)
@@ -170,7 +163,7 @@ Users can use the same approach to call the data observability platform `monteca
             import_options["resource_id"] = first_resource_id
 
         dbt_importer.import_run(**import_options)
-        logger.info("Successfully sent dbt run artifacts to Monte Carlo")
+        print("Successfully sent dbt run artifacts to Monte Carlo")
 
 
 Limitations and Contributions

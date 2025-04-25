@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, fix_dockdb]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -180,6 +180,7 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+          AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4

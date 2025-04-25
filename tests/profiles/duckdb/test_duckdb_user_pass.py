@@ -74,7 +74,7 @@ def test_profile_args_overrides(
     mock_duckdb_conn: Connection,
 ) -> None:
     """
-    Test that users can override the profile values.
+    Tests that you can override the profile values.
     """
     profile_mapping = get_automatic_profile_mapping(
         mock_duckdb_conn.conn_id,

@@ -380,3 +380,7 @@ def test_has_access_with_permissions_in_astro_must_include_custom_menu(url_path,
     mock_check_auth = cosmos.plugin.plugin_impl.dbt_docs_view.appbuilder.sm.check_authorization
     app.get(url_path)
     assert mock_check_auth.call_args[0][0] == [("menu_access", "Custom Menu"), ("can_read", "Website")]
+
+
+def test_cosmos_plugin_enabled_on_airflow2():
+    assert cosmos.plugin.CosmosPlugin is not None

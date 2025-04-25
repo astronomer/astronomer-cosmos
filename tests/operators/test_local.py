@@ -1563,10 +1563,13 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     assert "Copying dbt packages to temporary folder." in caplog.text
     assert "Completed copying dbt packages to temporary folder." in caplog.text
 
+
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
-def test_handle_post_execution_with_multiple_callbacks(mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json):
+def test_handle_post_execution_with_multiple_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json
+):
 
     multiple_callbacks = [MagicMock(), MagicMock(), MagicMock()]
     operator = ConcreteDbtLocalBaseOperator(
@@ -1574,7 +1577,7 @@ def test_handle_post_execution_with_multiple_callbacks(mock_override_rtif, mock_
         task_id="my-task",
         project_dir="my/dir",
         callback=multiple_callbacks,
-        callback_args={"arg1": "value1"}
+        callback_args={"arg1": "value1"},
     )
 
     context = {"dag_run": MagicMock(), "task": MagicMock()}

@@ -3,8 +3,9 @@ apache-airflow-task-sdk
 apache-airflow-providers-standard
 apache-airflow-providers-fab
 apache-airflow-providers-cncf-kubernetes
+# apache-airflow-providers-amazon[s3fs]
+apache-airflow-providers-google
 psycopg2
 asyncpg
 dbt-postgres
 dbt-bigquery
-apache-airflow-providers-google

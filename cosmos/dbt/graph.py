@@ -492,6 +492,15 @@ class DbtGraph:
         }
         """
         cache_dict: dict[str, str] = {}
+
+        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError]
+        try:
+            from airflow.sdk.exceptions import AirflowRuntimeError
+        except ImportError:
+            pass
+        else:
+            airflow_variable_exceptions.append(AirflowRuntimeError)
+
         try:
             remote_cache_dir = _configure_remote_cache_dir()
             cache_dict = (
@@ -499,7 +508,7 @@ class DbtGraph:
                 if remote_cache_dir
                 else Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
             )
-        except (json.decoder.JSONDecodeError, KeyError):
+        except tuple(airflow_variable_exceptions):
             return cache_dict
         else:
             dbt_ls_compressed = cache_dict.pop("dbt_ls_compressed", None)

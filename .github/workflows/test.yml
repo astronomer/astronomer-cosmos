@@ -3,8 +3,8 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main, add-airflow-3-test-matrix-entry]
-   pull_request_target: # Also run on pull requests originated from forks
-     branches: [main]
+  pull_request_target: # Also run on pull requests originated from forks
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

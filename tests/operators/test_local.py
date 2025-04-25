@@ -11,7 +11,11 @@ import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessResult
+
+try:  # For Airflow 3
+    from airflow.providers.standard.hooks.subprocess import SubprocessResult
+except ImportError:  # For Airflow 2
+    from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from packaging import version

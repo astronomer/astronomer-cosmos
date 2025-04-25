@@ -2,7 +2,11 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from airflow.hooks.subprocess import SubprocessResult
+
+try:  # For Airflow 3
+    from airflow.providers.standard.hooks.subprocess import SubprocessResult
+except ImportError:  # For Airflow 2
+    from airflow.hooks.subprocess import SubprocessResult
 
 from cosmos.dbt.parser.output import (
     extract_dbt_runner_issues,

@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 from airflow import DAG
 from airflow.models import DagRun, Variable
-from airflow.utils.db import create_session
+
+# from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
@@ -167,51 +168,99 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
 
 @pytest.fixture
 def vars_session():
-    with create_session() as session:
-        var1 = Variable(key="cosmos_cache__dag_a", val='{"dag_id": "dag_a"}')
-        var2 = Variable(key="cosmos_cache__dag_b", val='{"dag_id": "dag_b"}')
-        var3 = Variable(key="cosmos_cache__dag_c__task_group_1", val='{"dag_id": "dag_c"}')
+    # TODO: Revisit approach here
+    mock_variables = {
+        "cosmos_cache__dag_a": '{"dag_id": "dag_a"}',
+        "cosmos_cache__dag_b": '{"dag_id": "dag_b"}',
+        "cosmos_cache__dag_c__task_group_1": '{"dag_id": "dag_c"}',
+    }
 
-        dag_run_a = DagRun(
+    def mock_variable_get(key, default_var=None, deserialize_json=False):
+        val = mock_variables.get(key, default_var)
+        if deserialize_json and isinstance(val, str):
+            import json
+
+            return json.loads(val)
+        return val
+
+    # Mock DagRun access
+    mock_dagruns = [
+        DagRun(
             dag_id="dag_a",
             run_id="dag_a_run_a_week_ago",
             execution_date=datetime.now(timezone.utc) - timedelta(days=7),
             state="success",
             run_type="manual",
-        )
-        dag_run_b = DagRun(
+        ),
+        DagRun(
             dag_id="dag_b",
             run_id="dag_b_run_yesterday",
             execution_date=datetime.now(timezone.utc) - timedelta(days=1),
             state="failed",
             run_type="manual",
-        )
-        dag_run_c = DagRun(
+        ),
+        DagRun(
             dag_id="dag_c",
             run_id="dag_c_run_on_hour_ago",
             execution_date=datetime.now(timezone.utc) - timedelta(hours=1),
             state="running",
             run_type="manual",
-        )
+        ),
+    ]
 
-        session.add(var1)
-        session.add(var2)
-        session.add(var3)
-        session.add(dag_run_a)
-        session.add(dag_run_b)
-        session.add(dag_run_c)
-        session.commit()
+    def mock_get_dag_runs(*args, **kwargs):
+        return mock_dagruns
 
-        yield session
+    with patch("airflow.models.variable.Variable.get", side_effect=mock_variable_get), patch(
+        "airflow.models.dagrun.DagRun.get_dag_runs", side_effect=mock_get_dag_runs
+    ):
+        yield
 
-        session.query(Variable).filter_by(key="cosmos_cache__dag_a").delete()
-        session.query(Variable).filter_by(key="cosmos_cache__dag_b").delete()
-        session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").delete()
-
-        session.query(DagRun).filter_by(dag_id="dag_a", run_id="dag_a_run_a_week_ago").delete()
-        session.query(DagRun).filter_by(dag_id="dag_b", run_id="dag_b_run_yesterday").delete()
-        session.query(DagRun).filter_by(dag_id="dag_c", run_id="dag_c_run_on_hour_ago").delete()
-        session.commit()
+    # with create_session() as session:
+    #     var1 = Variable(key="cosmos_cache__dag_a", val='{"dag_id": "dag_a"}')
+    #     var2 = Variable(key="cosmos_cache__dag_b", val='{"dag_id": "dag_b"}')
+    #     var3 = Variable(key="cosmos_cache__dag_c__task_group_1", val='{"dag_id": "dag_c"}')
+    #
+    #     dag_run_a = DagRun(
+    #         dag_id="dag_a",
+    #         run_id="dag_a_run_a_week_ago",
+    #         execution_date=datetime.now(timezone.utc) - timedelta(days=7),
+    #         state="success",
+    #         run_type="manual",
+    #     )
+    #     dag_run_b = DagRun(
+    #         dag_id="dag_b",
+    #         run_id="dag_b_run_yesterday",
+    #         execution_date=datetime.now(timezone.utc) - timedelta(days=1),
+    #         state="failed",
+    #         run_type="manual",
+    #     )
+    #     dag_run_c = DagRun(
+    #         dag_id="dag_c",
+    #         run_id="dag_c_run_on_hour_ago",
+    #         execution_date=datetime.now(timezone.utc) - timedelta(hours=1),
+    #         state="running",
+    #         run_type="manual",
+    #     )
+    #
+    #     session.add(var1)
+    #     session.add(var2)
+    #     session.add(var3)
+    #     session.add(dag_run_a)
+    #     session.add(dag_run_b)
+    #     session.add(dag_run_c)
+    #     session.commit()
+    #
+    #     yield session
+    #
+    #     session.query(Variable).filter_by(key="cosmos_cache__dag_a").delete()
+    #     session.query(Variable).filter_by(key="cosmos_cache__dag_b").delete()
+    #     session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").delete()
+    #
+    #     session.query(DagRun).filter_by(dag_id="dag_a", run_id="dag_a_run_a_week_ago").delete()
+    #     session.query(DagRun).filter_by(dag_id="dag_b", run_id="dag_b_run_yesterday").delete()
+    #     session.query(DagRun).filter_by(dag_id="dag_c", run_id="dag_c_run_on_hour_ago").delete()
+    #     session.commit()
 
 
 @pytest.mark.integration

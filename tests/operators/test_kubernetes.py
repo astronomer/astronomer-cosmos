@@ -497,11 +497,10 @@ def test_kubernetes_task_group():
             profile_config=profile_config,
         )
 
-    tg_tasks = [t for t in task_group.iter_tasks()]
-    assert all(t.task_id.startswith(f"{group_id}.") for t in tg_tasks)
-    assert len(dag.tasks) == len(tg_tasks)
-    assert any(t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator))
-    assert all(t.image == image for t in (t for t in tg_tasks if isinstance(t, DbtKubernetesBaseOperator)))
+    assert all(t.task_id.startswith(f"{group_id}.") for t in task_group)
+    assert len(dag.tasks) == len([t for t in task_group])
+    assert any(t for t in task_group if isinstance(t, DbtKubernetesBaseOperator))
+    assert all(t.image == image for t in (t for t in task_group if isinstance(t, DbtKubernetesBaseOperator)))
 
 
 @pytest.mark.integration

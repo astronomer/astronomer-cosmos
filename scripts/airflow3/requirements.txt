@@ -4,7 +4,8 @@ apache-airflow-providers-standard
 apache-airflow-providers-fab
 apache-airflow-providers-cncf-kubernetes
 # Installing apache-airflow-providers-amazon[s3fs] and apache-airflow-providers-google together causes a
-# dependency resolution conflict for package fsspec. Please install this manually as an independent pip command # if you want to keep remote storage as S3.
+# dependency resolution conflict for package fsspec. Please install this manually as an independent pip command
+# if you want to keep remote storage as S3.
 apache-airflow-providers-amazon[s3fs]
 apache-airflow-providers-google
 psycopg2

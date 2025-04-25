@@ -91,11 +91,11 @@ We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distr
 
 The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
-For instance, to run the tests using Python 3.10, `Apache Airflow® <https://airflow.apache.org/>`_ 2.5 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
+For instance, to run the tests using Python 3.9, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
 
-    hatch run tests.py3.8-2.4-1.9:test-cov:test-cov
+    hatch run tests.py3.9-2.10-1.9:test-cov:test-cov
 
 It is also possible to run the tests using all the matrix combinations, by using:
 
@@ -125,14 +125,14 @@ To run the integration tests for the first time, use:
     export POSTGRES_PASSWORD=postgres
     export POSTGRES_USER=postgres
     export POSTGRES_HOST=localhost
-    hatch run tests.py3.8-2.4-1.9:test-cov:test-integration-setup
-    hatch run tests.py3.8-2.4-1.9:test-cov:test-integration
+    hatch run tests.py3.9-2.10-1.9:test-cov:test-integration-setup
+    hatch run tests.py3.9-2.10-1.9:test-cov:test-integration
 
 If testing for the same Airflow and Python version, next runs of the integration tests can be:
 
 .. code-block:: bash
 
-    hatch run tests.py3.8-2.4-1.9:test-integration
+    hatch run tests.py3.9-2.10-1.9:test-integration
 
 Pre-Commit
 ----------

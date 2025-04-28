@@ -10,7 +10,7 @@ echo "$DBT_VERSION"
 
 
 pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
-pip install "dbt-postgres==$DBT_VERSION"  "dbt-databricks==$DBT_VERSION" "dbt-bigquery==$DBT_VERSION"
+pip install -U "dbt-postgres~=$DBT_VERSION"  "dbt-databricks~=$DBT_VERSION" "dbt-bigquery~=$DBT_VERSION"
 
 # apache-airflow-core 3.0.0 requires pydantic>=2.11.0, but the above dbt adapters in case of version 1.6 and 1.9 install
 # pydantic 1.10.22 which make it incompatible.
@@ -35,13 +35,6 @@ if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
 else
     echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db init'..."
     airflow db init
-fi
-
-if [ "$DBT_VERSION" = "1.7" ]; then
-    # Otherwise, we will get the following error:
-    # stderr: MessageToJson() got an unexpected keyword argument 'including_default_value_fields'
-    echo "DBT version is 1.7 — Installing protobuf==4.25.6..."
-    pip install protobuf==4.25.6
 fi
 
 rm -rf dbt/jaffle_shop/dbt_packages

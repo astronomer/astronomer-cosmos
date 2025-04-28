@@ -6,7 +6,7 @@ set -e
 
 
 pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
-pip install dbt-postgres==1.5.4  dbt-databricks==1.5.4 dbt-bigquery==1.5.4
+pip install dbt-postgres==1.5.4 dbt-duckdb==1.5 dbt-databricks==1.5.4 dbt-bigquery==1.5.4
 export SOURCE_RENDERING_BEHAVIOR=all
 rm -rf airflow.*
 

@@ -49,7 +49,9 @@ dbt-all = [
     # the Pydantic version required by Airflow (version > 2.7)
     # See: https://github.com/astronomer/astronomer-cosmos/issues/1379
     "dbt-databricks!=1.9.0",
+    "dbt-duckdb",
     "dbt-exasol",
+    "dbt-duckdb",
     "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
@@ -62,6 +64,7 @@ dbt-athena = ["dbt-athena-community", "apache-airflow-providers-amazon>=8.0.0"]
 dbt-bigquery = ["dbt-bigquery"]
 dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
+dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
@@ -84,6 +87,7 @@ all = [
     "astronomer-cosmos[amazon]",
     "astronomer-cosmos[google]",
     "astronomer-cosmos[microsoft]",
+    "astronomer-cosmos[dbt-duckdb]"
 ]
 docs = [
     "sphinx",

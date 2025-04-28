@@ -672,7 +672,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         described before.
 
         The only limitation is that with Airflow 2.10.0 and 2.10.1, the `airflow dags test` command will not work
-        with Datasets:
+        with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
         from airflow.utils.session import create_session

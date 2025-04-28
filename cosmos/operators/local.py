@@ -577,7 +577,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                         # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance. The
                         # support for this is expected to be worked upon while addressing issue:
                         # https://github.com/astronomer/astronomer-cosmos/issues/1635
-                        context["task_instance"].openlineage_events_completes = self.openlineage_events_completes
+                        context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
                 if self.emit_datasets:
                     self._handle_datasets(context)

@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main, add-airflow-3-test-matrix-entry]
+    branches: [main, issue-1710-enable-af3-perf-dag]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 

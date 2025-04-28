@@ -356,19 +356,12 @@ jobs:
         python-version: [ "3.11" ]
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
-        # TODO: Add support for dbt 1.6, 1.7, 1.9 for Airflow 3.0.
+        # TODO: Add support for dbt 1.7 for Airflow 3.0.
         #       Issue dbt 1.7: https://github.com/astronomer/astronomer-cosmos/issues/1709
-        #       Issue dbt 1.6 and 1.9: https://github.com/astronomer/astronomer-cosmos/issues/1708
         exclude:
           - python-version: "3.11"
             airflow-version: "3.0"
-            dbt-version: "1.6"
-          - python-version: "3.11"
-            airflow-version: "3.0"
             dbt-version: "1.7"
-          - python-version: "3.11"
-            airflow-version: "3.0"
-            dbt-version: "1.9"
     services:
       postgres:
         image: postgres

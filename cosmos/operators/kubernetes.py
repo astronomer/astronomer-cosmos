@@ -169,7 +169,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         self,
         on_warning_callback: Callable[..., Any],
         operator: KubernetesPodOperator,
-        context: Optional[Context] = None
+        context: Optional[Context] = None,
     ) -> None:
         self.on_warning_callback = on_warning_callback
         self.operator = operator

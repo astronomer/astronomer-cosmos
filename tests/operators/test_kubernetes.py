@@ -246,11 +246,7 @@ class FakePodManager:
     ),
 )
 def test_dbt_kubernetes_operator_handle_warnings(
-    caplog,
-    fake_kubernetes_execute_pod_completion,
-    kubernetes_pod_operator_callback,
-    log_string,
-    should_call
+    caplog, fake_kubernetes_execute_pod_completion, kubernetes_pod_operator_callback, log_string, should_call
 ):
     mock_warning_callback = Mock()
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
@@ -273,9 +269,7 @@ def test_dbt_kubernetes_operator_handle_warnings(
 
 
 def test_dbt_kubernetes_operator_handle_warnings_noop(
-    caplog,
-    fake_kubernetes_execute_pod_completion,
-    kubernetes_pod_operator_callback
+    caplog, fake_kubernetes_execute_pod_completion, kubernetes_pod_operator_callback
 ):
     context = Context()
     mock_warning_callback = Mock()

@@ -32,6 +32,17 @@ if [ "$DBT_VERSION" = "1.6" ] || [ "$DBT_VERSION" = "1.9" ]; then
     pip install "pydantic>2.11.0"
 fi
 
+# As on 28th April, 2025, the latest patch dbt-bigquery 1.6.13 on the 1.6 minor is not yet compatible with the latest
+# release of google-cloud-bigquery 3.31.0 as it tries to access a protected attribute which no longer exists in that
+# latest version for google-cloud-bigquery and gives the below error:
+# stderr: module 'google.cloud.bigquery._helpers' has no attribute '_CELLDATA_FROM_JSON'.
+# Hence, we need to install the previous version of google-cloud-bigquery <3.31.0 that still has the protected attribute
+# 'google.cloud.bigquery._helpers._CELLDATA_FROM_JSON' available to make it compatible with dbt-bigquery 1.6.13.
+if [ "$DBT_VERSION" = "1.6" ]; then
+    echo "DBT_VERSION is $DBT_VERSION, installing google-cloud-bigquery<3.31.0 for compatibility issue."
+    pip install "google-cloud-bigquery<3.31.0"
+fi
+
 export SOURCE_RENDERING_BEHAVIOR=all
 rm -rf airflow.*
 

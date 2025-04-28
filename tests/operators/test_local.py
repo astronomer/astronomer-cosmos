@@ -504,8 +504,8 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
         seed_operator >> run_operator >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
-    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+    assert run_operator.outlets == [AssetAliasSchema(name="test_id_1__run")]
+    assert test_operator.outlets == [AssetAliasSchema(name="test_id_1__test")]
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)

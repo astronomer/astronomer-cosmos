@@ -482,7 +482,9 @@ jobs:
 
           # read the performance results and set them as an env var for the next step
           # format: NUM_MODELS={num_models}\nTIME={end - start}\n
-          cat /tmp/performance_results.txt > $GITHUB_STEP_SUMMARY
+          # TODO: Uncomment below "cat command" when issue https://github.com/astronomer/astronomer-cosmos/issues/1710
+          # is resolved. The below command is failing at the moment since corresponding tests are skipped.
+          # cat /tmp/performance_results.txt > $GITHUB_STEP_SUMMARY
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres

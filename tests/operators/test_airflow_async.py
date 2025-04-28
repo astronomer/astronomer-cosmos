@@ -49,7 +49,7 @@ def test_airflow_async_operator_init(mock_bigquery_conn):
             execution_mode=ExecutionMode.AIRFLOW_ASYNC,
             async_py_requirements=["dbt-bigquery"],
         ),
-        schedule_interval=None,
+        schedule=None,
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="simple_dag_async",
@@ -75,7 +75,7 @@ def test_airflow_async_operator_init_no_async_py_requirements_raises_error(mock_
             execution_config=ExecutionConfig(
                 execution_mode=ExecutionMode.AIRFLOW_ASYNC,
             ),
-            schedule_interval=None,
+            schedule=None,
             start_date=datetime(2023, 1, 1),
             catchup=False,
             dag_id="simple_dag_async",

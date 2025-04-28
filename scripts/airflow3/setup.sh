@@ -4,7 +4,7 @@
 set -e
 
 # Create a UV virtual environment named 'env' (you can change this as needed)
-echo "Creating virtual environment at $(pwd)/tools"
+echo "Creating virtual environment at $(pwd)/scripts/airflow3/venv-af3"
 python3 -m venv "$(pwd)/scripts/airflow3/venv-af3"
 
 # Activate the virtual environment

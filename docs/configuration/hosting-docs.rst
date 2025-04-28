@@ -5,6 +5,10 @@ Hosting Docs
 
 dbt docs can be served directly from the `Apache Airflow® <https://airflow.apache.org/>`_ webserver with the Cosmos Airflow plugin, without requiring the user to set up anything outside of Airflow. This page describes how to host docs in the Airflow webserver directly, although some users may opt to host docs externally.
 
+.. note::
+    The CosmosPlugin is not available for Airflow 3 yet as the compatibility is still being worked on. Hence, the dbt docs cannot be hosted and used in Airflow 3 yet.
+
+
 Overview
 ~~~~~~~~
 

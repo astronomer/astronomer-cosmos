@@ -37,7 +37,7 @@ profile_config = ProfileConfig(
 with DAG(
     dag_id="extract_dag",
     start_date=datetime(2022, 11, 27),
-    schedule_interval="@daily",
+    schedule="@daily",
     doc_md=__doc__,
     catchup=False,
     max_active_runs=1,

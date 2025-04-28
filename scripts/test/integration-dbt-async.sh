@@ -22,7 +22,7 @@ pip install "dbt-postgres==$DBT_VERSION"  "dbt-databricks==$DBT_VERSION" "dbt-bi
 #     from pydantic._internal._decorators import unwrap_wrapped_function
 # ModuleNotFoundError: No module named 'pydantic._internal'
 # Hence, we re-install pydantic with the required minimum version after installing dbt adapters.
-if [[ "$DBT_VERSION" == "1.6" || "$DBT_VERSION" == "1.9" ]]; then
+if [ "$DBT_VERSION" = "1.6" ] || [ "$DBT_VERSION" = "1.9" ]; then
     echo "DBT_VERSION is $DBT_VERSION, installing pydantic>=2.11.0 for apache-airflow-core compatibility."
     pip install "pydantic>2.11.0"
 fi

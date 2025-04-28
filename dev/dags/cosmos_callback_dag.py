@@ -51,7 +51,7 @@ cosmos_callback_dag = DbtDag(
         # --------------------------------------------------------------
     },
     # normal dag parameters
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="cosmos_callback_dag",

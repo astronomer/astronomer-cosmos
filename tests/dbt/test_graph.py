@@ -30,6 +30,7 @@ from cosmos.dbt.graph import (
     DbtGraph,
     DbtNode,
     LoadMode,
+    _normalize_path,
     parse_dbt_ls_output,
     run_command,
 )
@@ -40,6 +41,7 @@ DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 ALTERED_DBT_PROJECT_NAME = "altered_jaffle_shop"
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
+SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
@@ -272,6 +274,31 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
         "model.jaffle_shop.stg_payments",
     ]
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
+
+
+def test_load_via_manifest_with_ms_windows_manifest_and_star_selector():
+    # This test is based on a real user-case that in 1.9.0 and before would return an empty list of filtered nodes
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR,  # this value is not used in DAG rendering when the manifest is given
+        manifest_path=SAMPLE_SMALL_MANIFEST,
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(select=["path:models/edr*+"])
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    assert len(dbt_graph.nodes) == 1
+    assert len(dbt_graph.filtered_nodes) == 1
 
 
 @pytest.mark.parametrize(
@@ -1361,7 +1388,7 @@ Values returned by mac_get_values:
         "model.some_package.some_model": DbtNode(
             unique_id="model.some_package.some_model",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("fake-project/models/some_model.sql"),
+            file_path=Path("some_package/models/some_model.sql"),
             original_file_path="models/some_model.sql",
             tags=[],
             config={
@@ -1396,6 +1423,7 @@ Values returned by mac_get_values:
                 "unique_key": None,
             },
             depends_on=["source.some_source"],
+            package_name="some_package",
         ),
     }
     nodes = parse_dbt_ls_output(Path("fake-project"), dbt_ls_output)
@@ -1405,7 +1433,7 @@ Values returned by mac_get_values:
 
 
 def test_parse_dbt_ls_output():
-    fake_ls_stdout = '{"resource_type": "model", "name": "fake-name", "original_file_path": "fake-file-path.sql", "unique_id": "fake-unique-id", "tags": [], "config": {}}'
+    fake_ls_stdout = '{"resource_type": "model", "name": "fake-name", "package_name": "fake-project", "original_file_path": "fake-file-path.sql", "unique_id": "fake-unique-id", "tags": [], "config": {}}'
 
     expected_nodes = {
         "fake-unique-id": DbtNode(
@@ -1416,6 +1444,7 @@ def test_parse_dbt_ls_output():
             tags=[],
             config={},
             depends_on=[],
+            package_name="fake-project",
         ),
     }
     nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
@@ -1424,7 +1453,7 @@ def test_parse_dbt_ls_output():
 
 
 def test_parse_dbt_ls_output_with_json_without_tags_or_config():
-    some_ls_stdout = '{"resource_type": "model", "name": "some-name", "original_file_path": "some-file-path.sql", "unique_id": "some-unique-id", "config": {}}'
+    some_ls_stdout = '{"resource_type": "model", "name": "some-name", "package_name": "some-project", "original_file_path": "some-file-path.sql", "unique_id": "some-unique-id", "config": {}}'
 
     expected_nodes = {
         "some-unique-id": DbtNode(
@@ -1435,6 +1464,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
             tags=[],
             config={},
             depends_on=[],
+            package_name="some-project",
         ),
     }
     nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)
@@ -1866,7 +1896,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "afbced719302d5b1efdfb191c617e349"
+        assert hash_dir == "391db5c7e1fb90214d829dd0476059a1"
     else:
         assert hash_dir == "0148da6f5f7fd260c9fa55c3b3c45168"
 
@@ -2038,3 +2068,13 @@ def test_get_dbt_ls_cache_remote_cache_dir(
     }
 
     assert result == expected_result
+
+
+def test__normalize_path():
+    """
+    This normalizes the path (e.g. declared inside a manifest.json file) when it was created using MS Windows instead
+    of GNU Linux.
+    """
+    original_value = "seeds\\seed_ifs_util_manual_event_id.csv"
+    expected_value = "seeds/seed_ifs_util_manual_event_id.csv"
+    assert _normalize_path(original_value) == expected_value

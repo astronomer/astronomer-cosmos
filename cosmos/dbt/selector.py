@@ -15,7 +15,8 @@ if TYPE_CHECKING:
     from cosmos.dbt.graph import DbtNode
 
 
-SUPPORTED_CONFIG = ["materialized", "schema", "tags"]
+CONFIG_META_PATH = "meta"
+SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 CONFIG_SELECTOR = "config."
@@ -27,6 +28,40 @@ AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 
 logger = get_logger(__name__)
+
+
+def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
+    """
+    Given a dictionary dict_, identify if the pattern defined in pattern happens on the dictionary.
+
+    :param dict_: a dictionary
+    :param pattern: a string containing a dotted path that reference dictionary keys and a value (e.g.  "config.meta.frequency:daily")
+    :return: True/False if the desired pattern happens or not in the dictionary
+
+
+    Example:
+        dict_ = {
+            "config": {
+                "meta": {
+                    "frequency": "daily"
+                }
+            }
+        pattern = "config.meta.frequency:daily"
+        assert self._check_nested_value_in_dict(dict_, pattern)
+
+    """
+    keys, expected_value = pattern.split(":")
+    keys_values = keys.split(".")
+
+    current: dict[Any, Any] | str = dict_
+    for key in keys_values:
+        if isinstance(current, dict):
+            if key in current:
+                current = current[key]
+            else:
+                return False  # Key path doesn't exist
+
+    return current == expected_value
 
 
 @dataclass
@@ -175,7 +210,7 @@ class GraphSelector:
         # Index nodes by name, we can improve performance by doing this once
         # for multiple GraphSelectors
         if PATH_SELECTOR in self.node_name:
-            path_selection = self.node_name[len(PATH_SELECTOR) :]
+            path_selection = self.node_name[len(PATH_SELECTOR) :].rstrip("*")
             root_nodes.update({node_id for node_id, node in nodes.items() if path_selection in str(node.file_path)})
 
         elif TAG_SELECTOR in self.node_name:
@@ -196,13 +231,10 @@ class GraphSelector:
 
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
-            if config_selection_key not in SUPPORTED_CONFIG:
-                logger.warning("Unsupported config key selector: %s", config_selection_key)
-
-            # currently tags, materialized, and schema are the only supported config keys
+            # currently tags, materialized, schema and meta are the only supported config keys
             # logic is separated into two conditions because the config 'tags' contains a
-            # list of tags, but the config 'materialized', and 'schema' contain strings
-            elif config_selection_key == "tags":
+            # list of tags, the config 'materialized' & 'schema' contain strings and meta contains dictionaries
+            if config_selection_key == "tags":
                 root_nodes.update(
                     {
                         node_id
@@ -221,7 +253,16 @@ class GraphSelector:
                         if config_selection_value == node.config.get(config_selection_key, "")
                     }
                 )
-
+            elif config_selection_key.startswith(CONFIG_META_PATH):
+                root_nodes.update(
+                    {
+                        node_id
+                        for node_id, node in nodes.items()
+                        if _check_nested_value_in_dict(node.config, f"{config_selection_key}:{config_selection_value}")
+                    }
+                )
+            else:
+                logger.warning("Unsupported config key selector: %s", config_selection_key)
         else:
             node_by_name = {}
             for node_id, node in nodes.items():
@@ -362,7 +403,8 @@ class SelectorConfig:
     def _parse_config_selector(self, item: str) -> None:
         index = len(CONFIG_SELECTOR)
         key, value = item[index:].split(":")
-        if key in SUPPORTED_CONFIG:
+
+        if key in SUPPORTED_CONFIG or key.startswith(CONFIG_META_PATH):
             self.config[key] = value
 
     def _parse_tag_selector(self, item: str) -> None:
@@ -372,7 +414,7 @@ class SelectorConfig:
     def _parse_path_selector(self, item: str) -> None:
         index = len(PATH_SELECTOR)
         if self.project_dir:
-            self.paths.append(self.project_dir / Path(item[index:]))
+            self.paths.append(self.project_dir / Path(item[index:].rstrip("*")))
         else:
             self.paths.append(Path(item[index:]))
 
@@ -451,6 +493,31 @@ class NodeSelector:
         self.selected_nodes = selected_nodes
         return selected_nodes
 
+    def _should_include_based_on_meta(self, node: DbtNode, config: dict[Any, Any]) -> bool:
+
+        # Deal with meta properties
+        selector_meta_patterns = {key: value for key, value in config.items() if key.startswith(CONFIG_META_PATH)}
+        if selector_meta_patterns:
+            for key, value in selector_meta_patterns.items():
+                if not _check_nested_value_in_dict(node.config, f"{key}:{value}"):
+                    return False
+                config.pop(key)
+        return True
+
+    def _should_include_based_on_non_meta_and_non_tag_config(self, node: DbtNode, config: dict[Any, Any]) -> bool:
+        node_non_meta_or_tag_config = {
+            key: value
+            for key, value in node.config.items()
+            if key in SUPPORTED_CONFIG and key != "tag" and not key.startswith(CONFIG_META_PATH)
+        }
+
+        if not (config.items() <= node_non_meta_or_tag_config.items()):
+            return False
+
+        if not self._is_config_subset(node_non_meta_or_tag_config):
+            return False
+        return True
+
     def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
         """
         Checks if a single node should be included. Only runs once per node with caching."""
@@ -476,17 +543,14 @@ class NodeSelector:
             logger.debug("Excluding node <%s>", node_id)
             return False
 
-        node_config = {key: value for key, value in node.config.items() if key in SUPPORTED_CONFIG}
-
-        if not self._is_config_subset(node_config):
-            return False
-
         # Remove 'tags' as they've already been filtered for
         config_copy = copy.deepcopy(self.config.config)
         config_copy.pop("tags", None)
-        node_config.pop("tags", None)
 
-        if not (config_copy.items() <= node_config.items()):
+        # Handle other config attributes, including meta and general config
+        if not self._should_include_based_on_meta(
+            node, config_copy
+        ) or not self._should_include_based_on_non_meta_and_non_tag_config(node, config_copy):
             return False
 
         if self.config.paths and not self._is_path_matching(node):
@@ -650,7 +714,7 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
                 or filter_parameter.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(SOURCE_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
-                or any([filter_parameter.startswith(CONFIG_SELECTOR + config + ":") for config in SUPPORTED_CONFIG])
+                or any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG])
             ):
                 continue
             elif ":" in filter_parameter:

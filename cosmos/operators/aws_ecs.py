@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from airflow.utils.context import Context
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
@@ -21,6 +25,8 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
+DEFAULT_CONN_ID = "aws_default"
+DEFAULT_CONTAINER_NAME = "dbt"
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
 try:
@@ -47,10 +53,10 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     def __init__(
         self,
         # arguments required by EcsRunTaskOperator
-        aws_conn_id: str,
         cluster: str,
         task_definition: str,
-        container_name: str,
+        container_name: str = DEFAULT_CONTAINER_NAME,
+        aws_conn_id: str = DEFAULT_CONN_ID,
         #
         profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
@@ -66,6 +72,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
                 "aws_conn_id": aws_conn_id,
                 "task_definition": task_definition,
                 "cluster": cluster,
+                "container_name": container_name,
                 "overrides": None,
             }
         )

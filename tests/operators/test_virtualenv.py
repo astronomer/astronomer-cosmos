@@ -13,7 +13,7 @@ from airflow.models.connection import Connection
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import InvocationMode
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -43,6 +43,13 @@ real_profile_config = ProfileConfig(
 )
 
 
+def patch_execute_in_subprocess(func):
+    if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+        return patch("airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess")(func)
+    else:
+        return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
+
+
 class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 
     @property
@@ -51,8 +58,9 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 
 
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
-@patch("airflow.utils.python_virtualenv.execute_in_subprocess")
+@patch_execute_in_subprocess
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
@@ -62,6 +70,7 @@ def test_run_command_without_virtualenv_dir(
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_override_rtif,
     mock_calculate_openlineage_events_completes,
     mock_execute,
     _upload_sql_files,
@@ -98,11 +107,19 @@ def test_run_command_without_virtualenv_dir(
     assert dbt_cmd["command"][1] == "do-something"
     assert mock_execute.call_count == 2
     virtualenv_call, pip_install_call = mock_execute.call_args_list
-    assert "python" in virtualenv_call[0][0][0]
-    assert virtualenv_call[0][0][1] == "-m"
-    assert virtualenv_call[0][0][2] == "virtualenv"
-    assert "pip" in pip_install_call[0][0][0]
-    assert pip_install_call[0][0][1] == "install"
+    if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+        assert "python3" in virtualenv_call[0][0]
+        assert virtualenv_call[0][0][0] == "uv"
+        assert virtualenv_call[0][0][1] == "venv"
+        assert pip_install_call[0][0][0] == "uv"
+        assert pip_install_call[0][0][1] == "pip"
+        assert pip_install_call[0][0][2] == "install"
+    else:
+        assert "python" in virtualenv_call[0][0][0]
+        assert virtualenv_call[0][0][1] == "-m"
+        assert virtualenv_call[0][0][2] == "virtualenv"
+        assert "pip" in pip_install_call[0][0][0]
+        assert pip_install_call[0][0][1] == "install"
     cosmos_venv_dirs = [
         f for f in os.listdir("/tmp") if os.path.isdir(os.path.join("/tmp", f)) and f.startswith("cosmos-venv")
     ]
@@ -113,8 +130,9 @@ def test_run_command_without_virtualenv_dir(
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._is_lock_available")
 @patch("time.sleep")
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator._release_venv_lock")
-@patch("airflow.utils.python_virtualenv.execute_in_subprocess")
+@patch_execute_in_subprocess
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.operators.virtualenv.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
@@ -124,6 +142,7 @@ def test_run_command_with_virtualenv_dir(
     mock_subprocess_hook,
     mock_exception_handling,
     mock_store_compiled_sql,
+    mock_override_rtif,
     mock_calculate_openlineage_events_completes,
     mock_execute,
     mock_release_venv_lock,
@@ -362,6 +381,8 @@ def test__release_venv_lock_current_process(tmpdir):
     assert not lockfile.exists()
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1707
+@pytest.mark.skipif(AIRFLOW_VERSION.major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.5"),
     reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",

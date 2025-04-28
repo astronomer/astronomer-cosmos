@@ -1,3 +1,15 @@
+from airflow import __version__ as airflow_version
+from packaging import version
+
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
+
+# TODO: Enable and make tests functional in the module for AF 3. Disabling to due to DB access code in this module.
+#  Issue: https://github.com/astronomer/astronomer-cosmos/issues/1711
+if version.parse(airflow_version).major >= _AIRFLOW3_MAJOR_VERSION:
+    import pytest
+
+    pytest.skip("Skipping Cache tests on Airflow 3.0+", allow_module_level=True)
+
 import logging
 import shutil
 import tempfile

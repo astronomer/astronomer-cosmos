@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
@@ -8,6 +9,7 @@ from typing import Generator
 from cosmos.constants import (
     DBT_DEPENDENCIES_FILE_NAMES,
     DBT_LOG_DIR_NAME,
+    DBT_PACKAGES_FOLDER,
     DBT_PARTIAL_PARSE_FILE_NAME,
     DBT_TARGET_DIR_NAME,
     PACKAGE_LOCKFILE_YML,
@@ -34,12 +36,36 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return False
 
 
+def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
+    """
+    Copies the dbt packages related files and directories from source_folder to target_folder.
+
+    :param: source_folder: The base directory where paths are sourced from.
+    :param: target_folder: The directory where paths will be copied to.
+    """
+    logger.info("Copying dbt packages to temporary folder...")
+    dbt_packages_paths = [DBT_PACKAGES_FOLDER, PACKAGE_LOCKFILE_YML]
+
+    for relative_path in dbt_packages_paths:
+        src_path = source_folder / relative_path
+        dst_path = target_folder / relative_path
+
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+
+        if src_path.is_dir():
+            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+        else:
+            shutil.copy2(src_path, dst_path)
+
+    logger.info("Completed copying dbt packages to temporary folder.")
+
+
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:
     """Helper function to create symlinks to the dbt project files."""
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, PACKAGE_LOCKFILE_YML, "profiles.yml"]
     if ignore_dbt_packages:
         # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
-        ignore_paths.append("dbt_packages")
+        ignore_paths.append(DBT_PACKAGES_FOLDER)
     for child_name in os.listdir(project_path):
         if child_name not in ignore_paths:
             os.symlink(project_path / child_name, tmp_dir / child_name)

@@ -161,16 +161,6 @@ def validate_initial_user_config(
             DeprecationWarning,
         )
 
-    if "vars" in operator_args:
-        # TODO: remove the following in a separate PR
-        warn(
-            "operator_args with 'vars' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.vars instead.",
-            DeprecationWarning,
-        )
-        if project_config.dbt_vars:
-            raise CosmosValueError(
-                "ProjectConfig.dbt_vars and operator_args with 'vars' are mutually exclusive and only one can be used."
-            )
     # Cosmos 2.0 will remove the ability to pass RenderConfig.env_vars in place of ProjectConfig.env_vars, check that both are not set.
     if project_config.env_vars and render_config.env_vars:
         raise CosmosValueError(
@@ -226,6 +216,8 @@ def override_configuration(
     if execution_config.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
         if "install_deps" not in operator_args:
             operator_args["install_deps"] = project_config.install_dbt_deps
+        if "copy_dbt_packages" not in operator_args:
+            operator_args["copy_dbt_packages"] = project_config.copy_dbt_packages
 
 
 class DbtToAirflowConverter:
@@ -268,9 +260,6 @@ class DbtToAirflowConverter:
         override_configuration(project_config, render_config, execution_config, operator_args)
         validate_changed_config_paths(execution_config, project_config, render_config)
 
-        env_vars = project_config.env_vars or operator_args.get("env")
-        dbt_vars = project_config.dbt_vars or operator_args.get("vars")
-
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             logger.warning(
                 "`ExecutionConfig.virtualenv_dir` is only supported when \
@@ -291,7 +280,7 @@ class DbtToAirflowConverter:
             profile_config=profile_config,
             cache_dir=cache_dir,
             cache_identifier=cache_identifier,
-            dbt_vars=dbt_vars,
+            dbt_vars=project_config.dbt_vars,
             airflow_metadata=cache._get_airflow_metadata(dag, task_group),
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
@@ -303,6 +292,8 @@ class DbtToAirflowConverter:
         )
         previous_time = current_time
 
+        env_vars = operator_args.get("env") or project_config.env_vars
+        dbt_vars = operator_args.get("vars") or project_config.dbt_vars
         task_args = {
             **operator_args,
             "project_dir": execution_config.project_path,

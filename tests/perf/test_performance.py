@@ -12,7 +12,6 @@ except ImportError:
     from functools import lru_cache as cache
 
 import pytest
-from airflow import __version__ as airflow_version
 from airflow.models.dagbag import DagBag
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
@@ -88,8 +87,6 @@ def generate_project(
             model.unlink()
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1710
-@pytest.mark.skipif(Version(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.perf
 def test_perf_dag():
     num_models = os.environ.get("MODEL_COUNT", 10)
@@ -107,7 +104,7 @@ def test_perf_dag():
         dag = dag_bag.get_dag("performance_dag")
 
         # verify the integrity of the dag
-        assert dag.task_count == num_models
+        assert len(dag.tasks) == num_models
 
         # measure the time before and after the dag is run
 

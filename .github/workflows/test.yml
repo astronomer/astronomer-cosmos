@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main,enable-ci-dbt-async-1.7-af3]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -356,12 +356,6 @@ jobs:
         python-version: [ "3.11" ]
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
-        # TODO: Add support for dbt 1.7 for Airflow 3.0.
-        #       Issue dbt 1.7: https://github.com/astronomer/astronomer-cosmos/issues/1709
-        exclude:
-          - python-version: "3.11"
-            airflow-version: "3.0"
-            dbt-version: "1.7"
     services:
       postgres:
         image: postgres

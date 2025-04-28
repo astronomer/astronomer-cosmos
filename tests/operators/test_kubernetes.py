@@ -16,12 +16,26 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
+    DbtTestWarningHandler,
 )
 
 
 @pytest.fixture()
 def mock_kubernetes_execute():
     with patch("cosmos.operators.kubernetes.KubernetesPodOperator.execute") as mock_execute:
+        yield mock_execute
+
+
+@pytest.fixture()
+def fake_kubernetes_execute_pod_completion():
+    def execute(self, *args, **kwargs):
+        if isinstance(self.callbacks, list):
+            for callback in self.callbacks:
+                callback.on_pod_completion(pod="pod")
+        else:
+            self.callbacks.on_pod_completion(pod="pod")
+
+    with patch("cosmos.operators.kubernetes.KubernetesPodOperator.execute", new=execute) as mock_execute:
         yield mock_execute
 
 
@@ -231,9 +245,14 @@ class FakePodManager:
         ),
     ),
 )
-def test_dbt_kubernetes_operator_handle_warnings(caplog, kubernetes_pod_operator_callback, log_string, should_call):
+def test_dbt_kubernetes_operator_handle_warnings(
+    caplog,
+    fake_kubernetes_execute_pod_completion,
+    kubernetes_pod_operator_callback,
+    log_string,
+    should_call
+):
     mock_warning_callback = Mock()
-
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
 
     task_instance = TaskInstance(test_operator)
@@ -242,22 +261,7 @@ def test_dbt_kubernetes_operator_handle_warnings(caplog, kubernetes_pod_operator
 
     context = Context()
     context_merge(context, task_instance=task_instance)
-
-    test_operator.warning_handler.context = context
-
-    if isinstance(test_operator.callbacks, list):
-        for callback in test_operator.callbacks:
-            callback.on_pod_completion(
-                pod=task_instance.task.remote_pod,
-                client=None,
-                mode=None,
-            )
-    else:
-        test_operator.callbacks.on_pod_completion(
-            pod=task_instance.task.remote_pod,
-            client=None,
-            mode=None,
-        )
+    test_operator.build_and_run_cmd(context)
 
     if should_call:
         mock_warning_callback.assert_called_once()
@@ -266,6 +270,28 @@ def test_dbt_kubernetes_operator_handle_warnings(caplog, kubernetes_pod_operator
 
     if "gibberish" in log_string:
         assert "Failed to scrape warning count" in caplog.text
+
+
+def test_dbt_kubernetes_operator_handle_warnings_noop(
+    caplog,
+    fake_kubernetes_execute_pod_completion,
+    kubernetes_pod_operator_callback
+):
+    context = Context()
+    mock_warning_callback = Mock()
+    run_operator = DbtRunKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
+    task_instance = TaskInstance(run_operator)
+    context_merge(context, task_instance=task_instance)
+
+    warning_handler_no_context = DbtTestWarningHandler(mock_warning_callback, run_operator, None)
+    warning_handler_no_context.on_pod_completion(pod="pod")
+
+    assert "No context provided" in caplog.text
+
+    warning_handler = DbtTestWarningHandler(mock_warning_callback, run_operator, context)
+    warning_handler.on_pod_completion(pod="pod")
+
+    assert "Cannot handle dbt warnings for task of type" in caplog.text
 
 
 def test_created_pod():

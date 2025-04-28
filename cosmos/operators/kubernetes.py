@@ -165,17 +165,20 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
 
 
 class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
-    def __init__(self, on_warning_callback: Callable[..., Any], operator: KubernetesPodOperator) -> None:
+    def __init__(
+        self,
+        on_warning_callback: Callable[..., Any],
+        operator: KubernetesPodOperator,
+        context: Optional[Context] = None
+    ) -> None:
         self.on_warning_callback = on_warning_callback
         self.operator = operator
-        self.context: Optional[Context] = None
+        self.context = context
 
     def on_pod_completion(  # type: ignore[override]
         self,
         *,
         pod: k8s.V1Pod,
-        client: client_type,
-        mode: str,
         **kwargs: Any,
     ) -> None:
         """
@@ -187,14 +190,14 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         with `cncf.kubernetes` provider version 7.14.0 and later, we pass these parameters via instance variables.
 
         :param pod: the created pod.
-        :param client: the Kubernetes client that can be used in the callback.
-        :param mode: the current execution mode, it's one of (`sync`, `async`).
         """
         if not self.context:
+            self.operator.log.warning("No context provided to the DbtTestWarningHandler.")
             return
 
         task = self.context["task_instance"].task
         if not (isinstance(task, DbtTestKubernetesOperator) or isinstance(task, DbtSourceKubernetesOperator)):
+            self.operator.log.warning(f"Cannot handle dbt warnings for task of type {type(task)}.")
             return
 
         logs = [log.decode("utf-8") for log in task.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]

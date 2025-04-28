@@ -6,7 +6,6 @@ set -v
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
 
-
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
 if [ "$GITHUB_ACTIONS" = "true" ] && [ -z "${VIRTUAL_ENV}" ]; then

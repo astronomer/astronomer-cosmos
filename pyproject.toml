@@ -51,6 +51,7 @@ dbt-all = [
     "dbt-databricks!=1.9.0",
     "dbt-duckdb",
     "dbt-exasol",
+    "dbt-duckdb",
     "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
@@ -86,6 +87,7 @@ all = [
     "astronomer-cosmos[amazon]",
     "astronomer-cosmos[google]",
     "astronomer-cosmos[microsoft]",
+    "astronomer-cosmos[dbt-duckdb]"
 ]
 docs = [
     "sphinx",

@@ -26,7 +26,7 @@ profile_config = ProfileConfig(
 )
 
 with DAG("example_virtualenv_mini", start_date=datetime(2022, 1, 1)) as dag:
-    pre = BashOperator(task_id="pre", bash_command="mkdir /tmp/persistent-venv2")
+    pre = BashOperator(task_id="pre", bash_command="mkdir -p /tmp/persistent-venv2")
 
     seed_operator = DbtSeedVirtualenvOperator(
         profile_config=profile_config,

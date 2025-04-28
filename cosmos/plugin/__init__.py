@@ -7,7 +7,7 @@ from packaging import version
 
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .plugin_impl import CosmosPlugin as _CosmosPluginType
 
 CosmosPlugin: _CosmosPluginType | None = None

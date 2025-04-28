@@ -6,7 +6,6 @@ set -v
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
 
-
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
 if [ "$GITHUB_ACTIONS" = "true" ] && [ -z "${VIRTUAL_ENV}" ]; then
@@ -27,11 +26,9 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install pip --upgrade
 
-
 uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
 uv pip install apache-airflow-providers-docker --constraint /tmp/constraint.txt
 uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.txt
-
 
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 uv pip install "gcsfs<2025.3.0"

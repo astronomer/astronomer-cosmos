@@ -4,6 +4,9 @@ set -v
 set -x
 set -e
 
+echo "Current shell: $SHELL"
+ps -p $$
+
 DBT_VERSION="$1"
 echo "DBT_VERSION:"
 echo "$DBT_VERSION"

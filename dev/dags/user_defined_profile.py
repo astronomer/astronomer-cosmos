@@ -18,7 +18,7 @@ DBT_LS_PATH = Path(DBT_ROOT_PATH, "jaffle_shop", "dbt_ls_models_staging.txt")
 
 
 @dag(
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )

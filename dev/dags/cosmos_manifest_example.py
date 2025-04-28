@@ -31,7 +31,7 @@ render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["path:se
 
 
 @dag(
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     default_args={"retries": 2},

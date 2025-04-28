@@ -37,7 +37,7 @@ source_rendering_dag = DbtDag(
     },
     render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
     # normal dag parameters
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     dag_id="source_rendering_dag",

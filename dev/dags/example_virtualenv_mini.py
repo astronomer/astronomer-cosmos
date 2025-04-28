@@ -8,6 +8,11 @@ from cosmos import ProfileConfig
 from cosmos.operators.virtualenv import DbtSeedVirtualenvOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
+try:
+    from airflow.providers.standard.operators.bash import BashOperator
+except ImportError:
+    from airflow.operators.bash import BashOperator
+
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_PROJ_DIR = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)) / "jaffle_shop"
 
@@ -21,6 +26,8 @@ profile_config = ProfileConfig(
 )
 
 with DAG("example_virtualenv_mini", start_date=datetime(2022, 1, 1)) as dag:
+    pre = BashOperator(task_id="pre", bash_command="mkdir /tmp/persistent-venv2")
+
     seed_operator = DbtSeedVirtualenvOperator(
         profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
@@ -32,4 +39,4 @@ with DAG("example_virtualenv_mini", start_date=datetime(2022, 1, 1)) as dag:
         py_requirements=["dbt-postgres"],
         virtualenv_dir=Path("/tmp/persistent-venv2"),
     )
-    seed_operator
+    pre >> seed_operator

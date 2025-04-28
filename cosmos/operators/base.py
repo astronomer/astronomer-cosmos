@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import Any, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Sequence, Tuple
 
 import yaml
-from airflow.utils.context import Context, context_merge
-from airflow.utils.operator_helpers import context_to_airflow_vars
+from airflow.utils.context import context_merge
+
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+try:
+    from airflow.utils.operator_helpers import context_to_airflow_vars  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover
+    from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore
+
 from airflow.utils.strings import to_boolean
 
 from cosmos.dbt.executable import get_system_dbt
@@ -141,6 +153,26 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
+
+    # The following is necessary so that dynamic mapped classes work since Cosmos 1.9.0 subclass changes
+    # Bug report: https://github.com/astronomer/astronomer-cosmos/issues/1546
+    __init__._BaseOperatorMeta__param_names = {  # type: ignore
+        name
+        for (name, param) in inspect.signature(__init__).parameters.items()
+        if param.name != "self" and param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
+    }
+
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        # The following is necessary so that dynamic mapped classes work since Cosmos 1.9.0 subclass changes
+        # Since this class is subclassed by all Cosmos operators, to do this here allows to avoid to have this
+        # logic explicitly in all subclasses
+        # Bug report: https://github.com/astronomer/astronomer-cosmos/issues/1546
+        cls.__init__._BaseOperatorMeta__param_names = {  # type: ignore
+            name
+            for (name, param) in inspect.signature(cls.__init__).parameters.items()
+            if param.name != "self" and param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
+        }
 
     def get_env(self, context: Context) -> dict[str, str | bytes | os.PathLike[Any]]:
         """

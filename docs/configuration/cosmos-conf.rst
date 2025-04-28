@@ -78,6 +78,16 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_CONN_ID``
 
+.. _default_copy_dbt_packages:
+
+`default_copy_dbt_packages`_:
+    (Introduced in Cosmos 1.10.0):  By default, Cosmos 1.x either installs ``dbt deps`` or creates a symbolic link to the original ``dbt_packages`` folder.
+    This configuration changes this behaviour, by copying the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
+    Can be overridden at a ``DbtDag`` and ``DbtTaskGroup``, via ``ProjectConfig.copy_dbt_packages``, or at an operator level, via ``operator_args={"copy_dbt_packages"}``.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__DEFAULT_COPY_DBT_PACKAGES``
+
 .. _enable_cache_profile:
 
 `enable_cache_profile`_:

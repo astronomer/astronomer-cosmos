@@ -5,13 +5,17 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessResult
+
+try:  # For Airflow 3
+    from airflow.providers.standard.hooks.subprocess import SubprocessResult
+except ImportError:  # For Airflow 2
+    from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from packaging import version
@@ -458,6 +462,8 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert test_operator.outlets == []
 
 
+# TODO: Add compatibility for Airflow 3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1704.
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
@@ -570,6 +576,8 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     assert run_operator.outlets == []
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
@@ -601,6 +609,8 @@ def test_run_operator_dataset_url_encoded_names(caplog):
     ]
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
     caplog.set_level(logging.DEBUG)
@@ -644,6 +654,8 @@ def test_dbt_base_operator_no_partial_parse() -> None:
     assert "--no-partial-parse" in cmd
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_project):
@@ -679,6 +691,8 @@ def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_proje
     assert on_warning_callback.called
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_without_callback(invocation_mode):
@@ -751,14 +765,14 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     mock_log_info.assert_called_with("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
 
-def test_store_compiled_sql() -> None:
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
+def test_store_compiled_sql_airflow2() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
         project_dir="my/dir",
         should_store_compiled_sql=False,
     )
-
     # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
         tmp_project_dir="my/dir",
@@ -771,14 +785,47 @@ def test_store_compiled_sql() -> None:
         project_dir="my/dir",
         should_store_compiled_sql=True,
     )
-
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
     # here we call the method and see if it tries to access the context["ti"]
     # it should, and it should raise a KeyError because we didn't pass in a ti
     with pytest.raises(KeyError):
-        dbt_base_operator.store_compiled_sql(
-            tmp_project_dir="my/dir",
+        dbt_base_operator._override_rtif(
             context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
         )
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
+def test_store_compiled_sql_airflow3() -> None:
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    # here we just need to call the method to make sure it doesn't raise an exception
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=True,
+    )
+    dbt_base_operator.store_compiled_sql(
+        tmp_project_dir="my/dir",
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    # Test Airflow 3 behavior - should set flag
+    dbt_base_operator._override_rtif(
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
+    )
+    assert dbt_base_operator.overwrite_rtif_after_execution is True
 
 
 @pytest.mark.parametrize(
@@ -994,7 +1041,7 @@ def test_dbt_docs_gcs_local_operator():
 
 
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
-@patch("cosmos.operators.local.DbtLocalBaseOperator.store_compiled_sql")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.run_subprocess")
@@ -1007,7 +1054,7 @@ def test_operator_execute_deps_parameters(
     mock_subprocess,
     mock_ensure_profile,
     mock_exception_handling,
-    mock_store_compiled_sql,
+    mock_override_rtif,
     mock_upload_sql_files,
     invocation_mode,
     tmp_path,
@@ -1153,7 +1200,7 @@ def test_store_freshness_json(mock_path_class, mock_context, mock_session):
     expected_freshness = json.dumps({"key": "value"}, indent=4)
 
     # Call the method under test
-    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context)
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == expected_freshness
@@ -1174,7 +1221,7 @@ def test_store_freshness_json_no_file(mock_path_class, mock_context, mock_sessio
     mock_sources_json_path.exists.return_value = False
 
     # Call the method under test
-    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context)
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == ""
@@ -1189,7 +1236,7 @@ def test_store_freshness_not_store_compiled_sql(mock_context, mock_session):
     )
 
     # Call the method under test
-    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context, session=mock_session)
+    instance.store_freshness_json(tmp_project_dir="/mock/dir", context=mock_context)
 
     # Verify the freshness attribute is set correctly
     assert instance.freshness == ""
@@ -1237,9 +1284,10 @@ def test_dbt_compile_local_operator_initialisation():
     assert "compile" in operator.base_cmd
 
 
+@patch("cosmos.operators.local.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
-def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_files):
+def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_files, mock_override_rtif):
     operator = DbtCompileLocalOperator(
         task_id="fake-task",
         profile_config=profile_config,
@@ -1251,6 +1299,7 @@ def test_dbt_compile_local_operator_execute(store_compiled_sql, _upload_sql_file
     assert operator.should_upload_compiled_sql is True
     _upload_sql_files.assert_called_once()
     store_compiled_sql.assert_called_once()
+    mock_override_rtif.assert_called_once()
 
 
 def test_dbt_clone_local_operator_initialisation():
@@ -1441,10 +1490,10 @@ def test_mock_dbt_adapter_unsupported_profile_type():
 
 @patch("airflow.providers.google.cloud.operators.bigquery.BigQueryInsertJobOperator.execute")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._read_run_sql_from_target_dir")
-def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monkeypatch):
+@patch("cosmos.operators.local.settings.enable_setup_async_task", False)
+def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute):
     from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
-    monkeypatch.setattr("cosmos.operators.local.enable_setup_async_task", False)
     mock_read_sql.return_value = "select * from 1;"
     operator = DbtRunLocalOperator(
         task_id="test",
@@ -1457,6 +1506,7 @@ def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute, monk
     mock_bq_execute.assert_called_once()
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("pathlib.Path.rglob")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
@@ -1474,3 +1524,41 @@ def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_
     )
     operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
     mock_unlink.assert_called()
+
+
+def test_read_run_sql_from_target_dir():
+    tmp_project_dir = "/tmp/project"
+    sql_context = {"dbt_node_config": {"file_path": "/path/to/file.sql"}, "package_name": "package_name"}
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+
+    expected_sql_content = "SELECT * FROM my_table;"
+    with patch("pathlib.Path.open", new_callable=mock_open, read_data=expected_sql_content):
+        result = operator._read_run_sql_from_target_dir(tmp_project_dir, sql_context)
+        assert result == expected_sql_content
+
+
+@patch("cosmos.operators.local.copy_dbt_packages")
+@patch("cosmos.operators.local.create_symlinks")
+def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog):
+    project_dir = Path("/fake/project")
+    tmp_dir_path = Path("/fake/tmp")
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=project_dir,
+        install_deps=False,
+        copy_dbt_packages=True,
+        profile_config=profile_config,
+    )
+    operator._clone_project(tmp_dir_path)
+
+    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True)
+    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path)
+
+    assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
+    assert "Copying dbt packages to temporary folder." in caplog.text
+    assert "Completed copying dbt packages to temporary folder." in caplog.text

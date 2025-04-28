@@ -28,7 +28,7 @@ from cosmos.operators.local import (
 from cosmos.profiles import get_automatic_profile_mapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
-DBT_PROJECT_NAME = "original_jaffle_shop"
+DBT_PROJECT_NAME = "jaffle_shop"
 
 
 @pytest.mark.integration
@@ -49,7 +49,7 @@ def test_airflow_async_operator_init(mock_bigquery_conn):
             execution_mode=ExecutionMode.AIRFLOW_ASYNC,
             async_py_requirements=["dbt-bigquery"],
         ),
-        schedule_interval=None,
+        schedule=None,
         start_date=datetime(2023, 1, 1),
         catchup=False,
         dag_id="simple_dag_async",
@@ -75,7 +75,7 @@ def test_airflow_async_operator_init_no_async_py_requirements_raises_error(mock_
             execution_config=ExecutionConfig(
                 execution_mode=ExecutionMode.AIRFLOW_ASYNC,
             ),
-            schedule_interval=None,
+            schedule=None,
             start_date=datetime(2023, 1, 1),
             catchup=False,
             dag_id="simple_dag_async",

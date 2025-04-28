@@ -57,7 +57,7 @@ repos:
           - --py37-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.7
+    rev: v0.11.6
     hooks:
       - id: ruff
         args:
@@ -91,6 +91,7 @@ repos:
             apache-airflow,
           ]
         files: ^cosmos
+exclude: "dev/dags/dbt/simple/dbt_packages/.*"
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks

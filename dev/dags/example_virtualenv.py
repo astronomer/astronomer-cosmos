@@ -12,7 +12,7 @@ from airflow.operators.empty import EmptyOperator
 from cosmos import DbtTaskGroup, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 PROJECT_NAME = "jaffle_shop"
 
@@ -28,7 +28,7 @@ profile_config = ProfileConfig(
 
 # [START virtualenv_example]
 @dag(
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )

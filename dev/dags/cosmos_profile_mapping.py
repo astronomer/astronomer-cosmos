@@ -22,7 +22,7 @@ execution_config = ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER)
 
 
 @dag(
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )

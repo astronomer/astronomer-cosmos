@@ -3,9 +3,13 @@ from __future__ import annotations
 import inspect
 import textwrap
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from airflow.utils.context import Context
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos._utils.importer import load_method_from_module
 from cosmos.hooks.subprocess import FullOutputSubprocessResult

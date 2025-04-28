@@ -173,6 +173,7 @@ def test_select_nodes_by_select_config_meta_nested_property_two_meta_values():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path=SAMPLE_PROJ_PATH / "gen1/models/someone_else.sql",
+        original_file_path=SAMPLE_PROJ_PATH / "gen1/models/someone_else.sql",
         tags=[],
         config={"meta": {"frequency": "daily", "dbt_environment": "dev"}},
     )

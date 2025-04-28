@@ -77,8 +77,8 @@ class DbtNode:
     resource_type: DbtResourceType
     depends_on: list[str]
     file_path: Path
-    package_name: str | None = None
     original_file_path: Path
+    package_name: str | None = None
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False

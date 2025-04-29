@@ -12,7 +12,7 @@ from cosmos.cache import delete_unused_dbt_ls_cache, delete_unused_dbt_ls_remote
 
 
 @dag(
-    schedule_interval="0 0 * * 0",  # Runs every Sunday
+    schedule="0 0 * * 0",  # Runs every Sunday
     start_date=datetime(2023, 1, 1),
     catchup=False,
     tags=["example"],

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 try:
@@ -16,6 +17,7 @@ from packaging.version import Version
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
+_PYTHON_VERSION = sys.version_info[:2]
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.4": ["cosmos_seed_dag.py"],
@@ -42,6 +44,11 @@ def get_dag_bag() -> DagBag:
         for dagfile in IGNORED_DAG_FILES:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
+
+        # Python 3.8 has reached its end of life (EOL), and dbt no longer supports this version.
+        # This results in an error, as outlined in https://github.com/duckdb/dbt-duckdb/issues/488
+        if _PYTHON_VERSION < (3, 9):
+            file.writelines(["example_duckdb_dag.py\n"])
 
         # Ignore Async DAG for dbt <=1.5
         if DBT_VERSION <= Version("1.5.0"):

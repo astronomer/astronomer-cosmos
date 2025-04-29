@@ -2,9 +2,11 @@ import os
 from pathlib import Path
 
 import pytest
+from airflow import __version__ as airflow_version
 from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
+from packaging import version
 
 from . import utils as test_utils
 
@@ -35,6 +37,10 @@ def get_all_dag_files():
         dag_ignorefile.writelines([f"{file}\n" for file in python_files])
 
 
+# TODO: Add compatibility for Airflow 3.0. Issue: #1705.
+#  Comment: https://github.com/astronomer/astronomer-cosmos/issues/1705#issuecomment-2834926490
+#  Hint: Check if we can dag.test instead for Airflow 3.0 here.
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Add compatibility for 3.0")
 @pytest.mark.integration
 def test_example_dag_kubernetes(session):
     get_all_dag_files()

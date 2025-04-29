@@ -255,8 +255,7 @@ def test_dbt_kubernetes_operator_handle_warnings(
     task_instance.task.pod_manager = FakePodManager(log_string)
     task_instance.task.pod = task_instance.task.remote_pod = "pod"
 
-    context = Context()
-    context_merge(context, task_instance=task_instance)
+    context = Context(task_instance=task_instance)
     test_operator.build_and_run_cmd(context)
 
     if should_call:
@@ -271,11 +270,10 @@ def test_dbt_kubernetes_operator_handle_warnings(
 def test_dbt_kubernetes_operator_handle_warnings_noop(
     caplog, fake_kubernetes_execute_pod_completion, kubernetes_pod_operator_callback
 ):
-    context = Context()
     mock_warning_callback = Mock()
     run_operator = DbtRunKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
     task_instance = TaskInstance(run_operator)
-    context_merge(context, task_instance=task_instance)
+    context = Context(task_instance=task_instance)
 
     warning_handler_no_context = DbtTestWarningHandler(mock_warning_callback, run_operator, None)
     warning_handler_no_context.on_pod_completion(pod="pod")

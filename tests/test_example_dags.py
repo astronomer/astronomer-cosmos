@@ -98,8 +98,8 @@ def get_dag_bag() -> DagBag:
             file.writelines("example_cosmos_dbt_build.py\n")
 
         # # TODO: Make following dag tests compatible for AF3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1706
-        # if AIRFLOW_VERSION.major == 3:
-        #     file.writelines([f"{dag_file}\n" for dag_file in AIRFLOW3_IGNORE_DAG_FILES])
+        if AIRFLOW_VERSION.major == 3:
+            file.writelines([f"{dag_file}\n" for dag_file in AIRFLOW3_IGNORE_DAG_FILES])
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

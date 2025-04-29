@@ -49,7 +49,7 @@ AIRFLOW3_IGNORE_DAG_FILES = [
     "example_taskflow.py",
     "cosmos_manifest_example.py",
     "example_cosmos_cleanup_dag.py",
-    "basic_cosmos_task_group.py",
+    # "basic_cosmos_task_group.py",
 ]
 
 

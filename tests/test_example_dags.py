@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,7 +12,6 @@ except ImportError:
 
 import airflow
 import pytest
-import sqlalchemy
 from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
@@ -119,31 +117,7 @@ def get_dag_ids() -> list[str]:
 def run_dag(dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
-
-    # This feature is available since Airflow 2.5 and we've backported it in Cosmos:
-    # https://airflow.apache.org/docs/apache-airflow/stable/release_notes.html#airflow-2-5-0-2022-12-02
-    if AIRFLOW_VERSION >= Version("2.5"):
-        if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-            dag.test()
-        else:
-            # This is a work around until we fix the issue in Airflow:
-            # https://github.com/apache/airflow/issues/42495
-            """
-            FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
-            This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
-            Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
-            FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
-            FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
-            FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
-            """
-            try:
-                dag.test()
-            except sqlalchemy.exc.PendingRollbackError:
-                warnings.warn(
-                    "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
-                )
-    else:
-        test_utils.run_dag(dag)
+    test_utils.run_dag(dag)
 
 
 @pytest.mark.skipif(

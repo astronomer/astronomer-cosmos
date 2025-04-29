@@ -34,7 +34,7 @@ def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
 def test_dag(dag, conn_file_path: str | None = None) -> DagRun:
     if AIRFLOW_VERSION >= version.Version("2.5"):
         if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-            dag.test()
+            return dag.test()
         else:
             # This is a work around until we fix the issue in Airflow:
             # https://github.com/apache/airflow/issues/42495
@@ -53,7 +53,7 @@ def test_dag(dag, conn_file_path: str | None = None) -> DagRun:
                     "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
                 )
     else:
-        test_old_dag(dag, conn_file_path)
+        return test_old_dag(dag, conn_file_path)
 
 
 # DAG.test() was added in Airflow version 2.5.0. And to test on older Airflow versions, we need to copy the

@@ -469,7 +469,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
+def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     try:
         from airflow.models.asset import AssetAliasModel
     except ModuleNotFoundError:
@@ -509,7 +509,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
     assert seed_operator.outlets == []  # because emit_datasets=False,
     assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
-
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
 @pytest.mark.skipif(

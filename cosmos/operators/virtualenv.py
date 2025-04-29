@@ -76,14 +76,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         py_requirements: list[str] | None = None,
         pip_install_options: list[str] | None = None,
         py_system_site_packages: bool = False,
-        virtualenv_dir: str | None = None,
+        virtualenv_dir: Path | None = None,
         is_virtualenv_dir_temporary: bool = False,
         **kwargs: Any,
     ) -> None:
         self.py_requirements = py_requirements or []
         self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
-        self.virtualenv_dir = Path(virtualenv_dir) if virtualenv_dir else None
+        self.virtualenv_dir = virtualenv_dir
         if self.virtualenv_dir:
             self.virtualenv_dir.mkdir(parents=True, exist_ok=True)
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary

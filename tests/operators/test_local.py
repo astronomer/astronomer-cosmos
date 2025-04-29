@@ -511,11 +511,11 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
     with pytest.raises(FlushError):
         # This is a known limitation of Airflow 2.10.0 and 2.10.1
         # https://github.com/apache/airflow/issues/42495
-        dag_run, session = run_test_dag(dag)
-
+        run_test_dag(dag)
         # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
         # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
         # based on the resolution of the issue logged in Airflow:
+        # dag_run, session = run_test_dag(dag
         # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
         # assert dataset_model == 1
 

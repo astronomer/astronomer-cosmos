@@ -113,6 +113,8 @@ celerybeat.pid
 # Environments
 .venv
 env/
+# mock-venv created by Cosmos unit tests
+mock-venv/
 venv/
 ENV/
 env.bak/
@@ -156,6 +158,7 @@ dev/dags/.airflowignore
 airflow.cfg
 airflow.db
 standalone_admin_password.txt
+simple_auth_manager_passwords.json.generated
 webserver_config.py
 
 # VI

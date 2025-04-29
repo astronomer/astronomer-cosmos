@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag
+from airflow import DAG
 
 from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -27,12 +27,12 @@ profile_config = ProfileConfig(
 )
 
 
-@dag(
+with DAG(
+    dag_id="basic_cosmos_task_group_different_owners",
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-)
-def basic_cosmos_task_group_different_owners() -> None:
+):
     """
     Example of how to override arguments / properties being run per Airflow task
     using dbt YAML.
@@ -72,6 +72,3 @@ def basic_cosmos_task_group_different_owners() -> None:
     )
 
     non_models >> models
-
-
-basic_cosmos_task_group_different_owners()

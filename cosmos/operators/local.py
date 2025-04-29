@@ -17,11 +17,6 @@ import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
-
-try:  # Airflow 3
-    from airflow.sdk.bases.operator import BaseOperator
-except ImportError:  # Airflow 2
-    from airflow.models import BaseOperator
 from airflow.models.taskinstance import TaskInstance
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -48,6 +43,11 @@ from cosmos.settings import (
     remote_target_path,
     remote_target_path_conn_id,
 )
+
+try:
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator  # Airflow 2
 
 try:
     from airflow.datasets import Dataset
@@ -766,19 +766,31 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
-        abstract_dbt_local_base_kwargs = {}
-        base_operator_kwargs = {}
-        abstract_dbt_local_base_args_keys = (
-            inspect.getfullargspec(AbstractDbtBase.__init__).args
-            + inspect.getfullargspec(AbstractDbtLocalBase.__init__).args
-        )
-        base_operator_args = set(inspect.signature(BaseOperator.__init__).parameters.keys())
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in abstract_dbt_local_base_args_keys:
-                abstract_dbt_local_base_kwargs[arg_key] = arg_value
-            if arg_key in base_operator_args:
-                base_operator_kwargs[arg_key] = arg_value
-        AbstractDbtLocalBase.__init__(self, **abstract_dbt_local_base_kwargs)
+        base_kwargs = {}
+        operator_kwargs = {}
+        operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
+
+        default_args = kwargs.get("default_args", {})
+
+        for arg in operator_args:
+            try:
+                operator_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                pass
+
+        for arg in {
+            *inspect.getfullargspec(AbstractDbtBase.__init__).args,
+            *inspect.getfullargspec(AbstractDbtLocalBase.__init__).args,
+        }:
+            try:
+                base_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
+
+        AbstractDbtLocalBase.__init__(self, **base_kwargs)
         if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
             if (
                 kwargs.get("emit_datasets", True)
@@ -791,12 +803,12 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
                 dag_id = kwargs.get("dag")
                 task_group_id = kwargs.get("task_group")
-                base_operator_kwargs["outlets"] = [
+                operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
-        if "task_id" in base_operator_kwargs:
-            base_operator_kwargs.pop("task_id")
-        BaseOperator.__init__(self, task_id=self.task_id, **base_operator_kwargs)
+        if "task_id" in operator_kwargs:
+            operator_kwargs.pop("task_id")
+        BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

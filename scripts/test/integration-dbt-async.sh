@@ -14,7 +14,6 @@ NEXT_MINOR_VERSION=$(echo "$DBT_VERSION" | awk -F. '{print $1"."$2+1}')
 echo "Installing dbt adapters for DBT_VERSION=$DBT_VERSION (<$NEXT_MINOR_VERSION)"
 
 pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
-#pip install -U "dbt-postgres~=$DBT_VERSION"  "dbt-databricks~=$DBT_VERSION" "dbt-bigquery~=$DBT_VERSION"
 pip install -U \
   "dbt-postgres>=$DBT_VERSION,<$NEXT_MINOR_VERSION" \
   "dbt-databricks>=$DBT_VERSION,<$NEXT_MINOR_VERSION" \

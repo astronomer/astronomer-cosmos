@@ -1562,3 +1562,26 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
     assert "Copying dbt packages to temporary folder." in caplog.text
     assert "Completed copying dbt packages to temporary folder." in caplog.text
+
+
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_multiple_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json
+):
+
+    multiple_callbacks = [MagicMock(), MagicMock(), MagicMock()]
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback=multiple_callbacks,
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    for callback_fn in multiple_callbacks:
+        callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)

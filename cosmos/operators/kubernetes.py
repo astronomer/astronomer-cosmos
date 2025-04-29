@@ -186,7 +186,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         on_warning_callback with the updated context.
 
         Note that the signature of the interface method changed in `cncf.kubernetes` provider version 10.2.0, where the
-        `operator` and `context` parameters were added to all operator callbacks. To maintain backward compatibility
+        `operator` and `context` parameters were added to all operator callbacks. To maintain forward compatibility
         with `cncf.kubernetes` provider version 7.14.0 and later, we pass these parameters via instance variables.
 
         :param pod: the created pod.

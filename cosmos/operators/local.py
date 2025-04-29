@@ -675,9 +675,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
-        from airflow.utils.session import create_session
 
         if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+            from airflow.utils.session import create_session
+
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
                 self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
@@ -690,17 +691,20 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 session.commit()
         else:
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
+
             if AIRFLOW_VERSION.major == 2:
                 logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+
                 for outlet in new_outlets:
                     context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
             else:  # AIRFLOW_VERSION.major == 3
-                logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 3")
+                logger.info("Assigning outlets with DatasetAlias in Airflow 3")
                 from airflow.sdk.definitions.asset import AssetAlias
 
+                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
+                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined, call-arg, arg-type]
                 for outlet in new_outlets:
                     context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
-                    # context["outlet_events"].for_asset_alias(name=dataset_alias_name).add(outlet)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
@@ -813,6 +817,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
+
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)

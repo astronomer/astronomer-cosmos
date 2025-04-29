@@ -462,7 +462,6 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert test_operator.outlets == []
 
 
-# TODO: Add compatibility for Airflow 3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1704.
 @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),
@@ -506,6 +505,49 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
     assert seed_operator.outlets == []  # because emit_datasets=False,
     assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.Version("3.0.0"),
+    reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    dag.test()
+    # breakpoint()
+    assert False
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import TaskInstance
-from airflow.utils.context import Context, context_merge
+from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
 

@@ -50,7 +50,12 @@ except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
 
 try:
-    from airflow.datasets import Dataset
+    from airflow.sdk.definitions.asset import Asset
+except (ModuleNotFoundError, ImportError):
+    from airflow.datasets import Dataset as Asset
+
+
+try:
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
 except ModuleNotFoundError:
     is_openlineage_available = False
@@ -59,7 +64,6 @@ else:
     is_openlineage_available = True
 
 if TYPE_CHECKING:
-    from airflow.datasets import Dataset  # noqa: F811
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
     try:  # pragma: no cover
@@ -627,7 +631,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         except (FileNotFoundError, NotImplementedError, ValueError, KeyError, jinja2.exceptions.UndefinedError):
             self.log.debug("Unable to parse OpenLineage events", stack_info=True)
 
-    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
+    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Asset]:
         """
         Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
         command. Relies on the following files:
@@ -641,13 +645,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
-                dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name)
+                dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name).replace(".", "/")
                 uris.append(dataset_uri)
-        self.log.debug("URIs to be converted to Dataset: %s", uris)
+        self.log.debug("URIs to be converted to Asset: %s", uris)
 
-        datasets = []
+        assets = []
         try:
-            datasets = [Dataset(uri) for uri in uris]
+            assets = [Asset(uri) for uri in uris]
         except ValueError:
             raise AirflowCompatibilityError(
                 """
@@ -658,9 +662,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 By setting ``emit_datasets=False`` in ``RenderConfig``. For more information, see https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html.
                 """
             )
-        return datasets
+        return assets
 
-    def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset], context: Context) -> None:
+    def register_dataset(self, new_inlets: list[Asset], new_outlets: list[Asset], context: Context) -> None:
         """
         Register a list of datasets as outlets of the current task, when possible.
 
@@ -675,8 +679,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
-
-        if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+        if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
+            logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True.")
+            raise AirflowCompatibilityError(
+                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True."
+            )
+        elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             from airflow.utils.session import create_session
 
             logger.info("Assigning inlets/outlets without DatasetAlias")

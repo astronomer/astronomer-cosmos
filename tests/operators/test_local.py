@@ -468,8 +468,9 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
+def test_run_operator_dataset_inlets_and_outlets_after_airflow_210_and_before_300(caplog):
     from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -505,6 +506,17 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
     assert seed_operator.outlets == []  # because emit_datasets=False,
     assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+        dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
 
 
 @pytest.mark.skipif(
@@ -545,9 +557,37 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
         )
         seed_operator >> run_operator >> test_operator
 
+    caplog.clear()
     dag.test()
-    # breakpoint()
-    assert False
+    assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
+    "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'" in caplog.text
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="Airflow 3.0 only supports assets when setting enable_dataset_alias=True",
+)
+@pytest.mark.integration
+@patch("cosmos.settings.enable_dataset_alias", 0)
+def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fails(caplog):
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop",
+            task_id="run",
+            dbt_cmd_flags=["--models", "customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator
+
+    caplog.set_level(logging.ERROR)
+    caplog.clear()
+    run_test_dag(dag)
+
+    assert "AirflowCompatibilityError" in caplog.text
+    assert "ERROR" in caplog.text
+    assert "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True." in caplog.text
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
@@ -606,8 +646,10 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     assert run_operator.outlets == []
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
+@pytest.mark.skipif(
+    version.parse(airflow_version).major == 3,
+    reason="Airflow 3.0 only supports assets when setting enable_dataset_alias=True",
+)
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
@@ -639,6 +681,8 @@ def test_run_operator_dataset_url_encoded_names(caplog):
     ]
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
     caplog.set_level(logging.DEBUG)
@@ -682,6 +726,8 @@ def test_dbt_base_operator_no_partial_parse() -> None:
     assert "--no-partial-parse" in cmd
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_project):
@@ -717,6 +763,8 @@ def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_proje
     assert on_warning_callback.called
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_without_callback(invocation_mode):

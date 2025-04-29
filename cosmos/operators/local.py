@@ -49,10 +49,10 @@ try:
 except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
 
-try:
+try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset
-except (ModuleNotFoundError, ImportError):
-    from airflow.datasets import Dataset as Asset
+except (ModuleNotFoundError, ImportError):  # Airflow 2
+    from airflow.datasets import Dataset as Asset  # type: ignore[attr-defined]
 
 
 try:

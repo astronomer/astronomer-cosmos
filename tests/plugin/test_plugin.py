@@ -1,3 +1,18 @@
+from airflow import __version__ as airflow_version
+from packaging import version
+
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
+
+# The Cosmos plugin is only loaded if the Airflow version is less than 3.0. This is because the plugin is incompatible
+# with Airflow 3.0 and above. Once the compatibility issue is resolved as part of
+# https://github.com/astronomer/astronomer-cosmos/issues/1587, we can remove this check and run the tests on
+# Airflow 3.0+.
+if version.parse(airflow_version).major >= _AIRFLOW3_MAJOR_VERSION:
+    import pytest
+
+    pytest.skip("Skipping plugin tests on Airflow 3.0+", allow_module_level=True)
+
+
 # dbt-core relies on Jinja2>3, whereas Flask<2 relies on an incompatible version of Jinja2.
 #
 # This discrepancy causes the automated integration tests to fail, as dbt-core is installed in the same
@@ -28,7 +43,7 @@ from flask.testing import FlaskClient
 import cosmos
 import cosmos.plugin
 import cosmos.settings
-from cosmos.plugin import (
+from cosmos.plugin.plugin_impl import (
     iframe_script,
     open_azure_file,
     open_file,
@@ -57,7 +72,7 @@ def module_monkeypatch():
 def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
     module_monkeypatch.setenv("ASTRONOMER_ENVIRONMENT", "cloud")
     importlib.reload(cosmos.settings)
-    importlib.reload(cosmos.plugin)
+    importlib.reload(cosmos.plugin.plugin_impl)
     importlib.reload(cosmos)
     initdb()
 
@@ -67,15 +82,15 @@ def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
 
     appbuilder.sm.check_authorization = lambda *args, **kwargs: True
 
-    if cosmos.plugin.dbt_docs_view not in appbuilder.baseviews:
+    if cosmos.plugin.plugin_impl.dbt_docs_view not in appbuilder.baseviews:
         # unregister blueprints registered in global context
         app._got_first_request = False  # Necessary for Airflow 2.4, Flask==2.2.2 & Flask-AppBuilder==4.1.3
         del app.blueprints["DbtDocsView"]
         keys_to_delete = [view_name for view_name in app.view_functions.keys() if view_name.startswith("DbtDocsView")]
         [app.view_functions.pop(view_name) for view_name in keys_to_delete]
 
-        appbuilder._check_and_init(cosmos.plugin.dbt_docs_view)
-        appbuilder.register_blueprint(cosmos.plugin.dbt_docs_view)
+        appbuilder._check_and_init(cosmos.plugin.plugin_impl.dbt_docs_view)
+        appbuilder.register_blueprint(cosmos.plugin.plugin_impl.dbt_docs_view)
 
     yield app.test_client()
 
@@ -91,9 +106,9 @@ def app() -> FlaskClient:
 
     appbuilder.sm.check_authorization = lambda *args, **kwargs: True
 
-    if cosmos.plugin.dbt_docs_view not in appbuilder.baseviews:
-        appbuilder._check_and_init(cosmos.plugin.dbt_docs_view)
-        appbuilder.register_blueprint(cosmos.plugin.dbt_docs_view)
+    if cosmos.plugin.plugin_impl.dbt_docs_view not in appbuilder.baseviews:
+        appbuilder._check_and_init(cosmos.plugin.plugin_impl.dbt_docs_view)
+        appbuilder.register_blueprint(cosmos.plugin.plugin_impl.dbt_docs_view)
 
     yield app.test_client()
 
@@ -102,7 +117,7 @@ def app() -> FlaskClient:
 
 @pytest.mark.integration
 def test_dbt_docs(monkeypatch, app):
-    monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
+    monkeypatch.setattr("cosmos.plugin.plugin_impl.dbt_docs_dir", "path/to/docs/dir")
 
     response = app.get("/cosmos/dbt_docs")
 
@@ -111,7 +126,7 @@ def test_dbt_docs(monkeypatch, app):
 
 
 @pytest.mark.integration
-@patch.object(cosmos.plugin, "open_file")
+@patch.object(cosmos.plugin.plugin_impl, "open_file")
 def test_dbt_docs_not_set_up(monkeypatch, app):
     response = app.get("/cosmos/dbt_docs")
 
@@ -120,12 +135,12 @@ def test_dbt_docs_not_set_up(monkeypatch, app):
 
 
 @pytest.mark.integration
-@patch.object(cosmos.plugin, "open_file")
+@patch.object(cosmos.plugin.plugin_impl, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
-    monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
-    monkeypatch.setattr("cosmos.plugin.dbt_docs_conn_id", "mock_conn_id")
-    monkeypatch.setattr("cosmos.plugin.dbt_docs_index_file_name", "custom_index.html")
+    monkeypatch.setattr("cosmos.plugin.plugin_impl.dbt_docs_dir", "path/to/docs/dir")
+    monkeypatch.setattr("cosmos.plugin.plugin_impl.dbt_docs_conn_id", "mock_conn_id")
+    monkeypatch.setattr("cosmos.plugin.plugin_impl.dbt_docs_index_file_name", "custom_index.html")
 
     if artifact == "dbt_docs_index.html":
         mock_open_file.return_value = "<head></head><body></body>"
@@ -145,10 +160,10 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
 
 
 @pytest.mark.integration
-@patch.object(cosmos.plugin, "open_file")
+@patch.object(cosmos.plugin.plugin_impl, "open_file")
 @pytest.mark.parametrize("artifact", ["dbt_docs_index.html", "manifest.json", "catalog.json"])
 def test_dbt_docs_artifact_not_found(mock_open_file, monkeypatch, app, artifact):
-    monkeypatch.setattr("cosmos.plugin.dbt_docs_dir", "path/to/docs/dir")
+    monkeypatch.setattr("cosmos.plugin.plugin_impl.dbt_docs_dir", "path/to/docs/dir")
     mock_open_file.side_effect = FileNotFoundError
 
     response = app.get(f"/cosmos/{artifact}")
@@ -175,7 +190,7 @@ def test_dbt_docs_artifact_missing(app, artifact):
     ],
 )
 def test_open_file_calls(path, open_file_callback):
-    with patch.object(cosmos.plugin, open_file_callback) as mock_callback:
+    with patch.object(cosmos.plugin.plugin_impl, open_file_callback) as mock_callback:
         mock_callback.return_value = "mock file contents"
         res = open_file(path, conn_id="mock_conn_id")
 
@@ -349,8 +364,8 @@ def test_open_file_local(mock_file):
     "url_path", ["/cosmos/dbt_docs", "/cosmos/dbt_docs_index.html", "/cosmos/catalog.json", "/cosmos/manifest.json"]
 )
 def test_has_access_with_permissions_outside_astro_does_not_include_custom_menu(url_path, app):
-    cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
-    mock_check_auth = cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization
+    cosmos.plugin.plugin_impl.dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
+    mock_check_auth = cosmos.plugin.plugin_impl.dbt_docs_view.appbuilder.sm.check_authorization
     app.get(url_path)
     assert mock_check_auth.call_args[0][0] == [("can_read", "Website")]
 
@@ -361,7 +376,11 @@ def test_has_access_with_permissions_outside_astro_does_not_include_custom_menu(
 )
 def test_has_access_with_permissions_in_astro_must_include_custom_menu(url_path, app_within_astro_cloud):
     app = app_within_astro_cloud
-    cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
-    mock_check_auth = cosmos.plugin.dbt_docs_view.appbuilder.sm.check_authorization
+    cosmos.plugin.plugin_impl.dbt_docs_view.appbuilder.sm.check_authorization = MagicMock()
+    mock_check_auth = cosmos.plugin.plugin_impl.dbt_docs_view.appbuilder.sm.check_authorization
     app.get(url_path)
     assert mock_check_auth.call_args[0][0] == [("menu_access", "Custom Menu"), ("can_read", "Website")]
+
+
+def test_cosmos_plugin_enabled_on_airflow2():
+    assert cosmos.plugin.CosmosPlugin is not None

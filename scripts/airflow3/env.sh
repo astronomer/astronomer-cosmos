@@ -20,5 +20,9 @@ export AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=300
 export AIRFLOW_REPO_DIR="$PWD/../airflow"
 export AIRFLOW_CONN_EXAMPLE_CONN=postgresql+psycopg2://postgres:postgres@localhost:5432/airflow_db
 # Until we fix the ExecutionMode.VIRTUALENV https://github.com/astronomer/astronomer-cosmos/issues/1633
-export AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK=False
-export AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK=False
+export AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK=True
+export AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK=True
+export AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_gs_conn
+export AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target
+#export AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=s3_conn
+#export AIRFLOW__COSMOS__REMOTE_TARGET_PATH="s3://cosmos-remote-target"

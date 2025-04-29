@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import warnings
 from pathlib import Path
 from unittest.mock import patch
@@ -35,12 +36,23 @@ MIN_VER_DAG_FILE: dict[str, list[str]] = {
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]
-
+_PYTHON_VERSION = sys.version_info[:2]
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
     Version(version): MIN_VER_DAG_FILE[version] for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
 }
+
+# TODO: Make following dag tests compatible for AF3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1706
+AIRFLOW3_IGNORE_DAG_FILES = [
+    "basic_cosmos_task_group_different_owners.py",
+    "cosmos_profile_mapping.py",
+    "user_defined_profile.py",
+    "example_taskflow.py",
+    "cosmos_manifest_example.py",
+    "example_cosmos_cleanup_dag.py",
+    "basic_cosmos_task_group.py",
+]
 
 
 @provide_session
@@ -71,11 +83,13 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        # Ignore Async DAG for dbt <=1.5
-        if DBT_VERSION <= Version("1.5.0"):
-            file.writelines(["simple_dag_async.py\n"])
+        # Python 3.8 has reached its end of life (EOL), and dbt no longer supports this version.
+        # This results in an error, as outlined in https://github.com/duckdb/dbt-duckdb/issues/488
+        if _PYTHON_VERSION < (3, 9):
+            file.writelines(["example_duckdb_dag.py\n"])
 
         if DBT_VERSION < Version("1.6.0"):
+            file.writelines(["simple_dag_async.py\n"])
             file.writelines(["example_model_version.py\n"])
             file.writelines(["example_operators.py\n"])
 
@@ -84,6 +98,10 @@ def get_dag_bag() -> DagBag:
 
         if AIRFLOW_VERSION < Version("2.8.0"):
             file.writelines("example_cosmos_dbt_build.py\n")
+
+        # TODO: Make following dag tests compatible for AF3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1706
+        if AIRFLOW_VERSION.major == 3:
+            file.writelines([f"{dag_file}\n" for dag_file in AIRFLOW3_IGNORE_DAG_FILES])
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

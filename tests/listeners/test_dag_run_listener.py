@@ -5,8 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from airflow import __version__ as airflow_version
 from airflow.models import DAG
 from airflow.utils.state import State
+from packaging import version
 
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag
@@ -77,6 +79,8 @@ def test_not_cosmos_dag():
     assert total_cosmos_tasks(dag) == 0
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1703
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
@@ -102,6 +106,8 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
     assert mock_emit_usage_metrics_if_enabled.call_count == 1
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1703
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):

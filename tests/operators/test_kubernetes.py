@@ -156,6 +156,8 @@ def test_dbt_kubernetes_build_command():
         ]
 
 
+# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.parametrize(
     "additional_kwargs,expected_results",
     [
@@ -219,6 +221,8 @@ def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_re
     assert test_operator.on_finish_action_original == expected_action
 
 
+# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.parametrize(
     "additional_kwargs,expected_results",
     [
@@ -309,6 +313,8 @@ class FakePodManager:
         return (log.encode("utf-8") for log in log_string.split("\n"))
 
 
+# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
 )
@@ -334,6 +340,8 @@ def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
     test_operator._handle_warnings(context)
 
 
+# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
 )

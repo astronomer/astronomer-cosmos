@@ -510,6 +510,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
+
 @patch("cosmos.settings.enable_dataset_alias", 0)
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),

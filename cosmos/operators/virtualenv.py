@@ -83,7 +83,9 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.py_requirements = py_requirements or []
         self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
-        self.virtualenv_dir = virtualenv_dir
+        self.virtualenv_dir = Path(virtualenv_dir) if virtualenv_dir else None
+        if self.virtualenv_dir:
+            self.virtualenv_dir.mkdir(parents=True, exist_ok=True)
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
         self.max_retries_lock = settings.virtualenv_max_retries_lock
         self._py_bin: str | None = None

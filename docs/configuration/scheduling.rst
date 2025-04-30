@@ -163,7 +163,7 @@ If using Cosmos using a version of Airflow higher than 2.10.0, the two issues pr
 to support the dynamic creation of datasets during task execution. However, some Airflow 2.10.x users reported ``sqlalchemy.orm.exc.FlushError``
 errors if they attempt to run Cosmos-powered DAGs using ``airflow dags test`` with these versions.
 
-We've reported this issue and it seems to no longer happen:
+We had reported this issue and it seems to no longer happens:
 
 - https://github.com/apache/airflow/issues/42495
 

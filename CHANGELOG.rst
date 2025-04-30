@@ -8,20 +8,37 @@ Features
 
 * (WIP) Airflow 3 support
 * Support running ``dbt deps`` incrementally to pre-defined ``dbt_packages`` by @tatiana in #1668 and #1670
+* Add ``DuckDB`` profile mapping by @prithvijitguha and @pankajastro in #1553
+* Implement DBT exposure selector by ghjklw #1717
 
 Bug Fixes
 
 * Fix ``test_indirect_selection`` flag to be propagated in case of ``TestBehavior.BUILD`` by @corsettigyg in #1663
+* Fix ``select`` clause in the case of detached tests by @anyapriya in #1680
+* Operator argument fixes by @johnhoran in #1648
+
+
+Airflow 3 Support
+
+* Support rendering DbtDag in Airflow 3 by @tatiana and @ashb in #1657
+* Refactor Rendered Task Instance Fields (RTIF) handling for Airflow 2.x and 3.x by @pankajkoti in #1661
+* Run cosmos operator in Airflow 3 by @pankajastro in #1642
+* Fix ``python_virtualenv.prepare_env`` top-level import for Airflow 3 by @pankajkoti in #1678
+* Fix Variable not found issue in Airflow 3 by @tatiana in #1684
+* Disable CosmosPlugin on Airflow 3 setup by @pankajkoti in #1692, #1698
+* Use ``schedule`` param in example DAGs instead of the 2.10 deprecated and 3.0 removed ``schedule_interval`` by @pankajkoti in #1701
+* Ensure ``virtualenv_dir`` path exists by @pankajkoti in #1724
 
 Enhancements
 
-* Refactor Rendered Task Instance Fields (RTIF) handling for Airflow 2.x and 3.x by @pankajkoti in #1661
-* Support rendering DbtDag in Airflow 3 by @tatiana and @ashb in #1657
-* Run cosmos operator in Airflow 3 by @pankajastro in #1642
+* Allow multiple callbacks by @corsettigyg #1693
+* Refactor kubernetes warning callback handling by @canbekley in #1681
 
 Documentation
 
 * Add documentation related to ``copy_dbt_packages`` by @tatiana in #1671
+* Make wording and command consistent in the contributing doc by @pankajkoti in #1697
+* Add MonteCarlo callback example for importing dbt artifacts by @corsettigyg #1695
 
 Others
 
@@ -33,7 +50,21 @@ Others
 * Improve Airflow 3 tooling by @pankajastro in #1656
 * Skip associating ``openlineage_events_completes`` to ``ti`` in Airflow 3 by @pankajkoti in #1662
 * Add .gitignore file for the scripts/airflow3 directory by @pankajkoti in #1658
-* Pre-commit updates: #1666, #1653, #1641
+* Remove ``original_jaffle_shop`` dbt project by @pankajkoti in #1676
+* Fix or ignore type check error by @pankajastro in #1687
+* Run virtualenv example with Airflow 3 tooling by @pankajastro in #1686
+* Enable running setup/teardown tasks with Async execution DAG with Airflow 3 tooling by @pankajastro in #1696
+* Enable integration tests for the DuckDB adapter by @pankajastro in #1699
+* Add Airflow 3 tests matrix entries in CI by @pankajkoti in #1646
+* Use a different way to get tasks count for asserting test_perf_dag by @pankajkoti in #1714
+* Reinstall Airflow 3 dependency on ``pydantic>=2.11`` for dbt adapter versions 1.6 & 1.9 by @pankajkoti in #1715
+* Fix outdated ``echo`` in Airflow 3 tooling script #1700
+* Add files not needed for git tracking to .gitignore by @pankajkoti in #1723
+* Use latest minor versions for dbt adapters to get in compatibility fixes by @pankajkoti in #1719
+* Fix Airflow 3 tests raising generate_run_id() takes 0 positional arguments by @tatiana in #1725
+* Fix dataset tests failing in Airflow 3 by @tatiana in #1716
+* Enable example DAGs to run in CI that were disabled in PR #1646 by @pankajkoti in #1726
+* Pre-commit updates: #1666, #1653, #1641, #1682, #1720
 
 
 1.9.2 (2025-03-18)

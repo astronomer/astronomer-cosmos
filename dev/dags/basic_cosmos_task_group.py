@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag
+from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
@@ -30,12 +30,12 @@ shared_execution_config = ExecutionConfig(
 )
 
 
-@dag(
+with DAG(
+    dag_id="basic_cosmos_task_group",
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-)
-def basic_cosmos_task_group() -> None:
+):
     """
     The simplest example of using Cosmos to render a dbt project as a TaskGroup.
     """
@@ -75,6 +75,3 @@ def basic_cosmos_task_group() -> None:
 
     pre_dbt >> customers >> post_dbt
     pre_dbt >> orders >> post_dbt
-
-
-basic_cosmos_task_group()

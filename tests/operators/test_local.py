@@ -462,7 +462,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert test_operator.outlets == []
 
 
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
@@ -511,9 +511,12 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
     with pytest.raises(FlushError):
+        run_test_dag(dag)
         # This is a known limitation of Airflow 2.10.0 and 2.10.1
         # https://github.com/apache/airflow/issues/42495
-        dag_run, session = run_test_dag(dag)
+
+        # When this is solved, we can uncomment the following:
+        # dag_run, session = run_test_dag(dag)
 
         # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
         # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
@@ -683,8 +686,6 @@ def test_run_operator_dataset_url_encoded_names(caplog):
     ]
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
     caplog.set_level(logging.DEBUG)
@@ -728,8 +729,6 @@ def test_dbt_base_operator_no_partial_parse() -> None:
     assert "--no-partial-parse" in cmd
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_project):
@@ -765,8 +764,6 @@ def test_run_test_operator_with_callback(invocation_mode, failing_test_dbt_proje
     assert on_warning_callback.called
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1705
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @pytest.mark.parametrize("invocation_mode", [InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 def test_run_test_operator_without_callback(invocation_mode):

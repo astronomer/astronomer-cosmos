@@ -13,7 +13,7 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 6. **azure_container_instance**: Run ``dbt`` commands from Azure Container Instances managed by Cosmos (requires a pre-existing Docker image)
 7. **gcp_cloud_run_job**: Run ``dbt`` commands from GCP Cloud Run Job instances managed by Cosmos (requires a pre-existing Docker image)
 8. **aws_ecs**: Run ``dbt`` commands from AWS ECS instances managed by Cosmos (requires a pre-existing Docker image)
-9. **airflow_async**: (Experimental and introduced since Cosmos 1.7.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
+9. **airflow_async**: (stable since Cosmos 1.9.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -283,13 +283,13 @@ Please refer to the step-by-step guide for using AWS ECS as the execution mode.
         },
     )
 
-Airflow Async (experimental)
-----------------------------
+Airflow Async
+-------------
 
-.. versionadded:: 1.7.0
+.. versionadded:: 1.9.0
 
 
-(**Experimental**) The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
 `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 This execution mode could be preferred when you've long running resources and you want to run them asynchronously by
 leveraging Airflow's deferrable operators. With that, you would be able to potentially observe higher throughput of tasks
@@ -310,7 +310,7 @@ installation. However, the virtual environment created during execution of the `
 the necessary dbt adapter for the setup task to function correctly. This can be achieved by specifying the required
 dbt adapter in the ``async_py_requirements`` parameter within the ``ExecutionConfig`` of your ``DbtDag`` or ``DbtTaskGroup``.
 
-Note that currently, the ``airflow_async`` execution mode has the following limitations and is released as **Experimental**:
+Note that currently, the ``airflow_async`` execution mode has the following limitations:
 
 1. **Airflow 2.8 or higher required**: This mode relies on Airflow's `Object Storage <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`__ feature, introduced in Airflow 2.8, to store and retrieve compiled SQLs.
 2. **Limited to dbt models**: Only dbt resource type models are run asynchronously using Airflow deferrable operators. Other resource types are executed synchronously, similar to the local execution mode.

@@ -6,7 +6,7 @@ Changelog
 
 Features
 
-* (WIP) Airflow 3 support
+* Airflow 3 support
 * Support running ``dbt deps`` incrementally to pre-defined ``dbt_packages`` by @tatiana in #1668 and #1670
 * Add ``DuckDB`` profile mapping by @prithvijitguha and @pankajastro in #1553
 * Implement DBT exposure selector by ghjklw #1717
@@ -40,6 +40,7 @@ Documentation
 * Add documentation related to ``copy_dbt_packages`` by @tatiana in #1671
 * Make wording and command consistent in the contributing doc by @pankajkoti in #1697
 * Add MonteCarlo callback example for importing dbt artifacts by @corsettigyg #1695
+* Change async feature to be non-experimental by @tatiana in #1732
 
 Others
 

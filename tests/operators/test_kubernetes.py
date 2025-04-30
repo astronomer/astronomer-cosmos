@@ -1,10 +1,10 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG, TaskInstance
-from airflow.utils.context import Context, context_merge
+from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
 
@@ -20,20 +20,27 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
+    DbtTestWarningHandler,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-
-try:
-    from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
-
-    module_available = True
-except ImportError:
-    module_available = False
 
 
 @pytest.fixture()
 def mock_kubernetes_execute():
     with patch("cosmos.operators.kubernetes.KubernetesPodOperator.execute") as mock_execute:
+        yield mock_execute
+
+
+@pytest.fixture()
+def fake_kubernetes_execute_pod_completion():
+    def execute(self, *args, **kwargs):
+        if isinstance(self.callbacks, list):
+            for callback in self.callbacks:
+                callback.on_pod_completion(pod="pod")
+        else:
+            self.callbacks.on_pod_completion(pod="pod")
+
+    with patch("cosmos.operators.kubernetes.KubernetesPodOperator.execute", new=execute) as mock_execute:
         yield mock_execute
 
 
@@ -45,6 +52,16 @@ def base_operator(mock_kubernetes_execute):
         base_cmd = ["cmd"]
 
     return ConcreteDbtKubernetesBaseOperator
+
+
+@pytest.fixture
+def kubernetes_pod_operator_callback():
+    try:
+        from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback
+
+        return KubernetesPodOperatorCallback
+    except ImportError:
+        pytest.skip("Skipping: airflow.providers.cncf.kubernetes.callbacks not available")
 
 
 def test_dbt_kubernetes_operator_add_global_flags(base_operator) -> None:
@@ -128,12 +145,13 @@ if version.parse(airflow_version) == version.parse("2.4"):
     base_kwargs["name"] = "some-pod-name"
 
 result_map = {
-    "ls": DbtLSKubernetesOperator(**base_kwargs),
-    "run": DbtRunKubernetesOperator(**base_kwargs),
-    "test": DbtTestKubernetesOperator(**base_kwargs),
-    "build": DbtBuildKubernetesOperator(**base_kwargs),
-    "seed": DbtSeedKubernetesOperator(**base_kwargs),
-    "clone": DbtCloneKubernetesOperator(**base_kwargs),
+    ("ls",): DbtLSKubernetesOperator(**base_kwargs),
+    ("run",): DbtRunKubernetesOperator(**base_kwargs),
+    ("test",): DbtTestKubernetesOperator(**base_kwargs),
+    ("build",): DbtBuildKubernetesOperator(**base_kwargs),
+    ("seed",): DbtSeedKubernetesOperator(**base_kwargs),
+    ("clone",): DbtCloneKubernetesOperator(**base_kwargs),
+    ("source", "freshness"): DbtSourceKubernetesOperator(**base_kwargs),
 }
 
 
@@ -146,7 +164,7 @@ def test_dbt_kubernetes_build_command():
         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
         assert command_operator.arguments == [
             "dbt",
-            command_name,
+            *command_name,
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
@@ -156,215 +174,121 @@ def test_dbt_kubernetes_build_command():
         ]
 
 
-# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
-@pytest.mark.parametrize(
-    "additional_kwargs,expected_results",
-    [
-        ({"on_success_callback": None, "is_delete_operator_pod": True}, (1, 1, True, "delete_pod")),
-        (
-            {"on_success_callback": (lambda **kwargs: None), "is_delete_operator_pod": False},
-            (2, 1, False, "keep_pod"),
-        ),
-        (
-            {"on_success_callback": [(lambda **kwargs: None), (lambda **kwargs: None)], "is_delete_operator_pod": None},
-            (3, 1, True, "delete_pod"),
-        ),
-        (
-            {"on_failure_callback": None, "is_delete_operator_pod": True, "on_finish_action": "keep_pod"},
-            (1, 1, True, "delete_pod"),
-        ),
-        (
-            {
-                "on_failure_callback": (lambda **kwargs: None),
-                "is_delete_operator_pod": None,
-                "on_finish_action": "delete_pod",
-            },
-            (1, 2, True, "delete_pod"),
-        ),
-        (
-            {
-                "on_failure_callback": [(lambda **kwargs: None), (lambda **kwargs: None)],
-                "is_delete_operator_pod": None,
-                "on_finish_action": "delete_succeeded_pod",
-            },
-            (1, 3, False, "delete_succeeded_pod"),
-        ),
-        ({"is_delete_operator_pod": None, "on_finish_action": "keep_pod"}, (1, 1, False, "keep_pod")),
-        ({}, (1, 1, True, "delete_pod")),
-    ],
-)
-@pytest.mark.skipif(
-    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
-)
-def test_dbt_test_kubernetes_operator_constructor(additional_kwargs, expected_results):
-    # TODO: Refactor this test so that the asserts test according to the input parameters.
-    test_operator = DbtTestKubernetesOperator(
-        on_warning_callback=(lambda **kwargs: None), **additional_kwargs, **base_kwargs
-    )
-    print(additional_kwargs, test_operator.__dict__)
-
-    assert isinstance(test_operator.on_success_callback, list) or test_operator.on_success_callback is None
-    assert isinstance(test_operator.on_failure_callback, list) or test_operator.on_failure_callback is None
-
-    if test_operator.on_success_callback is not None:
-        assert test_operator._handle_warnings in test_operator.on_success_callback
-        assert len(test_operator.on_success_callback) == expected_results[0]
-
-    if test_operator.on_failure_callback is not None:
-        assert test_operator._cleanup_pod in test_operator.on_failure_callback
-        assert len(test_operator.on_failure_callback) == expected_results[1]
-
-    assert test_operator.is_delete_operator_pod_original == expected_results[2]
-
-    expected_action = OnFinishAction(expected_results[3])
-    assert test_operator.on_finish_action_original == expected_action
+def test_dbt_test_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
+    test_operator = DbtTestKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
+    if isinstance(test_operator.callbacks, list):
+        assert any([isinstance(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
+    else:
+        assert isinstance(test_operator.callbacks, kubernetes_pod_operator_callback)
 
 
-# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
-@pytest.mark.parametrize(
-    "additional_kwargs,expected_results",
-    [
-        ({"on_success_callback": None, "is_delete_operator_pod": True}, (1, 1, True, "delete_pod")),
-        (
-            {"on_success_callback": (lambda **kwargs: None), "is_delete_operator_pod": False},
-            (2, 1, False, "keep_pod"),
-        ),
-        (
-            {"on_success_callback": [(lambda **kwargs: None), (lambda **kwargs: None)], "is_delete_operator_pod": None},
-            (3, 1, True, "delete_pod"),
-        ),
-        (
-            {"on_failure_callback": None, "is_delete_operator_pod": True, "on_finish_action": "keep_pod"},
-            (1, 1, True, "delete_pod"),
-        ),
-        (
-            {
-                "on_failure_callback": (lambda **kwargs: None),
-                "is_delete_operator_pod": None,
-                "on_finish_action": "delete_pod",
-            },
-            (1, 2, True, "delete_pod"),
-        ),
-        (
-            {
-                "on_failure_callback": [(lambda **kwargs: None), (lambda **kwargs: None)],
-                "is_delete_operator_pod": None,
-                "on_finish_action": "delete_succeeded_pod",
-            },
-            (1, 3, False, "delete_succeeded_pod"),
-        ),
-        ({"is_delete_operator_pod": None, "on_finish_action": "keep_pod"}, (1, 1, False, "keep_pod")),
-        ({}, (1, 1, True, "delete_pod")),
-    ],
-)
-@pytest.mark.skipif(
-    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
-)
-def test_dbt_source_kubernetes_operator_constructor(additional_kwargs, expected_results):
-    # TODO: Refactor this test so that the asserts test according to the input parameters.
-    source_operator = DbtSourceKubernetesOperator(
-        on_warning_callback=(lambda **kwargs: None), **additional_kwargs, **base_kwargs
-    )
-
-    print(additional_kwargs, source_operator.__dict__)
-
-    assert isinstance(source_operator.on_success_callback, list) or source_operator.on_success_callback is None
-    assert isinstance(source_operator.on_failure_callback, list) or source_operator.on_failure_callback is None
-
-    if source_operator.on_success_callback is not None:
-        assert source_operator._handle_warnings in source_operator.on_success_callback
-        assert len(source_operator.on_success_callback) == expected_results[0]
-
-    if source_operator.on_failure_callback is not None:
-        assert source_operator._cleanup_pod in source_operator.on_failure_callback
-        assert len(source_operator.on_failure_callback) == expected_results[1]
-
-    assert source_operator.is_delete_operator_pod_original == expected_results[2]
-
-    expected_action = OnFinishAction(expected_results[3])
-    assert source_operator.on_finish_action_original == expected_action
+def test_dbt_source_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
+    test_operator = DbtSourceKubernetesOperator(on_warning_callback=(lambda *args, **kwargs: None), **base_kwargs)
+    if isinstance(test_operator.callbacks, list):
+        assert any([isinstance(cb, kubernetes_pod_operator_callback) for cb in test_operator.callbacks])
+    else:
+        assert isinstance(test_operator.callbacks, kubernetes_pod_operator_callback)
 
 
 class FakePodManager:
+    def __init__(self, log_string):
+        self.log_string = log_string
+
     def read_pod_logs(self, pod, container):
         assert pod == "pod"
         assert container == "base"
-        log_string = """
-19:48:25  Concurrency: 4 threads (target='target')
-19:48:25
-19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
-19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
-19:48:27  1 of 2 WARN 252 dbt_utils_accepted_range_table_col__12__0 ..................... [WARN 117 in 1.83s]
-19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
-19:48:27
-19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
-19:48:27
-19:48:27  Completed with 1 warning:
-19:48:27
-19:48:27  Warning in test dbt_utils_accepted_range_table_col__12__0 (models/ads/ads.yaml)
-19:48:27  Got 252 results, configured to warn if >0
-19:48:27
-19:48:27    compiled Code at target/compiled/model/models/table/table.yaml/dbt_utils_accepted_range_table_col__12__0.sql
-19:48:27
-19:48:27  Done. PASS=1 WARN=1 ERROR=0 SKIP=0 TOTAL=2
-"""
-        return (log.encode("utf-8") for log in log_string.split("\n"))
+        return (log.encode("utf-8") for log in self.log_string.split("\n"))
 
 
-# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
-@pytest.mark.skipif(
-    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
+@pytest.mark.parametrize(
+    ("log_string", "should_call"),
+    (
+        (
+            """
+        19:48:25  Concurrency: 4 threads (target='target')
+        19:48:25
+        19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
+        19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
+        19:48:27  1 of 2 WARN 252 dbt_utils_accepted_range_table_col__12__0 ..................... [WARN 117 in 1.83s]
+        19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
+        19:48:27
+        19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
+        19:48:27
+        19:48:27  Completed with 1 warning:
+        19:48:27
+        19:48:27  Warning in test dbt_utils_accepted_range_table_col__12__0 (models/ads/ads.yaml)
+        19:48:27  Got 252 results, configured to warn if >0
+        19:48:27
+        19:48:27    compiled Code at target/compiled/model/models/table/table.yaml/dbt_utils_accepted_range_table_col__12__0.sql
+        19:48:27
+        19:48:27  Done. PASS=1 WARN=1 ERROR=0 SKIP=0 TOTAL=2
+        19:48:27  Command `dbt test` succeeded at 07:50:02.340364 after 43.98 seconds
+        19:48:27  Flushing usage events
+        """,
+            True,
+        ),
+        (
+            """
+        19:48:25  Concurrency: 4 threads (target='target')
+        19:48:25
+        19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
+        19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
+        19:48:27  1 of 2 PASS 252 dbt_utils_accepted_range_table_col__12__0 ..................... [PASS in 1.83s]
+        19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
+        19:48:27
+        19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).
+        19:48:27
+        19:48:27  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 TOTAL=2
+        """,
+            False,
+        ),
+        (
+            """
+        gibberish
+        """,
+            False,
+        ),
+    ),
 )
-def test_dbt_test_kubernetes_operator_handle_warnings_and_cleanup_pod():
-    def on_warning_callback(context: Context):
-        assert context["test_names"] == ["dbt_utils_accepted_range_table_col__12__0"]
-        assert context["test_results"] == ["Got 252 results, configured to warn if >0"]
+def test_dbt_kubernetes_operator_handle_warnings(
+    caplog, fake_kubernetes_execute_pod_completion, kubernetes_pod_operator_callback, log_string, should_call
+):
+    mock_warning_callback = Mock()
+    test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
 
-    def cleanup(pod: str, remote_pod: str):
-        assert pod == remote_pod
-
-    test_operator = DbtTestKubernetesOperator(
-        is_delete_operator_pod=True, on_warning_callback=on_warning_callback, **base_kwargs
-    )
     task_instance = TaskInstance(test_operator)
-    task_instance.task.pod_manager = FakePodManager()
+    task_instance.task.pod_manager = FakePodManager(log_string)
     task_instance.task.pod = task_instance.task.remote_pod = "pod"
-    task_instance.task.cleanup = cleanup
 
-    context = Context()
-    context_merge(context, task_instance=task_instance)
+    context = Context(task_instance=task_instance)
+    test_operator.build_and_run_cmd(context)
 
-    test_operator._handle_warnings(context)
+    if should_call:
+        mock_warning_callback.assert_called_once()
+    else:
+        mock_warning_callback.assert_not_called()
+
+    if "gibberish" in log_string:
+        assert "Failed to scrape warning count" in caplog.text
 
 
-# TODO: Add Airflow 3 compatibility: https://github.com/astronomer/astronomer-cosmos/issues/1702
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
-@pytest.mark.skipif(
-    not module_available, reason="Kubernetes module `airflow.providers.cncf.kubernetes.utils.pod_manager` not available"
-)
-def test_dbt_source_kubernetes_operator_handle_warnings_and_cleanup_pod():
-    def on_warning_callback(context: Context):
-        assert context["test_names"] == ["dbt_utils_accepted_range_table_col__12__0"]
-        assert context["test_results"] == ["Got 252 results, configured to warn if >0"]
+def test_dbt_kubernetes_operator_handle_warnings_noop(
+    caplog, fake_kubernetes_execute_pod_completion, kubernetes_pod_operator_callback
+):
+    mock_warning_callback = Mock()
+    run_operator = DbtRunKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
+    task_instance = TaskInstance(run_operator)
+    context = Context(task_instance=task_instance)
 
-    def cleanup(pod: str, remote_pod: str):
-        assert pod == remote_pod
+    warning_handler_no_context = DbtTestWarningHandler(mock_warning_callback, run_operator, None)
+    warning_handler_no_context.on_pod_completion(pod="pod")
 
-    test_operator = DbtSourceKubernetesOperator(
-        is_delete_operator_pod=True, on_warning_callback=on_warning_callback, **base_kwargs
-    )
-    task_instance = TaskInstance(test_operator)
-    task_instance.task.pod_manager = FakePodManager()
-    task_instance.task.pod = task_instance.task.remote_pod = "pod"
-    task_instance.task.cleanup = cleanup
+    assert "No context provided" in caplog.text
 
-    context = Context()
-    context_merge(context, task_instance=task_instance)
+    warning_handler = DbtTestWarningHandler(mock_warning_callback, run_operator, context)
+    warning_handler.on_pod_completion(pod="pod")
 
-    test_operator._handle_warnings(context)
+    assert "Cannot handle dbt warnings for task of type" in caplog.text
 
 
 def test_created_pod():

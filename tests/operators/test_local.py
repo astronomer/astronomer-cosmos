@@ -468,9 +468,11 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_after_airflow_210_and_before_300(caplog):
-    from airflow.models.dataset import DatasetAliasModel
-    from sqlalchemy.orm.exc import FlushError
+def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
+    try:
+        from airflow.models.asset import AssetAliasModel
+    except ModuleNotFoundError:
+        from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -504,8 +506,8 @@ def test_run_operator_dataset_inlets_and_outlets_after_airflow_210_and_before_30
         seed_operator >> run_operator >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
-    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
+    assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
     with pytest.raises(FlushError):
         # This is a known limitation of Airflow 2.10.0 and 2.10.1
@@ -650,15 +652,13 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     version.parse(airflow_version).major == 3,
     reason="Airflow 3.0 only supports assets when setting enable_dataset_alias=True",
 )
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.integration
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names(caplog):
-    from airflow.datasets import Dataset
+    try:
+        from airflow.sdk.definitions.asset import Dataset
+    except ImportError:
+        from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(

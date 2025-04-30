@@ -650,8 +650,9 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version).major == 3,
-    reason="Airflow 3.0 only supports assets when setting enable_dataset_alias=True",
+    version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.integration
 @patch("cosmos.settings.enable_dataset_alias", 0)

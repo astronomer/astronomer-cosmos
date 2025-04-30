@@ -465,7 +465,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
+    reason="DatasetAlias did not exist before 2.10",
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
@@ -473,7 +473,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         from airflow.models.asset import AssetAliasModel
     except ModuleNotFoundError:
         from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
-    from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -510,19 +509,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
-    with pytest.raises(FlushError):
-        run_test_dag(dag)
-        # This is a known limitation of Airflow 2.10.0 and 2.10.1
-        # https://github.com/apache/airflow/issues/42495
-
-        # When this is solved, we can uncomment the following:
-        # dag_run, session = run_test_dag(dag)
-
-        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
-        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
-        # based on the resolution of the issue logged in Airflow:
-        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
-        # assert dataset_model == 1
+    run_test_dag(dag)
 
 
 @pytest.mark.skipif(

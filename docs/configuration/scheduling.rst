@@ -159,15 +159,15 @@ References about the root cause of these issues:
 Airflow 2.10.0 and 2.10.1
 _________________________
 
-If using Cosmos with Airflow 2.10.0 or 2.10.1, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
-to support the dynamic creation of datasets during task execution. However, users may face ``sqlalchemy.orm.exc.FlushError``
+If using Cosmos using a version of Airflow higher than 2.10.0, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
+to support the dynamic creation of datasets during task execution. However, if users are using 2.10.0-2.10.4, they may face ``sqlalchemy.orm.exc.FlushError``
 errors if they attempt to run Cosmos-powered DAGs using ``airflow dags test`` with these versions.
 
-We've reported this issue and it will be resolved in future versions of Airflow:
+We've reported this issue and it has been resolved in the latest 2.10 release:
 
 - https://github.com/apache/airflow/issues/42495
 
-For users to overcome this limitation in local tests, until the Airflow community solves this, we introduced the configuration
+For users to overcome this limitation in local tests, we introduced the configuration
 ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``, that is ``True`` by default. If users want to run ``dags test` and not see ``sqlalchemy.orm.exc.FlushError``,
 they can set this configuration to ``False``. It can also be set in the ``airflow.cfg`` file:
 
@@ -175,3 +175,5 @@ they can set this configuration to ``False``. It can also be set in the ``airflo
 
     [cosmos]
     enable_dataset_alias = False
+
+Starting in Airflow 3, Cosmos users no longer allowed to set ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS`` to ``True``.

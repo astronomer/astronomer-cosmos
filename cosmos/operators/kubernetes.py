@@ -4,10 +4,9 @@ import inspect
 import re
 from abc import ABC
 from os import PathLike
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 import kubernetes.client as k8s
-import kubernetes_asyncio.client as async_k8s
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
     convert_env_vars,
 )

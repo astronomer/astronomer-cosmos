@@ -381,8 +381,6 @@ def test__release_venv_lock_current_process(tmpdir):
     assert not lockfile.exists()
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1707
-@pytest.mark.skipif(AIRFLOW_VERSION.major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.5"),
     reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",

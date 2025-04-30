@@ -29,6 +29,7 @@ Airflow 3 Support
 * Use ``schedule`` param in example DAGs instead of the 2.10 deprecated and 3.0 removed ``schedule_interval`` by @pankajkoti in #1701
 * Ensure ``virtualenv_dir`` path exists by @pankajkoti in #1724
 * Support emitting Assets with Airflow 3 by @tatiana in #1713
+* Add docs on Airflow 3 compatibility by @pankajkoti  in #1731
 
 Enhancements
 

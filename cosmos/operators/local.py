@@ -49,8 +49,13 @@ try:
 except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
 
+try:  # Airflow 3
+    from airflow.sdk.definitions.asset import Asset
+except (ModuleNotFoundError, ImportError):  # Airflow 2
+    from airflow.datasets import Dataset as Asset  # type: ignore
+
+
 try:
-    from airflow.datasets import Dataset
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
 except ModuleNotFoundError:
     is_openlineage_available = False
@@ -59,7 +64,6 @@ else:
     is_openlineage_available = True
 
 if TYPE_CHECKING:
-    from airflow.datasets import Dataset  # noqa: F811
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
     try:  # pragma: no cover
@@ -489,8 +493,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         outlets = self.get_datasets("outputs")
         self.log.info("Inlets: %s", inlets)
         self.log.info("Outlets: %s", outlets)
-        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-            self.register_dataset(inlets, outlets, context)
+        self.register_dataset(inlets, outlets, context)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -572,14 +575,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     env=env,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-                    # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance. The
-                    # support for this is expected to be worked upon while addressing issue:
-                    # https://github.com/astronomer/astronomer-cosmos/issues/1635
+                if is_openlineage_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
-                    context[
-                        "task_instance"
-                    ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
+                    if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+                        # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
+                        # in that case we're storing as self.openlineage_events_completes
+                        context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
                 if self.emit_datasets:
                     self._handle_datasets(context)
@@ -629,7 +630,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         except (FileNotFoundError, NotImplementedError, ValueError, KeyError, jinja2.exceptions.UndefinedError):
             self.log.debug("Unable to parse OpenLineage events", stack_info=True)
 
-    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
+    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Asset]:
         """
         Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
         command. Relies on the following files:
@@ -640,15 +641,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Return a list of Dataset URIs (strings).
         """
         uris = []
+
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
                 dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name)
                 uris.append(dataset_uri)
-        self.log.debug("URIs to be converted to Dataset: %s", uris)
+        self.log.debug("URIs to be converted to Asset: %s", uris)
 
-        datasets = []
+        assets = []
         try:
-            datasets = [Dataset(uri) for uri in uris]
+            assets = [Asset(uri) for uri in uris]
         except ValueError:
             raise AirflowCompatibilityError(
                 """
@@ -659,9 +661,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 By setting ``emit_datasets=False`` in ``RenderConfig``. For more information, see https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html.
                 """
             )
-        return datasets
+        return assets
 
-    def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset], context: Context) -> None:
+    def register_dataset(self, new_inlets: list[Asset], new_outlets: list[Asset], context: Context) -> None:
         """
         Register a list of datasets as outlets of the current task, when possible.
 
@@ -676,9 +678,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
-        from airflow.utils.session import create_session
+        if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
+            logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True.")
+            raise AirflowCompatibilityError(
+                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True."
+            )
+        elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+            from airflow.utils.session import create_session
 
-        if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
                 self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
@@ -690,10 +697,21 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
                 session.commit()
         else:
-            logger.info("Assigning inlets/outlets with DatasetAlias")
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
-            for outlet in new_outlets:
-                context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+
+            if AIRFLOW_VERSION.major == 2:
+                logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+
+                for outlet in new_outlets:
+                    context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+            else:  # AIRFLOW_VERSION.major == 3
+                logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+                from airflow.sdk.definitions.asset import AssetAlias
+
+                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
+                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined, call-arg, arg-type]
+                for outlet in new_outlets:
+                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
@@ -806,6 +824,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
+
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)

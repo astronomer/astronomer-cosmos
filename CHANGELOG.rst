@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.10.0a2 (2025-04-30)
+1.10.0a3 (2025-04-30)
 ---------------------
 
 Features
@@ -28,6 +28,7 @@ Airflow 3 Support
 * Disable CosmosPlugin on Airflow 3 setup by @pankajkoti in #1692, #1698
 * Use ``schedule`` param in example DAGs instead of the 2.10 deprecated and 3.0 removed ``schedule_interval`` by @pankajkoti in #1701
 * Ensure ``virtualenv_dir`` path exists by @pankajkoti in #1724
+* Support emitting Assets with Airflow 3 by @tatiana in #1713
 
 Enhancements
 

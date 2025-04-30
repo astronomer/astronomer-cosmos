@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag
+from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
@@ -21,12 +21,12 @@ DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 execution_config = ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER)
 
 
-@dag(
-    schedule_interval="@daily",
+with DAG(
+    dag_id="cosmos_profile_mapping",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-)
-def cosmos_profile_mapping() -> None:
+):
     """
     Turns a dbt project into a TaskGroup with a profile mapping.
     """
@@ -52,6 +52,3 @@ def cosmos_profile_mapping() -> None:
     post_dbt = EmptyOperator(task_id="post_dbt")
 
     pre_dbt >> jaffle_shop >> post_dbt
-
-
-cosmos_profile_mapping()

@@ -4,7 +4,11 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from typing import Any, Callable, Union
 
-from airflow.models import BaseOperator
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
+
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
@@ -151,6 +155,8 @@ def create_test_task_metadata(
             task_args["models"] = node.resource_name
         elif node.resource_type == DbtResourceType.SOURCE:
             task_args["select"] = f"source:{node.resource_name}"
+        elif is_detached_test(node):
+            task_args["select"] = node.resource_name.split(".")[0]
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
 

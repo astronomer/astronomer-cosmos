@@ -6,18 +6,18 @@ parsing the DbtDag or DbtTaskGroup since Cosmos 1.5.
 # [START cache_example]
 from datetime import datetime, timedelta
 
-from airflow.decorators import dag, task
+from airflow import DAG
+from airflow.decorators import task
 
 from cosmos.cache import delete_unused_dbt_ls_cache, delete_unused_dbt_ls_remote_cache_files
 
-
-@dag(
-    schedule_interval="0 0 * * 0",  # Runs every Sunday
+with DAG(
+    dag_id="example_cosmos_cleanup_dag",
+    schedule="0 0 * * 0",  # Runs every Sunday
     start_date=datetime(2023, 1, 1),
     catchup=False,
     tags=["example"],
-)
-def example_cosmos_cleanup_dag():
+):
 
     @task()
     def clear_db_ls_cache(session=None):
@@ -39,5 +39,3 @@ def example_cosmos_cleanup_dag():
 
 
 # [END cache_example]
-
-example_cosmos_cleanup_dag()

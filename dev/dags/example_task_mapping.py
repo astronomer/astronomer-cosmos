@@ -26,7 +26,7 @@ profile_config = ProfileConfig(
 with DAG(
     dag_id="example_task_mapping",
     start_date=datetime(2024, 1, 1),
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
 ) as dag:
 

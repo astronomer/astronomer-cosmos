@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag
+from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
@@ -17,12 +17,12 @@ PROFILES_FILE_PATH = Path(DBT_ROOT_PATH, "jaffle_shop", "profiles.yml")
 DBT_LS_PATH = Path(DBT_ROOT_PATH, "jaffle_shop", "dbt_ls_models_staging.txt")
 
 
-@dag(
-    schedule_interval="@daily",
+with DAG(
+    dag_id="user_defined_profile",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-)
-def user_defined_profile() -> None:
+):
     """
     A DAG that uses Cosmos with a custom profile.
     """
@@ -48,6 +48,3 @@ def user_defined_profile() -> None:
     post_dbt = EmptyOperator(task_id="post_dbt")
 
     pre_dbt >> jaffle_shop >> post_dbt
-
-
-user_defined_profile()

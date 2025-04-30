@@ -11,7 +11,11 @@ import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.subprocess import SubprocessResult
+
+try:  # For Airflow 3
+    from airflow.providers.standard.hooks.subprocess import SubprocessResult
+except ImportError:  # For Airflow 2
+    from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
 from packaging import version
@@ -458,14 +462,18 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert test_operator.outlets == []
 
 
+# TODO: Add compatibility for Airflow 3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1704.
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
-    from airflow.models.dataset import DatasetAliasModel
-    from sqlalchemy.orm.exc import FlushError
+def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
+    try:
+        from airflow.models.asset import AssetAliasModel
+    except ModuleNotFoundError:
+        from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -499,19 +507,8 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards(caplog):
         seed_operator >> run_operator >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == [DatasetAliasModel(name="test_id_1__run")]
-    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
-
-    with pytest.raises(FlushError):
-        # This is a known limitation of Airflow 2.10.0 and 2.10.1
-        # https://github.com/apache/airflow/issues/42495
-        dag_run, session = run_test_dag(dag)
-
-        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
-        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
-        # based on the resolution of the issue logged in Airflow:
-        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
-        # assert dataset_model == 1
+    assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
@@ -570,6 +567,8 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     assert run_operator.outlets == []
 
 
+# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1713
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
@@ -578,7 +577,10 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
 @pytest.mark.integration
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names(caplog):
-    from airflow.datasets import Dataset
+    try:
+        from airflow.sdk.definitions.asset import Dataset
+    except ImportError:
+        from airflow.datasets import Dataset
 
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(
@@ -1548,3 +1550,26 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
     assert "Copying dbt packages to temporary folder." in caplog.text
     assert "Completed copying dbt packages to temporary folder." in caplog.text
+
+
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_multiple_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json
+):
+
+    multiple_callbacks = [MagicMock(), MagicMock(), MagicMock()]
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback=multiple_callbacks,
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    for callback_fn in multiple_callbacks:
+        callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)

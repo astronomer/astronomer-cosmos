@@ -2,7 +2,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag, task
+from airflow import DAG
+from airflow.decorators import task
 
 from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -27,12 +28,12 @@ def build_partial_dbt_env():
     return {"ENV_VAR_NAME": "value", "ENV_VAR_NAME_2": False}
 
 
-@dag(
-    schedule_interval="@daily",
+with DAG(
+    dag_id="example_taskflow",
+    schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-)
-def example_taskflow() -> None:
+):
     DbtTaskGroup(
         group_id="transform_task_group",
         project_config=ProjectConfig(
@@ -43,6 +44,3 @@ def example_taskflow() -> None:
         profile_config=profile_config,
         operator_args={"install_deps": True},
     )
-
-
-example_taskflow()

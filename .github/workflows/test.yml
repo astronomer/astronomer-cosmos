@@ -37,9 +37,10 @@ jobs:
   Run-Unit-Tests:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
         dbt-version: ["1.9"]
         exclude:
           - python-version: "3.11"
@@ -66,6 +67,8 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
+          - python-version: "3.8"
+            airflow-version: "3.0"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,9 +107,10 @@ jobs:
     needs: Authorize
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
         dbt-version: ["1.9"]
         exclude:
           - python-version: "3.11"
@@ -119,6 +123,8 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
+          - python-version: "3.8"
+            airflow-version: "3.0"
     services:
       postgres:
         image: postgres
@@ -180,6 +186,7 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+          AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -274,9 +281,10 @@ jobs:
     needs: Authorize
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.8" ]
+        airflow-version: [ "2.8", "3.0" ]
         dbt-version: [ "1.5" ]
     services:
       postgres:
@@ -346,7 +354,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.10" ]
+        airflow-version: [ "2.10", "3.0" ]
         dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
     services:
       postgres:
@@ -413,9 +421,10 @@ jobs:
     needs: Authorize
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11"]
-        airflow-version: ["2.8"]
+        airflow-version: ["2.8", "3.0" ]
         dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     services:
@@ -483,9 +492,10 @@ jobs:
     needs: Authorize
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: [ "3.12" ]
-        airflow-version: [ "2.10" ]
+        airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.9" ]
     steps:
       - uses: actions/checkout@v4

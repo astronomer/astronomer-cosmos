@@ -29,6 +29,8 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``source:my_source``: include/exclude nodes that have the source ``my_source`` and are of resource_type ``source``
 - ``source:my_source+``: include/exclude nodes that have the source ``my_source`` and their children
 - ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
+- ``exposure:my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and are of resource_type ``exposure``
+- ``exposure:+my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and their parents
 
 .. note::
 

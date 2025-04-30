@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import inspect
+import re
 from abc import ABC
 from os import PathLike
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
-from airflow.models import TaskInstance
+import kubernetes.client as k8s
+from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
+    convert_env_vars,
+)
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.utils.context import context_merge
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -13,6 +18,19 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+try:
+    # apache-airflow-providers-cncf-kubernetes >= 7.14.0
+    from airflow.providers.cncf.kubernetes.callbacks import (
+        KubernetesPodOperatorCallback,
+    )
+except ImportError:
+
+    class KubernetesPodOperatorCallback:  # type: ignore[no-redef]
+        """Mock fallback for older versions. Should not be used in practice."""
+
+        pass
+
 
 from cosmos.config import ProfileConfig
 from cosmos.dbt.parser.output import extract_log_issues
@@ -33,26 +51,6 @@ try:
     from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
-
-DBT_NO_TESTS_MSG = "Nothing to do"
-DBT_WARN_MSG = "WARN"
-
-try:
-    # apache-airflow-providers-cncf-kubernetes >= 7.4.0
-    from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
-        convert_env_vars,
-    )
-    from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-    from airflow.providers.cncf.kubernetes.utils.pod_manager import OnFinishAction
-except ImportError:
-    try:
-        # apache-airflow-providers-cncf-kubernetes < 7.4.0
-        from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
-    except ImportError:
-        raise ImportError(
-            "Could not import KubernetesPodOperator. Ensure you've installed the Kubernetes provider "
-            "separately or with with `pip install astronomer-cosmos[...,kubernetes]`."
-        )
 
 
 class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
@@ -186,102 +184,87 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
         super().__init__(*args, **kwargs)
 
 
-class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
-    def __init__(self, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
-        if not on_warning_callback:
-            super().__init__(**kwargs)
-        else:
-            self.on_warning_callback = on_warning_callback
-            self.is_delete_operator_pod_original = kwargs.get("is_delete_operator_pod", None)
-            if self.is_delete_operator_pod_original is not None:
-                self.on_finish_action_original = (
-                    OnFinishAction.DELETE_POD if self.is_delete_operator_pod_original else OnFinishAction.KEEP_POD
-                )
-            else:
-                self.on_finish_action_original = OnFinishAction(kwargs.get("on_finish_action", "delete_pod"))
-                self.is_delete_operator_pod_original = self.on_finish_action_original == OnFinishAction.DELETE_POD
-            # In order to read the pod logs, we need to keep the pod around.
-            # Depending on the on_finish_action & is_delete_operator_pod settings,
-            # we will clean up the pod later in the _handle_warnings method, which
-            # is called in on_success_callback.
-            kwargs["is_delete_operator_pod"] = False
-            kwargs["on_finish_action"] = OnFinishAction.KEEP_POD
+class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
+    def __init__(
+        self,
+        on_warning_callback: Callable[..., Any],
+        operator: KubernetesPodOperator,
+        context: Optional[Context] = None,
+    ) -> None:
+        self.on_warning_callback = on_warning_callback
+        self.operator = operator
+        self.context = context
 
-            # Add a callback to both success and failure callbacks.
-            # In case of success, check for a warning in the logs and clean up the pod.
-            self.on_success_callback = kwargs.get("on_success_callback", None) or []
-            if isinstance(self.on_success_callback, list):
-                self.on_success_callback += [self._handle_warnings]
-            else:
-                self.on_success_callback = [self.on_success_callback, self._handle_warnings]
-            kwargs["on_success_callback"] = self.on_success_callback
-            # In case of failure, clean up the pod.
-            self.on_failure_callback = kwargs.get("on_failure_callback", None) or []
-            if isinstance(self.on_failure_callback, list):
-                self.on_failure_callback += [self._cleanup_pod]
-            else:
-                self.on_failure_callback = [self.on_failure_callback, self._cleanup_pod]
-            kwargs["on_failure_callback"] = self.on_failure_callback
-
-            super().__init__(**kwargs)
-
-    def _handle_warnings(self, context: Context) -> None:
+    def on_pod_completion(  # type: ignore[override]
+        self,
+        *,
+        pod: k8s.V1Pod,
+        **kwargs: Any,
+    ) -> None:
         """
         Handles warnings by extracting log issues, creating additional context, and calling the
         on_warning_callback with the updated context.
 
-        :param context: The original airflow context in which the build and run command was executed.
-        """
-        if not (
-            isinstance(context["task_instance"], TaskInstance)
-            and (
-                isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
-                or isinstance(context["task_instance"].task, DbtSourceKubernetesOperator)
-            )
-        ):
-            return
-        task = context["task_instance"].task
-        logs = [
-            log.decode("utf-8") for log in task.pod_manager.read_pod_logs(task.pod, "base") if log.decode("utf-8") != ""
-        ]
+        Note that the signature of the interface method changed in `cncf.kubernetes` provider version 10.2.0, where the
+        `operator` and `context` parameters were added to all operator callbacks. To maintain forward compatibility
+        with `cncf.kubernetes` provider version 7.14.0 and later, we pass these parameters via instance variables.
 
-        should_trigger_callback = all(
-            [
-                logs,
-                self.on_warning_callback,
-                DBT_NO_TESTS_MSG not in logs[-1],
-                DBT_WARN_MSG in logs[-1],
-            ]
+        :param pod: the created pod.
+        """
+        if not self.context:
+            self.operator.log.warning("No context provided to the DbtTestWarningHandler.")
+            return
+
+        task = self.context["task_instance"].task
+        if not (isinstance(task, DbtTestKubernetesOperator) or isinstance(task, DbtSourceKubernetesOperator)):
+            self.operator.log.warning(f"Cannot handle dbt warnings for task of type {type(task)}.")
+            return
+
+        logs = [log.decode("utf-8") for log in task.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]
+
+        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
+        warn_count = warn_count_pattern.search("\n".join(logs))
+        if not warn_count:
+            self.operator.log.warning(
+                "Failed to scrape warning count from the pod logs."
+                "Potential warning callbacks could not be triggered."
+            )
+            return
+
+        if int(warn_count.group(1)) > 0:
+            test_names, test_results = extract_log_issues(logs)
+            context_merge(self.context, test_names=test_names, test_results=test_results)
+            self.on_warning_callback(self.context)
+
+
+class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
+    """
+    Executes a dbt core test command.
+    """
+
+    def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.warning_handler = None
+        if on_warning_callback:
+            self.warning_handler = DbtTestWarningHandler(on_warning_callback, operator=self)
+            # Support for handling multiple operator callbacks via self.callbacks was added in provider version 10.2.0
+            if isinstance(self.callbacks, list):  # type: ignore[has-type]
+                self.callbacks.append(self.warning_handler)  # type: ignore[has-type,arg-type]
+            else:
+                self.callbacks = self.warning_handler  # type: ignore[assignment]
+
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+    ) -> Any:
+        if self.warning_handler:
+            self.warning_handler.context = context
+        super().build_and_run_cmd(
+            context=context, cmd_flags=cmd_flags, run_as_async=run_as_async, async_context=async_context
         )
-
-        if should_trigger_callback:
-            warnings = int(logs[-1].split(f"{DBT_WARN_MSG}=")[1].split()[0])
-            if warnings > 0:
-                test_names, test_results = extract_log_issues(logs)
-                context_merge(context, test_names=test_names, test_results=test_results)
-                self.on_warning_callback(context)
-
-        self._cleanup_pod(context)
-
-    def _cleanup_pod(self, context: Context) -> None:
-        """
-        Handles the cleaning up of the pod after success or failure, if
-        there is a on_warning_callback function defined.
-
-        :param context: The original airflow context in which the build and run command was executed.
-        """
-        if not (
-            isinstance(context["task_instance"], TaskInstance)
-            and (
-                isinstance(context["task_instance"].task, DbtTestKubernetesOperator)
-                or isinstance(context["task_instance"].task, DbtSourceKubernetesOperator)
-            )
-        ):
-            return
-        task = context["task_instance"].task
-        if task.pod:
-            task.on_finish_action = self.on_finish_action_original
-            task.cleanup(pod=task.pod, remote_pod=task.remote_pod)
 
 
 class DbtTestKubernetesOperator(DbtTestMixin, DbtWarningKubernetesOperator):

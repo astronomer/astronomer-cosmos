@@ -5,7 +5,7 @@ The Cosmos 1.10.0 release marks the **first iteration** of adding compatibility 
 This is an important milestone as we work towards ensuring that Cosmos seamlessly integrates with the latest advancements in the Airflow ecosystem.
 
 What Works
-------------------
+----------
 
 With the changes contributed in Cosmos 1.10.0 to bring in compatibility with Airflow 3, we have validated Cosmos’
 functionality with Airflow 3 by extending our CI infrastructure:
@@ -21,7 +21,7 @@ These additions ensure that all core functionality, workflows, and integrations 
 reliably under Airflow 3.
 
 Validation in Progress
----------------------
+----------------------
 
 We are actively validating the combined support for `Assets <https://airflow.apache.org/docs/apache-airflow/3.0.0/authoring-and-scheduling/assets.html>`_
 and `OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_ with Airflow 3.
@@ -30,7 +30,7 @@ We encourage users to try it out and provide feedback, but note that certain edg
 investigation.
 
 Known Limitations
-------------------
+-----------------
 
 We have observed that the `cosmos_callback_dag.py <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/cosmos_callback_dag.py>`_
 DAG is experiencing noticeable **performance lag** in Airflow 3. This DAG leverages the ``ObjectStoragePath`` module
@@ -38,10 +38,19 @@ along with several libraries from the **fsspec** ecosystem.
 We are prioritizing a deeper investigation into this issue and will provide updates as optimizations or fixes become
 available in future releases.
 
-There have been significant changes to how plugins work in Airflow 3.0, and more changes are coming in Airflow 3.1. Even though the Cosmos dbt docs plugin is not currently working, we are actively working on supporting this feature.
-----
+There have been significant changes to how plugins work in Airflow 3.0, and more changes are coming in Airflow 3.1.
+Even though the Cosmos dbt docs plugin is not currently working, we are actively working on supporting this feature.
 
-We are excited to bring Airflow 3 compatibility to Cosmos and appreciate the community's feedback as we refine these
-capabilities.
+What's Next
+-----------
+
+We are actively tracking open issues and enhancements related to **Airflow 3 compatibility** in Cosmos.
+You can view the full list of currently open issues on GitHub here:
+
+- `Open Airflow 3 Support Issues on GitHub <https://github.com/astronomer/astronomer-cosmos/issues?q=is%3Aissue%20state%3Aopen%20label%3Asupport%3Aairflow3>`_
+
+We encourage community members to follow, comment, or contribute to any relevant discussions.
+
+We are excited to bring Airflow 3 compatibility to Cosmos and appreciate the community's feedback as we refine these capabilities.
 
 Stay tuned for continued improvements and enhancements.

@@ -52,7 +52,7 @@ except ImportError:
 try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset
 except (ModuleNotFoundError, ImportError):  # Airflow 2
-    from airflow.datasets import Dataset as Asset  # type: ignore[attr-defined]
+    from airflow.datasets import Dataset as Asset  # type: ignore
 
 
 try:
@@ -645,7 +645,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
-                dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name).replace(".", "/")
+                dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name)
                 uris.append(dataset_uri)
         self.log.debug("URIs to be converted to Asset: %s", uris)
 

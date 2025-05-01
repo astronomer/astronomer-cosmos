@@ -132,6 +132,28 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be r
 Known Limitations
 .................
 
+Airflow 3.0 and beyond
+______________________
+
+Airflow Asset (Dataset) URIs validation rules changed in Airflow 3.0.0 and OpenLineage URIs (standard used by Cosmos) are no longer valid in Airflow 3.
+
+Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to use backslashes instead of dots to separate the schema and table name.
+
+Example of Airflow 2 Cosmos Dataset URI:
+- postgres://0.0.0.0:5434/postgres.public.orders
+
+Example of Airflow 3 Cosmos Asset URI:
+- postgres://0.0.0.0:5434/postgres/public/orders
+
+
+If you want to use the Airflow 3 URI standard while still using Airflow 2, please set:
+
+```
+export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
+```
+
+Remember to update any DAGs that are scheduled using this dataset.
+
 Airflow 2.9 and below
 _____________________
 
@@ -159,15 +181,15 @@ References about the root cause of these issues:
 Airflow 2.10.0 and 2.10.1
 _________________________
 
-If using Cosmos using a version of Airflow higher than 2.10.0, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
-to support the dynamic creation of datasets during task execution. However, some Airflow 2.10.x users reported ``sqlalchemy.orm.exc.FlushError``
+If using Cosmos with Airflow 2.10.0 or 2.10.1, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
+to support the dynamic creation of datasets during task execution. However, users may face ``sqlalchemy.orm.exc.FlushError``
 errors if they attempt to run Cosmos-powered DAGs using ``airflow dags test`` with these versions.
 
-We had reported this issue and it seems to no longer happens:
+We've reported this issue and it will be resolved in future versions of Airflow:
 
 - https://github.com/apache/airflow/issues/42495
 
-For users who still face this limitation in local tests, we introduced the configuration
+For users to overcome this limitation in local tests, until the Airflow community solves this, we introduced the configuration 
 ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``, that is ``True`` by default. If users want to run ``dags test` and not see ``sqlalchemy.orm.exc.FlushError``,
 they can set this configuration to ``False``. It can also be set in the ``airflow.cfg`` file:
 

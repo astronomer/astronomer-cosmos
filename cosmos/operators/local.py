@@ -65,7 +65,7 @@ else:
     is_openlineage_available = True
 
 if TYPE_CHECKING:  # pragma: no cover
-    import openlineage
+    import openlineage  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
     try:  # pragma: no cover

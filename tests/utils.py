@@ -31,8 +31,10 @@ def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
     return test_dag(dag=dag, conn_file_path=conn_file_path)
 
 
-def test_dag(dag, conn_file_path: str | None = None) -> DagRun:
-    if AIRFLOW_VERSION >= version.Version("2.5"):
+def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False) -> DagRun:
+    if custom_tester:
+        return test_old_dag(dag, conn_file_path)
+    elif AIRFLOW_VERSION >= version.Version("2.5"):
         if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
             return dag.test()
         else:

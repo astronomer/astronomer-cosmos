@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.10.0 (2025-04-30)
+1.10.0 (2025-05-01)
 ---------------------
 
 Features
@@ -29,7 +29,9 @@ Airflow 3 Support
 * Use ``schedule`` param in example DAGs instead of the 2.10 deprecated and 3.0 removed ``schedule_interval`` by @pankajkoti in #1701
 * Ensure ``virtualenv_dir`` path exists by @pankajkoti in #1724
 * Support emitting Assets with Airflow 3 by @tatiana in #1713
-* Add docs on Airflow 3 compatibility by @pankajkoti  in #1731
+* Add docs on Airflow 3 compatibility by @pankajkoti and @tatiana in #1731
+* Introduce, test and document asset/dataset breaking change by @tatiana in #1672
+* Improve dataset/asset driven scheduling documentation by @tatiana in #1729
 
 Enhancements
 

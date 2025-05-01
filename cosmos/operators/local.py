@@ -64,7 +64,7 @@ except ModuleNotFoundError:
 else:
     is_openlineage_available = True
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import openlineage
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 

@@ -17,6 +17,7 @@ pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \
+    --durations \
     -m 'integration'  \
     --ignore=tests/perf \
     --ignore=tests/test_async_example_dag.py \

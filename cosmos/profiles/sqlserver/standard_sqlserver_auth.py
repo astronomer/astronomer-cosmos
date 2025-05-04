@@ -1,4 +1,8 @@
-from typing import Any, Dict
+"""Maps Airflow Sqlserver connections using user + password authentication to dbt profiles."""
+
+from __future__ import annotations
+
+from typing import Any
 
 from cosmos.profiles import BaseProfileMapping
 
@@ -31,7 +35,7 @@ class StandardSQLServerAuth(BaseProfileMapping):
         "driver": "extra.driver",
     }
 
-    def _set_default_param(self, profile_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def _set_default_param(self, profile_dict: dict[str, Any]) -> dict[str, Any]:
 
         if not profile_dict.get("port"):
             profile_dict["port"] = self.default_port

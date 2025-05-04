@@ -155,6 +155,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
         if settings.enable_setup_async_task:
             self.configuration = {
                 "query": {
@@ -193,6 +196,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         This returns immediately. It relies on trigger to throw an exception,
         otherwise it assumes execution was successful.
         """
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)

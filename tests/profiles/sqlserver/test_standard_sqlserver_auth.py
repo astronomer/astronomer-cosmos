@@ -40,7 +40,7 @@ def test_connection_claiming() -> None:
     - login
     - password
     - schema
-    - extra.databases
+    - extra.database
     - extra.driver
     """
     required_values = {

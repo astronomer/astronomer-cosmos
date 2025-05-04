@@ -536,7 +536,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             async_op_configurator(self, sql=sql)
             async_context["async_operator"].execute(self, context)
 
-    def run_command(
+    def run_command(  # noqa: C901
         self,
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],

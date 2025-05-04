@@ -311,8 +311,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dest_target_dir_str = str(dest_target_dir).rstrip("/")
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
+        run_id = self.extra_context["run_id"]
 
-        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{resource_type}/{rel_path}"
+        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
@@ -548,6 +549,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         if not self.invocation_mode:
             self._discover_invocation_mode()
+
+        if self.extra_context.get("run_id") is None:
+            self.extra_context["run_id"] = context["run_id"]
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
 

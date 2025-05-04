@@ -136,6 +136,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
         dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
+        run_id = self.async_context["run_id"]
 
         remote_target_path_str = str(remote_target_path).rstrip("/")
 
@@ -144,7 +145,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         project_dir_parent = str(Path(self.project_dir).parent)
         relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/run/{relative_file_path}"
+        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/{run_id}/run/{relative_file_path}"
 
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
         with object_storage_path.open() as fp:  # type: ignore

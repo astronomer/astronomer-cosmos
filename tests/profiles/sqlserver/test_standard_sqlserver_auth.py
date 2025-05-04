@@ -31,7 +31,7 @@ def mock_sqlserver_conn():  # type: ignore
 
 def test_connection_claiming() -> None:
     """
-    Tests that the clickhouse profile mapping claims the correct connection type.
+    Tests that the sqlserver profile mapping claims the correct connection type.
 
     should only claim when:
     - conn_type == generic
@@ -97,9 +97,7 @@ def test_profile_args(mock_sqlserver_conn: Connection) -> None:
 
 def test_mock_profile() -> None:
     """Tests that the mock_profile values get set correctly."""
-    profile_mapping = StandardSQLServerAuth(
-        "conn_id"
-    )  # get_automatic_profile_mapping("mock_clickhouse_conn.conn_id", profile_args={})
+    profile_mapping = StandardSQLServerAuth("conn_id")
 
     assert profile_mapping.mock_profile == {
         "type": "sqlserver",
@@ -107,6 +105,7 @@ def test_mock_profile() -> None:
         "schema": "mock_value",
         "database": "mock_value",
         "user": "mock_value",
+        "password": "mock_value",
         "driver": "mock_value",
         "port": 1433,
     }

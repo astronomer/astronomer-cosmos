@@ -64,7 +64,7 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):
         dbt_kwargs = {}
 
         # Extract full_refresh from kwargs if present
-        clean_kwargs["full_refresh"] = kwargs.pop("full_refresh", False)
+        dbt_kwargs["full_refresh"] = kwargs.pop("full_refresh", False)
 
         for arg_key, arg_value in kwargs.items():
             if arg_key == "task_id":

@@ -1534,12 +1534,13 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
 
     files = [file1, file2]
 
+    operator.extra_context["run_id"] = "test_run_id"
     with patch.object(Path, "rglob", return_value=files):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
-            expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
+            expected_dest_path = f"mock_remote_path/test_dag/test_run_id/compiled/{rel_path.lstrip('/')}"
             mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)
 

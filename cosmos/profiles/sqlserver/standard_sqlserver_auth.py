@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict
 
 from cosmos.profiles import BaseProfileMapping
 
@@ -31,7 +31,7 @@ class StandardSQLServerAuth(BaseProfileMapping):
         "driver": "extra.driver",
     }
 
-    def _set_default_param(self, profile_dict: dict[str, Any]) -> dict[str, Any]:
+    def _set_default_param(self, profile_dict: dict[str, Any]) -> Dict[str, Any]:
 
         if not profile_dict.get("port"):
             profile_dict["port"] = self.default_port

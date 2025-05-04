@@ -1204,7 +1204,7 @@ def test_operator_execute_deps_parameters(
     )
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
     mock_temporary_directory.return_value.__enter__.return_value = project_dir.as_posix()
-    task.execute(context={"task_instance": MagicMock()})
+    task.execute(context={"task_instance": MagicMock(), "run_id": "test_run_id"})
     if invocation_mode == InvocationMode.SUBPROCESS:
         assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
     elif invocation_mode == InvocationMode.DBT_RUNNER:

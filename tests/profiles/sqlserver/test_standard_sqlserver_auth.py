@@ -89,7 +89,7 @@ def test_profile_args(mock_sqlserver_conn: Connection) -> None:
         "user": mock_sqlserver_conn.login,
         "password": "{{ env_var('COSMOS_CONN_GENERIC_PASSWORD') }}",
         "driver": mock_sqlserver_conn.extra_dejson["driver"],
-        "port": 1433,
+        "port": mock_sqlserver_conn.port,
         "server": mock_sqlserver_conn.host,
         "database": mock_sqlserver_conn.extra_dejson["database"],
     }

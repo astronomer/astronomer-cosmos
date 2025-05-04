@@ -786,7 +786,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         async_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         # If this is an async run and we're using the setup task, make sure to include the full_refresh flag if set
-        if run_as_async and settings.enable_setup_async_task and hasattr(self, 'full_refresh') and self.full_refresh:
+        if run_as_async and settings.enable_setup_async_task and hasattr(self, "full_refresh") and self.full_refresh:
             if cmd_flags is None:
                 cmd_flags = []
             if "--full-refresh" not in cmd_flags:

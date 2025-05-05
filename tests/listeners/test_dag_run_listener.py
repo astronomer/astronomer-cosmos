@@ -123,7 +123,6 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
 
 
 # TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1703
-# @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):

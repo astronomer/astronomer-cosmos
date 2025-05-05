@@ -58,7 +58,7 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
         dag_hash = dag_run.dag_hash
     else:
-        dag_hash = dag_run.__hash__()
+        dag_hash = dag_run.dag.__hash__()
 
     additional_telemetry_metrics = {
         "dag_hash": dag_hash,
@@ -86,7 +86,7 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
     if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
         dag_hash = dag_run.dag_hash
     else:
-        dag_hash = dag_run.__hash__()
+        dag_hash = dag_run.dag.__hash__()
 
     additional_telemetry_metrics = {
         "dag_hash": dag_hash,

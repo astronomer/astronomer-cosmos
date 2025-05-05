@@ -336,17 +336,28 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
-    def _delete_sql_files(self, tmp_project_dir: Path, resource_type: str) -> None:
+    def _delete_sql_files(self) -> None:
+        """Deletes the entire run-specific directory from the remote target."""
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
-        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
-        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        if not dest_target_dir or not dest_conn_id:
+            self.log.warning("Remote target path or connection ID not configured. Skipping deletion.")
+            return
+
         from airflow.io.path import ObjectStoragePath
 
-        for file_path in files:
-            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)  # type: ignore
-            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
-            dest_object_storage_path.unlink()
-            self.log.debug("Deleted %s to %s", file_path, dest_object_storage_path)
+        try:
+            dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+            run_id = self.extra_context["run_id"]
+            run_dir_path_str = f"{str(dest_target_dir).rstrip('/')}/{dag_task_group_identifier}/{run_id}"
+            run_dir_path = ObjectStoragePath(run_dir_path_str, conn_id=dest_conn_id)
+
+            if run_dir_path.exists():
+                run_dir_path.rmdir(recursive=True)
+                self.log.info("Deleted remote run directory: %s", run_dir_path_str)
+            else:
+                self.log.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
+        except Exception as e:
+            self.log.error("Failed to delete remote run directory %s: %s", run_dir_path_str, e, exc_info=True)
 
     def store_freshness_json(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -522,7 +533,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if async_context.get("teardown_task") and settings.enable_teardown_async_task:
-            self._delete_sql_files(Path(tmp_project_dir), "run")
+            self._delete_sql_files()
             return
 
         if settings.enable_setup_async_task:

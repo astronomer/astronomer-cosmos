@@ -8,7 +8,6 @@ import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 from airflow.utils.state import State
-from airflow.utils.types import DagRunTriggeredByType, DagRunType
 from packaging import version
 
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
@@ -109,6 +108,8 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
         )
     else:
         # Airflow 3
+        from airflow.utils.types import DagRunTriggeredByType, DagRunType
+
         dag_run = dag.create_dagrun(
             state=State.NONE,
             run_id=run_id,
@@ -148,6 +149,8 @@ def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):
         )
     else:
         # Airflow 3
+        from airflow.utils.types import DagRunTriggeredByType, DagRunType
+
         dag_run = dag.create_dagrun(
             state=State.NONE,
             run_id=run_id,

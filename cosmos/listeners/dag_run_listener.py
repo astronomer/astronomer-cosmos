@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+
 from airflow.listeners import hookimpl
 from airflow.models.dag import DAG
 from airflow.models.dagrun import DagRun
-from airflow.utils.hashlib_wrapper import md5
 
 from cosmos import telemetry
 from cosmos.log import get_logger
@@ -52,7 +53,7 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         return
 
     additional_telemetry_metrics = {
-        "dag_hash": md5(dag_run.dag_id.encode("utf-8")).hexdigest(),
+        "dag_hash": hashlib.md5(dag_run.dag_id.encode("utf-8")).hexdigest()[:8],
         "status": EventStatus.SUCCESS,
         "task_count": len(serialized_dag.task_ids),
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
@@ -75,7 +76,7 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
         return
 
     additional_telemetry_metrics = {
-        "dag_hash": md5(dag_run.dag_id.encode("utf-8")).hexdigest(),
+        "dag_hash": hashlib.md5(dag_run.dag_id.encode("utf-8")).hexdigest()[:8],
         "status": EventStatus.FAILED,
         "task_count": len(serialized_dag.task_ids),
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),

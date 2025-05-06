@@ -89,16 +89,18 @@ Below, find an example of a callback method that raises an exception if the quer
 
         slow_query_threshold = 10
 
-        run_results_path = Path(project_dir, "run_results.json")
+        target_path = f"{project_dir}/target"
+        run_results_path = Path(target_path, "run_results.json")
         if run_results_path.exists():
             with open(run_results_path) as fp:
                 run_results = json.load(fp)
-                node_name = run_results["unique_id"]
-                execution_time = run_results["execution_time"]
-                if execution_time > slow_query_threshold:
-                    raise TimeoutError(
-                        f"The query for the node {node_name} took too long: {execution_time}"
-                    )
+                for result in run_results["results"]:
+                    node_name = result["unique_id"]
+                    execution_time = result["execution_time"]
+                    if execution_time > slow_query_threshold:
+                        raise TimeoutError(
+                            f"The query for the node {node_name} took too long: {execution_time}"
+                        )
 
 Users can use the same approach to call the data observability platform `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_ or other services.
 

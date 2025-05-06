@@ -30,6 +30,7 @@ from cosmos.dbt.parser.output import (
 )
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
+from cosmos.io import _construct_dest_file_path
 from cosmos.operators.local import (
     AbstractDbtLocalBase,
     DbtBuildLocalOperator,
@@ -50,7 +51,6 @@ from cosmos.operators.local import (
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from cosmos.settings import AIRFLOW_IO_AVAILABLE
-from cosmos.io import _construct_dest_file_path
 from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"

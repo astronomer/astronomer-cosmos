@@ -345,19 +345,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         from airflow.io.path import ObjectStoragePath
 
-        try:
-            dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
-            run_id = self.extra_context["run_id"]
-            run_dir_path_str = f"{str(dest_target_dir).rstrip('/')}/{dag_task_group_identifier}/{run_id}"
-            run_dir_path = ObjectStoragePath(run_dir_path_str, conn_id=dest_conn_id)
+        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+        run_id = self.extra_context["run_id"]
+        run_dir_path_str = f"{str(dest_target_dir).rstrip('/')}/{dag_task_group_identifier}/{run_id}"
+        run_dir_path = ObjectStoragePath(run_dir_path_str, conn_id=dest_conn_id)
 
-            if run_dir_path.exists():
-                run_dir_path.rmdir(recursive=True)
-                self.log.info("Deleted remote run directory: %s", run_dir_path_str)
-            else:
-                self.log.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
-        except Exception as e:
-            self.log.error("Failed to delete remote run directory %s: %s", run_dir_path_str, e, exc_info=True)
+        if run_dir_path.exists():
+            run_dir_path.rmdir(recursive=True)
+            self.log.info("Deleted remote run directory: %s", run_dir_path_str)
+        else:
+            self.log.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
 
     def store_freshness_json(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -565,7 +562,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.extra_context["run_id"] = context["run_id"]
 
         with tempfile.TemporaryDirectory() as tmp_project_dir:
-
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
             self._clone_project(tmp_dir_path)
@@ -816,7 +812,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
 
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
-
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -1284,7 +1279,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs: str) -> None:
         raise DeprecationWarning(
-            "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
+            "The DbtDepsOperator has been deprecated. Please use the `install_deps` flag in dbt_args instead."
         )
 
 

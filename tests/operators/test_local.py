@@ -89,13 +89,8 @@ def failing_test_dbt_project(tmp_path):
 
 
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
-    """Concrete implementation of AbstractDbtLocalBase for testing."""
 
     base_cmd = ["cmd"]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.invocation_mode = InvocationMode.SUBPROCESS
 
 
 def test_install_deps_in_empty_dir_becomes_false(tmpdir):

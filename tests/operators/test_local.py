@@ -1627,6 +1627,27 @@ def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute):
     mock_bq_execute.assert_called_once()
 
 
+def test_build_and_run_cmd_with_full_refresh_in_async_mode():
+    """Test that build_and_run_cmd adds --full-refresh flag when full_refresh is True in async mode."""
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+
+    with patch("cosmos.operators.local.settings.enable_setup_async_task", True):
+        operator = AbstractDbtLocalBase(
+            task_id="test_task",
+            project_dir="/tmp",
+            profile_config=profile_config,
+        )
+        operator.full_refresh = True
+
+        with patch.object(operator, "build_cmd") as mock_build_cmd:
+            mock_build_cmd.return_value = (["dbt", "run"], {})
+
+            with patch.object(operator, "run_command"):
+                operator.build_and_run_cmd(context={}, run_as_async=True)
+                cmd_flags_arg = mock_build_cmd.call_args[1].get("cmd_flags", [])
+                assert "--full-refresh" in cmd_flags_arg
+
+
 @pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("pathlib.Path.rglob")

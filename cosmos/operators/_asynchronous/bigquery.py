@@ -61,7 +61,7 @@ def _configure_bigquery_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql")
+    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql", "full_refresh")
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -81,6 +81,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.configuration: dict[str, Any] = {}
         self.dbt_kwargs = dbt_kwargs or {}
         task_id = self.dbt_kwargs.pop("task_id")
+        self.full_refresh = self.dbt_kwargs.pop("full_refresh", False)
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )

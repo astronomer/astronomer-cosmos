@@ -1658,7 +1658,7 @@ def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_
         task_id="test",
         project_dir=project_dir,
         profile_config=profile_config,
-        extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group"},
+        extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
     operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
     mock_unlink.assert_called()

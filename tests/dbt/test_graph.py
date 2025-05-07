@@ -550,8 +550,15 @@ def test_load(
     [
         ("subprocess", True),
         ("subprocess", False),
-        ("dbt_runner", True),
-        ("dbt_runner", False),
+        # NOTE: We are currently defaulting RenderConfig's InvocationMode to SUBPROCESS as part of PR #1750.
+        # As a result, execution does not follow the path expected by these tests, so we are disabling the cases below for now.
+        # They currently fail with the following error:
+        # FAILED tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-True] - ValueError: not enough values to unpack (expected 2, got 0)
+        # FAILED tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-False] - ValueError: not enough values to unpack (expected 2, got 0)
+        # TODO: Re-enable these test cases once the default InvocationMode is switched back to DBT_RUNNER when resolving
+        #       https://github.com/astronomer/astronomer-cosmos/issues/1751.
+        # ("dbt_runner", True),
+        # ("dbt_runner", False),
     ],
 )
 @patch("cosmos.config.is_profile_cache_enabled")

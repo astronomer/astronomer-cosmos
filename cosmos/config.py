@@ -71,7 +71,9 @@ class RenderConfig:
     emit_datasets: bool = True
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
-    # We're observing that InvocationMode.DBT_RUNNER is causing tasks to be stuck on Airflow 2 task executions. So, until we identify and fix this issue, we're setting the default to InvocationMode.SUBPROCESS.
+    # NOTE: InvocationMode.DBT_RUNNER is causing tasks to hang on Airflow 2 task execution.
+    # As a temporary workaround, we are defaulting to InvocationMode.SUBPROCESS until the issue is identified and resolved.
+    # TODO: Revert back to InvocationMode.DBT_RUNNER once https://github.com/astronomer/astronomer-cosmos/issues/1751 is fixed.
     invocation_mode: InvocationMode = InvocationMode.SUBPROCESS
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)

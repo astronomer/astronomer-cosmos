@@ -261,12 +261,13 @@ def run_command(
 ) -> str:
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
-    runner = "dbt Runner" if dbt_runner.is_available() else "Python subprocess"
+    use_dbt_runner = invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available()
+    runner = "dbt Runner" if use_dbt_runner else "Python subprocess"
     command = [str(arg) if arg is not None else "<None>" for arg in command]
     logger.info("Running command with %s: `%s`", runner, " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
 
-    if invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available():
+    if use_dbt_runner:
         stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
     else:
         stdout = run_command_with_subprocess(command, tmp_dir, env_vars)

@@ -1839,7 +1839,7 @@ def test_run_dbt_deps(run_command_mock):
     graph.local_flags = []
     graph.run_dbt_deps("dbt", "/some/path", {})
     run_command_mock.assert_called_with(
-        ["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {}, InvocationMode.DBT_RUNNER, None
+        ["dbt", "deps", "--vars", '{"var-key": "var-value"}'], "/some/path", {}, InvocationMode.SUBPROCESS, None
     )
 
 

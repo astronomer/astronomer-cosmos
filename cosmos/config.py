@@ -51,7 +51,7 @@ class RenderConfig:
     dependencies. Defaults to True
     :param test_behavior: The behavior for running tests. Defaults to after each (model)
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
-    :param invocation_mode: If `LoadMode.DBT_LS` is used, define how dbt ls should be run: using dbtRunner (default) or Python subprocess.
+    :param invocation_mode: If `LoadMode.DBT_LS` is used, define how dbt ls should be run: using dbtRunner or Python subprocess(default).
     :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
     :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
     :param selector: Name of a dbt YAML selector to use for parsing. Only supported when using ``load_method=LoadMode.DBT_LS``.
@@ -71,7 +71,8 @@ class RenderConfig:
     emit_datasets: bool = True
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
-    invocation_mode: InvocationMode = InvocationMode.DBT_RUNNER
+    # We're observing that InvocationMode.DBT_RUNNER is causing tasks to be stuck on Airflow 2 task executions. So, until we identify and fix this issue, we're setting the default to InvocationMode.SUBPROCESS.
+    invocation_mode: InvocationMode = InvocationMode.SUBPROCESS
     select: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
     selector: str | None = None

@@ -368,6 +368,7 @@ def generate_or_convert_task(
       - If no, creates the task as expected with the supplied task_meta
     Returns the created task
     """
+    task: BaseOperator
 
     conversion_function = node_converters.get(resource_type, create_airflow_task)
     if conversion_function != create_airflow_task:

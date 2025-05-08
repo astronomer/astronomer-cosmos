@@ -7,6 +7,7 @@ import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 from airflow.models.abstractoperator import DEFAULT_OWNER
+from airflow.operators.empty import EmptyOperator
 from airflow.utils.task_group import TaskGroup
 from packaging import version
 
@@ -32,6 +33,12 @@ from cosmos.constants import (
 from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
+from cosmos.operators.local import (
+    DbtBuildLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtTestLocalOperator,
+)
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -212,6 +219,8 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
                 ),
             ),
         },
+        dbt_project_name="astro_shop",
+        node_converters={},
         test_behavior=TestBehavior.AFTER_EACH,
         on_warning_callback=None,
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
@@ -977,6 +986,8 @@ def test_owner(dbt_extra_config, expected_owner):
                 ),
             ),
         },
+        dbt_project_name="astro_shop",
+        node_converters={},
         test_behavior=TestBehavior.AFTER_EACH,
         on_warning_callback=None,
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
@@ -1037,3 +1048,140 @@ def test_add_teardown_task_raises_error_without_async_py_requirements():
 
     with pytest.raises(CosmosValueError, match="ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set"):
         _add_teardown_task(sample_dag, ExecutionMode.AIRFLOW_ASYNC, task_args, sample_tasks_map, None, None)
+
+
+def convert_task(dag: DAG, task_group: TaskGroup, node: DbtNode, task_id: str, **kwargs):
+    """
+    Converts task to an empty operator.  Helper function to test node_converter logic.
+    """
+    return EmptyOperator(dag=dag, task_group=task_group, task_id=task_id)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "test_behavior,node_converters,expected_task_types",
+    [
+        (
+            TestBehavior.AFTER_EACH,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent.run": DbtRunLocalOperator,
+                "parent.test": EmptyOperator,
+                "child_run": DbtRunLocalOperator,
+                "child2_v2_run": DbtRunLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.AFTER_EACH,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent.run": EmptyOperator,
+                "parent.test": DbtTestLocalOperator,
+                "child_run": EmptyOperator,
+                "child2_v2_run": EmptyOperator,
+            },
+        ),
+        (
+            TestBehavior.AFTER_ALL,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": DbtRunLocalOperator,
+                "astro_shop_test": EmptyOperator,
+                "child_run": DbtRunLocalOperator,
+                "child2_v2_run": DbtRunLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.AFTER_ALL,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": EmptyOperator,
+                "astro_shop_test": DbtTestLocalOperator,
+                "child_run": EmptyOperator,
+                "child2_v2_run": EmptyOperator,
+            },
+        ),
+        (
+            TestBehavior.BUILD,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed_build": DbtBuildLocalOperator,
+                "parent_model_build": DbtBuildLocalOperator,
+                "child_model_build": DbtBuildLocalOperator,
+                "child2_v2_model_build": DbtBuildLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.BUILD,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed_build": DbtBuildLocalOperator,
+                "parent_model_build": EmptyOperator,
+                "child_model_build": EmptyOperator,
+                "child2_v2_model_build": EmptyOperator,
+            },
+        ),
+        (
+            TestBehavior.NONE,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": DbtRunLocalOperator,
+                "child_run": DbtRunLocalOperator,
+                "child2_v2_run": DbtRunLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.NONE,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": EmptyOperator,
+                "child_run": EmptyOperator,
+                "child2_v2_run": EmptyOperator,
+            },
+        ),
+    ],
+)
+def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, expected_task_types):
+    """
+    Tests node converter logic for different test behaviors.
+    Seed, Model, Snapshot, and Source should work fairly similarly in all situations,
+    so we'll choose just one of those DBT resource types (Model)
+    as well as Tests which behave very differently.
+    """
+
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=test_behavior,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                node_converters=node_converters,
+            ),
+            dbt_project_name="astro_shop",
+        )
+
+    assert len(dag.task_dict) == len(expected_task_types)
+    for id, task in dag.task_dict.items():
+        assert isinstance(task, expected_task_types[id])

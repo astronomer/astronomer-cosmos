@@ -157,6 +157,8 @@ dev/dags/.airflowignore
 # Local Airflow standalone
 airflow.cfg
 airflow.db
+airflow.db-shm
+airflow.db-wal
 standalone_admin_password.txt
 simple_auth_manager_passwords.json.generated
 webserver_config.py

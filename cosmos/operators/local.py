@@ -49,8 +49,14 @@ try:
 except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
 
+try:  # Airflow 3
+    from airflow.sdk.definitions.asset import Asset
+except (ModuleNotFoundError, ImportError):  # Airflow 2
+    from airflow.datasets import Dataset as Asset  # type: ignore
+
+
 try:
-    from airflow.datasets import Dataset
+    import openlineage
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
 except ModuleNotFoundError:
     is_openlineage_available = False
@@ -58,8 +64,8 @@ except ModuleNotFoundError:
 else:
     is_openlineage_available = True
 
-if TYPE_CHECKING:
-    from airflow.datasets import Dataset  # noqa: F811
+if TYPE_CHECKING:  # pragma: no cover
+    import openlineage  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
     try:  # pragma: no cover
@@ -489,8 +495,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         outlets = self.get_datasets("outputs")
         self.log.info("Inlets: %s", inlets)
         self.log.info("Outlets: %s", outlets)
-        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-            self.register_dataset(inlets, outlets, context)
+        self.register_dataset(inlets, outlets, context)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -572,14 +577,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     env=env,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-                    # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance. The
-                    # support for this is expected to be worked upon while addressing issue:
-                    # https://github.com/astronomer/astronomer-cosmos/issues/1635
+                if is_openlineage_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
-                    context[
-                        "task_instance"
-                    ].openlineage_events_completes = self.openlineage_events_completes  # type: ignore
+                    if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+                        # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
+                        # in that case we're storing as self.openlineage_events_completes
+                        context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
                 if self.emit_datasets:
                     self._handle_datasets(context)
@@ -629,7 +632,43 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         except (FileNotFoundError, NotImplementedError, ValueError, KeyError, jinja2.exceptions.UndefinedError):
             self.log.debug("Unable to parse OpenLineage events", stack_info=True)
 
-    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Dataset]:
+    @staticmethod
+    def _create_asset_uri(openlineage_event: openlineage.client.generated.base.OutputDataset) -> str:
+        """
+        Create the Airflow Asset or Dataset UIR given an OpenLineage event.
+        """
+        airflow_2_uri = str(openlineage_event.namespace + "/" + urllib.parse.quote(openlineage_event.name))
+        airflow_3_uri = str(
+            openlineage_event.namespace + "/" + urllib.parse.quote(openlineage_event.name).replace(".", "/")
+        )
+        if AIRFLOW_VERSION < Version("3.0.0"):
+            if settings.use_dataset_airflow3_uri_standard:
+                dataset_uri = airflow_3_uri
+            else:
+                logger.warning(
+                    f"""
+                    Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) will no longer be valid.
+                    Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <{airflow_3_uri}>.
+                    Previously, with Airflow 2.x, the URI was <{airflow_2_uri}>.
+                    If you want to use the Airflow 3 URI standard while still using Airflow 2, please, set:
+                        export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
+                    Remember to update any DAGs that are scheduled using this dataset.
+                    """
+                )
+                dataset_uri = airflow_2_uri
+        else:
+            logger.warning(
+                f"""
+                Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) are no longer accepted.
+                Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <{airflow_3_uri}>.
+                Before, with Airflow 2.x, the URI used to be <{airflow_2_uri}>.
+                Please, change any DAGs that were scheduled using the old standard to the new one.
+                """
+            )
+            dataset_uri = airflow_3_uri
+        return dataset_uri
+
+    def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Asset]:
         """
         Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
         command. Relies on the following files:
@@ -640,28 +679,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Return a list of Dataset URIs (strings).
         """
         uris = []
+
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
-                dataset_uri = output.namespace + "/" + urllib.parse.quote(output.name)
+                dataset_uri = self._create_asset_uri(output)
                 uris.append(dataset_uri)
-        self.log.debug("URIs to be converted to Dataset: %s", uris)
+        self.log.debug("URIs to be converted to Asset: %s", uris)
 
-        datasets = []
-        try:
-            datasets = [Dataset(uri) for uri in uris]
-        except ValueError:
-            raise AirflowCompatibilityError(
-                """
-                Apache Airflow 2.9.0 & 2.9.1 introduced a breaking change in Dataset URIs, to be fixed in newer versions:
-                https://github.com/apache/airflow/issues/39486
+        assets = [Asset(uri) for uri in uris]
 
-                If you want to use Cosmos with one of these Airflow versions, you will have to disable emission of Datasets:
-                By setting ``emit_datasets=False`` in ``RenderConfig``. For more information, see https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html.
-                """
-            )
-        return datasets
+        return assets
 
-    def register_dataset(self, new_inlets: list[Dataset], new_outlets: list[Dataset], context: Context) -> None:
+    def register_dataset(self, new_inlets: list[Asset], new_outlets: list[Asset], context: Context) -> None:
         """
         Register a list of datasets as outlets of the current task, when possible.
 
@@ -676,9 +705,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
-        from airflow.utils.session import create_session
+        if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
+            logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
+            raise AirflowCompatibilityError(
+                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
+            )
+        elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+            from airflow.utils.session import create_session
 
-        if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             logger.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
                 self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
@@ -690,10 +724,21 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
                 session.commit()
         else:
-            logger.info("Assigning inlets/outlets with DatasetAlias")
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
-            for outlet in new_outlets:
-                context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+
+            if AIRFLOW_VERSION.major == 2:
+                logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+
+                for outlet in new_outlets:
+                    context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+            else:  # AIRFLOW_VERSION.major == 3
+                logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+                from airflow.sdk.definitions.asset import AssetAlias
+
+                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
+                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined, call-arg, arg-type]
+                for outlet in new_outlets:
+                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
@@ -740,6 +785,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
+        # If this is an async run and we're using the setup task, make sure to include the full_refresh flag if set
+        if run_as_async and settings.enable_setup_async_task and getattr(self, "full_refresh", False):
+            if cmd_flags is None:
+                cmd_flags = []
+            if "--full-refresh" not in cmd_flags:
+                cmd_flags.append("--full-refresh")
+
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(
@@ -806,6 +858,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
+
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)

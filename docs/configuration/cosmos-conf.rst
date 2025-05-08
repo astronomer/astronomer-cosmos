@@ -178,6 +178,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK``
 
+.. _use_dataset_airflow3_uri_standard:
+
+`use_dataset_airflow3_uri_standard`_:
+    (Introduced in Cosmos 1.10.0): Changes Cosmos Dataset (Asset) URIs to be Airflow 3 compliant. Since this would be a breaking change, it is False by default in Cosmos 1.x.
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD``
+
+
 [openlineage]
 ~~~~~~~~~~~~~
 

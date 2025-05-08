@@ -38,6 +38,10 @@ simple_dag_async = DbtDag(
     catchup=False,
     dag_id="simple_dag_async",
     tags=["simple"],
-    operator_args={"location": "US", "install_deps": True},
+    operator_args={
+        "location": "US",
+        "install_deps": True,
+        "full_refresh": True,
+    },
 )
 # [END airflow_async_execution_mode_example]

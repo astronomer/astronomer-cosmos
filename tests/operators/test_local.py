@@ -462,8 +462,7 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
     assert test_operator.outlets == []
 
 
-# TODO: Add compatibility for Airflow 3. Issue: https://github.com/astronomer/astronomer-cosmos/issues/1704.
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),
     reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
@@ -474,6 +473,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         from airflow.models.asset import AssetAliasModel
     except ModuleNotFoundError:
         from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
+    from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -509,6 +509,94 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     assert seed_operator.outlets == []  # because emit_datasets=False,
     assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        run_test_dag(dag, custom_tester=True)
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+
+        # When this is solved, we can uncomment the following:
+        # dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.Version("3.0.0"),
+    reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    caplog.clear()
+    dag.test()
+    assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
+    assert (
+        "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
+        in caplog.text
+    )
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="Airflow 3.0 only supports assets when setting enable_dataset_alias=True (default)",
+)
+@pytest.mark.integration
+@patch("cosmos.settings.enable_dataset_alias", 0)
+def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fails(caplog):
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop",
+            task_id="run",
+            dbt_cmd_flags=["--models", "customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator
+
+    caplog.set_level(logging.ERROR)
+    caplog.clear()
+    run_test_dag(dag)
+
+    assert "AirflowCompatibilityError" in caplog.text
+    assert "ERROR" in caplog.text
+    assert "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)." in caplog.text
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
@@ -567,16 +655,18 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     assert run_operator.outlets == []
 
 
-# TODO: Make test compatible with Airflow 3.0. Issue:https://github.com/astronomer/astronomer-cosmos/issues/1713
-@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test need to be updated for Airflow 3.0")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.4")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
+@pytest.mark.skipif(
+    version.parse(airflow_version) >= version.parse("3"),
+    reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
+)
 @pytest.mark.integration
 @patch("cosmos.settings.enable_dataset_alias", 0)
-def test_run_operator_dataset_url_encoded_names(caplog):
+def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     try:
         from airflow.sdk.definitions.asset import Dataset
     except ImportError:
@@ -603,8 +693,48 @@ def test_run_operator_dataset_url_encoded_names(caplog):
     ]
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.4")
+    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+)
+@pytest.mark.skipif(
+    version.parse(airflow_version) >= version.parse("3"),
+    reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
+)
+@pytest.mark.integration
+@patch("cosmos.settings.use_dataset_airflow3_uri_standard", 1)
+@patch("cosmos.settings.enable_dataset_alias", 0)
+def test_run_operator_dataset_url_encoded_names_in_airflow2_with_airflow3_uri(caplog):
+    try:
+        from airflow.sdk.definitions.asset import Dataset
+    except ImportError:
+        from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop",
+            task_id="run",
+            dbt_cmd_flags=["--models", "ｍｕｌｔｉｂｙｔｅ"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator
+
+    run_test_dag(dag)
+
+    assert run_operator.outlets == [
+        Dataset(
+            uri="postgres://0.0.0.0:5432/postgres/public/%EF%BD%8D%EF%BD%95%EF%BD%8C%EF%BD%94%EF%BD%89%EF%BD%82%EF%BD%99%EF%BD%94%EF%BD%85",
+            extra=None,
+        )
+    ]
+
+
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
+    caplog.clear()
     caplog.set_level(logging.DEBUG)
     with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -1492,6 +1622,27 @@ def test_async_execution_without_start_task(mock_read_sql, mock_bq_execute):
         "/tmp", {}, {"profile_type": "bigquery", "async_operator": BigQueryInsertJobOperator}
     )
     mock_bq_execute.assert_called_once()
+
+
+def test_build_and_run_cmd_with_full_refresh_in_async_mode():
+    """Test that build_and_run_cmd adds --full-refresh flag when full_refresh is True in async mode."""
+    AbstractDbtLocalBase.__abstractmethods__ = set()
+
+    with patch("cosmos.operators.local.settings.enable_setup_async_task", True):
+        operator = AbstractDbtLocalBase(
+            task_id="test_task",
+            project_dir="/tmp",
+            profile_config=profile_config,
+        )
+        operator.full_refresh = True
+
+        with patch.object(operator, "build_cmd") as mock_build_cmd:
+            mock_build_cmd.return_value = (["dbt", "run"], {})
+
+            with patch.object(operator, "run_command"):
+                operator.build_and_run_cmd(context={}, run_as_async=True)
+                cmd_flags_arg = mock_build_cmd.call_args[1].get("cmd_flags", [])
+                assert "--full-refresh" in cmd_flags_arg
 
 
 @pytest.mark.integration

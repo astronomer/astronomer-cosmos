@@ -10,6 +10,7 @@
    Configuration <configuration/index>
    Profiles <profiles/index>
    Contributing <contributing>
+   Airflow 3 compatibility <airflow3_compatibility/index>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
@@ -105,6 +106,11 @@ as ``max_active_tasks``, ``max_active_runs`` and ``default_args``.
 With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
 
+
+Airflow 3 compatibility
+-----------------------
+
+See our :doc:`Airflow 3 Compatibility <airflow3_compatibility/index>` for full details.
 
 Changelog
 _________

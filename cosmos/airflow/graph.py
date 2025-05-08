@@ -87,7 +87,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
 def exclude_detached_tests_if_needed(
     node: DbtNode,
     task_args: dict[str, str],
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
 ) -> None:
     """
     Add exclude statements if there are tests associated to the model that should be run detached from the model/tests.
@@ -128,7 +128,7 @@ def create_test_task_metadata(
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
     render_config: RenderConfig | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -249,7 +249,7 @@ def create_task_metadata(
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -344,6 +344,63 @@ def is_detached_test(node: DbtNode) -> bool:
     return False
 
 
+def generate_or_convert_task(
+    node_converters: dict[DbtResourceType, Callable[..., Any]],
+    task_meta: TaskMetadata,
+    dbt_project_name: str,
+    dag: DAG,
+    task_group: TaskGroup | None,
+    node: DbtNode,
+    resource_type: DbtResourceType,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    test_behavior: TestBehavior,
+    source_rendering_behavior: SourceRenderingBehavior,
+    test_indirect_selection: TestIndirectSelection,
+    on_warning_callback: Callable[..., Any] | None,
+    normalize_task_id: Callable[..., Any] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
+    **kwargs: Any,
+) -> BaseOperator:
+    """
+    Checks if a node_converter was supplied for the given resource type:
+      - If yes, attempts to convert the task using the given node_converter
+      - If no, creates the task as expected with the supplied task_meta
+    Returns the created task
+    """
+
+    conversion_function = node_converters.get(resource_type, create_airflow_task)
+    if conversion_function != create_airflow_task:
+        task_id = task_meta.id
+        logger.warning(
+            "The `node_converters` attribute is an experimental feature. "
+            "Its syntax and behavior can be changed before a major release."
+        )
+        logger.debug(f"Converting node <{node.unique_id}> task <{task_id}> using <{conversion_function.__name__}>")
+        task = conversion_function(  # type: ignore
+            dag=dag,
+            task_group=task_group,
+            dbt_project_name=dbt_project_name,
+            execution_mode=execution_mode,
+            task_args=task_args,
+            test_behavior=test_behavior,
+            source_rendering_behavior=source_rendering_behavior,
+            test_indirect_selection=test_indirect_selection,
+            on_warning_callback=on_warning_callback,
+            normalize_task_id=normalize_task_id,
+            node=node,
+            task_id=task_id,
+            detached_from_parent=detached_from_parent,
+        )
+        if task is not None:
+            logger.debug(f"Conversion of node <{node.unique_id}> task <{task_id}> was successful!")
+        else:
+            logger.warning(f"Conversion of node <{node.unique_id}> task <{task_id}> failed")
+    else:
+        task = create_airflow_task(task_meta, dag, task_group)
+    return task
+
+
 def generate_task_or_group(
     dag: DAG,
     task_group: TaskGroup | None,
@@ -353,9 +410,11 @@ def generate_task_or_group(
     test_behavior: TestBehavior,
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
+    dbt_project_name: str,
+    node_converters: dict[DbtResourceType, Callable[..., Any]],
     on_warning_callback: Callable[..., Any] | None,
     normalize_task_id: Callable[..., Any] | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -387,7 +446,23 @@ def generate_task_or_group(
     if task_meta and not node.resource_type == DbtResourceType.TEST:
         if use_task_group:
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                task = generate_or_convert_task(
+                    node_converters=node_converters,
+                    task_meta=task_meta,
+                    dbt_project_name=dbt_project_name,
+                    dag=dag,
+                    task_group=model_task_group,
+                    node=node,
+                    resource_type=node.resource_type,
+                    execution_mode=execution_mode,
+                    task_args=task_args,
+                    test_behavior=test_behavior,
+                    source_rendering_behavior=source_rendering_behavior,
+                    test_indirect_selection=test_indirect_selection,
+                    on_warning_callback=on_warning_callback,
+                    normalize_task_id=normalize_task_id,
+                    detached_from_parent=detached_from_parent,
+                )
                 test_meta = create_test_task_metadata(
                     "test",
                     execution_mode,
@@ -397,11 +472,48 @@ def generate_task_or_group(
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
                 )
-                test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
-                task >> test_task
-                task_or_group = model_task_group
+                test_task = generate_or_convert_task(
+                    node_converters=node_converters,
+                    task_meta=test_meta,
+                    dbt_project_name=dbt_project_name,
+                    dag=dag,
+                    task_group=model_task_group,
+                    node=node,
+                    resource_type=DbtResourceType.TEST,  # type: ignore
+                    execution_mode=execution_mode,
+                    task_args=task_args,
+                    test_behavior=test_behavior,
+                    source_rendering_behavior=source_rendering_behavior,
+                    test_indirect_selection=test_indirect_selection,
+                    on_warning_callback=on_warning_callback,
+                    normalize_task_id=normalize_task_id,
+                    detached_from_parent=detached_from_parent,
+                )
+                if task is not None and test_task is not None:
+                    task >> test_task
+                    task_or_group = model_task_group
+                elif task is not None:
+                    task_or_group = task
+                else:
+                    task_or_group = test_task
         else:
-            task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+            task_or_group = generate_or_convert_task(
+                node_converters=node_converters,
+                task_meta=task_meta,
+                dbt_project_name=dbt_project_name,
+                dag=dag,
+                task_group=task_group,
+                node=node,
+                resource_type=node.resource_type,
+                execution_mode=execution_mode,
+                task_args=task_args,
+                test_behavior=test_behavior,
+                source_rendering_behavior=source_rendering_behavior,
+                test_indirect_selection=test_indirect_selection,
+                on_warning_callback=on_warning_callback,
+                normalize_task_id=normalize_task_id,
+                detached_from_parent=detached_from_parent,
+            )
 
     return task_or_group
 
@@ -592,29 +704,22 @@ def build_airflow_graph(
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
     for node_id, node in nodes.items():
-        conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
-        if conversion_function != generate_task_or_group:
-            logger.warning(
-                "The `node_converters` attribute is an experimental feature. "
-                "Its syntax and behavior can be changed before a major release."
-            )
-        logger.debug(f"Converting <{node.unique_id}> using <{conversion_function.__name__}>")
-        task_or_group = conversion_function(  # type: ignore
+        task_or_group = generate_task_or_group(  # type: ignore
             dag=dag,
             task_group=task_group,
-            dbt_project_name=dbt_project_name,
+            node=node,
             execution_mode=execution_mode,
             task_args=task_args,
             test_behavior=test_behavior,
             source_rendering_behavior=source_rendering_behavior,
             test_indirect_selection=test_indirect_selection,
+            node_converters=node_converters,
+            dbt_project_name=dbt_project_name,
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
-            node=node,
             detached_from_parent=detached_from_parent,
         )
         if task_or_group is not None:
-            logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
@@ -628,7 +733,23 @@ def build_airflow_graph(
             on_warning_callback=on_warning_callback,
             render_config=render_config,
         )
-        test_task = create_airflow_task(test_meta, dag, task_group=task_group)
+        test_task = generate_or_convert_task(
+            node_converters=node_converters,
+            task_meta=test_meta,
+            dbt_project_name=dbt_project_name,
+            dag=dag,
+            task_group=task_group,
+            node=node,
+            resource_type=DbtResourceType.TEST,  # type: ignore
+            execution_mode=execution_mode,
+            task_args=task_args,
+            test_behavior=test_behavior,
+            source_rendering_behavior=source_rendering_behavior,
+            test_indirect_selection=test_indirect_selection,
+            on_warning_callback=on_warning_callback,
+            normalize_task_id=normalize_task_id,
+            detached_from_parent=detached_from_parent,
+        )
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
@@ -645,7 +766,23 @@ def build_airflow_graph(
                 render_config=render_config,
                 node=node,
             )
-            test_task = create_airflow_task(test_meta, dag, task_group=task_group)
+            test_task = generate_or_convert_task(
+                node_converters=node_converters,
+                task_meta=test_meta,
+                dbt_project_name=dbt_project_name,
+                dag=dag,
+                task_group=task_group,
+                node=node,
+                resource_type=node.resource_type,
+                execution_mode=execution_mode,
+                task_args=task_args,
+                test_behavior=test_behavior,
+                source_rendering_behavior=source_rendering_behavior,
+                test_indirect_selection=test_indirect_selection,
+                on_warning_callback=on_warning_callback,
+                normalize_task_id=normalize_task_id,
+                detached_from_parent=detached_from_parent,
+            )
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)

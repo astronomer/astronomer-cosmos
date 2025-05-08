@@ -78,7 +78,7 @@ def test_teardown_execute(mock_build_and_run_cmd):
         profile_config=Mock(),
         project_dir="fake-dir",
     )
-    operator.execute({})
+    operator.execute({"run_id": "test_run_id"})
     mock_build_and_run_cmd.assert_called_once()
 
 
@@ -150,10 +150,13 @@ def test_setup_execute(mock_operator_params):
     op = SetupAsyncOperator(**mock_operator_params)
 
     with patch.object(op, "build_and_run_cmd") as mock_build_and_run:
-        op.execute(context={})
+        op.execute(context={"run_id": "test_run_id"})
 
         mock_build_and_run.assert_called_once_with(
-            context={}, cmd_flags=op.dbt_cmd_flags, run_as_async=True, async_context={"profile_type": "bigquery"}
+            context={"run_id": "test_run_id"},
+            cmd_flags=op.dbt_cmd_flags,
+            run_as_async=True,
+            async_context={"profile_type": "bigquery", "run_id": "test_run_id"},
         )
 
 

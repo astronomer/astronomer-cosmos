@@ -30,6 +30,7 @@ from cosmos.dbt.parser.output import (
 )
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
+from cosmos.io import _construct_dest_file_path
 from cosmos.operators.local import (
     AbstractDbtLocalBase,
     DbtBuildLocalOperator,
@@ -88,6 +89,7 @@ def failing_test_dbt_project(tmp_path):
 
 
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
+
     base_cmd = ["cmd"]
 
 
@@ -531,7 +533,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
-
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
@@ -626,7 +627,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_vi
 )
 @pytest.mark.integration
 def test_run_operator_dataset_emission_is_skipped(caplog):
-
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
@@ -761,7 +761,6 @@ def test_run_operator_caches_partial_parsing(caplog, tmp_path):
 
 
 def test_dbt_base_operator_no_partial_parse() -> None:
-
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -1204,7 +1203,7 @@ def test_operator_execute_deps_parameters(
     )
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
     mock_temporary_directory.return_value.__enter__.return_value = project_dir.as_posix()
-    task.execute(context={"task_instance": MagicMock()})
+    task.execute(context={"task_instance": MagicMock(), "run_id": "test_run_id"})
     if invocation_mode == InvocationMode.SUBPROCESS:
         assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
     elif invocation_mode == InvocationMode.DBT_RUNNER:
@@ -1239,7 +1238,6 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
 def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
-
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -1255,7 +1253,6 @@ def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigterm")
 def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
-
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -1534,12 +1531,13 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
 
     files = [file1, file2]
 
+    operator.extra_context["run_id"] = "test_run_id"
     with patch.object(Path, "rglob", return_value=files):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
-            expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
+            expected_dest_path = f"mock_remote_path/test_dag/test_run_id/compiled/{rel_path.lstrip('/')}"
             mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)
 
@@ -1660,6 +1658,7 @@ def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_
         task_id="test",
         project_dir=project_dir,
         profile_config=profile_config,
+        extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
     operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
     mock_unlink.assert_called()
@@ -1709,7 +1708,6 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
 def test_handle_post_execution_with_multiple_callbacks(
     mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json
 ):
-
     multiple_callbacks = [MagicMock(), MagicMock(), MagicMock()]
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
@@ -1724,3 +1722,68 @@ def test_handle_post_execution_with_multiple_callbacks(
 
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+def test_construct_dest_file_path_with_run_id():
+    """Test _construct_dest_file_path uses run_id correctly."""
+    dest_target_dir = Path("/dest")
+    source_target_dir = Path("/project_dir/target")
+    file_path = "/project_dir/target/subdir/file.txt"
+    source_subpath = "target"
+
+    expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
+    context = {
+        "dag": MagicMock(dag_id="test_dag"),
+        "run_id": "test_run_id",
+        "task_instance": MagicMock(task_id="test_task", _try_number=1),
+    }
+    result = _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, source_subpath, context=context)
+
+    assert result == expected_path
+    assert "test_run_id" in result
+
+
+def test_operator_construct_dest_file_path_with_run_id():
+    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
+    operator = ConcreteDbtLocalBaseOperator(
+        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
+    )
+
+    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
+
+    dest_target_dir = Path("/dest")
+    source_compiled_dir = Path("/project_dir/target/compiled")
+    file_path = "/project_dir/target/compiled/models/my_model.sql"
+    resource_type = "compiled"
+
+    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
+    result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
+
+    assert result == expected_path
+    assert "test_run_id" in result
+
+
+def test_construct_dest_file_path_in_operator():
+    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
+    operator = ConcreteDbtLocalBaseOperator(
+        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
+    )
+
+    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
+
+    dest_target_dir = Path("/dest")
+    source_compiled_dir = Path("/project_dir/target/compiled")
+    file_path = "/project_dir/target/compiled/models/my_model.sql"
+    resource_type = "compiled"
+
+    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
+
+    with patch.object(
+        operator, "_construct_dest_file_path", wraps=operator._construct_dest_file_path
+    ) as mock_construct:
+        result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
+
+        assert result == expected_path
+        assert "test_run_id" in result
+
+        mock_construct.assert_called_once_with(dest_target_dir, file_path, source_compiled_dir, resource_type)

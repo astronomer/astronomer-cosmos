@@ -460,7 +460,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
     def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
-        return [
+        dbt_flags = [
             "--project-dir",
             str(tmp_project_dir),
             "--profiles-dir",
@@ -470,6 +470,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             "--target",
             self.profile_config.target_name,
         ]
+        if self.invocation_mode == InvocationMode.DBT_RUNNER:
+            # TODO: Add comment on why we're doing this.
+            dbt_flags.append("--no-static-parser")
+        return dbt_flags
 
     def _install_dependencies(
         self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]

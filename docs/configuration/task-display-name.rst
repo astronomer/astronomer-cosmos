@@ -32,7 +32,7 @@ You can provide a function to convert the model name to an ASCII-compatible form
 .. note::
     Although the slugify example often works, it may not be suitable for use in actual production. Since slugify performs conversions based on pronunciation, there may be cases where task_id is not unique due to homophones and similar issues.
 
-Similarly, there are cases where the user might want to preserve the ``task_id`` while altering the ``display_name``. This can be accomplished with the ``normalize_task_display_name`` field of ``RenderConfig``.
+There may be cases where the user might want to preserve the ``task_id`` while altering the ``display_name`` only. This can be accomplished with the ``normalize_task_display_name`` field of ``RenderConfig``.
 
 Example:
 

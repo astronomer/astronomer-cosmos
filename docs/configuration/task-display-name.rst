@@ -41,7 +41,10 @@ You can provide a function to display the dbt models in airflow UI without any s
 .. code-block:: python
     def normalize_task_display_name(node):
         return f"{node.name}"
+
+
     from cosmos import DbtTaskGroup, RenderConfig
+
     jaffle_shop = DbtTaskGroup(
         render_config=RenderConfig(normalize_task_display_name=normalize_task_display_name)
     )

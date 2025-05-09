@@ -1706,7 +1706,7 @@ def test_handle_post_execution_with_multiple_callbacks(
 
 @patch("airflow.io.path.ObjectStoragePath")
 def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
-    """Test that parent directories are created duringL file uploads."""
+    """Test that parent directories are created during file uploads."""
 
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

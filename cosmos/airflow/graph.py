@@ -208,7 +208,6 @@ def _get_task_id_and_args(
 
     if use_task_group:
         task_id = resource_suffix
-        args_update["task_display_name"] = task_name
 
     elif normalize_task_id and not normalize_task_display_name:
         task_id = normalize_task_id(node)
@@ -221,7 +220,6 @@ def _get_task_id_and_args(
         args_update["task_display_name"] = normalize_task_display_name(node)
     else:
         task_id = task_name
-        args_update["task_display_name"] = task_name
 
     return task_id, args_update
 

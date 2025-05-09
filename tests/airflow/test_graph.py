@@ -659,17 +659,23 @@ def _normalize_task_id(node: DbtNode) -> str:
     return f"new_task_id_{node.name}_{node.resource_type.value}"
 
 
+def _normalize_task_display_name(node: DbtNode) -> str:
+    """for test_create_task_metadata_normalize_task_id"""
+    return f"new_task_display_name_{node.name}_{node.resource_type.value}"
+
+
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.9"),
     reason="Airflow task did not have display_name until the 2.9 release",
 )
 @pytest.mark.parametrize(
-    "node_type,node_id,normalize_task_id,use_task_group,test_behavior,expected_node_id,expected_display_name",
+    "node_type,node_id,normalize_task_id,normalize_task_display_name,use_task_group,test_behavior,expected_node_id,expected_display_name",
     [
         # normalize_task_id is None (default)
         (
             DbtResourceType.MODEL,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            None,
             None,
             False,
             None,
@@ -680,6 +686,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SOURCE,
             f"{DbtResourceType.SOURCE.value}.my_folder.test_node",
             None,
+            None,
             False,
             None,
             "test_node_source",
@@ -689,6 +696,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SEED,
             f"{DbtResourceType.SEED.value}.my_folder.test_node",
             None,
+            None,
             False,
             None,
             "test_node_seed",
@@ -697,6 +705,7 @@ def _normalize_task_id(node: DbtNode) -> str:
         (
             DbtResourceType.SEED,
             f"{DbtResourceType.SEED.value}.my_folder.test_node",
+            None,
             None,
             False,
             TestBehavior.BUILD,
@@ -708,6 +717,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.MODEL,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             False,
             None,
             "new_task_id_test_node_model",
@@ -717,6 +727,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SOURCE,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             False,
             None,
             "new_task_id_test_node_source",
@@ -726,6 +737,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SEED,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             False,
             None,
             "new_task_id_test_node_seed",
@@ -735,16 +747,100 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SEED,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             False,
             TestBehavior.BUILD,
             "new_task_id_test_node_seed",
             "test_node_seed_build",
+        ),
+        # normalize_task_id is passed together with normalize_task_display_name
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            _normalize_task_display_name,
+            False,
+            None,
+            "new_task_id_test_node_model",
+            "new_task_display_name_test_node_model",
+        ),
+        (
+            DbtResourceType.SOURCE,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            _normalize_task_display_name,
+            False,
+            None,
+            "new_task_id_test_node_source",
+            "new_task_display_name_test_node_source",
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            _normalize_task_display_name,
+            False,
+            None,
+            "new_task_id_test_node_seed",
+            "new_task_display_name_test_node_seed",
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            _normalize_task_id,
+            _normalize_task_display_name,
+            False,
+            TestBehavior.BUILD,
+            "new_task_id_test_node_seed",
+            "new_task_display_name_test_node_seed",
+        ),
+        # normalize_task_id is not passed but normalize_task_display_name is passed
+        (
+            DbtResourceType.MODEL,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            None,
+            _normalize_task_display_name,
+            False,
+            None,
+            "test_node_run",
+            "new_task_display_name_test_node_model",
+        ),
+        (
+            DbtResourceType.SOURCE,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            None,
+            _normalize_task_display_name,
+            False,
+            None,
+            "test_node_source",
+            "new_task_display_name_test_node_source",
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            None,
+            _normalize_task_display_name,
+            False,
+            None,
+            "test_node_seed",
+            "new_task_display_name_test_node_seed",
+        ),
+        (
+            DbtResourceType.SEED,
+            f"{DbtResourceType.MODEL.value}.my_folder.test_node",
+            None,
+            _normalize_task_display_name,
+            False,
+            TestBehavior.BUILD,
+            "test_node_seed_build",
+            "new_task_display_name_test_node_seed",
         ),
         # normalize_task_id is passed and use_task_group is True
         (
             DbtResourceType.MODEL,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             True,
             None,
             "run",
@@ -754,6 +850,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SOURCE,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             True,
             None,
             "source",
@@ -763,6 +860,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SEED,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             True,
             None,
             "seed",
@@ -772,6 +870,7 @@ def _normalize_task_id(node: DbtNode) -> str:
             DbtResourceType.SEED,
             f"{DbtResourceType.MODEL.value}.my_folder.test_node",
             _normalize_task_id,
+            None,
             True,
             TestBehavior.BUILD,
             "build",
@@ -780,7 +879,14 @@ def _normalize_task_id(node: DbtNode) -> str:
     ],
 )
 def test_create_task_metadata_normalize_task_id(
-    node_type, node_id, normalize_task_id, use_task_group, test_behavior, expected_node_id, expected_display_name
+    node_type,
+    node_id,
+    normalize_task_id,
+    normalize_task_display_name,
+    use_task_group,
+    test_behavior,
+    expected_node_id,
+    expected_display_name,
 ):
     node = DbtNode(
         unique_id=node_id,
@@ -798,6 +904,7 @@ def test_create_task_metadata_normalize_task_id(
         dbt_dag_task_group_identifier="",
         use_task_group=use_task_group,
         normalize_task_id=normalize_task_id,
+        normalize_task_display_name=normalize_task_display_name,
         source_rendering_behavior=SourceRenderingBehavior.ALL,
         test_behavior=test_behavior,
     )

@@ -31,3 +31,18 @@ You can provide a function to convert the model name to an ASCII-compatible form
 
 .. note::
     Although the slugify example often works, it may not be suitable for use in actual production. Since slugify performs conversions based on pronunciation, there may be cases where task_id is not unique due to homophones and similar issues.
+
+Similarily, there are cases where the user might want to preserve the ``task_id`` while altering the ``display_name``. This can be accomplished with the ``normalize_task_display_name`` field of ``RenderConfig``.
+
+Example:
+
+You can provide a function to display the dbt models in airflow UI without any suffix (``_source``, ``_run``, etc)
+
+.. code-block:: python
+    def normalize_task_display_name(node):
+        return f"{node.name}"
+    from cosmos import DbtTaskGroup, RenderConfig
+    jaffle_shop = DbtTaskGroup(
+        render_config=RenderConfig(normalize_task_display_name=normalize_task_display_name)
+    )
+..

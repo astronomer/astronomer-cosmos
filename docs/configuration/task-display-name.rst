@@ -43,6 +43,7 @@ You can provide a function to display the dbt models in the Airflow UI without a
     def normalize_task_display_name(node):
         return f"{node.name}"
 
+
     from cosmos import DbtTaskGroup, RenderConfig
 
     jaffle_shop = DbtTaskGroup(

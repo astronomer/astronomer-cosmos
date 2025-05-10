@@ -34,7 +34,7 @@ You can provide a function to convert the model name to an ASCII-compatible form
 
 Sometimes, users may want to keep the original ``task_id`` but change only the ``display_name`` instead. This can be done using the ``normalize_task_display_name`` field in ``RenderConfig``.
 
-**Example:**
+Example:
 
 You can provide a function to display the dbt models in the Airflow UI without any suffixes (e.g., ``_source``, ``_run``, etc).
 

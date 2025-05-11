@@ -57,6 +57,7 @@ dbt-all = [
     "dbt-redshift",
     "dbt-snowflake",
     "dbt-spark",
+    "dbt-sqlserver",
     "dbt-teradata",
     "dbt-vertica",
 ]
@@ -71,6 +72,7 @@ dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
 dbt-spark = ["dbt-spark"]
+dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]

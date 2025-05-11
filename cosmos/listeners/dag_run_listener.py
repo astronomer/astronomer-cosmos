@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import hashlib
+
+from airflow import __version__ as airflow_version
 from airflow.listeners import hookimpl
 from airflow.models.dag import DAG
 from airflow.models.dagrun import DagRun
+from packaging import version
 
 from cosmos import telemetry
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
 from cosmos.log import get_logger
+
+AIRFLOW_VERSION_MAJOR = version.parse(airflow_version).major
 
 logger = get_logger(__name__)
 
@@ -50,8 +57,13 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         logger.debug("The DAG does not use Cosmos")
         return
 
+    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
+        dag_hash = dag_run.dag_hash
+    else:
+        dag_hash = hashlib.md5(dag_run.dag_id.encode("utf-8")).hexdigest()
+
     additional_telemetry_metrics = {
-        "dag_hash": dag_run.dag_hash,
+        "dag_hash": dag_hash,
         "status": EventStatus.SUCCESS,
         "task_count": len(serialized_dag.task_ids),
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
@@ -73,8 +85,13 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
         logger.debug("The DAG does not use Cosmos")
         return
 
+    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
+        dag_hash = dag_run.dag_hash
+    else:
+        dag_hash = hashlib.md5(dag_run.dag_id.encode("utf-8")).hexdigest()
+
     additional_telemetry_metrics = {
-        "dag_hash": dag_run.dag_hash,
+        "dag_hash": dag_hash,
         "status": EventStatus.FAILED,
         "task_count": len(serialized_dag.task_ids),
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),

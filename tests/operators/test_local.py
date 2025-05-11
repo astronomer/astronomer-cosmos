@@ -1704,6 +1704,7 @@ def test_handle_post_execution_with_multiple_callbacks(
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
 
+
 @patch("airflow.io.path.ObjectStoragePath")
 def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
     """Test that parent directories are created during file uploads."""

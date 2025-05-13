@@ -329,6 +329,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         for file_path in files:
             dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
+            dest_object_storage_path.parent.mkdir(parents=True, exist_ok=True)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 

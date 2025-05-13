@@ -1724,3 +1724,31 @@ def test_handle_post_execution_with_multiple_callbacks(
 
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
+    """Test that parent directories are created during file uploads."""
+
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir="test/dir",
+    )
+
+    with patch.object(
+        operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
+    ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
+        "pathlib.Path.rglob", return_value=[Path("file.sql")]
+    ), patch(
+        "pathlib.Path.is_file", return_value=True
+    ):
+
+        mock_dest_path = MagicMock()
+        mock_dest_path.parent = MagicMock()
+        mock_object_storage_path.return_value = mock_dest_path
+
+        operator._upload_sql_files("tmp_dir", "compiled")
+
+        mock_dest_path.parent.mkdir.assert_called_with(parents=True, exist_ok=True)

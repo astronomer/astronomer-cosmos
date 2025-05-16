@@ -395,8 +395,6 @@ def generate_or_convert_task(
         )
         if task is not None:
             logger.debug(f"Conversion of node <{node.unique_id}> task <{task_id}> was successful!")
-        else:
-            logger.warning(f"Conversion of node <{node.unique_id}> task <{task_id}> failed")
     else:
         task = create_airflow_task(task_meta, dag, task_group)
     return task
@@ -490,13 +488,8 @@ def generate_task_or_group(
                     normalize_task_id=normalize_task_id,
                     detached_from_parent=detached_from_parent,
                 )
-                if task is not None and test_task is not None:
-                    task >> test_task
-                    task_or_group = model_task_group
-                elif task is not None:
-                    task_or_group = task
-                else:
-                    task_or_group = test_task
+                task >> test_task
+                task_or_group = model_task_group
         else:
             task_or_group = generate_or_convert_task(
                 node_converters=node_converters,

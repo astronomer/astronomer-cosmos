@@ -39,6 +39,13 @@ remote_cache_dir_conn_id = conf.get("cosmos", "remote_cache_dir_conn_id", fallba
 remote_target_path = conf.get("cosmos", "remote_target_path", fallback=None)
 remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fallback=None)
 
+# Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
+# which can significantly increase memory usage—even when Cosmos is installed but not actively used.
+# This option allows disabling those eager imports to reduce memory footprint.
+# When enabled, users must access Cosmos classes via their full module paths,
+# avoiding the overhead of importing unused modules and classes.
+lazy_imports = conf.getboolean("cosmos", "lazy_imports", fallback=False)
+
 # Related to async operators
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)

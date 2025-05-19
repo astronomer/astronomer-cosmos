@@ -484,7 +484,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         for filename in DBT_DEPENDENCIES_FILE_NAMES:
             filepath = tmp_dir_path / filename
-            if filepath.exists() and filepath.is_file():
+            if filepath.is_file():
                 self.log.debug(f"Checking for the {filename} dependencies file.")
                 self.log.debug(f"Contents of the <{filepath}> dependencies file:\n{filepath.read_text()}")
 

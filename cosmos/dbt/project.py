@@ -51,7 +51,7 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
     https://docs.getdbt.com/reference/project-configs/packages-install-path
 
     :param source_folder: The dbt project root directory
-    :returns: A string containing the dbt_packges subpath within the source folder.
+    :returns: A string containing the dbt_packages subpath within the source folder.
     """
     subpath = DBT_DEFAULT_PACKAGES_FOLDER
     dbt_project_yml_path = source_folder / DBT_PROJECT_FILENAME

@@ -1807,7 +1807,9 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
         operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
     ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
         "pathlib.Path.rglob", return_value=[Path("file.sql")]
-    ), patch("pathlib.Path.is_file", return_value=True):
+    ), patch(
+        "pathlib.Path.is_file", return_value=True
+    ):
         mock_dest_path = MagicMock()
         mock_dest_path.parent = MagicMock()
         mock_object_storage_path.return_value = mock_dest_path

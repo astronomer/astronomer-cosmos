@@ -1649,7 +1649,9 @@ def test_build_and_run_cmd_with_full_refresh_in_async_mode():
 @patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("airflow.io.path.ObjectStoragePath")
-def test_async_execution_teardown_delete_files(mock_object_storage_path, mock_configure_remote, mock_construct_dest_file_path, mock_rglob):
+def test_async_execution_teardown_delete_files(
+    mock_object_storage_path, mock_configure_remote, mock_construct_dest_file_path, mock_rglob
+):
     mock_path = MagicMock()
     mock_path.exists.return_value = True
     mock_object_storage_path.return_value = mock_path

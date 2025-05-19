@@ -1647,12 +1647,14 @@ def test_build_and_run_cmd_with_full_refresh_in_async_mode():
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("pathlib.Path.rglob")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
-@patch("airflow.io.path.ObjectStoragePath.rmdir")
-def test_async_execution_teardown_delete_files(mock_rmdir, mock_construct_dest_file_path, mock_rglob):
-    mock_file = MagicMock()
-    mock_file.is_file.return_value = True
-    mock_file.__str__.return_value = "/altered_jaffle_shop/target/run/file1.sql"
-    mock_rglob.return_value = [mock_file]
+@patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_async_execution_teardown_delete_files(mock_object_storage_path, mock_configure_remote, mock_construct_dest_file_path, mock_rglob):
+    mock_path = MagicMock()
+    mock_path.exists.return_value = True
+    mock_object_storage_path.return_value = mock_path
+    mock_configure_remote.return_value = (Path("/mock/path"), "mock_conn_id")
+
     project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
     operator = DbtRunLocalOperator(
         task_id="test",
@@ -1661,7 +1663,7 @@ def test_async_execution_teardown_delete_files(mock_rmdir, mock_construct_dest_f
         extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
     operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
-    mock_rmdir.assert_called_once_with(recursive=True)
+    mock_path.rmdir.assert_called_once_with(recursive=True)
 
 
 def test_read_run_sql_from_target_dir():

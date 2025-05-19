@@ -1647,8 +1647,8 @@ def test_build_and_run_cmd_with_full_refresh_in_async_mode():
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("pathlib.Path.rglob")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
-@patch("airflow.io.path.ObjectStoragePath.unlink")
-def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_file_path, mock_rglob):
+@patch("airflow.io.path.ObjectStoragePath.rmdir")
+def test_async_execution_teardown_delete_files(mock_rmdir, mock_construct_dest_file_path, mock_rglob):
     mock_file = MagicMock()
     mock_file.is_file.return_value = True
     mock_file.__str__.return_value = "/altered_jaffle_shop/target/run/file1.sql"
@@ -1661,7 +1661,7 @@ def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_
         extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
     operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
-    mock_unlink.assert_called()
+    mock_rmdir.assert_called_once_with(recursive=True)
 
 
 def test_read_run_sql_from_target_dir():

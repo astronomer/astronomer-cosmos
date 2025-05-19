@@ -3,17 +3,53 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 
-from cosmos.constants import DBT_PACKAGES_FOLDER, PACKAGE_LOCKFILE_YML
+from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, PACKAGE_LOCKFILE_YML
 from cosmos.dbt.project import (
     change_working_directory,
     copy_dbt_packages,
     create_symlinks,
     environ,
+    get_dbt_packages_subpath,
     has_non_empty_dependencies_file,
 )
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+
+
+def write_dbt_project_yml(path: Path, content: dict):
+    with open(path / "dbt_project.yml", "w") as fp:
+        yaml.dump(content, fp)
+    return path
+
+
+def test_returns_default_when_file_missing(tmpdir):
+    result = get_dbt_packages_subpath(tmpdir)
+    assert result == "dbt_packages"
+
+
+def test_returns_default_when_key_missing(tmpdir):
+    write_dbt_project_yml(tmpdir, {"name": "test_project"})
+    result = get_dbt_packages_subpath(tmpdir)
+    assert result == "dbt_packages"
+
+
+def test_returns_default_on_invalid_yaml(tmpdir, caplog):
+    # Write malformed YAML
+    bad_content = ":\nbad_yaml: [::"
+    path = tmpdir / DBT_PROJECT_FILENAME
+    path.write_text(bad_content, "utf-8")
+
+    result = get_dbt_packages_subpath(tmpdir)
+    assert result == DBT_DEFAULT_PACKAGES_FOLDER
+    assert "Unable to read" in caplog.text
+
+
+def test_returns_custom_path_when_defined(tmpdir):
+    write_dbt_project_yml(tmpdir, {"packages-install-path": "custom_dbt_packages"})
+    result = get_dbt_packages_subpath(tmpdir)
+    assert result == "custom_dbt_packages"
 
 
 def test_create_symlinks(tmp_path):
@@ -92,7 +128,7 @@ def test_copy_dbt_packages_all_cases(mock_logger, mock_dir, mock_makedirs, mock_
     assert mock_makedirs.call_count == 2
 
     mock_copytree.assert_called_once_with(
-        source_folder / DBT_PACKAGES_FOLDER, target_folder / DBT_PACKAGES_FOLDER, dirs_exist_ok=True
+        source_folder / DBT_DEFAULT_PACKAGES_FOLDER, target_folder / DBT_DEFAULT_PACKAGES_FOLDER, dirs_exist_ok=True
     )
     mock_copy2.assert_called_once_with(source_folder / PACKAGE_LOCKFILE_YML, target_folder / PACKAGE_LOCKFILE_YML)
 

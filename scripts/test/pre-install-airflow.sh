@@ -54,7 +54,7 @@ elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   # previously led to authentication issues with this version. This issue got resolved in
   # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
   # and skipping installation with constraints, as the specified version does not meet our requirements.
-  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"  --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"
 elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
@@ -66,8 +66,12 @@ elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   # https://github.com/apache/airflow/pull/38102 and fixed in apache-airflow-providers-google==10.17.0. Consequently,
   # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
   # version does not meet our requirements.
-  uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION"  --constraint /tmp/constraint.txt
-
+  uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
+else
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google"  --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
 fi
 
 rm /tmp/constraint.txt

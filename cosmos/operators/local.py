@@ -485,9 +485,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         for filename in DBT_DEPENDENCIES_FILE_NAMES:
             filepath = tmp_dir_path / filename
-            if self.log.isEnabledFor(logging.DEBUG) and filepath.is_file():
-                self.log.debug(f"Checking for the {filename} dependencies file.")
-                self.log.debug(f"Contents of the <{filepath}> dependencies file:\n{filepath.read_text()}")
+            if filepath.is_file():
+                self.log.debug("Checking for the %s dependencies file.", str(filename))
+                self.log.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
 
         self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
 

@@ -45,7 +45,7 @@ elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
 elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google<=10.26" "apache-airflow==$AIRFLOW_VERSION"
   # The Airflow 2.8 constraints file at
   # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
   # specifies apache-airflow-providers-microsoft-azure==8.4.0. However, our Azure connection setup in the CI,

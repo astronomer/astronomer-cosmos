@@ -760,6 +760,31 @@ def test_run_operator_caches_partial_parsing(caplog, tmp_path):
     assert not "Unable to do partial parsing" in caplog.text
 
 
+@pytest.mark.integration
+def test_run_operator_copies_manifest_file(caplog, tmp_path):
+    manifest_filepath = DBT_PROJ_DIR / "target/manifest.json"
+    assert manifest_filepath.exists()
+    caplog.clear()
+    caplog.set_level(logging.DEBUG)
+    with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+            cache_dir=cache._obtain_cache_dir_path("test-partial-parsing", tmp_path),
+            invocation_mode=InvocationMode.SUBPROCESS,
+            manifest_filepath=manifest_filepath,
+        )
+        seed_operator
+
+    run_test_dag(dag)
+
+    assert caplog.text.count("Copying the manifest from") == 1
+
+
 def test_dbt_base_operator_no_partial_parse() -> None:
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(

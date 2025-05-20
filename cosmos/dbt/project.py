@@ -12,6 +12,7 @@ from cosmos.constants import (
     DBT_DEFAULT_PACKAGES_FOLDER,
     DBT_DEPENDENCIES_FILE_NAMES,
     DBT_LOG_DIR_NAME,
+    DBT_MANIFEST_FILE_NAME,
     DBT_PARTIAL_PARSE_FILE_NAME,
     DBT_PROJECT_FILENAME,
     DBT_TARGET_DIR_NAME,
@@ -70,8 +71,8 @@ def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
     """
     Copies the dbt packages related files and directories from source_folder to target_folder.
 
-    :param: source_folder: The base directory where paths are sourced from.
-    :param: target_folder: The directory where paths will be copied to.
+    :param source_folder: The base directory where paths are sourced from.
+    :param target_folder: The directory where paths will be copied to.
     """
     logger.info("Copying dbt packages to temporary folder...")
 
@@ -90,6 +91,22 @@ def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
             shutil.copy2(src_path, dst_path)
 
     logger.info("Completed copying dbt packages to temporary folder.")
+
+
+def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder: str | Path) -> None:
+    """
+    Copies the source manifest.json file, if available, to the given desired dbt project folder.
+
+    :param source_manifest: manifest.json filepath
+    :param dbt_project_folder: destination dbt project folder (it will be copied to the target folder)
+    """
+    dbt_project_folder = Path(dbt_project_folder)
+    if source_manifest and Path(source_manifest).exists():
+        logger.info(f"Copying the manifest from {source_manifest}...")
+        target_folder_path = dbt_project_folder / DBT_TARGET_DIR_NAME
+        tmp_manifest_filepath = target_folder_path / DBT_MANIFEST_FILE_NAME
+        Path(target_folder_path).mkdir(parents=True, exist_ok=True)
+        shutil.copy(source_manifest, tmp_manifest_filepath)
 
 
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:

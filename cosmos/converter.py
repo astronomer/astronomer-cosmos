@@ -268,6 +268,7 @@ class DbtToAirflowConverter:
 
         cache_dir = None
         cache_identifier = None
+
         if settings.enable_cache:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
@@ -303,6 +304,7 @@ class DbtToAirflowConverter:
             "env": env_vars,
             "vars": dbt_vars,
             "cache_dir": cache_dir,
+            "manifest_filepath": project_config.manifest_path,
         }
 
         validate_arguments(

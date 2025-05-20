@@ -1753,7 +1753,7 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
 
         mock_dest_path.parent.mkdir.assert_called_with(parents=True, exist_ok=True)
 
-        
+
 def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cosmos.version import __version__
+from cosmos import __version__  # type: ignore[attr-defined]
 
 
 def get_provider_info() -> dict[str, Any]:

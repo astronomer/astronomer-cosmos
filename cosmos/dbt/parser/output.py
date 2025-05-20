@@ -9,8 +9,8 @@ import deprecation
 if TYPE_CHECKING:
     from dbt.cli.main import dbtRunnerResult
 
+from cosmos import __version__ as cosmos_version  # type: ignore[attr-defined]
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.version import __version__ as cosmos_version  # type: ignore[attr-defined]
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"

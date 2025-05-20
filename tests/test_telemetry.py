@@ -45,7 +45,7 @@ class MockFailedResponse:
     text = "Non existent URL"
 
 
-@patch.object(telemetry.httpx, "get", return_value=MockFailedResponse())
+@patch("cosmos.telemetry.httpx.get", return_value=MockFailedResponse())
 def test_emit_usage_metrics_is_unsuccessful(mock_httpx_get, caplog):
     sample_metrics = {
         "cosmos_version": "1.8.0a4",
@@ -71,7 +71,7 @@ def test_emit_usage_metrics_is_unsuccessful(mock_httpx_get, caplog):
     assert log_msg in caplog.text
 
 
-@patch.object(telemetry.httpx, "get", side_effect=httpx.ConnectError(message="Something is not right"))
+@patch("cosmos.telemetry.httpx.get", side_effect=httpx.ConnectError(message="Something is not right"))
 def test_emit_usage_metrics_fails(mock_httpx_get, caplog):
     sample_metrics = {
         "cosmos_version": "1.8.0a4",
@@ -118,7 +118,7 @@ def test_emit_usage_metrics_succeeds(caplog):
     assert "Telemetry is enabled. Emitting the following usage metrics to" in caplog.text
 
 
-@patch.object(telemetry, "should_emit", return_value=False)
+@patch("cosmos.telemetry.should_emit", return_value=False)
 def test_emit_usage_metrics_if_enabled_fails(mock_should_emit, caplog):
     caplog.set_level(logging.DEBUG)
     assert not telemetry.emit_usage_metrics_if_enabled("any", {})
@@ -126,9 +126,9 @@ def test_emit_usage_metrics_if_enabled_fails(mock_should_emit, caplog):
     assert "Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True." in caplog.text
 
 
-@patch.object(telemetry, "should_emit", return_value=True)
-@patch.object(telemetry, "collect_standard_usage_metrics", return_value={"k1": "v1", "k2": "v2", "variables": {}})
-@patch.object(telemetry, "emit_usage_metrics")
+@patch("cosmos.telemetry.should_emit", return_value=True)
+@patch("cosmos.telemetry.collect_standard_usage_metrics", return_value={"k1": "v1", "k2": "v2", "variables": {}})
+@patch("cosmos.telemetry.emit_usage_metrics")
 def test_emit_usage_metrics_if_enabled_succeeds(
     mock_emit_usage_metrics, mock_collect_standard_usage_metrics, mock_should_emit
 ):

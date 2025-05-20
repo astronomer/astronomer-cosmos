@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import platform
-from typing import Any
 from urllib import parse
 from urllib.parse import urlencode
 
@@ -22,12 +21,12 @@ def should_emit() -> bool:
     return settings.enable_telemetry and not settings.do_not_track and not settings.no_analytics
 
 
-def collect_standard_usage_metrics() -> dict[str, Any]:
+def collect_standard_usage_metrics() -> dict[str, object]:
     """
     Return standard telemetry metrics.
     """
     metrics = {
-        "cosmos_version": cosmos.version.__version__,  # type: ignore[attr-defined]
+        "cosmos_version": cosmos.__version__,  # type: ignore[attr-defined]
         "airflow_version": parse.quote(airflow_version),
         "python_version": platform.python_version(),
         "platform_system": platform.system(),

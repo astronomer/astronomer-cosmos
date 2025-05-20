@@ -196,6 +196,23 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS``
 
+    .. note::
+        This option will become the default behavior in Cosmos 2.0.0, where all eager imports will be removed from ``cosmos/__init__.py``.
+
+    As an example, when this option is enabled, the following is an example of specifying the imports with full module paths:
+
+    .. literalinclude:: ../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
+        :language: python
+        :start-after: [START cosmos_explicit_imports]
+        :end-before: [END cosmos_explicit_imports]
+
+    as opposed to the following approach you might be have when this option is disabled (default):
+
+    .. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
+        :language: python
+        :start-after: [START cosmos_init_imports]
+        :end-before: [END cosmos_init_imports]
+
 
 [openlineage]
 ~~~~~~~~~~~~~

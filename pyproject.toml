@@ -129,7 +129,7 @@ Documentation = "https://astronomer.github.io/astronomer-cosmos"
 "Source code" = "https://github.com/astronomer/astronomer-cosmos"
 
 [tool.hatch.version]
-path = "cosmos/version.py"
+path = "cosmos/__init__.py"
 
 [tool.hatch.build.targets.sdist]
 include = ["/cosmos"]

@@ -1,6 +1,6 @@
-import importlib
 import os
-import sys
+import subprocess
+import textwrap
 from importlib import reload
 from unittest.mock import patch
 
@@ -14,28 +14,30 @@ def test_enable_cache_env_var():
 
 
 def test_enable_memory_optimised_imports_true(monkeypatch):
-    monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS", "True")
-    importlib.invalidate_caches()
-    if "cosmos.settings" in sys.modules:
-        importlib.reload(sys.modules["cosmos.settings"])
-    if "cosmos" in sys.modules:
-        del sys.modules["cosmos"]
-    import cosmos
+    script = textwrap.dedent(
+        """
+            import os
+            os.environ["AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS"] = "True"
+            import cosmos
+            assert cosmos.settings.enable_memory_optimised_imports is True
+            assert not hasattr(cosmos, "DbtDag")
+        """
+    )
 
-    assert cosmos.settings.enable_memory_optimised_imports is True
-    # DbtDag should not be imported at top-level
-    assert not hasattr(cosmos, "DbtDag")
+    result = subprocess.run(["python", "-c", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
 
 
 def test_enable_memory_optimised_imports_false(monkeypatch):
-    monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS", "False")
-    importlib.invalidate_caches()
-    if "cosmos.settings" in sys.modules:
-        importlib.reload(sys.modules["cosmos.settings"])
-    if "cosmos" in sys.modules:
-        del sys.modules["cosmos"]
-    import cosmos
+    script = textwrap.dedent(
+        """
+            import os
+            os.environ["AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS"] = "False"
+            import cosmos
+            assert cosmos.settings.enable_memory_optimised_imports is False
+            assert hasattr(cosmos, "DbtDag")
+        """
+    )
 
-    assert cosmos.settings.enable_memory_optimised_imports is False
-    # DbtDag should be imported at top-level
-    assert hasattr(cosmos, "DbtDag")
+    result = subprocess.run(["python", "-c", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 import json
-import logging
 import os
 import tempfile
 import time
@@ -43,7 +42,12 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.dataset import get_dataset_alias_name
-from cosmos.dbt.project import copy_dbt_packages, get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import (
+    copy_dbt_packages,
+    copy_manifest_file_if_exists,
+    get_partial_parse_path,
+    has_non_empty_dependencies_file,
+)
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
@@ -149,6 +153,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
@@ -172,6 +177,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
+        manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
@@ -202,6 +208,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # We should not spend time trying to install deps if the project doesn't have any dependencies
         self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
         self.copy_dbt_packages = copy_dbt_packages
+
+        self.manifest_filepath = manifest_filepath
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -458,6 +466,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
+        copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
+
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
             return
@@ -567,6 +577,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
+
             self._clone_project(tmp_dir_path)
 
             if self.partial_parse:

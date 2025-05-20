@@ -9,6 +9,7 @@ from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, 
 from cosmos.dbt.project import (
     change_working_directory,
     copy_dbt_packages,
+    copy_manifest_file_if_exists,
     create_symlinks,
     environ,
     get_dbt_packages_subpath,
@@ -16,6 +17,31 @@ from cosmos.dbt.project import (
 )
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+
+
+def test_copy_manifest_file_if_exists(tmpdir):
+    source_manifest = tmpdir / "manifest.json"
+    source_manifest.write_text('{"mock_key": "mock_value"}', encoding="utf-8")
+
+    dbt_project_folder = tmpdir / "dbt_project"
+
+    target_manifest_path = dbt_project_folder / "target/manifest.json"
+    assert not target_manifest_path.exists()
+
+    copy_manifest_file_if_exists(source_manifest, dbt_project_folder)
+
+    assert target_manifest_path.exists()
+    assert target_manifest_path.read_text(encoding="utf-8") == '{"mock_key": "mock_value"}'
+
+
+def test_does_nothing_if_manifest_missing(tmpdir):
+    source_manifest = tmpdir / "nonexistent_manifest.json"
+    dbt_project_folder = tmpdir / "dbt_project"
+
+    copy_manifest_file_if_exists(source_manifest, dbt_project_folder)
+
+    target_folder = dbt_project_folder / "target"
+    assert not target_folder.exists()
 
 
 def write_dbt_project_yml(path: Path, content: dict):

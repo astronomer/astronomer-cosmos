@@ -13,8 +13,8 @@ def test_enable_cache_env_var():
     assert settings.enable_cache is False
 
 
-def test_explicit_imports_true(monkeypatch):
-    monkeypatch.setenv("AIRFLOW__COSMOS__EXPLICIT_IMPORTS", "True")
+def test_enable_memory_optimised_imports_true(monkeypatch):
+    monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS", "True")
     importlib.invalidate_caches()
     if "cosmos.settings" in sys.modules:
         importlib.reload(sys.modules["cosmos.settings"])
@@ -22,13 +22,13 @@ def test_explicit_imports_true(monkeypatch):
         del sys.modules["cosmos"]
     import cosmos
 
-    assert cosmos.settings.explicit_imports is True
+    assert cosmos.settings.enable_memory_optimised_imports is True
     # DbtDag should not be imported at top-level
     assert not hasattr(cosmos, "DbtDag")
 
 
-def test_explicit_imports_false(monkeypatch):
-    monkeypatch.setenv("AIRFLOW__COSMOS__EXPLICIT_IMPORTS", "False")
+def test_enable_memory_optimised_imports_false(monkeypatch):
+    monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS", "False")
     importlib.invalidate_caches()
     if "cosmos.settings" in sys.modules:
         importlib.reload(sys.modules["cosmos.settings"])
@@ -36,6 +36,6 @@ def test_explicit_imports_false(monkeypatch):
         del sys.modules["cosmos"]
     import cosmos
 
-    assert cosmos.settings.explicit_imports is False
+    assert cosmos.settings.enable_memory_optimised_imports is False
     # DbtDag should be imported at top-level
     assert hasattr(cosmos, "DbtDag")

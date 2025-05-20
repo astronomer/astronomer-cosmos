@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from cosmos import settings
 
-if not settings.explicit_imports:
+if not settings.enable_memory_optimised_imports:
     from cosmos.airflow.dag import DbtDag
     from cosmos.airflow.task_group import DbtTaskGroup
     from cosmos.config import (

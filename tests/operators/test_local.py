@@ -1807,9 +1807,7 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
         operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
     ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
         "pathlib.Path.rglob", return_value=[Path("file.sql")]
-    ), patch(
-        "pathlib.Path.is_file", return_value=True
-    ):
+    ), patch("pathlib.Path.is_file", return_value=True):
         mock_dest_path = MagicMock()
         mock_dest_path.parent = MagicMock()
         mock_object_storage_path.return_value = mock_dest_path
@@ -1871,3 +1869,27 @@ def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_p
     profile_path = tmp_path / "profiles.yml"
     flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
     assert "--no-static-parser" not in flags
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
+def test_delete_sql_files_no_remote_target_configured(mock_configure_remote):
+    """Test that _delete_sql_files exits early with a warning when remote path is not configured."""
+    mock_configure_remote.return_value = (None, None)
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/project/dir",
+        profile_config=profile_config,
+        extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
+    )
+
+    with patch.object(operator.log, "warning") as mock_log_warning:
+        operator._delete_sql_files()
+        expected_log_message = "Remote target path or connection ID not configured. Skipping deletion."
+        mock_log_warning.assert_called_once_with(expected_log_message)
+
+    mock_configure_remote.return_value = (Path("/mock/path"), None)
+    with patch.object(operator.log, "warning") as mock_log_warning:
+        operator._delete_sql_files()
+        mock_log_warning.assert_called_once_with(expected_log_message)

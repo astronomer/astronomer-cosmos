@@ -71,8 +71,8 @@ def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
     """
     Copies the dbt packages related files and directories from source_folder to target_folder.
 
-    :param: source_folder: The base directory where paths are sourced from.
-    :param: target_folder: The directory where paths will be copied to.
+    :param source_folder: The base directory where paths are sourced from.
+    :param target_folder: The directory where paths will be copied to.
     """
     logger.info("Copying dbt packages to temporary folder...")
 
@@ -97,8 +97,8 @@ def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder
     """
     Copies the source manifest.json file, if available, to the given desired dbt project folder.
 
-    :param: source_manifest: manifest.json filepath
-    :param: dbt_project_folder: destination dbt project folder (it will be copied to the target folder)
+    :param source_manifest: manifest.json filepath
+    :param dbt_project_folder: destination dbt project folder (it will be copied to the target folder)
     """
     dbt_project_folder = Path(dbt_project_folder)
     if source_manifest and Path(source_manifest).exists():

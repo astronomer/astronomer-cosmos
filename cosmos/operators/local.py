@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import os
 import tempfile
 import time
@@ -35,7 +36,12 @@ from cosmos.cache import (
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
 )
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
+from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
+    DBT_DEPENDENCIES_FILE_NAMES,
+    FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
+    InvocationMode,
+)
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.dbt.project import copy_dbt_packages, get_partial_parse_path, has_non_empty_dependencies_file
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
@@ -481,6 +487,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     ) -> None:
         self._cache_package_lockfile(tmp_dir_path)
         deps_command = [self.dbt_executable_path, "deps"] + flags
+
+        for filename in DBT_DEPENDENCIES_FILE_NAMES:
+            filepath = tmp_dir_path / filename
+            if filepath.is_file():
+                self.log.debug("Checking for the %s dependencies file.", str(filename))
+                self.log.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
+
         self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
 
     @staticmethod

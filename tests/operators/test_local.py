@@ -1845,3 +1845,28 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
         assert "/mock/path/test_dag_task_group/test_run_id" == log_path
 
     mock_path.rmdir.assert_not_called()
+
+def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir=tmp_path,
+    )
+    operator.invocation_mode = InvocationMode.DBT_RUNNER
+    tmp_project_dir = str(tmp_path)
+    profile_path = tmp_path / "profiles.yml"
+    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
+    assert "--no-static-parser" in flags
+
+
+def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_path):
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir=tmp_path,
+    )
+    operator.invocation_mode = InvocationMode.SUBPROCESS
+    tmp_project_dir = str(tmp_path)
+    profile_path = tmp_path / "profiles.yml"
+    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
+    assert "--no-static-parser" not in flags

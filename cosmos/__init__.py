@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from cosmos import settings
 
-if not settings.lazy_imports:
+if not settings.explicit_imports:
     from cosmos.airflow.dag import DbtDag
     from cosmos.airflow.task_group import DbtTaskGroup
     from cosmos.config import (

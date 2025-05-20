@@ -185,6 +185,17 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD``
 
+.. _explicit_imports:
+
+`explicit_imports`_:
+    (Introduced in Cosmos 1.10.1): Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
+    which can significantly increase memory usage—even when Cosmos is just installed but not actively used. This option allows
+    disabling those eager imports to reduce memory footprint. When enabled, users must access Cosmos classes via their full
+    module paths, avoiding the overhead of importing unused modules and classes.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__EXPLICIT_IMPORTS``
+
 
 [openlineage]
 ~~~~~~~~~~~~~

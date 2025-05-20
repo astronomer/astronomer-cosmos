@@ -44,7 +44,7 @@ remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fa
 # This option allows disabling those eager imports to reduce memory footprint.
 # When enabled, users must access Cosmos classes via their full module paths,
 # avoiding the overhead of importing unused modules and classes.
-lazy_imports = conf.getboolean("cosmos", "lazy_imports", fallback=False)
+explicit_imports = conf.getboolean("cosmos", "explicit_imports", fallback=False)
 
 # Related to async operators
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)

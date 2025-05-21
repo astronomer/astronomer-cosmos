@@ -38,6 +38,7 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
     assert operator.project_dir == "/path/to/project"
     assert operator.profile_config == profile_config_mock
     assert operator.gcp_conn_id == "google_cloud_default"
+    assert operator.full_refresh is False  # Default value should be False
 
 
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
@@ -62,17 +63,20 @@ def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd,
         dbt_kwargs={"task_id": "test_task"},
     )
 
+    # Mock context with run_id
     mock_context = MagicMock()
+    mock_context.__getitem__.return_value = "test_run_id"  # For context["run_id"]
+
     operator.execute(mock_context)
 
-    mock_build_and_run_cmd.assert_called_once_with(
-        context=mock_context,
-        run_as_async=True,
-        async_context={
-            "profile_type": "bigquery",
-            "async_operator": BigQueryInsertJobOperator,
-        },
-    )
+    # Check that build_and_run_cmd was called with the correct parameters
+    # but ignore the run_id in async_context for the assertion
+    assert mock_build_and_run_cmd.call_count == 1
+    args, kwargs = mock_build_and_run_cmd.call_args
+    assert kwargs["context"] == mock_context
+    assert kwargs["run_as_async"] is True
+    assert kwargs["async_context"]["profile_type"] == "bigquery"
+    assert kwargs["async_context"]["async_operator"] == BigQueryInsertJobOperator
 
 
 @pytest.fixture
@@ -140,7 +144,10 @@ def test_store_compiled_sql(mock_override_rtif, mock_get_remote_sql, profile_con
 
 @patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._store_template_fields")
 def test_execute_complete(mock_store_sql, profile_config_mock):
-    mock_context = Mock()
+    # Create a mock context with run_id
+    mock_context = MagicMock()
+    mock_context.__getitem__.return_value = "test_run_id"  # For context["run_id"]
+
     mock_event = {"job_id": "test_job"}
 
     operator = DbtRunAirflowAsyncBigqueryOperator(
@@ -156,3 +163,15 @@ def test_execute_complete(mock_store_sql, profile_config_mock):
     assert result == "test_job"
     mock_super_execute.assert_called_once_with(context=mock_context, event=mock_event)
     mock_store_sql.assert_called_once_with(context=mock_context)
+
+
+def test_dbt_run_airflow_async_bigquery_operator_with_full_refresh(profile_config_mock):
+    """Test DbtRunAirflowAsyncBigqueryOperator initializes with full_refresh=True."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task", "full_refresh": True},
+    )
+
+    assert operator.full_refresh is True

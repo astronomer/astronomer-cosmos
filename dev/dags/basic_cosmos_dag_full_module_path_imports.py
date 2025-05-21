@@ -1,15 +1,16 @@
 """
-An example DAG that uses Cosmos to render a dbt project into an Airflow DAG.
+An example DAG that uses Cosmos by importing Cosmos classes with their full module path.
 """
 
 import os
 from datetime import datetime
 from pathlib import Path
 
-# [START cosmos_init_imports]
-from cosmos import DbtDag, ProfileConfig, ProjectConfig
+# [START cosmos_explicit_imports]
+from cosmos.airflow.dag import DbtDag
+from cosmos.config import ProfileConfig, ProjectConfig
 
-# [END cosmos_init_imports]
+# [END cosmos_explicit_imports]
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -26,7 +27,7 @@ profile_config = ProfileConfig(
 )
 
 # [START local_example]
-basic_cosmos_dag = DbtDag(
+basic_cosmos_dag_full_module_path_imports = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "jaffle_shop",
@@ -40,7 +41,7 @@ basic_cosmos_dag = DbtDag(
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-    dag_id="basic_cosmos_dag",
+    dag_id="basic_cosmos_dag_full_module_path_imports",
     default_args={"retries": 2},
 )
 # [END local_example]

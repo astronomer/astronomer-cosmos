@@ -61,7 +61,7 @@ def _configure_bigquery_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql")
+    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql", "full_refresh")
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -81,6 +81,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.configuration: dict[str, Any] = {}
         self.dbt_kwargs = dbt_kwargs or {}
         task_id = self.dbt_kwargs.pop("task_id")
+        self.full_refresh = self.dbt_kwargs.pop("full_refresh", False)
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
@@ -136,6 +137,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
         dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
+        run_id = self.async_context["run_id"]
 
         remote_target_path_str = str(remote_target_path).rstrip("/")
 
@@ -144,7 +146,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         project_dir_parent = str(Path(self.project_dir).parent)
         relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/run/{relative_file_path}"
+        remote_model_path = (
+            f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/{run_id}/run/{relative_file_path}"
+        )
 
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
         with object_storage_path.open() as fp:  # type: ignore
@@ -154,6 +158,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
         if settings.enable_setup_async_task:
             self.configuration = {
                 "query": {
@@ -192,6 +199,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         This returns immediately. It relies on trigger to throw an exception,
         otherwise it assumes execution was successful.
         """
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)

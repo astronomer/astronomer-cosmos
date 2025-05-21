@@ -1,8 +1,8 @@
 import pytest
 
 import cosmos.log
-from cosmos import get_provider_info
 from cosmos.log import CosmosRichLogger, get_logger
+from cosmos.provider_info import get_provider_info
 
 
 def test_get_logger(monkeypatch):

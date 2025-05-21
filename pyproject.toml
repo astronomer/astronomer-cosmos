@@ -116,7 +116,7 @@ gcp-cloud-run-job = [
 ]
 
 [project.entry-points.apache_airflow_provider]
-provider_info = "cosmos:get_provider_info"
+provider_info = "cosmos.provider_info:get_provider_info"
 
 [project.entry-points."airflow.plugins"]
 cosmos = "cosmos.plugin:CosmosPlugin"

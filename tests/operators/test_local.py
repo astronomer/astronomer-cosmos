@@ -1920,3 +1920,34 @@ def test_delete_sql_files_no_remote_target_configured(mock_configure_remote):
     with patch.object(operator.log, "warning") as mock_log_warning:
         operator._delete_sql_files()
         mock_log_warning.assert_called_once_with(expected_log_message)
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
+def test_override_rtif_airflow2_with_should_store_compiled_sql_false():
+    """Test that _override_rtif does nothing in Airflow 2 when should_store_compiled_sql is False"""
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    context = {"task_instance": MagicMock()}
+
+    operator._override_rtif(context)
+    assert not context["task_instance"].called
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
+def test_override_rtif_airflow3_with_should_store_compiled_sql_false():
+    """Test that _override_rtif sets overwrite_rtif_after_execution to False in Airflow 3 when should_store_compiled_sql is False"""
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    context = {"task_instance": MagicMock()}
+    operator._override_rtif(context)
+    assert operator.overwrite_rtif_after_execution is False

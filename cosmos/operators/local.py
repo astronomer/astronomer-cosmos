@@ -42,7 +42,12 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.dataset import get_dataset_alias_name
-from cosmos.dbt.project import copy_dbt_packages, get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import (
+    copy_dbt_packages,
+    copy_manifest_file_if_exists,
+    get_partial_parse_path,
+    has_non_empty_dependencies_file,
+)
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
@@ -148,6 +153,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
@@ -171,6 +177,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
+        manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
@@ -201,6 +208,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # We should not spend time trying to install deps if the project doesn't have any dependencies
         self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
         self.copy_dbt_packages = copy_dbt_packages
+
+        self.manifest_filepath = manifest_filepath
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -316,8 +325,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dest_target_dir_str = str(dest_target_dir).rstrip("/")
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
+        run_id = self.extra_context["run_id"]
 
-        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{resource_type}/{rel_path}"
+        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
@@ -341,17 +351,25 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
-    def _delete_sql_files(self, tmp_project_dir: Path, resource_type: str) -> None:
+    def _delete_sql_files(self) -> None:
+        """Deletes the entire run-specific directory from the remote target."""
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
-        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
-        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        if not dest_target_dir or not dest_conn_id:
+            self.log.warning("Remote target path or connection ID not configured. Skipping deletion.")
+            return
+
         from airflow.io.path import ObjectStoragePath
 
-        for file_path in files:
-            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)  # type: ignore
-            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
-            dest_object_storage_path.unlink()
-            self.log.debug("Deleted %s to %s", file_path, dest_object_storage_path)
+        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+        run_id = self.extra_context["run_id"]
+        run_dir_path_str = f"{str(dest_target_dir).rstrip('/')}/{dag_task_group_identifier}/{run_id}"
+        run_dir_path = ObjectStoragePath(run_dir_path_str, conn_id=dest_conn_id)
+
+        if run_dir_path.exists():
+            run_dir_path.rmdir(recursive=True)
+            self.log.info("Deleted remote run directory: %s", run_dir_path_str)
+        else:
+            self.log.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
 
     def store_freshness_json(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -457,6 +475,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
+        copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
+
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
             return
@@ -466,7 +486,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
     def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
-        return [
+        dbt_flags = [
             "--project-dir",
             str(tmp_project_dir),
             "--profiles-dir",
@@ -476,6 +496,15 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             "--target",
             self.profile_config.target_name,
         ]
+        if self.invocation_mode == InvocationMode.DBT_RUNNER:
+            # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+            # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+            # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+            # directories, and the use of different temp paths between parsing and execution appears to interfere
+            # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+            # hangs and ensures reliable task execution.
+            dbt_flags.append("--no-static-parser")
+        return dbt_flags
 
     def _install_dependencies(
         self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
@@ -534,7 +563,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if async_context.get("teardown_task") and settings.enable_teardown_async_task:
-            self._delete_sql_files(Path(tmp_project_dir), "run")
+            self._delete_sql_files()
             return
 
         if settings.enable_setup_async_task:
@@ -548,7 +577,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             async_op_configurator(self, sql=sql)
             async_context["async_operator"].execute(self, context)
 
-    def run_command(
+    def run_command(  # noqa: C901
         self,
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
@@ -562,10 +591,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not self.invocation_mode:
             self._discover_invocation_mode()
 
-        with tempfile.TemporaryDirectory() as tmp_project_dir:
+        if self.extra_context.get("run_id") is None:
+            self.extra_context["run_id"] = context["run_id"]
 
+        with tempfile.TemporaryDirectory() as tmp_project_dir:
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
+
             self._clone_project(tmp_dir_path)
 
             if self.partial_parse:
@@ -821,7 +853,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
 
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
-
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -1289,7 +1320,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs: str) -> None:
         raise DeprecationWarning(
-            "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
+            "The DbtDepsOperator has been deprecated. Please use the `install_deps` flag in dbt_args instead."
         )
 
 

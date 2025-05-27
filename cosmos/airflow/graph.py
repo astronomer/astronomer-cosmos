@@ -128,6 +128,7 @@ def create_test_task_metadata(
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
+    render_config: RenderConfig | None = None,
     disable_owner_inheritance: bool | None = None,
 ) -> TaskMetadata:
     """

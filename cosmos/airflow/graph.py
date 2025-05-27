@@ -175,7 +175,7 @@ def create_test_task_metadata(
     if task_owner and disable_owner_inheritance:
         task_owner = ""
 
-    logger.info(f"create_task_metadata has the following val for disable_owner_inheritance: {disable_owner_inheritance}")
+    logger.info(f"create_test_task_metadata has the following val for disable_owner_inheritance: {disable_owner_inheritance}")
 
     args_to_override: dict[str, Any] = {}
     if node:

@@ -53,7 +53,7 @@ with DAG(
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     orders = DbtTaskGroup(
@@ -68,7 +68,7 @@ with DAG(
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

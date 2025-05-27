@@ -41,7 +41,7 @@ with DAG(
     schedule="@daily",
     doc_md=__doc__,
     catchup=False,
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 ) as dag:
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",

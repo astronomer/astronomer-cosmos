@@ -50,6 +50,7 @@ PROFILE_CONFIG = ProfileConfig(
     profiles_yml_filepath="./profiles.yml",
 )
 
+
 def skip_on_empty_operator(test_func):
     """
     Skip the test if DbtGcpCloudRunJob operators couldn't be imported.
@@ -222,6 +223,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 "--project-dir",
                 "my/dir",
             ]
+
 
 @skip_on_empty_operator
 def test_dbt_gcp_cloud_run_job_build_command_with_profile_config():

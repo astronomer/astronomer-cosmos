@@ -131,5 +131,7 @@ def test_async_example_dag_without_setup_task(monkeypatch):
     monkeypatch.setattr("cosmos.operators.local.settings.enable_setup_async_task", False)
     monkeypatch.setattr("cosmos.operators.local.settings.enable_teardown_async_task", False)
     monkeypatch.setattr("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+    monkeypatch.setattr("cosmos.settings.enable_setup_async_task", False)
+    monkeypatch.setattr("cosmos.settings.enable_teardown_async_task", False)
     for dag_id in async_dag_ids:
         run_dag(dag_id)

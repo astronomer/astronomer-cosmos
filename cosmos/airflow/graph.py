@@ -322,8 +322,6 @@ def create_task_metadata(
 
         task_owner = node.owner
 
-        disable_owner_inheritance = True
-
         if task_owner and disable_owner_inheritance:
             task_owner = ""
 

@@ -142,6 +142,9 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
             if self.profile_config.target_name:
                 dbt_cmd.extend(["--target", self.profile_config.target_name])
 
+        if self.project_dir:
+            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
+
         self.environment_variables = {**env_vars, **self.environment_variables}
         self.command = dbt_cmd
         # Override Cloud Run Job default arguments with dbt command

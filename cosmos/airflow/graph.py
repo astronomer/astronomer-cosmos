@@ -127,8 +127,8 @@ def create_test_task_metadata(
     task_args: dict[str, Any],
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
     render_config: RenderConfig | None = None,
+    detached_from_parent: dict[str, DbtNode] | None = None,
     disable_owner_inheritance: bool | None = None,
 ) -> TaskMetadata:
     """
@@ -175,8 +175,6 @@ def create_test_task_metadata(
 
     if task_owner and disable_owner_inheritance:
         task_owner = ""
-
-    logger.info(f"create_test_task_metadata has the following val for disable_owner_inheritance: {disable_owner_inheritance}")
 
     args_to_override: dict[str, Any] = {}
     if node:
@@ -325,8 +323,6 @@ def create_task_metadata(
 
         if task_owner and disable_owner_inheritance:
             task_owner = ""
-
-        logger.info(f"create_task_metadata has the following val for disable_owner_inheritance: {disable_owner_inheritance}")
 
         task_metadata = TaskMetadata(
             id=task_id,

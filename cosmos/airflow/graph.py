@@ -322,6 +322,8 @@ def create_task_metadata(
 
         task_owner = node.owner
 
+        disable_owner_inheritance = True
+
         if task_owner and disable_owner_inheritance:
             task_owner = ""
 
@@ -411,6 +413,7 @@ def generate_task_or_group(
                     node=node,
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
+                    disable_owner_inheritance=disable_owner_inheritance,
                 )
                 test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
                 task >> test_task

@@ -569,7 +569,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self._delete_sql_files()
             return
 
-        if settings.enable_setup_async_task:
+        if async_context.get("setup_task") and settings.enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)

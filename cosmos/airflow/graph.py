@@ -642,7 +642,7 @@ def build_airflow_graph(
             task_args=task_args,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
-            disable_owner_inheritance=disable_owner_inheritance
+            disable_owner_inheritance=disable_owner_inheritance,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)

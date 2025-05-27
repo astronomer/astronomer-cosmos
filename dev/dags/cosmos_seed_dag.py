@@ -41,7 +41,7 @@ with DAG(
     doc_md=__doc__,
     catchup=False,
     max_active_runs=1,
-    default_args={"owner": "01-EXTRACT", "retries": 2},
+    default_args={"owner": "01-EXTRACT", "retries": 0},
 ) as dag:
     with TaskGroup(group_id="drop_seeds_if_exist") as drop_seeds:
         for seed in ["raw_customers", "raw_payments", "raw_orders"]:

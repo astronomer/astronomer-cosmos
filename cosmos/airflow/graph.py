@@ -127,8 +127,8 @@ def create_test_task_metadata(
     task_args: dict[str, Any],
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
-    render_config: RenderConfig | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
+    disable_owner_inheritance: bool | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -171,6 +171,11 @@ def create_test_task_metadata(
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
         _override_profile_if_needed(task_args, node.profile_config_to_override)
+
+    if task_owner and disable_owner_inheritance:
+        task_owner = ""
+
+    logger.info(f"create_task_metadata has the following val for disable_owner_inheritance: {disable_owner_inheritance}")
 
     args_to_override: dict[str, Any] = {}
     if node:
@@ -250,6 +255,7 @@ def create_task_metadata(
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
+    disable_owner_inheritance: bool | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -314,9 +320,16 @@ def create_task_metadata(
 
         _override_profile_if_needed(args, node.profile_config_to_override)
 
+        task_owner = node.owner
+
+        if task_owner and disable_owner_inheritance:
+            task_owner = ""
+
+        logger.info(f"create_task_metadata has the following val for disable_owner_inheritance: {disable_owner_inheritance}")
+
         task_metadata = TaskMetadata(
             id=task_id,
-            owner=node.owner,
+            owner=task_owner,
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),
@@ -356,6 +369,7 @@ def generate_task_or_group(
     on_warning_callback: Callable[..., Any] | None,
     normalize_task_id: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
+    disable_owner_inheritance: bool | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -379,6 +393,7 @@ def generate_task_or_group(
         test_indirect_selection=test_indirect_selection,
         on_warning_callback=on_warning_callback,
         detached_from_parent=detached_from_parent,
+        disable_owner_inheritance=disable_owner_inheritance,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -582,6 +597,7 @@ def build_airflow_graph(
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
+    disable_owner_inheritance = render_config.disable_owner_inheritance
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -612,6 +628,7 @@ def build_airflow_graph(
             normalize_task_id=normalize_task_id,
             node=node,
             detached_from_parent=detached_from_parent,
+            disable_owner_inheritance=disable_owner_inheritance,
         )
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
@@ -627,6 +644,7 @@ def build_airflow_graph(
             task_args=task_args,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
+            disable_owner_inheritance=disable_owner_inheritance
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
@@ -644,6 +662,7 @@ def build_airflow_graph(
                 on_warning_callback=on_warning_callback,
                 render_config=render_config,
                 node=node,
+                disable_owner_inheritance=disable_owner_inheritance,
             )
             test_task = create_airflow_task(test_meta, dag, task_group=task_group)
             tasks_map[node_id] = test_task

@@ -95,7 +95,7 @@ For instance, to run the tests using Python 3.9, `Apache Airflow® <https://airf
 
 .. code-block:: bash
 
-    hatch run tests.py3.9-2.10-1.9:test-cov:test-cov
+    hatch run tests.py3.9-2.10-1.9:test-cov
 
 It is also possible to run the tests using all the matrix combinations, by using:
 

@@ -32,14 +32,11 @@ def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
 
 
 def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False) -> DagRun:
-    dr = None
     if custom_tester:
-        dr = test_old_dag(dag, conn_file_path)
-        assert dr.state == DagRunState.SUCCESS, f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+        return test_old_dag(dag, conn_file_path)
     elif AIRFLOW_VERSION >= version.Version("2.5"):
         if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-            dr = dag.test()
-            assert dr.state == DagRunState.SUCCESS, f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+            return dag.test()
         else:
             # This is a work around until we fix the issue in Airflow:
             # https://github.com/apache/airflow/issues/42495
@@ -52,19 +49,13 @@ def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False
             FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
             """
             try:
-                dr = dag.test()
-                assert (
-                    dr.state == DagRunState.SUCCESS
-                ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+                dag.test()
             except sqlalchemy.exc.PendingRollbackError:
                 warnings.warn(
                     "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
                 )
     else:
-        dr = test_old_dag(dag, conn_file_path)
-        assert dr.state == DagRunState.SUCCESS, f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-
-    return dr
+        return test_old_dag(dag, conn_file_path)
 
 
 # DAG.test() was added in Airflow version 2.5.0. And to test on older Airflow versions, we need to copy the

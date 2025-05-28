@@ -24,7 +24,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``source_rendering_behavior``: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6). See `Source Nodes Rendering <./source-nodes-rendering.html>`_ for more information.
 - ``normalize_task_id``: A callable that takes a dbt node as input and returns the task ID. This function allows users to set a custom task_id independently of the model name, which can be specified as the task’s display_name. This way, task_id can be modified using a user-defined function, while the model name remains as the task’s display name. The display_name parameter is available in Airflow 2.9 and above. See `Task display name <./task-display-name.html>`_ for more information.
 - ``should_detach_multiple_parents_tests``: A boolean to control if tests that depend on multiple parents should be run as standalone tasks. See `Parsing Methods <testing-behavior.html>`_ for more information.
-- ``disable_owner_inheritance``: A boolean to control if dbt owners should be imported as part of the airflow DAG owners. Defaults to False.
+- ``disable_owner_inheritance``: A boolean to control if dbt owners should not be imported as part of the airflow DAG owners. Defaults to False.
 
 
 How to run dbt ls (invocation mode)

@@ -22,9 +22,9 @@ Example of Airflow 3 Cosmos Asset URI:
 
 If you want to use the Airflow 3 URI standard while still using Airflow 2, please set:
 
-`
-export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
-`
+.. code-block:: bash
+
+    export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
 
 .. warning::
     Remember to update any DAGs that are triggered using Cosmos-generated datasets or aliases to the new URI format.

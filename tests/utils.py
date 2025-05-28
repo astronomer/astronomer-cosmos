@@ -31,12 +31,22 @@ def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
     return test_dag(dag=dag, conn_file_path=conn_file_path)
 
 
+def check_dag_success(dag_run: DagRun | None) -> bool:
+    """Check if a DAG was successful, if that Airflow version allows it."""
+    if dag_run is not None:
+        return dag_run.state == DagRunState.SUCCESS
+    return True
+
+
 def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False) -> DagRun:
+    dr = None
     if custom_tester:
-        return test_old_dag(dag, conn_file_path)
+        dr = test_old_dag(dag, conn_file_path)
+        assert dr.state == DagRunState.SUCCESS, f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
     elif AIRFLOW_VERSION >= version.Version("2.5"):
         if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-            return dag.test()
+            dr = dag.test()
+            assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
         else:
             # This is a work around until we fix the issue in Airflow:
             # https://github.com/apache/airflow/issues/42495
@@ -49,13 +59,17 @@ def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False
             FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
             """
             try:
-                dag.test()
+                dr = dag.test()
+                assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
             except sqlalchemy.exc.PendingRollbackError:
                 warnings.warn(
                     "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
                 )
     else:
-        return test_old_dag(dag, conn_file_path)
+        dr = test_old_dag(dag, conn_file_path)
+        assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+
+    return dr
 
 
 # DAG.test() was added in Airflow version 2.5.0. And to test on older Airflow versions, we need to copy the
@@ -121,7 +135,7 @@ def test_old_dag(
 
     print("conn_file_path", conn_file_path)
 
-    return dr, session
+    return dr
 
 
 def add_logger_if_needed(dag: DAG, ti: TaskInstance):

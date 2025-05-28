@@ -41,6 +41,6 @@ example_cosmos_dbt_build = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_cosmos_dbt_build",
-    default_args={"retries": 0},
+    default_args={"retries": 2},
 )
 # [END build_example]

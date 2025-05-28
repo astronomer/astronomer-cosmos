@@ -55,6 +55,6 @@ cosmos_callback_dag = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="cosmos_callback_dag",
-    default_args={"retries": 0},
+    default_args={"retries": 2},
 )
 # [END cosmos_callback_example]

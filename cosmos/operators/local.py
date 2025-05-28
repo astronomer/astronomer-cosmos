@@ -572,7 +572,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if settings.enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:
-            self.log.info(f"task-id: {self.task_id}")
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]
             module_path = f"cosmos.operators._asynchronous.{profile_type}"

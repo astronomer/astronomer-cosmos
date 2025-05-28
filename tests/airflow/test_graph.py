@@ -980,6 +980,7 @@ def test_owner(dbt_extra_config, expected_owner):
         test_behavior=TestBehavior.AFTER_EACH,
         on_warning_callback=None,
         source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        enable_owner_inheritance=True,
     )
 
     assert len(output.leaves) == 1
@@ -1040,17 +1041,16 @@ def test_add_teardown_task_raises_error_without_async_py_requirements():
 
 
 @pytest.mark.parametrize(
-    "disable_owner_inheritance,node_owner,expected_owner",
+    "enable_owner_inheritance,node_owner,expected_owner",
     [
-        (False, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
-        (True, "dbt-owner", ""),  # Disable inheritance - empty owner
-        (None, "dbt-owner", "dbt-owner"),  # None (default) - inherit owner
-        (False, "", ""),  # No owner to inherit
-        (True, "", ""),  # No owner to inherit, disable inheritance
+        (True, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
+        (False, "dbt-owner", ""),  # Disable inheritance - empty string
+        (True, "", ""),  # No owner to inherit - empty string
+        (False, "", ""),  # No owner to inherit, disable inheritance - empty string
     ],
 )
-def test_create_task_metadata_disable_owner_inheritance(disable_owner_inheritance, node_owner, expected_owner):
-    """Test that disable_owner_inheritance parameter works correctly in create_task_metadata."""
+def test_create_task_metadata_disable_owner_inheritance(enable_owner_inheritance, node_owner, expected_owner):
+    """Test that enable_owner_inheritance parameter works correctly in create_task_metadata."""
     node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
@@ -1065,7 +1065,7 @@ def test_create_task_metadata_disable_owner_inheritance(disable_owner_inheritanc
         execution_mode=ExecutionMode.LOCAL,
         args={"project_dir": SAMPLE_PROJ_PATH},
         dbt_dag_task_group_identifier="test_dag",
-        disable_owner_inheritance=disable_owner_inheritance,
+        enable_owner_inheritance=enable_owner_inheritance,
     )
 
     assert task_metadata is not None
@@ -1073,17 +1073,16 @@ def test_create_task_metadata_disable_owner_inheritance(disable_owner_inheritanc
 
 
 @pytest.mark.parametrize(
-    "disable_owner_inheritance,node_owner,expected_owner",
+    "enable_owner_inheritance,node_owner,expected_owner",
     [
-        (False, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
-        (True, "dbt-owner", ""),  # Disable inheritance - empty owner
-        (None, "dbt-owner", "dbt-owner"),  # None (default) - inherit owner
-        (False, "", ""),  # No owner to inherit
-        (True, "", ""),  # No owner to inherit, disable inheritance
+        (True, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
+        (False, "dbt-owner", ""),  # Disable inheritance - empty string
+        (True, "", ""),  # No owner to inherit - empty string
+        (False, "", ""),  # No owner to inherit, disable inheritance - empty string
     ],
 )
-def test_create_test_task_metadata_disable_owner_inheritance(disable_owner_inheritance, node_owner, expected_owner):
-    """Test that disable_owner_inheritance parameter works correctly in create_test_task_metadata."""
+def test_create_test_task_metadata_disable_owner_inheritance(enable_owner_inheritance, node_owner, expected_owner):
+    """Test that enable_owner_inheritance parameter works correctly in create_test_task_metadata."""
     node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
@@ -1099,36 +1098,37 @@ def test_create_test_task_metadata_disable_owner_inheritance(disable_owner_inher
         test_indirect_selection=TestIndirectSelection.EAGER,
         task_args={"project_dir": SAMPLE_PROJ_PATH},
         node=node,
-        disable_owner_inheritance=disable_owner_inheritance,
+        enable_owner_inheritance=enable_owner_inheritance,
     )
 
     assert test_metadata.owner == expected_owner
 
 
 def test_create_test_task_metadata_disable_owner_inheritance_without_node():
-    """Test that disable_owner_inheritance has no effect when node is None."""
+    """Test that enable_owner_inheritance has no effect when node is None."""
     test_metadata = create_test_task_metadata(
         test_task_name="test_all",
         execution_mode=ExecutionMode.LOCAL,
         test_indirect_selection=TestIndirectSelection.EAGER,
         task_args={"project_dir": SAMPLE_PROJ_PATH},
         node=None,
-        disable_owner_inheritance=True,
+        enable_owner_inheritance=False,
     )
 
     assert test_metadata.owner == ""
 
 
 @pytest.mark.parametrize(
-    "disable_owner_inheritance,node_owner,expected_owner",
+    "enable_owner_inheritance,node_owner,expected_owner",
     [
-        (False, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
-        (True, "dbt-owner", DEFAULT_OWNER),  # Disable inheritance - gets default Airflow owner
-        (None, "dbt-owner", "dbt-owner"),  # None (default) - inherit owner
+        (True, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
+        (False, "dbt-owner", DEFAULT_OWNER),  # Disable inheritance - use default owner
+        (True, "", DEFAULT_OWNER),  # No owner to inherit - use default owner
+        (False, "", DEFAULT_OWNER),  # No owner to inherit, disable inheritance - use default owner
     ],
 )
-def test_generate_task_or_group_disable_owner_inheritance(disable_owner_inheritance, node_owner, expected_owner):
-    """Test that disable_owner_inheritance parameter works correctly in generate_task_or_group."""
+def test_generate_task_or_group_disable_owner_inheritance(enable_owner_inheritance, node_owner, expected_owner):
+    """Test that enable_owner_inheritance parameter works correctly in generate_task_or_group."""
     with DAG("test-disable-owner-inheritance", start_date=datetime(2022, 1, 1)) as dag:
         node = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
@@ -1159,7 +1159,7 @@ def test_generate_task_or_group_disable_owner_inheritance(disable_owner_inherita
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             test_indirect_selection=TestIndirectSelection.EAGER,
             on_warning_callback=None,
-            disable_owner_inheritance=disable_owner_inheritance,
+            enable_owner_inheritance=enable_owner_inheritance,
         )
 
         assert task_or_group is not None
@@ -1167,18 +1167,18 @@ def test_generate_task_or_group_disable_owner_inheritance(disable_owner_inherita
 
 
 @pytest.mark.parametrize(
-    "test_behavior,disable_owner_inheritance",
+    "test_behavior,enable_owner_inheritance",
     [
-        (TestBehavior.AFTER_EACH, False),
         (TestBehavior.AFTER_EACH, True),
-        (TestBehavior.AFTER_ALL, False),
+        (TestBehavior.AFTER_EACH, False),
         (TestBehavior.AFTER_ALL, True),
-        (TestBehavior.BUILD, False),
+        (TestBehavior.AFTER_ALL, False),
         (TestBehavior.BUILD, True),
+        (TestBehavior.BUILD, False),
     ],
 )
-def test_build_airflow_graph_disable_owner_inheritance(test_behavior, disable_owner_inheritance):
-    """Test that disable_owner_inheritance parameter works correctly in build_airflow_graph."""
+def test_build_airflow_graph_disable_owner_inheritance(test_behavior, enable_owner_inheritance):
+    """Test that enable_owner_inheritance parameter works correctly in build_airflow_graph."""
     with DAG("test-disable-owner-inheritance-graph", start_date=datetime(2022, 1, 1)) as dag:
         node_with_owner = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.model_with_owner",
@@ -1214,7 +1214,7 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, disable_ow
             render_config=RenderConfig(
                 test_behavior=test_behavior,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
-                disable_owner_inheritance=disable_owner_inheritance,
+                enable_owner_inheritance=enable_owner_inheritance,
             ),
             dbt_project_name="test_project",
         )
@@ -1225,13 +1225,13 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, disable_ow
             assert isinstance(model_task, TaskGroup)
 
             run_task = model_task.children["model_with_owner.run"]
-            expected_owner = DEFAULT_OWNER if disable_owner_inheritance else "test-owner"
+            expected_owner = DEFAULT_OWNER if not enable_owner_inheritance else "test-owner"
             assert run_task.owner == expected_owner
 
             test_task = model_task.children["model_with_owner.test"]
             assert test_task.owner == expected_owner
         else:
-            expected_owner = DEFAULT_OWNER if disable_owner_inheritance else "test-owner"
+            expected_owner = DEFAULT_OWNER if not enable_owner_inheritance else "test-owner"
             assert model_task.owner == expected_owner
 
         if test_behavior == TestBehavior.AFTER_ALL:
@@ -1242,7 +1242,7 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, disable_ow
 
 
 def test_build_airflow_graph_disable_owner_inheritance_with_detached_tests():
-    """Test that disable_owner_inheritance works correctly with detached test nodes."""
+    """Test that enable_owner_inheritance works correctly with detached test nodes."""
     with DAG("test-disable-owner-inheritance-detached", start_date=datetime(2022, 1, 1)) as dag:
         parent_node1 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
@@ -1297,7 +1297,7 @@ def test_build_airflow_graph_disable_owner_inheritance_with_detached_tests():
                 test_behavior=TestBehavior.BUILD,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
                 should_detach_multiple_parents_tests=True,
-                disable_owner_inheritance=True,
+                enable_owner_inheritance=False,
             ),
             dbt_project_name="test_project",
         )

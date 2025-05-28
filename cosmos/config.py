@@ -88,7 +88,7 @@ class RenderConfig:
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
     normalize_task_id: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
-    enable_owner_inheritance: bool = True
+    enable_owner_inheritance: bool | None = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

@@ -89,7 +89,7 @@ def get_dag_bag() -> DagBag:
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
-    # assert not db.import_errors
+    assert not db.import_errors
     return db
 
 

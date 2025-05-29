@@ -1,35 +1,27 @@
 {% extends base_template %}
 {% block page_title %}dbt docs - {{ appbuilder.app_name }}{% endblock %}
 {% block content %}
-    <script src="{{ url_for('.static', filename='iframeResizer.min.js') }}"></script>
-    <iframe id="dbtIframe" src="{{ url_for('.dbt_docs_index') }}" style="min-width: 100%; border: 0;"></iframe>
-    <script>
-        iFrameResize(
-            {
-                heightCalculationMethod: 'custom',
-                resizeFrom: 'child',
-                minHeight: 500
-            },
-            '#dbtIframe'
-        );
+<iframe id="dbtIframe" src="{{ url_for('.dbt_docs_index') }}"
+    style="min-width: 100%; border: 0; height: calc(100vh - 140px);"></iframe>
+<script>
 
-        window.addEventListener('message', function (event) {
-            let msgData = event.data;
-            if (msgData.startsWith('#!')) {
-                let updateUrl = new URL(window.location);
-                updateUrl.hash = msgData;
-                history.replaceState(null, null, updateUrl);
-            }
-        });
+    window.addEventListener('message', function (event) {
+        let msgData = event.data;
+        if (msgData.startsWith('#!')) {
+            let updateUrl = new URL(window.location);
+            updateUrl.hash = msgData;
+            history.replaceState(null, null, updateUrl);
+        }
+    });
 
-        window.addEventListener('popstate', function () {
-            dbtIframe.contentWindow.postMessage(window.location.hash);
-        });
+    window.addEventListener('popstate', function () {
+        dbtIframe.contentWindow.postMessage(window.location.hash);
+    });
 
-        let dbtIframe = document.getElementById('dbtIframe');
-        let iframeUrl = new URL(dbtIframe.src);
-        iframeUrl.hash = window.location.hash;
-        dbtIframe.src = iframeUrl.href;
+    let dbtIframe = document.getElementById('dbtIframe');
+    let iframeUrl = new URL(dbtIframe.src);
+    iframeUrl.hash = window.location.hash;
+    dbtIframe.src = iframeUrl.href;
 
-    </script>
+</script>
 {% endblock %}

@@ -1,13 +1,158 @@
 Changelog
 =========
 
-1.9.1a1 (2025-02-20)
+1.10.1 (2025-05-21)
+---------------------
+
+Bug Fixes
+
+* Fix ``full_refresh`` parameter in ``AIRFLOW_ASYNC`` ``ExecutionConfig`` mode by @tuantran0910 in #1738
+* Fix dbt ls invocation method log message by @tatiana and @dstandish in #1749
+* Ensure remote target directory is created when copying files when using local directory by @tuantran0910 and @corsettigyg in #1740
+* Support custom ``packages-install-path`` by @tatiana in #1768
+* Disable dbt static parser during Airflow task execution using dbt runner by @pankajkoti and @tatiana in #1760
+* Fix ``ExecutionMode.LOCAL`` to leverage ``ProjectConfig.manifest_path`` by @tatiana in #1772
+* Refactor ``AIRFLOW_ASYNC`` so that the path in the remote object store is specific per DAG run by @tuantran0910 in #1741
+* Optimise memory usage with optional explicit imports by @pankajkoti and @tatiana in #1769
+
+Documentation
+
+* Fix documentation rendering for ``use_dataset_airflow3_uri_standard`` by @pankajastro in #1742
+* Correct custom callback example by @walter9388 in #1747
+
+Others
+
+* Re-enable integration tests durations to troubleshoot performance degradation by @tatiana in #1735
+* Run listener tests for Airflow 3 by @pankajastro in #1743
+* Add Airflow 3 db files to ignore from git tracking by @pankajkoti in #1755
+* Log contents of ``packages.yml`` when ``AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG`` by @tatiana in #1764
+* Fix Airflow dependencies in the CI by @tatiana in #1773
+* Pre-commit updates: #1744, #1765, #1770
+
+
+1.10.0 (2025-05-01)
+---------------------
+
+Features
+
+* Airflow 3 support. `More details here. <https://astronomer.github.io/astronomer-cosmos/airflow3_compatibility/>`_.
+* Support running ``dbt deps`` incrementally to pre-defined ``dbt_packages`` by @tatiana in #1668 and #1670
+* Add ``DuckDB`` profile mapping by @prithvijitguha and @pankajastro in #1553
+* Implement DBT exposure selector by ghjklw #1717
+
+Bug Fixes
+
+* Fix ``test_indirect_selection`` flag to be propagated in case of ``TestBehavior.BUILD`` by @corsettigyg in #1663
+* Fix ``select`` clause in the case of detached tests by @anyapriya in #1680
+* Operator argument fixes by @johnhoran in #1648
+
+Airflow 3 Support
+
+`Documentation about the current status <https://astronomer.github.io/astronomer-cosmos/airflow3_compatibility/>`_ and completed tasks:
+
+* Support rendering DbtDag in Airflow 3 by @tatiana and @ashb in #1657
+* Refactor Rendered Task Instance Fields (RTIF) handling for Airflow 2.x and 3.x by @pankajkoti in #1661
+* Run cosmos operator in Airflow 3 by @pankajastro in #1642
+* Fix ``python_virtualenv.prepare_env`` top-level import for Airflow 3 by @pankajkoti in #1678
+* Fix Variable not found issue in Airflow 3 by @tatiana in #1684
+* Disable CosmosPlugin on Airflow 3 setup by @pankajkoti in #1692, #1698
+* Use ``schedule`` param in example DAGs instead of the 2.10 deprecated and 3.0 removed ``schedule_interval`` by @pankajkoti in #1701
+* Ensure ``virtualenv_dir`` path exists by @pankajkoti in #1724
+* Support emitting Assets with Airflow 3 by @tatiana in #1713
+* Add docs on Airflow 3 compatibility by @pankajkoti and @tatiana in #1731
+* Introduce, test and document asset/dataset breaking change by @tatiana in #1672
+* Improve dataset/asset driven scheduling documentation by @tatiana in #1729
+
+Enhancements
+
+* Allow multiple callbacks by @corsettigyg #1693
+* Refactor kubernetes warning callback handling by @canbekley in #1681
+
+Documentation
+
+* Add documentation related to ``copy_dbt_packages`` by @tatiana in #1671
+* Make wording and command consistent in the contributing doc by @pankajkoti in #1697
+* Add MonteCarlo callback example for importing dbt artifacts by @corsettigyg #1695
+* Change async feature to be non-experimental by @tatiana in #1732
+
+Others
+
+* Add sample ``dbt_packages`` to validate incremental ``dbt deps`` by @tatiana in #1669
+* Add kubernetes execution mode example in Airflow 3 by @pankajastro in #1667
+* Check only major version until Airflow 3 stable release by @pankajastro in #1665
+* Install Airflow from main branch by @pankajastro in #1660
+* Add dev tool for Airflow 3 by @pankajastro and @tatiana in #1627
+* Improve Airflow 3 tooling by @pankajastro in #1656
+* Skip associating ``openlineage_events_completes`` to ``ti`` in Airflow 3 by @pankajkoti in #1662
+* Add .gitignore file for the scripts/airflow3 directory by @pankajkoti in #1658
+* Remove ``original_jaffle_shop`` dbt project by @pankajkoti in #1676
+* Fix or ignore type check error by @pankajastro in #1687
+* Run virtualenv example with Airflow 3 tooling by @pankajastro in #1686
+* Enable running setup/teardown tasks with Async execution DAG with Airflow 3 tooling by @pankajastro in #1696
+* Enable integration tests for the DuckDB adapter by @pankajastro in #1699
+* Add Airflow 3 tests matrix entries in CI by @pankajkoti in #1646
+* Use a different way to get tasks count for asserting test_perf_dag by @pankajkoti in #1714
+* Reinstall Airflow 3 dependency on ``pydantic>=2.11`` for dbt adapter versions 1.6 & 1.9 by @pankajkoti in #1715
+* Fix outdated ``echo`` in Airflow 3 tooling script #1700
+* Add files not needed for git tracking to .gitignore by @pankajkoti in #1723
+* Use latest minor versions for dbt adapters to get in compatibility fixes by @pankajkoti in #1719
+* Fix Airflow 3 tests raising generate_run_id() takes 0 positional arguments by @tatiana in #1725
+* Fix dataset tests failing in Airflow 3 by @tatiana in #1716
+* Enable example DAGs to run in CI that were disabled in PR #1646 by @pankajkoti in #1726
+* Pre-commit updates: #1666, #1653, #1641, #1682, #1720
+
+
+1.9.2 (2025-03-18)
+------------------
+
+Bug Fixes
+
+* Detach dbt vars used to render DAGs from the operator args' by @tatiana in #1616
+
+Enhancements
+
+* Support filtering by config meta nested properties by @tatiana in #1617
+
+Others
+
+* Update contributing.rst to latest test matrix by @tatiana in #1614
+* Pre-commit updates: #1615
+
+1.9.1 (2025-03-13)
 --------------------
 
 Bug Fixes
 
 * Fix import error in dbt bigquery adapter mock for ``dbt-bigquery<1.8`` for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti in #1548
+* Fix ``operator_args`` override configuration by @ghjklw in #1558
+* Fix missing ``install_dbt_deps`` in ``ProjectConfig`` ``__init__`` method by @ghjklw in #1556
+* Fix dbt project parsing ``dbt_vars`` behavior passed via ``operator_args`` by @AlexandrKhabarov in #1543
+* Avoid reading the connection during DAG parsing of the async BigQuery operator by @joppevos in #1582
+* Fix: Workaround to incorrectly raised ``gcsfs.retry.HttpError`` (Invalid Credentials, 401) by @tatiana in #1598
+* Fix the async execution mode read sql files for dbt packages by @pankajastro in #1588
+* Improve BQ async error handling by @tatiana in #1597
+* Fix path selector when ``manifest.json`` is created using MS Windows by @tatiana in #1601
+* Fix log that prints 'Total filtered nodes' by @tatiana in #1603
+* Fix select behaviour using ``LoadMode.MANIFEST`` and a path with star by @tatiana in #1602
+* Support ``on_warning_callback`` with ``TestBehavior.BUILD`` and ``ExecutionMode.LOCAL`` by @corsettigyg in #1571
+* Fix ``DbtRunLocalOperator.partial()`` support by @tatiana @ashb in #1609
+* fix: ``container_name`` is null for ecs integration by @nicor88 in #1592
 
+Docs
+
+* Improve MWAA getting-started docs by removing unused imports by @jx2lee in #1562
+
+Others
+
+* Disable ``example_cosmos_dbt_build.py`` DAG in CI by @pankajastro in #1567
+* Upgrade GitHub Actions Ubuntu version by @tatiana in #1561
+* Update GitHub bug issue template by @pankajastro in #1586
+* Enable DAG ``example_cosmos_dbt_build.py`` in CI by @pankajastro in #1573
+* Run async DAG in DAG without setup/teardown task by @pankajastro in #1599
+* Add test case that fully covers recent select issue by @tatiana in #1604
+* Add CI job to test multiple dbt versions for the async DAG by @pankajkoti in #1535
+* Improve unit tests speed from 89s to 14s by @tatiana in #1600
+* Pre-commit updates: #1560, #1583, #1596
 
 1.9.0 (2025-02-19)
 --------------------

@@ -52,7 +52,7 @@ another_grandparent_node = DbtNode(
     depends_on=[],
     file_path=SAMPLE_PROJ_PATH / "gen1/models/another_grandparent_node.sql",
     tags=[],
-    config={},
+    config={"meta": {"frequency": "daily"}},
 )
 
 parent_node = DbtNode(
@@ -139,6 +139,45 @@ def test_select_nodes_by_select_config():
     assert selected == expected
 
 
+def test_select_nodes_by_select_config_meta_nested_property():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.meta.frequency:daily"])
+    expected = {another_grandparent_node.unique_id: another_grandparent_node}
+    assert selected == expected
+
+
+def test_select_nodes_by_select_config_meta_nested_property_with_children():
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.meta.frequency:daily+"])
+    expected = {
+        another_grandparent_node.unique_id: another_grandparent_node,
+        parent_node.unique_id: parent_node,
+        child_node.unique_id: child_node,
+        sibling1_node.unique_id: sibling1_node,
+        sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_select_config_meta_nested_property_two_meta_values():
+    local_nodes = dict(sample_nodes)
+    someone_else_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.someone_else",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "gen1/models/someone_else.sql",
+        tags=[],
+        config={"meta": {"frequency": "daily", "dbt_environment": "dev"}},
+    )
+    local_nodes[someone_else_node.unique_id] = someone_else_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["config.meta.frequency:daily,config.meta.dbt_environment:dev"],
+    )
+    expected = {someone_else_node.unique_id: someone_else_node}
+    assert selected == expected
+
+
 def test_select_nodes_by_select_config_tag():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["config.tags:is_child"])
     expected = {
@@ -173,6 +212,15 @@ def test_select_nodes_by_select_union_config_test_tags():
         sibling2_node.unique_id: sibling2_node,
     }
     assert selected == expected
+
+
+def test_select_nodes_by_invalid_config(caplog):
+    select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        select=["config.invalid_config:test+"],
+    )
+    assert "Unsupported config key selector: invalid_config" in caplog.messages
 
 
 def test_select_nodes_by_select_intersection_tag():
@@ -284,9 +332,28 @@ def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
 
 
 def test_select_nodes_by_select_path():
+    # Path without star or graph selector
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models"])
     expected = {
         parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+    # Path with star
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/*"])
+    expected = {
+        parent_node.unique_id: parent_node,
+    }
+    assert selected == expected
+
+    # Path with star and graph selector that retrieves descendants
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["path:gen2/models/*+"])
+    expected = {
+        child_node.unique_id: child_node,
+        parent_node.unique_id: parent_node,
+        sibling1_node.unique_id: sibling1_node,
+        sibling2_node.unique_id: sibling2_node,
+        sibling3_node.unique_id: sibling3_node,
     }
     assert selected == expected
 
@@ -866,6 +933,62 @@ def test_select_nodes_by_source_name():
     assert selected == expected
 
 
+def test_select_nodes_by_exposure_name():
+    """
+    Test selecting a single exposure node by exact name 'exposure:exposure_name'.
+    The code in _should_include_node requires node.resource_type == EXPOSURE
+    AND node.name == "exposure_name".
+    """
+    local_nodes = dict(sample_nodes)
+    exposure_node = DbtNode(
+        unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.exposure_name",
+        resource_type=DbtResourceType.EXPOSURE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "exposures/my_exposure.yml",
+        tags=[],
+        config={},
+    )
+
+    local_nodes[exposure_node.unique_id] = exposure_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["exposure:exposure_name"],
+    )
+    expected = {exposure_node.unique_id: exposure_node}
+    assert selected == expected
+
+
+def test_select_exposure_nodes_by_graph_ancestry():
+    """
+    Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.
+    """
+
+    local_nodes = dict(sample_nodes)
+    exposure_node = DbtNode(
+        unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.exposure_name",
+        resource_type=DbtResourceType.EXPOSURE,
+        depends_on=[parent_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "exposures/my_exposure.yml",
+        tags=[],
+        config={},
+    )
+
+    local_nodes[exposure_node.unique_id] = exposure_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["+exposure:exposure_name"],
+    )
+    expected = {
+        exposure_node.unique_id: exposure_node,
+        parent_node.unique_id: parent_node,
+        grandparent_node.unique_id: grandparent_node,
+        another_grandparent_node.unique_id: another_grandparent_node,
+    }
+    assert selected == expected
+
+
 def test_exclude_nodes_by_resource_type_seed():
     """
     Test excluding any seed node via 'resource_type:seed'.
@@ -950,3 +1073,47 @@ def test_source_selector():
         source_node_match.unique_id: source_node_match,
     }
     assert selected == expected, f"Expected only {source_node_match.unique_id} to match"
+
+
+def test_exposure_selector():
+    """
+    Covers:
+    1) exposure_selection = self.node_name[len(EXPOSURE_SELECTOR):]
+    2) root_nodes.update(...) in that exposure logic
+    3) __repr__ for SelectorConfig
+    4) the line 'if node.resource_name not in self.config.exposures: return False'
+    """
+    local_nodes = dict(sample_nodes)
+
+    exposure_node_match = DbtNode(
+        unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.my_exposure",
+        resource_type=DbtResourceType.EXPOSURE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "exposures/my_exposure.yml",
+        tags=[],
+        config={},
+    )
+    exposure_node_mismatch = DbtNode(
+        unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.another_exposure",
+        resource_type=DbtResourceType.EXPOSURE,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "exposures/another_exposure.yml",
+        tags=[],
+        config={},
+    )
+    local_nodes[exposure_node_match.unique_id] = exposure_node_match
+    local_nodes[exposure_node_mismatch.unique_id] = exposure_node_mismatch
+
+    select_statement = ["exposure:my_exposure"]
+
+    config = SelectorConfig(SAMPLE_PROJ_PATH, select_statement[0])
+
+    config_repr = repr(config)
+    assert "my_exposure" in config_repr, "Expected 'my_exposure' to appear in the config repr"
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, select=select_statement)
+
+    expected = {
+        exposure_node_match.unique_id: exposure_node_match,
+    }
+    assert selected == expected, f"Expected only {exposure_node_match.unique_id} to match"

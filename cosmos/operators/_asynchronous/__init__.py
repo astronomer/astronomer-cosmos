@@ -3,9 +3,13 @@ from __future__ import annotations
 import inspect
 import textwrap
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from airflow.utils.context import Context
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos._utils.importer import load_method_from_module
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
@@ -38,7 +42,7 @@ class SetupAsyncOperator(DbtRunVirtualenvOperator):
         return super().run_subprocess(command, env, cwd)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        async_context = {"profile_type": self.profile_config.get_profile_type()}
+        async_context = {"profile_type": self.profile_config.get_profile_type(), "run_id": context["run_id"]}
         self.build_and_run_cmd(
             context=context, cmd_flags=self.dbt_cmd_flags, run_as_async=True, async_context=async_context
         )
@@ -70,7 +74,11 @@ class TeardownAsyncOperator(DbtRunVirtualenvOperator):
         return super().run_subprocess(command, env, cwd)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
-        async_context = {"profile_type": self.profile_config.get_profile_type(), "teardown_task": True}
+        async_context = {
+            "profile_type": self.profile_config.get_profile_type(),
+            "teardown_task": True,
+            "run_id": context["run_id"],
+        }
         self.build_and_run_cmd(
             context=context, cmd_flags=self.dbt_cmd_flags, run_as_async=True, async_context=async_context
         )

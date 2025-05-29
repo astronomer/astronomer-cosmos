@@ -89,18 +89,90 @@ Below, find an example of a callback method that raises an exception if the quer
 
         slow_query_threshold = 10
 
-        run_results_path = Path(project_dir, "run_results.json")
+        target_path = f"{project_dir}/target"
+        run_results_path = Path(target_path, "run_results.json")
         if run_results_path.exists():
             with open(run_results_path) as fp:
                 run_results = json.load(fp)
-                node_name = run_results["unique_id"]
-                execution_time = run_results["execution_time"]
-                if execution_time > slow_query_threshold:
-                    raise TimeoutError(
-                        f"The query for the node {node_name} took too long: {execution_time}"
-                    )
+                for result in run_results["results"]:
+                    node_name = result["unique_id"]
+                    execution_time = result["execution_time"]
+                    if execution_time > slow_query_threshold:
+                        raise TimeoutError(
+                            f"The query for the node {node_name} took too long: {execution_time}"
+                        )
 
 Users can use the same approach to call the data observability platform `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_ or other services.
+
+.. code-block:: python
+    def montecarlo_import_artifacts(
+        project_dir: str,
+        mcd_id: str,
+        mcd_token: str,
+        job_name: str,
+        project_name: str = "default-project",
+        resource_id: str = None,
+        **kwargs,
+    ):
+        """
+         An example of a custom callback that import dbt artifacts to Monte Carlo.
+
+        Args:
+        :param project_dir: Path of the project directory used by Cosmos to run the dbt command
+        :param mcd_id: Monte Carlo token user ID
+        :param mcd_token: Monte Carlo token value
+        :param job_name: Job name (required - perhaps a logical sequence of dbt executions)
+        :param project_name: Project name (perhaps a logical group of dbt models)
+        :param resource_id: UUID of the warehouse as described by MonteCarlo. If not specified, the
+                    first warehouse connected to the user's account will be used
+        """
+        from pycarlo.core import Client, Session, Query
+        from pycarlo.features.dbt.dbt_importer import DbtImporter
+
+        def get_resource_id(client):
+            """Get the resource ID of the first warehouse connected to the user's account"""
+            query = Query()
+            query.get_user().account.warehouses.__fields__(
+                "name", "connection_type", "uuid"
+            )
+            warehouses = client(query).get_user.account.warehouses
+            warehouse_list = []
+            if len(warehouses) > 0:
+                for val in warehouses:
+                    warehouse_list.append(val.uuid)
+            else:
+                raise Exception(
+                    "no warehouses connected ! Please check your Monte Carlo account."
+                )
+            return warehouse_list[0]
+
+        if not mcd_id or not mcd_token:
+            raise Exception(
+                "Monte Carlo credentials are required to authenticate with MonteCarlo!"
+            )
+
+        client = Client(session=Session(mcd_id=mcd_id, mcd_token=mcd_token))
+
+        dbt_importer = DbtImporter(mc_client=client)
+
+        target_path = f"{project_dir}/target"
+
+        import_options = {
+            "manifest_path": f"{target_path}/manifest.json",
+            "run_results_path": f"{target_path}/run_results.json",
+            "project_name": project_name,
+            "job_name": job_name,
+        }
+
+        if resource_id:
+            import_options["resource_id"] = resource_id
+        else:
+            first_resource_id = get_resource_id(client)
+            import_options["resource_id"] = first_resource_id
+
+        dbt_importer.import_run(**import_options)
+        print("Successfully sent dbt run artifacts to Monte Carlo")
+
 
 Limitations and Contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -4,7 +4,11 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from typing import Any, Callable, Union
 
-from airflow.models import BaseOperator
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
+
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
@@ -151,6 +155,8 @@ def create_test_task_metadata(
             task_args["models"] = node.resource_name
         elif node.resource_type == DbtResourceType.SOURCE:
             task_args["select"] = f"source:{node.resource_name}"
+        elif is_detached_test(node):
+            task_args["select"] = node.resource_name.split(".")[0]
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
 
@@ -241,6 +247,7 @@ def create_task_metadata(
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
+    test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata | None:
@@ -267,9 +274,12 @@ def create_task_metadata(
         extra_context: dict[str, Any] = {
             "dbt_node_config": node.context_dict,
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
+            "package_name": node.package_name,
         }
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            if test_indirect_selection != TestIndirectSelection.EAGER:
+                args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
@@ -366,6 +376,7 @@ def generate_task_or_group(
         source_rendering_behavior=source_rendering_behavior,
         normalize_task_id=normalize_task_id,
         test_behavior=test_behavior,
+        test_indirect_selection=test_indirect_selection,
         on_warning_callback=on_warning_callback,
         detached_from_parent=detached_from_parent,
     )

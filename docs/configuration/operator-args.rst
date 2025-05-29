@@ -92,10 +92,13 @@ dbt-related
 - ``models``: Specifies which nodes to include.
 - ``no_version_check``: If set, skip ensuring ``dbt``'s version matches the one specified in the ``dbt_project.yml``.
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
-- ``vars``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.dbt_vars`` instead) Supply variables to the project. This argument overrides variables defined in the ``dbt_project.yml``.
+- ``vars``: Supply dbt variables to run the task using dbt project. This argument overrides variables defined in the ``dbt_project.yml`` and any values set in ``ProjectConfig.dbt_vars``. Arguments set as dbt ``vars`` in ``operators_args`` will not be used to render the DAG when using ``LoadMode.DBT_LS``. Use  ``ProjectConfig.dbt_vars`` instead for this use-case.
 - ``warn_error``: convert ``dbt`` warnings into errors.
 - ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
+- ``copy_dbt_packages``: (new in v1.10) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``install_deps``: (deprecated in v1.9, use ``ProjectConfig.install_dbt_deps`` onwards) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, run ``dbt deps`` every time a task is executed.
+- ``manifest_filepath`` (new in v1.10.1):  When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, use the user-defined ``manifest.json`` file.
+
 
 Airflow-related
 ...............

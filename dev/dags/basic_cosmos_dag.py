@@ -6,7 +6,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+# [START cosmos_init_imports]
 from cosmos import DbtDag, ProfileConfig, ProjectConfig
+
+# [END cosmos_init_imports]
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -34,10 +37,10 @@ basic_cosmos_dag = DbtDag(
         "full_refresh": True,  # used only in dbt commands that support this flag
     },
     # normal dag parameters
-    schedule_interval="@daily",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="basic_cosmos_dag",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 )
 # [END local_example]

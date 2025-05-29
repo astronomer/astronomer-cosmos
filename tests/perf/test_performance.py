@@ -104,7 +104,7 @@ def test_perf_dag():
         dag = dag_bag.get_dag("performance_dag")
 
         # verify the integrity of the dag
-        assert dag.task_count == num_models
+        assert len(dag.tasks) == num_models
 
         # measure the time before and after the dag is run
 

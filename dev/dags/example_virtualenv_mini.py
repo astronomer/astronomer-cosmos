@@ -8,7 +8,7 @@ from cosmos import ProfileConfig
 from cosmos.operators.virtualenv import DbtSeedVirtualenvOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_PROJ_DIR = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH)) / "jaffle_shop"
 
 profile_config = ProfileConfig(

@@ -3,7 +3,7 @@
 docs/profiles/*
 
 # dbt_packages is a directory that gets created when you run dbt deps
-dbt_packages/
+dev/dags/dbt/jaffle_shop/dbt_packages/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -113,6 +113,8 @@ celerybeat.pid
 # Environments
 .venv
 env/
+# mock-venv created by Cosmos unit tests
+mock-venv/
 venv/
 ENV/
 env.bak/
@@ -155,7 +157,10 @@ dev/dags/.airflowignore
 # Local Airflow standalone
 airflow.cfg
 airflow.db
+airflow.db-shm
+airflow.db-wal
 standalone_admin_password.txt
+simple_auth_manager_passwords.json.generated
 webserver_config.py
 
 # VI

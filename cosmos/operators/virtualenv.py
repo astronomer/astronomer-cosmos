@@ -8,7 +8,11 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import psutil
-from airflow.utils.python_virtualenv import prepare_virtualenv
+
+try:  # Airflow 3
+    from airflow.providers.standard.utils.python_virtualenv import prepare_virtualenv
+except ImportError:  # Airflow 2
+    from airflow.utils.python_virtualenv import prepare_virtualenv  # type: ignore[no-redef]
 
 from cosmos import settings
 from cosmos.constants import InvocationMode
@@ -29,9 +33,12 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-if TYPE_CHECKING:
-    from airflow.utils.context import Context  # pragma: no cover
-    from dbt.cli.main import dbtRunnerResult  # pragma: no cover
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
+    from dbt.cli.main import dbtRunnerResult
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"
@@ -76,7 +83,9 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.py_requirements = py_requirements or []
         self.pip_install_options = pip_install_options or []
         self.py_system_site_packages = py_system_site_packages
-        self.virtualenv_dir = virtualenv_dir
+        self.virtualenv_dir = Path(virtualenv_dir) if virtualenv_dir else None
+        if self.virtualenv_dir:
+            self.virtualenv_dir.mkdir(parents=True, exist_ok=True)
         self.is_virtualenv_dir_temporary = is_virtualenv_dir_temporary
         self.max_retries_lock = settings.virtualenv_max_retries_lock
         self._py_bin: str | None = None
@@ -140,7 +149,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     def on_kill(self) -> None:
         self.clean_dir_if_temporary()
 
-    def _prepare_virtualenv(self) -> str:
+    def _prepare_virtualenv(self) -> Any:
         self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),

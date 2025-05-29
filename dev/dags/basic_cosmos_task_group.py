@@ -6,14 +6,14 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from airflow.decorators import dag
+from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import InvocationMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
+DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
 profile_config = ProfileConfig(
@@ -30,12 +30,12 @@ shared_execution_config = ExecutionConfig(
 )
 
 
-@dag(
-    schedule_interval="@daily",
+with DAG(
+    dag_id="basic_cosmos_task_group",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-)
-def basic_cosmos_task_group() -> None:
+):
     """
     The simplest example of using Cosmos to render a dbt project as a TaskGroup.
     """
@@ -53,7 +53,7 @@ def basic_cosmos_task_group() -> None:
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     orders = DbtTaskGroup(
@@ -68,13 +68,10 @@ def basic_cosmos_task_group() -> None:
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")
 
     pre_dbt >> customers >> post_dbt
     pre_dbt >> orders >> post_dbt
-
-
-basic_cosmos_task_group()

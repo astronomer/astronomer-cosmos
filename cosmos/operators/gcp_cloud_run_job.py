@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from airflow.utils.context import Context
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
@@ -23,6 +27,11 @@ from cosmos.operators.base import (
 logger = get_logger(__name__)
 
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
+
+try:
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator  # Airflow 2
 
 try:
     from airflow.providers.google.cloud.operators.cloud_run import CloudRunExecuteJobOperator
@@ -68,7 +77,6 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
-        super().__init__(project_id=project_id, region=region, job_name=job_name, **kwargs)
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -80,17 +88,33 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
                 "project_id": project_id,
                 "region": region,
                 "job_name": job_name,
-                "command": command,
-                "environment_variables": environment_variables,
             }
         )
-        base_operator_args = set(inspect.signature(CloudRunExecuteJobOperator.__init__).parameters.keys())
+
+        default_args = kwargs.get("default_args", {})
+        operator_kwargs = {}
+        operator_args: set[str] = set()
+        for clazz in CloudRunExecuteJobOperator.__mro__:
+            operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
+            if clazz == BaseOperator:
+                break
+        for arg in operator_args:
+            try:
+                operator_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                pass
+
         base_kwargs = {}
-        for arg_key, arg_value in kwargs.items():
-            if arg_key in base_operator_args:
-                base_kwargs[arg_key] = arg_value
-        base_kwargs["task_id"] = kwargs["task_id"]
-        CloudRunExecuteJobOperator.__init__(self, **base_kwargs)
+        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
+            try:
+                base_kwargs[arg] = kwargs[arg]
+            except KeyError:
+                try:
+                    base_kwargs[arg] = default_args[arg]
+                except KeyError:
+                    pass
+        AbstractDbtBase.__init__(self, **base_kwargs)
+        CloudRunExecuteJobOperator.__init__(self, **operator_kwargs)
 
     def build_and_run_cmd(
         self,
@@ -110,6 +134,17 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
+
+        # Parse ProfileConfig and add additional arguments to the dbt_cmd
+        if self.profile_config:
+            if self.profile_config.profile_name:
+                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
+            if self.profile_config.target_name:
+                dbt_cmd.extend(["--target", self.profile_config.target_name])
+
+        if self.project_dir:
+            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
+
         self.environment_variables = {**env_vars, **self.environment_variables}
         self.command = dbt_cmd
         # Override Cloud Run Job default arguments with dbt command

@@ -31,7 +31,7 @@ cosmos_perf_dag = DbtDag(
         dbt_deps=False,
     ),
     # normal dag parameters
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
     dag_id="performance_dag",

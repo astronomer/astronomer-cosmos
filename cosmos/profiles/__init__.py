@@ -12,6 +12,7 @@ from .bigquery.service_account_keyfile_dict import GoogleCloudServiceAccountDict
 from .clickhouse.user_pass import ClickhouseUserPasswordProfileMapping
 from .databricks.oauth import DatabricksOauthProfileMapping
 from .databricks.token import DatabricksTokenProfileMapping
+from .duckdb.user_pass import DuckDBUserPasswordProfileMapping
 from .exasol.user_pass import ExasolUserPasswordProfileMapping
 from .oracle.user_pass import OracleUserPasswordProfileMapping
 from .postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -21,6 +22,7 @@ from .snowflake.user_encrypted_privatekey_file import SnowflakeEncryptedPrivateK
 from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
+from .sqlserver.standard_sqlserver_auth import StandardSQLServerAuth
 from .teradata.user_pass import TeradataUserPasswordProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
@@ -35,7 +37,9 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     GoogleCloudOauthProfileMapping,
     DatabricksTokenProfileMapping,
     DatabricksOauthProfileMapping,
+    DuckDBUserPasswordProfileMapping,
     OracleUserPasswordProfileMapping,
+    DuckDBUserPasswordProfileMapping,
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
     SnowflakeUserPasswordProfileMapping,
@@ -49,6 +53,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     TrinoCertificateProfileMapping,
     TrinoJWTProfileMapping,
     VerticaUserPasswordProfileMapping,
+    StandardSQLServerAuth,
 ]
 
 
@@ -79,6 +84,7 @@ __all__ = [
     "DatabricksTokenProfileMapping",
     "DatabricksOauthProfileMapping",
     "DbtProfileConfigVars",
+    "DuckDBUserPasswordProfileMapping",
     "OracleUserPasswordProfileMapping",
     "PostgresUserPasswordProfileMapping",
     "RedshiftUserPasswordProfileMapping",
@@ -92,4 +98,5 @@ __all__ = [
     "TrinoCertificateProfileMapping",
     "TrinoJWTProfileMapping",
     "VerticaUserPasswordProfileMapping",
+    "StandardSQLServerAuth",
 ]

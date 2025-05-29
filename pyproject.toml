@@ -49,12 +49,15 @@ dbt-all = [
     # the Pydantic version required by Airflow (version > 2.7)
     # See: https://github.com/astronomer/astronomer-cosmos/issues/1379
     "dbt-databricks!=1.9.0",
+    "dbt-duckdb",
     "dbt-exasol",
+    "dbt-duckdb",
     "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
     "dbt-spark",
+    "dbt-sqlserver",
     "dbt-teradata",
     "dbt-vertica",
 ]
@@ -62,19 +65,23 @@ dbt-athena = ["dbt-athena-community", "apache-airflow-providers-amazon>=8.0.0"]
 dbt-bigquery = ["dbt-bigquery"]
 dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
+dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
 dbt-spark = ["dbt-spark"]
+dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]
-google = ["apache-airflow-providers-google>=10.17.0"]
+
+# Due to issue https://github.com/fsspec/gcsfs/issues/664
+google = ["apache-airflow-providers-google>=10.17.0", "gcsfs<2025.3.0"]
 microsoft = ["apache-airflow-providers-microsoft-azure>=8.5.0"]
 all = [
     "astronomer-cosmos[dbt-all]",
@@ -82,19 +89,20 @@ all = [
     "astronomer-cosmos[amazon]",
     "astronomer-cosmos[google]",
     "astronomer-cosmos[microsoft]",
+    "astronomer-cosmos[dbt-duckdb]"
 ]
 docs = [
     "sphinx",
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
 kubernetes = [
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
 aws_eks = [
     "apache-airflow-providers-amazon>=8.0.0",
@@ -110,7 +118,7 @@ gcp-cloud-run-job = [
 ]
 
 [project.entry-points.apache_airflow_provider]
-provider_info = "cosmos:get_provider_info"
+provider_info = "cosmos.provider_info:get_provider_info"
 
 [project.entry-points."airflow.plugins"]
 cosmos = "cosmos.plugin:CosmosPlugin"
@@ -159,7 +167,8 @@ pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow}
 
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
-airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10"]
+airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
+dbt = ["1.5", "1.6", "1.7", "1.8", "1.9"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
@@ -174,6 +183,7 @@ test-integration = 'sh scripts/test/integration.sh'
 test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
 test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh"
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
+test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh  {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-integration-setup = 'sh scripts/test/integration-setup.sh'
 test-performance = 'sh scripts/test/performance.sh'

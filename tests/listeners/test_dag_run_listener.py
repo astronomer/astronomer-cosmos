@@ -1,21 +1,26 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from airflow import __version__ as airflow_version
 from airflow.models import DAG
 from airflow.utils.state import State
+from packaging import version
 
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
 from cosmos.listeners.dag_run_listener import on_dag_run_failed, on_dag_run_success, total_cosmos_tasks
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
+
+AIRFLOW_VERSION_MAJOR = version.parse(airflow_version).major
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -91,10 +96,25 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
         dag_id="basic_cosmos_dag",
     )
     run_id = str(uuid.uuid1())
-    dag_run = dag.create_dagrun(
-        state=State.NONE,
-        run_id=run_id,
-    )
+
+    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
+        # Airflow 2
+        dag_run = dag.create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+        )
+    else:
+        # Airflow 3
+        from airflow.utils.types import DagRunTriggeredByType, DagRunType
+
+        dag_run = dag.create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+            run_after=run_after,
+            run_type=DagRunType.MANUAL,
+            triggered_by=DagRunTriggeredByType.TIMETABLE,
+        )
 
     on_dag_run_success(dag_run, msg="test success")
     assert "Running on_dag_run_success" in caplog.text
@@ -116,10 +136,24 @@ def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):
         dag_id="basic_cosmos_dag",
     )
     run_id = str(uuid.uuid1())
-    dag_run = dag.create_dagrun(
-        state=State.FAILED,
-        run_id=run_id,
-    )
+    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
+        # Airflow 2
+        dag_run = dag.create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+        )
+    else:
+        # Airflow 3
+        from airflow.utils.types import DagRunTriggeredByType, DagRunType
+
+        dag_run = dag.create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+            run_after=run_after,
+            run_type=DagRunType.MANUAL,
+            triggered_by=DagRunTriggeredByType.TIMETABLE,
+        )
 
     on_dag_run_failed(dag_run, msg="test failed")
     assert "Running on_dag_run_failed" in caplog.text

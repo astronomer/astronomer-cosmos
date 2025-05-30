@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, add-dbt-1.10b-to-test-matrix]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -41,7 +41,7 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
-        dbt-version: ["1.9"]
+        dbt-version: ["1.9", "1.10.0b3"]
         exclude:
           - python-version: "3.11"
             airflow-version: "2.4"
@@ -111,7 +111,7 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
         airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
-        dbt-version: ["1.9"]
+        dbt-version: ["1.9", "1.10.0b3"]
         exclude:
           - python-version: "3.11"
             airflow-version: "2.4"

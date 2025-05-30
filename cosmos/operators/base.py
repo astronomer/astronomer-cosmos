@@ -296,15 +296,18 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
         env = self.get_env(context)
 
-        # Parse ProfileConfig and add additional arguments to the dbt_cmd
-        if self.profile_config:
-            if self.profile_config.profile_name:
-                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
-            if self.profile_config.target_name:
-                dbt_cmd.extend(["--target", self.profile_config.target_name])
+        from cosmos.operators.local import AbstractDbtLocalBase
+        # AbstractDbtLocalBase has its own implementation for these flags via `_generate_dbt_flags`
+        if not type(self) is AbstractDbtLocalBase:
+            # Parse ProfileConfig and add additional arguments to the dbt_cmd
+            if self.profile_config:
+                if self.profile_config.profile_name:
+                    dbt_cmd.extend(["--profile", self.profile_config.profile_name])
+                if self.profile_config.target_name:
+                    dbt_cmd.extend(["--target", self.profile_config.target_name])
 
-        if self.project_dir:
-            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
+            if self.project_dir:
+                dbt_cmd.extend(["--project-dir", str(self.project_dir)])
 
         return dbt_cmd, env
 

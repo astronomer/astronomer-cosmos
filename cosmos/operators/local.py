@@ -196,7 +196,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
 
-        # to enforce the ProfileConfig type instead of ProfileConfig | None for anything inheriting from this class
+        # to enforce the `ProfileConfig` type instead of `ProfileConfig | None` for anything inheriting from this class
         kwargs["profile_config"] = profile_config
 
         super().__init__(task_id=task_id, **kwargs)

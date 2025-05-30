@@ -32,7 +32,6 @@ except ImportError:
         pass
 
 
-from cosmos.config import ProfileConfig
 from cosmos.dbt.parser.output import extract_log_issues
 from cosmos.operators.base import (
     AbstractDbtBase,
@@ -65,9 +64,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
 
     intercept_flag = False
 
-    def __init__(self, profile_config: ProfileConfig | None = None, **kwargs: Any) -> None:
-        self.profile_config = profile_config
-
+    def __init__(self, **kwargs: Any) -> None:
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -128,17 +125,6 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
-
-        # Parse ProfileConfig and add additional arguments to the dbt_cmd
-        if self.profile_config:
-            if self.profile_config.profile_name:
-                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
-            if self.profile_config.target_name:
-                dbt_cmd.extend(["--target", self.profile_config.target_name])
-
-        if self.project_dir:
-            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
-
         # set env vars
         self.build_env_args(env_vars)
         self.arguments = dbt_cmd

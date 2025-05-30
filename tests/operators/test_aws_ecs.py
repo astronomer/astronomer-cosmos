@@ -150,6 +150,8 @@ def test_dbt_aws_ecs_build_command():
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
                 "--no-version-check",
+                "--project-dir",
+                "my/dir",
             ]
         elif command_name == "source":
             assert command_operator.command == [
@@ -160,6 +162,8 @@ def test_dbt_aws_ecs_build_command():
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
                 "--no-version-check",
+                "--project-dir",
+                "my/dir",
             ]
         else:
             assert command_operator.command == [
@@ -170,6 +174,8 @@ def test_dbt_aws_ecs_build_command():
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
                 "--no-version-check",
+                "--project-dir",
+                "my/dir",
             ]
 
 

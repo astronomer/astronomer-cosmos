@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any, Sequence, Tuple
 import yaml
 from airflow.utils.context import context_merge
 
+from cosmos import ProfileConfig
+
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
@@ -33,6 +35,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
     :param project_dir: Which directory to look in for the dbt_project.yml file. Default is the current working
     directory and its parents.
+    :param profile_config: Optional argument for the dbt profile configuration.
     :param conn_id: The airflow connection to use as the target
     :param select: dbt optional argument that specifies which nodes to include.
     :param exclude: dbt optional argument that specifies which models to exclude.
@@ -97,6 +100,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
     def __init__(
         self,
         project_dir: str,
+        profile_config: ProfileConfig | None = None,
         conn_id: str | None = None,
         select: str | None = None,
         exclude: str | None = None,
@@ -126,6 +130,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
+        self.profile_config = profile_config
         self.conn_id = conn_id
         self.select = select
         self.exclude = exclude
@@ -290,6 +295,16 @@ class AbstractDbtBase(metaclass=ABCMeta):
             dbt_cmd.extend(self.dbt_cmd_flags)
 
         env = self.get_env(context)
+
+        # Parse ProfileConfig and add additional arguments to the dbt_cmd
+        if self.profile_config:
+            if self.profile_config.profile_name:
+                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
+            if self.profile_config.target_name:
+                dbt_cmd.extend(["--target", self.profile_config.target_name])
+
+        if self.project_dir:
+            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
 
         return dbt_cmd, env
 

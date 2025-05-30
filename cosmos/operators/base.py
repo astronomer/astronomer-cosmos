@@ -297,6 +297,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         env = self.get_env(context)
 
         from cosmos.operators.local import AbstractDbtLocalBase
+
         # AbstractDbtLocalBase has its own implementation for these flags via `_generate_dbt_flags`
         if not type(self) is AbstractDbtLocalBase:
             # Parse ProfileConfig and add additional arguments to the dbt_cmd

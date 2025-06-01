@@ -173,7 +173,7 @@ def create_test_task_metadata(
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
         _override_profile_if_needed(task_args, node.profile_config_to_override)
 
-    if task_owner and not enable_owner_inheritance:
+    if not enable_owner_inheritance:
         task_owner = ""
 
     args_to_override: dict[str, Any] = {}
@@ -321,7 +321,7 @@ def create_task_metadata(
 
         task_owner = node.owner
 
-        if task_owner and not enable_owner_inheritance:
+        if not enable_owner_inheritance:
             task_owner = ""
 
         task_metadata = TaskMetadata(

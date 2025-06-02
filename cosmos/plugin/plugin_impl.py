@@ -7,7 +7,7 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.security import permissions
 from airflow.www.auth import has_access
 from airflow.www.views import AirflowBaseView
-from flask import abort, url_for
+from flask import abort
 from flask_appbuilder import AppBuilder, expose
 
 from cosmos.listeners import dag_run_listener
@@ -120,85 +120,6 @@ def open_file(path: str, conn_id: Optional[str] = None) -> str:
         return content  # type: ignore[no-any-return]
 
 
-iframe_script = """
-<script>
-  function getMaxElement(side, elements_query) {
-    var elements = document.querySelectorAll(elements_query)
-    var elementsLength = elements.length,
-      elVal = 0,
-      maxVal = 0,
-      Side = capitalizeFirstLetter(side),
-      timer = Date.now()
-
-    for (var i = 0; i < elementsLength; i++) {
-      elVal =
-        elements[i].getBoundingClientRect()[side] +
-        getComputedStyleWrapper('margin' + Side, elements[i])
-      if (elVal > maxVal) {
-        maxVal = elVal
-      }
-    }
-
-    timer = Date.now() - timer
-
-    chkEventThottle(timer)
-
-    return maxVal
-  }
-  var throttledTimer = 16
-  function chkEventThottle(timer) {
-    if (timer > throttledTimer / 2) {
-      throttledTimer = 2 * timer
-    }
-  }
-  function capitalizeFirstLetter(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1)
-  }
-  function getComputedStyleWrapper(prop, el) {
-    var retVal = 0
-    el = el || document.body // Not testable in phantonJS
-
-    retVal = document.defaultView.getComputedStyle(el, null)
-    retVal = null === retVal ? 0 : retVal[prop]
-
-    return parseInt(retVal)
-  }
-  window.iFrameResizer = {
-    heightCalculationMethod: function getHeight() {
-      return Math.max(
-        // Overview page
-        getMaxElement('bottom', 'div.panel.panel-default') + 50,
-        // Model page
-        getMaxElement('bottom', 'section.section') + 75,
-        // Search page
-        getMaxElement('bottom', 'div.result-body') + 125
-      )
-    }
-  }
-
-  // Prevent parent hash changes from sending a message back to the parent.
-  // This is necessary for making sure the browser back button works properly.
-  let hashChangeLock = true;
-
-  window.addEventListener('hashchange', function () {
-    if (!hashChangeLock) {
-      window.parent.postMessage(window.location.hash);
-    }
-    hashChangeLock = false;
-  });
-  window.addEventListener('message', function (event) {
-    let msgData = event.data;
-    if (typeof msgData === 'string' && msgData.startsWith('#!')) {
-      let updateUrl = new URL(window.location);
-      updateUrl.hash = msgData;
-      hashChangeLock = true;
-      history.replaceState(null, null, updateUrl);
-    }
-  });
-</script>
-"""
-
-
 class DbtDocsView(AirflowBaseView):  # type: ignore
     default_view = "dbt_docs"
     route_base = "/cosmos"
@@ -228,9 +149,6 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         except FileNotFoundError:
             abort(404)
         else:
-            # Hack the dbt docs to render properly in an iframe
-            iframe_resizer_url = url_for(".static", filename="iframeResizer.contentWindow.min.js")
-            html = html.replace("</head>", f'{iframe_script}<script src="{iframe_resizer_url}"></script></head>', 1)
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
     @expose("/catalog.json")  # type: ignore[misc]

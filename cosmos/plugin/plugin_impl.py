@@ -132,7 +132,7 @@ iframe_script = """
     }
     hashChangeLock = false;
   });
-  
+
   window.addEventListener('message', function (event) {
     let msgData = event.data;
     if (typeof msgData === 'string' && msgData.startsWith('#!')) {

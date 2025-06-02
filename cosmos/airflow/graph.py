@@ -283,6 +283,8 @@ def create_task_metadata(
                 node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
             )
         elif node.resource_type == DbtResourceType.MODEL:
+            args["select"] = f"{node.resource_name}"  # TODO: This may be problematic
+            args.pop("models")  # dbtf no longer supports models
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SEED:
             # temporarily trying to fix the SEED behaviour for dbtf

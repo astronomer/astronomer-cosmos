@@ -306,9 +306,20 @@ def create_task_metadata(
                 include_resource_type=True,
             )
         elif node.resource_type == DbtResourceType.MODEL:
+            # dbt fusion no longer has the --models flag
+            args["select"] = f"{node.resource_name}"
+            args.pop("models")  # dbtf no longer supports models
             task_id, args = _get_task_id_and_args(
                 node, args, use_task_group, normalize_task_id, normalize_task_display_name, "run"
             )
+            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
+        elif node.resource_type == DbtResourceType.SEED:
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, node.resource_type.value
+            )
+            # dbt fusion no longer has the --models flag
+            args["select"] = f"{node.resource_name}"
+            args.pop("models")
         elif node.resource_type == DbtResourceType.SOURCE:
             args["on_warning_callback"] = on_warning_callback
 

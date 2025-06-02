@@ -565,6 +565,10 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
+        # TODO: improve this logic
+        #  dbtf no longer returns a few fields by default when running dbt ls, including depends_on
+        #  temporarily I'm injecting all of them, but I know this will not work for older versions
+        #  of dbt. To simplify the code, it may be worth checking if they reached end of life
         # if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
         ls_command = [
             dbt_cmd,

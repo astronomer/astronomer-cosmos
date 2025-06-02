@@ -284,6 +284,14 @@ def create_task_metadata(
             )
         elif node.resource_type == DbtResourceType.MODEL:
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
+        elif node.resource_type == DbtResourceType.SEED:
+            # temporarily trying to fix the SEED behaviour for dbtf
+            # review if we should improve this further
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, node.resource_type.value
+            )
+            args["select"] = f"{node.resource_name}"  #  TODO: This may be problematic
+            args.pop("models") # dbtf no longer supports models
         elif node.resource_type == DbtResourceType.SOURCE:
             args["on_warning_callback"] = on_warning_callback
 

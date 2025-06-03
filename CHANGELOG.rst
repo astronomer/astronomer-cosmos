@@ -1,6 +1,35 @@
 Changelog
 =========
 
+1.10.1 (2025-05-21)
+---------------------
+
+Bug Fixes
+
+* Fix ``full_refresh`` parameter in ``AIRFLOW_ASYNC`` ``ExecutionConfig`` mode by @tuantran0910 in #1738
+* Fix dbt ls invocation method log message by @tatiana and @dstandish in #1749
+* Ensure remote target directory is created when copying files when using local directory by @tuantran0910 and @corsettigyg in #1740
+* Support custom ``packages-install-path`` by @tatiana in #1768
+* Disable dbt static parser during Airflow task execution using dbt runner by @pankajkoti and @tatiana in #1760
+* Fix ``ExecutionMode.LOCAL`` to leverage ``ProjectConfig.manifest_path`` by @tatiana in #1772
+* Refactor ``AIRFLOW_ASYNC`` so that the path in the remote object store is specific per DAG run by @tuantran0910 in #1741
+* Optimise memory usage with optional explicit imports by @pankajkoti and @tatiana in #1769
+
+Documentation
+
+* Fix documentation rendering for ``use_dataset_airflow3_uri_standard`` by @pankajastro in #1742
+* Correct custom callback example by @walter9388 in #1747
+
+Others
+
+* Re-enable integration tests durations to troubleshoot performance degradation by @tatiana in #1735
+* Run listener tests for Airflow 3 by @pankajastro in #1743
+* Add Airflow 3 db files to ignore from git tracking by @pankajkoti in #1755
+* Log contents of ``packages.yml`` when ``AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG`` by @tatiana in #1764
+* Fix Airflow dependencies in the CI by @tatiana in #1773
+* Pre-commit updates: #1744, #1765, #1770
+
+
 1.10.0 (2025-05-01)
 ---------------------
 

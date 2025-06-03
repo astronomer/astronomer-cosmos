@@ -97,6 +97,7 @@ dbt-related
 - ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
 - ``copy_dbt_packages``: (new in v1.10) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``install_deps``: (deprecated in v1.9, use ``ProjectConfig.install_dbt_deps`` onwards) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, run ``dbt deps`` every time a task is executed.
+- ``manifest_filepath`` (new in v1.10.1):  When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, use the user-defined ``manifest.json`` file.
 
 
 Airflow-related

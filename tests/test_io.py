@@ -23,7 +23,7 @@ def dummy_kwargs():
         "context": {
             "dag": MagicMock(dag_id="test_dag"),
             "run_id": "test_run_id",
-            "task_instance": MagicMock(task_id="test_task", _try_number=1),
+            "task_instance": MagicMock(task_id="test_task", try_number=1),
         },
         "bucket_name": "test_bucket",
         "container_name": "test_container",

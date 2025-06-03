@@ -183,7 +183,7 @@ def _construct_dest_file_path(
         f"{context['dag'].dag_id}"
         f"/{context['run_id']}"
         f"/{context['task_instance'].task_id}"
-        f"/{context['task_instance']._try_number}"
+        f"/{context['task_instance'].try_number}"
     )
     rel_path = os.path.relpath(file_path, source_target_dir).lstrip("/")
 

@@ -97,7 +97,9 @@ def test_run_command_without_virtualenv_dir(
         invocation_mode=InvocationMode.SUBPROCESS,
     )
     assert venv_operator.virtualenv_dir == None
-    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
+    venv_operator.run_command(
+        cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock(), "run_id": "test_run_id"}
+    )
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 2
     dbt_deps = run_command_args[0].kwargs
@@ -174,7 +176,9 @@ def test_run_command_with_virtualenv_dir(
         invocation_mode=InvocationMode.SUBPROCESS,
         virtualenv_dir=Path("mock-venv"),
     )
-    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
+    venv_operator.run_command(
+        cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock(), "run_id": "test_run_id"}
+    )
     assert str(venv_operator.virtualenv_dir) == "mock-venv"
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 2

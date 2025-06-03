@@ -1,35 +1,46 @@
 {% extends base_template %}
 {% block page_title %}dbt docs - {{ appbuilder.app_name }}{% endblock %}
 {% block content %}
-    <script src="{{ url_for('.static', filename='iframeResizer.min.js') }}"></script>
-    <iframe id="dbtIframe" src="{{ url_for('.dbt_docs_index') }}" style="min-width: 100%; border: 0;"></iframe>
-    <script>
-        iFrameResize(
-            {
-                heightCalculationMethod: 'custom',
-                resizeFrom: 'child',
-                minHeight: 500
-            },
-            '#dbtIframe'
-        );
+<style>
+    :root {
+        --height-offset: 140px;
+        /*
+            Airflow uses a padding of 70px for the header and 70px
+            for the footer in versions 2.X
+            [Ref: main.css](https://github.com/apache/airflow/blob/c083e456fa02c6cb32cdbe0c9ed3c3b2380beccd/airflow/www/static/css/main.css#L22)
 
-        window.addEventListener('message', function (event) {
-            let msgData = event.data;
-            if (msgData.startsWith('#!')) {
-                let updateUrl = new URL(window.location);
-                updateUrl.hash = msgData;
-                history.replaceState(null, null, updateUrl);
-            }
-        });
+            We use this value to offset the height of the iframe. These values are fixed in the body css.
 
-        window.addEventListener('popstate', function () {
-            dbtIframe.contentWindow.postMessage(window.location.hash);
-        });
+        */
+    }
 
-        let dbtIframe = document.getElementById('dbtIframe');
-        let iframeUrl = new URL(dbtIframe.src);
-        iframeUrl.hash = window.location.hash;
-        dbtIframe.src = iframeUrl.href;
+    #dbtIframe {
+        min-width: 100%;
+        border: 0;
+        height: calc(100vh - var(--height-offset));
+    }
+</style>
+<iframe id="dbtIframe" src="{{ url_for('.dbt_docs_index') }}"
+    style="min-width: 100%; border: 0; height: calc(100vh - 140px);"></iframe>
+<script>
 
-    </script>
+    window.addEventListener('message', function (event) {
+        let msgData = event.data;
+        if (msgData.startsWith('#!')) {
+            let updateUrl = new URL(window.location);
+            updateUrl.hash = msgData;
+            history.replaceState(null, null, updateUrl);
+        }
+    });
+
+    window.addEventListener('popstate', function () {
+        dbtIframe.contentWindow.postMessage(window.location.hash);
+    });
+
+    let dbtIframe = document.getElementById('dbtIframe');
+    let iframeUrl = new URL(dbtIframe.src);
+    iframeUrl.hash = window.location.hash;
+    dbtIframe.src = iframeUrl.href;
+
+</script>
 {% endblock %}

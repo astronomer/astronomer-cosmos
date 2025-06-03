@@ -148,8 +148,14 @@ def test_dbt_base_operator_add_user_supplied_flags() -> None:
     cmd, _ = dbt_base_operator.build_cmd(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    assert cmd[-2] == "cmd"
-    assert cmd[-1] == "--full-refresh"
+    assert cmd[1] == "cmd"
+    assert cmd[2] == "--full-refresh"
+    assert cmd[3] == "--profile"
+    assert cmd[4] == "default"
+    assert cmd[5] == "--target"
+    assert cmd[6] == "dev"
+    assert cmd[7] == "--project-dir"
+    assert cmd[8] == "my/dir"
 
 
 def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
@@ -163,8 +169,14 @@ def test_dbt_base_operator_add_user_supplied_global_flags() -> None:
     cmd, _ = dbt_base_operator.build_cmd(
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    assert cmd[-2] == "--cache-selected-only"
-    assert cmd[-1] == "cmd"
+    assert cmd[1] == "--cache-selected-only"
+    assert cmd[2] == "cmd"
+    assert cmd[3] == "--profile"
+    assert cmd[4] == "default"
+    assert cmd[5] == "--target"
+    assert cmd[6] == "dev"
+    assert cmd[7] == "--project-dir"
+    assert cmd[8] == "my/dir"
 
 
 @pytest.mark.parametrize(
@@ -243,11 +255,23 @@ def test_dbt_base_operator_use_indirect_selection(indirect_selection_type) -> No
         Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
     if indirect_selection_type:
-        assert cmd[-2] == "--indirect-selection"
-        assert cmd[-1] == indirect_selection_type
+        assert cmd[2] == "--indirect-selection"
+        assert cmd[3] == indirect_selection_type
+        assert cmd[4] == "--profile"
+        assert cmd[5] == "default"
+        assert cmd[6] == "--target"
+        assert cmd[7] == "dev"
+        assert cmd[8] == "--project-dir"
+        assert cmd[9] == "my/dir"
     else:
         assert cmd[0].endswith("dbt")
         assert cmd[1] == "cmd"
+        assert cmd[2] == "--profile"
+        assert cmd[3] == "default"
+        assert cmd[4] == "--target"
+        assert cmd[5] == "dev"
+        assert cmd[6] == "--project-dir"
+        assert cmd[7] == "my/dir"
 
 
 def test_dbt_base_operator_run_dbt_runner_cannot_import():
@@ -978,7 +1002,16 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["seed", "--full-refresh"],
+                "cmd_flags": [
+                    "seed",
+                    "--full-refresh",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },
@@ -989,7 +1022,16 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["build", "--full-refresh"],
+                "cmd_flags": [
+                    "build",
+                    "--full-refresh",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },
@@ -1000,7 +1042,16 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["run", "--full-refresh"],
+                "cmd_flags": [
+                    "run",
+                    "--full-refresh",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },
@@ -1011,7 +1062,16 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["clone", "--full-refresh"],
+                "cmd_flags": [
+                    "clone",
+                    "--full-refresh",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },
@@ -1019,12 +1079,24 @@ def test_store_compiled_sql_airflow3() -> None:
         (
             DbtTestLocalOperator,
             {},
-            {"context": {}, "env": {}, "cmd_flags": ["test"], "run_as_async": False, "async_context": None},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["test", "--profile", "default", "--target", "dev", "--project-dir", "my/dir"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtTestLocalOperator,
             {"select": []},
-            {"context": {}, "env": {}, "cmd_flags": ["test"], "run_as_async": False, "async_context": None},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["test", "--profile", "default", "--target", "dev", "--project-dir", "my/dir"],
+                "run_as_async": False,
+                "async_context": None,
+            },
         ),
         (
             DbtTestLocalOperator,
@@ -1032,7 +1104,19 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"],
+                "cmd_flags": [
+                    "test",
+                    "--select",
+                    "tag:daily",
+                    "--exclude",
+                    "tag:disabled",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },
@@ -1043,7 +1127,17 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["test", "--selector", "nightly_snowplow"],
+                "cmd_flags": [
+                    "test",
+                    "--selector",
+                    "nightly_snowplow",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },
@@ -1054,7 +1148,18 @@ def test_store_compiled_sql_airflow3() -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"],
+                "cmd_flags": [
+                    "run-operation",
+                    "bla",
+                    "--args",
+                    "days: 7\ndry_run: true\n",
+                    "--profile",
+                    "default",
+                    "--target",
+                    "dev",
+                    "--project-dir",
+                    "my/dir",
+                ],
                 "run_as_async": False,
                 "async_context": None,
             },

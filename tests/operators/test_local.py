@@ -1763,7 +1763,7 @@ def test_construct_dest_file_path_with_run_id():
     context = {
         "dag": MagicMock(dag_id="test_dag"),
         "run_id": "test_run_id",
-        "task_instance": MagicMock(task_id="test_task", _try_number=1),
+        "task_instance": MagicMock(task_id="test_task", try_number=1),
     }
     result = _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, source_subpath, context=context)
 

@@ -41,6 +41,14 @@ def check_dag_success(dag_run: DagRun | None, expect_success: bool = True) -> bo
     return True
 
 
+def new_test_dag(dag: DAG) -> DagRun:
+    if AIRFLOW_VERSION >= version.Version("3.0"):
+        dr = dag.test(logical_date=timezone.utcnow())
+    else:
+        dr = dag.test()
+    return dr
+
+
 def test_dag(
     dag, conn_file_path: str | None = None, custom_tester: bool = False, expect_success: bool = True
 ) -> DagRun:
@@ -50,7 +58,7 @@ def test_dag(
         assert check_dag_success(dr, expect_success), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
     elif AIRFLOW_VERSION >= version.Version("2.5"):
         if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-            dr = dag.test(logical_date=timezone.utcnow())
+            dr = new_test_dag(dag)
             assert check_dag_success(
                 dr, expect_success
             ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
@@ -66,7 +74,7 @@ def test_dag(
             FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
             """
             try:
-                dr = dag.test(logical_date=timezone.utcnow())
+                dr = new_test_dag(dag)
                 assert check_dag_success(
                     dr, expect_success
                 ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "

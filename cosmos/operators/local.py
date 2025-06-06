@@ -505,7 +505,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
             from dbt.version import __version__ as dbt_version
 
-            if Version(dbt_version) >= Version("1.6"):
+            if Version(dbt_version) >= Version("1.5.6"):
                 # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
                 # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
                 # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary

@@ -298,6 +298,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             target_path_schema = urlparse(target_path_str).scheme
             remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
         if remote_conn_id is None:
+            logger.info(
+                "Remote target connection not set. Please, configure [cosmos][remote_target_path_conn_id] or set the environment variable AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID"
+            )
             return None, None
 
         if not settings.AIRFLOW_IO_AVAILABLE:

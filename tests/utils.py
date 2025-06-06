@@ -31,22 +31,29 @@ def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
     return test_dag(dag=dag, conn_file_path=conn_file_path)
 
 
-def check_dag_success(dag_run: DagRun | None) -> bool:
+def check_dag_success(dag_run: DagRun | None, expect_success: bool = True) -> bool:
     """Check if a DAG was successful, if that Airflow version allows it."""
     if dag_run is not None:
-        return dag_run.state == DagRunState.SUCCESS
+        if expect_success:
+            return dag_run.state == DagRunState.SUCCESS
+        else:
+            return dag_run.state == DagRunState.FAILED
     return True
 
 
-def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False) -> DagRun:
+def test_dag(
+    dag, conn_file_path: str | None = None, custom_tester: bool = False, expect_success: bool = True
+) -> DagRun:
     dr = None
     if custom_tester:
         dr = test_old_dag(dag, conn_file_path)
-        assert dr.state == DagRunState.SUCCESS, f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+        assert check_dag_success(dr, expect_success), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
     elif AIRFLOW_VERSION >= version.Version("2.5"):
         if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
-            dr = dag.test()
-            assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+            dr = dag.test(logical_date=timezone.utcnow())
+            assert check_dag_success(
+                dr, expect_success
+            ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
         else:
             # This is a work around until we fix the issue in Airflow:
             # https://github.com/apache/airflow/issues/42495
@@ -59,8 +66,10 @@ def test_dag(dag, conn_file_path: str | None = None, custom_tester: bool = False
             FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
             """
             try:
-                dr = dag.test()
-                assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+                dr = dag.test(logical_date=timezone.utcnow())
+                assert check_dag_success(
+                    dr, expect_success
+                ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
             except sqlalchemy.exc.PendingRollbackError:
                 warnings.warn(
                     "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
@@ -215,4 +224,5 @@ def _get_or_create_dagrun(
         conf=conf,
     )
     log.info("created dagrun %s", str(dr))
+
     return dr

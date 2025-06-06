@@ -74,6 +74,10 @@ def get_dag_bag() -> DagBag:
         if _PYTHON_VERSION < (3, 9):
             file.writelines(["example_duckdb_dag.py\n"])
 
+        if _PYTHON_VERSION < (3, 9):
+            # dbt-bigquery 1.9 supports Python 3.9 onwards
+            file.writelines(["simple_dag_async.py\n"])
+
         if DBT_VERSION < Version("1.6.0"):
             file.writelines(["simple_dag_async.py\n"])
             file.writelines(["example_model_version.py\n"])

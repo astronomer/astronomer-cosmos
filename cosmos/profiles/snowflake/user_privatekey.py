@@ -86,7 +86,10 @@ class SnowflakePrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):
         if conn_dejson.get("extra__snowflake__account"):
             conn_dejson = {key.replace("extra__snowflake__", ""): value for key, value in conn_dejson.items()}
 
-        conn_dejson["private_key_content"] = self._decode_private_key_content(conn_dejson["private_key_content"])
+        private_key_content = conn_dejson.get("private_key_content")
+        if private_key_content:
+            conn_dejson["private_key_content"] = self._decode_private_key_content(private_key_content)
+
         conn.extra = json.dumps(conn_dejson)
 
         return conn

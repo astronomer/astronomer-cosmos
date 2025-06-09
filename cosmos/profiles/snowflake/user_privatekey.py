@@ -5,15 +5,12 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import logging
 from typing import TYPE_CHECKING, Any
 
 from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
 if TYPE_CHECKING:
     from airflow.models import Connection
-
-logger = logging.getLogger(__name__)
 
 
 class SnowflakePrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):

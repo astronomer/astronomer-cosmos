@@ -120,9 +120,6 @@ def test_example_dag(session, dag_id: str):
     run_dag(dag_id)
 
 
-async_dag_ids = ["simple_dag_async"]
-
-
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.8") or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
@@ -132,5 +129,8 @@ def test_async_example_dag_without_setup_task(session, monkeypatch):
     monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK", "false")
     monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK", "false")
 
+    dag_bag = get_dag_bag()
+    async_dag_ids = ["simple_dag_async"]
     for dag_id in async_dag_ids:
-        run_dag(dag_id)
+        dag = dag_bag.get_dag(dag_id)
+        run_dag(dag)

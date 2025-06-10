@@ -32,6 +32,7 @@ def mock_snowflake_conn_base64():  # type: ignore
                 "database": "my_database",
                 "warehouse": "my_warehouse",
                 "private_key_content": BASE64_ENCODED_KEY,
+                "private_key_passphrase": "my_private_key_passphrase",
             }
         ),
     )
@@ -58,7 +59,6 @@ def mock_snowflake_conn():  # type: ignore
                 "database": "my_database",
                 "warehouse": "my_warehouse",
                 "private_key_content": "my_private_key",
-                "private_key_passphrase": "my_private_key_passphrase",
             }
         ),
     )

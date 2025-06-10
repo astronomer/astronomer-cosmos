@@ -63,8 +63,7 @@ class SnowflakePrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):
             The decoded private key in plain-text PEM format
         """
         try:
-            decoded_key = base64.b64decode(private_key_content).decode("utf-8")
-            return decoded_key
+            return base64.b64decode(private_key_content).decode("utf-8")
         except (UnicodeDecodeError, binascii.Error):
             return private_key_content
 

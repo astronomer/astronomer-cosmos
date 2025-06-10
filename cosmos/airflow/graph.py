@@ -293,7 +293,7 @@ def create_task_metadata(
                 node, args, use_task_group, normalize_task_id, node.resource_type.value
             )
             args["select"] = f"{node.resource_name}"  #  TODO: This may be problematic
-            args.pop("models") # dbtf no longer supports models
+            args.pop("models")  # dbtf no longer supports models
         elif node.resource_type == DbtResourceType.SOURCE:
             args["on_warning_callback"] = on_warning_callback
 

@@ -36,7 +36,6 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
-    SourceRenderingBehavior,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import (
@@ -585,7 +584,7 @@ class DbtGraph:
             "config",
             "freshness",
         ]
-        #else:
+        # else:
         #    ls_command = [dbt_cmd, "ls", "--output", "json"]
 
         ls_args = self.dbt_ls_args

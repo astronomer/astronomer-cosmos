@@ -101,7 +101,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
-    # assert not db.import_errors
+    assert not db.import_errors
     return db
 
 
@@ -113,6 +113,7 @@ def get_dag_ids() -> list[str]:
 def run_dag(dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
+    assert dag
     test_utils.run_dag(dag)
 
 
@@ -138,6 +139,5 @@ def test_example_dag(session, dag_id: str):
 )
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):
-    async_dag_ids = ["simple_dag_async"]
-    for dag_id in async_dag_ids:
-        run_dag(dag_id)
+    async_dag_id = "simple_dag_async"
+    run_dag(async_dag_id)

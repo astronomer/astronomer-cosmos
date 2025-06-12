@@ -64,7 +64,6 @@ elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
   # and skipping installation with constraints, as the specified version does not meet our requirements.
   uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"
-  uv pip install "pydantic<2.0"
 elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt

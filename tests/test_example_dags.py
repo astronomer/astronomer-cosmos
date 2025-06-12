@@ -58,7 +58,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
     if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
         return DagBag(dag_folder=None, include_examples=False)
-    """
+
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
         for min_version, files in MIN_VER_DAG_FILE_VER.items():
             if AIRFLOW_VERSION < min_version:
@@ -94,7 +94,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
         # https://github.com/astronomer/astronomer-cosmos/issues/1802
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_source_rendering.py\n")
-    """
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

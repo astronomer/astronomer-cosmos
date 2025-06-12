@@ -31,5 +31,5 @@ pip install 'dbt-databricks!=1.9.0' 'dbt-bigquery' 'dbt-postgres' 'dbt-vertica' 
 # Such as:
 # ERROR tests/operators/_asynchronous/test_base.py - pydantic.errors.PydanticUserError: A non-annotated attribute was detected: `dag_id = <class 'str'>`. All model fields require a type annotation; if `dag_id` is not meant to be a field, you may be able to resolve this error by annotating it as a `ClassVar` or updating `model_config['ignored_types']`.
 if [ "$AIRFLOW_VERSION" = "2.6" ] ; then
-  uv pip install "pydantic<2>"
+  uv pip install "pydantic<2"
 fi

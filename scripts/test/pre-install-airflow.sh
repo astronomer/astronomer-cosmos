@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -x
 set -v
+set -x
+set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"

@@ -36,7 +36,6 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
-    SourceRenderingBehavior,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import (
@@ -304,7 +303,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=base_path / node_dict["original_file_path"],
+                    file_path=base_path / (node_dict.get("path") or node_dict["original_file_path"]),
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(
@@ -565,24 +564,28 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
-            ls_command = [
-                dbt_cmd,
-                "ls",
-                "--output",
-                "json",
-                "--output-keys",
-                "name",
-                "unique_id",
-                "resource_type",
-                "depends_on",
-                "original_file_path",
-                "tags",
-                "config",
-                "freshness",
-            ]
-        else:
-            ls_command = [dbt_cmd, "ls", "--output", "json"]
+        # TODO: improve this logic
+        #  dbtf no longer returns a few fields by default when running dbt ls, including depends_on
+        #  temporarily I'm injecting all of them, but I know this will not work for older versions
+        #  of dbt. To simplify the code, it may be worth checking if they reached end of life
+        # if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+        ls_command = [
+            dbt_cmd,
+            "ls",
+            "--output",
+            "json",
+            "--output-keys",
+            "name",
+            "unique_id",
+            "resource_type",
+            "depends_on",
+            "original_file_path",
+            "tags",
+            "config",
+            "freshness",
+        ]
+        # else:
+        #    ls_command = [dbt_cmd, "ls", "--output", "json"]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)

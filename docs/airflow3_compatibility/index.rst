@@ -58,14 +58,11 @@ investigation.
 Known Limitations
 -----------------
 
-We have observed that the `cosmos_callback_dag.py <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/cosmos_callback_dag.py>`_
-DAG is experiencing noticeable **performance lag** in Airflow 3. This DAG leverages the ``ObjectStoragePath`` module
-along with several libraries from the **fsspec** ecosystem.
-We are prioritizing a deeper investigation into this issue and will provide updates as optimizations or fixes become
-available in future releases.
-
 There have been significant changes to how plugins work in Airflow 3.0, and more changes are coming in Airflow 3.1.
 Even though the Cosmos dbt docs plugin is not currently working, we are actively working on supporting this feature.
+
+Airflow 3 DatasetAlias no longer support ASCII characters. This issue has been reported to the `Airflow community <https://github.com/apache/airflow/issues/51566>`_
+and we are also tracking it in the `Cosmos repository <https://github.com/astronomer/astronomer-cosmos/issues/1802>`_.
 
 What's Next
 -----------

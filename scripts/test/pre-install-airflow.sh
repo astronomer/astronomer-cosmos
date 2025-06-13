@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -x
 set -v
+set -x
+set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
@@ -16,7 +17,12 @@ fi
 
 echo "${VIRTUAL_ENV}"
 
-CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
+if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.2/constraints-$PYTHON_VERSION.txt"
+else
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
+fi;
+
 curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
 # Workaround to remove PyYAML constraint that will work on both Linux and MacOS
 sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
@@ -37,6 +43,12 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFL
   uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install pyopenssl --upgrade
+elif [ "$AIRFLOW_VERSION" = "2.6" ] ; then
+  uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install  "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
+  uv pip install "pydantic<2.0"
 elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
@@ -68,7 +80,7 @@ elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google"  --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
 fi
 

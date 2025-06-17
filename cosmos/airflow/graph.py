@@ -16,6 +16,7 @@ from airflow.utils.task_group import TaskGroup
 from cosmos import settings
 from cosmos.config import RenderConfig
 from cosmos.constants import (
+    AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH,
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
@@ -242,6 +243,15 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
     return dbt_resource_to_class
 
 
+def _create_empty_operator_task_metadata(task_id: str, args: dict[str, Any]) -> TaskMetadata:
+    # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
+    if "task_display_name" in args:
+        args = {"task_display_name": args["task_display_name"]}
+    else:
+        args = {}
+    return TaskMetadata(id=task_id, operator_class=AIRFLOW_EMPTY_OPERATOR_CLASS_IMPORT_PATH, arguments=args)
+
+
 def create_task_metadata(
     node: DbtNode,
     execution_mode: ExecutionMode,
@@ -292,6 +302,9 @@ def create_task_metadata(
             )
         elif node.resource_type == DbtResourceType.MODEL:
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
+            if node.config.get("materialized") == "ephemeral":
+                # render models with ephemeral materialization as empty operators
+                return _create_empty_operator_task_metadata(task_id, args)
         elif node.resource_type == DbtResourceType.SOURCE:
             args["on_warning_callback"] = on_warning_callback
 
@@ -304,14 +317,12 @@ def create_task_metadata(
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
-            if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
+            if node.has_freshness is False and (
+                source_rendering_behavior == SourceRenderingBehavior.ALL
+                or (SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS and node.has_test is True)
+            ):
                 # render sources without freshness as empty operators
-                # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
-                if "task_display_name" in args:
-                    args = {"task_display_name": args["task_display_name"]}
-                else:
-                    args = {}
-                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
+                return _create_empty_operator_task_metadata(task_id, args)
         else:
             task_id, args = _get_task_id_and_args(
                 node, args, use_task_group, normalize_task_id, node.resource_type.value

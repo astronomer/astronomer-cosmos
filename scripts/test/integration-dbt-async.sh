@@ -15,6 +15,7 @@ echo "Installing dbt adapters for DBT_VERSION=$DBT_VERSION (<$NEXT_MINOR_VERSION
 
 pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
 pip install -U \
+  "dbt-core==$DBT_VERSION" \
   "dbt-postgres>=$DBT_VERSION,<$NEXT_MINOR_VERSION" \
   "dbt-databricks>=$DBT_VERSION,<$NEXT_MINOR_VERSION" \
   "dbt-bigquery>=$DBT_VERSION,<$NEXT_MINOR_VERSION"

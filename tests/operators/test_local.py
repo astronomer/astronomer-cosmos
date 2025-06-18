@@ -592,7 +592,7 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
     caplog.set_level(logging.ERROR)
     caplog.clear()
-    run_test_dag(dag)
+    run_test_dag(dag, expect_success=False)
 
     assert "AirflowCompatibilityError" in caplog.text
     assert "ERROR" in caplog.text

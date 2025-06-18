@@ -45,7 +45,7 @@ fi
 
 
 actual_dbt_version=$(dbt --version | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
-if [ "$actual_version" = $DBT_VERSION ]; then
+if [ $actual_version = $DBT_VERSION ]; then
     echo "Version is as expected: $DBT_VERSION"
 else
     echo "Version does not match. Expected: $DBT_VERSION, but got: $actual_dbt_version"

@@ -26,9 +26,10 @@ pip install -U \
 #     from pydantic._internal._decorators import unwrap_wrapped_function
 # ModuleNotFoundError: No module named 'pydantic._internal'
 # Hence, we re-install pydantic with the required minimum version after installing dbt adapters.
+# dbt-core 1.9 raises
 if [ "$DBT_VERSION" = "1.6" ] || [ "$DBT_VERSION" = "1.9" ]; then
-    echo "DBT_VERSION is $DBT_VERSION, installing pydantic>=2.11.0 for apache-airflow-core compatibility."
-    pip install "pydantic>2.11.0"
+    echo "DBT_VERSION is $DBT_VERSION, installing pydantic==2.11.0 for apache-airflow-core compatibility."
+    pip install "pydantic==2.11.0"
 fi
 
 # As on 28th April, 2025, the latest patch dbt-bigquery 1.6.13 on the 1.6 minor is not yet compatible with the latest
@@ -40,6 +41,15 @@ fi
 if [ "$DBT_VERSION" = "1.6" ]; then
     echo "DBT_VERSION is $DBT_VERSION, installing google-cloud-bigquery<3.31.0 for compatibility issue."
     pip install "google-cloud-bigquery<3.31.0"
+fi
+
+
+actual_dbt_version=$(dbt --version | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
+if [ "$actual_version" = $DBT_VERSION ]; then
+    echo "Version is as expected: $DBT_VERSION"
+else
+    echo "Version does not match. Expected: $DBT_VERSION, but got: $actual_dbt_version"
+    exit 1
 fi
 
 export SOURCE_RENDERING_BEHAVIOR=all

@@ -128,7 +128,7 @@ jobs:
           # since 1.9, dbt no longer supports Python 3.8
           - python-version: "3.8"
             dbt-version: "1.9"
-          #
+          # To be fixed in https://github.com/astronomer/astronomer-cosmos/issues/1817
           - python-version: "3.9"
             airflow-version: "3.0"
             dbt-version: "1.9"

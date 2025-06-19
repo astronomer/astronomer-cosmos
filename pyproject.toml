@@ -175,11 +175,6 @@ matrix.airflow.dependencies = [
     # Known issue: https://github.com/zmievsa/cadwyn/issues/283
     { value = "typing-extensions!=4.14.0", if = ["3.0"] }
 ]
-matrix.python.dependencies = [
-    # Known issue: https://github.com/zmievsa/cadwyn/issues/283
-    { value = "cadwyn!=5.4.0", if = ["3.9", "3.10", "3.11", "3.12"] }
-
-]
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"

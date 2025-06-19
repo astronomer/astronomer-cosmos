@@ -18,3 +18,4 @@ else
 fi
 
 pip install 'dbt-postgres'
+pip install 'Pydantic>=2'

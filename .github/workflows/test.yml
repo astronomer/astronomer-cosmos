@@ -206,7 +206,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11"]
-        airflow-version: ["2.6"]
+        airflow-version: ["2.9"]
         dbt-version: ["1.9"]
 
     services:

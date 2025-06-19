@@ -172,6 +172,7 @@ dbt = ["1.5", "1.6", "1.7", "1.8", "1.9"]
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
     { value = "typing_extensions<4.6", if = ["2.6"] },
+    { value = "typing_extensions<4.14", if = ["3.0"] },
 ]
 
 [tool.hatch.envs.tests.scripts]

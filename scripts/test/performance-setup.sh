@@ -11,8 +11,7 @@ NEXT_MINOR_VERSION=$(echo "$DBT_VERSION" | awk -F. '{print $1"."$2+1}')
 
 pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
 pip install -U \
-  "dbt-core==$DBT_VERSION" \
-  "dbt-postgres>=$DBT_VERSION,<$NEXT_MINOR_VERSION"
+  "dbt-core>=$DBT_VERSION,<$NEXT_MINOR_VERSION" dbt-postgres
 
 # apache-airflow-core 3.0.0 requires pydantic>=2.11.0, but the above dbt adapters in case of version 1.6 and 1.9 install
 # pydantic 1.10.22 which make it incompatible.

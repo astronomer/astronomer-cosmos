@@ -25,7 +25,7 @@ if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; 
   pip install  'dbt-duckdb' 'airflow-provider-duckdb>=0.2.0'
 fi
 
-pip install 'dbt-databricks!=1.9.0' 'dbt-bigquery' 'dbt-postgres' 'dbt-vertica' 'openlineage-airflow'
+pip install -U "dbt-core>=$DBT_VERSION,<$NEXT_MINOR_VERSION" dbt-postgres 'dbt-databricks!=1.9.0' dbt-bigquery dbt-vertica openlineage-airflow
 
 # To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9
 # Such as:

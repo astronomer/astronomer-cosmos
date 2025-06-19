@@ -4,6 +4,9 @@ set -v
 set -x
 set -e
 
+DBT_VERSION="$1"
+echo "DBT_VERSION:"
+
 pip uninstall -y dbt-core dbt-sqlite dbt-postgres openlineage-airflow openlineage-integration-common
 rm -rf airflow.*
 
@@ -17,5 +20,4 @@ else
     airflow db init
 fi
 
-pip install 'dbt-postgres'
-pip install 'Pydantic>=2'
+pip install 'dbt-postgres==$DBT_VERSION"'

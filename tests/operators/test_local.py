@@ -1181,6 +1181,7 @@ def test_dbt_docs_gcs_local_operator():
         mock_hook.upload.assert_has_calls(expected_upload_calls)
 
 
+@pytest.mark.integration
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
@@ -1872,6 +1873,7 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
     mock_path.rmdir.assert_not_called()
 
 
+@pytest.mark.integration
 def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

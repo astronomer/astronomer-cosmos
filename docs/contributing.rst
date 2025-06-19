@@ -16,7 +16,7 @@ ________
 To contribute to the cosmos project:
 
 #. Please create a `GitHub Issue <https://github.com/astronomer/astronomer-cosmos/issues>`_ describing your contribution
-#. Fork the repository and clone your fork locally.
+#. `Fork the repository <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo>`_ and clone your fork locally.
 #. Open a feature branch off of the main branch in your fork
 #. Make your changes, push the branch to your fork, and open a Pull Request from your feature branch into the ``main`` branch of the upstream repository.
 #. Link your issue to the pull request

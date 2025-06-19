@@ -425,7 +425,7 @@ jobs:
       matrix:
         python-version: ["3.11"]
         airflow-version: ["2.10", "3.0" ]
-        dbt-version: ["1.10"]
+        dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     services:
       postgres:
@@ -495,7 +495,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ "3.12" ]
-        airflow-version: [ "2.11", "3.0" ]
+        airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.9" ]
     steps:
       - uses: actions/checkout@v4

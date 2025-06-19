@@ -175,7 +175,7 @@ matrix.airflow.dependencies = [
     # Known issue: https://github.com/zmievsa/cadwyn/issues/283
     { value = "typing-extensions!=4.14.0", if = ["3.0"] },
     # ImportError: cannot import name '_BaseGenericAlias' from 'typing_extensions'
-    { value = "cadwin!=5.4.2", if = ["3.0"] },
+    { value = "cadwin<5.4", if = ["3.0"] },
 ]
 
 [tool.hatch.envs.tests.scripts]

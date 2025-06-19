@@ -32,15 +32,11 @@ if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; 
   pip install  'dbt-duckdb' 'airflow-provider-duckdb>=0.2.0'
 fi
 
-# apache-airflow-core 3.0.0 requires pydantic>=2.11.0, but the above dbt adapters in case of version 1.6 and 1.9 install
-# pydantic 1.10.22 which make it incompatible.
-# With pydantic 1.10.22 we get the below error
-# File "<...>/hatch/env/virtual/astronomer-cosmos/D9FI7Men/tests.py3.11-3.0-1.6/lib/python3.11/site-packages/cadwyn/_utils.py", line 5, in <module>
-#     from pydantic._internal._decorators import unwrap_wrapped_function
-# ModuleNotFoundError: No module named 'pydantic._internal'
-# Hence, we re-install pydantic with the required minimum version after installing dbt adapters.
-# dbt-core 1.9 raises
-if [ "$DBT_VERSION" = "1.6" ] || [ "$DBT_VERSION" = "1.9" ]; then
-    echo "DBT_VERSION is $DBT_VERSION, installing pydantic==2.11.0 for apache-airflow-core compatibility."
-    pip install "pydantic==2.11.0"
+# To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9
+# Such as:
+# ERROR tests/operators/_asynchronous/test_base.py - pydantic.errors.PydanticUserError: A non-annotated attribute was detected: `dag_id = <class 'str'>`. All model fields require a type annotation; if `dag_id` is not meant to be a field, you may be able to resolve this error by annotating it as a `ClassVar` or updating `model_config['ignored_types']`.
+if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
+  pip install "pydantic<2"
+  pip freeze
+  pip freeze | grep -i pydantic
 fi

@@ -72,7 +72,7 @@ jobs:
           # Airflow 2.11 does not support Python 3.8 or older versions
           - python-version: "3.8"
             airflow-version: "2.11"
-  steps:
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}

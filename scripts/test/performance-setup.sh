@@ -20,5 +20,5 @@ else
     airflow db init
 fi
 
-pip install 'dbt-postgres==$DBT_VERSION"'
+pip install 'dbt-postgres==$DBT_VERSION'
 pip install 'pydantic==2.10'

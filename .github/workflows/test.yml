@@ -125,8 +125,6 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.8"
             airflow-version: "3.0"
-          - python-version: "3.8"
-            airflow-version: "1.9"
           # since 1.9, dbt no longer supports Python 3.8
           - python-version: "3.8"
             dbt-version: "1.9"

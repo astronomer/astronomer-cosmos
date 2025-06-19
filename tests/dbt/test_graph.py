@@ -1301,6 +1301,7 @@ def test_run_command_forcing_subprocess(mock_dbt_runner, mock_subprocess, tmp_db
     assert not mock_dbt_runner.called
 
 
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
 @patch("cosmos.dbt.graph.run_command_with_subprocess")
 @patch("cosmos.dbt.graph.run_command_with_dbt_runner")
 def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):

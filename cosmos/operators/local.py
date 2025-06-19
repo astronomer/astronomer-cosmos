@@ -298,6 +298,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             target_path_schema = urlparse(target_path_str).scheme
             remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
         if remote_conn_id is None:
+            logger.info(
+                "Remote target connection not set. Please, configure [cosmos][remote_target_path_conn_id] or set the environment variable AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID"
+            )
             return None, None
 
         if not settings.AIRFLOW_IO_AVAILABLE:
@@ -500,13 +503,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.profile_config.target_name,
         ]
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
-            # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
-            # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
-            # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
-            # directories, and the use of different temp paths between parsing and execution appears to interfere
-            # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
-            # hangs and ensures reliable task execution.
-            dbt_flags.append("--no-static-parser")
+            from dbt.version import __version__ as dbt_version
+
+            if Version(dbt_version) >= Version("1.5.6"):
+                # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+                # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+                # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+                # directories, and the use of different temp paths between parsing and execution appears to interfere
+                # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+                # hangs and ensures reliable task execution.
+                dbt_flags.append("--no-static-parser")
         return dbt_flags
 
     def _install_dependencies(

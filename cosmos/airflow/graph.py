@@ -13,6 +13,7 @@ from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos import settings
 from cosmos.config import RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
@@ -31,7 +32,6 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
-from cosmos.settings import enable_setup_async_task, enable_teardown_async_task
 
 logger = get_logger(__name__)
 
@@ -666,7 +666,7 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    if enable_setup_async_task:
+    if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(
             dag,
             execution_mode,
@@ -676,7 +676,7 @@ def build_airflow_graph(
             render_config=render_config,
             async_py_requirements=async_py_requirements,
         )
-    if enable_teardown_async_task:
+    if settings.enable_teardown_async_task:
         _add_teardown_task(
             dag,
             execution_mode,

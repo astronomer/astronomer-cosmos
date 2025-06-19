@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from functools import cache
@@ -53,7 +55,7 @@ def session():
 
 
 @cache
-def get_dag_bag() -> DagBag:
+def get_dag_bag() -> DagBag:  # noqa: C901
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
 
     if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
@@ -74,6 +76,10 @@ def get_dag_bag() -> DagBag:
         if _PYTHON_VERSION < (3, 9):
             file.writelines(["example_duckdb_dag.py\n"])
 
+        if _PYTHON_VERSION < (3, 9):
+            # dbt-bigquery 1.9 supports Python 3.9 onwards
+            file.writelines(["simple_dag_async.py\n"])
+
         if DBT_VERSION < Version("1.6.0"):
             file.writelines(["simple_dag_async.py\n"])
             file.writelines(["example_model_version.py\n"])
@@ -84,6 +90,12 @@ def get_dag_bag() -> DagBag:
 
         if AIRFLOW_VERSION < Version("2.8.0"):
             file.writelines("example_cosmos_dbt_build.py\n")
+
+        # Disabling this DAG temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
+        # https://github.com/apache/airflow/issues/51566
+        # https://github.com/astronomer/astronomer-cosmos/issues/1802
+        if AIRFLOW_VERSION >= Version("3.0.0"):
+            file.writelines("example_source_rendering.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
@@ -101,6 +113,7 @@ def get_dag_ids() -> list[str]:
 def run_dag(dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
+    assert dag
     test_utils.run_dag(dag)
 
 
@@ -116,17 +129,17 @@ def test_example_dag(session, dag_id: str):
     run_dag(dag_id)
 
 
-async_dag_ids = ["simple_dag_async"]
-
-
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.8") or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
+    _PYTHON_VERSION < (3, 9)
+    or AIRFLOW_VERSION < Version("2.8")
+    or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="dbt-bigquery only supports Python 3.9 onwards. See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
+)
+@patch.dict(
+    os.environ,
+    {"AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK": "false", "AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK": "false"},
 )
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):
-    monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_SETUP_ASYNC_TASK", "false")
-    monkeypatch.setenv("AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK", "false")
-
-    for dag_id in async_dag_ids:
-        run_dag(dag_id)
+    async_dag_id = "simple_dag_async"
+    run_dag(async_dag_id)

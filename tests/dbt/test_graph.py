@@ -1301,6 +1301,7 @@ def test_run_command_forcing_subprocess(mock_dbt_runner, mock_subprocess, tmp_db
     assert not mock_dbt_runner.called
 
 
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
 @patch("cosmos.dbt.graph.run_command_with_subprocess")
 @patch("cosmos.dbt.graph.run_command_with_dbt_runner")
 def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):
@@ -1882,9 +1883,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("391db5c7e1fb90214d829dd0476059a1", "0148da6f5f7fd260c9fa55c3b3c45168")
+        assert hash_dir in ("64934a984040076870accfc177706353", "159b4a3432c3d0ebad32080a55697089")
     else:
-        assert hash_dir == "0148da6f5f7fd260c9fa55c3b3c45168"
+        assert hash_dir == "159b4a3432c3d0ebad32080a55697089"
 
 
 @pytest.mark.integration

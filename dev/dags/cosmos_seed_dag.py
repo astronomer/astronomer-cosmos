@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 
 from airflow import DAG
-from airflow.datasets import Dataset
 from airflow.utils.task_group import TaskGroup
 from pendulum import datetime
 
@@ -57,7 +56,11 @@ with DAG(
     jaffle_shop_seed = DbtSeedOperator(
         task_id="seed_jaffle_shop",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
-        outlets=[Dataset("SEED://JAFFLE_SHOP")],
+        # the following line is commented out because Airflow 3 raises an `AirflowInactiveAssetInInletOrOutletException`
+        # we can re-enable it once the issue is solved in Airflow 3
+        # https://github.com/apache/airflow/issues/51644
+        # https://github.com/astronomer/astronomer-cosmos/issues/1804
+        # outlets=[Dataset("SEED://JAFFLE_SHOP")],
         profile_config=profile_config,
         install_deps=True,
     )

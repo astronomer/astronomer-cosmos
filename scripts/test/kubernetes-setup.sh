@@ -7,6 +7,7 @@ set -e
 
 pip install --force-reinstall 'dbt-postgres>=1.8'
 pip install --force-reinstall dbt-adapters
+pip install 'pydantic==2.10'
 
 # Create a Kubernetes secret named 'postgres-secrets' with the specified literals for host and password
 kubectl create secret generic postgres-secrets \

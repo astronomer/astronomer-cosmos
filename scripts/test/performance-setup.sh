@@ -21,3 +21,4 @@ else
 fi
 
 pip install 'dbt-postgres==$DBT_VERSION"'
+pip install 'pydantic==2.10'

@@ -14,6 +14,17 @@ rm -rf airflow.*
 pip freeze | grep airflow
 airflow db reset -y
 
+AIRFLOW_VERSION=$(airflow version)
+AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
+if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
+    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
+    airflow db migrate
+else
+    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db init'..."
+    airflow db init
+fi
+
+
 uv pip install -U "dbt-core==$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica 'dbt-databricks' pyspark
 
 pip install  -U openlineage-airflow
@@ -29,15 +40,4 @@ if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
   pip install "pydantic<2"
   pip freeze
   pip freeze | grep -i pydantic
-fi
-
-
-AIRFLOW_VERSION=$(airflow version)
-AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
-if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
-    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
-    airflow db migrate
-else
-    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db init'..."
-    airflow db init
 fi

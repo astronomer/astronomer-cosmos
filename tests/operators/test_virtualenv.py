@@ -92,7 +92,7 @@ def test_run_command_without_virtualenv_dir(
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         pip_install_options=["--test-flag"],
-        py_requirements=["dbt-postgres==1.6.0b1"],
+        py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
     )
@@ -171,7 +171,7 @@ def test_run_command_with_virtualenv_dir(
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         pip_install_options=["--test-flag"],
-        py_requirements=["dbt-postgres==1.6.0b1"],
+        py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
         virtualenv_dir=Path("mock-venv"),
@@ -203,7 +203,7 @@ def test_virtualenv_operator_append_env_is_true_by_default():
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         pip_install_options=["--test-flag"],
-        py_requirements=["dbt-postgres==1.6.0b1"],
+        py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
     )

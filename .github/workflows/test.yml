@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, af-2-11]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -40,7 +40,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
         dbt-version: ["1.9"]
         exclude:
           - python-version: "3.11"
@@ -69,6 +69,9 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.8"
             airflow-version: "3.0"
+          # Airflow 2.11 does not support Python 3.8 or older versions
+          - python-version: "3.8"
+            airflow-version: "2.11"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,7 +113,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
         dbt-version: ["1.9"]
         exclude:
           - python-version: "3.11"
@@ -125,6 +128,9 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.8"
             airflow-version: "3.0"
+          # Airflow 2.11 does not support Python 3.8 or older versions
+          - python-version: "3.8"
+            airflow-version: "2.11"
           # since 1.9, dbt no longer supports Python 3.8
           - python-version: "3.8"
             dbt-version: "1.9"
@@ -361,7 +367,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.10", "3.0" ]
+        airflow-version: [ "2.11", "3.0" ]
         dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
     services:
       postgres:

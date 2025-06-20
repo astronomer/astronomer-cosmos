@@ -99,10 +99,9 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
 
         AbstractDbtBase.__init__(self, **base_kwargs)
 
-        if isinstance(operator_kwargs.get("container_resources"), dict):
-            operator_kwargs["container_resources"] = k8s.V1ResourceRequirements(
-                **operator_kwargs["container_resources"]
-            )
+        container_resources = operator_kwargs.get("container_resources")
+        if isinstance(container_resources, dict):
+            operator_kwargs["container_resources"] = k8s.V1ResourceRequirements(**container_resources)
         KubernetesPodOperator.__init__(self, **operator_kwargs)
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:

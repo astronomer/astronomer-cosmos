@@ -152,9 +152,7 @@ def create_test_task_metadata(
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
-        if node.resource_type == DbtResourceType.MODEL:
-            task_args["models"] = node.resource_name
-        elif node.resource_type == DbtResourceType.SOURCE:
+        if node.resource_type == DbtResourceType.SOURCE:
             task_args["select"] = f"source:{node.resource_name}"
         elif is_detached_test(node):
             task_args["select"] = node.resource_name.split(".")[0]
@@ -163,7 +161,6 @@ def create_test_task_metadata(
 
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
-
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
@@ -291,7 +288,17 @@ def create_task_metadata(
                 node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
             )
         elif node.resource_type == DbtResourceType.MODEL:
+            args["select"] = f"{node.resource_name}"  # TODO: This may be problematic
+            args.pop("models")  # dbtf no longer supports models
             task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
+        elif node.resource_type == DbtResourceType.SEED:
+            # temporarily trying to fix the SEED behaviour for dbtf
+            # review if we should improve this further
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, node.resource_type.value
+            )
+            args["select"] = f"{node.resource_name}"  #  TODO: This may be problematic
+            args.pop("models")  # dbtf no longer supports models
         elif node.resource_type == DbtResourceType.SOURCE:
             args["on_warning_callback"] = on_warning_callback
 

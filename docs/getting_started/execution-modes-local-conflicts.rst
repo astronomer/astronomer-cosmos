@@ -6,29 +6,40 @@ Airflow and dbt dependencies conflicts
 When using the `Local Execution Mode <execution-modes.html#local>`__, users may face dependency conflicts between
 `Apache Airflow® <https://airflow.apache.org/>`_ and dbt. The conflicts may increase depending on the Airflow providers and dbt adapters being used.
 
-If you find errors, we recommend users look into using `alternative execution modes <execution-modes.html>`__.
+If you find errors, we recommend users isolating the installation of dbt from the Airflow installation.
+With the `Local Execution Mode <execution-modes.html#local>`__, this can be accomplished by installing dbt in a separate
+Python virtualenv and setting the `ExecutionConfig.dbt_executable_path <../configuration/execution-config.html>`_  and
+`RenderConfig.dbt_executable_path <../configuration/render-config.html>`_ parameters.
+
+The page `execution modes <execution-modes.html>`__ describes many other methods that support isolating dbt from Airflow.
 
 In the following table, ``x`` represents combinations that lead to conflicts (vanilla ``apache-airflow`` and ``dbt-core`` packages):
 
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| Airflow / DBT | 1.0 | 1.1 | 1.2 | 1.3 | 1.4 | 1.5 | 1.6 | 1.7 | 1.8 |
-+===============+=====+=====+=====+=====+=====+=====+=====+=====+=====+
-| 2.2           |     |     |     | x   | x   | x   | x   | x   | x   |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.3           | x   | x   |     | x   | x   | x   | x   | x   | X   |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.4           | x   | x   | x   |     |     |     |     |     |     |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.5           | x   | x   | x   |     |     |     |     |     |     |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.6           | x   | x   | x   | x   | x   |     |     |     |     |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.7           | x   | x   | x   | x   | x   |     |     |     |     |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.8           | x   | x   | x   | x   | x   |     |  x  |     |     |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-| 2.9           | x   | x   | x   | x   | x   |     |     |     |     |
-+---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| Airflow / DBT | 1.0 | 1.1 | 1.2 | 1.3 | 1.4 | 1.5 | 1.6 | 1.7 | 1.8 | 1.9 | 1.10 |
++===============+=====+=====+=====+=====+=====+=====+=====+=====+=====+=====+======+
+| 2.2           |     |     |     | x   | x   | x   | x   | x   | x   | X   |  X   |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.3           | x   | x   |     | x   | x   | x   | x   | x   | X   | X   |  X   |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.4           | x   | x   | x   |     |     |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.5           | x   | x   | x   |     |     |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.6           | x   | x   | x   | x   | x   |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.7           | x   | x   | x   | x   | x   |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.8           | x   | x   | x   | x   | x   |     |  x  |     |     |     |  X   |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.9           | x   | x   | x   | x   | x   |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.10          | X   | X   | X   | X   | X   |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 2.11          | X   | X   | X   | X   | X   |     |     |     |     |     |      |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
+| 3.0           | X   | X   | X   | X   | X   | X   | X   | X   |     |     |  X   |
++---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
 
 Examples of errors
 -----------------------------------
@@ -77,6 +88,16 @@ Examples of errors
         flask-appbuilder 4.3.3 depends on jsonschema<5 and >=3
         connexion 2.10.0 depends on jsonschema<4 and >=2.5.1
 
+.. code-block:: bash
+
+ERROR: Cannot install apache-airflow and dbt-core==1.10.0 because these package versions have conflicting dependencies.
+
+The conflict is caused by:
+    dbt-core 1.10.0 depends on pydantic<2
+    apache-airflow-core 3.0.0 depends on pydantic>=2.11.0
+
+
+
 How to reproduce
 ----------------
 
@@ -84,26 +105,28 @@ The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ wi
 
 .. code-block:: python
 
-  import nox
+    import nox
 
 
-  nox.options.sessions = ["compatibility"]
-  nox.options.reuse_existing_virtualenvs = True
+    nox.options.sessions = ["compatibility"]
+    nox.options.reuse_existing_virtualenvs = True
 
 
-  @nox.session(python=["3.10"])
-  @nox.parametrize(
-      "dbt_version", ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8"]
-  )
-  @nox.parametrize(
-      "airflow_version", ["2.2.4", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
-  )
-  def compatibility(session: nox.Session, airflow_version, dbt_version) -> None:
-      """Run both unit and integration tests."""
-      session.run(
-          "pip3",
-          "install",
-          "--pre",
-          f"apache-airflow=={airflow_version}",
-          f"dbt-core=={dbt_version}",
-      )
+    @nox.session(python=["3.10"])
+    @nox.parametrize(
+        "dbt_version",
+        ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10"],
+    )
+    @nox.parametrize(
+        "airflow_version",
+        ["2.2.4", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"],
+    )
+    def compatibility(session: nox.Session, airflow_version, dbt_version) -> None:
+        """Run both unit and integration tests."""
+        session.run(
+            "pip3",
+            "install",
+            "--pre",
+            f"apache-airflow=={airflow_version}",
+            f"dbt-core=={dbt_version}",
+        )

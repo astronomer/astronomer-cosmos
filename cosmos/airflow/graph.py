@@ -197,6 +197,7 @@ def _get_task_id_and_args(
     args: dict[str, Any],
     use_task_group: bool,
     normalize_task_id: Callable[..., Any] | None,
+    normalize_task_display_name: Callable[..., Any] | None,
     resource_suffix: str,
     include_resource_type: bool = False,
 ) -> tuple[str, dict[str, Any]]:
@@ -204,16 +205,26 @@ def _get_task_id_and_args(
     Generate task ID and update args with display name if needed.
     """
     args_update = args
-    task_display_name = f"{node.name}_{resource_suffix}"
+    task_name = f"{node.name}_{resource_suffix}"
+
     if include_resource_type:
-        task_display_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
+        task_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
+
     if use_task_group:
         task_id = resource_suffix
-    elif normalize_task_id:
+
+    elif normalize_task_id and not normalize_task_display_name:
         task_id = normalize_task_id(node)
-        args_update["task_display_name"] = task_display_name
+        args_update["task_display_name"] = task_name
+    elif not normalize_task_id and normalize_task_display_name:
+        task_id = task_name
+        args_update["task_display_name"] = normalize_task_display_name(node)
+    elif normalize_task_id and normalize_task_display_name:
+        task_id = normalize_task_id(node)
+        args_update["task_display_name"] = normalize_task_display_name(node)
     else:
-        task_id = task_display_name
+        task_id = task_name
+
     return task_id, args_update
 
 
@@ -250,6 +261,7 @@ def create_task_metadata(
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
+    normalize_task_display_name: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
@@ -288,10 +300,18 @@ def create_task_metadata(
             args["on_warning_callback"] = on_warning_callback
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
+                node,
+                args,
+                use_task_group,
+                normalize_task_id,
+                normalize_task_display_name,
+                "build",
+                include_resource_type=True,
             )
         elif node.resource_type == DbtResourceType.MODEL:
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "run"
+            )
         elif node.resource_type == DbtResourceType.SOURCE:
             args["on_warning_callback"] = on_warning_callback
 
@@ -303,7 +323,9 @@ def create_task_metadata(
                 return None
             args["select"] = f"source:{node.resource_name}"
             args.pop("models")
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
+            )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
                 # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
@@ -314,7 +336,7 @@ def create_task_metadata(
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
         else:
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, node.resource_type.value
+                node, args, use_task_group, normalize_task_id, normalize_task_display_name, node.resource_type.value
             )
 
         _override_profile_if_needed(args, node.profile_config_to_override)
@@ -365,6 +387,7 @@ def generate_task_or_group(
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
     normalize_task_id: Callable[..., Any] | None = None,
+    normalize_task_display_name: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
     enable_owner_inheritance: bool | None = None,
     **kwargs: Any,
@@ -386,6 +409,7 @@ def generate_task_or_group(
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
         normalize_task_id=normalize_task_id,
+        normalize_task_display_name=normalize_task_display_name,
         test_behavior=test_behavior,
         test_indirect_selection=test_indirect_selection,
         on_warning_callback=on_warning_callback,
@@ -595,6 +619,7 @@ def build_airflow_graph(
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
+    normalize_task_display_name = render_config.normalize_task_display_name
     enable_owner_inheritance = render_config.enable_owner_inheritance
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
@@ -624,6 +649,7 @@ def build_airflow_graph(
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
+            normalize_task_display_name=normalize_task_display_name,
             node=node,
             detached_from_parent=detached_from_parent,
             enable_owner_inheritance=enable_owner_inheritance,

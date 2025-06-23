@@ -280,9 +280,12 @@ def create_task_metadata(
     :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
+    # dbt fusion does not support the --models flag
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
-    args = {**args, **{"models": node.resource_name}}
+    resource_suffix_map = {
+        DbtResourceType.MODEL: "run",
+    }
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context: dict[str, Any] = {
@@ -290,37 +293,26 @@ def create_task_metadata(
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
             "package_name": node.package_name,
         }
+        resource_suffix = resource_suffix_map.get(node.resource_type) or node.resource_type.value
+        models_select_key = "models" if settings.legacy_dbt_model_selector else "select"
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
-                node,
-                args,
-                use_task_group,
-                normalize_task_id,
-                normalize_task_display_name,
-                "build",
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=resource_suffix,
                 include_resource_type=True,
             )
-        elif node.resource_type == DbtResourceType.MODEL:
-            # dbt fusion no longer has the --models flag
-            args["select"] = f"{node.resource_name}"
-            args.pop("models")  # dbtf no longer supports models
-            task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "run"
-            )
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
-        elif node.resource_type == DbtResourceType.SEED:
-            task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, node.resource_type.value
-            )
-            # dbt fusion no longer has the --models flag
-            args["select"] = f"{node.resource_name}"
-            args.pop("models")
         elif node.resource_type == DbtResourceType.SOURCE:
+            args["select"] = f"source:{node.resource_name}"
             args["on_warning_callback"] = on_warning_callback
 
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
@@ -329,8 +321,7 @@ def create_task_metadata(
                 and node.has_test is False
             ):
                 return None
-            args["select"] = f"source:{node.resource_name}"
-            args.pop("models")
+
             task_id, args = _get_task_id_and_args(
                 node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
             )
@@ -343,8 +334,14 @@ def create_task_metadata(
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
         else:
+            args[models_select_key] = node.resource_name
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, normalize_task_display_name, node.resource_type.value
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=resource_suffix,
             )
 
         _override_profile_if_needed(args, node.profile_config_to_override)

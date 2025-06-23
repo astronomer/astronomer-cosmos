@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+import kubernetes.client as k8s
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG, TaskInstance
@@ -461,3 +462,20 @@ def test_kubernetes_default_args():
     assert dbt_run_operation.image == image
     assert dbt_run_operation.project_dir == DBT_ROOT_PATH / "jaffle_shop"
     assert dbt_run_operation.profile_config.target_name == profile_config.target_name
+
+
+def test_kubernetes_pod_container_resources():
+    """Test that the container_resources are converted to V1ResourceRequirements in the operator."""
+    resources = {
+        "requests": {"cpu": "100m", "memory": "128Mi"},
+        "limits": {"cpu": "500m", "memory": "512Mi"},
+    }
+    run_operator = DbtRunOperationKubernetesOperator(
+        task_id="run_macro_command",
+        macro_name="macro",
+        project_dir = DBT_ROOT_PATH / "jaffle_shop",
+        container_resources=resources,
+    )
+    assert isinstance(run_operator.container_resources, k8s.V1ResourceRequirements)
+    assert run_operator.container_resources.to_dict()["requests"] == resources["requests"]
+    assert run_operator.container_resources.to_dict()["limits"] == resources["limits"]

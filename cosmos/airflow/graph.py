@@ -282,6 +282,9 @@ def create_task_metadata(
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
+    # Make a copy to avoid issues with mutable arguments
+    args = {**args}
+
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context: dict[str, Any] = {
             "dbt_node_config": node.context_dict,

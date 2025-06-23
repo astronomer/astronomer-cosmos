@@ -237,14 +237,20 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--select", "combined_model"]
+    assert args[1:] == ["test", "--select", "combined_model", "--exclude", "custom_test_combined_model_combined_model_"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--select", "model_a"]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "model_a",
+        "--exclude",
+        "custom_test_combined_model_combined_model_",
+    ]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_b"]
+    assert args[1:] == ["test", "--select", "model_b"]
 
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
@@ -412,11 +418,11 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     ]
 
     args = tasks["model.my_dbt_project.model_a"].build_cmd({})[0]
-    assert args[1:] == ["build", "--exclude", "custom_test_combined_model_combined_model_", "--models", "model_a"]
+    assert args[1:] == ["build", "--select", "model_a", "--exclude", "custom_test_combined_model_combined_model_"]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].build_cmd({})[0]
-    assert args[1:] == ["build", "--models", "model_b"]
+    assert args[1:] == ["build", "--select", "model_b"]
 
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]

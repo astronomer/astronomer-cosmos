@@ -280,7 +280,6 @@ def create_task_metadata(
     :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
-    # dbt fusion does not support the --models flag
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
     resource_suffix_map = {DbtResourceType.MODEL: "run", TestBehavior.BUILD: "build"}
@@ -296,7 +295,12 @@ def create_task_metadata(
             or resource_suffix_map.get(test_behavior)
             or node.resource_type.value
         )
-        models_select_key = "models" if settings.legacy_dbt_model_selector else "select"
+        # Since Cosmos 1.11, it selects models using --select, instead of --models. The reason for this is that
+        # this flag was deprecated in dbt-core 1.10 (https://github.com/dbt-labs/dbt-core/issues/11561)
+        # and dbt fusion (2.0.0-beta26) does not support it.
+        # Users can still force Cosmos to use `--models` by setting the environment variable
+        # `AIRFLOW__COSMOS__PRE_DBT_FUSION=1`.
+        models_select_key = "models" if settings.pre_dbt_fusion else "select"
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             args[models_select_key] = f"{node.resource_name}"

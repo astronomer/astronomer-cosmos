@@ -31,7 +31,7 @@ enable_cache_profile = conf.getboolean("cosmos", "enable_cache_profile", fallbac
 dbt_profile_cache_dir_name = conf.get("cosmos", "profile_cache_dir_name", fallback="profile")
 virtualenv_max_retries_lock = conf.getint("cosmos", "virtualenv_max_retries_lock", fallback=120)
 default_copy_dbt_packages = conf.getboolean("cosmos", "default_copy_dbt_packages", fallback=False)
-legacy_dbt_model_selector = conf.getboolean("cosmos", "legacy_dbt_model_selector", fallback=False)
+pre_dbt_fusion = conf.getboolean("cosmos", "pre_dbt_fusion", fallback=False)
 
 # Experimentally adding `remote_cache_dir` as a separate entity in the Cosmos 1.6 release to gather feedback.
 # This will be merged with the `cache_dir` config parameter in upcoming releases.

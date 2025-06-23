@@ -96,6 +96,13 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE``
 
+.. _pre_dbt_fusion:
+    Since Cosmos 1.11, we introduced support to dbt Fusion. Some of the changes may not be compatible with legacy versions of dbt-core.
+    If you find any issues on how Cosmos interacts with older versions of dbt-core we introduced this configuration.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__PRE_DBT_FUSION``
+
 .. _profile_cache_dir_name:
 
 `profile_cache_dir_name`_:

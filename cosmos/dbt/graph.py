@@ -36,7 +36,6 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
-    SourceRenderingBehavior,
 )
 from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import (
@@ -567,7 +566,18 @@ class DbtGraph:
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
 
-        if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+        # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
+        # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
+        # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
+        # Users can force previous Cosmos behaviour by setting pre_dbt_fusion to True
+        if settings.pre_dbt_fusion:
+            ls_command = [
+                dbt_cmd,
+                "ls",
+                "--output",
+                "json",
+            ]
+        else:
             ls_command = [
                 dbt_cmd,
                 "ls",
@@ -583,18 +593,6 @@ class DbtGraph:
                 "config",
                 "freshness",
             ]
-        elif settings.pre_dbt_fusion:
-            ls_command = [
-                dbt_cmd,
-                "ls",
-                "--output",
-                "json",
-            ]
-        else:
-            # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10
-            # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
-            # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
-            ls_command = [dbt_cmd, "ls", "--output", "json", "--output-keys", "alias", "depends_on", "config", "tags"]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)

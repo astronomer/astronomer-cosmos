@@ -470,12 +470,29 @@ def test_kubernetes_pod_container_resources():
         "requests": {"cpu": "100m", "memory": "128Mi"},
         "limits": {"cpu": "500m", "memory": "512Mi"},
     }
-    run_operator = DbtRunOperationKubernetesOperator(
+    a_operator = DbtRunOperationKubernetesOperator(
         task_id="run_macro_command",
         macro_name="macro",
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         container_resources=resources,
     )
-    assert isinstance(run_operator.container_resources, k8s.V1ResourceRequirements)
-    assert run_operator.container_resources.to_dict()["requests"] == resources["requests"]
-    assert run_operator.container_resources.to_dict()["limits"] == resources["limits"]
+    assert isinstance(a_operator.container_resources, k8s.V1ResourceRequirements)
+    assert a_operator.container_resources.to_dict()["requests"] == resources["requests"]
+    assert a_operator.container_resources.to_dict()["limits"] == resources["limits"]
+
+    b_operator = DbtRunOperationKubernetesOperator(
+        task_id="run_macro_command",
+        macro_name="macro",
+        project_dir = DBT_ROOT_PATH / "jaffle_shop",
+        container_resources=k8s.V1ResourceRequirements(**resources),
+    )
+    assert isinstance(b_operator.container_resources, k8s.V1ResourceRequirements)
+    assert b_operator.container_resources.to_dict()["requests"] == resources["requests"]
+    assert b_operator.container_resources.to_dict()["limits"] == resources["limits"]
+
+    c_operator = DbtRunOperationKubernetesOperator(
+        task_id="run_macro_command",
+        macro_name="macro",
+        project_dir = DBT_ROOT_PATH / "jaffle_shop",
+    )
+    assert c_operator.container_resources is None

@@ -305,7 +305,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
-                    file_path=base_path / node_dict["original_file_path"] or (node_dict.get("path")),
+                    file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(

@@ -237,10 +237,10 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--models", "combined_model"]
+    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--select", "combined_model"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--models", "model_a"]
+    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--select", "model_a"]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
@@ -286,14 +286,14 @@ def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detac
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "combined_model"]
+    assert args[1:] == ["test", "--select", "combined_model"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_a"]
+    assert args[1:] == ["test", "--select", "model_a"]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_b"]
+    assert args[1:] == ["test", "--select", "model_b"]
 
 
 @pytest.mark.integration
@@ -405,10 +405,10 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     args = tasks["model.my_dbt_project.combined_model"].build_cmd({})[0]
     assert args[1:] == [
         "build",
+        "--select",
+        "combined_model",
         "--exclude",
         "custom_test_combined_model_combined_model_",
-        "--models",
-        "combined_model",
     ]
 
     args = tasks["model.my_dbt_project.model_a"].build_cmd({})[0]

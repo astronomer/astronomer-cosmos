@@ -282,17 +282,16 @@ def create_task_metadata(
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
-    resource_suffix_map = {DbtResourceType.MODEL: "run", TestBehavior.BUILD: "build"}
-
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context: dict[str, Any] = {
             "dbt_node_config": node.context_dict,
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
             "package_name": node.package_name,
         }
+        resource_suffix_map = {TestBehavior.BUILD: "build", DbtResourceType.MODEL: "run"}
         resource_suffix = (
-            resource_suffix_map.get(node.resource_type)
-            or resource_suffix_map.get(test_behavior)
+            resource_suffix_map.get(test_behavior)
+            or resource_suffix_map.get(node.resource_type)
             or node.resource_type.value
         )
         # Since Cosmos 1.11, it selects models using --select, instead of --models. The reason for this is that

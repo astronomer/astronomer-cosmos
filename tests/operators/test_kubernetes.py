@@ -483,7 +483,7 @@ def test_kubernetes_pod_container_resources():
     b_operator = DbtRunOperationKubernetesOperator(
         task_id="run_macro_command",
         macro_name="macro",
-        project_dir = DBT_ROOT_PATH / "jaffle_shop",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         container_resources=k8s.V1ResourceRequirements(**resources),
     )
     assert isinstance(b_operator.container_resources, k8s.V1ResourceRequirements)
@@ -493,6 +493,6 @@ def test_kubernetes_pod_container_resources():
     c_operator = DbtRunOperationKubernetesOperator(
         task_id="run_macro_command",
         macro_name="macro",
-        project_dir = DBT_ROOT_PATH / "jaffle_shop",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
     )
     assert c_operator.container_resources is None

@@ -8,6 +8,8 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :caption: Contents:
 
+   dbt Fusion <dbt-fusion>
+
    Project Config <project-config>
    Profile Config <profile-config>
    Execution Config <execution-config>

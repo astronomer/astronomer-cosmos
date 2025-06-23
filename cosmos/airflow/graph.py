@@ -283,9 +283,7 @@ def create_task_metadata(
     # dbt fusion does not support the --models flag
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
-    resource_suffix_map = {
-        DbtResourceType.MODEL: "run",
-    }
+    resource_suffix_map = {DbtResourceType.MODEL: "run", TestBehavior.BUILD: "build"}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context: dict[str, Any] = {
@@ -293,7 +291,11 @@ def create_task_metadata(
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
             "package_name": node.package_name,
         }
-        resource_suffix = resource_suffix_map.get(node.resource_type) or node.resource_type.value
+        resource_suffix = (
+            resource_suffix_map.get(node.resource_type)
+            or resource_suffix_map.get(test_behavior)
+            or node.resource_type.value
+        )
         models_select_key = "models" if settings.legacy_dbt_model_selector else "select"
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:

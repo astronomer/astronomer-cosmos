@@ -473,7 +473,7 @@ def test_kubernetes_pod_container_resources():
     run_operator = DbtRunOperationKubernetesOperator(
         task_id="run_macro_command",
         macro_name="macro",
-        project_dir = DBT_ROOT_PATH / "jaffle_shop",
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
         container_resources=resources,
     )
     assert isinstance(run_operator.container_resources, k8s.V1ResourceRequirements)

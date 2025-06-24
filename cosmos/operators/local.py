@@ -25,7 +25,7 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 from airflow.version import version as airflow_version
-from attr import define
+from attrs import define
 from packaging.version import Version
 
 from cosmos import cache, settings

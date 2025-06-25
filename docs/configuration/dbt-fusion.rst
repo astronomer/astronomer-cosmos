@@ -40,7 +40,7 @@ How to use
 
 End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:
 
-.. code-block:: 
+.. code-block::
 
     USER root
     RUN apt install -y curl
@@ -50,7 +50,7 @@ End-users should install the dbt Fusion package themselves. An example of how to
 
 Example:
 
-.. code-block:: 
+.. code-block::
     DbtDag(
         ...,
         execution_config=ExecutionConfig(

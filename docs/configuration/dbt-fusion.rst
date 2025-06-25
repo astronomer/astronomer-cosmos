@@ -24,7 +24,8 @@ Some reported dbt Fusion features include:
  - **Real-time dev experience:** Catch errors instantly and explore lineage as you code, if you're using the VS Code extension
  - **Multi-dialect support:** Instant error detection across Snowflake, Databricks, BigQuery, and Redshift SQL dialects
 
-> Note: dbt Fusion is in public beta with current support for Snowflake and Databricks projects, with additional data platforms coming soon.
+.. note::
+    dbt Fusion is in public beta with current support for Snowflake and Databricks projects, with additional data platforms coming soon.
 
 Support
 -------
@@ -51,6 +52,7 @@ End-users should install the dbt Fusion package themselves. An example of how to
 Example:
 
 .. code-block::
+
     DbtDag(
         ...,
         execution_config=ExecutionConfig(

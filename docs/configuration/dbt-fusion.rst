@@ -65,6 +65,4 @@ Limitations
 - Currently (23 June 2025) dbt Fusion is still in beta
 - dbt Fusion only supports Snowflake
 - Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``
-- To support dbt Fusion, Cosmos changed how it interacts with dbt. This works with the latest versions of dbt-core, but may not
-work with older versions. If you want to continue using dbt-core and was affected, set the environment variable
-``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.
+- To support dbt Fusion, Cosmos changed how it interacts with dbt. This works with the latest versions of dbt-core, but may not work with older versions. If you want to continue using dbt-core and was affected, set the environment variable ``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.

@@ -40,24 +40,24 @@ How to use
 
 End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:
 
-```
-USER root
-RUN apt install -y curl
-RUN curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
-```
+.. code-block::
+
+    USER root
+    RUN apt install -y curl
+    RUN curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
 
 2. Update your ``DbtDag`` or ``DbtTaskGroup`` to use the dbt Fusion binary
 
 Example:
 
-```
-DbtDag(
-    ...,
-    execution_config=ExecutionConfig(
-        dbt_executable_path="/home/astro/.local/bin/dbt"
+.. code-block::
+    DbtDag(
+        ...,
+        execution_config=ExecutionConfig(
+            dbt_executable_path="/home/astro/.local/bin/dbt"
+        )
     )
-)
-```
+
 
 Limitations
 -----------
@@ -65,6 +65,4 @@ Limitations
 - Currently (23 June 2025) dbt Fusion is still in beta
 - dbt Fusion only supports Snowflake
 - Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``
-- To support dbt Fusion, Cosmos changed how it interacts with dbt. This works with the latest versions of dbt-core, but may not
-work with older versions. If you want to continue using dbt-core and was affected, set the environment variable
-``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.
+- To support dbt Fusion, Cosmos changed how it interacts with dbt. This works with the latest versions of dbt-core, but may not work with older versions. If you want to continue using dbt-core and was affected, set the environment variable ``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.

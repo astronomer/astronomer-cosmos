@@ -98,7 +98,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
 .. _pre_dbt_fusion:
     From Cosmos 1.11, we have introduced support for dbt Fusion. Some of the changes may not be compatible with legacy versions of dbt-core.
-    If you find any issues on how Cosmos interacts with older versions of dbt-core we introduced this configuration.
+    If you find any issues on how Cosmos interacts with older versions of dbt-core you can use this configuration.
 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__PRE_DBT_FUSION``

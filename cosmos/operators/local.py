@@ -193,6 +193,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir")
 
         # install_dbt_deps resolution: kwarg > operator_args > deprecated kwarg > deprecated operator_args > default
+        deps_flag = None
         if install_dbt_deps is not None:
             deps_flag = install_dbt_deps
         elif "install_dbt_deps" in self.operator_args:
@@ -212,11 +213,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             )
             deps_flag = self.operator_args["install_deps"]
         else:
-            # Default: Only install deps if project_dir and deps file exists
-            if self.project_dir and has_non_empty_dependencies_file(Path(self.project_dir)):
-                deps_flag = True
-            else:
-                deps_flag = False
+            deps_flag = True
+
+        # Always check for non-empty dependencies file
+        if self.project_dir and not has_non_empty_dependencies_file(Path(self.project_dir)):
+            deps_flag = False
 
         self.install_dbt_deps = bool(deps_flag)
         self.install_deps = self.install_dbt_deps

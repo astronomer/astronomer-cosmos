@@ -64,7 +64,6 @@ try:  # Airflow 3
 except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
-
 try:
     import openlineage
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
@@ -82,7 +81,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from openlineage.client.event_v2 import RunEvent  # pragma: no cover
     except ImportError:  # pragma: no cover
         from openlineage.client.run import RunEvent  # pragma: no cover
-
 
 from sqlalchemy.orm import Session
 
@@ -150,8 +148,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
+    :param install_dbt_deps: If true, install dependencies before running the command.
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
+    :param operator_args: A dictionary of arguments to pass to the dbt command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
@@ -175,7 +175,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        operator_args: dict[str, Any] | None = None,
+        install_dbt_deps: bool | None = None,
+        install_deps: bool | None = None,  # deprecated
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -185,6 +187,55 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
+        self.operator_args: dict[str, Any] = operator_args or {}
+
+        # Determine project_dir first, as deps_flag defaults may depend on it
+        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir") or ""
+
+        # Emit deprecation warnings if install_deps is supplied in any way (regardless of value)
+        if "install_deps" in kwargs:
+            warnings.warn(
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+        if "install_deps" in self.operator_args:
+            warnings.warn(
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+
+        # install_dbt_deps resolution: kwarg > operator_args > deprecated kwarg > deprecated operator_args > default
+        deps_flag = None
+        if install_dbt_deps is not None:
+            deps_flag = install_dbt_deps
+        elif "install_dbt_deps" in self.operator_args:
+            deps_flag = self.operator_args["install_dbt_deps"]
+        elif install_deps is not None:
+            warnings.warn(
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+            deps_flag = install_deps
+        elif "install_deps" in self.operator_args:
+            warnings.warn(
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+            deps_flag = self.operator_args["install_deps"]
+        else:
+            deps_flag = True
+
+        # Always check for non-empty dependencies file
+        if self.project_dir and not has_non_empty_dependencies_file(Path(self.project_dir)):
+            deps_flag = False
+
+        self.install_dbt_deps = bool(deps_flag)
+        self.install_deps = self.install_dbt_deps
+
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
@@ -199,17 +250,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         super().__init__(task_id=task_id, **kwargs)
 
-        # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
-        # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
-        # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
-        # as it can break existing DAGs.
         self.append_env = append_env
-
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
-        self.copy_dbt_packages = copy_dbt_packages
-
         self.manifest_filepath = manifest_filepath
+
+        # copy_dbt_packages: explicit kw > operator_args > global default
+        if copy_dbt_packages != settings.default_copy_dbt_packages:
+            pkg_flag = copy_dbt_packages
+        elif "copy_dbt_packages" in self.operator_args:
+            pkg_flag = self.operator_args["copy_dbt_packages"]
+        else:
+            pkg_flag = settings.default_copy_dbt_packages
+        self.copy_dbt_packages: bool = bool(pkg_flag)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

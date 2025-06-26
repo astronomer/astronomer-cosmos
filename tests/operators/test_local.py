@@ -121,6 +121,7 @@ def test_install_dbt_deps_resolution_old(op_args, kw, expected, has_deps_file, d
         has_depr = any(issubclass(w.category, DeprecationWarning) for w in rec)
         assert has_depr == deprecated_used_expected
 
+
 @pytest.mark.parametrize(
     "op_args, kw, expected, has_deps_file",
     [

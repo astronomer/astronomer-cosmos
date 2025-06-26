@@ -195,14 +195,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Emit deprecation warnings if install_deps is supplied in any way (regardless of value)
         if "install_deps" in kwargs:
             warnings.warn(
-                "`install_deps` is deprecated; use `install_dbt_deps`.",
-                DeprecationWarning,
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
                 stacklevel=2,
             )
         if "install_deps" in self.operator_args:
             warnings.warn(
-                "`install_deps` (inside `operator_args`) is deprecated; use `install_dbt_deps`.",
-                DeprecationWarning,
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
                 stacklevel=2,
             )
 
@@ -213,8 +213,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elif "install_dbt_deps" in self.operator_args:
             deps_flag = self.operator_args["install_dbt_deps"]
         elif install_deps is not None:
+            warnings.warn(
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
             deps_flag = install_deps
         elif "install_deps" in self.operator_args:
+            warnings.warn(
+                message="'install_deps' is deprecated. Use 'install_dbt_deps' instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
             deps_flag = self.operator_args["install_deps"]
         else:
             deps_flag = True

@@ -107,6 +107,7 @@ def test_install_dbt_deps_resolution(op_args, kw, expected):
     with warnings.catch_warnings(record=True) as rec:
         task = DbtRunOperationLocalOperator(
             task_id="macro",
+            macro_name="bla",
             profile_config=profile_config,
             project_dir="/tmp/proj",
             operation_name="macro",
@@ -131,6 +132,7 @@ def test_install_dbt_deps_resolution(op_args, kw, expected):
 def test_copy_dbt_packages_resolution(op_args, kw, expected):
     task = DbtRunOperationLocalOperator(
         task_id="macro2",
+        macro_name="bla",
         profile_config=profile_config,
         project_dir="/tmp/proj",
         operation_name="macro",

@@ -150,8 +150,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
+    :param install_dbt_deps: If true, install dependencies before running the command.
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
+    :param operator_args: A dictionary of arguments to pass to the dbt command
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
@@ -175,7 +177,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        operator_args: dict[str, Any] | None = None,
+        install_dbt_deps: bool | None = True,
+        install_deps: bool | None = None,  # deprecated
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -185,6 +189,49 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
+        self.operator_args: dict[str, Any] = operator_args or {}
+
+        # install_dbt_deps resolution: keyword > operator_args > deprecated kw > deprecated operator_args > default
+        if install_dbt_deps is not None:
+            deps_flag = install_dbt_deps
+        elif "install_dbt_deps" in self.operator_args:
+            deps_flag = self.operator_args["install_dbt_deps"]
+        elif install_deps is not None:
+            warnings.warn(
+                "`install_deps` is deprecated; use `install_dbt_deps`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            deps_flag = install_deps
+        elif "install_deps" in self.operator_args:
+            warnings.warn(
+                "`install_deps` (inside `operator_args`) is deprecated; use `install_dbt_deps`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            deps_flag = self.operator_args["install_deps"]
+        else:
+            deps_flag = True
+
+        # Now, apply the "has_non_empty_dependencies_file" check to install_dbt_deps
+        has_deps = has_non_empty_dependencies_file(Path(kwargs.get("project_dir", getattr(self, "project_dir", None) or "")))
+        # If project_dir is not yet set (e.g., not passed as kwarg), fallback to True for now (preserves old behavior)
+        if kwargs.get("project_dir") or getattr(self, "project_dir", None):
+            self.install_dbt_deps: bool = bool(deps_flag and has_deps)
+        else:
+            self.install_dbt_deps: bool = bool(deps_flag)
+        # For legacy, mirror install_dbt_deps
+        self.install_deps: bool = self.install_dbt_deps
+
+        # copy_dbt_packages: explicit kw > operator_args > global default
+        if copy_dbt_packages != settings.default_copy_dbt_packages:
+            pkg_flag = copy_dbt_packages
+        elif "copy_dbt_packages" in self.operator_args:
+            pkg_flag = self.operator_args["copy_dbt_packages"]
+        else:
+            pkg_flag = settings.default_copy_dbt_packages
+        self.copy_dbt_packages: bool = bool(pkg_flag)
+
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback

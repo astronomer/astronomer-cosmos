@@ -64,7 +64,6 @@ try:  # Airflow 3
 except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
-
 try:
     import openlineage
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
@@ -82,7 +81,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from openlineage.client.event_v2 import RunEvent  # pragma: no cover
     except ImportError:  # pragma: no cover
         from openlineage.client.run import RunEvent  # pragma: no cover
-
 
 from sqlalchemy.orm import Session
 
@@ -219,9 +217,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         # If project_dir is not yet set (e.g., not passed as kwarg), fallback to True for now (preserves old behavior)
         if kwargs.get("project_dir") or getattr(self, "project_dir", None):
-            self.install_dbt_deps: bool = bool(deps_flag and has_deps)
+            self.install_dbt_deps = bool(deps_flag and has_deps)
         else:
-            self.install_dbt_deps: bool = bool(deps_flag)
+            self.install_dbt_deps = bool(deps_flag)
         # For legacy, mirror install_dbt_deps
         self.install_deps: bool = self.install_dbt_deps
 
@@ -255,7 +253,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.append_env = append_env
 
         # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        self.install_deps = bool(install_deps and has_non_empty_dependencies_file(Path(self.project_dir)))
         self.copy_dbt_packages = copy_dbt_packages
 
         self.manifest_filepath = manifest_filepath

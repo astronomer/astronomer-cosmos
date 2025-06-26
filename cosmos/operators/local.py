@@ -176,7 +176,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
         operator_args: dict[str, Any] | None = None,
-        install_dbt_deps: bool | None = True,
+        install_dbt_deps: bool | None = None,
         install_deps: bool | None = None,  # deprecated
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
@@ -189,7 +189,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     ) -> None:
         self.operator_args: dict[str, Any] = operator_args or {}
 
-        # install_dbt_deps resolution: keyword > operator_args > deprecated kw > deprecated operator_args > default
+        # install_dbt_deps resolution: kwarg > operator_args > deprecated kwarg > deprecated operator_args > default
         if install_dbt_deps is not None:
             deps_flag = install_dbt_deps
         elif "install_dbt_deps" in self.operator_args:
@@ -211,17 +211,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         else:
             deps_flag = True
 
-        # Now, apply the "has_non_empty_dependencies_file" check to install_dbt_deps
-        has_deps = has_non_empty_dependencies_file(
-            Path(kwargs.get("project_dir", getattr(self, "project_dir", None) or ""))
-        )
-        # If project_dir is not yet set (e.g., not passed as kwarg), fallback to True for now (preserves old behavior)
-        if kwargs.get("project_dir") or getattr(self, "project_dir", None):
-            self.install_dbt_deps = bool(deps_flag and has_deps)
-        else:
-            self.install_dbt_deps = bool(deps_flag)
-        # For legacy, mirror install_dbt_deps
-        self.install_deps: bool = self.install_dbt_deps
+        self.install_dbt_deps: bool = bool(deps_flag)
+        self.install_deps: bool = self.install_dbt_deps  # Alias for legacy code
 
         # copy_dbt_packages: explicit kw > operator_args > global default
         if copy_dbt_packages != settings.default_copy_dbt_packages:
@@ -232,6 +223,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             pkg_flag = settings.default_copy_dbt_packages
         self.copy_dbt_packages: bool = bool(pkg_flag)
 
+        # ... rest of init as you had it ...
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
@@ -246,18 +238,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         super().__init__(task_id=task_id, **kwargs)
 
-        # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
-        # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
-        # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
-        # as it can break existing DAGs.
         self.append_env = append_env
-
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = bool(install_deps and has_non_empty_dependencies_file(Path(self.project_dir)))
-        self.copy_dbt_packages = copy_dbt_packages
-
         self.manifest_filepath = manifest_filepath
-
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
         """Returns hook for running the bash command."""

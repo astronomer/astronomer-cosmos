@@ -189,6 +189,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     ) -> None:
         self.operator_args: dict[str, Any] = operator_args or {}
 
+        # Determine project_dir first, as deps_flag defaults may depend on it
+        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir")
+
         # install_dbt_deps resolution: kwarg > operator_args > deprecated kwarg > deprecated operator_args > default
         if install_dbt_deps is not None:
             deps_flag = install_dbt_deps
@@ -209,7 +212,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             )
             deps_flag = self.operator_args["install_deps"]
         else:
-            deps_flag = True
+            # Default: Only install deps if project_dir and deps file exists
+            if self.project_dir and has_non_empty_dependencies_file(Path(self.project_dir)):
+                deps_flag = True
+            else:
+                deps_flag = False
+
+        self.install_dbt_deps = bool(deps_flag)
+        self.install_deps = self.install_dbt_deps
 
         self.task_id = task_id
         self.profile_config = profile_config
@@ -227,13 +237,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         self.append_env = append_env
         self.manifest_filepath = manifest_filepath
-
-        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir")
-        if deps_flag and self.project_dir and has_non_empty_dependencies_file(Path(self.project_dir)):
-            self.install_dbt_deps = True
-        else:
-            self.install_dbt_deps = False
-        self.install_deps = self.install_dbt_deps
 
         # copy_dbt_packages: explicit kw > operator_args > global default
         if copy_dbt_packages != settings.default_copy_dbt_packages:

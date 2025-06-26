@@ -190,7 +190,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.operator_args: dict[str, Any] = operator_args or {}
 
         # Determine project_dir first, as deps_flag defaults may depend on it
-        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir")
+        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir") or ""
 
         # Emit deprecation warnings if install_deps is supplied in any way (regardless of value)
         if "install_deps" in kwargs:

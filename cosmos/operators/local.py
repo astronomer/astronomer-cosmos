@@ -210,19 +210,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         else:
             deps_flag = True
 
-        self.install_dbt_deps: bool = bool(deps_flag)
-        self.install_deps: bool = self.install_dbt_deps  # Alias for legacy code
-
-        # copy_dbt_packages: explicit kw > operator_args > global default
-        if copy_dbt_packages != settings.default_copy_dbt_packages:
-            pkg_flag = copy_dbt_packages
-        elif "copy_dbt_packages" in self.operator_args:
-            pkg_flag = self.operator_args["copy_dbt_packages"]
-        else:
-            pkg_flag = settings.default_copy_dbt_packages
-        self.copy_dbt_packages: bool = bool(pkg_flag)
-
-        # ... rest of init as you had it ...
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
@@ -239,6 +226,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         self.append_env = append_env
         self.manifest_filepath = manifest_filepath
+
+        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir")
+        if deps_flag and self.project_dir and has_non_empty_dependencies_file(Path(self.project_dir)):
+            self.install_dbt_deps = True
+        else:
+            self.install_dbt_deps = False
+        self.install_deps = self.install_dbt_deps
+
+        # copy_dbt_packages: explicit kw > operator_args > global default
+        if copy_dbt_packages != settings.default_copy_dbt_packages:
+            pkg_flag = copy_dbt_packages
+        elif "copy_dbt_packages" in self.operator_args:
+            pkg_flag = self.operator_args["copy_dbt_packages"]
+        else:
+            pkg_flag = settings.default_copy_dbt_packages
+        self.copy_dbt_packages: bool = bool(pkg_flag)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

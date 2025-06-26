@@ -214,7 +214,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             deps_flag = True
 
         # Now, apply the "has_non_empty_dependencies_file" check to install_dbt_deps
-        has_deps = has_non_empty_dependencies_file(Path(kwargs.get("project_dir", getattr(self, "project_dir", None) or "")))
+        has_deps = has_non_empty_dependencies_file(
+            Path(kwargs.get("project_dir", getattr(self, "project_dir", None) or ""))
+        )
         # If project_dir is not yet set (e.g., not passed as kwarg), fallback to True for now (preserves old behavior)
         if kwargs.get("project_dir") or getattr(self, "project_dir", None):
             self.install_dbt_deps: bool = bool(deps_flag and has_deps)

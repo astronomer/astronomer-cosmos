@@ -1920,6 +1920,7 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
 
     mock_path.rmdir.assert_not_called()
 
+
 @pytest.mark.integration
 def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
     operator = ConcreteDbtLocalBaseOperator(

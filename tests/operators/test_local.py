@@ -122,12 +122,19 @@ def test_install_dbt_deps_resolution(op_args, kw, expected, has_deps_file, depre
 
 
 def test_install_deps_in_empty_dir_becomes_false(tmpdir):
-    # Patch to simulate NO dependencies file present
+    """
+    Ensure that install_deps is False when there is no dependencies file in the project directory.
+    """
     with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=False):
-        dbt_base_operator = ConcreteDbtLocalBaseOperator(
-            profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
+        operator = ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config,
+            task_id="my-task",
+            project_dir=tmpdir,
+            install_deps=True,
         )
-
+        # install_deps and install_dbt_deps should both be False
+        assert operator.install_deps is False
+        assert operator.install_dbt_deps is False
 
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(

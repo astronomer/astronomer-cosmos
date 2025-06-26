@@ -46,7 +46,6 @@ from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
     get_partial_parse_path,
-    has_non_empty_dependencies_file,
 )
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
@@ -240,6 +239,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         self.append_env = append_env
         self.manifest_filepath = manifest_filepath
+
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
         """Returns hook for running the bash command."""

@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -90,6 +91,53 @@ def failing_test_dbt_project(tmp_path):
 
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
     base_cmd = ["cmd"]
+
+
+@pytest.mark.parametrize(
+    "op_args, kw, expected",
+    [
+        ({"install_dbt_deps": False}, {}, False),
+        ({"install_deps": False}, {}, False),  # legacy dict key
+        ({}, {"install_dbt_deps": False}, False),  # keyword
+        ({}, {"install_deps": False}, False),  # legacy kw
+        ({}, {}, True),  # default
+    ],
+)
+def test_install_dbt_deps_resolution(op_args, kw, expected):
+    with warnings.catch_warnings(record=True) as rec:
+        task = DbtRunOperationLocalOperator(
+            task_id="macro",
+            profile_config=profile_config,
+            project_dir="/tmp/proj",
+            operation_name="macro",
+            operator_args=op_args,
+            **kw,
+        )
+    assert task.install_dbt_deps is expected
+    assert task.install_deps is expected  # alias
+    deprecated_used = "install_deps" in op_args or "install_deps" in kw
+    has_depr = any(issubclass(w.category, DeprecationWarning) for w in rec)
+    assert has_depr == deprecated_used
+
+
+@pytest.mark.parametrize(
+    "op_args, kw, expected",
+    [
+        ({"copy_dbt_packages": False}, {}, False),  # via dict
+        ({}, {"copy_dbt_packages": False}, False),  # via kw
+        ({"copy_dbt_packages": False}, {"copy_dbt_packages": True}, True),  # kw wins
+    ],
+)
+def test_copy_dbt_packages_resolution(op_args, kw, expected):
+    task = DbtRunOperationLocalOperator(
+        task_id="macro2",
+        profile_config=profile_config,
+        project_dir="/tmp/proj",
+        operation_name="macro",
+        operator_args=op_args,
+        **kw,
+    )
+    assert task.copy_dbt_packages is expected
 
 
 def test_install_deps_in_empty_dir_becomes_false(tmpdir):
@@ -1871,7 +1919,6 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
         assert "/mock/path/test_dag_task_group/test_run_id" == log_path
 
     mock_path.rmdir.assert_not_called()
-
 
 @pytest.mark.integration
 def test_generate_dbt_flags_appends_no_static_parser(tmp_path):

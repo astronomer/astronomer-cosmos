@@ -136,6 +136,7 @@ def test_install_deps_in_empty_dir_becomes_false(tmpdir):
         assert operator.install_deps is False
         assert operator.install_dbt_deps is False
 
+
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

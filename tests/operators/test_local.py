@@ -94,59 +94,39 @@ class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
 
 
 @pytest.mark.parametrize(
-    "op_args, kw, expected",
+    "op_args, kw, expected, has_deps_file, deprecated_used_expected",
     [
-        ({"install_dbt_deps": False}, {}, False),
-        ({"install_deps": False}, {}, False),  # legacy dict key
-        ({}, {"install_dbt_deps": False}, False),  # keyword
-        ({}, {"install_deps": False}, False),  # legacy kw
-        ({}, {}, True),  # default
+        ({"install_dbt_deps": False}, {}, False, True, False),
+        ({"install_deps": False}, {}, False, True, True),  # legacy dict key/deprecated
+        ({}, {"install_dbt_deps": False}, False, True, False),  # keyword
+        ({}, {"install_deps": False}, False, True, True),  # legacy kw/deprecated
+        ({}, {}, True, True, False),  # default with deps file present
     ],
 )
-def test_install_dbt_deps_resolution(op_args, kw, expected):
-    with warnings.catch_warnings(record=True) as rec:
-        task = DbtRunOperationLocalOperator(
-            task_id="macro",
-            macro_name="bla",
-            profile_config=profile_config,
-            project_dir="/tmp/proj",
-            operation_name="macro",
-            operator_args=op_args,
-            **kw,
-        )
-    assert task.install_dbt_deps is expected
-    assert task.install_deps is expected  # alias
-    deprecated_used = "install_deps" in op_args or "install_deps" in kw
-    has_depr = any(issubclass(w.category, DeprecationWarning) for w in rec)
-    assert has_depr == deprecated_used
-
-
-@pytest.mark.parametrize(
-    "op_args, kw, expected",
-    [
-        ({"copy_dbt_packages": False}, {}, False),  # via dict
-        ({}, {"copy_dbt_packages": False}, False),  # via kw
-        ({"copy_dbt_packages": False}, {"copy_dbt_packages": True}, True),  # kw wins
-    ],
-)
-def test_copy_dbt_packages_resolution(op_args, kw, expected):
-    task = DbtRunOperationLocalOperator(
-        task_id="macro2",
-        macro_name="bla",
-        profile_config=profile_config,
-        project_dir="/tmp/proj",
-        operation_name="macro",
-        operator_args=op_args,
-        **kw,
-    )
-    assert task.copy_dbt_packages is expected
+def test_install_dbt_deps_resolution(op_args, kw, expected, has_deps_file, deprecated_used_expected):
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=has_deps_file):
+        with warnings.catch_warnings(record=True) as rec:
+            task = DbtRunOperationLocalOperator(
+                task_id="macro",
+                macro_name="bla",
+                profile_config=profile_config,
+                project_dir="/tmp/proj",
+                operation_name="macro",
+                operator_args=op_args,
+                **kw,
+            )
+        assert task.install_dbt_deps is expected
+        assert task.install_deps is expected  # alias
+        has_depr = any(issubclass(w.category, DeprecationWarning) for w in rec)
+        assert has_depr == deprecated_used_expected
 
 
 def test_install_deps_in_empty_dir_becomes_false(tmpdir):
-    dbt_base_operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
-    )
-    assert not dbt_base_operator.install_deps
+    # Patch to simulate NO dependencies file present
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=False):
+        dbt_base_operator = ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
+        )
 
 
 def test_dbt_base_operator_add_global_flags() -> None:

@@ -192,6 +192,20 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Determine project_dir first, as deps_flag defaults may depend on it
         self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir")
 
+        # Emit deprecation warnings if install_deps is supplied in any way
+        if install_deps is not None:
+            warnings.warn(
+                "`install_deps` is deprecated; use `install_dbt_deps`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if "install_deps" in self.operator_args:
+            warnings.warn(
+                "`install_deps` (inside `operator_args`) is deprecated; use `install_dbt_deps`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # install_dbt_deps resolution: kwarg > operator_args > deprecated kwarg > deprecated operator_args > default
         deps_flag = None
         if install_dbt_deps is not None:
@@ -199,18 +213,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elif "install_dbt_deps" in self.operator_args:
             deps_flag = self.operator_args["install_dbt_deps"]
         elif install_deps is not None:
-            warnings.warn(
-                "`install_deps` is deprecated; use `install_dbt_deps`.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
             deps_flag = install_deps
         elif "install_deps" in self.operator_args:
-            warnings.warn(
-                "`install_deps` (inside `operator_args`) is deprecated; use `install_dbt_deps`.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
             deps_flag = self.operator_args["install_deps"]
         else:
             deps_flag = True

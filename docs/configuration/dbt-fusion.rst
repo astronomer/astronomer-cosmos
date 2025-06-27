@@ -37,7 +37,7 @@ We do not have a solution for using `ExecutionMode.AIRFLOW_ASYNC <https://astron
 How to use
 ----------
 
-1. Install Cosmos 1.11 alpha
+1. Install Cosmos 1.11.0a1 alpha
 
 .. code-block::
 

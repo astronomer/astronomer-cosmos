@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+import pytest
 from airflow.utils.state import DagRunState
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
@@ -22,6 +23,8 @@ profile_config = ProfileConfig(
 execution_config = ExecutionConfig(dbt_executable_path=DBT_FUSION_BINARY)
 
 
+@pytest.mark.integration
+@pytest.mark.dbtFusion
 def test_dbt_dag_with_dbt_fusion():
     """
     Run a DbtDag using dbt Fusion.

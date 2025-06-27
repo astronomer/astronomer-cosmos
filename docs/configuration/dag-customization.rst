@@ -37,5 +37,17 @@ you can iterate over the dag.dbt_graph.filtered_nodes property like so:
                 upstream_task = EmptyOperator(task_id=f"upstream_of_{unique_id}")
                 upstream_task >> task
 
-You can also leverage `dbt_node.context_dict["depends_on"]` to find upstream dependencies of every dbt node.
+You can also leverage ``dbt_node.context_dict["depends_on"]`` to find upstream dependencies of every dbt node.
 This way, you can add sensors for inter-dag dependencies to ensure these follow the dbt graph without having to manually wire each node.
+
+
+
+
+
+
+
+
+
+
+
+

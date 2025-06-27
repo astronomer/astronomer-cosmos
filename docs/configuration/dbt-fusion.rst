@@ -43,8 +43,6 @@ How to use
 
     pip install astronomer-cosmos --pre
 
-
-
 2. Install dbt Fusion in your Airflow deployment
 
 End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:

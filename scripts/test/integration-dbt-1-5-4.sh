@@ -24,7 +24,7 @@ pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \
-    -m integration  \
+    -m 'integration and not dbtFusion' \
     --ignore=tests/perf \
     --ignore=tests/test_example_k8s_dags.py \
     -k 'basic_cosmos_task_group'

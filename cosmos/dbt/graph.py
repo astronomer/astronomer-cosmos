@@ -304,7 +304,8 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=base_path / node_dict["original_file_path"],
+                    # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
+                    file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(
@@ -565,7 +566,16 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+
+        # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
+        # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
+        # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
+        # Users can force previous Cosmos behaviour by setting pre_dbt_fusion to True.
+        specify_output_keys = (
+            not settings.pre_dbt_fusion or self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+        )
+
+        if specify_output_keys:
             ls_command = [
                 dbt_cmd,
                 "ls",
@@ -582,7 +592,12 @@ class DbtGraph:
                 "freshness",
             ]
         else:
-            ls_command = [dbt_cmd, "ls", "--output", "json"]
+            ls_command = [
+                dbt_cmd,
+                "ls",
+                "--output",
+                "json",
+            ]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)

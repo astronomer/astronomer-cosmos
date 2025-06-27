@@ -39,9 +39,10 @@ How to use
 
 1. Install Cosmos 1.11 alpha
 
-```
-pip install astronomer-cosmos --pre
-```
+.. code-block::
+
+    pip install astronomer-cosmos --pre
+
 
 
 2. Install dbt Fusion in your Airflow deployment

@@ -620,7 +620,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
                 if self.install_deps:
-                    self._install_dependencies(tmp_dir_path, flags, env)
+                    self._install_dependencies(
+                        tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
+                    )
 
                 if run_as_async and not settings.enable_setup_async_task:
                     self._mock_dbt_adapter(async_context)

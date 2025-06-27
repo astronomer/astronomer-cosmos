@@ -30,7 +30,7 @@ Some reported dbt Fusion features include:
 Support
 -------
 
-Cosmos 1.11.0a adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
+Cosmos 1.11.0a1 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
 
 We do not have a solution for using `ExecutionMode.AIRFLOW_ASYNC <https://astronomer.github.io/astronomer-cosmos/getting_started/execution-modes.html#airflow-async>`_.
 

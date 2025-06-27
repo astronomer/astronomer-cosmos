@@ -430,8 +430,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
+        python-version: ["3.10", "3.11"]
+        airflow-version: ["2.10", "3.0"]
         dbt-version: ["2.0"]  # dbt Fusion
         exclude:
           - python-version: "3.8"

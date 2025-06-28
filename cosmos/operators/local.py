@@ -484,7 +484,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        should_not_create_dbt_deps_symbolic_link = self.install_dbt_deps or self.copy_dbt_packages
         create_symlinks(
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
@@ -631,7 +631,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
-                if self.install_deps:
+                if self.install_dbt_deps:
                     self._install_dependencies(tmp_dir_path, flags, env)
 
                 if run_as_async and not settings.enable_setup_async_task:

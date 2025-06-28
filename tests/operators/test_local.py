@@ -161,9 +161,8 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
     "kw, expected_install_deps, expected_install_dbt_deps, has_deps_file",
     [
         # Test cases for install_deps
-        ({"install_deps": True}, True, True, True),   # Dependencies file exists
+        ({"install_deps": True}, True, True, True),  # Dependencies file exists
         ({"install_deps": True}, False, False, False),  # No dependencies file exists
-
         # Test cases for install_dbt_deps
         ({"install_dbt_deps": True}, True, True, True),  # Dependencies file exists
         ({"install_dbt_deps": False}, False, False, False),  # Explicitly disabled

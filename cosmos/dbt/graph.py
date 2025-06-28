@@ -77,6 +77,7 @@ class DbtNode:
     resource_type: DbtResourceType
     depends_on: list[str]
     file_path: Path
+    original_file_path: Path
     package_name: str | None = None
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
@@ -161,6 +162,7 @@ class DbtNode:
             "resource_type": self.resource_type.value,  # convert enum to value
             "depends_on": self.depends_on,
             "file_path": str(self.file_path),  # convert path to string
+            "original_file_path": str(self.original_file_path),  # convert original path to string
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,
@@ -305,6 +307,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=base_path / node_dict["original_file_path"],
+                    original_file_path=node_dict["original_file_path"],
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
                     has_freshness=(
@@ -853,6 +856,7 @@ class DbtGraph:
                         self.render_config.project_path.as_posix(), self.execution_config.project_path.as_posix()
                     )
                 ),
+                original_file_path=model.path.relative_to(self.render_config.project_path),
                 tags=tags or [],
                 config=config,
             )
@@ -907,6 +911,7 @@ class DbtGraph:
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
+                    original_file_path=Path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
                     config=node_dict["config"],
                     has_freshness=(

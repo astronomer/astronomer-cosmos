@@ -42,6 +42,7 @@ parent_seed = DbtNode(
     resource_type=DbtResourceType.SEED,
     depends_on=[],
     file_path="",
+    original_file_path="",
     config={
         "meta": {
             "cosmos": {
@@ -58,6 +59,7 @@ parent_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_seed.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+    original_file_path="gen2/models/parent.sql",
     tags=["has_child"],
     config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
@@ -67,12 +69,14 @@ test_parent_node = DbtNode(
     resource_type=DbtResourceType.TEST,
     depends_on=[parent_node.unique_id],
     file_path="",
+    original_file_path="",
 )
 child_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
+    original_file_path="gen3/models/child.sql",
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"queue": "custom_queue"}}}},
 )
@@ -82,6 +86,7 @@ child2_node = DbtNode(
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
     file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
+    original_file_path="gen3/models/child2_v2.sql",
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
 )
@@ -96,6 +101,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
     )
     assert calculate_detached_node_name(node) == "a_very_short_name_test"
 
@@ -104,6 +110,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
     )
     assert calculate_detached_node_name(node) == "detached_0_test"
 
@@ -112,6 +119,7 @@ def test_calculate_datached_node_name_under_is_under_250():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
     )
     assert calculate_detached_node_name(node) == "detached_1_test"
 
@@ -142,6 +150,7 @@ def test_build_airflow_graph_with_after_each():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             render_config=RenderConfig(
+                enable_resource_grouping=True,
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             ),
@@ -150,22 +159,25 @@ def test_build_airflow_graph_with_after_each():
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = [
         "seed_parent_seed",
-        "parent.run",
-        "parent.test",
-        "child_run",
-        "child2_v2_run",
+        "gen2.models.parent.run",
+        "gen2.models.parent.test",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
     ]
 
     assert topological_sort == expected_sort
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 1
+    assert len(task_groups) == 4
 
-    assert task_groups["parent"].upstream_task_ids == {"seed_parent_seed"}
-    assert list(task_groups["parent"].children.keys()) == ["parent.run", "parent.test"]
+    assert task_groups["gen2.models.parent"].upstream_task_ids == {"seed_parent_seed"}
+    assert list(task_groups["gen2.models.parent"].children.keys()) == [
+        "gen2.models.parent.run",
+        "gen2.models.parent.test",
+    ]
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id == "child_run"
-    assert dag.leaves[1].task_id == "child2_v2_run"
+    assert dag.leaves[0].task_id == "gen2.models.child_run"
+    assert dag.leaves[1].task_id == "gen2.models.child2_v2_run"
 
     task_seed_parent_seed = dag.tasks[0]
     task_parent_run = dag.tasks[1]
@@ -190,6 +202,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
             unique_id=f"{node_type.value}.{SAMPLE_PROJ_PATH.stem}.dbt_node",
             resource_type=node_type,
             file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            original_file_path="gen2/models/parent.sql",
             tags=["has_child"],
             config={"materialized": "view"},
             depends_on=[],
@@ -241,6 +254,7 @@ def test_build_airflow_graph_with_after_all():
         }
         render_config = RenderConfig(
             select=["tag:some"],
+            enable_resource_grouping=True,
             test_behavior=TestBehavior.AFTER_ALL,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         )
@@ -254,11 +268,17 @@ def test_build_airflow_graph_with_after_all():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed", "parent_run", "child_run", "child2_v2_run", "astro_shop_test"]
+    expected_sort = [
+        "seed_parent_seed",
+        "gen2.models.parent_run",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
+        "astro_shop_test",
+    ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 0
+    assert len(task_groups) == 3
 
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
@@ -285,6 +305,7 @@ def test_build_airflow_graph_with_build():
             ),
         }
         render_config = RenderConfig(
+            enable_resource_grouping=True,
             test_behavior=TestBehavior.BUILD,
         )
         build_airflow_graph(
@@ -297,15 +318,20 @@ def test_build_airflow_graph_with_build():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed_build", "parent_model_build", "child_model_build", "child2_v2_model_build"]
+    expected_sort = [
+        "seed_parent_seed_build",
+        "gen2.models.parent_model_build",
+        "gen2.models.child_model_build",
+        "gen2.models.child2_v2_model_build",
+    ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 0
+    assert len(task_groups) == 3
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id in ("child_model_build", "child2_v2_model_build")
-    assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
+    assert dag.leaves[0].task_id in ("gen2.models.child_model_build", "gen2.models.child2_v2_model_build")
+    assert dag.leaves[1].task_id in ("gen2.models.child_model_build", "gen2.models.child2_v2_model_build")
 
 
 @pytest.mark.skipif(
@@ -336,14 +362,14 @@ def test_build_airflow_graph_with_override_profile_config():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             dbt_project_name="astro_shop",
-            render_config=RenderConfig(),
+            render_config=RenderConfig(enable_resource_grouping=True),
         )
 
     generated_seed_profile_config = dag.task_dict["seed_parent_seed"].profile_config
     assert generated_seed_profile_config.profile_name == "new_profile"  # overridden via config
     assert generated_seed_profile_config.profile_mapping.profile_args["schema"] == "different"  # overridden via config
 
-    generated_parent_profile_config = dag.task_dict["parent.run"].profile_config
+    generated_parent_profile_config = dag.task_dict["gen2.models.parent.run"].profile_config
     assert generated_parent_profile_config.profile_name == "default"
     assert generated_parent_profile_config.profile_mapping.profile_args["schema"] == "public"
 
@@ -359,6 +385,7 @@ def test_calculate_leaves():
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -367,6 +394,7 @@ def test_calculate_leaves():
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -375,6 +403,7 @@ def test_calculate_leaves():
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent1_node.unique_id],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -383,6 +412,7 @@ def test_calculate_leaves():
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent1_node.unique_id, parent2_node.unique_id],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -401,6 +431,7 @@ def test_create_task_metadata_unsupported(caplog):
         resource_type="unsupported",
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -429,6 +460,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "model",
                     "depends_on": [],
                     "file_path": ".",
+                    "original_file_path": ".",
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -450,6 +482,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "source",
                     "depends_on": [],
                     "file_path": ".",
+                    "original_file_path": ".",
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -471,6 +504,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "snapshot",
                     "depends_on": [],
                     "file_path": ".",
+                    "original_file_path": ".",
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -496,6 +530,7 @@ def test_create_task_metadata_model(
         resource_type=resource_type,
         depends_on=[],
         file_path=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
         has_freshness=True,
@@ -517,6 +552,7 @@ def test_create_task_metadata_model_with_versions(caplog):
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -534,6 +570,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         file_path=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
     )
@@ -588,6 +625,7 @@ def test_create_task_metadata_source_with_rendering_options(
         resource_type=resource_type,
         depends_on=[],
         file_path=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
         has_freshness=has_freshness,
@@ -612,6 +650,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         resource_type=DbtResourceType.SEED,
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -643,6 +682,7 @@ def test_create_task_metadata_snapshot(caplog):
         resource_type=DbtResourceType.SNAPSHOT,
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -893,6 +933,7 @@ def test_create_task_metadata_normalize_task_id(
         resource_type=node_type,
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -993,6 +1034,7 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         resource_type=node_type,
         depends_on=[],
         file_path="",
+        original_file_path="",
         tags=[],
         config={},
     )
@@ -1030,7 +1072,9 @@ def test_airflow_kwargs_generation():
         "group_id": "fake_group_id",
         "project_dir": SAMPLE_PROJ_PATH,
         "conn_id": "fake_conn",
-        "render_config": RenderConfig(select=["fake-render"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR),
+        "render_config": RenderConfig(
+            select=["fake-render"], enable_resource_grouping=True, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
+        ),
         "default_args": {"retries": 2},
         "profile_config": ProfileConfig(
             profile_name="default",
@@ -1062,6 +1106,7 @@ def test_owner(dbt_extra_config, expected_owner):
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
             file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            original_file_path="gen2/models/parent.sql",
             tags=["has_child"],
             config={"materialized": "view", **dbt_extra_config},
             depends_on=[],
@@ -1115,6 +1160,7 @@ def test_custom_meta():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             render_config=RenderConfig(
+                enable_resource_grouping=True,
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             ),
@@ -1122,12 +1168,12 @@ def test_custom_meta():
         )
         # test custom meta (queue, pool)
         for task in dag.tasks:
-            if task.task_id == "child2_v2_run":
+            if task.task_id == "gen2.models.child2_v2_run":
                 assert task.pool == "custom_pool"
             else:
                 assert task.pool == "default_pool"
 
-            if task.task_id == "child_run":
+            if task.task_id == "gen2.models.child_run":
                 assert task.queue == "custom_queue"
             else:
                 assert task.queue == "default"

@@ -175,7 +175,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_dbt_deps: bool | None = None,
+        install_dbt_deps: bool | None = True,
         install_deps: bool | None = None,  # deprecated
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",

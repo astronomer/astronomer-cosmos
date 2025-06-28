@@ -9,7 +9,6 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBase,
@@ -69,12 +68,10 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         region: str,
         job_name: str,
         #
-        profile_config: ProfileConfig | None = None,
         command: list[str] | None = None,
         environment_variables: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        self.profile_config = profile_config
         self.command = command
         self.environment_variables = environment_variables or DEFAULT_ENVIRONMENT_VARIABLES
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
@@ -134,17 +131,6 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
-
-        # Parse ProfileConfig and add additional arguments to the dbt_cmd
-        if self.profile_config:
-            if self.profile_config.profile_name:
-                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
-            if self.profile_config.target_name:
-                dbt_cmd.extend(["--target", self.profile_config.target_name])
-
-        if self.project_dir:
-            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
-
         self.environment_variables = {**env_vars, **self.environment_variables}
         self.command = dbt_cmd
         # Override Cloud Run Job default arguments with dbt command

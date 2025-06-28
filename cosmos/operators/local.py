@@ -186,30 +186,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
-        # Emit deprecation warning if install_deps is used
-        if install_deps is not None:
-            warnings.warn(
-                "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
-                DeprecationWarning,
-            )
-
-        # Determine project_dir first, as deps_flag defaults may depend on it
-        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir") or ""
-
-        # Resolve install_dbt_deps: explicit kwarg > deprecated kwarg > default
-        if install_dbt_deps is not None:
-            deps_flag = install_dbt_deps
-        elif install_deps is not None:
-            deps_flag = install_deps
-        else:
-            deps_flag = True
-
-        # Always check for non-empty dependencies file
-        if self.project_dir and not has_non_empty_dependencies_file(Path(self.project_dir)):
-            deps_flag = False
-
-        self.install_dbt_deps = deps_flag
-        self.install_deps = self.install_dbt_deps  # Alias for compatibility
 
         self.task_id = task_id
         self.profile_config = profile_config
@@ -225,9 +201,27 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         super().__init__(task_id=task_id, **kwargs)
 
+        # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
+        # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
+        # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
+        # as it can break existing DAGs.
         self.append_env = append_env
-        self.manifest_filepath = manifest_filepath
+
+        # has_non_empty_dependencies_file: We should not spend time trying to install deps if the project doesn't have any dependencies
+        self.install_dbt_deps = (
+            install_deps
+            if install_deps is not None
+            else (install_dbt_deps and has_non_empty_dependencies_file(project_path=Path(self.project_dir)))
+        )
+        if install_deps is not None:
+            warnings.warn(
+                "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
+                DeprecationWarning,
+            )
+        self.install_deps = install_dbt_deps  # deprecated, kept for backward compatibility
         self.copy_dbt_packages = copy_dbt_packages
+
+        self.manifest_filepath = manifest_filepath
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

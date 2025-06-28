@@ -160,7 +160,7 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
 @pytest.mark.parametrize(
     "kw, expected, has_deps_file",
     [
-        ({"install_deps": True}, True, True),   # Dependencies file exists
+        ({"install_deps": True}, True, True),  # Dependencies file exists
         ({"install_deps": True}, False, False),  # No dependencies file exists
     ],
 )

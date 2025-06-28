@@ -175,8 +175,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_dbt_deps: bool | None = None,
-        install_deps: bool | None = None,  # deprecated
+        install_dbt_deps: bool = True,
+        install_deps: bool | None = None,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -186,30 +186,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
-        # Emit deprecation warning if install_deps is used
+
+        # Use property setters to ensure validation and consistency
         if install_deps is not None:
-            warnings.warn(
-                "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
-                DeprecationWarning,
-            )
-
-        # Determine project_dir first, as deps_flag defaults may depend on it
-        self.project_dir = getattr(self, "project_dir", None) or kwargs.get("project_dir") or ""
-
-        # Resolve install_dbt_deps: explicit kwarg > deprecated kwarg > default
-        if install_dbt_deps is not None:
-            deps_flag = install_dbt_deps
-        elif install_deps is not None:
-            deps_flag = install_deps
+            self.install_deps = install_deps
         else:
-            deps_flag = True
-
-        # Always check for non-empty dependencies file
-        if self.project_dir and not has_non_empty_dependencies_file(Path(self.project_dir)):
-            deps_flag = False
-
-        self.install_dbt_deps = deps_flag
-        self.install_deps = self.install_dbt_deps  # Alias for compatibility
+            self.install_dbt_deps = install_dbt_deps
 
         self.task_id = task_id
         self.profile_config = profile_config
@@ -228,6 +210,38 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.append_env = append_env
         self.manifest_filepath = manifest_filepath
         self.copy_dbt_packages = copy_dbt_packages
+
+    @property
+    def install_dbt_deps(self) -> bool:
+        """Whether to install dbt dependencies before running the command."""
+        return self._install_dbt_deps
+
+    @install_dbt_deps.setter
+    def install_dbt_deps(self, value: bool) -> None:
+        """Set whether to install dbt dependencies before running the command.
+        Only sets to True if value is truthy and there is a non-empty dependencies file.
+        """
+        self._install_dbt_deps = value and has_non_empty_dependencies_file(project_path=Path(self.project_dir))
+
+    @property
+    def install_deps(self) -> bool | None:
+        """Deprecated: always returns the value of install_dbt_deps."""
+        warnings.warn(
+            "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.install_dbt_deps
+
+    @install_deps.setter
+    def install_deps(self, value: bool) -> None:
+        warnings.warn(
+            "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.install_dbt_deps = value
+        # Do not assign directly to _install_deps; let the property logic handle state.
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

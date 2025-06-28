@@ -64,7 +64,6 @@ try:  # Airflow 3
 except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
-
 try:
     import openlineage
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
@@ -82,7 +81,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from openlineage.client.event_v2 import RunEvent  # pragma: no cover
     except ImportError:  # pragma: no cover
         from openlineage.client.run import RunEvent  # pragma: no cover
-
 
 from sqlalchemy.orm import Session
 
@@ -150,7 +148,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
-    :param install_deps (deprecated): If true, install dependencies before running the command
+    :param install_dbt_deps: If true, install dependencies before running the command.
+    :param install_deps (deprecated): If true, install dependencies before running the command.
+        This parameter is deprecated and will be removed in Cosmos 2.0. Use install_dbt_deps instead.
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
@@ -175,7 +175,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        install_dbt_deps: bool = True,
+        install_deps: bool | None = None,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -185,6 +186,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
+
+        # Use property setters to ensure validation and consistency
+        if install_deps is not None:
+            self.install_deps = install_deps
+        else:
+            self.install_dbt_deps = install_dbt_deps
+
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
@@ -199,17 +207,41 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         super().__init__(task_id=task_id, **kwargs)
 
-        # For local execution mode, we're consistent with the LoadMode.DBT_LS command in forwarding the environment
-        # variables to the subprocess by default. Although this behavior is designed for ExecuteMode.LOCAL and
-        # ExecuteMode.VIRTUALENV, it is not desired for the other execution modes to forward the environment variables
-        # as it can break existing DAGs.
         self.append_env = append_env
-
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        self.manifest_filepath = manifest_filepath
         self.copy_dbt_packages = copy_dbt_packages
 
-        self.manifest_filepath = manifest_filepath
+    @property
+    def install_dbt_deps(self) -> bool:
+        """Whether to install dbt dependencies before running the command."""
+        return self._install_dbt_deps
+
+    @install_dbt_deps.setter
+    def install_dbt_deps(self, value: bool) -> None:
+        """Set whether to install dbt dependencies before running the command.
+        Only sets to True if value is truthy and there is a non-empty dependencies file.
+        """
+        self._install_dbt_deps = value and has_non_empty_dependencies_file(project_path=Path(self.project_dir))
+
+    @property
+    def install_deps(self) -> bool | None:
+        """Deprecated: always returns the value of install_dbt_deps."""
+        warnings.warn(
+            "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.install_dbt_deps
+
+    @install_deps.setter
+    def install_deps(self, value: bool) -> None:
+        warnings.warn(
+            "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.install_dbt_deps = value
+        # Do not assign directly to _install_deps; let the property logic handle state.
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:

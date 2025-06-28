@@ -51,7 +51,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE, default_copy_dbt_packages
+from cosmos.settings import AIRFLOW_IO_AVAILABLE
 from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
@@ -114,7 +114,6 @@ def test_install_dbt_deps_resolution_old(kw, expected, has_deps_file, deprecated
                 **kw,
             )
         assert task.install_dbt_deps is expected
-        assert task.install_deps is expected  # alias
         has_depr = any(issubclass(w.category, DeprecationWarning) for w in rec)
         assert has_depr == deprecated_used_expected
 
@@ -137,13 +136,12 @@ def test_install_dbt_deps_resolution(kw, expected, has_deps_file):
             **kw,
         )
         assert task.install_dbt_deps is expected
-        assert task.install_deps is expected  # alias
 
 
 @pytest.mark.parametrize(
     "kw",
     [
-        ({"install_deps": False},),  # legacy kw/deprecated
+        {"install_deps": False},  # legacy kw/deprecated
     ],
 )
 def test_install_dbt_deps_resolution_deprecated_warns(kw):
@@ -159,27 +157,6 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
             )
 
 
-@pytest.mark.parametrize(
-    "kw, expected",
-    [
-        ({"copy_dbt_packages": False}, False),  # set via kwarg
-        ({}, default_copy_dbt_packages),  # default value (use actual default)
-        ({"copy_dbt_packages": True}, True),  # explicit True in kwarg
-    ],
-)
-def test_copy_dbt_packages_resolution(kw, expected):
-    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=True):
-        task = DbtRunOperationLocalOperator(
-            task_id="macro",
-            macro_name="bla",
-            profile_config=profile_config,
-            project_dir="/tmp/proj",
-            operation_name="macro",
-            **kw,
-        )
-        assert task.copy_dbt_packages is expected
-
-
 def test_install_deps_in_empty_dir_becomes_false(tmpdir):
     """
     Ensure that install_deps is False when there is no dependencies file in the project directory.
@@ -191,8 +168,7 @@ def test_install_deps_in_empty_dir_becomes_false(tmpdir):
             project_dir=tmpdir,
             install_deps=True,
         )
-        # install_deps and install_dbt_deps should both be False
-        assert operator.install_deps is False
+        # install_dbt_deps should be False
         assert operator.install_dbt_deps is False
 
 

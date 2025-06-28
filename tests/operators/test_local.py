@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -97,6 +98,70 @@ def test_install_deps_in_empty_dir_becomes_false(tmpdir):
         profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
     )
     assert not dbt_base_operator.install_deps
+
+
+@pytest.mark.parametrize(
+    "kw, expected, has_deps_file, deprecated_used_expected",
+    [
+        ({"install_dbt_deps": False}, False, True, False),
+        ({"install_deps": False}, False, True, True),  # legacy kw/deprecated - moved/adapted
+        ({}, True, True, False),
+    ],
+)
+def test_install_dbt_deps_resolution_old(kw, expected, has_deps_file, deprecated_used_expected):
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=has_deps_file):
+        with warnings.catch_warnings(record=True) as rec:
+            warnings.simplefilter("always")
+            task = DbtRunOperationLocalOperator(
+                task_id="macro",
+                macro_name="bla",
+                profile_config=profile_config,
+                project_dir="/tmp/proj",
+                operation_name="macro",
+                **kw,
+            )
+        assert task.install_dbt_deps is expected
+        has_depr = any(issubclass(w.category, DeprecationWarning) for w in rec)
+        assert has_depr == deprecated_used_expected
+
+
+@pytest.mark.parametrize(
+    "kw, expected, has_deps_file",
+    [
+        ({"install_dbt_deps": False}, False, True),
+        ({}, True, True),
+    ],
+)
+def test_install_dbt_deps_resolution(kw, expected, has_deps_file):
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=has_deps_file):
+        task = DbtRunOperationLocalOperator(
+            task_id="macro",
+            macro_name="bla",
+            profile_config=profile_config,
+            project_dir="/tmp/proj",
+            operation_name="macro",
+            **kw,
+        )
+        assert task.install_dbt_deps is expected
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"install_deps": False},  # legacy kw/deprecated
+    ],
+)
+def test_install_dbt_deps_resolution_deprecated_warns(kw):
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=True):
+        with pytest.warns(DeprecationWarning, match="install_deps"):
+            DbtRunOperationLocalOperator(
+                task_id="macro",
+                macro_name="bla",
+                profile_config=profile_config,
+                project_dir="/tmp/proj",
+                operation_name="macro",
+                **kw,
+            )
 
 
 def test_dbt_base_operator_add_global_flags() -> None:

@@ -64,7 +64,6 @@ try:  # Airflow 3
 except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
-
 try:
     import openlineage
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
@@ -82,7 +81,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from openlineage.client.event_v2 import RunEvent  # pragma: no cover
     except ImportError:  # pragma: no cover
         from openlineage.client.run import RunEvent  # pragma: no cover
-
 
 from sqlalchemy.orm import Session
 
@@ -150,7 +148,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
-    :param install_deps (deprecated): If true, install dependencies before running the command
+    :param install_dbt_deps: If true, install dependencies before running the command.
+    :param install_deps (deprecated): If true, install dependencies before running the command.
+        This parameter is deprecated and will be removed in Cosmos 2.0. Use install_dbt_deps instead.
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
@@ -175,7 +175,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        install_dbt_deps: bool | None = True,
+        install_deps: bool | None = None,  # deprecated
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -185,6 +186,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         append_env: bool = True,
         **kwargs: Any,
     ) -> None:
+
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
@@ -205,8 +207,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # as it can break existing DAGs.
         self.append_env = append_env
 
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        # has_non_empty_dependencies_file: We should not spend time trying to install deps if the project doesn't have any dependencies
+        self.install_dbt_deps = (
+            install_deps
+            if install_deps is not None
+            else (install_dbt_deps and has_non_empty_dependencies_file(project_path=Path(self.project_dir)))
+        )
+        if install_deps is not None:
+            warnings.warn(
+                "'install_deps' is deprecated and will be removed in Cosmos 2.0. Use 'install_dbt_deps' instead.",
+                DeprecationWarning,
+            )
+        self.install_deps = install_dbt_deps  # deprecated, kept for backward compatibility
         self.copy_dbt_packages = copy_dbt_packages
 
         self.manifest_filepath = manifest_filepath
@@ -472,7 +484,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        should_not_create_dbt_deps_symbolic_link = self.install_dbt_deps or self.copy_dbt_packages
         create_symlinks(
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
@@ -619,7 +631,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
-                if self.install_deps:
+                if self.install_dbt_deps:
                     self._install_dependencies(tmp_dir_path, flags, env)
 
                 if run_as_async and not settings.enable_setup_async_task:

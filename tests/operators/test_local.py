@@ -92,6 +92,7 @@ def failing_test_dbt_project(tmp_path):
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
     base_cmd = ["cmd"]
 
+
 def test_install_deps_in_empty_dir_becomes_false(tmpdir):
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
@@ -161,6 +162,7 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
                 operation_name="macro",
                 **kw,
             )
+
 
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(

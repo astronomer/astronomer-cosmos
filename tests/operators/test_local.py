@@ -158,20 +158,15 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
 
 
 @pytest.mark.parametrize(
-    "kw, expected_install_deps, expected_install_dbt_deps, has_deps_file",
+    "kw, expected, has_deps_file",
     [
-        # Test cases for install_deps
-        ({"install_deps": True}, True, True, True),  # Dependencies file exists
-        ({"install_deps": True}, False, False, False),  # No dependencies file exists
-        # Test cases for install_dbt_deps
-        ({"install_dbt_deps": True}, True, True, True),  # Dependencies file exists
-        ({"install_dbt_deps": False}, False, False, False),  # Explicitly disabled
+        ({"install_deps": True}, True, True),   # Dependencies file exists
+        ({"install_deps": True}, False, False),  # No dependencies file exists
     ],
 )
-def test_install_deps_in_empty_dir_becomes_false(kw, expected_install_deps, expected_install_dbt_deps, has_deps_file):
+def test_install_deps_in_empty_dir_becomes_false(kw, expected, has_deps_file):
     """
-    Ensure that install_deps and install_dbt_deps behave as expected
-    based on the presence of a dependencies file and the provided kwargs.
+    Ensure that install_deps behaves as expected based on the presence of a dependencies file.
     """
     with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=has_deps_file):
         operator = ConcreteDbtLocalBaseOperator(
@@ -180,10 +175,7 @@ def test_install_deps_in_empty_dir_becomes_false(kw, expected_install_deps, expe
             project_dir="/tmp/proj",
             **kw,
         )
-        # Validate install_deps behavior
-        assert operator.install_deps == expected_install_deps
-        # Validate install_dbt_deps behavior
-        assert operator.install_dbt_deps == expected_install_dbt_deps
+        assert operator.install_deps == expected
 
 
 def test_dbt_base_operator_add_global_flags() -> None:

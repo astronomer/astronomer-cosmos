@@ -157,18 +157,25 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
             )
 
 
-def test_install_deps_in_empty_dir_becomes_false(tmpdir):
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"install_deps": True},
+    ],
+)
+def test_install_deps_in_empty_dir_becomes_false(kw):
     """
-    Ensure that install_deps is False when there is no dependencies file in the project directory.
+    Ensure that install_deeps is False when there is no dependencies file in the project directory.
     """
     with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=False):
         operator = ConcreteDbtLocalBaseOperator(
             profile_config=profile_config,
             task_id="my-task",
-            project_dir=tmpdir,
-            install_deps=True,
+            project_dir="/tmp/proj",
+            **kw,
         )
-        # install_dbt_deps should be False
+        # install_deps and install_dbt_deps should both be False
+        assert operator.install_deps is False
         assert operator.install_dbt_deps is False
 
 

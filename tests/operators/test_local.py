@@ -92,6 +92,12 @@ def failing_test_dbt_project(tmp_path):
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
     base_cmd = ["cmd"]
 
+def test_install_deps_in_empty_dir_becomes_false(tmpdir):
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
+    )
+    assert not dbt_base_operator.install_deps
+
 
 @pytest.mark.parametrize(
     "kw, expected, has_deps_file, deprecated_used_expected",
@@ -155,28 +161,6 @@ def test_install_dbt_deps_resolution_deprecated_warns(kw):
                 operation_name="macro",
                 **kw,
             )
-
-
-@pytest.mark.parametrize(
-    "kw, expected, has_deps_file",
-    [
-        ({"install_deps": True}, True, True),  # Dependencies file exists
-        ({"install_deps": True}, False, False),  # No dependencies file exists
-    ],
-)
-def test_install_deps_in_empty_dir_becomes_false(kw, expected, has_deps_file):
-    """
-    Ensure that install_deps behaves as expected based on the presence of a dependencies file.
-    """
-    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=has_deps_file):
-        operator = ConcreteDbtLocalBaseOperator(
-            profile_config=profile_config,
-            task_id="my-task",
-            project_dir="/tmp/proj",
-            **kw,
-        )
-        assert operator.install_deps == expected
-
 
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(

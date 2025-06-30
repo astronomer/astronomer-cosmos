@@ -135,6 +135,8 @@ def test_dbt_docker_build_command():
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
             "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
             "--no-version-check",
+            "--project-dir",
+            "my/dir",
         ]
 
 

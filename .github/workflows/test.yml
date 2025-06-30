@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
         dbt-version: ["1.9"]
         exclude:
@@ -63,12 +63,8 @@ jobs:
             airflow-version: "2.8"
           # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
           # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.8"
-            airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
-          - python-version: "3.8"
-            airflow-version: "3.0"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -109,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11"]
         airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
         dbt-version: ["1.9"]
         exclude:
@@ -119,15 +115,8 @@ jobs:
             airflow-version: "2.5"
           # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
           # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.8"
-            airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
-          - python-version: "3.8"
-            airflow-version: "3.0"
-          # since 1.9, dbt no longer supports Python 3.8
-          - python-version: "3.8"
-            dbt-version: "1.9"
           # To be fixed in https://github.com/astronomer/astronomer-cosmos/issues/1817
           - python-version: "3.9"
             airflow-version: "3.0"
@@ -424,6 +413,7 @@ jobs:
       AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
+
   Run-Performance-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
@@ -439,7 +429,7 @@ jobs:
         image: postgres
         env:
           POSTGRES_PASSWORD: postgres
-        options: >-
+        optfFrom ions: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s

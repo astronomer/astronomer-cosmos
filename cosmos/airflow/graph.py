@@ -341,7 +341,7 @@ def create_task_metadata(
                 else:
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
-        else:
+        else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
             args[models_select_key] = node.resource_name
             task_id, args = _get_task_id_and_args(
                 node=node,

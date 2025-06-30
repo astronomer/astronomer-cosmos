@@ -929,3 +929,42 @@ def test_converter_contains_tasks_map(mock_load_dbt_graph, execution_mode, opera
         operator_args=operator_args,
     )
     assert isinstance(converter.tasks_map, dict)
+
+
+sample_model = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL}.{SAMPLE_DBT_PROJECT.stem}.sample_model",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    file_path="",
+)
+nodes_with_model = {"sample_model": sample_model}
+
+
+@patch("cosmos.airflow.graph.settings.pre_dbt_fusion", True)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes_with_model)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_creates_model_with_pre_dbt_fusion(mock_load_dbt_graph):
+    """
+    This test validates that DbtToAirflowConverter contains and exposes a tasks map instance
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+
+    converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 1, 1)),
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args={},
+    )
+    assert isinstance(converter.tasks_map, dict)
+    assert converter.tasks_map["sample_model"].models == "sample.sample_model"
+    assert converter.tasks_map["sample_model"].select is None

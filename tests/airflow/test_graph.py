@@ -421,7 +421,7 @@ def test_create_task_metadata_unsupported(caplog):
             DbtResourceType.MODEL,
             "my_model_run",
             "cosmos.operators.local.DbtRunLocalOperator",
-            {"models": "my_model"},
+            {"select": "my_model"},
             {
                 "dbt_dag_task_group_identifier": "",
                 "dbt_node_config": {
@@ -463,7 +463,7 @@ def test_create_task_metadata_unsupported(caplog):
             DbtResourceType.SNAPSHOT,
             "my_snapshot_snapshot",
             "cosmos.operators.local.DbtSnapshotLocalOperator",
-            {"models": "my_snapshot"},
+            {"select": "my_snapshot"},
             {
                 "dbt_dag_task_group_identifier": "",
                 "dbt_node_config": {
@@ -525,7 +525,7 @@ def test_create_task_metadata_model_with_versions(caplog):
     )
     assert metadata.id == "my_model_v1_run"
     assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
-    assert metadata.arguments == {"models": "my_model.v1"}
+    assert metadata.arguments == {"select": "my_model.v1"}
 
 
 def test_create_task_metadata_model_use_task_group(caplog):
@@ -634,7 +634,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         assert metadata.id == "seed"
 
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
-    assert metadata.arguments == {"models": "my_seed"}
+    assert metadata.arguments == {"select": "my_seed"}
 
 
 def test_create_task_metadata_snapshot(caplog):
@@ -651,7 +651,7 @@ def test_create_task_metadata_snapshot(caplog):
     )
     assert metadata.id == "my_snapshot_snapshot"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator"
-    assert metadata.arguments == {"models": "my_snapshot"}
+    assert metadata.arguments == {"select": "my_snapshot"}
 
 
 def _normalize_task_id(node: DbtNode) -> str:
@@ -959,13 +959,13 @@ def test_build_airflow_graph_with_build_and_buildable_indirect_selection():
             DbtResourceType.MODEL,
             f"{DbtResourceType.MODEL.value}.my_folder.node_name",
             TestIndirectSelection.EAGER,
-            {"models": "node_name"},
+            {"select": "node_name"},
         ),
         (
             DbtResourceType.MODEL,
             f"{DbtResourceType.MODEL.value}.my_folder.node_name.v1",
             TestIndirectSelection.EAGER,
-            {"models": "node_name.v1"},
+            {"select": "node_name.v1"},
         ),
         (
             DbtResourceType.SEED,

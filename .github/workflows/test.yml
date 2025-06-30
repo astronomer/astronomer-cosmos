@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, dbtf]
   pull_request_target: # Also run on pull requests originated from forks
     branches: [main]
 
@@ -423,6 +423,65 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+
+  Run-Integration-dbt-fusion-Tests:
+    needs: Authorize
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+        airflow-version: ["2.10", "3.0"]
+        dbt-version: ["2.0"]  # dbt Fusion
+        exclude:
+          - python-version: "3.8"
+            airflow-version: "3.0"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: integration-dbtf-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system hatch
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf-setup
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf
+        env:
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
+          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+
+      - name: Upload coverage to Github
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          path: .coverage
+          include-hidden-files: true
 
   Run-Performance-Tests:
     needs: Authorize

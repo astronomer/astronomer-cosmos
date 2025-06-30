@@ -152,9 +152,7 @@ def create_test_task_metadata(
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
-        if node.resource_type == DbtResourceType.MODEL:
-            task_args["models"] = node.resource_name
-        elif node.resource_type == DbtResourceType.SOURCE:
+        if node.resource_type == DbtResourceType.SOURCE:
             task_args["select"] = f"source:{node.resource_name}"
         elif is_detached_test(node):
             task_args["select"] = node.resource_name.split(".")[0]
@@ -163,7 +161,6 @@ def create_test_task_metadata(
 
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
-
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
@@ -197,6 +194,7 @@ def _get_task_id_and_args(
     args: dict[str, Any],
     use_task_group: bool,
     normalize_task_id: Callable[..., Any] | None,
+    normalize_task_display_name: Callable[..., Any] | None,
     resource_suffix: str,
     include_resource_type: bool = False,
 ) -> tuple[str, dict[str, Any]]:
@@ -204,16 +202,26 @@ def _get_task_id_and_args(
     Generate task ID and update args with display name if needed.
     """
     args_update = args
-    task_display_name = f"{node.name}_{resource_suffix}"
+    task_name = f"{node.name}_{resource_suffix}"
+
     if include_resource_type:
-        task_display_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
+        task_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
+
     if use_task_group:
         task_id = resource_suffix
-    elif normalize_task_id:
+
+    elif normalize_task_id and not normalize_task_display_name:
         task_id = normalize_task_id(node)
-        args_update["task_display_name"] = task_display_name
+        args_update["task_display_name"] = task_name
+    elif not normalize_task_id and normalize_task_display_name:
+        task_id = task_name
+        args_update["task_display_name"] = normalize_task_display_name(node)
+    elif normalize_task_id and normalize_task_display_name:
+        task_id = normalize_task_id(node)
+        args_update["task_display_name"] = normalize_task_display_name(node)
     else:
-        task_id = task_display_name
+        task_id = task_name
+
     return task_id, args_update
 
 
@@ -250,6 +258,7 @@ def create_task_metadata(
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
+    normalize_task_display_name: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
@@ -273,7 +282,8 @@ def create_task_metadata(
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
-    args = {**args, **{"models": node.resource_name}}
+    # Make a copy to avoid issues with mutable arguments
+    args = {**args}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context: dict[str, Any] = {
@@ -281,18 +291,36 @@ def create_task_metadata(
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
             "package_name": node.package_name,
         }
+        resource_suffix_map = {TestBehavior.BUILD: "build", DbtResourceType.MODEL: "run"}
+        resource_suffix = (
+            resource_suffix_map.get(test_behavior)
+            or resource_suffix_map.get(node.resource_type)
+            or node.resource_type.value
+        )
+        # Since Cosmos 1.11, it selects models using --select, instead of --models. The reason for this is that
+        # this flag was deprecated in dbt-core 1.10 (https://github.com/dbt-labs/dbt-core/issues/11561)
+        # and dbt fusion (2.0.0-beta26) does not support it.
+        # Users can still force Cosmos to use `--models` by setting the environment variable
+        # `AIRFLOW__COSMOS__PRE_DBT_FUSION=1`.
+        models_select_key = "models" if settings.pre_dbt_fusion else "select"
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=resource_suffix,
+                include_resource_type=True,
             )
-        elif node.resource_type == DbtResourceType.MODEL:
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SOURCE:
+            args["select"] = f"source:{node.resource_name}"
             args["on_warning_callback"] = on_warning_callback
 
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
@@ -301,9 +329,10 @@ def create_task_metadata(
                 and node.has_test is False
             ):
                 return None
-            args["select"] = f"source:{node.resource_name}"
-            args.pop("models")
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
+
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
+            )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
                 # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
@@ -312,9 +341,15 @@ def create_task_metadata(
                 else:
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
-        else:
+        else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
+            args[models_select_key] = node.resource_name
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, node.resource_type.value
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=resource_suffix,
             )
 
         _override_profile_if_needed(args, node.profile_config_to_override)
@@ -365,6 +400,7 @@ def generate_task_or_group(
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
     normalize_task_id: Callable[..., Any] | None = None,
+    normalize_task_display_name: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
     enable_owner_inheritance: bool | None = None,
     **kwargs: Any,
@@ -386,6 +422,7 @@ def generate_task_or_group(
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
         normalize_task_id=normalize_task_id,
+        normalize_task_display_name=normalize_task_display_name,
         test_behavior=test_behavior,
         test_indirect_selection=test_indirect_selection,
         on_warning_callback=on_warning_callback,
@@ -595,6 +632,7 @@ def build_airflow_graph(
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
+    normalize_task_display_name = render_config.normalize_task_display_name
     enable_owner_inheritance = render_config.enable_owner_inheritance
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
@@ -624,6 +662,7 @@ def build_airflow_graph(
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
+            normalize_task_display_name=normalize_task_display_name,
             node=node,
             detached_from_parent=detached_from_parent,
             enable_owner_inheritance=enable_owner_inheritance,

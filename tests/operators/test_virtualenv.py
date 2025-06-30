@@ -95,6 +95,7 @@ def test_run_command_without_virtualenv_dir(
         py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
+        vars={"variable": "value"},
     )
     assert venv_operator.virtualenv_dir == None
     venv_operator.run_command(
@@ -106,6 +107,7 @@ def test_run_command_without_virtualenv_dir(
     dbt_cmd = run_command_args[1].kwargs
     assert dbt_deps["command"][0] == dbt_cmd["command"][0]
     assert dbt_deps["command"][1] == "deps"
+    assert ["--vars", "variable: value\n"] not in dbt_deps["command"][-2:]
     assert dbt_cmd["command"][1] == "do-something"
     assert mock_execute.call_count == 2
     virtualenv_call, pip_install_call = mock_execute.call_args_list

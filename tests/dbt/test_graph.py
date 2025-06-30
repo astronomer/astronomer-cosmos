@@ -1883,9 +1883,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("64934a984040076870accfc177706353", "159b4a3432c3d0ebad32080a55697089")
+        assert hash_dir in ("c2c47529eaec412281bdb243a479b734", "efabb6a9130840317ded8d2c05caaea4")
     else:
-        assert hash_dir == "159b4a3432c3d0ebad32080a55697089"
+        assert hash_dir == "efabb6a9130840317ded8d2c05caaea4"
 
 
 @pytest.mark.integration
@@ -2065,3 +2065,27 @@ def test__normalize_path():
     original_value = "seeds\\seed_ifs_util_manual_event_id.csv"
     expected_value = "seeds/seed_ifs_util_manual_event_id.csv"
     assert _normalize_path(original_value) == expected_value
+
+
+@pytest.mark.parametrize(
+    "pre_dbt_fusion_value,source_rendering_behaviour_value,expected_args_count",
+    [
+        (True, SourceRenderingBehavior.NONE, 4),
+        (False, SourceRenderingBehavior.NONE, 13),
+        (True, SourceRenderingBehavior.ALL, 13),
+        (False, SourceRenderingBehavior.ALL, 13),
+    ],
+)
+@patch("cosmos.dbt.graph.settings")
+@patch("cosmos.dbt.graph.run_command")
+def test_run_dbt_ls(
+    mock_run_command, mock_settings, pre_dbt_fusion_value, source_rendering_behaviour_value, expected_args_count
+):
+    mock_settings.pre_dbt_fusion = pre_dbt_fusion_value
+    graph = DbtGraph(
+        project=ProjectConfig(dbt_project_path="/tmp"),
+        render_config=RenderConfig(source_rendering_behavior=source_rendering_behaviour_value),
+    )
+    graph.local_flags = []
+    graph.run_dbt_ls(dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={})
+    assert len(mock_run_command.call_args[0][0]) == expected_args_count

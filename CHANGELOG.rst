@@ -1,8 +1,18 @@
 Changelog
 =========
 
-1.10.1 (2025-05-21)
+1.11.0a1 (2025-06-23)
 ---------------------
+
+Feature
+
+* Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/configuration/dbt-fusion>`_.
+
+(many other features, pending details)
+
+
+1.10.1 (2025-05-21)
+-------------------
 
 Bug Fixes
 

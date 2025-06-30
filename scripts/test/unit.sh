@@ -1,6 +1,6 @@
 pytest \
     -vv \
-    -m "not (integration or perf)" \
+    -m "not (integration or perf or dbtfusion)" \
     --ignore=tests/perf \
     --ignore=tests/test_example_dags.py \
     --ignore=tests/test_async_example_dag.py \

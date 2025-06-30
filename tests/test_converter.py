@@ -237,14 +237,20 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--models", "combined_model"]
+    assert args[1:] == ["test", "--select", "combined_model", "--exclude", "custom_test_combined_model_combined_model_"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--models", "model_a"]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "model_a",
+        "--exclude",
+        "custom_test_combined_model_combined_model_",
+    ]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_b"]
+    assert args[1:] == ["test", "--select", "model_b"]
 
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
@@ -286,14 +292,14 @@ def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detac
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "combined_model"]
+    assert args[1:] == ["test", "--select", "combined_model"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_a"]
+    assert args[1:] == ["test", "--select", "model_a"]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_b"]
+    assert args[1:] == ["test", "--select", "model_b"]
 
 
 @pytest.mark.integration
@@ -405,18 +411,18 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     args = tasks["model.my_dbt_project.combined_model"].build_cmd({})[0]
     assert args[1:] == [
         "build",
+        "--select",
+        "combined_model",
         "--exclude",
         "custom_test_combined_model_combined_model_",
-        "--models",
-        "combined_model",
     ]
 
     args = tasks["model.my_dbt_project.model_a"].build_cmd({})[0]
-    assert args[1:] == ["build", "--exclude", "custom_test_combined_model_combined_model_", "--models", "model_a"]
+    assert args[1:] == ["build", "--select", "model_a", "--exclude", "custom_test_combined_model_combined_model_"]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].build_cmd({})[0]
-    assert args[1:] == ["build", "--models", "model_b"]
+    assert args[1:] == ["build", "--select", "model_b"]
 
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
@@ -923,3 +929,42 @@ def test_converter_contains_tasks_map(mock_load_dbt_graph, execution_mode, opera
         operator_args=operator_args,
     )
     assert isinstance(converter.tasks_map, dict)
+
+
+sample_model = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL}.{SAMPLE_DBT_PROJECT.stem}.sample_model",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    file_path="",
+)
+nodes_with_model = {"sample_model": sample_model}
+
+
+@patch("cosmos.airflow.graph.settings.pre_dbt_fusion", True)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes_with_model)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_creates_model_with_pre_dbt_fusion(mock_load_dbt_graph):
+    """
+    This test validates that DbtToAirflowConverter contains and exposes a tasks map instance
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+
+    converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 1, 1)),
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args={},
+    )
+    assert isinstance(converter.tasks_map, dict)
+    assert converter.tasks_map["sample_model"].models == "sample.sample_model"
+    assert converter.tasks_map["sample_model"].select is None

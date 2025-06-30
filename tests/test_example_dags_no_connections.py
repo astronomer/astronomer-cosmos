@@ -45,11 +45,6 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        # Python 3.8 has reached its end of life (EOL), and dbt no longer supports this version.
-        # This results in an error, as outlined in https://github.com/duckdb/dbt-duckdb/issues/488
-        if _PYTHON_VERSION < (3, 9):
-            file.writelines(["example_duckdb_dag.py\n"])
-
         # Ignore Async DAG for dbt <=1.5
         if DBT_VERSION <= Version("1.5.0"):
             file.writelines(["simple_dag_async.py\n"])

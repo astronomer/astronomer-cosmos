@@ -198,7 +198,7 @@ type-check = "pre-commit run mypy --files cosmos/**/*"
 addopts = "--ignore-glob=**/dbt_packages/*"
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "perf"]
+markers = ["integration", "perf", "dbtfusion"]
 
 ######################################
 # DOCS

@@ -18,7 +18,7 @@ pytest -vv \
     --cov-report=term-missing \
     --cov-report=xml \
     --durations=0 \
-    -m 'integration and not dbtFusion' \
+    -m 'integration and not dbtfusion' \
     --ignore=tests/perf \
     --ignore=tests/test_async_example_dag.py \
     --ignore=tests/test_example_k8s_dags.py \

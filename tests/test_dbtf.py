@@ -24,7 +24,7 @@ execution_config = ExecutionConfig(dbt_executable_path=DBT_FUSION_BINARY)
 
 
 @pytest.mark.integration
-@pytest.mark.dbtFusion
+@pytest.mark.dbtfusion
 def test_dbt_dag_with_dbt_fusion():
     """
     Run a DbtDag using dbt Fusion.

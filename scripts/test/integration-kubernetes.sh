@@ -11,5 +11,5 @@ pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \
-    -m 'integration and not dbtFusion' \
+    -m 'integration and not dbtfusion' \
     tests/test_example_k8s_dags.py

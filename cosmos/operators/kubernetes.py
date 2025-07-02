@@ -259,10 +259,9 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
             )
             return
 
-        if warning_detected:
-            test_names, test_results = extract_log_issues(logs)
-            context_merge(self.context, test_names=test_names, test_results=test_results)
-            self.on_warning_callback(self.context)
+        test_names, test_results = extract_log_issues(logs)
+        context_merge(self.context, test_names=test_names, test_results=test_results)
+        self.on_warning_callback(self.context)
 
     def _detect_standard_warnings(self, log_text: str) -> Optional[int]:
         """

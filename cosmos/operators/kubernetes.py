@@ -231,7 +231,11 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
             return
 
         # Get the logs from the pod
-        logs = [log.decode("utf-8") for log in task.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]
+        logs = []
+        for log in task.pod_manager.read_pod_logs(pod, "base"):
+            decoded_log = log.decode("utf-8")
+            if decoded_log != "":
+                logs.append(decoded_log)
 
         logs_text = "\n".join(logs)
 

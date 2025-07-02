@@ -415,7 +415,7 @@ def test_source_freshness_log_formats(log_text):
         19:48:25
         19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
         19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
-        19:48:27  1 of 2 WARN 252 dbt_utils_accepted_range_table_col__12__0 ..................... [WARN 117 in 1.83s]
+        19:48:27  1 of 2 WARN dbt_utils_accepted_range_table_col__12__0 ..................... [WARN in 1.83s]
         19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
         19:48:27
         19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).

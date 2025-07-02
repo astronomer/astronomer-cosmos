@@ -194,6 +194,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
     1. Regular dbt tests (using the standard "Done. PASS=X WARN=Y" pattern)
     2. Source freshness tests (using "WARN freshness of..." pattern)
     """
+
     def __init__(
         self,
         on_warning_callback: Callable[..., Any],

@@ -137,7 +137,7 @@ ______________________
 
 Airflow Asset (Dataset) URIs validation rules changed in Airflow 3.0.0 and OpenLineage URIs (standard used by Cosmos) are no longer valid in Airflow 3.
 
-Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to use backslashes instead of dots to separate the schema and table name.
+Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to use slashes instead of dots to separate the schema and table name.
 
 Example of Airflow 2 Cosmos Dataset URI:
 - postgres://0.0.0.0:5434/postgres.public.orders

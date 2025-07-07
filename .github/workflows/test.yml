@@ -20,6 +20,7 @@ jobs:
       - run: true
 
   Type-Check:
+    needs: Authorize
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +36,7 @@ jobs:
       - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
+    needs: Authorize
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -609,6 +611,7 @@ jobs:
   Code-Coverage:
     if: github.event.action != 'labeled'
     needs:
+      - Authorize
       - Run-Unit-Tests
       - Run-Integration-Tests
       - Run-Integration-Tests-Expensive

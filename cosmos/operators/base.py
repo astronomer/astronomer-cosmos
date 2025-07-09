@@ -482,6 +482,55 @@ class DbtCompileMixin:
     ui_color = "#877c7c"
 
 
+class DbtShowMixin:
+    """
+    Mixin for dbt show command.
+
+    :param select: The selection of nodes to include in the compilation.
+    :param args: Additional arguments to pass to the dbt command.
+    :param limit: Limit the number of results returned.
+    :param inline: If True, show the compiled SQL inline with the results.
+    """
+
+    base_cmd = ["show"]
+    ui_color = "#6C8EBF"  # A muted blue color
+    ui_fgcolor = "#FFFFFF"
+
+    template_fields: Sequence[str] = ("select", "limit", "inline")
+
+    def __init__(
+        self,
+        select: str | None = None,
+        limit: int | str | None = None,
+        inline: bool | str = False,
+        **kwargs: Any,
+    ) -> None:
+        self.select = select
+        self.limit = limit
+        self.inline = inline
+        super().__init__(select=select, **kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+
+        if self.select:
+            flags.extend(["--select", str(self.select)])
+
+        if self.limit is not None:
+            flags.extend(["--limit", str(self.limit)])
+
+        if isinstance(self.inline, str):
+            # Handle template fields when render_template_as_native_obj=False
+            inline = to_boolean(self.inline)
+        else:
+            inline = self.inline
+
+        if inline is True:
+            flags.append("--inline")
+
+        return flags
+
+
 class DbtCloneMixin:
     """Mixin for dbt clone command."""
 

@@ -111,6 +111,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtShowMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -1349,6 +1350,17 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtShowLocalOperator(DbtShowMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt core show command.
+    """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtShowMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

@@ -506,9 +506,8 @@ class DbtShowMixin:
     def add_cmd_flags(self) -> list[str]:
         flags = []
 
-        flags.extend(["--quiet"])
         flags.extend(["--output", "json"])
-        flags.extend(["--log-format-file", "json"])
+        # flags.extend(["--log-format-file", "json"])
 
         if self.inline:
             flags.extend(["--inline", str(self.inline)])

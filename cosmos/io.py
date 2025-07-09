@@ -87,6 +87,39 @@ def upload_to_gcp_gs(
             )
 
 
+def _extract_show_list(log_string: str) -> list:
+    """
+    Extracts the JSON list after "show" key from a log string.
+
+    TODO: This is not something we'll actually use, but it's useful for PoC purposes.
+    """
+    import re
+    import json
+
+    # Regex to find: "show": <whitespace> <JSON array starting with [ and ending with ]>
+    pattern = r'"show"\s*:\s*(\[[^\]]*\])'
+
+    # If you might have nested { } inside, you can make it lazy with:
+    # r'"show"\s*:\s*(\[[\s\S]*?\])'
+    # which is more greedy but more flexible for multiple lines
+
+    match = re.search(pattern, log_string, re.DOTALL)
+    if not match:
+        raise ValueError("Could not find 'show' JSON array in string.")
+
+    json_array_str = match.group(1)
+
+    # Build a small JSON object string to parse
+    json_str = f'{{"show": {json_array_str}}}'
+
+    try:
+        data = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"JSON decoding failed: {e}")
+
+    return data.get("show", [])
+
+
 def log_to_xcom(
     project_dir: str,
     log_relative_path: str = "logs/dbt.log",
@@ -130,9 +163,12 @@ def log_to_xcom(
     else:
         log_content = f"Log file not found: {log_path}"
 
+    # Next, retrive the JSON from the plaintext log file. The JSON always is contained in a key {"show": [...]}.
+    json_content = _extract_show_list(log_content)
+
     # Push to XCom
     context = get_current_context()
-    context["ti"].xcom_push(key=xcom_key, value=log_content)
+    context["ti"].xcom_push(key=xcom_key, value=json_content)
 
 
 def upload_to_azure_wasb(

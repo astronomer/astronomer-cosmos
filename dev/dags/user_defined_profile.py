@@ -53,11 +53,12 @@ with DAG(
             profiles_yml_filepath=PROFILES_FILE_PATH,
         ),
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
-        task_id="show",
+        task_id="show_dbt",
         callback=log_to_xcom,
         inline="select * from stg_customers",
         install_deps=True,
         append_env=True,
+        quiet=True,
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

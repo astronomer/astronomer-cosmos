@@ -704,6 +704,27 @@ def build_airflow_graph(
             test_task = create_airflow_task(test_meta, dag, task_group=task_group)
             tasks_map[node_id] = test_task
 
+    import os
+
+    include_show_local_task = os.getenv("COSMOS__INCLUDE_SHOW_LOCAL_TASK", "false").lower() in ("true", "1", "t")
+    # Add DbtShowLocalOperator to the DAG
+    if include_show_local_task and execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
+        from cosmos.operators.local import DbtShowLocalOperator
+        from cosmos.io import log_to_xcom
+
+        show_task_id = f"{dbt_project_name}__show"
+        show_operator = DbtShowLocalOperator(
+            task_id=show_task_id,
+            project_dir=task_args.get("project_dir", ""),
+            profile_config=task_args.get("profile_config"),
+            callback=log_to_xcom,
+            inline="select * from stg_customers where first_name = 'Jesus'",
+            dag=dag,
+            task_group=task_group,
+            **{k: v for k, v in task_args.items() if k not in ["task_id", "profile_config", "project_dir"]},
+        )
+        tasks_map[show_task_id] = show_operator
+
     create_airflow_task_dependencies(nodes, tasks_map)
     if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(

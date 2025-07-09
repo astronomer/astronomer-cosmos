@@ -709,8 +709,8 @@ def build_airflow_graph(
     include_show_local_task = os.getenv("COSMOS__RENDER_DBT_SHOW_LOCAL_TASK", "false").lower() in ("true", "1", "t")
     # Add DbtShowLocalOperator to the DAG
     if include_show_local_task and execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
-        from cosmos.operators.local import DbtShowLocalOperator
         from cosmos.io import log_to_xcom
+        from cosmos.operators.local import DbtShowLocalOperator
 
         show_task_id = f"cosmos__dbt_show_local"
         show_operator = DbtShowLocalOperator(

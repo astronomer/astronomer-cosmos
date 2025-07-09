@@ -9,7 +9,7 @@ from pathlib import Path
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, LoadMode, ProfileConfig, ProjectConfig, RenderConfig, DbtShowLocalOperator
+from cosmos import DbtShowLocalOperator, DbtTaskGroup, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.io import log_to_xcom
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"

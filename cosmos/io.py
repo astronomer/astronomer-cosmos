@@ -69,6 +69,7 @@ def upload_to_gcp_gs(
     :param source_subpath: Path of the source directory sub-path to upload files from.
     """
     import os
+
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
     target_dir = os.path.join(project_dir, source_subpath)
@@ -93,8 +94,8 @@ def _extract_show_list(log_string: str) -> list:
 
     TODO: This is not something we'll actually use, but it's useful for PoC purposes.
     """
-    import re
     import json
+    import re
 
     # Regex to find: "show": <whitespace> <JSON array starting with [ and ending with ]>
     pattern = r'"show"\s*:\s*(\[[^\]]*\])'
@@ -136,8 +137,8 @@ def log_to_xcom(
         callback=log_to_xcom,
         callback_args={
             "log_relative_path": "logs/dbt.log",  # Relative to project_dir
-            "xcom_key": "dbt_logs"  # Optional: Custom XCom key
-        }
+            "xcom_key": "dbt_logs",  # Optional: Custom XCom key
+        },
     )
     ```
 
@@ -147,6 +148,7 @@ def log_to_xcom(
     :param kwargs: Additional keyword arguments including task instance context.
     """
     from pathlib import Path
+
     from airflow.operators.python import get_current_context
 
     # Get the full path to the log file
@@ -156,7 +158,7 @@ def log_to_xcom(
     log_content = ""
     if log_path.exists():
         try:
-            with open(log_path, "r", encoding="utf-8") as file:
+            with open(log_path, encoding="utf-8") as file:
                 log_content = file.read()
         except Exception as error:
             log_content = f"Error reading log file {log_path}: {str(error)}"

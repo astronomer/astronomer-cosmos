@@ -163,11 +163,10 @@ def log_to_xcom(
     else:
         log_content = f"Log file not found: {log_path}"
 
+    context = get_current_context()
+
     # Next, retrive the JSON from the plaintext log file. The JSON always is contained in a key {"show": [...]}.
     json_content = _extract_show_list(log_content)
-
-    # Push to XCom
-    context = get_current_context()
     context["ti"].xcom_push(key=xcom_key, value=json_content)
 
 

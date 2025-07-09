@@ -706,19 +706,19 @@ def build_airflow_graph(
 
     import os
 
-    include_show_local_task = os.getenv("COSMOS__INCLUDE_SHOW_LOCAL_TASK", "false").lower() in ("true", "1", "t")
+    include_show_local_task = os.getenv("COSMOS__RENDER_DBT_SHOW_LOCAL_TASK", "false").lower() in ("true", "1", "t")
     # Add DbtShowLocalOperator to the DAG
     if include_show_local_task and execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
         from cosmos.operators.local import DbtShowLocalOperator
         from cosmos.io import log_to_xcom
 
-        show_task_id = f"{dbt_project_name}__show"
+        show_task_id = f"cosmos__dbt_show_local"
         show_operator = DbtShowLocalOperator(
             task_id=show_task_id,
             project_dir=task_args.get("project_dir", ""),
             profile_config=task_args.get("profile_config"),
             callback=log_to_xcom,
-            inline="select * from stg_customers where first_name = 'Jesus'",
+            inline="{{ var.value.COSMOS__DBT_SHOW_LOCAL_INLINE_QUERY }}",
             dag=dag,
             task_group=task_group,
             **{k: v for k, v in task_args.items() if k not in ["task_id", "profile_config", "project_dir"]},

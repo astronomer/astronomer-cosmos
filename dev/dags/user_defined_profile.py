@@ -55,7 +55,7 @@ with DAG(
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
         task_id="show_dbt",
         callback=log_to_xcom,
-        inline="select * from stg_customers where first_name = 'Jesus'",
+        inline="{{ var.value.COSMOS__DBT_SHOW_LOCAL_INLINE_QUERY }}",
         install_deps=True,
         append_env=True,
         quiet=True,

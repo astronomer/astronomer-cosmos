@@ -68,29 +68,71 @@ def upload_to_gcp_gs(
     :param gcp_conn_id: GCP connection ID to use when uploading files.
     :param source_subpath: Path of the source directory sub-path to upload files from.
     """
+    import os
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
-    target_dir = f"{project_dir}/{source_subpath}"
-    gcp_conn_id = gcp_conn_id if gcp_conn_id else GCSHook.default_conn_name
-    # bucket_name = kwargs["bucket_name"]
-    hook = GCSHook(gcp_conn_id=gcp_conn_id)
-    context = kwargs["context"]
+    target_dir = os.path.join(project_dir, source_subpath)
+    conn_id = gcp_conn_id if gcp_conn_id else GCSHook.default_conn_name
+    hook = GCSHook(gcp_conn_id=conn_id)
 
-    # Iterate over the files in the target dir and upload them to GCP GS
-    for dirpath, _, filenames in os.walk(target_dir):
-        for filename in filenames:
-            object_name = (
-                f"{context['dag'].dag_id}"
-                f"/{context['run_id']}"
-                f"/{context['task_instance'].task_id}"
-                f"/{context['task_instance']._try_number}"
-                f"{dirpath.split(project_dir)[-1]}/{filename}"
-            )
+    # Get all files in target directory
+    for root, _, files in os.walk(target_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
+            destination_file_path = os.path.relpath(file_path, os.path.join(project_dir, os.pardir))
             hook.upload(
-                filename=f"{dirpath}/{filename}",
                 bucket_name=bucket_name,
-                object_name=object_name,
+                object_name=destination_file_path,
+                filename=file_path,
             )
+
+
+def log_to_xcom(
+    project_dir: str,
+    log_relative_path: str = "logs/dbt.log",
+    xcom_key: str = "dbt_logs",
+    **kwargs: Any,
+) -> None:
+    """
+    Callback function that reads a log file and pushes its contents to XCom.
+
+    Example usage in DbtTaskGroup or DbtOperator:
+    ```python
+    DbtTaskGroup(
+        # ... other parameters ...
+        callback=log_to_xcom,
+        callback_args={
+            "log_relative_path": "logs/dbt.log",  # Relative to project_dir
+            "xcom_key": "dbt_logs"  # Optional: Custom XCom key
+        }
+    )
+    ```
+
+    :param project_dir: Base directory of the dbt project.
+    :param log_relative_path: Relative path to the log file from project_dir.
+    :param xcom_key: Key to use when pushing logs to XCom.
+    :param kwargs: Additional keyword arguments including task instance context.
+    """
+    from pathlib import Path
+    from airflow.operators.python import get_current_context
+
+    # Get the full path to the log file
+    log_path = Path(project_dir) / log_relative_path
+
+    # Read the log file if it exists
+    log_content = ""
+    if log_path.exists():
+        try:
+            with open(log_path, "r", encoding="utf-8") as file:
+                log_content = file.read()
+        except Exception as error:
+            log_content = f"Error reading log file {log_path}: {str(error)}"
+    else:
+        log_content = f"Log file not found: {log_path}"
+
+    # Push to XCom
+    context = get_current_context()
+    context["ti"].xcom_push(key=xcom_key, value=log_content)
 
 
 def upload_to_azure_wasb(

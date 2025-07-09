@@ -1357,10 +1357,11 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
 
 class DbtShowLocalOperator(DbtShowMixin, DbtLocalBaseOperator):
     """
-    Executes a dbt core show command.
+    Executes a dbt core show command and pushes the JSON output to XCom.
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtShowMixin.template_fields  # type: ignore[operator]
+    ui_color = "#F4A259"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

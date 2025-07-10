@@ -322,16 +322,13 @@ class ProfileConfig:
     def get_profile_type(self) -> str:
         if isinstance(self.profile_mapping, BaseProfileMapping):
             return str(self.profile_mapping.dbt_profile_type)
-
-        profile_path = self._get_profile_path()
-
-        with open(profile_path) as file:
-            profiles = yaml.safe_load(file)
-
-            profile = profiles[self.profile_name]
-            target_type = profile["outputs"][self.target_name]["type"]
-            return str(target_type)
-
+        elif self.profiles_yml_filepath:
+            with open(self.profiles_yml_filepath) as file:
+                profiles = yaml.safe_load(file)
+    
+                profile = profiles[self.profile_name]
+                target_type = profile["outputs"][self.target_name]["type"]
+                return str(target_type)
         return "undefined"
 
     def _get_profile_path(self, use_mock_values: bool = False) -> Path:

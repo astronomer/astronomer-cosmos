@@ -325,7 +325,7 @@ class ProfileConfig:
         elif self.profiles_yml_filepath:
             with open(self.profiles_yml_filepath) as file:
                 profiles = yaml.safe_load(file)
-    
+
                 profile = profiles[self.profile_name]
                 target_type = profile["outputs"][self.target_name]["type"]
                 return str(target_type)

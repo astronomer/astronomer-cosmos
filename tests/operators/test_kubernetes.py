@@ -201,6 +201,211 @@ class FakePodManager:
         return (log.encode("utf-8") for log in self.log_string.split("\n"))
 
 
+def create_test_handler():
+    """Helper function to create a test handler with mocks"""
+    mock_callback = Mock()
+    mock_operator = Mock()
+    mock_context = {"task_instance": Mock()}
+    handler = DbtTestWarningHandler(on_warning_callback=mock_callback, operator=mock_operator, context=mock_context)
+    return handler, mock_callback, mock_operator, mock_context
+
+
+@pytest.mark.parametrize(
+    ("log_text", "expected_warn_count"),
+    [
+        # Standard warning with summary
+        (
+            """
+            19:48:25  Concurrency: 4 threads (target='target')
+            19:48:27  1 of 2 WARN dbt_utils_accepted_range ..................... [WARN 117 in 1.83s]
+            19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
+            19:48:27  Done. PASS=1 WARN=1 ERROR=0 SKIP=0 TOTAL=2
+            """,
+            1,
+        ),
+        # Multiple warnings
+        (
+            """
+            19:48:25  Concurrency: 4 threads (target='target')
+            19:48:27  1 of 3 WARN test_one ..................... [WARN in 1.83s]
+            19:48:27  2 of 3 WARN test_two ..................... [WARN in 1.85s]
+            19:48:27  3 of 3 PASS test_three ................... [PASS in 1.85s]
+            19:48:27  Done. PASS=1 WARN=2 ERROR=0 SKIP=0 TOTAL=3
+            """,
+            2,
+        ),
+        # No warnings
+        (
+            """
+            19:48:25  Concurrency: 4 threads (target='target')
+            19:48:27  1 of 2 PASS test_one ..................... [PASS in 1.83s]
+            19:48:27  2 of 2 PASS test_two ..................... [PASS in 1.85s]
+            19:48:27  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 TOTAL=2
+            """,
+            0,
+        ),
+        # No summary (like source freshness)
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:20 1 of 1 START freshness of auction_net.raw .......................... [RUN]
+            15:49:21 1 of 1 WARN freshness of auction_net.raw ........................... [WARN in 0.90s]
+            15:49:21 Done.
+            """,
+            None,
+        ),
+    ],
+)
+def test_detect_standard_warnings(log_text, expected_warn_count):
+    """Test detection of standard dbt test warnings"""
+    handler, _, _, _ = create_test_handler()
+    warn_count = handler._detect_standard_warnings(log_text)
+    assert warn_count == expected_warn_count
+
+
+@pytest.mark.parametrize(
+    ("log_text", "expected_warning_count", "expected_sources"),
+    [
+        # Single source freshness warning
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:20 1 of 1 START freshness of auction_net.auction_net_raw .......................... [RUN]
+            15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ........................... [WARN in 0.90s]
+            15:49:21 Done.
+            """,
+            1,
+            ["auction_net.auction_net_raw"],
+        ),
+        # Multiple source freshness warnings
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:20 1 of 3 START freshness of source1.table1 .......................... [RUN]
+            15:49:21 1 of 3 WARN freshness of source1.table1 ........................... [WARN in 0.90s]
+            15:49:21 2 of 3 START freshness of source2.table2 .......................... [RUN]
+            15:49:22 2 of 3 WARN freshness of source2.table2 ........................... [WARN in 1.20s]
+            15:49:22 3 of 3 START freshness of source3.table3 .......................... [RUN]
+            15:49:23 3 of 3 PASS freshness of source3.table3 ........................... [PASS in 0.45s]
+            15:49:23 Done.
+            """,
+            2,
+            ["source1.table1", "source2.table2"],
+        ),
+        # No source freshness warnings - all pass
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:20 1 of 1 START freshness of auction_net.raw .......................... [RUN]
+            15:49:21 1 of 1 PASS freshness of auction_net.raw ........................... [PASS in 0.90s]
+            15:49:21 Done.
+            """,
+            0,
+            [],
+        ),
+        # Empty source freshness log
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:21 Done.
+            """,
+            0,
+            [],
+        ),
+    ],
+)
+def test_detect_source_freshness_warnings(log_text, expected_warning_count, expected_sources):
+    """Test detection of source freshness warnings"""
+    handler, _, _, _ = create_test_handler()
+    warnings = handler._detect_source_freshness_warnings(log_text)
+    assert len(warnings) == expected_warning_count
+
+    if expected_sources:
+        actual_sources = [w["source"] for w in warnings]
+        for expected_source in expected_sources:
+            assert expected_source in actual_sources
+
+
+@pytest.mark.parametrize(
+    ("log_text",),
+    [
+        # Source freshness log with single warning
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:18 Concurrency: 2 threads (target='default')
+            15:49:20 1 of 1 START freshness of auction_net.auction_net_raw .......................... [RUN]
+            15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ........................... [WARN in 0.90s]
+            15:49:21 Finished running 1 source in 0 hours 0 minutes and 3.27 seconds (3.27s).
+            15:49:21 Done.
+            """,
+        ),
+        # Source freshness log with multiple warnings
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:18 Concurrency: 2 threads (target='default')
+            15:49:20 1 of 3 START freshness of source1.table1 .......................... [RUN]
+            15:49:21 1 of 3 WARN freshness of source1.table1 ........................... [WARN in 0.90s]
+            15:49:21 2 of 3 START freshness of source2.table2 .......................... [RUN]
+            15:49:22 2 of 3 WARN freshness of source2.table2 ........................... [WARN in 1.20s]
+            15:49:22 3 of 3 START freshness of source3.table3 .......................... [RUN]
+            15:49:23 3 of 3 PASS freshness of source3.table3 ........................... [PASS in 0.45s]
+            15:49:23 Finished running 3 sources in 0 hours 0 minutes and 5.12 seconds (5.12s).
+            15:49:23 Done.
+            """,
+        ),
+        # Source freshness log with no warnings
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:18 Concurrency: 2 threads (target='default')
+            15:49:20 1 of 2 START freshness of auction_net.raw .......................... [RUN]
+            15:49:21 1 of 2 PASS freshness of auction_net.raw ........................... [PASS in 0.90s]
+            15:49:21 2 of 2 START freshness of another_source.table .......................... [RUN]
+            15:49:22 2 of 2 PASS freshness of another_source.table ........................... [PASS in 0.45s]
+            15:49:22 Finished running 2 sources in 0 hours 0 minutes and 4.32 seconds (4.32s).
+            15:49:22 Done.
+            """,
+        ),
+        # Source freshness log with mixed results
+        (
+            """
+            15:49:18 Found 205 models, 27 data tests, 66 sources, 639 macros
+            15:49:18 Concurrency: 2 threads (target='default')
+            15:49:20 1 of 4 START freshness of source_a.table_a .......................... [RUN]
+            15:49:21 1 of 4 PASS freshness of source_a.table_a ........................... [PASS in 0.90s]
+            15:49:21 2 of 4 START freshness of source_b.table_b .......................... [RUN]
+            15:49:22 2 of 4 WARN freshness of source_b.table_b ........................... [WARN in 1.10s]
+            15:49:22 3 of 4 START freshness of source_c.table_c .......................... [RUN]
+            15:49:23 3 of 4 PASS freshness of source_c.table_c ........................... [PASS in 0.45s]
+            15:49:23 4 of 4 START freshness of source_d.table_d .......................... [RUN]
+            15:49:24 4 of 4 WARN freshness of source_d.table_d ........................... [WARN in 0.78s]
+            15:49:24 Finished running 4 sources in 0 hours 0 minutes and 6.45 seconds (6.45s).
+            15:49:24 Done.
+            """,
+        ),
+    ],
+)
+def test_source_freshness_log_formats(log_text):
+    """Test various source freshness log formats to ensure parsing works correctly"""
+    handler, _, _, _ = create_test_handler()
+    warnings = handler._detect_source_freshness_warnings(log_text)
+
+    # Count expected warnings by counting "WARN freshness of" occurrences
+    expected_warnings = log_text.count("WARN freshness of")
+    assert len(warnings) == expected_warnings
+
+    # Verify each warning has required fields
+    for warning in warnings:
+        assert "name" in warning
+        assert "status" in warning
+        assert warning["status"] == "WARN"
+        assert "type" in warning
+        assert warning["type"] == "source_freshness"
+        assert "source" in warning
+
+
 @pytest.mark.parametrize(
     ("log_string", "should_call"),
     (
@@ -210,7 +415,7 @@ class FakePodManager:
         19:48:25
         19:48:25  1 of 2 START test dbt_utils_accepted_range_table_col__12__0 ................... [RUN]
         19:48:25  2 of 2 START test unique_table__uuid .......................................... [RUN]
-        19:48:27  1 of 2 WARN 252 dbt_utils_accepted_range_table_col__12__0 ..................... [WARN 117 in 1.83s]
+        19:48:27  1 of 2 WARN dbt_utils_accepted_range_table_col__12__0 ..................... [WARN in 1.83s]
         19:48:27  2 of 2 PASS unique_table__uuid ................................................ [PASS in 1.85s]
         19:48:27
         19:48:27  Finished running 2 tests, 1 hook in 0 hours 0 minutes and 12.86 seconds (12.86s).

@@ -307,7 +307,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
                     file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
                     tags=node_dict.get("tags", []),
-                    config=node_dict.get("config", {}),
+                    config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
@@ -923,7 +923,7 @@ class DbtGraph:
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
-                    config=node_dict["config"],
+                    config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE

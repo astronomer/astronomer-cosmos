@@ -89,7 +89,8 @@ class DbtNode:
         Extract node-specific configuration declared in the model dbt YAML configuration.
         These will be used while instantiating Airflow tasks.
         """
-        value = self.config.get("meta", {}).get("cosmos", {})
+        meta_cfg = self.config.get("meta") or {}
+        value = meta_cfg.get("cosmos", {})
         if not isinstance(value, dict):
             raise CosmosLoadDbtException(
                 f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'cosmos' in meta must be a dict."
@@ -148,7 +149,9 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        return str(self.config.get("meta", {}).get("owner", ""))
+        cfg = self.config or {}
+        meta_cfg = cfg.get("meta") or {}
+        return str(meta_cfg.get("owner", ""))
 
     @property
     def context_dict(self) -> dict[str, Any]:

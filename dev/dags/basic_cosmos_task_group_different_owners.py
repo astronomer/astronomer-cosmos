@@ -13,7 +13,7 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-PROJECT_DIR = DBT_ROOT_PATH / "jaffle_shop"
+PROJECT_DIR = DBT_ROOT_PATH / "altered_jaffle_shop"
 
 
 profile_config = ProfileConfig(
@@ -40,7 +40,7 @@ with DAG(
 
     # Considering the `dbt_project.yml` file contains the following:
     # seeds:
-    #   jaffle_shop:
+    #   altered_jaffle_shop:
     #     +meta:
     #       cosmos:
     #         profile_config:

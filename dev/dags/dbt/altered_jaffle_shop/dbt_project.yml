@@ -24,3 +24,12 @@ models:
       materialized: table
       staging:
         materialized: view
+
+seeds:
+  altered_jaffle_shop:
+      +meta:
+        cosmos:
+          profile_config:
+            profile_name: postgres_profile
+            profile_mapping:
+              threads: 2

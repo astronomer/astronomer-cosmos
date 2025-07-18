@@ -82,11 +82,12 @@ def get_dag_bag() -> DagBag:  # noqa: C901
         if AIRFLOW_VERSION < Version("2.8.0"):
             file.writelines("example_cosmos_dbt_build.py\n")
 
-        # Disabling this DAG temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
+        # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
         # https://github.com/apache/airflow/issues/51566
         # https://github.com/astronomer/astronomer-cosmos/issues/1802
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_source_rendering.py\n")
+            file.writelines("basic_cosmos_task_group_different_owners.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

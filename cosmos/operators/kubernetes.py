@@ -241,19 +241,15 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
 
         # Check for warnings
         warning_detected = False
-        test_names, test_results = [], []
         if isinstance(task, DbtTestKubernetesOperator):
             warn_count = self._detect_standard_warnings(logs_text)
             if warn_count:
                 self.operator.log.info(f"Detected {warn_count} warnings using standard pattern")
-                # test_names, test_results = self._extract_standard_log_issues(logs_text)
                 warning_detected = True
         elif isinstance(task, DbtSourceKubernetesOperator):
             source_freshness_warnings = self._detect_source_freshness_warnings(logs_text)
             if source_freshness_warnings:
                 self.operator.log.info(f"Detected {len(source_freshness_warnings)} source freshness warnings")
-                # test_names = [w["name"] for w in source_freshness_warnings]
-                # test_results = [w["status"] for w in source_freshness_warnings]
                 warning_detected = True
 
         if not warning_detected:

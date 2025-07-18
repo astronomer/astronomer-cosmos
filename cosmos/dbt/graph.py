@@ -149,8 +149,8 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        cfg = self.config or {}
-        meta_cfg = cfg.get("meta") or {}
+        config_dict = self.config or {}
+        meta_cfg = config_dict.get("meta") or {}
         return str(meta_cfg.get("owner", ""))
 
     @property

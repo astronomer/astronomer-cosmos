@@ -1883,9 +1883,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("c2c47529eaec412281bdb243a479b734", "efabb6a9130840317ded8d2c05caaea4")
+        assert hash_dir in ("c2c47529eaec412281bdb243a479b734", "fa93914ecb491cc40a17ab956397359a")
     else:
-        assert hash_dir == "efabb6a9130840317ded8d2c05caaea4"
+        assert hash_dir == "fa93914ecb491cc40a17ab956397359a"
 
 
 @pytest.mark.integration

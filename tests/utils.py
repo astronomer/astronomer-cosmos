@@ -57,7 +57,7 @@ def test_dag(
         dr = test_old_dag(dag, conn_file_path)
         assert check_dag_success(dr, expect_success), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
     elif AIRFLOW_VERSION >= version.Version("2.5"):
-        if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2")):
+        if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
             dr = new_test_dag(dag)
             assert check_dag_success(
                 dr, expect_success
@@ -80,7 +80,7 @@ def test_dag(
                 ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
             except sqlalchemy.exc.PendingRollbackError:
                 warnings.warn(
-                    "Early versions of Airflow 2.10 have issues when running the test command with DatasetAlias / Datasets"
+                    "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"
                 )
     else:
         dr = test_old_dag(dag, conn_file_path)

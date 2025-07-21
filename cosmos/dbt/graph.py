@@ -89,7 +89,8 @@ class DbtNode:
         Extract node-specific configuration declared in the model dbt YAML configuration.
         These will be used while instantiating Airflow tasks.
         """
-        value = self.config.get("meta", {}).get("cosmos", {})
+        meta_cfg = self.config.get("meta") or {}
+        value = meta_cfg.get("cosmos", {})
         if not isinstance(value, dict):
             raise CosmosLoadDbtException(
                 f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'cosmos' in meta must be a dict."
@@ -148,7 +149,9 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        return str(self.config.get("meta", {}).get("owner", ""))
+        config_dict = self.config or {}
+        meta_cfg = config_dict.get("meta") or {}
+        return str(meta_cfg.get("owner", ""))
 
     @property
     def context_dict(self) -> dict[str, Any]:
@@ -306,7 +309,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=base_path / node_dict["original_file_path"],
                     tags=node_dict.get("tags", []),
-                    config=node_dict.get("config", {}),
+                    config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
@@ -908,7 +911,7 @@ class DbtGraph:
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
                     tags=node_dict["tags"],
-                    config=node_dict["config"],
+                    config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE

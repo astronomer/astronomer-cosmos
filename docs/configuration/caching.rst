@@ -111,7 +111,7 @@ The cache values contain a few properties:
 
 
 Caching the partial parse file
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.4)
 

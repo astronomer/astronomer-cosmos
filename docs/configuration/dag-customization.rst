@@ -1,7 +1,7 @@
 .. _dag_customization:
 
 Post-rendering DAG customization
-================
+================================
 
 .. note::
     The DbtToAirflowConverter.tasks_map property is only available for cosmos >= 1.8.0
@@ -13,7 +13,7 @@ An example use case you can think of is implementing sensor tasks that wait for 
 running a source node task (or task group, if the source contains a test).
 
 Mapping from dbt nodes to Airflow tasks
-----------------------
+---------------------------------------
 
 To interact with Airflow tasks created by Cosmos,
 you can iterate over the dag.dbt_graph.filtered_nodes property like so:

@@ -1,7 +1,7 @@
 .. _source-nodes-rendering:
 
 Source Nodes Rendering
-================
+======================
 
 .. note::
     This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.
@@ -11,6 +11,7 @@ You can control this behavior using the ``source_rendering_behavior`` field in t
 
 - **all**:
   When set to ``all``, Cosmos renders all sources in the dbt project. It uses three different node types for this:
+
     - ``EmptyOperator``: For sources that do not have tests or freshness checks.
     - ``DbtSourceOperator``: For sources that have freshness checks.
     - ``DbtTestOperator``: For sources that have tests.

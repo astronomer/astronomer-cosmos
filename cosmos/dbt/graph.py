@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import tempfile
+import warnings
 import zlib
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -821,6 +822,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         self.load_method = LoadMode.CUSTOM
+        warnings.warn(
+            "Using `load_method` = `LoadMode.CUSTOM` is deprecated in current version and will"
+            " be removed in Cosmos 2.0",
+            DeprecationWarning,
+        )
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
         if self.render_config.selector:

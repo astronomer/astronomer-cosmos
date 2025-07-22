@@ -14,6 +14,7 @@ from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Any, Dict, Optional
+import warnings
 
 from airflow.models import Variable
 
@@ -836,6 +837,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         self.load_method = LoadMode.CUSTOM
+        warnings.warn(
+            "Using `load_method` = `LoadMode.CUSTOM` is deprecated in current version and will"
+            " be removed in Cosmos 2.0",
+            DeprecationWarning,
+        )
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
         if self.render_config.selector:

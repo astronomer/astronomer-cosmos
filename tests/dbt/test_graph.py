@@ -1039,7 +1039,8 @@ def test_load_via_load_via_custom_parser(project_name, nodes_count):
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     assert len(dbt_graph.nodes) == nodes_count
-    
+
+
 @pytest.mark.parametrize("project_name", [("altered_jaffle_shop"), ("jaffle_shop_python")])
 def test_validate_load_via_load_via_custom_parser_deprecated(project_name):
     """Deprecating warnings should be raised when using load_mode CUSTOM."""
@@ -1063,6 +1064,7 @@ def test_validate_load_via_load_via_custom_parser_deprecated(project_name):
 
     with pytest.deprecated_call():
         dbt_graph.load_via_custom_parser()
+
 
 def test_load_via_load_via_custom_parser_select_rendering_config():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "jaffle_shop")

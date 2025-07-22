@@ -8,13 +8,13 @@ import json
 import os
 import platform
 import tempfile
+import warnings
 import zlib
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Any, Dict, Optional
-import warnings
 
 from airflow.models import Variable
 

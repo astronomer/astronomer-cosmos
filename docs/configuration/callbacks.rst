@@ -105,6 +105,7 @@ Below, find an example of a callback method that raises an exception if the quer
 Users can use the same approach to call the data observability platform `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_ or other services.
 
 .. code-block:: python
+
     def montecarlo_import_artifacts(
         project_dir: str,
         mcd_id: str,

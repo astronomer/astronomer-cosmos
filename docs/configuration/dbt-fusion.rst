@@ -14,9 +14,10 @@ It is a unified approach that aims to merge dbt Core and dbt Cloud features via 
 implemented in a different programming language (Rust, as opposed to Python).
 As part of this, dbt Labs are `rewriting all dbt adapters <https://github.com/dbt-labs/dbt-fusion/tree/main/crates/dbt-fusion-adapter/src/adapters>`_ (equivalent to Airflow providers) in Rust, starting from Snowflake.
 They are also changing the `licensing model <https://github.com/dbt-labs/dbt-fusion/blob/main/LICENSES.md>`_ to a hybrid Open-Source and commercial license. We're supporting dbt Fusion with a license-complaint integration. This integration enables teams to:
- - Use dbt Fusion locally for enhanced development experience with real-time validation
- - Deploy dbt Fusion on Astro for production compliance with ELv2 licensing restrictions
- - Maintain consistent workflows across development and production environments
+
+- Use dbt Fusion locally for enhanced development experience with real-time validation
+- Deploy dbt Fusion on Astro for production compliance with ELv2 licensing restrictions
+- Maintain consistent workflows across development and production environments
 
 Some reported dbt Fusion features include:
  - **Lightning-fast performance:** Up to 30× faster parsing speeds
@@ -74,4 +75,5 @@ Limitations
 - Currently (23 June 2025) dbt Fusion is still in beta
 - dbt Fusion only supports Snowflake
 - Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``
+
 To support dbt Fusion, Cosmos modified its interaction with dbt. This works with the latest versions of dbt-core, but may not work with older versions. If you want to continue using dbt-core and was affected, set the environment variable ``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.

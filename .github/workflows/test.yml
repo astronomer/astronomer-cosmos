@@ -3,8 +3,11 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main]
-  pull_request_target: # Also run on pull requests originated from forks
-    branches: [main]
+  # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
+  # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
+  # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
+  pull_request_target:
+    branches: [main] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -125,7 +128,7 @@ jobs:
             dbt-version: "1.9"
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -204,7 +207,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -286,7 +289,7 @@ jobs:
         dbt-version: [ "1.5" ]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -356,7 +359,7 @@ jobs:
         dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -483,7 +486,7 @@ jobs:
         num-models: [1, 10, 50, 100, 500]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -568,7 +571,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Create KinD cluster
-        uses: container-tools/kind-action@v2
+        uses: container-tools/kind-action@0ad70e2299366b0e1552c7240f4e4567148f723e  # v2.0.4
 
       - name: Install packages and dependencies
         run: |
@@ -639,7 +642,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24  # v5.4.3
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

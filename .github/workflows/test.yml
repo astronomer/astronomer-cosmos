@@ -16,12 +16,16 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - run: true
 
   Type-Check:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,6 +42,8 @@ jobs:
   Run-Unit-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +110,8 @@ jobs:
   Run-Integration-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -196,6 +204,8 @@ jobs:
   Run-Integration-Tests-Expensive:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ["3.11"]
@@ -278,6 +288,8 @@ jobs:
   Run-Integration-Tests-DBT-1-5-4:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -348,6 +360,8 @@ jobs:
   Run-Integration-Tests-DBT-Async:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -418,6 +432,8 @@ jobs:
   Run-Integration-dbt-fusion-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -474,6 +490,8 @@ jobs:
   Run-Performance-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -545,6 +563,8 @@ jobs:
   Run-Kubernetes-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -618,6 +638,8 @@ jobs:
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:

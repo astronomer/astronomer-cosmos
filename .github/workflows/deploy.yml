@@ -8,6 +8,8 @@ jobs:
   build:
     name: Build wheels and source distribution
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +36,7 @@ jobs:
       url: https://pypi.org/p/astronomer-cosmos
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      contents: read
     steps:
       # retrieve your distributions here
       - uses: actions/download-artifact@v4

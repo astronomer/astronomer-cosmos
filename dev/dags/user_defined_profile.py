@@ -9,7 +9,8 @@ from pathlib import Path
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 
-from cosmos import DbtTaskGroup, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtShowLocalOperator, DbtTaskGroup, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.io import log_to_xcom
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -45,6 +46,21 @@ with DAG(
         default_args={"retries": 0},
     )
 
+    show_dbt = DbtShowLocalOperator(
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=PROFILES_FILE_PATH,
+        ),
+        project_dir=DBT_ROOT_PATH / "jaffle_shop",
+        task_id="show_dbt",
+        callback=log_to_xcom,
+        inline="{{ var.value.COSMOS__DBT_SHOW_LOCAL_INLINE_QUERY }}",
+        install_deps=True,
+        append_env=True,
+        quiet=True,
+    )
+
     post_dbt = EmptyOperator(task_id="post_dbt")
 
-    pre_dbt >> jaffle_shop >> post_dbt
+    pre_dbt >> jaffle_shop >> show_dbt >> post_dbt

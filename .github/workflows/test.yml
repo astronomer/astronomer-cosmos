@@ -497,9 +497,9 @@ jobs:
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -507,6 +507,22 @@ jobs:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
           include-hidden-files: true
+
+      - name: Clean up Snowflake resources
+        if: always()
+        run: |
+         pip install snowflake-connector-python
+         # Trigger a python script to delete the resources
+         python scripts/ci_dbtf_delete_snowflake_resources.py
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+
 
   Run-Performance-Tests:
     needs: Authorize

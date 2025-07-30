@@ -165,13 +165,13 @@ Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-ti
                 "{% if params.EVENT_TIME_END %}--event-time-end{% endif %}",
                 "{% if params.EVENT_TIME_END %}{{ params.EVENT_TIME_END }}{% endif %}",
                 "--select",
-                "{{ params.MODEL_NAME if params.MODEL_NAME else 'default_model' }}",
+                "{{ params.MODEL_NAME }}",
             ]
         },
         params={
             "EVENT_TIME_START": Param(default=None, type=["null", "string"]),
             "EVENT_TIME_END": Param(default=None, type=["null", "string"]),
-            "MODEL_NAME": Param(default="stg_funnel_events", type="string"),
+            "MODEL_NAME": Param(default=None, type=["null", "string"]),
         },
     )
 

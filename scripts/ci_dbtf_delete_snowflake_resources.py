@@ -24,7 +24,7 @@ def delete_snowflake_resource():
         WHERE table_schema = %s
         AND table_name LIKE %s
         """
-        cursor.execute(query, (os.environ['SNOWFLAKE_SCHEMA'], f"{prefix}_%"))
+        cursor.execute(query, (os.environ["SNOWFLAKE_SCHEMA"], f"{prefix}_%"))
         resources = cursor.fetchall()
 
         for resource_name, resource_type in resources:

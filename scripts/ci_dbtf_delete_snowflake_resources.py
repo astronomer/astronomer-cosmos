@@ -1,4 +1,5 @@
 import os
+import re
 
 import snowflake.connector
 
@@ -18,6 +19,7 @@ def delete_snowflake_resource():
     prefix = os.getenv("RESOURCE_PREFIX", "")
     if prefix:
         cursor = conn.cursor()
+        # Use parameterized query for the SELECT (safe for values)
         query = """
         SELECT table_name, table_type
         FROM information_schema.tables
@@ -28,14 +30,28 @@ def delete_snowflake_resource():
         resources = cursor.fetchall()
 
         for resource_name, resource_type in resources:
-            if resource_type == "BASE TABLE":
-                cursor.execute("DROP TABLE IF EXISTS %s", (resource_name,))
-            elif resource_type == "VIEW":
-                cursor.execute("DROP VIEW IF EXISTS %s", (resource_name,))
+            # Validate table name contains only safe characters (prevent injection)
+            if not re.match(r"^[A-Z0-9_]+$", resource_name):
+                print(f"Skipping potentially unsafe table name: {resource_name}")
+                continue
+
+            try:
+                if resource_type == "BASE TABLE":
+                    # Table names must be part of SQL string, not parameterized
+                    drop_sql = f"DROP TABLE IF EXISTS {resource_name}"
+                    print(f"Executing: {drop_sql}")
+                    cursor.execute(drop_sql)
+                elif resource_type == "VIEW":
+                    drop_sql = f"DROP VIEW IF EXISTS {resource_name}"
+                    print(f"Executing: {drop_sql}")
+                    cursor.execute(drop_sql)
+            except Exception as e:
+                print(f"Failed to drop {resource_name}: {e}")
+
         cursor.close()
-        print(f"Deleted {len(resources)} resources")
+        print(f"Processed {len(resources)} resources")
     else:
-        print("No resources to delete")
+        print("No RESOURCE_PREFIX set, skipping cleanup")
     conn.close()
 
 

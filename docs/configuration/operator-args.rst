@@ -147,7 +147,7 @@ The following operator args support templating, and are accessible both through 
 - ``env``
 - ``vars``
 - ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
-- ``dbt_cmd_flags`` (since Cosmos 1.x)
+- ``dbt_cmd_flags``
 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
@@ -160,7 +160,6 @@ Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-ti
         # ... other parameters
         operator_args={
             "dbt_cmd_flags": [
-                "--warn-error",
                 "{% if params.EVENT_TIME_START %}--event-time-start{% endif %}",
                 "{% if params.EVENT_TIME_START %}{{ params.EVENT_TIME_START }}{% endif %}",
                 "{% if params.EVENT_TIME_END %}--event-time-end{% endif %}",

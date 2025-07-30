@@ -147,9 +147,34 @@ The following operator args support templating, and are accessible both through 
 - ``env``
 - ``vars``
 - ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
+- ``dbt_cmd_flags`` (since Cosmos 1.x)
 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+
+Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-time ranges:
+
+.. code-block:: python
+
+    DbtDag(
+        # ... other parameters
+        operator_args={
+            "dbt_cmd_flags": [
+                "--warn-error",
+                "{% if params.EVENT_TIME_START %}--event-time-start{% endif %}",
+                "{% if params.EVENT_TIME_START %}{{ params.EVENT_TIME_START }}{% endif %}",
+                "{% if params.EVENT_TIME_END %}--event-time-end{% endif %}",
+                "{% if params.EVENT_TIME_END %}{{ params.EVENT_TIME_END }}{% endif %}",
+                "--select",
+                "{{ params.MODEL_NAME if params.MODEL_NAME else 'default_model' }}",
+            ]
+        },
+        params={
+            "EVENT_TIME_START": Param(default=None, type=["null", "string"]),
+            "EVENT_TIME_END": Param(default=None, type=["null", "string"]),
+            "MODEL_NAME": Param(default="stg_funnel_events", type="string"),
+        }
+    )
 
 The following template fields are only selectable when using the operators in a standalone context (starting in Cosmos 1.4):
 

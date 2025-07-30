@@ -482,7 +482,7 @@ jobs:
           PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
           AIRFLOW_VER=$(echo "${{ matrix.airflow-version }}" | tr -d '.')
           DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.')
-          echo "RESOURCE_PREFIX=COSMOS_${{ github.run_id }}_Py${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}" >> $GITHUB_ENV
+          echo "RESOURCE_PREFIX=COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}" >> $GITHUB_ENV
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |

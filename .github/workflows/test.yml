@@ -477,6 +477,13 @@ jobs:
           uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Set RESOURCE_PREFIX without periods
+        run: |
+          PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
+          AIRFLOW_VER=$(echo "${{ matrix.airflow-version }}" | tr -d '.')
+          DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.')
+          echo "RESOURCE_PREFIX=COSMOS_${{ github.run_id }}_Py${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}" >> $GITHUB_ENV
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf-setup
@@ -489,7 +496,8 @@ jobs:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_SCHEMA: COSMOS_${{ github.event.pull_request.number || github.run_id }}_Py${{ matrix.python-version }}_AF${{ matrix.airflow-version }}_DBT${{ matrix.dbt-version }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
 

@@ -18,21 +18,20 @@ def delete_snowflake_resource():
     prefix = os.getenv("RESOURCE_PREFIX", "")
     if prefix:
         cursor = conn.cursor()
-        query = f"""
+        query = """
         SELECT table_name, table_type
         FROM information_schema.tables
-        WHERE table_schema = '{os.environ['SNOWFLAKE_SCHEMA']}'
-        AND table_name LIKE '{prefix}_%'
+        WHERE table_schema = %s
+        AND table_name LIKE %s
         """
-        print(query)
-        cursor.execute(query)
+        cursor.execute(query, (os.environ['SNOWFLAKE_SCHEMA'], f"{prefix}_%"))
         resources = cursor.fetchall()
 
         for resource_name, resource_type in resources:
             if resource_type == "BASE TABLE":
-                cursor.execute(f"DROP TABLE IF EXISTS {resource_name}")
+                cursor.execute("DROP TABLE IF EXISTS %s", (resource_name,))
             elif resource_type == "VIEW":
-                cursor.execute(f"DROP VIEW IF EXISTS {resource_name}")
+                cursor.execute("DROP VIEW IF EXISTS %s", (resource_name,))
         cursor.close()
         print(f"Deleted {len(resources)} resources")
     else:

@@ -1132,15 +1132,48 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     [
         (
             DbtSeedLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags", "compiled_sql", "freshness", "full_refresh"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "full_refresh",
+            ),
         ),
         (
             DbtRunLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags", "compiled_sql", "freshness", "full_refresh"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "full_refresh",
+            ),
         ),
         (
             DbtBuildLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags", "compiled_sql", "freshness", "full_refresh"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "full_refresh",
+            ),
         ),
         (
             DbtSourceLocalOperator,
@@ -1957,11 +1990,12 @@ def test_override_rtif_airflow3_with_should_store_compiled_sql_false():
 
 def test_dbt_cmd_flags_templating():
     """Test that dbt_cmd_flags supports Jinja templating."""
-    from airflow import DAG
     from datetime import datetime
-    
+
+    from airflow import DAG
+
     dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
-    
+
     operator = DbtRunLocalOperator(
         task_id="test_templating",
         project_dir="my/dir",
@@ -1977,43 +2011,40 @@ def test_dbt_cmd_flags_templating():
         ],
         dag=dag,
     )
-    
+
     # Test with parameters
     context = {
-        "params": {
-            "event_time_start": "2024-01-01", 
-            "event_time_end": "2024-01-31",
-            "model_name": "stg_funnel_events"
-        }
+        "params": {"event_time_start": "2024-01-01", "event_time_end": "2024-01-31", "model_name": "stg_funnel_events"}
     }
-    
+
     # Render templates
     operator.render_template_fields(context)
-    
+
     # Verify the flags were templated correctly
     expected_flags = [
         "--warn-error",
         "--event-time-start",
-        "2024-01-01", 
+        "2024-01-01",
         "--event-time-end",
         "2024-01-31",
         "--select",
-        "stg_funnel_events"
+        "stg_funnel_events",
     ]
-    
+
     assert operator.dbt_cmd_flags == expected_flags
 
 
 def test_dbt_cmd_flags_empty_template():
     """Test that empty template results are filtered out."""
-    from airflow import DAG
     from datetime import datetime
-    
+
+    from airflow import DAG
+
     dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
-    
+
     operator = DbtRunLocalOperator(
         task_id="test_empty",
-        project_dir="my/dir", 
+        project_dir="my/dir",
         profile_config=profile_config,
         dbt_cmd_flags=[
             "--warn-error",
@@ -2024,15 +2055,15 @@ def test_dbt_cmd_flags_empty_template():
         ],
         dag=dag,
     )
-    
+
     context = {"params": {"model_name": "test_model"}}  # No missing_param
-    
+
     # Render templates
     operator.render_template_fields(context)
-    
+
     # Build command to test filtering
     dbt_cmd, _ = operator.build_cmd(context, [])
-    
+
     # Verify empty flags are filtered out and only non-empty flags remain
     # The command should contain the non-empty flags but not the empty ones
     cmd_str = " ".join(dbt_cmd)
@@ -2044,11 +2075,12 @@ def test_dbt_cmd_flags_empty_template():
 
 def test_dbt_cmd_flags_mixed_static_and_templated():
     """Test that dbt_cmd_flags works with a mix of static and templated values."""
-    from airflow import DAG
     from datetime import datetime
-    
+
+    from airflow import DAG
+
     dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
-    
+
     operator = DbtRunLocalOperator(
         task_id="test_mixed",
         project_dir="my/dir",
@@ -2063,36 +2095,25 @@ def test_dbt_cmd_flags_mixed_static_and_templated():
         ],
         dag=dag,
     )
-    
-    context = {
-        "params": {
-            "model_name": "my_model",
-            "use_cache": True
-        }
-    }
-    
+
+    context = {"params": {"model_name": "my_model", "use_cache": True}}
+
     # Render templates
     operator.render_template_fields(context)
-    
-    expected_flags = [
-        "--full-refresh",
-        "--select", 
-        "my_model",
-        "--cache",
-        "--threads",
-        "4"
-    ]
-    
+
+    expected_flags = ["--full-refresh", "--select", "my_model", "--cache", "--threads", "4"]
+
     assert operator.dbt_cmd_flags == expected_flags
 
 
 def test_dbt_cmd_flags_all_templated():
     """Test that dbt_cmd_flags works when all values are templated."""
-    from airflow import DAG
     from datetime import datetime
-    
+
+    from airflow import DAG
+
     dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
-    
+
     operator = DbtRunLocalOperator(
         task_id="test_all_templated",
         project_dir="my/dir",
@@ -2105,24 +2126,12 @@ def test_dbt_cmd_flags_all_templated():
         ],
         dag=dag,
     )
-    
-    context = {
-        "params": {
-            "flag1": "--select",
-            "flag2": "--exclude", 
-            "value1": "model1",
-            "value2": "model2"
-        }
-    }
-    
+
+    context = {"params": {"flag1": "--select", "flag2": "--exclude", "value1": "model1", "value2": "model2"}}
+
     # Render templates
     operator.render_template_fields(context)
-    
-    expected_flags = [
-        "--select",
-        "--exclude",
-        "model1", 
-        "model2"
-    ]
-    
+
+    expected_flags = ["--select", "--exclude", "model1", "model2"]
+
     assert operator.dbt_cmd_flags == expected_flags

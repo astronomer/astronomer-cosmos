@@ -173,7 +173,7 @@ Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-ti
             "EVENT_TIME_START": Param(default=None, type=["null", "string"]),
             "EVENT_TIME_END": Param(default=None, type=["null", "string"]),
             "MODEL_NAME": Param(default="stg_funnel_events", type="string"),
-        }
+        },
     )
 
 The following template fields are only selectable when using the operators in a standalone context (starting in Cosmos 1.4):

@@ -1,7 +1,7 @@
 {{ config( materialized = "table" ) }}
- 
+
 -- TO DO: remove if-statement
- 
+
 {% set tbl = ref('data_nullcheck_table') %}
 
 

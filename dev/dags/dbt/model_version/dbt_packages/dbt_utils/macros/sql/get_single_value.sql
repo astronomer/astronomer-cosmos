@@ -21,11 +21,11 @@
         {% else %}
             {% set sql_result = r[0] %}
         {% endif %}
-        
+
     {%- else -%}
-    
+
         {% set sql_result = default %}
-    
+
     {%- endif -%}
 
     {% do return(sql_result) %}

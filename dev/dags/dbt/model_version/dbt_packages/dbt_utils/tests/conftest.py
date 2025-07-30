@@ -1,5 +1,6 @@
-import pytest
 import os
+
+import pytest
 
 pytest_plugins = ["dbt.tests.fixtures.project"]
 
@@ -40,22 +41,22 @@ def dbt_profile_target(request):
 def postgres_target():
     return {
         "type": "postgres",
-        "host": os.getenv('POSTGRES_TEST_HOST'),
-        "user": os.getenv('POSTGRES_TEST_USER'),
-        "pass": os.getenv('POSTGRES_TEST_PASS'),
-        "port": int(os.getenv('POSTGRES_TEST_PORT')),
-        "dbname": os.getenv('POSTGRES_TEST_DBNAME'),
+        "host": os.getenv("POSTGRES_TEST_HOST"),
+        "user": os.getenv("POSTGRES_TEST_USER"),
+        "pass": os.getenv("POSTGRES_TEST_PASS"),
+        "port": int(os.getenv("POSTGRES_TEST_PORT")),
+        "dbname": os.getenv("POSTGRES_TEST_DBNAME"),
     }
 
 
 def redshift_target():
     return {
         "type": "redshift",
-        "host": os.getenv('REDSHIFT_TEST_HOST'),
-        "user": os.getenv('REDSHIFT_TEST_USER'),
-        "pass": os.getenv('REDSHIFT_TEST_PASS'),
-        "port": int(os.getenv('REDSHIFT_TEST_PORT')),
-        "dbname": os.getenv('REDSHIFT_TEST_DBNAME'),
+        "host": os.getenv("REDSHIFT_TEST_HOST"),
+        "user": os.getenv("REDSHIFT_TEST_USER"),
+        "pass": os.getenv("REDSHIFT_TEST_PASS"),
+        "port": int(os.getenv("REDSHIFT_TEST_PORT")),
+        "dbname": os.getenv("REDSHIFT_TEST_DBNAME"),
     }
 
 
@@ -63,20 +64,20 @@ def bigquery_target():
     return {
         "type": "bigquery",
         "method": "service-account",
-        "keyfile": os.getenv('BIGQUERY_SERVICE_KEY_PATH'),
-        "project": os.getenv('BIGQUERY_TEST_DATABASE'),
+        "keyfile": os.getenv("BIGQUERY_SERVICE_KEY_PATH"),
+        "project": os.getenv("BIGQUERY_TEST_DATABASE"),
     }
 
 
 def snowflake_target():
     return {
         "type": "snowflake",
-        "account": os.getenv('SNOWFLAKE_TEST_ACCOUNT'),
-        "user": os.getenv('SNOWFLAKE_TEST_USER'),
-        "password": os.getenv('SNOWFLAKE_TEST_PASSWORD'),
-        "role": os.getenv('SNOWFLAKE_TEST_ROLE'),
-        "database": os.getenv('SNOWFLAKE_TEST_DATABASE'),
-        "warehouse": os.getenv('SNOWFLAKE_TEST_WAREHOUSE'),
+        "account": os.getenv("SNOWFLAKE_TEST_ACCOUNT"),
+        "user": os.getenv("SNOWFLAKE_TEST_USER"),
+        "password": os.getenv("SNOWFLAKE_TEST_PASSWORD"),
+        "role": os.getenv("SNOWFLAKE_TEST_ROLE"),
+        "database": os.getenv("SNOWFLAKE_TEST_DATABASE"),
+        "warehouse": os.getenv("SNOWFLAKE_TEST_WAREHOUSE"),
     }
 
 

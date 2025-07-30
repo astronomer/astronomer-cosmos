@@ -4,6 +4,6 @@ with comparisons as (
   select '{{ dbt_utils.slugify("0Hell0 world-hi") }}' as output, '_0hell0_world_hi' as expected
 )
 
-select * 
+select *
 from comparisons
 where output != expected

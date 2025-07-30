@@ -1,4 +1,4 @@
- 
+
 with data_safe_divide as (
 
     select * from {{ ref('data_safe_divide') }}
@@ -23,7 +23,7 @@ from data_safe_divide
 
 union all
 
-select 
+select
     {{ dbt_utils.safe_divide('numerator_1 * numerator_2', 'denominator') }} as actual,
     output as expected
 
@@ -31,7 +31,7 @@ from data_safe_divide_numerator_expressions
 
 union all
 
-select 
+select
     {{ dbt_utils.safe_divide('numerator', 'denominator_1 * denominator_2') }} as actual,
     output as expected
 

@@ -120,7 +120,7 @@ models:
       - assert_equal:
           actual: actual
           expected: expected
-  
+
   - name: test_safe_subtract
     tests:
       - assert_equal:
@@ -185,9 +185,9 @@ models:
           compare_model: ref('data_star_expected')
 
   - name: test_star_no_columns
-    columns: 
+    columns:
       - name: canary_column #If the no-columns state isn't hit, this table won't be queryable because there will be a missing comma
-        tests: 
+        tests:
           - not_null
 
   - name: test_generate_surrogate_key
@@ -213,7 +213,7 @@ models:
       - name: favorite_number
         tests:
           - dbt_utils.not_constant
-  
+
   - name: test_union_no_source_column
     tests:
       - expect_table_columns_to_match_set:

@@ -14,7 +14,7 @@ with expected as (
 ),
 
 actual as (
-     
+
         {% for val in column_values %}
             select {{ safe_cast("'" ~ val ~ "'", type_string()) }} as actual_column_value
             {% if not loop.last %}

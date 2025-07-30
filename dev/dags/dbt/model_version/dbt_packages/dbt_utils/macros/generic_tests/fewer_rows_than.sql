@@ -25,20 +25,20 @@
 
 with a as (
 
-    select 
+    select
       {{select_gb_cols}}
       1 as id_dbtutils_test_fewer_rows_than,
-      count(*) as count_our_model 
+      count(*) as count_our_model
     from {{ model }}
     {{ groupby_gb_cols }}
 
 ),
 b as (
 
-    select 
+    select
       {{select_gb_cols}}
       1 as id_dbtutils_test_fewer_rows_than,
-      count(*) as count_comparison_model 
+      count(*) as count_comparison_model
     from {{ compare_model }}
     {{ groupby_gb_cols }}
 
@@ -55,7 +55,7 @@ counts as (
         count_our_model,
         count_comparison_model
     from a
-    full join b on 
+    full join b on
     a.id_dbtutils_test_fewer_rows_than = b.id_dbtutils_test_fewer_rows_than
     {{ join_gb_cols }}
 

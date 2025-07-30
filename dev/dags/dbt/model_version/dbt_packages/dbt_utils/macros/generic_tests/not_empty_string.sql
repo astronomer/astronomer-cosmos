@@ -7,10 +7,10 @@
 {% macro default__test_not_empty_string(model, column_name, trim_whitespace=true) %}
 
     with
-    
+
     all_values as (
 
-        select 
+        select
 
 
             {% if trim_whitespace == true -%}
@@ -22,7 +22,7 @@
                 {{ column_name }}
 
             {%- endif %}
-            
+
         from {{ model }}
 
     ),

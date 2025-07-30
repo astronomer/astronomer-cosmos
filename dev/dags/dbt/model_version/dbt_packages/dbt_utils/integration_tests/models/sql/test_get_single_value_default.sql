@@ -1,5 +1,5 @@
-{# 
-    Dear future reader, 
+{#
+    Dear future reader,
     Before you go restructuring the delicate web of casts and quotes below, a warning:
     I once thought as you are thinking. Proceed with caution.
 #}
@@ -18,11 +18,11 @@ with default_data as (
         123456 as int_expected,
         {{ dbt_utils.get_single_value(false_statement, 123456) }} as int_actual,
 
-        cast({{ dbt.string_literal('fallback') }} as {{ dbt.type_string() }}) as string_expected,    
+        cast({{ dbt.string_literal('fallback') }} as {{ dbt.type_string() }}) as string_expected,
         cast({{ dbt.string_literal(dbt_utils.get_single_value(false_statement, 'fallback')) }} as {{ dbt.type_string() }}) as string_actual
 
     from {{ ref('data_get_single_value') }}
 )
 
-select * 
+select *
 from default_data

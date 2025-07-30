@@ -17,8 +17,8 @@
         {% if flags.WHICH == 'compile' %}
             {% set response %}
 *
-/* No columns were returned. Maybe the relation doesn't exist yet 
-or all columns were excluded. This star is only output during  
+/* No columns were returned. Maybe the relation doesn't exist yet
+or all columns were excluded. This star is only output during
 dbt compile, and exists to keep SQLFluff happy. */
             {% endset %}
             {% do return(response) %}
@@ -37,4 +37,3 @@ dbt compile, and exists to keep SQLFluff happy. */
         {%- endfor -%}
     {% endif %}
 {%- endmacro %}
-

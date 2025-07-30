@@ -1,5 +1,5 @@
-select 
-    id, 
+select
+    id,
     favorite_number
-from 
+from
     {{ ref('test_union_where_base') }}

@@ -14,7 +14,7 @@
 
 with recency as (
 
-    select 
+    select
 
       {{ select_gb_cols }}
       {% if ignore_time_component %}

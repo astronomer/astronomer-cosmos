@@ -478,11 +478,13 @@ jobs:
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Set RESOURCE_PREFIX without periods
+        id: set-resource-prefix
         run: |
           PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
           AIRFLOW_VER=$(echo "${{ matrix.airflow-version }}" | tr -d '.')
           DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.')
-          echo "RESOURCE_PREFIX=COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}" >> $GITHUB_ENV
+          PREFIX="COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}"
+          echo "prefix=${PREFIX}" >> $GITHUB_OUTPUT
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
@@ -499,7 +501,7 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+          RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -521,7 +523,7 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+          RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
 
   Run-Performance-Tests:

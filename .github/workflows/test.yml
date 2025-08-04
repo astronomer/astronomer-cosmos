@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, enable_dbt-1.9-py-3.9-test]
   # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
@@ -139,10 +139,7 @@ jobs:
             dbt-version: "1.9"
           - python-version: "3.8"
             dbt-version: "1.10"
-          # To be fixed in https://github.com/astronomer/astronomer-cosmos/issues/1817
-          - python-version: "3.9"
-            airflow-version: "3.0"
-            dbt-version: "1.9"
+
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18

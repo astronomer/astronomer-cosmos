@@ -20,7 +20,7 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install pip --upgrade
 
-uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docker apache-airflow-providers-postgres openlineage-airflow --constraint /tmp/constraint.txt
+uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docker apache-airflow-providers-postgres --constraint /tmp/constraint.txt
 
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 uv pip install "gcsfs<2025.3.0"

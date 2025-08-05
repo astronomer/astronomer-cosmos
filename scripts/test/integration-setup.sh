@@ -31,6 +31,8 @@ fi
 
 uv pip install -U "dbt-core==$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica 'dbt-databricks' pyspark
 
+pip install  -U openlineage-airflow
+
 if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; then
   pip install  'dbt-duckdb' 'airflow-provider-duckdb>=0.2.0'
 fi

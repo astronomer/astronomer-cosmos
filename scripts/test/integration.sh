@@ -14,6 +14,7 @@ airflow db check
 
 rm -rf dbt/jaffle_shop/dbt_packages;
 pytest -vv \
+    tests/test_example_dags_no_connections.py \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \

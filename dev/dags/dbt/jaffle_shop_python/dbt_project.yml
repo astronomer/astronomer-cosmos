@@ -18,7 +18,3 @@ clean-targets:
     - "logs"
 
 require-dbt-version: [">=1.0.0", "<2.0.0"]
-
-catalogs:
-  unity:
-    file_format: delta

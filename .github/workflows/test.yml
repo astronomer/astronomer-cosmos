@@ -390,7 +390,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.11", "3.0" ]
-        dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
+        dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10"]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18

@@ -1,9 +1,5 @@
 jaffle_shop:
  outputs:
-   dev:
-     catalogs:
-       unity:
-         file_format: null
      host: "{{ env_var('DATABRICKS_HOST') }}"
      http_path: /sql/1.0/warehouses/{{ env_var('DATABRICKS_WAREHOUSE_ID') }}
      schema: cosmos

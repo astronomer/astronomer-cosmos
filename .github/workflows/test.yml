@@ -3,8 +3,11 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main]
-  pull_request_target: # Also run on pull requests originated from forks
-    branches: [main]
+  # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
+  # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
+  # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
+  pull_request_target:
+    branches: [main] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -135,7 +138,7 @@ jobs:
             dbt-version: "1.9"
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -217,7 +220,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -303,7 +306,7 @@ jobs:
         dbt-version: [ "1.5" ]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -377,7 +380,7 @@ jobs:
         dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -474,6 +477,15 @@ jobs:
           uv pip install --system hatch
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Set RESOURCE_PREFIX without periods
+        id: set-resource-prefix
+        run: |
+          PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
+          AIRFLOW_VER=$(echo "${{ matrix.airflow-version }}" | tr -d '.')
+          DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.')
+          PREFIX="COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}"
+          echo "prefix=${PREFIX}" >> $GITHUB_OUTPUT
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf-setup
@@ -489,6 +501,7 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -496,6 +509,22 @@ jobs:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
           include-hidden-files: true
+
+      - name: Clean up Snowflake resources
+        if: always()
+        run: |
+         pip install snowflake-connector-python
+         # Trigger a python script to delete the resources
+         python scripts/ci_dbtf_delete_snowflake_resources.py
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
+
 
   Run-Performance-Tests:
     needs: Authorize
@@ -511,7 +540,7 @@ jobs:
         num-models: [1, 10, 50, 100, 500]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -602,7 +631,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Create KinD cluster
-        uses: container-tools/kind-action@v2
+        uses: container-tools/kind-action@0ad70e2299366b0e1552c7240f4e4567148f723e  # v2.0.4
 
       - name: Install packages and dependencies
         run: |
@@ -677,7 +706,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24  # v5.4.3
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

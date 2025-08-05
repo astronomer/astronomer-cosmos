@@ -37,7 +37,8 @@ uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docke
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 uv pip install "gcsfs<2025.3.0"
 
-if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
+
+if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] ; then
   uv pip install "apache-airflow-providers-amazon" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
   uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
@@ -56,6 +57,7 @@ elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install  "apache-airflow-providers-google>10.11" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
+  uv pip install apache-airflow-providers-openlineage "apache-airflow==$AIRFLOW_VERSION"
 elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
@@ -67,6 +69,7 @@ elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
   # and skipping installation with constraints, as the specified version does not meet our requirements.
   uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install apache-airflow-providers-openlineage "apache-airflow==$AIRFLOW_VERSION"
 elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
@@ -79,11 +82,13 @@ elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
   # version does not meet our requirements.
   uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install apache-airflow-providers-openlineage "apache-airflow==$AIRFLOW_VERSION"
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
+  uv pip install apache-airflow-providers-openlineage "apache-airflow==$AIRFLOW_VERSION"
 fi
 
 

@@ -21,7 +21,8 @@ airflow db reset -y
 AIRFLOW_VERSION=$(airflow version)
 AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
 if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
-    uv pip install cadwyn!=5.4.0
+  # https://github.com/zmievsa/cadwyn/issues/283
+    uv pip install "cadwyn>=5.4.1"
     echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
     airflow db migrate
 else
@@ -29,9 +30,11 @@ else
     airflow db init
 fi
 
-uv pip install -U "dbt-core==$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica 'dbt-databricks' pyspark
-
-pip install  -U openlineage-airflow
+if [ "$DBT_VERSION" = "1.10" ]; then
+    uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica "dbt-databricks>=1.10.8" pyspark
+else
+    uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+fi
 
 if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; then
   pip install  'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" "apache-airflow==$AIRFLOW_VERSION"

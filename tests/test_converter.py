@@ -968,3 +968,147 @@ def test_converter_creates_model_with_pre_dbt_fusion(mock_load_dbt_graph):
     assert isinstance(converter.tasks_map, dict)
     assert converter.tasks_map["sample_model"].models == "sample.sample_model"
     assert converter.tasks_map["sample_model"].select is None
+
+
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_appended_to_empty_doc_md(mock_load_dbt_graph, mock_hash_func):
+    """Test that dbt project hash is appended to DAG doc_md when doc_md is initially empty."""
+    mock_hash_func.return_value = "abc123def456"
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+    assert dag.doc_md is None  # Initially empty
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    assert dag.doc_md == "dbt project hash: `abc123def456`"
+    mock_hash_func.assert_called_once()
+
+
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_appended_to_existing_doc_md(mock_load_dbt_graph, mock_hash_func):
+    """Test that dbt project hash is appended to existing DAG doc_md."""
+    mock_hash_func.return_value = "xyz789abc123"
+    existing_doc = "This is my existing DAG documentation.\n\nIt has multiple lines."
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1), doc_md=existing_doc)
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    expected_doc = existing_doc + "\n\n**dbt project hash:** `xyz789abc123`"
+    assert dag.doc_md == expected_doc
+    mock_hash_func.assert_called_once()
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_error_handling(mock_load_dbt_graph, mock_hash_func, mock_logger):
+    """Test that hash creation errors are properly handled and logged."""
+    mock_hash_func.side_effect = Exception("File system error")
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+    original_doc_md = dag.doc_md  # Should be None
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    # DAG doc_md should remain unchanged when error occurs
+    assert dag.doc_md == original_doc_md
+
+    # Error should be logged as warning
+    mock_logger.warning.assert_called_once()
+    warning_call = mock_logger.warning.call_args[0][0]
+    assert "Failed to append dbt project hash to DAG documentation" in warning_call
+    assert "File system error" in warning_call
+
+
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_with_special_characters(mock_load_dbt_graph, mock_hash_func):
+    """Test hash appending works correctly with special characters in existing doc_md."""
+    mock_hash_func.return_value = "hash_with_special_chars!@#$%"
+    existing_doc = "DAG with **markdown**, `code`, and [links](http://example.com)"
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1), doc_md=existing_doc)
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    expected_doc = existing_doc + "\n\n**dbt project hash:** `hash_with_special_chars!@#$%`"
+    assert dag.doc_md == expected_doc
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, mock_logger):
+    """Test that successful hash appending is logged at debug level."""
+    mock_hash_func.return_value = "test_hash_123"
+    dag = DAG("test_dag_logging", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    mock_logger.debug.assert_called_once_with(
+        "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation"
+    )

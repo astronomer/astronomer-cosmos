@@ -23,6 +23,7 @@ from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
+from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 
@@ -286,6 +287,8 @@ class DbtToAirflowConverter:
         )
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
+        self._add_dbt_project_hash_to_dag_docs(dag)
+
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
@@ -336,3 +339,28 @@ class DbtToAirflowConverter:
         logger.info(
             f"Cosmos performance ({cache_identifier}) - [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG."
         )
+
+    def _add_dbt_project_hash_to_dag_docs(self, dag: DAG | None) -> None:
+        """
+        Add dbt project content hash to DAG documentation for Airflow 3 dag versioning support.
+
+        This enables Airflow 3's automatic DAG versioning to detect when dbt project
+        files change, ensuring proper DAG version updates.
+
+        :param dag: The Airflow DAG to add versioning information to. If None, no action is taken.
+        """
+        if dag is None:
+            return
+
+        try:
+            dbt_project_hash = _create_folder_version_hash(self.dbt_graph.project_path)
+            hash_suffix = f"\n\n**dbt project hash:** `{dbt_project_hash}`"
+
+            if dag.doc_md:
+                dag.doc_md += hash_suffix
+            else:
+                dag.doc_md = f"dbt project hash: `{dbt_project_hash}`"
+
+            logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
+        except Exception as e:
+            logger.warning(f"Failed to append dbt project hash to DAG documentation: {e}")

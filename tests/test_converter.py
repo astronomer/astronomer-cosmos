@@ -993,7 +993,7 @@ def test_dag_versioning_hash_appended_to_empty_doc_md(mock_load_dbt_graph, mock_
         execution_config=execution_config,
     )
 
-    assert dag.doc_md == "dbt project hash: `abc123def456`"
+    assert dag.doc_md == "**dbt project hash:** `abc123def456`"
     mock_hash_func.assert_called_once()
 
 

@@ -42,6 +42,7 @@ from cosmos.settings import (
     remote_cache_dir_conn_id,
 )
 from cosmos.settings import remote_cache_dir as settings_remote_cache_dir
+from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
@@ -52,7 +53,7 @@ def _configure_remote_cache_dir() -> Path | None:
     if not settings_remote_cache_dir:
         return None
 
-    _configured_cache_dir = None
+    _configured_cache_dir: Path | None = None
 
     cache_dir_str = str(settings_remote_cache_dir)
 
@@ -265,37 +266,6 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     if source_manifest_filepath.exists():
         shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
-
-
-def _create_folder_version_hash(dir_path: Path) -> str:
-    """
-    Given a directory, iterate through its content and create a hash that will change in case the
-    contents of the directory change. The value should not change if the values of the directory do not change, even if
-    the command is run from different Airflow instances.
-
-    This method output must be concise and it currently changes based on operating system.
-    """
-    # This approach is less efficient than using modified time
-    # sum([path.stat().st_mtime for path in dir_path.glob("**/*")])
-    # unfortunately, the modified time approach does not work well for dag-only deployments
-    # where DAGs are constantly synced to the deployed Airflow
-    # for 5k files, this seems to take 0.14
-    hasher = hashlib.md5()
-    filepaths = []
-
-    for root_dir, dirs, files in os.walk(dir_path):
-        paths = [os.path.join(root_dir, filepath) for filepath in files]
-        filepaths.extend(paths)
-
-    for filepath in sorted(filepaths):
-        try:
-            with open(str(filepath), "rb") as fp:
-                buf = fp.read()
-                hasher.update(buf)
-        except FileNotFoundError:
-            logger.warning(f"The dbt project folder contains a symbolic link to a non-existent file: {filepath}")
-
-    return hasher.hexdigest()
 
 
 def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:

@@ -359,7 +359,7 @@ class DbtToAirflowConverter:
             if dag.doc_md:
                 dag.doc_md += hash_suffix
             else:
-                dag.doc_md = f"dbt project hash: `{dbt_project_hash}`"
+                dag.doc_md = f"**dbt project hash:** `{dbt_project_hash}`"
 
             logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
         except Exception as e:

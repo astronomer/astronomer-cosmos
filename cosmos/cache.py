@@ -122,7 +122,7 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     task_group_id = metadata.get("task_group_id")
 
     if dag_id:
-        cache_identifiers_list.append(dag_id)
+        cache_identifiers_list.append(dag_id.replace(".", "___"))
     if task_group_id:
         cache_identifiers_list.append(task_group_id.replace(".", "__"))
 

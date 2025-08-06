@@ -1,3 +1,5 @@
+.. _aws-container-run-job:
+
 .. title:: Getting Started with Astronomer Cosmos on AWS ECS
 
 Getting Started with Astronomer Cosmos on AWS ECS

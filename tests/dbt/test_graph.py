@@ -1041,6 +1041,31 @@ def test_load_via_load_via_custom_parser(project_name, nodes_count):
     assert len(dbt_graph.nodes) == nodes_count
 
 
+@pytest.mark.parametrize("project_name", [("altered_jaffle_shop"), ("jaffle_shop_python")])
+def test_validate_load_via_load_via_custom_parser_deprecated(project_name):
+    """Deprecating warnings should be raised when using load_mode CUSTOM."""
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+    render_config = RenderConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    with pytest.deprecated_call():
+        dbt_graph.load_via_custom_parser()
+
+
 def test_load_via_load_via_custom_parser_select_rendering_config():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "jaffle_shop")
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -1883,9 +1908,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("c2c47529eaec412281bdb243a479b734", "efabb6a9130840317ded8d2c05caaea4")
+        assert hash_dir in ("c2c47529eaec412281bdb243a479b734", "71bbf303ad4e06a7b1e2be20e0b73c0d")
     else:
-        assert hash_dir == "efabb6a9130840317ded8d2c05caaea4"
+        assert hash_dir == "71bbf303ad4e06a7b1e2be20e0b73c0d"
 
 
 @pytest.mark.integration

@@ -29,7 +29,11 @@ else
     airflow db init
 fi
 
-uv pip install -U "dbt-core==$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica 'dbt-databricks' pyspark
+if [ "$DBT_VERSION" = "1.10" ]; then
+    uv pip install -U "dbt-core==$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica "dbt-databricks>=1.10.8" pyspark
+else
+    uv pip install -U "dbt-core==$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+fi
 
 pip install  -U openlineage-airflow
 

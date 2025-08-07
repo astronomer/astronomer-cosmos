@@ -139,10 +139,6 @@ jobs:
             dbt-version: "1.9"
           - python-version: "3.8"
             dbt-version: "1.10"
-          # To be fixed in https://github.com/astronomer/astronomer-cosmos/issues/1817
-          - python-version: "3.9"
-            airflow-version: "3.0"
-            dbt-version: "1.9"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18

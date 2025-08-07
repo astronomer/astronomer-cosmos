@@ -2,7 +2,7 @@ import json
 from unittest.mock import patch
 
 import pytest
-from airflow.models import Connection
+from airflow.models.connection import Connection
 
 
 @pytest.fixture()

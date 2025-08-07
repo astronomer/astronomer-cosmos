@@ -158,8 +158,7 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "methodtools",
-    "cadwyn!=4.14.0"
+    "methodtools"
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

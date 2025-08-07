@@ -31,7 +31,8 @@ else
 fi
 
 if [ "$DBT_VERSION" = "1.10" ]; then
-    uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica "dbt-databricks>=1.10.8" pyspark
+    # The package dbt-databricks version 1.10.8 has been yanked from PyPI: https://pypi.org/project/dbt-databricks/1.10.8/
+    uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica "dbt-databricks!=1.10.8" pyspark
 else
     uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
 fi

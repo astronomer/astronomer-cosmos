@@ -30,11 +30,7 @@ else
     airflow db init
 fi
 
-if [ "$DBT_VERSION" = "1.10" ]; then
-    uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica "dbt-databricks>=1.10.8" pyspark
-else
-    uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
-fi
+uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
 
 if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; then
   pip install  'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" "apache-airflow==$AIRFLOW_VERSION"

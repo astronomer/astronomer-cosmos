@@ -61,6 +61,7 @@ def skip_on_empty_operator(test_func):
     )(test_func)
 
 
+@skip_on_empty_operator
 def test_overrides_missing():
     """
     The overrides parameter needed to pass the dbt command was added in apache-airflow-providers-google==10.11.0.

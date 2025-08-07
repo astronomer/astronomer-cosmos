@@ -47,13 +47,13 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFL
 elif [ "$AIRFLOW_VERSION" = "2.6" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install  "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
   uv pip install "pydantic<2.0"
 elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install  "apache-airflow-providers-google>10.11" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
 elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt

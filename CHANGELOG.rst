@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.10.2 (2025-08-07)
+1.10.2 (2025-08-08)
 ---------------------
 
 Bug Fixes
@@ -10,7 +10,6 @@ Bug Fixes
 * Fix rendered template override logic when ``should_store_compiled_sql=False`` to restore pre-refactor behaviour by @pankajkoti in #1777
 * Fix ``ProfileConfig`` in GCP Cloud Run job execution mode by @ramonvermeulen in #1783
 * Fix dbt Docs page height by @1cadumagalhaes in #1793
-* Fix ``test_example_dags_no_connections`` tests by @pankajkoti in #1797
 * Add support to base64 encoded pem in Snowflake profiles by @brunocmartins in #1801
 * Allow to disable owner inheritance from dbt into airflow DAG owners by @CorsettiS in #1787
 * Fix Kubernetes Pod Operator conversion of ``container_resources`` to ``resources`` by @johnhoran in #1821
@@ -24,23 +23,20 @@ Documentation
 * Fix ``contributing.rst`` docs by @tatiana in #1785
 * Fix docs rendering in Airflow 3 Compatibility by @pankajastro in #1790
 * Fix typo in ``selecting-excluding.rst`` by @msshroff in #1814
-* Update testing behavior file with k8s exec mode by @LuigiCerone in #1813
+* Update testing behavior file with ``ExecutionMode.KUBERNETES`` by @LuigiCerone in #1813
 * Add step to fork repo in contributing guide by @pankajastro in #1808
 * Fix ``depends_on`` attribute by @benedikt-buchert in #1837
 * Fix character name by @ThePsyjo in #1860
-* Fix docs rendering in Airflow 3 Compatibility by @pankajastro in #1883
 * Update suggested MWAA startup script by @jaklan in #1884
-* Fix docs rendering in Airflow 3 Compatibility by @pankajastro in #1883
 * Make implementation & docs consistent regarding ``use_dataset_airflow3_uri_standard`` by @Anti0ff in #1878
 
 Others
 
 * Set retries to 0 in example DAGs by @pankajkoti in #1782
 * Fix ``test_async_example_dag_without_setup_task`` tests by @pankajastro in #1788
-???? * Add ``.airflowignore`` to ignore files in CI by @pankajkoti in #1796
 * Fix test hash value for Darwin when using Py 3.12.10 by @tatiana in #1786
 * Upgrade Python and Airflow used to run MyPy checks by @tatiana in #1796
-* Assert example DAGs' ``DagRunState`` and fix issues by @pankajkoti in #1778
+* Assert example DAGs' ``DagRunState`` and fix issues by @pankajkoti and @tatiana in #1778
 * Update the conflict matrix to include AF 2.10, 2.11 & 3.0 and dbt 1.9 & 1.10 by @tatiana in #1820
 * Fix broken CI due to Pydantic conflicts by @tatiana in #1809
 * Drop Python 3.8 Support by @pankajastro in #1852
@@ -51,8 +47,7 @@ Others
 * Remove commented code and fix mypy failures by @pankajkoti in #1876
 * Add Zizmor analysis GitHub action by @pankajkoti in #1870
 * Catch FlushError on Datasets for Airflow 2.11 dags test by @pankajkoti in #1880
-* Add deprecation warning for LoadMode.CUSTOM parser by @duongphannamhung in #1885
-* Fix docs rendering in Airflow 3 Compatibility by @pankajastro in #1883
+* Add deprecation warning for ``LoadMode.CUSTOM`` parser by @duongphannamhung in #1885
 * CI: Add GitHub CodeQL analysis workflow (codeql.yml) by @pankajkoti in #1871
 * Resolve 'credential persistence through GitHub Actions artifacts' warnings from Zizmor by @pankajkoti in #1890
 * Resolve 'overly broad permissions' warnings from Zizmor by @pankajkoti in #1889
@@ -60,7 +55,8 @@ Others
 * Fix broken CI ``tests.py3.11-2.8-1.9:test-integration-setup`` by @tatiana in #1902
 * Add dbt-core 1.10 to test matrix by @tatiana in #1767
 * Pin package dbt-databricks by @pankajastro in #1909
-* Pre-commit updates: #1779, #1795, #1800, #1857, #1863, #1869, #1873, #1877, #1878, #1880, #1882, #1887, #1892, #1903, #1901, #1905, #1909
+* Enable matrix test entry for dbt-1.9, python-3.9 and airflow-3.0 tests in CI by @pankajastro in #1900
+* Pre-commit updates: #1779, #1795, #1800, #1857, #1863, #1869, #1882, #1892, #1901
 * Dependabot updates: #1904
 
 

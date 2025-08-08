@@ -32,6 +32,9 @@ def upload_to_aws_s3(
     hook = S3Hook(aws_conn_id=aws_conn_id)
     context = kwargs["context"]
 
+    # Airflow 3 and Airflow 2 compatibility, respectively:
+    try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
+
     # Iterate over the files in the target dir and upload them to S3
     for dirpath, _, filenames in os.walk(target_dir):
         for filename in filenames:
@@ -39,7 +42,7 @@ def upload_to_aws_s3(
                 f"{context['dag'].dag_id}"
                 f"/{context['run_id']}"
                 f"/{context['task_instance'].task_id}"
-                f"/{context['task_instance']._try_number}"
+                f"/{try_number}"
                 f"{dirpath.split(project_dir)[-1]}/{filename}"
             )
             hook.load_file(
@@ -183,7 +186,7 @@ def _construct_dest_file_path(
         f"{context['dag'].dag_id}"
         f"/{context['run_id']}"
         f"/{context['task_instance'].task_id}"
-        f"/{context['task_instance']._try_number}"
+        f"/{context['task_instance'].try_number}"
     )
     rel_path = os.path.relpath(file_path, source_target_dir).lstrip("/")
 

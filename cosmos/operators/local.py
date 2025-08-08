@@ -25,7 +25,7 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 from airflow.version import version as airflow_version
-from attr import define
+from attrs import define
 from packaging.version import Version
 
 from cosmos import cache, settings
@@ -298,6 +298,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             target_path_schema = urlparse(target_path_str).scheme
             remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
         if remote_conn_id is None:
+            logger.info(
+                "Remote target connection not set. Please, configure [cosmos][remote_target_path_conn_id] or set the environment variable AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID"
+            )
             return None, None
 
         if not settings.AIRFLOW_IO_AVAILABLE:
@@ -389,6 +392,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.freshness = ""
 
     def _override_rtif(self, context: Context) -> None:
+        if not self.should_store_compiled_sql:
+            return
+
         if AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION:
             self.overwrite_rtif_after_execution = True
             return
@@ -497,13 +503,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.profile_config.target_name,
         ]
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
-            # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
-            # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
-            # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
-            # directories, and the use of different temp paths between parsing and execution appears to interfere
-            # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
-            # hangs and ensures reliable task execution.
-            dbt_flags.append("--no-static-parser")
+            from dbt.version import __version__ as dbt_version
+
+            if Version(dbt_version) >= Version("1.5.6"):
+                # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+                # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+                # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+                # directories, and the use of different temp paths between parsing and execution appears to interfere
+                # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+                # hangs and ensures reliable task execution.
+                dbt_flags.append("--no-static-parser")
         return dbt_flags
 
     def _install_dependencies(
@@ -611,7 +620,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
                 if self.install_deps:
-                    self._install_dependencies(tmp_dir_path, flags, env)
+                    self._install_dependencies(
+                        tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
+                    )
 
                 if run_as_async and not settings.enable_setup_async_task:
                     self._mock_dbt_adapter(async_context)

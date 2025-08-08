@@ -4,7 +4,7 @@ import inspect
 import re
 from abc import ABC
 from os import PathLike
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence
 
 import kubernetes.client as k8s
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
@@ -98,6 +98,10 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
                     pass
 
         AbstractDbtBase.__init__(self, **base_kwargs)
+
+        container_resources = operator_kwargs.get("container_resources")
+        if isinstance(container_resources, dict):
+            operator_kwargs["container_resources"] = k8s.V1ResourceRequirements(**container_resources)
         KubernetesPodOperator.__init__(self, **operator_kwargs)
 
     def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
@@ -185,6 +189,12 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
 
 
 class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
+    """
+    This handler can detect warnings from:
+    1. Regular dbt tests (using the standard "Done. PASS=X WARN=Y" pattern)
+    2. Source freshness tests (using "WARN freshness of..." pattern)
+    """
+
     def __init__(
         self,
         on_warning_callback: Callable[..., Any],
@@ -220,21 +230,112 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
             self.operator.log.warning(f"Cannot handle dbt warnings for task of type {type(task)}.")
             return
 
-        logs = [log.decode("utf-8") for log in task.pod_manager.read_pod_logs(pod, "base") if log.decode("utf-8") != ""]
+        # Get the logs from the pod
+        logs = []
+        for log in task.pod_manager.read_pod_logs(pod, "base"):
+            decoded_log = log.decode("utf-8")
+            if decoded_log != "":
+                logs.append(decoded_log)
 
-        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
-        warn_count = warn_count_pattern.search("\n".join(logs))
-        if not warn_count:
+        logs_text = "\n".join(logs)
+
+        # Check for warnings
+        warning_detected = False
+        if isinstance(task, DbtTestKubernetesOperator):
+            warn_count = self._detect_standard_warnings(logs_text)
+            if warn_count:
+                self.operator.log.info(f"Detected {warn_count} warnings using standard pattern")
+                warning_detected = True
+        elif isinstance(task, DbtSourceKubernetesOperator):
+            source_freshness_warnings = self._detect_source_freshness_warnings(logs_text)
+            if source_freshness_warnings:
+                self.operator.log.info(f"Detected {len(source_freshness_warnings)} source freshness warnings")
+                warning_detected = True
+
+        if not warning_detected:
             self.operator.log.warning(
                 "Failed to scrape warning count from the pod logs."
                 "Potential warning callbacks could not be triggered."
             )
             return
 
-        if int(warn_count.group(1)) > 0:
-            test_names, test_results = extract_log_issues(logs)
-            context_merge(self.context, test_names=test_names, test_results=test_results)
-            self.on_warning_callback(self.context)
+        test_names, test_results = extract_log_issues(logs)
+        context_merge(self.context, test_names=test_names, test_results=test_results)
+        self.on_warning_callback(self.context)
+
+    def _detect_standard_warnings(self, log_text: str) -> Optional[int]:
+        """
+        Detect warnings using the standard dbt summary pattern.
+
+        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W"
+
+        :param log_text: Complete log text from the pod
+        :return: Number of warnings detected, or None if pattern not found
+        """
+        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
+        match = warn_count_pattern.search(log_text)
+
+        if match:
+            return int(match.group(1))
+        return None
+
+    def _detect_source_freshness_warnings(self, log_text: str) -> List[Dict[str, Any]]:
+        """
+        Detect source freshness warnings from dbt logs.
+
+        Pattern examples:
+        - "15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ... [WARN in 0.90s]"
+        - "WARN freshness of source_name.table_name"
+
+        :param log_text: Complete log text from the pod
+        :return: List of warning dictionaries
+        """
+        warnings = []
+
+        # Primary pattern for source freshness warnings
+        # Matches: "HH:MM:SS X of Y WARN freshness of source.table ... [WARN in Xs]"
+        freshness_pattern = re.compile(
+            r"(\d{2}:\d{2}:\d{2})\s+"  # timestamp
+            r"\d+\s+of\s+\d+\s+"  # "X of Y"
+            r"WARN\s+freshness\s+of\s+"  # "WARN freshness of"
+            r"([^\s]+)"  # source name
+            r".*?\[WARN\s+in\s+([\d.]+)s\]"  # execution time
+        )
+
+        for match in freshness_pattern.finditer(log_text):
+            timestamp = match.group(1)
+            source_name = match.group(2)
+            execution_time = match.group(3)
+
+            warnings.append(
+                {
+                    "name": f"source_freshness_{source_name}",
+                    "status": "WARN",
+                    "type": "source_freshness",
+                    "source": source_name,
+                    "timestamp": timestamp,
+                    "execution_time": execution_time,
+                }
+            )
+
+        # Secondary pattern for simpler source freshness warnings
+        # Matches: "WARN freshness of source_name"
+        simple_freshness_pattern = re.compile(r"WARN\s+freshness\s+of\s+([^\s]+)")
+
+        for match in simple_freshness_pattern.finditer(log_text):
+            source_name = match.group(1)
+            # Only add if not already captured by primary pattern
+            if not any(w["source"] == source_name for w in warnings):
+                warnings.append(
+                    {
+                        "name": f"source_freshness_{source_name}",
+                        "status": "WARN",
+                        "type": "source_freshness",
+                        "source": source_name,
+                    }
+                )
+
+        return warnings
 
 
 class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):

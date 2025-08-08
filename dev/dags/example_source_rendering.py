@@ -41,7 +41,7 @@ source_rendering_dag = DbtDag(
     start_date=datetime(2024, 1, 1),
     catchup=False,
     dag_id="source_rendering_dag",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
     on_warning_callback=lambda context: print(context),
 )
 # [END cosmos_source_node_example]

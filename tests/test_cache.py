@@ -51,6 +51,8 @@ from cosmos.settings import AIRFLOW_IO_AVAILABLE, dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
+example_dag_with_dots = DAG("dag.with.dots", start_date=START_DATE)
+
 SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.msgpack"
 
 
@@ -58,6 +60,7 @@ SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.ms
     "dag, task_group, result_identifier",
     [
         (example_dag, None, "dag"),
+        (example_dag_with_dots, None, "dag___with___dots"),
         (None, TaskGroup(dag=example_dag, group_id="inner_tg"), "dag__inner_tg"),
         (
             None,

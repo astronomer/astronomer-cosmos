@@ -461,7 +461,7 @@ jobs:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
-        optfFrom ions: >-
+        options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s

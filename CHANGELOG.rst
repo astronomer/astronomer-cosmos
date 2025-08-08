@@ -60,10 +60,8 @@ Others
 * Fix broken CI ``tests.py3.11-2.8-1.9:test-integration-setup`` by @tatiana in #1902
 * Add dbt-core 1.10 to test matrix by @tatiana in #1767
 * Pin package dbt-databricks by @pankajastro in #1909
-
 * Pre-commit updates: #1779, #1795, #1800, #1857, #1863, #1869, #1873, #1877, #1878, #1880, #1882, #1887, #1892, #1903, #1901, #1905, #1909
 * Dependabot updates: #1904
-
 
 
 1.10.1 (2025-05-21)

@@ -52,7 +52,6 @@ Others
 * Add Zizmor analysis GitHub action by @pankajkoti in #1870
 * Catch FlushError on Datasets for Airflow 2.11 dags test by @pankajkoti in #1880
 * Add deprecation warning for LoadMode.CUSTOM parser by @duongphannamhung in #1885
-* Fix a bunch of docs build errors and warnings by @pankajkoti in #1886
 * Fix docs rendering in Airflow 3 Compatibility by @pankajastro in #1883
 * CI: Add GitHub CodeQL analysis workflow (codeql.yml) by @pankajkoti in #1871
 * Resolve 'credential persistence through GitHub Actions artifacts' warnings from Zizmor by @pankajkoti in #1890

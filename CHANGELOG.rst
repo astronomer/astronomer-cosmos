@@ -56,7 +56,7 @@ Others
 * Add dbt-core 1.10 to test matrix by @tatiana in #1767
 * Pin package dbt-databricks by @pankajastro in #1909
 * Enable matrix test entry for dbt-1.9, python-3.9 and airflow-3.0 tests in CI by @pankajastro in #1900
-* Pre-commit updates: #1779, #1795, #1800, #1857, #1863, #1869, #1882, #1892, #1901
+* Pre-commit updates: #1779, #1795, #1800, #1857, #1863, #1869, #1892, #1901
 * Dependabot updates: #1904
 
 

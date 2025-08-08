@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from cosmos import settings
 
-__version__ = "1.10.2a1"
+__version__ = "1.10.2"
 
 if not settings.enable_memory_optimised_imports:
     from cosmos.airflow.dag import DbtDag

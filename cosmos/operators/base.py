@@ -484,6 +484,39 @@ class DbtCompileMixin:
     ui_color = "#877c7c"
 
 
+class DbtShowMixin:
+    """
+    Mixin for dbt show command.
+
+    :param inline: SQL query to execute
+    """
+
+    base_cmd = ["show"]
+    ui_color = "#6C8EBF"  # A muted blue color
+    ui_fgcolor = "#FFFFFF"
+
+    template_fields: Sequence[str] = ("inline",)
+
+    def __init__(
+        self,
+        inline: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.inline = inline
+        super().__init__(**kwargs)
+
+    def add_cmd_flags(self) -> list[str]:
+        flags = []
+
+        flags.extend(["--output", "json"])
+        # flags.extend(["--log-format-file", "json"])
+
+        if self.inline:
+            flags.extend(["--inline", str(self.inline)])
+
+        return flags
+
+
 class DbtCloneMixin:
     """Mixin for dbt clone command."""
 

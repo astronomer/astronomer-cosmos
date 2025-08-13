@@ -2114,3 +2114,64 @@ def test_run_dbt_ls(
     graph.local_flags = []
     graph.run_dbt_ls(dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={})
     assert len(mock_run_command.call_args[0][0]) == expected_args_count
+
+
+# ------------------------------------------------------------------------------
+# Tests for handling `tags` field edge cases (null or missing) in manifest nodes
+# ------------------------------------------------------------------------------
+
+
+def _create_manifest_with_tags(tmp_path: Path, tags_value):
+    """Helper to create a minimal manifest with configurable `tags` value."""
+    manifest_content = {
+        "nodes": {
+            "model.test_project.my_model": {
+                "unique_id": "model.test_project.my_model",
+                "resource_type": "model",
+                "package_name": "test_project",
+                "depends_on": {"nodes": []},
+                "original_file_path": "models/my_model.sql",
+                # The key/value below is the part we vary across tests
+                **({"tags": tags_value} if tags_value is not _MISSING_TAGS else {}),
+                "config": {},
+            }
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+    return manifest_path
+
+
+# Sentinel object to represent the "tags" key not being present at all
+class _MissingTags:
+    pass
+
+
+_MISSING_TAGS = _MissingTags()
+
+
+@pytest.mark.parametrize("tags_value", [None, _MISSING_TAGS])
+def test_load_manifest_handles_null_or_missing_tags(tags_value, tmp_path):
+    """Ensure that null or absent `tags` result in an empty list on the DbtNode object."""
+
+    project_path = tmp_path / "project"
+    (project_path / "models").mkdir(parents=True, exist_ok=True)
+
+    manifest_path = _create_manifest_with_tags(tmp_path, tags_value)
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    render_config = RenderConfig(source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    node = dbt_graph.nodes["model.test_project.my_model"]
+    assert node.tags == []

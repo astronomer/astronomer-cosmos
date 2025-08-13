@@ -2144,12 +2144,7 @@ def _create_manifest_with_tags(tmp_path: Path, tags_value):
     return manifest_path
 
 
-# Sentinel object to represent the "tags" key not being present at all
-class _MissingTags:
-    pass
-
-
-_MISSING_TAGS = _MissingTags()
+_MISSING_TAGS = object()
 
 
 @pytest.mark.parametrize("tags_value", [None, _MISSING_TAGS])

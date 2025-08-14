@@ -5,7 +5,7 @@
 Airflow Async Execution Mode
 ============================
 
-The Airflow async execution mode in Cosmos designed to improve pipeline performance. This execution mode could be preferred when you’ve long running resources and you want to run them asynchronously by leveraging Airflow’s `deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__. In this mode, additional operators—``SetupAsyncOperator`` and ``TeardownAsyncOperator``—are added to your workflow.
+The Airflow async execution mode in Cosmos is designed to improve pipeline performance. This execution mode could be preferred when you’ve long running resources and you want to run them asynchronously by leveraging Airflow’s `deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__. In this mode, additional operators—``SetupAsyncOperator`` and ``TeardownAsyncOperator``—are added to your workflow.
 
 - **SetupAsyncOperator:** This task runs a mocked ``dbt run`` command on your dbt project, which outputs compiled SQL files to the project’s target directory. These compiled SQLs are then uploaded to a remote location specified by the ``remote_target_path`` configuration.
 - **TeardownAsyncOperator:** This task deletes the resources created by ``SetupAsyncOperator`` from the remote location defined by the ``remote_target_path`` configuration.
@@ -14,7 +14,7 @@ Advantages of Airflow Async Mode
 ++++++++++++++++++++++++++++++++
 
 - **Improved Task Throughput:** Async tasks free up Airflow workers by leveraging the Airflow Trigger framework. While long-running SQL transformations are executing in the data warehouse, the worker is released and can handle other tasks, increasing overall task throughput.
-- **Faster Task Execution:** With Cosmos ``SetupAsyncOperator``, transformations can be executed without invoking the full dbt run command. This reduces the overhead of running unnecessary dbt commands, improving the performance of each task.
+- **Faster Task Execution:** With Cosmos ``SetupAsyncOperator``, the SQL transformations are precompiled and uploaded to a remote location. Instead of invoking a full dbt run during each dbt model task, the SQL files are downloaded from this remote path and executed directly. This eliminates unnecessary overhead from running the full dbt command, resulting in faster and more efficient task execution.
 - **Better Resource Utilization:** By minimizing idle time on Airflow workers, async tasks allow more efficient use of compute resources. Workers aren't blocked waiting for external systems and can be reused for other work while waiting on async operations.
 
 Getting Started with Airflow Async Mode

@@ -148,6 +148,7 @@ Create an Airflow connection with following configurations
 - Extra Fields JSON:
 
 .. code-block:: bash
+
     {
       "project": "astronomer-**",
       "keyfile_dict": {

@@ -11,6 +11,7 @@ Prerequisites
 +++++++++++++
 
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
+- Airflow>=2.8
 
 1. Create Astro-CLI Project
 +++++++++++++++++++++++++++

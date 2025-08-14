@@ -1,12 +1,19 @@
-# Running Cosmos Task with Deferrable Operator
+.. _async-execution-mode:
+
+.. title:: Getting Started with Astronomer Cosmos Deferrable Operator
+
+Getting Started with Astronomer Cosmos Deferrable Operator
+==========================================================
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 
-## Prerequisites
+Prerequisites
++++++++++++++
 
 - [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli)
 
-## 1. Create Astro-CLI Project
+1. Create Astro-CLI Project
++++++++++++++++++++++++++++
 
 Run the following command in your terminal:
 
@@ -29,7 +36,8 @@ This will scaffold an Astro project with the following structure:
 └── tests/
 ```
 
-## 2. Update Dockerfile
+2. Update Dockerfile
+++++++++++++++++++++
 
 Edit your Dockerfile to ensure add necessary requirements
 
@@ -43,7 +51,8 @@ ENV AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
 ENV AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
 ```
 
-## 3. Add astronomer-cosmos Dependency
+3. Add astronomer-cosmos Dependency
++++++++++++++++++++++++++++++++++++
 
 In your requirements.txt, add:
 
@@ -51,7 +60,8 @@ In your requirements.txt, add:
 astronomer-cosmos[dbt-bigquery, google]>=1.9
 ```
 
-## 4. Create DAG
+4. Create Airflow DAG
++++++++++++++++++++++
 
 1. Create a new DAG file: dags/cosmos_async_dag.py
 
@@ -110,7 +120,8 @@ simple_dag_async = DbtDag(
 - Add a valid dbt project inside your Airflow project under ``dags/dbt/``.
 
 
-## 5. Start the Project
+5. Start the Project
+++++++++++++++++++++
 
 Launch the Airflow project locally:
 
@@ -123,7 +134,8 @@ This will:
 - Spin up the scheduler, webserver, and triggerer (needed for deferrable operators)
 - Expose Airflow UI at http://localhost:8080
 
-## 6. Create Airflow Connection
+6. Create Airflow Connection
+++++++++++++++++++++++++++++
 
 Create an Airflow connection with following configurations
 
@@ -149,7 +161,8 @@ Create an Airflow connection with following configurations
 }
 ```
 
-## 7. Execute the DAG
+7. Execute the DAG
+++++++++++++++++++
 
 1. Visit the Airflow UI at http://localhost:8080
 2. Enable the DAG: cosmos_async_dag

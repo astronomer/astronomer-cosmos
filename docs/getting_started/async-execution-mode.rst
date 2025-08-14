@@ -1,8 +1,8 @@
 .. _async-execution-mode:
 
-.. title:: Getting Started with Astronomer Cosmos Deferrable Operator
+.. title:: Getting Started with Deferrable Operator
 
-Getting Started with Astronomer Cosmos Deferrable Operator
+Getting Started with Deferrable Operator
 ==========================================================
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
@@ -10,7 +10,7 @@ This guide walks you through setting up an Astro CLI project and running a Cosmo
 Prerequisites
 +++++++++++++
 
-- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli)
+- `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
 
 1. Create Astro-CLI Project
 +++++++++++++++++++++++++++
@@ -173,5 +173,9 @@ Create an Airflow connection with following configurations
 1. Visit the Airflow UI at http://localhost:8080
 2. Enable the DAG: cosmos_async_dag
 3. Trigger the DAG manually
+
+.. image:: /_static/jaffle_shop_async_execution_mode.png
+    :alt: Cosmos dbt Async DAG
+    :align: center
 
 The ``run`` tasks will run asynchronously via the deferrable operator, freeing up worker slots while waiting on I/O or long-running tasks.

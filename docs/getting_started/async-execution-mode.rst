@@ -21,7 +21,6 @@ Run the following command in your terminal:
 
     astro dev init
 
-
 This will scaffold an Astro project with the following structure:
 
 .. code-block:: bash
@@ -41,7 +40,7 @@ This will scaffold an Astro project with the following structure:
 2. Update Dockerfile
 ++++++++++++++++++++
 
-Edit your Dockerfile to ensure add necessary requirements
+Edit your ``Dockerfile`` to ensure add necessary requirements
 
 .. code-block:: bash
 
@@ -56,7 +55,7 @@ Edit your Dockerfile to ensure add necessary requirements
 3. Add astronomer-cosmos Dependency
 +++++++++++++++++++++++++++++++++++
 
-In your requirements.txt, add:
+In your ``requirements.txt``, add:
 
 .. code-block:: bash
 
@@ -66,8 +65,9 @@ In your requirements.txt, add:
 4. Create Airflow DAG
 +++++++++++++++++++++
 
-1. Create a new DAG file: dags/cosmos_async_dag.py
-    1.1 Update the ``dataset`` and ``project``
+1. Create a new DAG file: ``dags/cosmos_async_dag.py``
+
+- Update the ``dataset`` and ``project``
 
 .. code-block:: python
 
@@ -89,7 +89,7 @@ In your requirements.txt, add:
     DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
     DBT_ADAPTER_VERSION = os.getenv("DBT_ADAPTER_VERSION", "1.9")
 
-    simple_dag_async = DbtDag(
+    cosmos_async_dag = DbtDag(
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
         ),
@@ -111,7 +111,7 @@ In your requirements.txt, add:
         schedule=None,
         start_date=datetime(2025, 1, 1),
         catchup=False,
-        dag_id="simple_dag_async",
+        dag_id="cosmos_async_dag",
         operator_args={
             "location": "US",
             "install_deps": True,
@@ -169,8 +169,8 @@ Create an Airflow connection with following configurations
 7. Execute the DAG
 ++++++++++++++++++
 
-1. Visit the Airflow UI at http://localhost:8080
-2. Enable the DAG: cosmos_async_dag
+1. Visit the Airflow UI at ``http://localhost:8080``
+2. Enable the DAG: ``cosmos_async_dag``
 3. Trigger the DAG manually
 
 .. image:: /_static/jaffle_shop_async_execution_mode.png
@@ -178,3 +178,6 @@ Create an Airflow connection with following configurations
     :align: center
 
 The ``run`` tasks will run asynchronously via the deferrable operator, freeing up worker slots while waiting on I/O or long-running tasks.
+
+.. note::
+    The deferrable operator is supported for dbt models when using BigQuery.

@@ -21,7 +21,7 @@ Run the following command in your terminal:
 
     astro dev init
 
-This will scaffold an Astro project with the following structure:
+This will create an Astro project with the following structure:
 
 .. code-block:: bash
 

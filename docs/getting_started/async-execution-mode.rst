@@ -3,7 +3,7 @@
 .. title:: Getting Started with Deferrable Operator
 
 Getting Started with Deferrable Operator
-==========================================================
+========================================
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 

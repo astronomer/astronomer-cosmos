@@ -67,6 +67,7 @@ In your requirements.txt, add:
 +++++++++++++++++++++
 
 1. Create a new DAG file: dags/cosmos_async_dag.py
+    1.1 Update the ``dataset`` and ``project``
 
 .. code-block:: python
 
@@ -99,7 +100,7 @@ In your requirements.txt, add:
                 conn_id="gcp_conn",
                 profile_args={
                     "dataset": "cosmos_async_demo",
-                    "project": "astronomer-airflow-providers",
+                    "project": "astronomer-**",
                 },
             ),
         ),
@@ -118,7 +119,6 @@ In your requirements.txt, add:
         },
     )
 
-
 2. Folder structure for dbt project
 
 - Add a valid dbt project inside your Airflow project under ``dags/dbt/``.
@@ -132,7 +132,6 @@ Launch the Airflow project locally:
 .. code-block:: bash
 
     astro dev start
-
 
 This will:
 

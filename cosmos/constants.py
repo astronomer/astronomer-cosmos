@@ -99,6 +99,7 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"
+    SINGLE_RUN = "single_run"
 
 
 class InvocationMode(Enum):

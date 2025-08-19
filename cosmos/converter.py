@@ -256,6 +256,18 @@ class DbtToAirflowConverter:
         render_config = copy.deepcopy(render_config) if render_config is not None else RenderConfig()
         operator_args = copy.deepcopy(operator_args) if operator_args is not None else {}
 
+        from cosmos.constants import DbtResourceType, ExecutionMode
+
+        if execution_config.execution_mode == ExecutionMode.SINGLE_RUN:
+            # Lazy import to avoid heavy cost if not needed
+            from cosmos.airflow.master_build_converter import model_to_sensor_converter
+
+            if render_config.node_converters is None:
+                render_config.node_converters = {}
+
+            render_config.node_converters.setdefault(DbtResourceType.MODEL, model_to_sensor_converter)
+            execution_config.execution_mode = ExecutionMode.LOCAL
+
         project_config.validate_project()
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
         override_configuration(project_config, render_config, execution_config, operator_args)
@@ -308,6 +320,7 @@ class DbtToAirflowConverter:
             "vars": dbt_vars,
             "cache_dir": cache_dir,
             "manifest_filepath": project_config.manifest_path,
+            "render_config": render_config,
         }
 
         validate_arguments(

@@ -14,7 +14,7 @@ except ImportError:
         "with with `pip install apache-airflow-providers-google`."
     )
 
-from airflow.utils.context import Context
+from airflow.utils.context import Context  # type: ignore[attr-defined]
 from packaging.version import Version
 
 from cosmos import settings
@@ -38,10 +38,26 @@ def _mock_bigquery_adapter() -> None:
     except (ModuleNotFoundError, ImportError):  # pragma: no cover
         from dbt.clients.agate_helper import empty_table
 
+    _original_execute = BigQueryConnectionManager.execute
+
     def execute(  # type: ignore[no-untyped-def]
         self, sql, auto_begin=False, fetch=None, limit: Optional[int] = None
     ) -> Tuple[BigQueryAdapterResponse, agate.Table]:
-        return BigQueryAdapterResponse("mock_bigquery_adapter_response"), empty_table()
+        # Normalize and trim the SQL string
+        sql_str = sql.strip().lower()
+
+        is_select = sql_str.startswith("select")
+
+        # If it's a SELECT and potentially expensive, override it
+        if is_select:
+            # Add LIMIT 1 to reduce cost
+            if "limit" not in sql_str:
+                sql = f"{sql.rstrip(';')} LIMIT 1"
+            # Optionally skip execution altogether for SELECTs
+            # return _original_execute(self, sql, auto_begin=auto_begin, fetch=fetch, limit=limit)
+            return BigQueryAdapterResponse("mock_bigquery_adapter_response"), empty_table()
+
+        return _original_execute(self, sql, auto_begin=auto_begin, fetch=fetch, limit=limit)  # type: ignore[no-any-return]
 
     BigQueryConnectionManager.execute = execute
 

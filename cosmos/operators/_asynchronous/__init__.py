@@ -22,22 +22,12 @@ class SetupAsyncOperator(DbtRunVirtualenvOperator):
         super().__init__(*args, **kwargs)
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+        # SAFELY inject mock at runtime (in memory)
         profile_type = self.profile_config.get_profile_type()
-        if not self._py_bin:
-            raise AttributeError("_py_bin attribute not set for VirtualEnv operator")
-        dbt_executable_path = str(Path(self._py_bin).parent / "dbt")
-        asynchronous_operator_module = f"cosmos.operators._asynchronous.{profile_type}"
-        mock_function_name = f"_mock_{profile_type}_adapter"
-        mock_function = load_method_from_module(asynchronous_operator_module, mock_function_name)
-        mock_function_full_source = inspect.getsource(mock_function)
-        mock_function_body = textwrap.dedent("\n".join(mock_function_full_source.split("\n")[1:]))
-
-        with open(dbt_executable_path) as f:
-            dbt_entrypoint_script = f.readlines()
-        if dbt_entrypoint_script[0].startswith("#!"):
-            dbt_entrypoint_script.insert(1, mock_function_body)
-        with open(dbt_executable_path, "w") as f:
-            f.writelines(dbt_entrypoint_script)
+        mock_module = f"cosmos.operators._asynchronous.{profile_type}"
+        mock_func = f"_mock_{profile_type}_adapter"
+        mock = load_method_from_module(mock_module, mock_func)
+        mock()  # Safe in-memory patch
 
         return super().run_subprocess(command, env, cwd)
 

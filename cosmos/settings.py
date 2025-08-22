@@ -43,6 +43,7 @@ remote_cache_dir = conf.get("cosmos", "remote_cache_dir", fallback=None)
 remote_cache_dir_conn_id = conf.get("cosmos", "remote_cache_dir_conn_id", fallback=None)
 remote_target_path = conf.get("cosmos", "remote_target_path", fallback=None)
 remote_target_path_conn_id = conf.get("cosmos", "remote_target_path_conn_id", fallback=None)
+upload_sql_to_xocm = conf.getboolean("cosmos", "upload_sql_to_xocm", fallback=True)
 
 # Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
 # which can significantly increase memory usage—even when Cosmos is installed but not actively used.

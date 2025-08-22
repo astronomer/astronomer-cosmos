@@ -14,7 +14,7 @@ except ImportError:
         "with with `pip install apache-airflow-providers-google`."
     )
 
-from airflow.utils.context import Context
+from airflow.utils.context import Context  # type: ignore
 from packaging.version import Version
 
 from cosmos import settings
@@ -128,6 +128,20 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def base_cmd(self) -> list[str]:
         return ["run"]
 
+    def get_sql_from_xocm(self, context: Context) -> str:
+        start_time = time.time()
+        file_path = self.async_context["dbt_node_config"]["file_path"]
+        project_dir_parent = str(Path(self.project_dir).parent)
+        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
+        run_id = self.async_context["run_id"]
+        xcom_model_path = f"{dbt_dag_task_group_identifier}/{run_id}/run/{relative_file_path}"
+        sql_query = context["ti"].xcom_pull(task_ids="dbt_setup_async", key=xcom_model_path)
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
+        return sql_query  # type: ignore
+
     def get_remote_sql(self) -> str:
         start_time = time.time()
 
@@ -161,10 +175,15 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if self.async_context.get("run_id") is None:
             self.async_context["run_id"] = context["run_id"]
 
+        if settings.upload_sql_to_xocm:
+            sql_query = self.get_sql_from_xocm(context)
+        else:
+            sql_query = self.get_remote_sql()
+
         if settings.enable_setup_async_task:
             self.configuration = {
                 "query": {
-                    "query": self.get_remote_sql(),
+                    "query": sql_query,
                     "useLegacySql": False,
                 }
             }
@@ -177,7 +196,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if not settings.enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
-        sql = self.get_remote_sql().strip()
+        if settings.upload_sql_to_xocm:
+            sql = self.get_sql_from_xocm(context)
+        else:
+            sql = self.get_remote_sql().strip()
         self.log.debug("Executed SQL is: %s", sql)
         self.compiled_sql = sql
 

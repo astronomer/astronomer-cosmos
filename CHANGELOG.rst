@@ -1,14 +1,27 @@
 Changelog
 =========
 
-1.11.0a1 (2025-06-23)
+1.11.0a2 (2025-08-08)
 ---------------------
 
 Feature
 
 * Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/configuration/dbt-fusion>`_.
+* Support DAG versioning in Airflow 3 by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1907
+* Add SQL Server profile mapping by @pankajastro in #1737
+* Allow to set task display name as a user-defined function by @corsettigyg in https://github.com/astronomer/astronomer-cosmos/pull/1761
+* feat: Add Jinja templating support for ``dbt_cmd_flags`` by @skillicinski in https://github.com/astronomer/astronomer-cosmos/pull/1899
 
-(many other features, pending details)
+Docs
+
+* Fix a bunch of docs build errors and warnings by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1886
+* Add dbt Fusion documentation by @tatiana in https://github.com/astronomer/astronomer-cosmos/pull/1824
+* Fix dbt Fusion documentation by @tatiana in https://github.com/astronomer/astronomer-cosmos/pull/1830
+* Update dbt-fusion.rst to explicitly highlight it is in alpha by @tatiana in https://github.com/astronomer/astronomer-cosmos/pull/1838
+
+Others
+
+* Fix failing dbt-fusion tests when run in parallel in CI by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1896
 
 
 1.10.2 (2025-08-08)

@@ -330,6 +330,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
         run_id = self.extra_context["run_id"]
 
+        if settings.upload_sql_to_xocm:
+            return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
+
         return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
@@ -350,6 +353,21 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_object_storage_path.parent.mkdir(parents=True, exist_ok=True)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
+
+    def _upload_sql_files_xocm(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
+        start_time = time.time()
+        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
+        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        for file_path in files:
+            dest_file_path = self._construct_dest_file_path(Path(""), file_path, source_run_dir, resource_type)
+            with open(file_path, encoding="utf-8") as f:
+                file_data = f.read()
+                self.log.info("DAta %s", file_data)
+                context["ti"].xcom_push(key=dest_file_path, value=file_data)
+            self.log.info("Copied %s", file_path)
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
@@ -572,7 +590,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:
-            self._upload_sql_files(tmp_project_dir, "run")
+            if settings.upload_sql_to_xocm:
+                self._upload_sql_files_xocm(context, tmp_project_dir, "run")
+            else:
+                self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]

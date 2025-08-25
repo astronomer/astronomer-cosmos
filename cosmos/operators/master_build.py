@@ -179,12 +179,135 @@ class DbtModelStatusSensor(BaseSensorOperator):
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
     ) -> None:
+        self.project_dir: str | None = kwargs.pop("project_dir", None)
+        self.profiles_dir: str | None = kwargs.pop("profiles_dir", None)
         super().__init__(poke_interval=poke_interval, timeout=timeout, **kwargs)
         self.model_unique_id = model_unique_id
         self.master_task_id = master_task_id
         self.check_fn = check_fn or (lambda s: s == "SUCCESS")
 
     def poke(self, context: Context) -> bool:
+        try_number = context["ti"].try_number
+
+        # Lazy discovery: if project_dir/profiles_dir were not provided, attempt to
+        # obtain them from the upstream master build operator instance present in
+        # the DAG definition. This mirrors what the user most likely configured in
+        # the DAG converter (one project path shared by all tasks).
+        if self.project_dir is None or self.profiles_dir is None:
+            dag = context.get("dag") or context["ti"].task.dag  # runtime DAG object
+            if dag is not None:
+                upstream_task = dag.get_task(self.master_task_id)
+                if upstream_task is not None:
+                    if self.project_dir is None and hasattr(upstream_task, "project_dir"):
+                        self.project_dir = getattr(upstream_task, "project_dir")
+                    if self.profiles_dir is None and hasattr(upstream_task, "profiles_dir"):
+                        self.profiles_dir = getattr(upstream_task, "profiles_dir")
+
+        # If this is a retry attempt (manual or automatic) then re-run the model immediately, ignoring
+        # the cached XCom status from the previous try. This allows users to click “retry” on a
+        # successful task and still force the model to be re-executed.
+        if try_number > 1:
+            if not self.project_dir:
+                raise AirflowException(
+                    "project_dir must be supplied to DbtModelStatusSensor to enable automatic retry run"
+                )
+
+            import os
+            import shlex
+            import shutil
+            import subprocess
+            import tempfile
+            from pathlib import Path
+
+            self.log.info(
+                "Retry attempt #%s – cloning project %s to temp dir and running `dbt run --select %s`",
+                try_number - 1,
+                self.project_dir,
+                self.model_unique_id,
+            )
+
+            with tempfile.TemporaryDirectory() as tmp_project_dir:
+                src = Path(self.project_dir)
+                dst = Path(tmp_project_dir)
+                self.log.info("Copying project to temporary directory %s", dst)
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+
+                # Prepare profiles path and env vars using upstream task's profile_config if available
+                env: dict[str, str] = os.environ.copy()
+                profiles_dir_arg: str | None = None
+                profile_path_obj: Path | None = None
+
+                upstream_task = context["ti"].task.dag.get_task(self.master_task_id)
+                if upstream_task and hasattr(upstream_task, "profile_config"):
+                    profile_config = getattr(upstream_task, "profile_config")
+                    from contextlib import ExitStack
+
+                    with ExitStack() as stack:
+                        profile_path, extra_env = stack.enter_context(profile_config.ensure_profile())
+                        profile_path_obj = profile_path
+                        env.update({k: str(v) for k, v in extra_env.items()})
+                        profiles_dir_arg = str(profile_path.parent)
+
+                # Final fallback – if still none, attempt to copy profiles.yml from original project root
+                if profiles_dir_arg is None:
+                    candidate = src / "profiles.yml"
+                    if candidate.exists():
+                        temp_profiles = dst / "profiles.yml"
+                        shutil.copy(candidate, temp_profiles)
+                        profiles_dir_arg = str(dst)
+                        self.log.info("Copied profiles.yml from project root into temporary dir for dbt execution")
+
+                # fall back to self.profiles_dir if still None
+                if profiles_dir_arg is None and self.profiles_dir:
+                    profiles_dir_arg = self.profiles_dir
+
+                # Reuse upstream task to construct flags for full parity
+                dbt_flags: list[str] = []
+                extra_flags: list[str] = []
+                if upstream_task is not None and hasattr(upstream_task, "add_cmd_flags"):
+                    raw_flags = upstream_task.add_cmd_flags()
+                    clean_flags: list[str] = []
+                    skip_until_next_flag = False
+                    for tok in raw_flags:
+                        if skip_until_next_flag:
+                            if tok.startswith("--"):
+                                skip_until_next_flag = False  # new flag starts
+                            else:
+                                continue  # still skipping values belonging to removed flag
+                        if tok in ("--select", "--exclude"):
+                            skip_until_next_flag = True  # drop this flag and its values
+                            continue
+                        clean_flags.append(tok)
+                    extra_flags = clean_flags
+
+                # Generate base dbt flags using upstream helper if available
+                if (
+                    upstream_task is not None
+                    and hasattr(upstream_task, "_generate_dbt_flags")
+                    and profile_path_obj is not None
+                ):
+                    dbt_flags = upstream_task._generate_dbt_flags(str(dst), profile_path_obj)  # type: ignore[arg-type]
+
+                # Ensure profiles flag present if discovery earlier (fallback)
+                if profiles_dir_arg and "--profiles-dir" not in dbt_flags:
+                    dbt_flags += ["--profiles-dir", profiles_dir_arg]
+                model_selector = self.model_unique_id.split(".")[-1]
+                # Build final command
+                cmd = ["dbt", "run"] + dbt_flags + extra_flags + ["--select", model_selector]
+
+                self.log.info("Executing: %s (cwd=%s)", " ".join(shlex.quote(c) for c in cmd), dst)
+                result = subprocess.run(cmd, cwd=dst, capture_output=True, text=True, env=env)
+
+                self.log.info("dbt run stdout:\n%s", result.stdout)
+                if result.returncode != 0:
+                    self.log.error("dbt run stderr:\n%s", result.stderr)
+                    raise AirflowException(
+                        f"Automatic dbt run retry failed for model {self.model_unique_id}. Exit code {result.returncode}."
+                    )
+
+            self.log.info("dbt run completed successfully on retry for model %s", self.model_unique_id)
+            return True
+
         ti = context["ti"]
         # 1) immediate per-node XCom
         logger.info(
@@ -204,6 +327,7 @@ class DbtModelStatusSensor(BaseSensorOperator):
 
         self.log.info("Model %s finished with status %s", self.model_unique_id, status)
         if not self.check_fn(status):
+            # Normal path: status not accepted; raise to trigger retry
             raise AirflowException(f"Model {self.model_unique_id} finished with status '{status}'")
         return True
 
@@ -227,6 +351,5 @@ def create_model_result_task(
         model_unique_id=model_unique_id,
         master_task_id=upstream_task_id,
         check_fn=check_fn,
-        retries=0,
         **sensor_kwargs,
     )

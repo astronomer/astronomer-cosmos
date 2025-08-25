@@ -33,6 +33,7 @@ def _ensure_master_task(dag: DAG, task_args: Dict[str, Any]) -> DbtMasterBuildOp
             "task_id": master_id,
             "render_config": render_config,
             "dag": dag,
+            "retries": 0,
         }
     )
     master = DbtMasterBuildOperator(**master_kwargs)

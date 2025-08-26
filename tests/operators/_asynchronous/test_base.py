@@ -6,7 +6,7 @@ import pytest
 
 from cosmos.config import ProfileConfig
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.operators._asynchronous import SetupAsyncOperator
+from cosmos.operators._asynchronous import SetupAsyncOperator, TeardownAsyncOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators._asynchronous.databricks import DbtRunAirflowAsyncDatabricksOperator
@@ -143,3 +143,23 @@ def test_setup_run_subprocess_py_bin_unset(
 
     with pytest.raises(AttributeError, match="_py_bin attribute not set for VirtualEnv operator"):
         op.run_subprocess(command, env, cwd)
+
+
+@patch("cosmos.operators._asynchronous.ObjectStoragePath")  # Patch where it's imported
+def test_execute_removes_existing_path(mock_object_storage_path):
+    mock_path_instance = MagicMock()
+    mock_path_instance.exists.return_value = True
+    mock_object_storage_path.return_value = mock_path_instance
+
+    operator = TeardownAsyncOperator(task_id="dbt_teardown_async")
+    operator._configure_remote_target_path = MagicMock(return_value=("s3://my-bucket/path", "my_conn_id"))
+    operator.extra_context = {"dbt_dag_task_group_identifier": "jaffle_shop"}
+
+    mock_context = {"run_id": "run_456"}
+
+    operator.execute(mock_context)
+
+    expected_path = "s3://my-bucket/path/jaffle_shop/run_456"
+    mock_object_storage_path.assert_called_once_with(expected_path, conn_id="my_conn_id")
+    mock_path_instance.exists.assert_called_once()
+    mock_path_instance.rmdir.assert_called_once_with(recursive=True)

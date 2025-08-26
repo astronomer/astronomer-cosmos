@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
@@ -151,7 +151,11 @@ def test_execute_removes_existing_path(mock_object_storage_path):
     mock_path_instance.exists.return_value = True
     mock_object_storage_path.return_value = mock_path_instance
 
-    operator = TeardownAsyncOperator(task_id="dbt_teardown_async")
+    operator = TeardownAsyncOperator(
+        task_id="dbt_teardown_async",
+        profile_config=Mock(),
+        project_dir="fake-dir",
+    )
     operator._configure_remote_target_path = MagicMock(return_value=("s3://my-bucket/path", "my_conn_id"))
     operator.extra_context = {"dbt_dag_task_group_identifier": "jaffle_shop"}
 

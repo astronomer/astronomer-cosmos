@@ -477,7 +477,6 @@ def _add_dbt_setup_async_task(
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
     async_py_requirements: list[str] | None = None,
-    virtualenv_dir: str | None = None,
 ) -> None:
     if execution_mode != ExecutionMode.AIRFLOW_ASYNC:
         return
@@ -490,8 +489,6 @@ def _add_dbt_setup_async_task(
         task_args["selector"] = render_config.selector
         task_args["exclude"] = render_config.exclude
         task_args["py_requirements"] = async_py_requirements
-
-    task_args["virtualenv_dir"] = virtualenv_dir
 
     setup_task_metadata = TaskMetadata(
         id=DBT_SETUP_ASYNC_TASK_ID,
@@ -714,12 +711,11 @@ def build_airflow_graph(
         _add_dbt_setup_async_task(
             dag,
             execution_mode,
-            task_args,
+            {**task_args, "virtualenv_dir": virtualenv_dir},
             tasks_map,
             task_group,
             render_config=render_config,
             async_py_requirements=async_py_requirements,
-            virtualenv_dir=virtualenv_dir,
         )
     if settings.enable_teardown_async_task:
         _add_teardown_task(

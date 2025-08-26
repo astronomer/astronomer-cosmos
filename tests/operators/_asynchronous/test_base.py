@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
+import airflow
 import pytest
+from packaging.version import Version
 
 from cosmos.config import ProfileConfig
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
@@ -11,6 +13,8 @@ from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperato
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators._asynchronous.databricks import DbtRunAirflowAsyncDatabricksOperator
 from cosmos.operators.local import DbtRunLocalOperator
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 @pytest.mark.parametrize(
@@ -145,6 +149,7 @@ def test_setup_run_subprocess_py_bin_unset(
         op.run_subprocess(command, env, cwd)
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.8"), reason="ObjectStoragePath requires Apache Airflow >= 2.8")
 @patch("airflow.io.path.ObjectStoragePath")
 def test_execute_removes_existing_path(mock_object_storage_path):
     mock_path_instance = MagicMock()

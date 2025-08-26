@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock, mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
 from cosmos.config import ProfileConfig
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.operators._asynchronous import SetupAsyncOperator, TeardownAsyncOperator
+from cosmos.operators._asynchronous import SetupAsyncOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators._asynchronous.databricks import DbtRunAirflowAsyncDatabricksOperator
@@ -71,17 +71,6 @@ def test_dbt_run_airflow_async_factory_operator_init(mock_create_class, profile_
     assert isinstance(operator, MockAsyncOperator)
 
 
-@patch("cosmos.operators.local.DbtRunLocalOperator.build_and_run_cmd")
-def test_teardown_execute(mock_build_and_run_cmd):
-    operator = TeardownAsyncOperator(
-        task_id="fake-task",
-        profile_config=Mock(),
-        project_dir="fake-dir",
-    )
-    operator.execute({"run_id": "test_run_id"})
-    mock_build_and_run_cmd.assert_called_once()
-
-
 @pytest.fixture
 def mock_operator_params():
     return {
@@ -130,22 +119,6 @@ def test_setup_run_subprocess(mock_operator_params, mock_load_method, mock_file_
     mock_super_run_subprocess.assert_called_once_with(command, env, cwd)
 
 
-def test_teardown_run_subprocess(
-    mock_operator_params, mock_load_method, mock_file_operations, mock_super_run_subprocess
-):
-    op = TeardownAsyncOperator(**mock_operator_params)
-    op._py_bin = "/fake/venv/bin/python"
-
-    command = ["dbt", "clean"]
-    env = {}
-    cwd = "/tmp"
-
-    op.run_subprocess(command, env, cwd)
-
-    mock_file_operations.assert_called_with("/fake/venv/bin/dbt", "w")
-    mock_super_run_subprocess.assert_called_once_with(command, env, cwd)
-
-
 def test_setup_execute(mock_operator_params):
     op = SetupAsyncOperator(**mock_operator_params)
 
@@ -164,18 +137,6 @@ def test_setup_run_subprocess_py_bin_unset(
     mock_operator_params, mock_load_method, mock_file_operations, mock_super_run_subprocess
 ):
     op = SetupAsyncOperator(**mock_operator_params)
-    command = ["dbt", "run"]
-    env = {}
-    cwd = "/tmp"
-
-    with pytest.raises(AttributeError, match="_py_bin attribute not set for VirtualEnv operator"):
-        op.run_subprocess(command, env, cwd)
-
-
-def test_teardown_run_subprocess_py_bin_unset(
-    mock_operator_params, mock_load_method, mock_file_operations, mock_super_run_subprocess
-):
-    op = TeardownAsyncOperator(**mock_operator_params)
     command = ["dbt", "run"]
     env = {}
     cwd = "/tmp"

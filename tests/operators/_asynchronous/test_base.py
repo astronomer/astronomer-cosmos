@@ -145,7 +145,7 @@ def test_setup_run_subprocess_py_bin_unset(
         op.run_subprocess(command, env, cwd)
 
 
-@patch("cosmos.operators._asynchronous.__init__.ObjectStoragePath")
+@patch("airflow.io.path.ObjectStoragePath")
 def test_execute_removes_existing_path(mock_object_storage_path):
     mock_path_instance = MagicMock()
     mock_path_instance.exists.return_value = True

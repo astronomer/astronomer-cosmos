@@ -571,10 +571,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        if async_context.get("teardown_task") and settings.enable_teardown_async_task:
-            self._delete_sql_files()
-            return
-
         if settings.enable_setup_async_task:
             self._upload_sql_files(tmp_project_dir, "run")
         else:

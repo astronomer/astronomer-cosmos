@@ -643,6 +643,8 @@ def build_airflow_graph(
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
+    virtualenv_dir = task_args.pop("virtualenv_dir", None)
+
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
@@ -709,7 +711,7 @@ def build_airflow_graph(
         _add_dbt_setup_async_task(
             dag,
             execution_mode,
-            task_args,
+            {**task_args, "virtualenv_dir": virtualenv_dir},
             tasks_map,
             task_group,
             render_config=render_config,

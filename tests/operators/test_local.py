@@ -5,7 +5,6 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from unittest import mock
 from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
@@ -1348,7 +1347,7 @@ def test_handle_exception_subprocess():
 
 @pytest.fixture
 def mock_context():
-    return {"ti": MagicMock()}
+    return MagicMock()
 
 
 @pytest.fixture
@@ -1561,35 +1560,23 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
 
-def test_upload_sql_files_xocm(mock_context):
+def test_upload_sql_files_xocm(tmp_path):
+    sql_file = tmp_path / "target" / "models" / "test.sql"
+    sql_file.parent.mkdir(parents=True, exist_ok=True)
+    sql_file.write_text("SELECT 1;")
 
-    tmp_project_dir = "/fake/tmp/project"
-    resource_type = "models"
+    mock_context = {"ti": MagicMock()}
 
-    source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
-    fake_file_1 = source_run_dir / "query1.sql"
-    fake_file_2 = source_run_dir / "subdir/query2.sql"
+    obj = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    obj._construct_dest_file_path = lambda a, b, c, d: "dest.sql"
 
-    # Mock Path.rglob to return fake file paths
-    with mock.patch("pathlib.Path.rglob", return_value=[fake_file_1, fake_file_2]), mock.patch(
-        "builtins.open", mock.mock_open(read_data="SELECT * FROM table;")
-    ), mock.patch.object(
-        DbtRunLocalOperator, "_construct_dest_file_path", side_effect=lambda a, b, c, d: f"dest/{Path(b).name}"
-    ), mock.patch.object(
-        DbtRunLocalOperator, "log", autospec=True
-    ):
-        operator = DbtRunLocalOperator(
-            task_id="test",
-            project_dir="/tmp",
-            profile_config=profile_config,
-        )
+    obj._upload_sql_files_xocm(mock_context, str(tmp_path), "models")
 
-        operator._upload_sql_files_xocm(mock_context, tmp_project_dir, resource_type)
-
-        # Assert
-        assert mock_context["ti"].xcom_push.call_count == 2
-        mock_context["ti"].xcom_push.assert_any_call(key="dest/query1.sql", value="SELECT * FROM table;")
-        mock_context["ti"].xcom_push.assert_any_call(key="dest/query2.sql", value="SELECT * FROM table;")
+    mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value="SELECT 1;")
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")

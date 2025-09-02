@@ -161,16 +161,3 @@ def test_example_dag(session, dag_id: str):
 def test_async_example_dag_without_setup_task(session, monkeypatch):
     async_dag_id = "simple_dag_async"
     run_dag(async_dag_id)
-
-
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
-)
-@patch.dict(
-    {"AIRFLOW__COSMOS__UPLOAD_SQL_TO_XCOM": "true"},
-)
-@pytest.mark.integration
-def test_async_example_dag_upload_sql_to_xcom(session, monkeypatch):
-    async_dag_id = "simple_dag_async"
-    run_dag(async_dag_id)

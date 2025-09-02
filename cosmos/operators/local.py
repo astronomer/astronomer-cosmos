@@ -365,12 +365,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_file_path = self._construct_dest_file_path(Path(""), file_path, source_run_dir, resource_type)
             with open(file_path, encoding="utf-8") as f:
                 file_data = f.read()
-                self.log.info("DAta %s", file_data)
                 context["ti"].xcom_push(key=dest_file_path, value=file_data)
-            self.log.info("Copied %s", file_path)
+            self.log.debug("SQL files %s uploaded to xcom.", file_path)
 
         elapsed_time = time.time() - start_time
-        self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
+        self.log.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)
 
     def _delete_sql_files(self) -> None:
         """Deletes the entire run-specific directory from the remote target."""

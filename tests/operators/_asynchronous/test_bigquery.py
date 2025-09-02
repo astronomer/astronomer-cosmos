@@ -82,38 +82,6 @@ def test_get_sql_from_xocm(profile_config_mock):
     assert result == fake_sql
 
 
-# def test_get_sql_from_xocm(mock_context):
-#     operator = DbtRunAirflowAsyncBigqueryOperator(
-#         task_id="test_task",
-#         project_dir="/path/to/project",
-#         profile_config=profile_config_mock,
-#         dbt_kwargs={"task_id": "test_task"},
-#     )
-#     # Setup required async_context attributes
-#     operator.async_context = {
-#         "dbt_node_config": {
-#             "file_path": "/opt/airflow/dags/dbt_project/target/models/my_model.sql"
-#         },
-#         "dbt_dag_task_group_identifier": "my_dag_group",
-#         "run_id": "abc123"
-#     }
-#
-#     operator.project_dir = "/opt/airflow/dags/dbt_project"
-#
-#     # Simulate context['ti'].xcom_pull returning SQL
-#     mock_context.__getitem__.return_value.xcom_pull.return_value = "SELECT * FROM users;"
-#
-#     with mock.patch.object(DbtRunAirflowAsyncBigqueryOperator, "log", autospec=True):
-#         result = operator.get_sql_from_xocm(mock_context)
-#
-#     expected_key = "my_dag_group/abc123/run/models/my_model.sql"
-#     mock_context.__getitem__.return_value.xcom_pull.assert_called_once_with(
-#         task_ids="dbt_setup_async",
-#         key=expected_key
-#     )
-#     assert result == "SELECT * FROM users;"
-
-
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
 @patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
 def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd, profile_config_mock):

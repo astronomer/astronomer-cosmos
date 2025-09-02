@@ -175,12 +175,13 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if self.async_context.get("run_id") is None:
             self.async_context["run_id"] = context["run_id"]
 
-        if settings.upload_sql_to_xocm:
-            sql_query = self.get_sql_from_xocm(context)
-        else:
-            sql_query = self.get_remote_sql()
-
         if settings.enable_setup_async_task:
+
+            if settings.upload_sql_to_xocm:
+                sql_query = self.get_sql_from_xocm(context)
+            else:
+                sql_query = self.get_remote_sql()
+
             self.configuration = {
                 "query": {
                     "query": sql_query,

@@ -1,9 +1,11 @@
+import base64
 import json
 import logging
 import os
 import shutil
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -1561,9 +1563,10 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
 
 
 def test_upload_sql_files_xocm(tmp_path):
-    sql_file = tmp_path / "target" / "models" / "test.sql"
+    sql_query = "SELECT 1;"
+    sql_file = tmp_path / "target" / "models" / "dest.sql"
     sql_file.parent.mkdir(parents=True, exist_ok=True)
-    sql_file.write_text("SELECT 1;")
+    sql_file.write_text(sql_query)
 
     mock_context = {"ti": MagicMock()}
 
@@ -1576,7 +1579,9 @@ def test_upload_sql_files_xocm(tmp_path):
 
     obj._upload_sql_files_xocm(mock_context, str(tmp_path), "models")
 
-    mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value="SELECT 1;")
+    compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+    compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+    mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value=compressed_b64_sql)
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")

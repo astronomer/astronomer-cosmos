@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import zlib
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -54,8 +56,12 @@ def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
 
 def test_get_sql_from_xocm(profile_config_mock):
     fake_sql = "SELECT 42;"
+    compressed_sql = zlib.compress(fake_sql.encode("utf-8"))
+    compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+
     mock_context = {"ti": MagicMock()}
-    mock_context["ti"].xcom_pull.return_value = fake_sql
+
+    mock_context["ti"].xcom_pull.return_value = compressed_b64_sql
 
     obj = DbtRunAirflowAsyncBigqueryOperator(
         task_id="test_task",
@@ -66,12 +72,12 @@ def test_get_sql_from_xocm(profile_config_mock):
     obj.project_dir = "/tmp/project/subdir"
 
     obj.async_context = {
-        "dbt_node_config": {"file_path": "/tmp/project/models/test.sql"},
+        "dbt_node_config": {"file_path": "/tmp/project/models_test.sql"},
         "dbt_dag_task_group_identifier": "tg1",
         "run_id": "rid123",
     }
 
-    expected_key = "tg1/rid123/run/models/test.sql"
+    expected_key = "models_test.sql"
 
     result = obj.get_sql_from_xocm(mock_context)
 

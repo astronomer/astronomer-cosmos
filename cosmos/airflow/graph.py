@@ -592,7 +592,7 @@ def _add_teardown_task(
     tasks_map[DBT_TEARDOWN_ASYNC_TASK_ID] = teardown_airflow_task
 
 
-def build_airflow_graph(  # noqa: C901
+def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astronomer-cosmos/issues/1943
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use

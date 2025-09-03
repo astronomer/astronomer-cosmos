@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import base64
 import time
+import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 import airflow
+
+from cosmos.operators.base import _sanitize_xcom_key
 
 try:
     from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -132,11 +136,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         start_time = time.time()
         file_path = self.async_context["dbt_node_config"]["file_path"]
         project_dir_parent = str(Path(self.project_dir).parent)
-        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
-        run_id = self.async_context["run_id"]
-        xcom_model_path = f"{dbt_dag_task_group_identifier}/{run_id}/run/{relative_file_path}"
-        sql_query = context["ti"].xcom_pull(task_ids="dbt_setup_async", key=xcom_model_path)
+        sql_model_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        compressed_b64_sql = context["ti"].xcom_pull(task_ids="dbt_setup_async", key=_sanitize_xcom_key(sql_model_path))
+        compressed_b64_sql = base64.b64decode(compressed_b64_sql)
+        sql_query = zlib.decompress(compressed_b64_sql).decode("utf-8")
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)

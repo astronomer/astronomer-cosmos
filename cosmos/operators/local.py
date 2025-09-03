@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import json
 import os
@@ -7,6 +8,7 @@ import tempfile
 import time
 import urllib.parse
 import warnings
+import zlib
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
@@ -114,6 +116,7 @@ from cosmos.operators.base import (
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
+    _sanitize_xcom_key,
 )
 
 AIRFLOW_VERSION = Version(airflow.__version__)
@@ -362,11 +365,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
         for file_path in files:
-            dest_file_path = self._construct_dest_file_path(Path(""), file_path, source_run_dir, resource_type)
+            sql_model_path = os.path.relpath(file_path, source_run_dir).lstrip("/")
             with open(file_path, encoding="utf-8") as f:
-                file_data = f.read()
-                context["ti"].xcom_push(key=dest_file_path, value=file_data)
-            self.log.debug("SQL files %s uploaded to xcom.", file_path)
+                sql_query = f.read()
+            compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+            compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+            context["ti"].xcom_push(key=_sanitize_xcom_key(sql_model_path), value=compressed_b64_sql)
+            self.log.debug("SQL files %s uploaded to xcom.", sql_model_path)
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)

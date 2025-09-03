@@ -14,7 +14,7 @@ except ImportError:
         "with with `pip install apache-airflow-providers-google`."
     )
 
-from airflow.utils.context import Context
+from airflow.utils.context import Context  # type: ignore
 from packaging.version import Version
 
 from cosmos import settings
@@ -105,7 +105,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
             configuration=self.configuration,
-            deferrable=True,
+            deferrable=False,
             **kwargs,
         )
         self.async_context = extra_context or {}

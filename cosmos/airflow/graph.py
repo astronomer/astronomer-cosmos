@@ -592,7 +592,7 @@ def _add_teardown_task(
     tasks_map[DBT_TEARDOWN_ASYNC_TASK_ID] = teardown_airflow_task
 
 
-def build_airflow_graph(
+def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astronomer-cosmos/issues/1943
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
@@ -642,6 +642,10 @@ def build_airflow_graph(
     detached_nodes: dict[str, DbtNode] = OrderedDict()
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
+
+    virtualenv_dir = None
+    if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
+        virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
@@ -709,7 +713,7 @@ def build_airflow_graph(
         _add_dbt_setup_async_task(
             dag,
             execution_mode,
-            task_args,
+            {**task_args, "virtualenv_dir": virtualenv_dir},
             tasks_map,
             task_group,
             render_config=render_config,

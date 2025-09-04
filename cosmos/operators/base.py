@@ -27,6 +27,10 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
 
+def _sanitize_xcom_key(file_path: str) -> str:
+    return file_path.replace("/", "_").replace("\\", "_")
+
+
 class AbstractDbtBase(metaclass=ABCMeta):
     """
     Executes a dbt core cli command.

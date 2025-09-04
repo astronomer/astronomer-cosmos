@@ -1,9 +1,11 @@
+import base64
 import json
 import logging
 import os
 import shutil
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -1558,6 +1560,28 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
 
     with pytest.raises(CosmosValueError, match="remote target path is not configured"):
         operator._upload_sql_files(tmp_project_dir, "compiled")
+
+
+def test_upload_sql_files_xocm(tmp_path):
+    sql_query = "SELECT 1;"
+    sql_file = tmp_path / "target" / "models" / "dest.sql"
+    sql_file.parent.mkdir(parents=True, exist_ok=True)
+    sql_file.write_text(sql_query)
+
+    mock_context = {"ti": MagicMock()}
+
+    obj = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    obj._construct_dest_file_path = lambda a, b, c, d: "dest.sql"
+
+    obj._upload_sql_files_xocm(mock_context, str(tmp_path), "models")
+
+    compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+    compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+    mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value=compressed_b64_sql)
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")

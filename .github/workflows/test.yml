@@ -434,6 +434,7 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
+      AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: 0
       AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
       AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
       AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0

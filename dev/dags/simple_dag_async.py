@@ -24,7 +24,7 @@ profile_config = ProfileConfig(
 simple_dag_async = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop",
+        DBT_ROOT_PATH / "altered_jaffle_shop",
     ),
     profile_config=profile_config,
     execution_config=ExecutionConfig(

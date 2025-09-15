@@ -131,8 +131,11 @@ def get_dag_ids() -> list[str]:
     return dag_bag.dag_ids
 
 
-def run_dag(dag_id: str):
-    dag_bag = get_dagbag_depending_on_single_dag()
+def run_dag(dag_id: str, consider_singLe_dag: bool = True):
+    if consider_singLe_dag:
+        dag_bag = get_dagbag_depending_on_single_dag()
+    else:
+        dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
     assert dag
     test_utils.run_dag(dag)
@@ -163,4 +166,4 @@ def test_example_dag(session, dag_id: str):
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):
     async_dag_id = "simple_dag_async"
-    run_dag(async_dag_id)
+    run_dag(async_dag_id, consider_singLe_dag=False)

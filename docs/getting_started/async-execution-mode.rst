@@ -62,8 +62,11 @@ Edit your Dockerfile to ensure all necessary requirements are included.
 
     FROM astrocrpublic.azurecr.io/runtime:3.0-2
 
-    # These environment variables configure Cosmos to upload and download
-    # compiled SQL files from the specified GCS bucket.
+    # These environment variables configure Cosmos to upload and download compiled SQL files from the specified
+    # Upload and download the compiled SQL files from Airflow xcom (Require Cosmos>=1.11)
+    # ENV AIRFLOW__COSMOS__UPLOAD_SQL_TO_XCOM=True
+
+    # (Optional): Upload and download the compiled SQL files from gcs
     # The path is set to 'cosmos_remote_target_demo', and access is handled via the 'gcp_conn' Airflow connection.
     ENV AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
     ENV AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn

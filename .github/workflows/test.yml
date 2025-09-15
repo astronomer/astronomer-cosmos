@@ -421,16 +421,6 @@ jobs:
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
-        env:
-          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
-          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
-          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
-          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-          AIRFLOW__COSMOS__ENABLE_CACHE: 0
-          AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
-          AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -441,10 +431,18 @@ jobs:
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
+      AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
+      AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
+      AIRFLOW__COSMOS__ENABLE_CACHE: 0
+      AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
+      AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+      DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
+
       # The following are only required because the profiles.yml file references them. They are not used by the tests selected by this job.
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       POSTGRES_HOST: localhost
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

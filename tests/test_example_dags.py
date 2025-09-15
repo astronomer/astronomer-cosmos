@@ -71,8 +71,10 @@ def get_dag_bag() -> DagBag:  # noqa: C901
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
+        # We are testing this DAG in a dedicated CI job
+        file.writelines(["simple_dag_async.py\n"])
+
         if DBT_VERSION < Version("1.6.0"):
-            file.writelines(["simple_dag_async.py\n"])
             file.writelines(["example_model_version.py\n"])
             file.writelines(["example_operators.py\n"])
 

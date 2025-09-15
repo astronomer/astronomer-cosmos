@@ -8,6 +8,8 @@ from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "jaffle_shop")
+DBT_PROJECT_PATH = DBT_ROOT_PATH / DBT_PROJECT_NAME
 
 DBT_ADAPTER_VERSION = os.getenv("DBT_ADAPTER_VERSION", "1.9")
 
@@ -24,7 +26,7 @@ profile_config = ProfileConfig(
 simple_dag_async = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
-        DBT_ROOT_PATH / "altered_jaffle_shop",
+        DBT_PROJECT_PATH,
     ),
     profile_config=profile_config,
     execution_config=ExecutionConfig(

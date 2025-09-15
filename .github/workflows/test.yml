@@ -434,6 +434,7 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
+      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
       AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: 0
       AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
       AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}

@@ -116,22 +116,23 @@ def get_dag_bag_single_dag(single_dag: str) -> DagBag:
     return db
 
 
-def get_dag_ids() -> list[str]:
+def get_dagbag_depending_on_single_dag() -> DagBag:
+    """Return DagBag for a single DAG or for all DAGs, depending on environment variable TEST_SINGLE_DAG"""
     single_dag = os.getenv("TEST_SINGLE_DAG")
     if single_dag:
         dag_bag = get_dag_bag_single_dag(single_dag)
-        return dag_bag.dag_ids
     else:
         dag_bag = get_dag_bag()
-        return dag_bag.dag_ids
+    return dag_bag
+
+
+def get_dag_ids() -> list[str]:
+    dag_bag = get_dagbag_depending_on_single_dag()
+    return dag_bag.dag_ids
 
 
 def run_dag(dag_id: str):
-    single_dag = os.getenv("TEST_SINGLE_DAG")
-    if single_dag:
-        dag_bag = get_dag_bag_single_dag(single_dag)
-    else:
-        dag_bag = get_dag_bag()
+    dag_bag = get_dagbag_depending_on_single_dag()
     dag = dag_bag.get_dag(dag_id)
     assert dag
     test_utils.run_dag(dag)

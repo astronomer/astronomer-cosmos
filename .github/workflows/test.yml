@@ -431,6 +431,13 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
+          # The following are only required because the profiles.yml file references them. They are not used by the tests selected by this job.
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_SCHEMA: public
+          POSTGRES_PORT: 5432
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4

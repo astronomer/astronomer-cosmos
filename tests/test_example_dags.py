@@ -99,9 +99,30 @@ def get_dag_bag() -> DagBag:  # noqa: C901
     return db
 
 
+def get_dag_bag_single_dag(single_dag: str) -> DagBag:
+    """Create a DagBag by adding the files that are not supported to .airflowignore"""
+    # add everything to airflow ignore that isn't performance_dag.py
+    with open(AIRFLOW_IGNORE_FILE, "w+") as f:
+        for file in EXAMPLE_DAGS_DIR.iterdir():
+            if file.is_file() and file.suffix == ".py":
+                if file.name != single_dag:
+                    print(f"Adding {file.name} to .airflowignore")
+                    f.write(f"{file.name}\n")
+    print(".airflowignore contents: ")
+    print(AIRFLOW_IGNORE_FILE.read_text())
+    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    assert db.dags
+    assert not db.import_errors
+    return db
+
+
 def get_dag_ids() -> list[str]:
-    dag_bag = get_dag_bag()
-    return dag_bag.dag_ids
+    if os.getenv("TEST_SINGLE_DAG"):
+        dag_bag = get_dag_bag_single_dag(os.getenv("TEST_SINGLE_DAG"))
+        return dag_bag.dag_ids
+    else:
+        dag_bag = get_dag_bag()
+        return dag_bag.dag_ids
 
 
 def run_dag(dag_id: str):

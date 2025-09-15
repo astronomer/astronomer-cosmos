@@ -370,6 +370,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+          TEST_SINGLE_DAG: "basic_cosmos_task_group.py"
 
   Run-Integration-Tests-DBT-Async:
     needs: Authorize

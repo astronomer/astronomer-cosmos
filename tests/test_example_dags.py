@@ -117,8 +117,9 @@ def get_dag_bag_single_dag(single_dag: str) -> DagBag:
 
 
 def get_dag_ids() -> list[str]:
-    if os.getenv("TEST_SINGLE_DAG"):
-        dag_bag = get_dag_bag_single_dag(os.getenv("TEST_SINGLE_DAG"))
+    single_dag = os.getenv("TEST_SINGLE_DAG")
+    if single_dag:
+        dag_bag = get_dag_bag_single_dag(single_dag)
         return dag_bag.dag_ids
     else:
         dag_bag = get_dag_bag()
@@ -126,7 +127,11 @@ def get_dag_ids() -> list[str]:
 
 
 def run_dag(dag_id: str):
-    dag_bag = get_dag_bag()
+    single_dag = os.getenv("TEST_SINGLE_DAG")
+    if single_dag:
+        dag_bag = get_dag_bag_single_dag(single_dag)
+    else:
+        dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
     assert dag
     test_utils.run_dag(dag)

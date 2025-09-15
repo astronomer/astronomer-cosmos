@@ -197,4 +197,13 @@ Create an Airflow connection with following configurations
 The ``run`` tasks will run asynchronously via the deferrable operator, freeing up worker slots while waiting on I/O or long-running tasks.
 
 .. note::
-    The deferrable operator is currently supported for dbt models only when using BigQuery. Adding support for other adapters is on the roadmap.
+
+   1. The deferrable operator is currently supported for dbt models only when using BigQuery. Adding support for other adapters is on the roadmap.
+
+   2. By default, the ``SetupAsyncOperator`` creates and executes within a new isolated virtual environment for each run. To reuse an existing virtual environment, use the ``virtualenv_dir`` parameter within the ``operator_args`` of the ``DbtDag``.
+
+      Example:
+
+      .. code-block:: python
+
+         DbtDag(..., operator_args={"virtualenv_dir": "dbt_venv"})

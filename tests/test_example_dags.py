@@ -71,9 +71,6 @@ def get_dag_bag() -> DagBag:  # noqa: C901
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        # We are testing this DAG in a dedicated CI job
-        file.writelines(["simple_dag_async.py\n"])
-
         if DBT_VERSION < Version("1.6.0"):
             file.writelines(["example_model_version.py\n"])
             file.writelines(["example_operators.py\n"])
@@ -131,11 +128,8 @@ def get_dag_ids() -> list[str]:
     return dag_bag.dag_ids
 
 
-def run_dag(dag_id: str, consider_singLe_dag: bool = True):
-    if consider_singLe_dag:
-        dag_bag = get_dagbag_depending_on_single_dag()
-    else:
-        dag_bag = get_dag_bag()
+def run_dag(dag_id: str):
+    dag_bag = get_dagbag_depending_on_single_dag()
     dag = dag_bag.get_dag(dag_id)
     assert dag
     test_utils.run_dag(dag)
@@ -166,4 +160,4 @@ def test_example_dag(session, dag_id: str):
 @pytest.mark.integration
 def test_async_example_dag_without_setup_task(session, monkeypatch):
     async_dag_id = "simple_dag_async"
-    run_dag(async_dag_id, consider_singLe_dag=False)
+    run_dag(async_dag_id)

@@ -61,7 +61,7 @@ with DAG(
     orders = DbtTaskGroup(
         group_id="orders",
         project_config=ProjectConfig(
-            (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
+            (DBT_PROJECT_PATH).as_posix(),
         ),
         render_config=RenderConfig(
             select=["path:seeds/raw_orders.csv"],

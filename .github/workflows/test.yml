@@ -369,6 +369,8 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+          DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+          TEST_SINGLE_DAG: "basic_cosmos_task_group.py"
 
   Run-Integration-Tests-DBT-Async:
     needs: Authorize
@@ -380,7 +382,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.11", "3.0" ]
-        dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10"]
+        dbt-version: ["1.6", "1.7", "1.8", "1.9", "1.10"]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -421,16 +423,6 @@ jobs:
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
-        env:
-          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
-          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
-          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
-          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-          AIRFLOW__COSMOS__ENABLE_CACHE: 0
-          AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
-          AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -441,8 +433,26 @@ jobs:
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+
+      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+      AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: 0
+      AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
+      AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
+      AIRFLOW__COSMOS__ENABLE_CACHE: 0
+      AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
+      AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+      DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
+
+      # The following are only required because the profiles.yml file references them. They are not used by the tests selected by this job.
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_SCHEMA: public
+      POSTGRES_PORT: 5432
 
   Run-Integration-dbt-fusion-Tests:
     needs: Authorize
@@ -614,7 +624,7 @@ jobs:
       matrix:
         python-version: [ "3.12" ]
         airflow-version: [ "2.10", "3.0" ]
-        dbt-version: [ "1.9" ]
+        dbt-version: [ "1.10" ]
     steps:
       - uses: actions/checkout@v5
         with:

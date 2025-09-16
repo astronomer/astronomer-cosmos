@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import airflow
@@ -172,3 +173,21 @@ def test_execute_removes_existing_path(mock_object_storage_path):
     mock_object_storage_path.assert_called_once_with(expected_path, conn_id="my_conn_id")
     mock_path_instance.exists.assert_called_once()
     mock_path_instance.rmdir.assert_called_once_with(recursive=True)
+
+
+def test_run_with_existing_venv(profile_config_mock):
+
+    virtualenv_path = Path("/temp/myenv")
+
+    with patch.object(Path, "mkdir") as mock_mkdir:
+        # Simulate that the directory already exists
+        mock_mkdir.return_value = None
+
+        SetupAsyncOperator(
+            task_id="test_task",
+            project_dir="some/path",
+            profile_config=profile_config_mock,
+            virtualenv_dir=virtualenv_path,
+        )
+        # Assert that mkdir was called with expected arguments
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)

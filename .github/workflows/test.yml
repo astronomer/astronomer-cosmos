@@ -7,7 +7,7 @@ on:
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
   pull_request_target:
-    branches: [main] # zizmor: ignore[dangerous-triggers]
+    branches: [main, af-31] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -52,7 +52,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1.0b2"]
         dbt-version: ["1.10"]
         exclude:
           - python-version: "3.11"
@@ -121,7 +121,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1.0b2"]
         dbt-version: ["1.10"]
         exclude:
           - python-version: "3.11"
@@ -463,7 +463,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11"]
-        airflow-version: ["2.10", "3.0"]
+        airflow-version: ["2.10", "3.1.0b2"]
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
@@ -548,7 +548,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11"]
-        airflow-version: ["2.10", "3.0" ]
+        airflow-version: ["2.10", "3.0", "3.1.0b2"]
         dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     services:

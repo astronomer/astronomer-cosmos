@@ -132,7 +132,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def base_cmd(self) -> list[str]:
         return ["run"]
 
-    def get_sql_from_xocm(self, context: Context) -> str:
+    def get_sql_from_xcom(self, context: Context) -> str:
         start_time = time.time()
         file_path = self.async_context["dbt_node_config"]["file_path"]
         project_dir_parent = str(Path(self.project_dir).parent)
@@ -181,7 +181,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if settings.enable_setup_async_task:
 
             if settings.upload_sql_to_xocm:
-                sql_query = self.get_sql_from_xocm(context)
+                sql_query = self.get_sql_from_xcom(context)
             else:
                 sql_query = self.get_remote_sql()
 
@@ -201,7 +201,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
         if settings.upload_sql_to_xocm:
-            sql = self.get_sql_from_xocm(context)
+            sql = self.get_sql_from_xcom(context)
         else:
             sql = self.get_remote_sql().strip()
         self.log.debug("Executed SQL is: %s", sql)

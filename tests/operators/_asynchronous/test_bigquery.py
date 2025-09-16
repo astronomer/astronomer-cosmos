@@ -54,7 +54,7 @@ def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
     assert operator.base_cmd == ["run"]
 
 
-def test_get_sql_from_xocm(profile_config_mock):
+def test_get_sql_from_xcom(profile_config_mock):
     fake_sql = "SELECT 42;"
     compressed_sql = zlib.compress(fake_sql.encode("utf-8"))
     compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
@@ -79,7 +79,7 @@ def test_get_sql_from_xocm(profile_config_mock):
 
     expected_key = "models_test.sql"
 
-    result = obj.get_sql_from_xocm(mock_context)
+    result = obj.get_sql_from_xcom(mock_context)
 
     mock_context["ti"].xcom_pull.assert_called_once_with(
         task_ids="dbt_setup_async",

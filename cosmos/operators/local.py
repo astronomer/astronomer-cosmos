@@ -360,7 +360,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
-    def _upload_sql_files_xocm(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
+    def _upload_sql_files_xcom(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
         source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
@@ -595,7 +595,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:
             if settings.upload_sql_to_xocm:
-                self._upload_sql_files_xocm(context, tmp_project_dir, "run")
+                self._upload_sql_files_xcom(context, tmp_project_dir, "run")
             else:
                 self._upload_sql_files(tmp_project_dir, "run")
         else:

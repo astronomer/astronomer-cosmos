@@ -151,6 +151,13 @@ except (ImportError, ModuleNotFoundError):
             job_facets: dict[str, str] = dict()
 
 
+if settings.AIRFLOW_IO_AVAILABLE:
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
+
+
 class AbstractDbtLocalBase(AbstractDbtBase):
     """
     Executes a dbt core cli command locally.
@@ -320,8 +327,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Airflow 2.8 or later."
             )
 
-        from airflow.io.path import ObjectStoragePath
-
         _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
         if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
@@ -352,8 +357,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if not dest_target_dir:
             raise CosmosValueError("You're trying to upload SQL files, but the remote target path is not configured. ")
-
-        from airflow.io.path import ObjectStoragePath
 
         source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
@@ -389,8 +392,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not dest_target_dir or not dest_conn_id:
             self.log.warning("Remote target path or connection ID not configured. Skipping deletion.")
             return
-
-        from airflow.io.path import ObjectStoragePath
 
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         run_id = self.extra_context["run_id"]

@@ -1525,7 +1525,7 @@ def test_config_remote_target_path_unset_settings(rem_target_path, rem_target_pa
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
 @patch("cosmos.operators.local.remote_target_path_conn_id", new="aws_s3_conn")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.operators.local.ObjectStoragePath")
 def test_configure_remote_target_path(mock_object_storage_path):
     operator = DbtCompileLocalOperator(
         task_id="fake-task",
@@ -1586,8 +1586,8 @@ def test_upload_sql_files_xcom(tmp_path):
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.settings.upload_sql_to_xcom", False)
-@patch("airflow.io.path.ObjectStoragePath.copy")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.operators.local.ObjectStoragePath.copy")
+@patch("cosmos.operators.local.ObjectStoragePath")
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
 def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_storage_path, mock_copy):
     """Test upload_compiled_sql when should_upload_compiled_sql is True and uploads files."""
@@ -1854,7 +1854,7 @@ def test_construct_dest_file_path_in_operator():
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.operators.local.ObjectStoragePath")
 def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
     """Test that parent directories are created during file uploads."""
 
@@ -1883,7 +1883,7 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
 @pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.operators.local.ObjectStoragePath")
 def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote):
     """Test the _delete_sql_files method when the remote directory doesn't exist."""
     mock_path = MagicMock()

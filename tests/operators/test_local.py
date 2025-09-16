@@ -1562,7 +1562,7 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
 
-def test_upload_sql_files_xocm(tmp_path):
+def test_upload_sql_files_xcom(tmp_path):
     sql_query = "SELECT 1;"
     sql_file = tmp_path / "target" / "models" / "dest.sql"
     sql_file.parent.mkdir(parents=True, exist_ok=True)
@@ -1577,7 +1577,7 @@ def test_upload_sql_files_xocm(tmp_path):
     )
     obj._construct_dest_file_path = lambda a, b, c, d: "dest.sql"
 
-    obj._upload_sql_files_xocm(mock_context, str(tmp_path), "models")
+    obj._upload_sql_files_xcom(mock_context, str(tmp_path), "models")
 
     compressed_sql = zlib.compress(sql_query.encode("utf-8"))
     compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")

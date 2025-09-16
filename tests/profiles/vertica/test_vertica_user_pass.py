@@ -26,7 +26,7 @@ def mock_vertica_conn():  # type: ignore
         schema="my_database",
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -45,7 +45,7 @@ def mock_vertica_conn_custom_port():  # type: ignore
         schema="my_database",
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 

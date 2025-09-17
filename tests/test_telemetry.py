@@ -94,7 +94,7 @@ def test_emit_usage_metrics_fails(mock_httpx_get, caplog):
         follow_redirects=True,
     )
     assert not is_success
-    log_msg = f"""Unable to emit usage metrics to https://astronomer.gateway.scarf.sh/astronomer-cosmos/v2/1.8.0a4/2.10.1/3.11/darwin/amd64/dag_run/success/d151d1fa2f03270ea116cc7494f2c591/3/3. An HTTPX connection error occurred: Something is not right."""
+    log_msg = f"""Unable to emit usage metrics to https://astronomer.gateway.scarf.sh/astronomer-cosmos/v2/1.8.0a4/2.10.1/3.11/darwin/amd64/dag_run/success/d151d1fa2f03270ea116cc7494f2c591/3/3/local. An HTTPX connection error occurred: Something is not right."""
     assert caplog.text.startswith("WARNING")
     assert log_msg in caplog.text
 

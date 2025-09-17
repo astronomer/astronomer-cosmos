@@ -84,10 +84,11 @@ def test_emit_usage_metrics_fails(mock_httpx_get, caplog):
         "dag_hash": "d151d1fa2f03270ea116cc7494f2c591",
         "task_count": 3,
         "cosmos_task_count": 3,
+        "execution_modes": "local",
     }
     is_success = telemetry.emit_usage_metrics(sample_metrics)
     mock_httpx_get.assert_called_once_with(
-        f"""https://astronomer.gateway.scarf.sh/astronomer-cosmos/v1/1.8.0a4/2.10.1/3.11/darwin/amd64/dag_run/success/d151d1fa2f03270ea116cc7494f2c591/3/3""",
+        f"""https://astronomer.gateway.scarf.sh/astronomer-cosmos/v2/1.8.0a4/2.10.1/3.11/darwin/amd64/dag_run/success/d151d1fa2f03270ea116cc7494f2c591/3/3/local""",
         timeout=1.0,
         follow_redirects=True,
     )
@@ -111,6 +112,7 @@ def test_emit_usage_metrics_succeeds(caplog):
         "dag_hash": "dag-hash-ci",
         "task_count": 33,
         "cosmos_task_count": 33,
+        "execution_modes": "local",
     }
     is_success = telemetry.emit_usage_metrics(sample_metrics)
     assert is_success

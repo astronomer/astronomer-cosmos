@@ -56,6 +56,9 @@ def get_execution_modes(dag: DAG) -> str:
         if (getattr(task, "_task_module", None) or task.__class__.__module__).startswith("cosmos.")
     }
 
+    if not modes:
+        return "none"
+
     # Sorted to ensure consistent and predictable output
     return "__".join(sorted(modes))
 

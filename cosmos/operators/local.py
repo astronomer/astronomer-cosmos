@@ -579,7 +579,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.log.info("Pushed run results to XCom")
 
     def _handle_post_execution(self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool) -> None:
-        self.log.info("Handling post execution with push_run_results_to_xcom: %s", push_run_results_to_xcom)
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
         self._override_rtif(context)

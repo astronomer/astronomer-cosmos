@@ -589,7 +589,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         context: Context,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
-    ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
+    ) -> FullOutputSubprocessResult | dbtRunnerResult:
         """
         Copies the dbt project to a temporary directory and runs the command.
         """

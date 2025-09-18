@@ -15,6 +15,8 @@ Committers
 * Giovanni Corsetti Silva (`@corsettigyg <https://github.com/corsettigyg>`_)
 * Julian LaNeve (`@jlaneve <https://github.com/jlaneve>`_)
 * Justin Bandoro (`@jbandoro <https://github.com/jbandoro>`_)
+* Pankaj Koti (`@pankajkoti <https://github.com/pankajkoti>`_)
+* Pankaj Singh (`@pankajastro <https://github.com/pankajastro>`_)
 * Tatiana Al-Chueyr (`@tatiana <https://github.com/tatiana>`_)
 
 

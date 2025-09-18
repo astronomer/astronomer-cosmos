@@ -180,7 +180,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         if settings.enable_setup_async_task:
 
-            if settings.upload_sql_to_xocm:
+            if settings.upload_sql_to_xcom:
                 sql_query = self.get_sql_from_xcom(context)
             else:
                 sql_query = self.get_remote_sql()
@@ -200,7 +200,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if not settings.enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
-        if settings.upload_sql_to_xocm:
+        if settings.upload_sql_to_xcom:
             sql = self.get_sql_from_xcom(context)
         else:
             sql = self.get_remote_sql().strip()

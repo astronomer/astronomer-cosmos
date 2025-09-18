@@ -333,7 +333,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
         run_id = self.extra_context["run_id"]
 
-        if settings.upload_sql_to_xocm:
+        if settings.upload_sql_to_xcom:
             return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
         return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
@@ -594,7 +594,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:
-            if settings.upload_sql_to_xocm:
+            if settings.upload_sql_to_xcom:
                 self._upload_sql_files_xcom(context, tmp_project_dir, "run")
             else:
                 self._upload_sql_files(tmp_project_dir, "run")

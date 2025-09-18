@@ -16,6 +16,7 @@ class MysqlUserPasswordProfileMapping(BaseProfileMapping):
 
     airflow_connection_type: str = "mysql"
     dbt_profile_type: str = "mysql"
+    is_community: bool = True
 
     required_fields = [
         "server",

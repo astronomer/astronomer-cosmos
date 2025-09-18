@@ -152,6 +152,7 @@ def test_configure_bigquery_async_op_args_missing_sql(async_operator_mock):
         _configure_bigquery_async_op_args(async_operator_mock)
 
 
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator.get_remote_sql")
 @patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._override_rtif")
 def test_store_compiled_sql(mock_override_rtif, mock_get_remote_sql, profile_config_mock):

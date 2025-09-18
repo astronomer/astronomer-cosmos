@@ -1585,6 +1585,7 @@ def test_upload_sql_files_xcom(tmp_path):
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("airflow.io.path.ObjectStoragePath.copy")
 @patch("airflow.io.path.ObjectStoragePath")
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
@@ -1804,6 +1805,7 @@ def test_construct_dest_file_path_with_run_id():
     assert "test_run_id" in result
 
 
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 def test_operator_construct_dest_file_path_with_run_id():
     """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
     operator = ConcreteDbtLocalBaseOperator(
@@ -1824,6 +1826,7 @@ def test_operator_construct_dest_file_path_with_run_id():
     assert "test_run_id" in result
 
 
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 def test_construct_dest_file_path_in_operator():
     """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
     operator = ConcreteDbtLocalBaseOperator(

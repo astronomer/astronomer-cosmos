@@ -4,7 +4,8 @@ import base64
 import gzip
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -166,79 +167,80 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
             flags.extend(["--select", *self.render_config.select])
         return flags
 
-    def execute(self, context: Context, **kwargs: Any) -> Any:  # type: ignore[override]
+    @staticmethod
+    def _serialize_event(ev: EventMsg) -> dict[str, Any]:
+        """Convert structured dbt EventMsg to plain dict."""
+        from google.protobuf.json_format import MessageToDict
+
+        return MessageToDict(ev, preserving_proto_field_name=True)  # type: ignore[no-any-return]
+
+    def _handle_startup_event(self, ev: EventMsg, startup_events: list[dict[str, Any]]) -> None:
+        info = ev.info  # type: ignore[attr-defined]
+        raw_ts = getattr(info, "ts", None)
+        ts_val = raw_ts.ToJsonString() if getattr(raw_ts, "ToJsonString", None) else str(raw_ts)  # type: ignore[union-attr]
+        startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
+
+    def _handle_node_finished(
+        self,
+        ev: EventMsg,
+        context: Context,
+    ) -> None:
+        self.log.debug("DbtBuildCoordinatorOperator: handling node finished event: %s", ev)
+        ti = context["ti"]
+        uid = ev.data.node_info.unique_id
+        ev_dict = self._serialize_event(ev)
+        payload = base64.b64encode(gzip.compress(json.dumps(ev_dict).encode())).decode()
+        ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
+
+    @contextmanager
+    def _patch_runner(self, callback: Callable[[EventMsg], None]) -> Any:
+        import cosmos.dbt.runner as _dbt_runner_mod
+
+        original = _dbt_runner_mod.get_runner
+
+        def _patched_get_runner() -> Any:
+            from dbt.cli.main import dbtRunner
+
+            return dbtRunner(callbacks=[callback])
+
+        _dbt_runner_mod.get_runner = _patched_get_runner  # type: ignore[assignment]
+        if hasattr(original, "cache_clear"):
+            original.cache_clear()
+        try:
+            yield
+        finally:
+            _dbt_runner_mod.get_runner = original
+
+    def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
+        ti = context["ti"]
+        # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
+        if startup_events:
+            ti.xcom_push(key="dbt_startup_events", value=startup_events)
+
+    def execute(self, context: Context, **kwargs: Any) -> Any:
         if not self.invocation_mode:
             self._discover_invocation_mode()
 
-        # Prefer structured events for low-latency status streaming when the dbtRunner is available.
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-        self.log.debug("DbtBuildCoordinatorOperator: use_events: %s", use_events)
+        self.log.debug("DbtBuildCoordinatorOperator: use_events=%s", use_events)
 
-        results_mapping: dict[str, str] = {}
-        startup_events: list[dict[str, Any]] = []  # capture metadata events
+        startup_events: list[dict[str, Any]] = []
 
         if use_events:
-            logger.info("DbtBuildCoordinatorOperator: capturing node statuses via dbtRunner callbacks")
 
-            ti = context["ti"]
+            def _cb(ev: EventMsg) -> None:
+                name = ev.info.name
+                if name in {"MainReportVersion", "AdapterRegistered"}:
+                    self._handle_startup_event(ev, startup_events)
+                elif name == "NodeFinished":
+                    self._handle_node_finished(ev, context)
 
-            def _event_callback(ev: EventMsg) -> None:  # type: ignore[valid-type]
-                # Capture node completion events
-                ev_name = ev.info.name
-
-                if ev_name in {"MainReportVersion", "AdapterRegistered"}:
-                    info = ev.info  # type: ignore[attr-defined]
-                    raw_ts = getattr(info, "ts", None)
-                    if raw_ts is not None and hasattr(raw_ts, "ToJsonString"):
-                        ts_val = raw_ts.ToJsonString()
-                    else:
-                        ts_val = str(raw_ts)
-                    startup_events.append(
-                        {
-                            "name": info.name,
-                            "msg": info.msg,
-                            "ts": ts_val,
-                        }
-                    )
-
-                if ev_name == "NodeFinished":
-                    from google.protobuf.json_format import MessageToDict
-
-                    uid = ev.data.node_info.unique_id
-                    status = ev.data.run_result.status.upper()
-                    results_mapping[uid] = status
-                    ev_dict = MessageToDict(ev, preserving_proto_field_name=True)
-                    payload = base64.b64encode(gzip.compress(json.dumps(ev_dict).encode())).decode()
-
-                    ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
-
-            import cosmos.dbt.runner as _dbt_runner_mod
-
-            original_get_runner = _dbt_runner_mod.get_runner
-
-            def _patched_get_runner() -> Any:
-                from dbt.cli.main import dbtRunner
-
-                return dbtRunner(callbacks=[_event_callback])
-
-            # Monkey-patch get_runner so AbstractDbtLocalBase picks up patched runner with event callbacks.
-            _dbt_runner_mod.get_runner = _patched_get_runner  # type: ignore[assignment]
-            if hasattr(original_get_runner, "cache_clear"):
-                original_get_runner.cache_clear()
-
-            try:
+            with self._patch_runner(_cb):
                 result = super().execute(context=context, **kwargs)
-            finally:
-                _dbt_runner_mod.get_runner = original_get_runner
 
-            logger.info("Captured %d node statuses from dbtRunner events", len(results_mapping))
+            self._finalize(context, startup_events)
+            return result
 
-            self.log.debug("Startup events: %s", startup_events)
-            if startup_events:
-                ti.xcom_push(key="dbt_startup_events", value=startup_events)
-        else:
-            logger.info("DbtBuildCoordinatorOperator: falling back to run_results.json for status capture")
-            kwargs["push_run_results_to_xcom"] = True
-            result = super().execute(context=context, **kwargs)
-
-        return result
+        # Fallback – push run_results.json via base class helper
+        kwargs["push_run_results_to_xcom"] = True
+        return super().execute(context=context, **kwargs)

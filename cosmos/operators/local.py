@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import json
 import os
@@ -7,6 +8,7 @@ import tempfile
 import time
 import urllib.parse
 import warnings
+import zlib
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
@@ -114,6 +116,7 @@ from cosmos.operators.base import (
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
+    _sanitize_xcom_key,
 )
 
 AIRFLOW_VERSION = Version(airflow.__version__)
@@ -330,6 +333,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
         run_id = self.extra_context["run_id"]
 
+        if settings.upload_sql_to_xcom:
+            return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
+
         return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
@@ -353,6 +359,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
+
+    def _upload_sql_files_xcom(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
+        start_time = time.time()
+        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
+        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        for file_path in files:
+            sql_model_path = os.path.relpath(file_path, source_run_dir).lstrip("/")
+            with open(file_path, encoding="utf-8") as f:
+                sql_query = f.read()
+            compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+            compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+            context["ti"].xcom_push(key=_sanitize_xcom_key(sql_model_path), value=compressed_b64_sql)
+            self.log.debug("SQL files %s uploaded to xcom.", sql_model_path)
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)
 
     def _delete_sql_files(self) -> None:
         """Deletes the entire run-specific directory from the remote target."""
@@ -572,7 +594,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:
-            self._upload_sql_files(tmp_project_dir, "run")
+            if settings.upload_sql_to_xcom:
+                self._upload_sql_files_xcom(context, tmp_project_dir, "run")
+            else:
+                self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]

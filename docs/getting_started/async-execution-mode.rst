@@ -7,7 +7,7 @@ Airflow Async Execution Mode
 
 The Airflow async execution mode in Cosmos is designed to improve pipeline performance. This execution mode could be preferred when you’ve long running resources and you want to run them asynchronously by leveraging Airflow’s `deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__. In this mode, additional operators—``SetupAsyncOperator`` and ``TeardownAsyncOperator``—are added to your workflow.
 
-- **SetupAsyncOperator:** This task runs a mocked ``dbt run`` command on your dbt project, which outputs compiled SQL files to the project’s target director. If ``upload_sql_xcom`` is enabled, the compiled SQL files will be uploaded to Airflow XCom. Otherwise, they will be uploaded to the remote location specified by the ``remote_target_path`` configuration.
+- **SetupAsyncOperator:** This task runs a mocked ``dbt run`` command on your dbt project, which outputs compiled SQL files to the project’s target director. If ``upload_sql_xcom`` is enabled (default behaviour), the compiled SQL files will be uploaded to Airflow XCom. Otherwise, they will be uploaded to the remote location specified by the ``remote_target_path`` configuration.
 - **TeardownAsyncOperator:** This task deletes the resources created by ``SetupAsyncOperator`` from the remote location defined by the ``remote_target_path`` configuration.
 
 Advantages of Airflow Async Mode

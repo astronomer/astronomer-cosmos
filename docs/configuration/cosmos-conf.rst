@@ -190,7 +190,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 `upload_sql_to_xcom`_:
     (Introduced in Cosmos 1.11.0): Enable this if the setup async task is enabled for ``ExecutionMode.AIRFLOW_ASYNC`` and you want to upload the compiled SQL to Airflow XCom instead of a remote location (e.g., S3 or GCS).
 
-    - Default: ``False``
+    - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__UPLOAD_SQL_TO_XCOM``
 
 .. _use_dataset_airflow3_uri_standard:

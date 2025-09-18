@@ -578,7 +578,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         self.log.info("Pushed run results to XCom")
 
-    def _handle_post_execution(self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool) -> None:
+    def _handle_post_execution(
+        self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool = False
+    ) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
         self._override_rtif(context)
@@ -977,11 +979,10 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
-    def execute(self, context: Context, **kwargs: Any) -> FullOutputSubprocessResult | dbtRunnerResult:
+    def execute(self, context: Context, **kwargs: Any) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
         if self.on_warning_callback:
             self._handle_warnings(result, context)
-        return result
 
 
 class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):

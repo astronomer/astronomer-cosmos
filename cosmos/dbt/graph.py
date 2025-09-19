@@ -661,7 +661,7 @@ class DbtGraph:
             load_method[method]()
 
         self.update_node_dependency()
-        
+
         # Only build downstream graph references if needed (for performance optimization)
         if needs_downstream_graph:
             self._set_graph_references()

@@ -1,5 +1,6 @@
 """
-An example DAG that uses Cosmos to render a dbt project into an Airflow DAG using Cosmos source rendering.
+An example DAG that uses Cosmos to render a dbt project into an Airflow DAG using Cosmos source rendering, and then
+prunes unused source nodes.
 """
 
 import os

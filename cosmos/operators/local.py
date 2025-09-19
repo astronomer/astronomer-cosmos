@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import gzip
 import inspect
 import json
 import os
@@ -577,13 +578,40 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if partial_parse_file.exists():
             cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
-    def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
+    def _push_run_results_to_xcom(self, tmp_project_dir: str, context: Context) -> None:
+        run_results_path = Path(tmp_project_dir) / "target" / "run_results.json"
+        if not run_results_path.is_file():  # pragma: no cover
+            raise AirflowException(f"run_results.json not found at {run_results_path}")
+
+        try:
+            with run_results_path.open() as fp:
+                raw = json.load(fp)
+        except json.JSONDecodeError as exc:  # pragma: no cover
+            raise AirflowException("Invalid JSON in run_results.json") from exc
+        self.log.debug("Loaded run results from %s", run_results_path)
+
+        # results_mapping = {result["unique_id"]: result for result in raw.get("results", [])}
+        # compressed = base64.b64encode(gzip.compress(json.dumps(results_mapping).encode())).decode()
+        # self.log.debug("Parsed %d entries out of run_results.json", len(results_mapping))
+
+        compressed = base64.b64encode(gzip.compress(json.dumps(raw).encode())).decode()
+        context["ti"].xcom_push(key="run_results", value=compressed)
+
+        self.log.info("Pushed run results to XCom")
+
+    def _handle_post_execution(
+        self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool = False
+    ) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
         self._override_rtif(context)
 
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
+
+        if push_run_results_to_xcom:
+            self._push_run_results_to_xcom(tmp_project_dir, context)
+
         if self.callback:
             self.callback_args.update({"context": context})
             if isinstance(self.callback, list):
@@ -614,6 +642,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         context: Context,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        push_run_results_to_xcom: bool = False,
     ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -667,7 +696,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 if self.partial_parse:
                     self._update_partial_parse_cache(tmp_dir_path)
 
-                self._handle_post_execution(tmp_project_dir, context)
+                self._handle_post_execution(tmp_project_dir, context, push_run_results_to_xcom)
                 self.handle_exception(result)
 
                 if run_as_async and async_context:
@@ -861,6 +890,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         cmd_flags: list[str] | None = None,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         # If this is an async run and we're using the setup task, make sure to include the full_refresh flag if set
         if run_as_async and settings.enable_setup_async_task and getattr(self, "full_refresh", False):
@@ -872,7 +902,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(
-            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context
+            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context, **kwargs
         )
         return result
 
@@ -974,7 +1004,7 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
         if self.on_warning_callback:
             self._handle_warnings(result, context)
 

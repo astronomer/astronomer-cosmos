@@ -36,7 +36,7 @@ source_rendering_dag = DbtDag(
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag
     },
-    render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL, source_prunning=True),
+    render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL, source_pruning=True),
     # normal dag parameters
     schedule="@daily",
     start_date=datetime(2024, 1, 1),

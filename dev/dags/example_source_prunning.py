@@ -41,7 +41,7 @@ source_rendering_dag = DbtDag(
     schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    dag_id="source_prunning_dag",
+    dag_id="source_pruning_dag",
     default_args={"retries": 0},
     on_warning_callback=lambda context: print(context),
 )

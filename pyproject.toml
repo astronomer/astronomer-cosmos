@@ -36,6 +36,7 @@ dependencies = [
     "packaging>=22.0",
     "pydantic>=1.10.0",
     "virtualenv",
+    "click<8.3.0"
 ]
 
 [project.optional-dependencies]

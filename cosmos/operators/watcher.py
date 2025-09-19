@@ -16,6 +16,7 @@ if TYPE_CHECKING:  # pragma: no cover
 from cosmos.config import RenderConfig
 from cosmos.constants import InvocationMode
 from cosmos.operators.local import DbtBuildLocalOperator
+from cosmos.settings import watcher_build_coordinator_priority_weight
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -155,7 +156,8 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
         self.render_config: RenderConfig | None = render_config
 
         task_id = kwargs.pop("task_id", "dbt_build_coordinator")
-        super().__init__(task_id=task_id, **kwargs)
+
+        super().__init__(task_id=task_id, priority_weight=watcher_build_coordinator_priority_weight, **kwargs)
 
     def add_cmd_flags(self) -> list[str]:
         flags: list[str] = super().add_cmd_flags()

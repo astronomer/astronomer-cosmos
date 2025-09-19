@@ -207,3 +207,11 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
 
     assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
+
+
+@patch("cosmos.operators.watcher.watcher_build_coordinator_priority_weight", 4242)
+def test_build_coordinator_uses_priority_weight_setting():
+    """Operator should honour watcher_build_coordinator_priority_weight setting."""
+    op = DbtBuildCoordinatorOperator(project_dir=".", profile_config=None)
+
+    assert op.priority_weight == 4242

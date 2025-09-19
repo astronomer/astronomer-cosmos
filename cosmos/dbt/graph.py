@@ -83,7 +83,7 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
-    _graph_nodes: dict[str, "DbtNode"] = field(default_factory=dict, init=False, repr=False)
+    _graph_nodes: dict[str, DbtNode] = field(default_factory=dict, init=False, repr=False)
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -175,10 +175,10 @@ class DbtNode:
         }
 
     @property
-    def downstream_nodes(self) -> list["DbtNode"]:
+    def downstream_nodes(self) -> list[DbtNode]:
         """
         Find all nodes that depend on this node (downstream dependencies).
-        
+
         :returns: List of DbtNode objects that depend on this node
         """
         downstream_nodes = []
@@ -191,7 +191,7 @@ class DbtNode:
     def downstream_ids(self) -> list[str]:
         """
         Find all node IDs that depend on this node (downstream dependencies).
-        
+
         :returns: List of unique_ids of nodes that depend on this node
         """
         downstream_ids = []
@@ -200,7 +200,7 @@ class DbtNode:
                 downstream_ids.append(node.unique_id)
         return downstream_ids
 
-    def _set_graph_nodes(self, graph_nodes: dict[str, "DbtNode"]) -> None:
+    def _set_graph_nodes(self, graph_nodes: dict[str, DbtNode]) -> None:
         """
         Internal method to set the graph nodes reference.
         This should only be called by DbtGraph after loading nodes.
@@ -1011,15 +1011,15 @@ class DbtGraph:
     def get_downstream_nodes(self, node_unique_id: str, use_filtered: bool = True) -> list[DbtNode]:
         """
         Get all downstream nodes for a given node.
-        
+
         :param node_unique_id: The unique_id of the node to find downstream dependencies for
         :param use_filtered: Whether to search in filtered_nodes (True) or all nodes (False)
         :returns: List of DbtNode objects that depend on the specified node
         """
         nodes_dict = self.filtered_nodes if use_filtered else self.nodes
-        
+
         if node_unique_id not in nodes_dict:
             return []
-            
+
         node = nodes_dict[node_unique_id]
         return node.downstream_nodes

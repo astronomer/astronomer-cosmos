@@ -178,7 +178,7 @@ class DbtNode:
     def downstream_nodes(self) -> list[DbtNode]:
         """
         Find all nodes that depend on this node (downstream dependencies).
-        
+
         :returns: List of DbtNode objects that depend on this node
         """
         if self.downstream_graph is None:
@@ -189,7 +189,7 @@ class DbtNode:
     def downstream_ids(self) -> list[str]:
         """
         Find all node IDs that depend on this node (downstream dependencies).
-        
+
         :returns: List of unique_ids of nodes that depend on this node
         """
         if self.downstream_graph is None:
@@ -207,64 +207,62 @@ class DbtNode:
 class DownstreamGraph:
     """
     Optimized data structure for computing downstream relationships in a dbt graph.
-    
+
     This class precomputes and caches downstream relationships to avoid O(n) lookups
     for each node when computing downstream dependencies, otherwise we would risk overloading the scheduler.
     """
-    
+
     def __init__(self, nodes: dict[str, DbtNode]):
         """
-        
+
         :param nodes: Dictionary mapping node unique_id to DbtNode objects
         """
         self.nodes = nodes
         self._downstream_map: dict[str, list[str]] = {}
         self._downstream_nodes_cache: dict[str, list[DbtNode]] = {}
         self._build_downstream_map()
-    
+
     def _build_downstream_map(self) -> None:
         """
         Build the downstream map by iterating through all nodes at once.
         """
         for node_id in self.nodes:
             self._downstream_map[node_id] = []
-        
+
         # Build the downstream relationships
         for node in self.nodes.values():
             for dependency_id in node.depends_on:
                 if dependency_id in self._downstream_map:
                     self._downstream_map[dependency_id].append(node.unique_id)
-    
+
     @lru_cache(maxsize=1024)
     def get_downstream_ids(self, node_id: str) -> list[str]:
         """
         Get downstream node IDs for a given node.
         Uses LRU cache for performance with repeated access.
-        
+
         :param node_id: The unique_id of the node
         :returns: List of downstream node IDs
         """
         return self._downstream_map.get(node_id, []).copy()
-    
+
     def get_downstream_nodes(self, node_id: str) -> list[DbtNode]:
         """
         Get downstream DbtNode objects for a given node.
         Uses caching to avoid repeated node lookups.
-        
+
         :param node_id: The unique_id of the node
         :returns: List of downstream DbtNode objects
         """
         if node_id not in self._downstream_nodes_cache:
             downstream_ids = self.get_downstream_ids(node_id)
             downstream_nodes = [
-                self.nodes[downstream_id] 
-                for downstream_id in downstream_ids 
-                if downstream_id in self.nodes
+                self.nodes[downstream_id] for downstream_id in downstream_ids if downstream_id in self.nodes
             ]
             self._downstream_nodes_cache[node_id] = downstream_nodes
-        
+
         return self._downstream_nodes_cache[node_id].copy()
-    
+
     def clear_cache(self) -> None:
         """Clear the internal caches"""
         self.get_downstream_ids.cache_clear()
@@ -1070,7 +1068,7 @@ class DbtGraph:
         """
         # Create the optimized downstream graph using filtered_nodes
         downstream_graph = DownstreamGraph(self.filtered_nodes)
-        
+
         # Set the downstream graph reference for all nodes
         for node in self.nodes.values():
             node.set_downstream_graph(downstream_graph)
@@ -1078,15 +1076,15 @@ class DbtGraph:
     def get_downstream_nodes(self, node_unique_id: str, use_filtered: bool = True) -> list[DbtNode]:
         """
         Get all downstream nodes for a given node.
-        
+
         :param node_unique_id: The unique_id of the node to find downstream dependencies for
         :param use_filtered: Whether to search in filtered_nodes (True) or all nodes (False)
         :returns: List of DbtNode objects that depend on the specified node
         """
         nodes_dict = self.filtered_nodes if use_filtered else self.nodes
-        
+
         if node_unique_id not in nodes_dict:
             return []
-            
+
         node = nodes_dict[node_unique_id]
         return node.downstream_nodes

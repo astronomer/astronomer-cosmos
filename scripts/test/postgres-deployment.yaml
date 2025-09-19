@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: bitnami/postgresql:latest
+        image: postgres:latest
         env:
         - name: POSTGRES_DB
           value: postgres

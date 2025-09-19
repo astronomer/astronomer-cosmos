@@ -580,7 +580,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _push_run_results_to_xcom(self, tmp_project_dir: str, context: Context) -> None:
         run_results_path = Path(tmp_project_dir) / "target" / "run_results.json"
-        if not run_results_path.is_file():
+        if not run_results_path.is_file():  # pragma: no cover
             raise AirflowException(f"run_results.json not found at {run_results_path}")
 
         try:

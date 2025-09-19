@@ -649,7 +649,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch click<8.3.0
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run kubernetes tests

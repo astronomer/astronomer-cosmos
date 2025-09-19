@@ -285,7 +285,11 @@ class DbtToAirflowConverter:
             dbt_vars=project_config.dbt_vars,
             airflow_metadata=cache._get_airflow_metadata(dag, task_group),
         )
-        self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
+        self.dbt_graph.load(
+            method=render_config.load_method, 
+            execution_mode=execution_config.execution_mode,
+            needs_downstream_graph=render_config.source_prunning
+        )
 
         self._add_dbt_project_hash_to_dag_docs(dag)
 

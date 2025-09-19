@@ -624,6 +624,7 @@ class DbtGraph:
         self,
         method: LoadMode = LoadMode.AUTOMATIC,
         execution_mode: ExecutionMode = ExecutionMode.LOCAL,
+        needs_downstream_graph: bool = False,
     ) -> None:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
@@ -631,6 +632,8 @@ class DbtGraph:
         :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
             or dbt ls)
         :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.KUBERNETES)
+        :param needs_downstream_graph: Whether to build the downstream graph references. Set to False to skip
+            building downstream relationships for better performance when source pruning is not needed.
 
         Fundamentally, there are two different execution paths
         There is automatic, and manual.
@@ -658,7 +661,10 @@ class DbtGraph:
             load_method[method]()
 
         self.update_node_dependency()
-        self._set_graph_references()
+        
+        # Only build downstream graph references if needed (for performance optimization)
+        if needs_downstream_graph:
+            self._set_graph_references()
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.filtered_nodes))

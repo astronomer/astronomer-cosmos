@@ -40,7 +40,9 @@ jobs:
           python-version: "3.10"
           architecture: "x64"
 
-      - run: pip3 install hatch
+      # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+      # issue https://github.com/pypa/hatch/issues/2050 is resolved.
+      - run: pip3 install hatch "click<8.3.0"
       - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
@@ -96,9 +98,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -170,9 +174,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -253,9 +259,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -339,9 +347,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
@@ -415,9 +425,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -485,9 +497,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Set RESOURCE_PREFIX without periods
@@ -582,9 +596,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run performance tests against against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -647,9 +663,11 @@ jobs:
         uses: container-tools/kind-action@0ad70e2299366b0e1552c7240f4e4567148f723e  # v2.0.4
 
       - name: Install packages and dependencies
+        # Remove the `click` installation(which currently has an upper bound 8.3.0) once the
+        # issue https://github.com/pypa/hatch/issues/2050 is resolved.
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system hatch "click<8.3.0"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run kubernetes tests

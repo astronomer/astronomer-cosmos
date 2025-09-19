@@ -56,6 +56,11 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
+# Airflow task priority weight for the DbtBuildCoordinatorOperator task in WATCHER Execution Mode
+watcher_build_coordinator_priority_weight = conf.getint(
+    "cosmos", "watcher_build_coordinator_priority_weight", fallback=9999
+)
+
 AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 
 # The following environment variable is populated in Astro Cloud

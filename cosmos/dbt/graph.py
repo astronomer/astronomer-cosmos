@@ -83,6 +83,7 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+    _graph_nodes: dict[str, "DbtNode"] = field(default_factory=dict, init=False, repr=False)
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -170,7 +171,41 @@ class DbtNode:
             "has_test": self.has_test,
             "resource_name": self.resource_name,
             "name": self.name,
+            "downstream_ids": self.downstream_ids,
         }
+
+    @property
+    def downstream_nodes(self) -> list["DbtNode"]:
+        """
+        Find all nodes that depend on this node (downstream dependencies).
+        
+        :returns: List of DbtNode objects that depend on this node
+        """
+        downstream_nodes = []
+        for node in self._graph_nodes.values():
+            if self.unique_id in node.depends_on:
+                downstream_nodes.append(node)
+        return downstream_nodes
+
+    @property
+    def downstream_ids(self) -> list[str]:
+        """
+        Find all node IDs that depend on this node (downstream dependencies).
+        
+        :returns: List of unique_ids of nodes that depend on this node
+        """
+        downstream_ids = []
+        for node in self._graph_nodes.values():
+            if self.unique_id in node.depends_on:
+                downstream_ids.append(node.unique_id)
+        return downstream_ids
+
+    def _set_graph_nodes(self, graph_nodes: dict[str, "DbtNode"]) -> None:
+        """
+        Internal method to set the graph nodes reference.
+        This should only be called by DbtGraph after loading nodes.
+        """
+        self._graph_nodes = graph_nodes
 
 
 def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
@@ -562,6 +597,7 @@ class DbtGraph:
             load_method[method]()
 
         self.update_node_dependency()
+        self._set_graph_references()
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.filtered_nodes))
@@ -963,3 +999,27 @@ class DbtGraph:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node
+
+    def _set_graph_references(self) -> None:
+        """
+        Set the graph nodes reference for all nodes so they can compute downstream dependencies.
+        This should be called after loading and filtering nodes.
+        """
+        for node in self.nodes.values():
+            node._set_graph_nodes(self.filtered_nodes)
+
+    def get_downstream_nodes(self, node_unique_id: str, use_filtered: bool = True) -> list[DbtNode]:
+        """
+        Get all downstream nodes for a given node.
+        
+        :param node_unique_id: The unique_id of the node to find downstream dependencies for
+        :param use_filtered: Whether to search in filtered_nodes (True) or all nodes (False)
+        :returns: List of DbtNode objects that depend on the specified node
+        """
+        nodes_dict = self.filtered_nodes if use_filtered else self.nodes
+        
+        if node_unique_id not in nodes_dict:
+            return []
+            
+        node = nodes_dict[node_unique_id]
+        return node.downstream_nodes

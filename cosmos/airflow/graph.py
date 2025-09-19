@@ -257,6 +257,7 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
+    source_prunning: bool = False,
     normalize_task_id: Callable[..., Any] | None = None,
     normalize_task_display_name: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
@@ -330,6 +331,8 @@ def create_task_metadata(
             ):
                 return None
 
+            if source_prunning and not node.downstream_nodes:
+                return None
             task_id, args = _get_task_id_and_args(
                 node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
             )
@@ -397,8 +400,9 @@ def generate_task_or_group(
     task_args: dict[str, Any],
     test_behavior: TestBehavior,
     source_rendering_behavior: SourceRenderingBehavior,
+    source_prunning: bool,
     test_indirect_selection: TestIndirectSelection,
-    on_warning_callback: Callable[..., Any] | None,
+    on_warning_callback: Callable[..., Any] | None = None,
     normalize_task_id: Callable[..., Any] | None = None,
     normalize_task_display_name: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
@@ -421,6 +425,7 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
+        source_prunning=source_prunning,
         normalize_task_id=normalize_task_id,
         normalize_task_display_name=normalize_task_display_name,
         test_behavior=test_behavior,
@@ -631,6 +636,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
+    source_prunning = render_config.source_prunning
     normalize_task_id = render_config.normalize_task_id
     normalize_task_display_name = render_config.normalize_task_display_name
     enable_owner_inheritance = render_config.enable_owner_inheritance
@@ -663,6 +669,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             task_args=task_args,
             test_behavior=test_behavior,
             source_rendering_behavior=source_rendering_behavior,
+            source_prunning=source_prunning,
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,

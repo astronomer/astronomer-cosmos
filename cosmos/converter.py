@@ -288,7 +288,7 @@ class DbtToAirflowConverter:
         self.dbt_graph.load(
             method=render_config.load_method, 
             execution_mode=execution_config.execution_mode,
-            needs_downstream_graph=render_config.source_prunning
+            needs_downstream_graph=render_config.source_pruning
         )
 
         self._add_dbt_project_hash_to_dag_docs(dag)

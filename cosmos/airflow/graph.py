@@ -73,12 +73,12 @@ def _is_source_used_by_filtered_nodes(source_node: DbtNode, filtered_nodes: dict
     :returns: True if the source is used by any filtered node, False otherwise
     """
     source_id = source_node.unique_id
-    
+
     # Check if any filtered node depends on this source
     for node in filtered_nodes.values():
         if source_id in node.depends_on:
             return True
-    
+
     return False
 
 

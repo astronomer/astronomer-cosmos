@@ -67,10 +67,9 @@ def calculate_operator_class(
 def _is_source_used_by_filtered_nodes(source_node: DbtNode, filtered_nodes: dict[str, DbtNode]) -> bool:
     """
     Check if a source node is referenced by any of the filtered nodes.
-    This is a much simpler approach than building the entire downstream graph.
-    
+
     :param source_node: The source node to check
-    :param filtered_nodes: Dictionary of filtered nodes (nodes that will be rendered)
+    :param filtered_nodes: Dictionary of filtered nodes
     :returns: True if the source is used by any filtered node, False otherwise
     """
     source_id = source_node.unique_id

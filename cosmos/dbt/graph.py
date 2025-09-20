@@ -11,7 +11,7 @@ import tempfile
 import warnings
 import zlib
 from dataclasses import dataclass, field
-from functools import cached_property, lru_cache
+from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Any, Dict, Optional
@@ -83,7 +83,6 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
-    downstream_graph: DownstreamGraph = field(default=None, init=False, repr=False)
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -171,102 +170,7 @@ class DbtNode:
             "has_test": self.has_test,
             "resource_name": self.resource_name,
             "name": self.name,
-            "downstream_ids": self.downstream_ids,
         }
-
-    @property
-    def downstream_nodes(self) -> list[DbtNode]:
-        """
-        Find all nodes that depend on this node (downstream dependencies).
-
-        :returns: List of DbtNode objects that depend on this node
-        """
-        if self.downstream_graph is None:
-            return []
-        return self.downstream_graph.get_downstream_nodes(self.unique_id)
-
-    @property
-    def downstream_ids(self) -> list[str]:
-        """
-        Find all node IDs that depend on this node (downstream dependencies).
-
-        :returns: List of unique_ids of nodes that depend on this node
-        """
-        if self.downstream_graph is None:
-            return []
-        return self.downstream_graph.get_downstream_ids(self.unique_id)
-
-    def set_downstream_graph(self, downstream_graph: DownstreamGraph) -> None:
-        """
-        Internal method to set the downstream graph reference.
-        This should only be called by DbtGraph after loading nodes.
-        """
-        self.downstream_graph = downstream_graph
-
-
-class DownstreamGraph:
-    """
-    Optimized data structure for computing downstream relationships in a dbt graph.
-
-    This class precomputes and caches downstream relationships to avoid O(n) lookups
-    for each node when computing downstream dependencies, otherwise we would risk overloading the scheduler.
-    """
-
-    def __init__(self, nodes: dict[str, DbtNode]):
-        """
-
-        :param nodes: Dictionary mapping node unique_id to DbtNode objects
-        """
-        self.nodes = nodes
-        self._downstream_map: dict[str, list[str]] = {}
-        self._downstream_nodes_cache: dict[str, list[DbtNode]] = {}
-        self._build_downstream_map()
-
-    def _build_downstream_map(self) -> None:
-        """
-        Build the downstream map by iterating through all nodes at once.
-        """
-        for node_id in self.nodes:
-            self._downstream_map[node_id] = []
-
-        # Build the downstream relationships
-        for node in self.nodes.values():
-            for dependency_id in node.depends_on:
-                if dependency_id in self._downstream_map:
-                    self._downstream_map[dependency_id].append(node.unique_id)
-
-    @lru_cache(maxsize=1024)
-    def get_downstream_ids(self, node_id: str) -> list[str]:
-        """
-        Get downstream node IDs for a given node.
-        Uses LRU cache for performance with repeated access.
-
-        :param node_id: The unique_id of the node
-        :returns: List of downstream node IDs
-        """
-        return self._downstream_map.get(node_id, []).copy()
-
-    def get_downstream_nodes(self, node_id: str) -> list[DbtNode]:
-        """
-        Get downstream DbtNode objects for a given node.
-        Uses caching to avoid repeated node lookups.
-
-        :param node_id: The unique_id of the node
-        :returns: List of downstream DbtNode objects
-        """
-        if node_id not in self._downstream_nodes_cache:
-            downstream_ids = self.get_downstream_ids(node_id)
-            downstream_nodes = [
-                self.nodes[downstream_id] for downstream_id in downstream_ids if downstream_id in self.nodes
-            ]
-            self._downstream_nodes_cache[node_id] = downstream_nodes
-
-        return self._downstream_nodes_cache[node_id].copy()
-
-    def clear_cache(self) -> None:
-        """Clear the internal caches"""
-        self.get_downstream_ids.cache_clear()
-        self._downstream_nodes_cache.clear()
 
 
 def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
@@ -624,7 +528,6 @@ class DbtGraph:
         self,
         method: LoadMode = LoadMode.AUTOMATIC,
         execution_mode: ExecutionMode = ExecutionMode.LOCAL,
-        needs_downstream_graph: bool = False,
     ) -> None:
         """
         Load a `dbt` project into a `DbtGraph`, setting `nodes` and `filtered_nodes` accordingly.
@@ -632,8 +535,6 @@ class DbtGraph:
         :param method: How to load `nodes` from a `dbt` project (automatically, using custom parser, using dbt manifest
             or dbt ls)
         :param execution_mode: Where Cosmos should run each dbt task (e.g. ExecutionMode.KUBERNETES)
-        :param needs_downstream_graph: Whether to build the downstream graph references. Set to False to skip
-            building downstream relationships for better performance when source pruning is not needed.
 
         Fundamentally, there are two different execution paths
         There is automatic, and manual.
@@ -661,10 +562,6 @@ class DbtGraph:
             load_method[method]()
 
         self.update_node_dependency()
-
-        # Only build downstream graph references if needed (for performance optimization)
-        if needs_downstream_graph:
-            self._set_graph_references()
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.filtered_nodes))
@@ -1066,31 +963,3 @@ class DbtGraph:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node
-
-    def _set_graph_references(self) -> None:
-        """
-        Set the downstream graph reference for all nodes so they can compute downstream dependencies.
-        This should be called after loading and filtering nodes.
-        """
-        # Create the optimized downstream graph using filtered_nodes
-        downstream_graph = DownstreamGraph(self.filtered_nodes)
-
-        # Set the downstream graph reference for all nodes
-        for node in self.nodes.values():
-            node.set_downstream_graph(downstream_graph)
-
-    def get_downstream_nodes(self, node_unique_id: str, use_filtered: bool = True) -> list[DbtNode]:
-        """
-        Get all downstream nodes for a given node.
-
-        :param node_unique_id: The unique_id of the node to find downstream dependencies for
-        :param use_filtered: Whether to search in filtered_nodes (True) or all nodes (False)
-        :returns: List of DbtNode objects that depend on the specified node
-        """
-        nodes_dict = self.filtered_nodes if use_filtered else self.nodes
-
-        if node_unique_id not in nodes_dict:
-            return []
-
-        node = nodes_dict[node_unique_id]
-        return node.downstream_nodes

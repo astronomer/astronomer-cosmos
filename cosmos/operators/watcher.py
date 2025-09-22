@@ -205,6 +205,9 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
 
         _dbt_runner_mod.get_runner = _patched_get_runner  # type: ignore[assignment]
         if hasattr(original, "cache_clear"):
+            # Clear the cache of the original get_runner function to ensure that
+            # no stale cached runners are used after monkey-patching. This prevents
+            # inconsistencies that could arise from the lru_cache holding onto old results.
             original.cache_clear()
         try:
             yield

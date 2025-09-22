@@ -177,7 +177,7 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
     def _handle_startup_event(self, ev: EventMsg, startup_events: list[dict[str, Any]]) -> None:
         info = ev.info  # type: ignore[attr-defined]
         raw_ts = getattr(info, "ts", None)
-        ts_val = raw_ts.ToJsonString() if getattr(raw_ts, "ToJsonString", None) else str(raw_ts)  # type: ignore[union-attr]
+        ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]
         startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
 
     def _handle_node_finished(

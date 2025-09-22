@@ -121,7 +121,7 @@ dbt_watcher_adapterregistered = {
 
 
 class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
-    """Run dbt build and coordinate model run statuses via XCom for *WATCHER* execution mode .
+    """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
     Executes **one** ``dbt build`` covering the whole selection.
 

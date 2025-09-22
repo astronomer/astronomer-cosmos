@@ -75,18 +75,22 @@ def test_handle_node_finished_pushes_xcom():
 
 def test_execute_streaming_mode():
     """Streaming path should push startup + per-model XComs."""
+    from contextlib import nullcontext
 
     op = DbtBuildCoordinatorOperator(project_dir=".", profile_config=None)
     op.invocation_mode = InvocationMode.DBT_RUNNER
 
     import cosmos.operators.watcher as _watch_mod
 
+    # Ensure EventMsg symbol exists without permanently altering the module
     if _watch_mod.EventMsg is None:
 
         class _DummyEv:
             pass
 
-        _watch_mod.EventMsg = _DummyEv
+        eventmsg_patch = patch("cosmos.operators.watcher.EventMsg", _DummyEv, create=True)
+    else:
+        eventmsg_patch = nullcontext()  # type: ignore
 
     ti = _MockTI()
     ctx = {"ti": ti, "run_id": "dummy"}
@@ -97,11 +101,10 @@ def test_execute_streaming_mode():
     def fake_patch(self, cb):
         cb(main_rep)
         cb(node_evt)
-        from contextlib import nullcontext
 
         return nullcontext()
 
-    with patch.object(DbtBuildCoordinatorOperator, "_patch_runner", fake_patch), patch.object(
+    with eventmsg_patch, patch.object(DbtBuildCoordinatorOperator, "_patch_runner", fake_patch), patch.object(
         DbtBuildCoordinatorOperator, "_serialize_event", lambda self, ev: {"dummy": True}
     ), patch("cosmos.operators.watcher.DbtBuildLocalOperator.execute", lambda *_, **__: None):
         op.execute(context=ctx)

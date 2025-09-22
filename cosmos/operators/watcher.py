@@ -231,14 +231,14 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
 
         if use_events:
 
-            def _cb(ev: EventMsg) -> None:
+            def _callback(ev: EventMsg) -> None:
                 name = ev.info.name
                 if name in {"MainReportVersion", "AdapterRegistered"}:
                     self._handle_startup_event(ev, startup_events)
                 elif name == "NodeFinished":
                     self._handle_node_finished(ev, context)
 
-            with self._patch_runner(_cb):
+            with self._patch_runner(_callback):
                 result = super().execute(context=context, **kwargs)
 
             self._finalize(context, startup_events)

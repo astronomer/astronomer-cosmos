@@ -139,7 +139,7 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
       ``InvocationMode=SUBPROCESS``) we fallback to delayed strategy: after
       dbt exits we read ``target/run_results.json`` and push the whole mapping
       once under key ``run_results`` to XCom.  Sensors can poll this key but will not
-      get per-model updates until the build completes.
+      get per-model updates until the build completes - by the end of the execution of all dbt nodes.
 
     This keeps the heavy dbt work centralised while providing near real-time
     feedback and granular task-level observability downstream.

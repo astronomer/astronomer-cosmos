@@ -346,11 +346,11 @@ class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
 
         dbt_startup_events = ti.xcom_pull(task_ids=self.master_task_id, key="dbt_startup_events")
         if dbt_startup_events:
-            self.log.info("dbt_startup_events: %s", dbt_startup_events)
+            self.log.info("dbt_startup_events: %s", dbt_startup_events)  # TODO: FixMe
 
         pipeline_outlets = ti.xcom_pull(task_ids=self.master_task_id, key="pipeline_outlets")
         if pipeline_outlets:
-            self.log.info("pipeline_outlets: %s", pipeline_outlets)
+            self.log.info("pipeline_outlets: %s", pipeline_outlets)  # TODO: FixMe
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
         compressed_b64_event_data = ti.xcom_pull(task_ids=self.master_task_id, key=node_finished_key)
@@ -358,12 +358,12 @@ class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
         if not compressed_b64_event_data:
             return False
 
-        compressed_event_data = base64.b64decode(compressed_b64_event_data)
-        event_data = zlib.decompress(compressed_event_data).decode("utf-8")
-        if event_data:
-            self.log.info("event_data: %s", event_data)  # TODO: FixMe
+        compressed_event_msg = base64.b64decode(compressed_b64_event_data)
+        event_msg = zlib.decompress(compressed_event_msg).decode("utf-8")
+        if event_msg:
+            self.log.info("event_data: %s", event_msg)  # TODO: FixMe
 
-        event_json = ast.literal_eval(event_data)
+        event_json = ast.literal_eval(event_msg)
         status = event_json.get("data", {}).get("run_result", {}).get("status")
 
         self.log.info("Model %s finished with status %s", self.model_unique_id, status)

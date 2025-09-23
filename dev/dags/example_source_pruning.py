@@ -36,7 +36,11 @@ source_rendering_dag = DbtDag(
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag
     },
-    render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL, source_pruning=True),
+    render_config=RenderConfig(
+        source_rendering_behavior=SourceRenderingBehavior.ALL, 
+        source_pruning=True,
+        exclude=["ｍｕｌｔｉｂｙｔｅ"],  # Exclude multibyte model to avoid Airflow 3.0 AssetAlias ASCII validation issues
+    ),
     # normal dag parameters
     schedule="@daily",
     start_date=datetime(2024, 1, 1),

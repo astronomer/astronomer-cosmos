@@ -309,7 +309,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
     ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
-    def execute(self, context: Context, **kwargs) -> Any | None:  # type: ignore
+    def execute(self, context: Context) -> Any | None:  # type: ignore
         if self.extra_context:
             context_merge(context, self.extra_context)
 

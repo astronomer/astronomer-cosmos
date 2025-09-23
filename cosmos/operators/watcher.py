@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import ast
 import base64
-import gzip
 import json
 import logging
+import zlib
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -13,9 +14,15 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-from cosmos.config import RenderConfig
+try:
+    from airflow.sdk.bases.sensor import BaseSensorOperator
+except ImportError:
+    from airflow.sensors.base import BaseSensorOperator
+from airflow.exceptions import AirflowException
+
+from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtBuildLocalOperator
+from cosmos.operators.local import DbtBuildLocalOperator, DbtRunLocalOperator
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -189,7 +196,7 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)
-        payload = base64.b64encode(gzip.compress(json.dumps(ev_dict).encode())).decode()
+        payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     @contextmanager
@@ -247,3 +254,121 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
         # Fallback – push run_results.json via base class helper
         kwargs["push_run_results_to_xcom"] = True
         return super().execute(context=context, **kwargs)
+
+
+class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
+    template_fields = ("model_unique_id",)
+
+    def __init__(
+        self,
+        *,
+        model_unique_id: str,
+        profile_config: ProfileConfig | None = None,
+        project_dir: str | None = None,
+        profiles_dir: str | None = None,
+        master_task_id: str = "dbt_build_coordinator",
+        poke_interval: int = 20,
+        timeout: int = 60 * 60,  # 1 h safety valve # TODO: Test for custom value
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            poke_interval=poke_interval,
+            timeout=timeout,
+            profile_config=profile_config,
+            project_dir=project_dir,
+            profiles_dir=profiles_dir,
+            **kwargs,
+        )
+        self.model_unique_id = model_unique_id
+        self.master_task_id = master_task_id
+
+    @staticmethod
+    def _filter_flags(flags: list[str]) -> list[str]:
+        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
+        filtered = []
+        skip_next = False
+        for token in flags:
+            if skip_next:
+                if token.startswith("--"):
+                    skip_next = False
+                else:
+                    continue  # skip value of previous flag
+            if token in ("--select", "--exclude"):
+                skip_next = True
+                continue
+            filtered.append(token)
+        return filtered
+
+    def _handle_task_retry(self, try_number: int, context: Context) -> bool:
+        """
+        Handles logic for retrying a failed dbt model execution.
+        Reconstructs the dbt command by cloning the project and re-running the model
+        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+        """
+        self.log.info(
+            "Retry attempt #%s – Re-running model '%s' from project '%s'",
+            try_number - 1,
+            self.model_unique_id,
+            self.project_dir,
+        )
+
+        upstream_task = context["ti"].task.dag.get_task(self.master_task_id)
+
+        extra_flags: list[str] = []
+        if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
+            raw_flags = upstream_task.add_cmd_flags()
+            extra_flags = self._filter_flags(raw_flags)
+
+        model_selector = self.model_unique_id.split(".")[-1]
+        cmd_flags = extra_flags + ["--select", model_selector]
+
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+
+        self.log.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
+        return True
+
+    def poke(self, context: Context) -> bool:
+        """
+        Checks the status of a dbt model run by pulling relevant XComs from the master task.
+        Handles retries and checks for successful completion of the model execution.
+        """
+        try_number = context["ti"].try_number
+        ti = context["ti"]
+
+        if try_number > 1:
+            return self._handle_task_retry(try_number, context)
+
+        logger.info(
+            "Pulling status from task_id %s for model %s",
+            self.master_task_id,
+            self.model_unique_id,
+        )
+
+        dbt_startup_events = ti.xcom_pull(task_ids=self.master_task_id, key="dbt_startup_events")
+        if dbt_startup_events:
+            self.log.info("dbt_startup_events: %s", dbt_startup_events)
+
+        pipeline_outlets = ti.xcom_pull(task_ids=self.master_task_id, key="pipeline_outlets")
+        if pipeline_outlets:
+            self.log.info("pipeline_outlets: %s", pipeline_outlets)
+
+        node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
+        compressed_b64_event_data = ti.xcom_pull(task_ids=self.master_task_id, key=node_finished_key)
+
+        if not compressed_b64_event_data:
+            return False
+
+        compressed_event_data = base64.b64decode(compressed_b64_event_data)
+        event_data = zlib.decompress(compressed_event_data).decode("utf-8")
+        if event_data:
+            self.log.info("event_data: %s", event_data)  # TODO: FixMe
+
+        event_json = ast.literal_eval(event_data)
+        status = event_json.get("data", {}).get("run_result", {}).get("status")
+
+        self.log.info("Model %s finished with status %s", self.model_unique_id, status)
+
+        if status == "success":
+            return True
+        else:
+            raise AirflowException(f"Model {self.model_unique_id} finished with status '{status}'")

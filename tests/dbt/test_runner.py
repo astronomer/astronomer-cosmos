@@ -126,6 +126,16 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
     # Track dbtRunner instances
     instances = []
 
+    class _MockTI:
+        """Mock TaskInstance with required attributes."""
+
+        def __init__(self):
+            self.openlineage_events_completes = []
+            self.store = {}
+
+        def xcom_push(self, key, value, **_):
+            self.store[key] = value
+
     class _FakeResult:
         """Mock dbtRunnerResult."""
 
@@ -142,6 +152,14 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
 
         def invoke(self, *args):
             return _FakeResult()
+
+    # Create mock context with task_instance
+    mock_ti = _MockTI()
+    mock_context = {
+        "ti": mock_ti,
+        "task_instance": mock_ti,
+        "run_id": "test_run",
+    }
 
     mock_profile = ProfileConfig(
         profile_name="test", target_name="test", profiles_yml_filepath=str(valid_dbt_project_dir / "profiles.yml")
@@ -173,7 +191,8 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
                 profile_config=mock_profile,
                 install_deps=False,
             )
-            op1.execute(context={"ti": None, "run_id": "x", "dag": dag})
+            mock_context["dag"] = dag
+            op1.execute(context=mock_context)
 
             # Second operator - DbtProducerWatcherOperator should create new runner with callback
             op2 = DbtProducerWatcherOperator(
@@ -188,7 +207,7 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
                 pass
 
             with patch("cosmos.operators.watcher.EventMsg", _DummyEv):
-                op2.execute(context={"ti": None, "run_id": "y", "dag": dag})
+                op2.execute(context=mock_context)
 
             # Verify:
             # 1. We have two dbt Runner instances (cached + new with callbacks)

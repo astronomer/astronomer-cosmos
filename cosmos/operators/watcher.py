@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import base64
-import gzip
 import json
 import logging
+import zlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -130,7 +130,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
           ``AdapterRegistered``) together under XCom key
           ``dbt_startup_events``;
         – pushes each ``NodeFinished`` event immediately to XCom under
-          ``nodefinished_<unique_id>`` (gzipped+base64 JSON) so downstream
+          ``nodefinished_<unique_id>`` (zlib zipped+base64 JSON) so downstream
           sensors can react with near-zero latency.
 
     - **When ``dbtRunner`` is *not* available** (older dbt or
@@ -171,7 +171,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)
-        payload = base64.b64encode(gzip.compress(json.dumps(ev_dict).encode())).decode()
+        payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:

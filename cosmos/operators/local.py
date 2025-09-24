@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import gzip
 import inspect
 import json
 import os
@@ -592,11 +591,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowException("Invalid JSON in run_results.json") from exc
         self.log.debug("Loaded run results from %s", run_results_path)
 
-        # results_mapping = {result["unique_id"]: result for result in raw.get("results", [])}
-        # compressed = base64.b64encode(gzip.compress(json.dumps(results_mapping).encode())).decode()
-        # self.log.debug("Parsed %d entries out of run_results.json", len(results_mapping))
-
-        compressed = base64.b64encode(gzip.compress(json.dumps(raw).encode())).decode()
+        compressed = base64.b64encode(zlib.compress(json.dumps(raw).encode())).decode()
         context["ti"].xcom_push(key="run_results", value=compressed)
 
         self.log.info("Pushed run results to XCom")

@@ -117,6 +117,7 @@ def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
     assert expected1 in err_msg
 
 
+@pytest.mark.integration
 def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
     """Test that:
     1. DbtRunLocalOperator uses cached runner (no callbacks)

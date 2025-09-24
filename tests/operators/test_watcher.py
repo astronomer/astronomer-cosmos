@@ -1,6 +1,6 @@
 import base64
-import gzip
 import json
+import zlib
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -69,7 +69,7 @@ def test_handle_node_finished_pushes_xcom():
         op._handle_node_finished(ev, ctx)
 
     stored = list(ti.store.values())[0]
-    raw = gzip.decompress(base64.b64decode(stored)).decode()
+    raw = zlib.decompress(base64.b64decode(stored)).decode()
     assert json.loads(raw) == {"foo": "bar"}
 
 
@@ -145,7 +145,7 @@ def test_execute_fallback_mode(tmp_path):
 
     compressed = ti.store.get("run_results")
     assert compressed
-    data = json.loads(gzip.decompress(base64.b64decode(compressed)).decode())
+    data = json.loads(zlib.decompress(base64.b64decode(compressed)).decode())
     assert data["results"][0]["status"] == "success"
 
 

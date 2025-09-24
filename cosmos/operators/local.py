@@ -187,6 +187,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
+        dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -200,6 +201,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
+        self._dbt_runner_callbacks = dbt_runner_callbacks
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -471,7 +473,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)

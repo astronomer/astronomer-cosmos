@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+from typing import TYPE_CHECKING
 
 from airflow import __version__ as airflow_version
 from airflow.listeners import hookimpl
-from airflow.models.dag import DAG
-from airflow.models.dagrun import DagRun
+
+if TYPE_CHECKING:
+    from airflow.models.dag import DAG
+    from airflow.models.dagrun import DagRun
+
 from packaging import version
 
 from cosmos import telemetry
@@ -44,7 +48,18 @@ def total_cosmos_tasks(dag: DAG) -> int:
     return cosmos_tasks
 
 
-# @provide_session
+def get_execution_modes(dag: DAG) -> str:
+    """Determine the execution mode(s) based on task modules in the DAG."""
+    modes = {
+        (getattr(task, "_task_module", None) or task.__class__.__module__).split(".")[2]
+        for task in dag.task_dict.values()
+        if (getattr(task, "_task_module", None) or task.__class__.__module__).startswith("cosmos.")
+    }
+
+    # Sorted to ensure consistent and predictable output
+    return "__".join(sorted(modes))
+
+
 @hookimpl
 def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.debug("Running on_dag_run_success")
@@ -67,6 +82,7 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         "status": EventStatus.SUCCESS,
         "task_count": len(serialized_dag.task_ids),
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
+        "execution_modes": get_execution_modes(serialized_dag),
     }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
@@ -95,6 +111,7 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
         "status": EventStatus.FAILED,
         "task_count": len(serialized_dag.task_ids),
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
+        "execution_modes": get_execution_modes(serialized_dag),
     }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)

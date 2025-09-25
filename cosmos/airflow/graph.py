@@ -19,6 +19,7 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
@@ -503,6 +504,37 @@ def _add_dbt_setup_async_task(
             setup_airflow_task >> task
 
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
+
+
+def _add_producer(
+    dag: DAG,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+    task_group: TaskGroup | None,
+    render_config: RenderConfig | None = None,
+    async_py_requirements: list[str] | None = None,
+) -> None:
+
+    producer_task_args = task_args.copy()
+
+    if render_config is not None:
+        producer_task_args["select"] = render_config.select
+        producer_task_args["selector"] = render_config.selector
+        producer_task_args["exclude"] = render_config.exclude
+
+    producer_task_metadata = TaskMetadata(
+        id=PRODUCER_WATCHER_TASK_ID,
+        operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
+        arguments=producer_task_args,
+    )
+    producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
+
+    # for task_id, task in tasks_map.items():
+    #    if not task.upstream_list:
+    #        producer_airflow_task >> task
+
+    tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:

@@ -2,10 +2,17 @@ import base64
 import json
 import zlib
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+import pytest
+from airflow.exceptions import AirflowException
 
 from cosmos.config import InvocationMode
-from cosmos.operators.watcher import PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT, DbtProducerWatcherOperator
+from cosmos.operators.watcher import (
+    PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
+    DbtNodeStatusSensor,
+    DbtProducerWatcherOperator,
+)
 
 
 class _MockTI:
@@ -178,3 +185,87 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
 
     assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
+
+
+class TestDbtModelStatusSensor:
+
+    @pytest.fixture
+    def sensor(self):
+        return DbtNodeStatusSensor(
+            task_id="model.my_model",
+            model_unique_id="model.my_model",
+            project_dir="/fake/project",
+            profiles_dir="/fake/profiles",
+        )
+
+    def test_filter_flags_removes_select_and_exclude(self):
+        flags = ["--select", "model_a", "--exclude", "model_b", "--threads", "4"]
+        expected = ["--threads", "4"]
+        result = DbtNodeStatusSensor._filter_flags(flags)
+        assert result == expected
+
+    def test_filter_flags_handles_no_flags(self):
+        assert DbtNodeStatusSensor._filter_flags([]) == []
+
+    @patch("cosmos.operators.watcher.DbtModelStatusSensor.build_and_run_cmd")
+    def test_handle_task_retry_runs_model(self, mock_build_and_run_cmd, sensor):
+        mock_context = {
+            "ti": Mock(),
+        }
+
+        mock_task = Mock()
+        mock_task.add_cmd_flags.return_value = ["--select", "model_a", "--threads", "4"]
+        mock_context["ti"].task.dag.get_task.return_value = mock_task
+
+        result = sensor._handle_task_retry(2, mock_context)
+
+        assert result is True
+        mock_build_and_run_cmd.assert_called_once()
+        called_args = mock_build_and_run_cmd.call_args[1]["cmd_flags"]
+        assert "--select" in called_args
+        assert "my_model" in called_args
+        assert "--threads" in called_args
+
+    def test_poke_returns_false_when_no_data(self, sensor):
+        ti_mock = Mock()
+        ti_mock.try_number = 1
+        ti_mock.xcom_pull.return_value = None
+        context = {"ti": ti_mock}
+        result = sensor.poke(context)
+        assert result is False
+
+    def make_event_payload(self, status: str) -> str:
+        data = {"data": {"run_result": {"status": status}}}
+        compressed = zlib.compress(str(data).encode("utf-8"))
+        return base64.b64encode(compressed).decode("utf-8")
+
+    def test_poke_success_returns_true(self, sensor):
+        ti_mock = Mock()
+        ti_mock.try_number = 1
+        ti_mock.xcom_pull.side_effect = [
+            [],  # dbt_startup_events
+            [],  # pipeline_outlets
+            self.make_event_payload("success"),  # node_finished_key
+        ]
+        context = {"ti": ti_mock}
+        assert sensor.poke(context) is True
+
+    def test_poke_failure_raises_exception(self, sensor):
+        ti_mock = Mock()
+        ti_mock.try_number = 1
+        ti_mock.xcom_pull.side_effect = [
+            None,  # dbt_startup_events
+            None,  # pipeline_outlets
+            self.make_event_payload("error"),  # node_finished_key
+        ]
+        context = {"ti": ti_mock}
+        with pytest.raises(AirflowException, match="finished with status 'error'"):
+            sensor.poke(context)
+
+    @patch.object(DbtNodeStatusSensor, "_handle_task_retry")
+    def test_poke_calls_retry_on_retry_attempt(self, mock_retry, sensor):
+        ti_mock = Mock()
+        ti_mock.try_number = 2
+        context = {"ti": ti_mock}
+        sensor.poke(context)
+        mock_retry.assert_called_once_with(2, context)

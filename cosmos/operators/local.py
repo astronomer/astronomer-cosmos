@@ -187,6 +187,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
+        dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -200,6 +201,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
+        self._dbt_runner_callbacks = dbt_runner_callbacks
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -471,7 +473,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
@@ -580,21 +582,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _push_run_results_to_xcom(self, tmp_project_dir: str, context: Context) -> None:
         run_results_path = Path(tmp_project_dir) / "target" / "run_results.json"
-        if not run_results_path.is_file():  # pragma: no cover
-            raise AirflowException(f"run_results.json not found at {run_results_path}")
+        if not run_results_path.is_file():            raise AirflowException(f"run_results.json not found at {run_results_path}")
 
         try:
             with run_results_path.open() as fp:
                 raw = json.load(fp)
-        except json.JSONDecodeError as exc:  # pragma: no cover
+        except json.JSONDecodeError as exc:
             raise AirflowException("Invalid JSON in run_results.json") from exc
         self.log.debug("Loaded run results from %s", run_results_path)
 
-        # results_mapping = {result["unique_id"]: result for result in raw.get("results", [])}
-        # compressed = base64.b64encode(gzip.compress(json.dumps(results_mapping).encode())).decode()
-        # self.log.debug("Parsed %d entries out of run_results.json", len(results_mapping))
-
-        compressed = base64.b64encode(gzip.compress(json.dumps(raw).encode())).decode()
+        compressed = base64.b64encode(zlib.compress(json.dumps(raw).encode())).decode()
         context["ti"].xcom_push(key="run_results", value=compressed)
 
         self.log.info("Pushed run results to XCom")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from cosmos.dbt.project import change_working_directory, environ
 from cosmos.exceptions import CosmosDbtRunError
@@ -39,7 +39,7 @@ def is_available() -> bool:
 
 
 @cache
-def get_runner() -> dbtRunner:
+def _get_cached_dbt_runner() -> dbtRunner:
     """
     Retrieves a dbtRunner instance.
     """
@@ -48,7 +48,21 @@ def get_runner() -> dbtRunner:
     return dbtRunner()
 
 
-def run_command(command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
+def get_runner(callbacks: list[Callable] | None = None) -> dbtRunner:  # type: ignore[type-arg]
+    """
+    Retrieves a dbtRunner instance.
+    """
+    if callbacks and isinstance(callbacks, list):
+        from dbt.cli.main import dbtRunner
+
+        return dbtRunner(callbacks=callbacks)
+
+    return _get_cached_dbt_runner()
+
+
+def run_command(
+    command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None  # type: ignore[type-arg]
+) -> dbtRunnerResult:
     """
     Invokes the dbt command programmatically.
     """
@@ -58,7 +72,7 @@ def run_command(command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerR
     cli_args = command[1:]
     with change_working_directory(cwd), environ(env):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
-        runner = get_runner()
+        runner = get_runner(callbacks=callbacks)
         result = runner.invoke(cli_args)
     return result
 

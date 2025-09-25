@@ -2108,6 +2108,71 @@ def test_dbt_cmd_flags_mixed_static_and_templated():
     assert operator.dbt_cmd_flags == expected_flags
 
 
+def test_push_run_results_to_xcom_missing_file():
+    """Test that _push_run_results_to_xcom raises AirflowException when run_results.json doesn't exist."""
+    from airflow.exceptions import AirflowException
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._push_run_results_to_xcom("/tmp", mock_context)
+    assert "run_results.json not found" in str(exc_info.value)
+
+
+def test_push_run_results_to_xcom_invalid_json(tmp_path):
+    """Test that _push_run_results_to_xcom raises AirflowException when run_results.json is invalid JSON."""
+    from airflow.exceptions import AirflowException
+
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    run_results_path = target_dir / "run_results.json"
+    run_results_path.write_text("invalid json{")
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=str(tmp_path),
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._push_run_results_to_xcom(str(tmp_path), mock_context)
+    assert "Invalid JSON in run_results.json" in str(exc_info.value)
+
+
+def test_push_run_results_to_xcom_success(tmp_path):
+    """Test that _push_run_results_to_xcom successfully pushes valid JSON to XCom."""
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    run_results_path = target_dir / "run_results.json"
+    test_data = {"results": [{"status": "success"}]}
+    run_results_path.write_text(json.dumps(test_data))
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=str(tmp_path),
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    operator._push_run_results_to_xcom(str(tmp_path), mock_context)
+
+    mock_ti.xcom_push.assert_called_once()
+    key, value = mock_ti.xcom_push.call_args[1]["key"], mock_ti.xcom_push.call_args[1]["value"]
+    assert key == "run_results"
+
+    decompressed = json.loads(zlib.decompress(base64.b64decode(value)).decode())
+    assert decompressed == test_data
+
+
 def test_dbt_cmd_flags_all_templated():
     """Test that dbt_cmd_flags works when all values are templated."""
     from datetime import datetime

@@ -5,24 +5,22 @@ import base64
 import json
 import logging
 import zlib
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
-
+ 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
 except ImportError:
     from airflow.sensors.base import BaseSensorOperator
 from airflow.exceptions import AirflowException
 
-from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtBuildLocalOperator, DbtRunLocalOperator
+from cosmos.operators.local import DbtLocalBaseOperator
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -31,6 +29,8 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+
+PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
 
 # Example dbt event JSON dictionaries (kept for reference)
 nodefinished_model__fhir_dbt_utils__fhir_table_list = {
@@ -127,7 +127,7 @@ dbt_watcher_adapterregistered = {
 }
 
 
-class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
+class DbtProducerWatcherOperator(DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
     Executes **one** ``dbt build`` covering the whole selection.
@@ -139,7 +139,7 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
           ``AdapterRegistered``) together under XCom key
           ``dbt_startup_events``;
         – pushes each ``NodeFinished`` event immediately to XCom under
-          ``nodefinished_<unique_id>`` (gzipped+base64 JSON) so downstream
+          ``nodefinished_<unique_id>`` (zlib zipped+base64 JSON) so downstream
           sensors can react with near-zero latency.
 
     - **When ``dbtRunner`` is *not* available** (older dbt or
@@ -152,27 +152,12 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
     feedback and granular task-level observability downstream.
     """
 
-    def __init__(
-        self,
-        *,
-        render_config: RenderConfig | None = None,
-        **kwargs: Any,
-    ) -> None:
-        # Store so we can honour select/exclude when building flags
-        self.render_config: RenderConfig | None = render_config
+    base_cmd = ["build"]
 
-        task_id = kwargs.pop("task_id", "dbt_build_coordinator")
-        super().__init__(task_id=task_id, **kwargs)
-
-    def add_cmd_flags(self) -> list[str]:
-        flags: list[str] = super().add_cmd_flags()
-
-        self.log.info("DbtBuildCoordinatorOperator: render_config: %s", self.render_config)
-        if self.render_config is not None and self.render_config.exclude:
-            flags.extend(["--exclude", *self.render_config.exclude])
-        if self.render_config is not None and self.render_config.select:
-            flags.extend(["--select", *self.render_config.select])
-        return flags
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        kwargs["priority_weight"] = kwargs.get("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        super().__init__(task_id=task_id, *args, **kwargs)
 
     @staticmethod
     def _serialize_event(ev: EventMsg) -> dict[str, Any]:
@@ -192,34 +177,12 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
         ev: EventMsg,
         context: Context,
     ) -> None:
-        self.log.debug("DbtBuildCoordinatorOperator: handling node finished event: %s", ev)
+        self.log.debug("DbtProducerWatcherOperator: handling node finished event: %s", ev)
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)
         payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
-
-    @contextmanager
-    def _patch_runner(self, callback: Callable[[EventMsg], None]) -> Any:
-        import cosmos.dbt.runner as _dbt_runner_mod
-
-        original = _dbt_runner_mod.get_runner
-
-        def _patched_get_runner() -> Any:
-            from dbt.cli.main import dbtRunner
-
-            return dbtRunner(callbacks=[callback])
-
-        _dbt_runner_mod.get_runner = _patched_get_runner  # type: ignore[assignment]
-        if hasattr(original, "cache_clear"):
-            # Clear the cache of the original get_runner function to ensure that
-            # no stale cached runners are used after monkey-patching. This prevents
-            # inconsistencies that could arise from the lru_cache holding onto old results.
-            original.cache_clear()
-        try:
-            yield
-        finally:
-            _dbt_runner_mod.get_runner = original
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
         ti = context["ti"]
@@ -232,7 +195,7 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
             self._discover_invocation_mode()
 
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-        self.log.debug("DbtBuildCoordinatorOperator: use_events=%s", use_events)
+        self.log.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
 
         startup_events: list[dict[str, Any]] = []
 
@@ -245,8 +208,8 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
                 elif name == "NodeFinished":
                     self._handle_node_finished(ev, context)
 
-            with self._patch_runner(_callback):
-                result = super().execute(context=context, **kwargs)
+            self._dbt_runner_callbacks = [_callback]
+            result = super().execute(context=context, **kwargs)
 
             self._finalize(context, startup_events)
             return result
@@ -254,10 +217,10 @@ class DbtBuildCoordinatorOperator(DbtBuildLocalOperator):
         # Fallback – push run_results.json via base class helper
         kwargs["push_run_results_to_xcom"] = True
         return super().execute(context=context, **kwargs)
-
-
+      
+      
 class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
-    template_fields = ("model_unique_id",)
+  template_fields = ("model_unique_id",)
 
     def __init__(
         self,

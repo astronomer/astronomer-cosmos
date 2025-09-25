@@ -19,9 +19,23 @@ except ImportError:
     from airflow.sensors.base import BaseSensorOperator
 from airflow.exceptions import AirflowException
 
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
+
 from cosmos.config import ProfileConfig
-from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtLocalBaseOperator, DbtRunLocalOperator
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.operators.base import (
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+)
+from cosmos.operators.local import (
+    DbtLocalBaseOperator,
+    DbtRunLocalOperator,
+    DbtSourceLocalOperator,
+)
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -230,7 +244,7 @@ class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
         profile_config: ProfileConfig | None = None,
         project_dir: str | None = None,
         profiles_dir: str | None = None,
-        master_task_id: str = "dbt_build_coordinator",
+        master_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 20,
         timeout: int = 60 * 60,  # 1 h safety valve # TODO: Test for custom value
         **kwargs: Any,
@@ -336,3 +350,74 @@ class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
             return True
         else:
             raise AirflowException(f"Model {self.model_unique_id} finished with status '{status}'")
+
+
+# This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
+# That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD, until we have a better experience.
+class DbtBuildWatcherOperator:
+    def __init__(self, *args: Any, **kwargs: Any):
+        raise NotImplementedError(
+            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, since the build command is executed by the producer task."
+        )
+
+
+class DbtSeedWatcherOperator(DbtSeedMixin, DbtModelStatusSensor):  # type: ignore[misc]
+    """
+    Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: Sequence[str] = DbtModelStatusSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtModelStatusSensor):
+    """
+    Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: Sequence[str] = DbtModelStatusSensor.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSourceWatcherOperator(DbtSourceLocalOperator):
+    """
+    Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
+    """
+
+    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtRunWatcherOperator(DbtModelStatusSensor):  # type: ignore[misc]
+    """
+    Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: Sequence[str] = DbtModelStatusSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtTestWatcherOperator(EmptyOperator):
+    """
+    As a starting point, this operator does nothing.
+    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+
+        super().__init__(dag={kwargs["dag"]})
+
+
+# Not implemented:
+# - LS
+# - Run operation
+# - Docs
+# - Clone

@@ -90,6 +90,7 @@ class ExecutionMode(Enum):
     Where the Cosmos tasks should be executed.
     """
 
+    WATCHER = "watcher"
     LOCAL = "local"
     AIRFLOW_ASYNC = "airflow_async"
     DOCKER = "docker"
@@ -99,7 +100,6 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"
-    WATCHER = "watcher"
 
 
 class InvocationMode(Enum):

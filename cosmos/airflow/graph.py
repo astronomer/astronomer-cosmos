@@ -194,6 +194,7 @@ def _get_task_id_and_args(
     node: DbtNode,
     args: dict[str, Any],
     use_task_group: bool,
+    execution_mode: ExecutionMode,
     normalize_task_id: Callable[..., Any] | None,
     normalize_task_display_name: Callable[..., Any] | None,
     resource_suffix: str,
@@ -222,6 +223,9 @@ def _get_task_id_and_args(
         args_update["task_display_name"] = normalize_task_display_name(node)
     else:
         task_id = task_name
+
+    if execution_mode == ExecutionMode.WATCHER:
+        args_update["model_unique_id"] = node.unique_id
 
     return task_id, args_update
 
@@ -319,6 +323,7 @@ def create_task_metadata(
                 normalize_task_display_name=normalize_task_display_name,
                 resource_suffix=resource_suffix,
                 include_resource_type=True,
+                execution_mode=execution_mode,
             )
         elif node.resource_type == DbtResourceType.SOURCE:
             args["select"] = f"source:{node.resource_name}"
@@ -332,7 +337,13 @@ def create_task_metadata(
                 return None
 
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
+                node,
+                args,
+                use_task_group,
+                normalize_task_id,
+                normalize_task_display_name,
+                "source",
+                execution_mode=execution_mode,
             )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
@@ -351,6 +362,7 @@ def create_task_metadata(
                 normalize_task_id=normalize_task_id,
                 normalize_task_display_name=normalize_task_display_name,
                 resource_suffix=resource_suffix,
+                execution_mode=execution_mode,
             )
 
         _override_profile_if_needed(args, node.profile_config_to_override)
@@ -508,12 +520,10 @@ def _add_dbt_setup_async_task(
 
 def _add_producer(
     dag: DAG,
-    execution_mode: ExecutionMode,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
-    async_py_requirements: list[str] | None = None,
 ) -> None:
 
     producer_task_args = task_args.copy()
@@ -530,6 +540,8 @@ def _add_producer(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
 
+    # If we trigger_rule="always" (https://github.com/astronomer/astronomer-cosmos/issues/1959),
+    # the producer task becomes the parent to the root nodes of the remaining DAG
     # for task_id, task in tasks_map.items():
     #    if not task.upstream_list:
     #        producer_airflow_task >> task
@@ -741,6 +753,15 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
+
+    if execution_mode == ExecutionMode.WATCHER:
+        _add_producer(
+            dag,
+            task_args,
+            tasks_map,
+            task_group,
+        )
+
     if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(
             dag,

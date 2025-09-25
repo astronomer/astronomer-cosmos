@@ -167,7 +167,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ev: EventMsg,
         context: Context,
     ) -> None:
-        self.log.debug("DbtBuildCoordinatorOperator: handling node finished event: %s", ev)
+        self.log.debug("DbtProducerWatcherOperator: handling node finished event: %s", ev)
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)

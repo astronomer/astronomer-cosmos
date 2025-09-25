@@ -1,3 +1,5 @@
+from cosmos.constants import ExecutionMode
+
 """
 An example DAG that uses Cosmos to render a dbt project into an Airflow DAG.
 """
@@ -7,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 # [START cosmos_init_imports]
-from cosmos import DbtDag, ProfileConfig, ProjectConfig
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
 
 # [END cosmos_init_imports]
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -28,11 +30,18 @@ profile_config = ProfileConfig(
     ),
 )
 
+
 # [START local_example]
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
+    execution_config=ExecutionConfig(
+        execution_mode=ExecutionMode.WATCHER,
+    ),
+    # render_config=RenderConfig(
+    #    test_behavior=TestBehavior.NONE,
+    # ),
     operator_args={
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag

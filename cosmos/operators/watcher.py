@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import zlib
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -19,9 +19,23 @@ except ImportError:
     from airflow.sensors.base import BaseSensorOperator
 from airflow.exceptions import AirflowException
 
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+
 from cosmos.config import ProfileConfig
-from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtLocalBaseOperator, DbtRunLocalOperator
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.operators.base import (
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+)
+from cosmos.operators.local import (
+    DbtLocalBaseOperator,
+    DbtRunLocalOperator,
+    DbtSourceLocalOperator,
+)
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -272,3 +286,68 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             return True
         else:
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")
+
+
+# This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
+# That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD, until we have a better experience.
+class DbtBuildWatcherOperator:
+    def __init__(self, *args: Any, **kwargs: Any):
+        raise NotImplementedError(
+            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, since the build command is executed by the producer task."
+        )
+
+
+class DbtSeedWatcherOperator(DbtSeedMixin, DbtModelStatusSensor):  # type: ignore[misc]
+    """
+    Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str] = DbtModelStatusSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtModelStatusSensor):
+    """
+    Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str] = DbtModelStatusSensor.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSourceWatcherOperator(DbtSourceLocalOperator):
+    """
+    Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
+    """
+
+    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtRunWatcherOperator(DbtModelStatusSensor):
+    """
+    Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str] = DbtModelStatusSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtTestWatcherOperator(EmptyOperator):
+    """
+    As a starting point, this operator does nothing.
+    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        desired_keys = ("dag", "task_group", "task_id")
+        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
+        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]

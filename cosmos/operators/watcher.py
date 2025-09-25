@@ -136,7 +136,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
         profile_config: ProfileConfig | None = None,
         project_dir: str | None = None,
         profiles_dir: str | None = None,
-        master_task_id: str = "dbt_build_coordinator",
+        master_task_id: str = "dbt_producer_watcher",
         poke_interval: int = 20,
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
@@ -197,48 +197,77 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
         self.log.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True
 
+    def _get_status_from_events(self, ti: Any) -> Any:
+
+        dbt_startup_events = ti.xcom_pull(task_ids=self.master_task_id, key="dbt_startup_events")
+        if dbt_startup_events:
+            self.log.info("Dbt Startup Event: %s", dbt_startup_events)
+
+        node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
+        compressed_b64_event_msg = ti.xcom_pull(task_ids=self.master_task_id, key=node_finished_key)
+
+        if not compressed_b64_event_msg:
+            return None
+
+        compressed_bytes = base64.b64decode(compressed_b64_event_msg)
+        event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
+        event_json = ast.literal_eval(event_json_str)
+
+        self.log.info("Node Info: %s", event_json_str)
+
+        return event_json.get("data", {}).get("run_result", {}).get("status")
+
+    def _get_status_from_run_results(self, ti: Any) -> Any:
+        compressed_b64_run_results = ti.xcom_pull(task_ids=self.master_task_id, key="run_results")
+
+        if not compressed_b64_run_results:
+            return None
+
+        compressed_bytes = base64.b64decode(compressed_b64_run_results)
+        run_results_str = zlib.decompress(compressed_bytes).decode("utf-8")
+        run_results_json = ast.literal_eval(run_results_str)
+
+        self.log.debug("Run results: %s", run_results_json)
+
+        results = run_results_json.get("results", [])
+        model_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
+
+        if not model_result:
+            self.log.warning("No matching result found for unique_id '%s'", self.model_unique_id)
+            return None
+
+        self.log.info("Node Info: %s", run_results_str)
+        return model_result.get("status")
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
         Handles retries and checks for successful completion of the model execution.
         """
-        try_number = context["ti"].try_number
         ti = context["ti"]
+        try_number = ti.try_number
 
         if try_number > 1:
             return self._handle_task_retry(try_number, context)
 
-        logger.info(
-            "Pulling status from task_id %s for model %s",
+        self.log.info(
+            "Pulling status from task_id '%s' for model '%s'",
             self.master_task_id,
             self.model_unique_id,
         )
 
-        dbt_startup_events = ti.xcom_pull(task_ids=self.master_task_id, key="dbt_startup_events")
-        if dbt_startup_events:
-            self.log.info("dbt_startup_events: %s", dbt_startup_events)  # TODO: FixMe
+        if not self.invocation_mode:
+            self._discover_invocation_mode()
+        use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
-        pipeline_outlets = ti.xcom_pull(task_ids=self.master_task_id, key="pipeline_outlets")
-        if pipeline_outlets:
-            self.log.info("pipeline_outlets: %s", pipeline_outlets)  # TODO: FixMe
+        if use_events:
+            status = self._get_status_from_events(ti)
+        else:
+            status = self._get_status_from_run_results(ti)
 
-        node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-        compressed_b64_event_data = ti.xcom_pull(task_ids=self.master_task_id, key=node_finished_key)
-
-        if not compressed_b64_event_data:
+        if status is None:
             return False
-
-        compressed_event_msg = base64.b64decode(compressed_b64_event_data)
-        event_msg = zlib.decompress(compressed_event_msg).decode("utf-8")
-        if event_msg:
-            self.log.info("event_data: %s", event_msg)  # TODO: FixMe
-
-        event_json = ast.literal_eval(event_msg)
-        status = event_json.get("data", {}).get("run_result", {}).get("status")
-
-        self.log.info("Model %s finished with status %s", self.model_unique_id, status)
-
-        if status == "success":
+        elif status == "success":
             return True
         else:
-            raise AirflowException(f"Model {self.model_unique_id} finished with status '{status}'")
+            raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

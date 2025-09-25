@@ -2,7 +2,7 @@ import base64
 import json
 import zlib
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
@@ -187,85 +187,133 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
     assert op.invocation_mode == InvocationMode.SUBPROCESS
 
 
-class TestDbtModelStatusSensor:
+MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
+ENCODED_RUN_RESULTS = base64.b64encode(
+    zlib.compress(b'{"results":[{"unique_id":"model.jaffle_shop.stg_orders","status":"success"}]}')
+).decode("utf-8")
 
-    @pytest.fixture
-    def sensor(self):
-        return DbtNodeStatusSensor(
+ENCODED_RUN_RESULTS_FAILED = base64.b64encode(
+    zlib.compress(b'{"results":[{"unique_id":"model.jaffle_shop.stg_orders","status":"fail"}]}')
+).decode("utf-8")
+
+ENCODED_EVENT = base64.b64encode(zlib.compress(b"{'data': {'run_result': {'status': 'success'}}}")).decode("utf-8")
+
+
+class TestDbtNodeStatusSensor:
+
+    def make_sensor(self, **kwargs):
+        sensor = DbtNodeStatusSensor(
             task_id="model.my_model",
-            model_unique_id="model.my_model",
-            project_dir="/fake/project",
-            profiles_dir="/fake/profiles",
+            model_unique_id=MODEL_UNIQUE_ID,
+            project_dir="/tmp/project",
+            profile_config=None,
+            **kwargs,
         )
+        # sensor.log = MagicMock()
+        sensor.invocation_mode = "DBT_RUNNER"
+        return sensor
 
-    def test_filter_flags_removes_select_and_exclude(self):
-        flags = ["--select", "model_a", "--exclude", "model_b", "--threads", "4"]
-        expected = ["--threads", "4"]
-        result = DbtNodeStatusSensor._filter_flags(flags)
-        assert result == expected
+    def make_context(self, ti_mock):
+        return {"ti": ti_mock}
 
-    def test_filter_flags_handles_no_flags(self):
-        assert DbtNodeStatusSensor._filter_flags([]) == []
+    @patch("cosmos.operators.watcher.EventMsg", new=True)
+    def test_poke_status_none_from_events(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = [None, None]  # no event msg found
+        context = self.make_context(ti)
 
-    @patch("cosmos.operators.watcher.DbtModelStatusSensor.build_and_run_cmd")
-    def test_handle_task_retry_runs_model(self, mock_build_and_run_cmd, sensor):
-        mock_context = {
-            "ti": Mock(),
-        }
-
-        mock_task = Mock()
-        mock_task.add_cmd_flags.return_value = ["--select", "model_a", "--threads", "4"]
-        mock_context["ti"].task.dag.get_task.return_value = mock_task
-
-        result = sensor._handle_task_retry(2, mock_context)
-
-        assert result is True
-        mock_build_and_run_cmd.assert_called_once()
-        called_args = mock_build_and_run_cmd.call_args[1]["cmd_flags"]
-        assert "--select" in called_args
-        assert "my_model" in called_args
-        assert "--threads" in called_args
-
-    def test_poke_returns_false_when_no_data(self, sensor):
-        ti_mock = Mock()
-        ti_mock.try_number = 1
-        ti_mock.xcom_pull.return_value = None
-        context = {"ti": ti_mock}
         result = sensor.poke(context)
         assert result is False
 
-    def make_event_payload(self, status: str) -> str:
-        data = {"data": {"run_result": {"status": status}}}
-        compressed = zlib.compress(str(data).encode("utf-8"))
-        return base64.b64encode(compressed).decode("utf-8")
+    def test_poke_success_from_run_results(self):
+        sensor = self.make_sensor()
+        sensor.invocation_mode = "OTHER_MODE"  # not DBT_RUNNER
 
-    def test_poke_success_returns_true(self, sensor):
-        ti_mock = Mock()
-        ti_mock.try_number = 1
-        ti_mock.xcom_pull.side_effect = [
-            [],  # dbt_startup_events
-            [],  # pipeline_outlets
-            self.make_event_payload("success"),  # node_finished_key
-        ]
-        context = {"ti": ti_mock}
-        assert sensor.poke(context) is True
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
+        context = self.make_context(ti)
 
-    def test_poke_failure_raises_exception(self, sensor):
-        ti_mock = Mock()
-        ti_mock.try_number = 1
-        ti_mock.xcom_pull.side_effect = [
-            None,  # dbt_startup_events
-            None,  # pipeline_outlets
-            self.make_event_payload("error"),  # node_finished_key
-        ]
-        context = {"ti": ti_mock}
-        with pytest.raises(AirflowException, match="finished with status 'error'"):
+        result = sensor.poke(context)
+        assert result is True
+
+    def test_poke_failure_from_run_results(self):
+        sensor = self.make_sensor()
+        sensor.invocation_mode = "OTHER_MODE"
+
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS_FAILED
+        context = self.make_context(ti)
+
+        with pytest.raises(AirflowException):
             sensor.poke(context)
 
-    @patch.object(DbtNodeStatusSensor, "_handle_task_retry")
-    def test_poke_calls_retry_on_retry_attempt(self, mock_retry, sensor):
-        ti_mock = Mock()
-        ti_mock.try_number = 2
-        context = {"ti": ti_mock}
-        sensor.poke(context)
-        mock_retry.assert_called_once_with(2, context)
+    def test_poke_status_none_from_run_results(self):
+        sensor = self.make_sensor()
+        sensor.invocation_mode = "OTHER_MODE"
+
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
+
+    def test_handle_task_retry(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        result = sensor._handle_task_retry(2, context)
+
+        assert result is True
+        sensor.build_and_run_cmd.assert_called_once()
+        args, kwargs = sensor.build_and_run_cmd.call_args
+        assert "--select" in kwargs["cmd_flags"]
+        assert MODEL_UNIQUE_ID.split(".")[-1] in kwargs["cmd_flags"]
+
+    def test_filter_flags(self):
+        flags = ["--select", "model", "--exclude", "other", "--threads", "2"]
+        expected = ["--threads", "2"]
+
+        result = DbtNodeStatusSensor._filter_flags(flags)
+
+        assert result == expected
+
+    def test_get_status_from_run_results_success(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
+
+        result = sensor._get_status_from_run_results(ti)
+        assert result == "success"
+
+    def test_get_status_from_run_results_none(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+
+        result = sensor._get_status_from_run_results(ti)
+        assert result is None
+
+    def test_get_status_from_events_success(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.side_effect = [None, ENCODED_EVENT]
+
+        result = sensor._get_status_from_events(ti)
+        assert result == "success"
+
+    def test_get_status_from_events_none(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.side_effect = [None, None]
+
+        result = sensor._get_status_from_events(ti)
+        assert result is None

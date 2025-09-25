@@ -7,6 +7,8 @@ import logging
 import zlib
 from typing import TYPE_CHECKING, Any
 
+from cosmos.config import ProfileConfig
+
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
@@ -20,7 +22,7 @@ except ImportError:
 from airflow.exceptions import AirflowException
 
 from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtLocalBaseOperator
+from cosmos.operators.local import DbtLocalBaseOperator, DbtRunLocalOperator
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -220,7 +222,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
 
 class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
-  template_fields = ("model_unique_id",)
+    template_fields = ("model_unique_id",)
 
     def __init__(
         self,

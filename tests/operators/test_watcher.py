@@ -2,10 +2,17 @@ import base64
 import json
 import zlib
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+import pytest
+from airflow.exceptions import AirflowException
 
 from cosmos.config import InvocationMode
-from cosmos.operators.watcher import PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT, DbtProducerWatcherOperator
+from cosmos.operators.watcher import (
+    PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
+    DbtModelStatusSensor,
+    DbtProducerWatcherOperator,
+)
 
 
 class _MockTI:

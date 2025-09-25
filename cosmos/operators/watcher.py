@@ -185,7 +185,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             self._discover_invocation_mode()
 
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-        self.log.debug("DbtBuildCoordinatorOperator: use_events=%s", use_events)
+        self.log.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
 
         startup_events: list[dict[str, Any]] = []
 

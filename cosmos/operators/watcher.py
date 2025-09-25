@@ -123,4 +123,4 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
         except Exception as e:
             context["ti"].xcom_push(key="task_status", value="completed")
-            raise e
+            raise

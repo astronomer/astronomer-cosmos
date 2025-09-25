@@ -132,7 +132,6 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
     def __init__(
         self,
         *,
-        model_unique_id: str,
         profile_config: ProfileConfig | None = None,
         project_dir: str | None = None,
         profiles_dir: str | None = None,
@@ -141,6 +140,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
     ) -> None:
+        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -149,7 +149,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
             profiles_dir=profiles_dir,
             **kwargs,
         )
-        self.model_unique_id = model_unique_id
+        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
         self.master_task_id = master_task_id
 
     @staticmethod

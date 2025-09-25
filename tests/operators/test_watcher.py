@@ -202,9 +202,10 @@ ENCODED_EVENT = base64.b64encode(zlib.compress(b"{'data': {'run_result': {'statu
 class TestDbtNodeStatusSensor:
 
     def make_sensor(self, **kwargs):
+        extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+        kwargs["extra_context"] = extra_context
         sensor = DbtNodeStatusSensor(
             task_id="model.my_model",
-            model_unique_id=MODEL_UNIQUE_ID,
             project_dir="/tmp/project",
             profile_config=None,
             **kwargs,

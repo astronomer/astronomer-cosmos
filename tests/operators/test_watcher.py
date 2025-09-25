@@ -178,8 +178,8 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
 
     assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
-    
-    
+
+
 class TestDbtModelStatusSensor:
 
     @pytest.fixture

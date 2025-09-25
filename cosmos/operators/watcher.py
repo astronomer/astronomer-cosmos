@@ -12,7 +12,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
- 
+
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
 except ImportError:
@@ -217,8 +217,8 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         # Fallback – push run_results.json via base class helper
         kwargs["push_run_results_to_xcom"] = True
         return super().execute(context=context, **kwargs)
-      
-      
+
+
 class DbtModelStatusSensor(BaseSensorOperator, DbtRunLocalOperator):
   template_fields = ("model_unique_id",)
 

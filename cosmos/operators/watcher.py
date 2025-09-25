@@ -147,6 +147,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        kwargs["priority_weight"] = kwargs.get("priority_weight", 9999)
         super().__init__(task_id=task_id, *args, **kwargs)
 
     @staticmethod

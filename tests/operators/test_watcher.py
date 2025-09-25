@@ -51,6 +51,18 @@ def test_serialize_event(mock_mtd):
     mock_mtd.assert_called()
 
 
+def test_dbt_producer_watcher_operator_priority_weight_default():
+    """Test that DbtProducerWatcherOperator uses default priority_weight of 9999."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.priority_weight == 9999
+
+
+def test_dbt_producer_watcher_operator_priority_weight_override():
+    """Test that DbtProducerWatcherOperator allows overriding priority_weight."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, priority_weight=100)
+    assert op.priority_weight == 100
+
+
 def test_handle_startup_event():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     lst: list[dict] = []

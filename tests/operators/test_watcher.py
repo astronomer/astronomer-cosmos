@@ -196,7 +196,7 @@ ENCODED_RUN_RESULTS_FAILED = base64.b64encode(
     zlib.compress(b'{"results":[{"unique_id":"model.jaffle_shop.stg_orders","status":"fail"}]}')
 ).decode("utf-8")
 
-ENCODED_EVENT = base64.b64encode(zlib.compress(b"{'data': {'run_result': {'status': 'success'}}}")).decode("utf-8")
+ENCODED_EVENT = base64.b64encode(zlib.compress(b'{"data": {"run_result": {"status": "success"}}}')).decode("utf-8")
 
 
 class TestDbtConsumerWatcherSensor:

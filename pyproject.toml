@@ -233,6 +233,7 @@ known_third_party = ["airflow", "jinja2"]
 strict = true
 ignore_missing_imports = true
 no_warn_unused_ignores = true
+disable_error_code = ["misc"]
 
 [tool.ruff]
 line-length = 120

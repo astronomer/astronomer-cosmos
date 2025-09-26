@@ -11,7 +11,10 @@ from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
 from typing import NamedTuple
 
-from airflow.hooks.base import BaseHook
+try:
+    from airflow.sdk.bases.hook import BaseHook
+except ImportError:
+    from airflow.hooks.base import BaseHook
 
 
 class FullOutputSubprocessResult(NamedTuple):

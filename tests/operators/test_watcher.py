@@ -10,7 +10,7 @@ from airflow.exceptions import AirflowException
 from cosmos.config import InvocationMode
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
-    DbtNodeStatusSensor,
+    DbtConsumerWatcherSensor,
     DbtProducerWatcherOperator,
 )
 
@@ -199,12 +199,12 @@ ENCODED_RUN_RESULTS_FAILED = base64.b64encode(
 ENCODED_EVENT = base64.b64encode(zlib.compress(b"{'data': {'run_result': {'status': 'success'}}}")).decode("utf-8")
 
 
-class TestDbtNodeStatusSensor:
+class TestDbtConsumerWatcherSensor:
 
     def make_sensor(self, **kwargs):
         extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
         kwargs["extra_context"] = extra_context
-        sensor = DbtNodeStatusSensor(
+        sensor = DbtConsumerWatcherSensor(
             task_id="model.my_model",
             project_dir="/tmp/project",
             profile_config=None,
@@ -311,7 +311,7 @@ class TestDbtNodeStatusSensor:
         flags = ["--select", "model", "--exclude", "other", "--threads", "2"]
         expected = ["--threads", "2"]
 
-        result = DbtNodeStatusSensor._filter_flags(flags)
+        result = DbtConsumerWatcherSensor._filter_flags(flags)
 
         assert result == expected
 

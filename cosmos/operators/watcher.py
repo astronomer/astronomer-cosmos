@@ -126,7 +126,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         return super().execute(context=context, **kwargs)
 
 
-class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
+class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
     template_fields = ("model_unique_id",)
 
     def __init__(
@@ -135,7 +135,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
         profile_config: ProfileConfig | None = None,
         project_dir: str | None = None,
         profiles_dir: str | None = None,
-        master_task_id: str = "dbt_producer_watcher",
+        producer_task_id: str = "dbt_producer_watcher",
         poke_interval: int = 20,
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
@@ -150,7 +150,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
             **kwargs,
         )
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
-        self.master_task_id = master_task_id
+        self.producer_task_id = producer_task_id
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
@@ -182,7 +182,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
             self.project_dir,
         )
 
-        upstream_task = context["ti"].task.dag.get_task(self.master_task_id)
+        upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
 
         extra_flags: list[str] = []
         if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
@@ -199,12 +199,12 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
 
     def _get_status_from_events(self, ti: Any) -> Any:
 
-        dbt_startup_events = ti.xcom_pull(task_ids=self.master_task_id, key="dbt_startup_events")
+        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
             self.log.info("Dbt Startup Event: %s", dbt_startup_events)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-        compressed_b64_event_msg = ti.xcom_pull(task_ids=self.master_task_id, key=node_finished_key)
+        compressed_b64_event_msg = ti.xcom_pull(task_ids=self.producer_task_id, key=node_finished_key)
 
         if not compressed_b64_event_msg:
             return None
@@ -218,7 +218,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
     def _get_status_from_run_results(self, ti: Any) -> Any:
-        compressed_b64_run_results = ti.xcom_pull(task_ids=self.master_task_id, key="run_results")
+        compressed_b64_run_results = ti.xcom_pull(task_ids=self.producer_task_id, key="run_results")
 
         if not compressed_b64_run_results:
             return None
@@ -252,13 +252,13 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
 
         self.log.info(
             "Pulling status from task_id '%s' for model '%s'",
-            self.master_task_id,
+            self.producer_task_id,
             self.model_unique_id,
         )
 
+        # We have assumption here that both the build producer and the sensor task will have same invocation mode
         if not self.invocation_mode:
             self._discover_invocation_mode()
-
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
         if use_events:

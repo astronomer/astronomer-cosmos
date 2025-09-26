@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import base64
 import json
 import logging
@@ -211,7 +210,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         compressed_bytes = base64.b64decode(compressed_b64_event_msg)
         event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
-        event_json = ast.literal_eval(event_json_str)
+        event_json = json.loads(event_json_str)
 
         self.log.info("Node Info: %s", event_json_str)
 
@@ -225,7 +224,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         compressed_bytes = base64.b64decode(compressed_b64_run_results)
         run_results_str = zlib.decompress(compressed_bytes).decode("utf-8")
-        run_results_json = ast.literal_eval(run_results_str)
+        run_results_json = json.loads(run_results_str)
 
         self.log.debug("Run results: %s", run_results_json)
 

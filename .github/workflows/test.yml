@@ -41,7 +41,7 @@ jobs:
           architecture: "x64"
 
       - run: pip3 install "hatch>=1.14.2"
-      - run: hatch run tests.py3.10-3.0-1.9:type-check
+      - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
     needs: Authorize

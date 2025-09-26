@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, use_af3_in_typecheck]
   # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
@@ -41,7 +41,7 @@ jobs:
           architecture: "x64"
 
       - run: pip3 install "hatch>=1.14.2"
-      - run: hatch run tests.py3.10-2.10-1.9:type-check
+      - run: hatch run tests.py3.10-3.0-1.9:type-check
 
   Run-Unit-Tests:
     needs: Authorize

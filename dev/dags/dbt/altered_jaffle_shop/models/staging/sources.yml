@@ -6,6 +6,7 @@ sources:
     database: "{{ env_var('POSTGRES_DB') }}"
     schema: "{{ env_var('POSTGRES_SCHEMA') }}"
     tables:
+      - name: not_connected_source
       - name: raw_customers
         columns:
           - name: id

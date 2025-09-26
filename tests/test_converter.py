@@ -1112,3 +1112,70 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
     mock_logger.debug.assert_called_once_with(
         "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation"
     )
+
+
+@pytest.mark.integration
+def test_converter_passes_excludes_to_test_tasks():
+    """
+    Validate that the exclude in render config is passed through to the tests
+    """
+    project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(should_detach_multiple_parents_tests=True, exclude=["resource_type:unit_test"])
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="example_conn",
+            profile_args={"schema": "public"},
+            disable_event_tracking=True,
+        ),
+    )
+    with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
+        converter = DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+    tasks = converter.tasks_map
+
+    assert len(converter.tasks_map) == 4
+
+    # We exclude the test that depends on combined_model and model_a from their commands
+    args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "combined_model",
+        "--exclude",
+        "resource_type:unit_test custom_test_combined_model_combined_model_",
+    ]
+
+    args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "model_a",
+        "--exclude",
+        "resource_type:unit_test custom_test_combined_model_combined_model_",
+    ]
+
+    # The test for model_b should not be changed, since it is not a parent of this test
+    args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
+    assert args[1:] == ["test", "--select", "model_b", "--exclude", "resource_type:unit_test"]
+
+    # We should have a task dedicated to run the test with multiple parents
+    args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "custom_test_combined_model_combined_model_",
+        "--exclude",
+        "resource_type:unit_test",
+    ]
+    assert (
+        tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].task_id
+        == "custom_test_combined_model_combined_model__test"
+    )

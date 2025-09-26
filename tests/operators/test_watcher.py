@@ -210,16 +210,21 @@ class TestDbtNodeStatusSensor:
             profile_config=None,
             **kwargs,
         )
-        # sensor.log = MagicMock()
+
         sensor.invocation_mode = "DBT_RUNNER"
         return sensor
 
     def make_context(self, ti_mock):
         return {"ti": ti_mock}
 
-    @patch("cosmos.operators.watcher.EventMsg", new=True)
-    def test_poke_status_none_from_events(self):
+    @patch("cosmos.operators.watcher.EventMsg")
+    def test_poke_status_none_from_events(self, MockEventMsg):
+        mock_event_instance = MagicMock()
+        mock_event_instance.status = "done"
+        MockEventMsg.return_value = mock_event_instance
+
         sensor = self.make_sensor()
+        sensor.invocation_mode = InvocationMode.DBT_RUNNER
         ti = MagicMock()
         ti.try_number = 1
         ti.xcom_pull.side_effect = [None, None]  # no event msg found
@@ -230,7 +235,19 @@ class TestDbtNodeStatusSensor:
 
     def test_poke_success_from_run_results(self):
         sensor = self.make_sensor()
-        sensor.invocation_mode = "OTHER_MODE"  # not DBT_RUNNER
+        sensor.invocation_mode = "SUBPROCESS"
+
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is True
+
+    def test_invocation_mode_none(self):
+        sensor = self.make_sensor()
+        sensor.invocation_mode = None
 
         ti = MagicMock()
         ti.try_number = 1
@@ -263,6 +280,17 @@ class TestDbtNodeStatusSensor:
 
         result = sensor.poke(context)
         assert result is False
+
+    @patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
+    def test_task_retry(self, mock_build_and_run_cmd):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 2
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+
+        sensor.poke(context)
+        mock_build_and_run_cmd.assert_called_once()
 
     def test_handle_task_retry(self):
         sensor = self.make_sensor()

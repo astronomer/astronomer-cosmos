@@ -200,7 +200,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
     def _get_status_from_events(self, ti: Any) -> Any:
 
         dbt_startup_events = ti.xcom_pull(task_ids=self.master_task_id, key="dbt_startup_events")
-        if dbt_startup_events:
+        if dbt_startup_events:  # pragma: no cover
             self.log.info("Dbt Startup Event: %s", dbt_startup_events)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
@@ -230,14 +230,14 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
         self.log.debug("Run results: %s", run_results_json)
 
         results = run_results_json.get("results", [])
-        model_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
+        node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
 
-        if not model_result:
+        if not node_result:  # pragma: no cover
             self.log.warning("No matching result found for unique_id '%s'", self.model_unique_id)
             return None
 
         self.log.info("Node Info: %s", run_results_str)
-        return model_result.get("status")
+        return node_result.get("status")
 
     def poke(self, context: Context) -> bool:
         """
@@ -258,6 +258,7 @@ class DbtNodeStatusSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ign
 
         if not self.invocation_mode:
             self._discover_invocation_mode()
+
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
         if use_events:

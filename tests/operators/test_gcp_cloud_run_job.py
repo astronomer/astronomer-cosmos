@@ -7,6 +7,8 @@ import pytest
 from airflow.utils.context import Context
 from pendulum import datetime
 
+from cosmos import ProfileConfig
+
 try:
     from cosmos.operators.gcp_cloud_run_job import (
         DbtBuildGcpCloudRunJobOperator,
@@ -42,6 +44,12 @@ BASE_KWARGS = {
     "no_version_check": True,
 }
 
+PROFILE_CONFIG = ProfileConfig(
+    target_name="cosmos",
+    profile_name="test",
+    profiles_yml_filepath="./profiles.yml",
+)
+
 
 def skip_on_empty_operator(test_func):
     """
@@ -53,6 +61,7 @@ def skip_on_empty_operator(test_func):
     )(test_func)
 
 
+@skip_on_empty_operator
 def test_overrides_missing():
     """
     The overrides parameter needed to pass the dbt command was added in apache-airflow-providers-google==10.11.0.
@@ -188,6 +197,8 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
                 "--no-version-check",
+                "--project-dir",
+                "my/dir",
             ]
         elif command_name == "run-operation":
             assert command_operator.command == [
@@ -198,6 +209,8 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
                 "--no-version-check",
+                "--project-dir",
+                "my/dir",
             ]
         else:
             assert command_operator.command == [
@@ -208,6 +221,81 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
                 "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
                 "--no-version-check",
+                "--project-dir",
+                "my/dir",
+            ]
+
+
+@skip_on_empty_operator
+def test_dbt_gcp_cloud_run_job_build_command_with_profile_config():
+    """
+    Check whether the dbt command is built correctly.
+    """
+    profile_config_kwargs = {
+        **BASE_KWARGS,
+        "profile_config": PROFILE_CONFIG,
+    }
+
+    result_map = {
+        "ls": DbtLSGcpCloudRunJobOperator(**profile_config_kwargs),
+        "run": DbtRunGcpCloudRunJobOperator(**profile_config_kwargs),
+        "test": DbtTestGcpCloudRunJobOperator(**profile_config_kwargs),
+        "seed": DbtSeedGcpCloudRunJobOperator(**profile_config_kwargs),
+        "build": DbtBuildGcpCloudRunJobOperator(**profile_config_kwargs),
+        "snapshot": DbtSnapshotGcpCloudRunJobOperator(**profile_config_kwargs),
+        "source": DbtSourceGcpCloudRunJobOperator(**profile_config_kwargs),
+        "clone": DbtCloneGcpCloudRunJobOperator(**profile_config_kwargs),
+        "run-operation": DbtRunOperationGcpCloudRunJobOperator(macro_name="some-macro", **profile_config_kwargs),
+    }
+
+    for command_name, command_operator in result_map.items():
+        command_operator.build_command(context=MagicMock(), cmd_flags=MagicMock())
+        if command_name not in ("run-operation", "source"):
+            assert command_operator.command == [
+                "dbt",
+                command_name,
+                "--vars",
+                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "--no-version-check",
+                "--profile",
+                "test",
+                "--target",
+                "cosmos",
+                "--project-dir",
+                "my/dir",
+            ]
+        elif command_name == "run-operation":
+            assert command_operator.command == [
+                "dbt",
+                command_name,
+                "some-macro",
+                "--vars",
+                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "--no-version-check",
+                "--profile",
+                "test",
+                "--target",
+                "cosmos",
+                "--project-dir",
+                "my/dir",
+            ]
+        else:
+            assert command_operator.command == [
+                "dbt",
+                command_name,
+                "freshness",
+                "--vars",
+                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "--no-version-check",
+                "--profile",
+                "test",
+                "--target",
+                "cosmos",
+                "--project-dir",
+                "my/dir",
             ]
 
 

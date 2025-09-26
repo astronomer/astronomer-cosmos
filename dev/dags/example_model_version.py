@@ -34,6 +34,6 @@ basic_cosmos_dag = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_model_version",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 )
 # [END local_example]

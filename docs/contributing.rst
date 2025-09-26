@@ -16,7 +16,9 @@ ________
 To contribute to the cosmos project:
 
 #. Please create a `GitHub Issue <https://github.com/astronomer/astronomer-cosmos/issues>`_ describing your contribution
-#. Open a feature branch off of the ``main`` branch and create a Pull Request into the ``main`` branch from your feature branch
+#. `Fork the repository <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo>`_ and clone your fork locally.
+#. Open a feature branch off of the main branch in your fork
+#. Make your changes, push the branch to your fork, and open a Pull Request from your feature branch into the ``main`` branch of the upstream repository.
 #. Link your issue to the pull request
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
@@ -95,7 +97,7 @@ For instance, to run the tests using Python 3.9, `Apache Airflow® <https://airf
 
 .. code-block:: bash
 
-    hatch run tests.py3.9-2.10-1.9:test-cov:test-cov
+    hatch run tests.py3.9-2.10-1.9:test-cov
 
 It is also possible to run the tests using all the matrix combinations, by using:
 

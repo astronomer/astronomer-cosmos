@@ -6,11 +6,17 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+# [START cosmos_init_imports]
 from cosmos import DbtDag, ProfileConfig, ProjectConfig
+
+# [END cosmos_init_imports]
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "jaffle_shop")
+DBT_PROJECT_PATH = DBT_ROOT_PATH / DBT_PROJECT_NAME
+
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -25,9 +31,7 @@ profile_config = ProfileConfig(
 # [START local_example]
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters
-    project_config=ProjectConfig(
-        DBT_ROOT_PATH / "jaffle_shop",
-    ),
+    project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     operator_args={
         "install_deps": True,  # install any necessary dependencies before running any dbt command
@@ -38,6 +42,6 @@ basic_cosmos_dag = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="basic_cosmos_dag",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 )
 # [END local_example]

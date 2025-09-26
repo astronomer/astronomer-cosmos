@@ -4,14 +4,12 @@
 .. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
     :target: https://ossrank.com/p/2121-astronomer-cosmos
 
-.. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos.svg
-    :target: https://img.shields.io/pypi/dm/astronomer-cosmos
+.. |downloads| image:: https://pepy.tech/badge/astronomer-cosmos/month
+    :target: https://pepy.tech/project/astronomer-cosmos
 
 .. |pre-commit| image:: https://results.pre-commit.ci/badge/github/astronomer/astronomer-cosmos/main.svg
    :target: https://results.pre-commit.ci/latest/github/astronomer/astronomer-cosmos/main
    :alt: pre-commit.ci status
-
-
 
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 

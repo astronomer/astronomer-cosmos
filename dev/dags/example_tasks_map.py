@@ -41,7 +41,7 @@ with DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="customized_cosmos_dag",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 ) as dag:
     # Walk the dbt graph
     for unique_id, dbt_node in dag.dbt_graph.filtered_nodes.items():

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import json
 import os
@@ -7,6 +8,7 @@ import tempfile
 import time
 import urllib.parse
 import warnings
+import zlib
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
@@ -25,7 +27,7 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 from airflow.version import version as airflow_version
-from attr import define
+from attrs import define
 from packaging.version import Version
 
 from cosmos import cache, settings
@@ -35,9 +37,19 @@ from cosmos.cache import (
     _get_latest_cached_package_lockfile,
     is_cache_package_lockfile_enabled,
 )
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP, InvocationMode
+from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
+    DBT_DEPENDENCIES_FILE_NAMES,
+    FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
+    InvocationMode,
+)
 from cosmos.dataset import get_dataset_alias_name
-from cosmos.dbt.project import copy_dbt_packages, get_partial_parse_path, has_non_empty_dependencies_file
+from cosmos.dbt.project import (
+    copy_dbt_packages,
+    copy_manifest_file_if_exists,
+    get_partial_parse_path,
+    has_non_empty_dependencies_file,
+)
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
@@ -104,6 +116,7 @@ from cosmos.operators.base import (
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
+    _sanitize_xcom_key,
 )
 
 AIRFLOW_VERSION = Version(airflow.__version__)
@@ -143,6 +156,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
@@ -166,11 +180,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         invocation_mode: InvocationMode | None = None,
         install_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
+        manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
+        dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -184,6 +200,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
+        self._dbt_runner_callbacks = dbt_runner_callbacks
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -196,6 +213,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # We should not spend time trying to install deps if the project doesn't have any dependencies
         self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
         self.copy_dbt_packages = copy_dbt_packages
+
+        self.manifest_filepath = manifest_filepath
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -284,6 +303,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             target_path_schema = urlparse(target_path_str).scheme
             remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
         if remote_conn_id is None:
+            logger.info(
+                "Remote target connection not set. Please, configure [cosmos][remote_target_path_conn_id] or set the environment variable AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID"
+            )
             return None, None
 
         if not settings.AIRFLOW_IO_AVAILABLE:
@@ -311,8 +333,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dest_target_dir_str = str(dest_target_dir).rstrip("/")
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
+        run_id = self.extra_context["run_id"]
 
-        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{resource_type}/{rel_path}"
+        if settings.upload_sql_to_xcom:
+            return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
+
+        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
@@ -329,23 +355,48 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         for file_path in files:
             dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
+            dest_object_storage_path.parent.mkdir(parents=True, exist_ok=True)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
             self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
-    def _delete_sql_files(self, tmp_project_dir: Path, resource_type: str) -> None:
-        dest_target_dir, dest_conn_id = self._configure_remote_target_path()
+    def _upload_sql_files_xcom(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
+        start_time = time.time()
         source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        for file_path in files:
+            sql_model_path = os.path.relpath(file_path, source_run_dir).lstrip("/")
+            with open(file_path, encoding="utf-8") as f:
+                sql_query = f.read()
+            compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+            compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+            context["ti"].xcom_push(key=_sanitize_xcom_key(sql_model_path), value=compressed_b64_sql)
+            self.log.debug("SQL files %s uploaded to xcom.", sql_model_path)
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)
+
+    def _delete_sql_files(self) -> None:
+        """Deletes the entire run-specific directory from the remote target."""
+        dest_target_dir, dest_conn_id = self._configure_remote_target_path()
+        if not dest_target_dir or not dest_conn_id:
+            self.log.warning("Remote target path or connection ID not configured. Skipping deletion.")
+            return
+
         from airflow.io.path import ObjectStoragePath
 
-        for file_path in files:
-            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)  # type: ignore
-            dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
-            dest_object_storage_path.unlink()
-            self.log.debug("Deleted %s to %s", file_path, dest_object_storage_path)
+        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+        run_id = self.extra_context["run_id"]
+        run_dir_path_str = f"{str(dest_target_dir).rstrip('/')}/{dag_task_group_identifier}/{run_id}"
+        run_dir_path = ObjectStoragePath(run_dir_path_str, conn_id=dest_conn_id)
+
+        if run_dir_path.exists():
+            run_dir_path.rmdir(recursive=True)
+            self.log.info("Deleted remote run directory: %s", run_dir_path_str)
+        else:
+            self.log.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
 
     def store_freshness_json(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -365,6 +416,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.freshness = ""
 
     def _override_rtif(self, context: Context) -> None:
+        if not self.should_store_compiled_sql:
+            return
+
         if AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION:
             self.overwrite_rtif_after_execution = True
             return
@@ -418,7 +472,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
@@ -451,6 +505,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
+        copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
+
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
             return
@@ -460,7 +516,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
     def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
-        return [
+        dbt_flags = [
             "--project-dir",
             str(tmp_project_dir),
             "--profiles-dir",
@@ -470,12 +526,31 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             "--target",
             self.profile_config.target_name,
         ]
+        if self.invocation_mode == InvocationMode.DBT_RUNNER:
+            from dbt.version import __version__ as dbt_version
+
+            if Version(dbt_version) >= Version("1.5.6"):
+                # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+                # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+                # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+                # directories, and the use of different temp paths between parsing and execution appears to interfere
+                # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+                # hangs and ensures reliable task execution.
+                dbt_flags.append("--no-static-parser")
+        return dbt_flags
 
     def _install_dependencies(
         self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
     ) -> None:
         self._cache_package_lockfile(tmp_dir_path)
         deps_command = [self.dbt_executable_path, "deps"] + flags
+
+        for filename in DBT_DEPENDENCIES_FILE_NAMES:
+            filepath = tmp_dir_path / filename
+            if filepath.is_file():
+                self.log.debug("Checking for the %s dependencies file.", str(filename))
+                self.log.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
+
         self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
 
     @staticmethod
@@ -504,13 +579,36 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if partial_parse_file.exists():
             cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
-    def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
+    def _push_run_results_to_xcom(self, tmp_project_dir: str, context: Context) -> None:
+        run_results_path = Path(tmp_project_dir) / "target" / "run_results.json"
+        if not run_results_path.is_file():
+            raise AirflowException(f"run_results.json not found at {run_results_path}")
+
+        try:
+            with run_results_path.open() as fp:
+                raw = json.load(fp)
+        except json.JSONDecodeError as exc:
+            raise AirflowException("Invalid JSON in run_results.json") from exc
+        self.log.debug("Loaded run results from %s", run_results_path)
+
+        compressed = base64.b64encode(zlib.compress(json.dumps(raw).encode())).decode()
+        context["ti"].xcom_push(key="run_results", value=compressed)
+
+        self.log.info("Pushed run results to XCom")
+
+    def _handle_post_execution(
+        self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool = False
+    ) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
         self._override_rtif(context)
 
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
+
+        if push_run_results_to_xcom:
+            self._push_run_results_to_xcom(tmp_project_dir, context)
+
         if self.callback:
             self.callback_args.update({"context": context})
             if isinstance(self.callback, list):
@@ -520,12 +618,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.callback(tmp_project_dir, **self.callback_args)
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
-        if async_context.get("teardown_task") and settings.enable_teardown_async_task:
-            self._delete_sql_files(Path(tmp_project_dir), "run")
-            return
-
         if settings.enable_setup_async_task:
-            self._upload_sql_files(tmp_project_dir, "run")
+            if settings.upload_sql_to_xcom:
+                self._upload_sql_files_xcom(context, tmp_project_dir, "run")
+            else:
+                self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]
@@ -535,13 +632,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             async_op_configurator(self, sql=sql)
             async_context["async_operator"].execute(self, context)
 
-    def run_command(
+    def run_command(  # noqa: C901
         self,
         cmd: list[str],
         env: dict[str, str | bytes | os.PathLike[Any]],
         context: Context,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        push_run_results_to_xcom: bool = False,
     ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -549,10 +647,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not self.invocation_mode:
             self._discover_invocation_mode()
 
-        with tempfile.TemporaryDirectory() as tmp_project_dir:
+        if self.extra_context.get("run_id") is None:
+            self.extra_context["run_id"] = context["run_id"]
 
+        with tempfile.TemporaryDirectory() as tmp_project_dir:
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
+
             self._clone_project(tmp_dir_path)
 
             if self.partial_parse:
@@ -566,7 +667,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
                 if self.install_deps:
-                    self._install_dependencies(tmp_dir_path, flags, env)
+                    self._install_dependencies(
+                        tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
+                    )
 
                 if run_as_async and not settings.enable_setup_async_task:
                     self._mock_dbt_adapter(async_context)
@@ -590,7 +693,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 if self.partial_parse:
                     self._update_partial_parse_cache(tmp_dir_path)
 
-                self._handle_post_execution(tmp_project_dir, context)
+                self._handle_post_execution(tmp_project_dir, context, push_run_results_to_xcom)
                 self.handle_exception(result)
 
                 if run_as_async and async_context:
@@ -784,6 +887,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         cmd_flags: list[str] | None = None,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         # If this is an async run and we're using the setup task, make sure to include the full_refresh flag if set
         if run_as_async and settings.enable_setup_async_task and getattr(self, "full_refresh", False):
@@ -795,7 +899,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(
-            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context
+            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context, **kwargs
         )
         return result
 
@@ -808,7 +912,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
 
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
-
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -898,7 +1001,7 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
         if self.on_warning_callback:
             self._handle_warnings(result, context)
 
@@ -1276,7 +1379,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
     def __init__(self, **kwargs: str) -> None:
         raise DeprecationWarning(
-            "The DbtDepsOperator has been deprecated. " "Please use the `install_deps` flag in dbt_args instead."
+            "The DbtDepsOperator has been deprecated. Please use the `install_deps` flag in dbt_args instead."
         )
 
 

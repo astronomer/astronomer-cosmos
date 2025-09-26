@@ -96,6 +96,13 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE``
 
+.. _pre_dbt_fusion:
+    From Cosmos 1.11, we have introduced support for dbt Fusion. Some of the changes may not be compatible with legacy versions of dbt-core.
+    If you find any issues on how Cosmos interacts with older versions of dbt-core you can use this configuration.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__PRE_DBT_FUSION``
+
 .. _profile_cache_dir_name:
 
 `profile_cache_dir_name`_:
@@ -178,12 +185,48 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK``
 
+.. _upload_sql_to_xcom:
+
+`upload_sql_to_xcom`_:
+    (Introduced in Cosmos 1.11.0): Enable this if the setup async task is enabled for ``ExecutionMode.AIRFLOW_ASYNC`` and you want to upload the compiled SQL to Airflow XCom instead of a remote location (e.g., S3 or GCS).
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__UPLOAD_SQL_TO_XCOM``
+
 .. _use_dataset_airflow3_uri_standard:
 
 `use_dataset_airflow3_uri_standard`_:
     (Introduced in Cosmos 1.10.0): Changes Cosmos Dataset (Asset) URIs to be Airflow 3 compliant. Since this would be a breaking change, it is False by default in Cosmos 1.x.
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD``
+
+.. _enable_memory_optimised_imports:
+
+`enable_memory_optimised_imports`_:
+    (Introduced in Cosmos 1.10.1): Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
+    which can significantly increase memory usage—even when Cosmos is just installed but not actively used. This option allows
+    disabling those eager imports to reduce memory footprint. When enabled, users must access Cosmos classes via their full
+    module paths, avoiding the overhead of importing unused modules and classes.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS``
+
+    .. note::
+        This option will become the default behavior in Cosmos 2.0.0, where all eager imports will be removed from ``cosmos/__init__.py``.
+
+    As an example, when this option is enabled, the following is an example of specifying the imports with full module paths:
+
+    .. literalinclude:: ../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
+        :language: python
+        :start-after: [START cosmos_explicit_imports]
+        :end-before: [END cosmos_explicit_imports]
+
+    as opposed to the following approach you might be have when this option is disabled (default):
+
+    .. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
+        :language: python
+        :start-after: [START cosmos_init_imports]
+        :end-before: [END cosmos_init_imports]
 
 
 [openlineage]

@@ -46,7 +46,7 @@ with DAG(
             ),
         ),
         operator_args={"install_deps": True},
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

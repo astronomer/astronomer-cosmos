@@ -12,7 +12,9 @@
    Docker Execution Mode <docker>
    Kubernetes Execution Mode <kubernetes>
    Azure Container Instance Execution Mode <azure-container-instance>
+   AWS Container Run Job Execution Mode <aws-container-run-job>
    GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
+   Airflow Async Execution Mode <async-execution-mode>
    dbt and Airflow Similar Concepts <dbt-airflow-concepts>
    Operators <operators>
    Custom Airflow Properties <custom-airflow-properties>

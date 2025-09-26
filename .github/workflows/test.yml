@@ -3,8 +3,11 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main]
-  pull_request_target: # Also run on pull requests originated from forks
-    branches: [main]
+  # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
+  # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
+  # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
+  pull_request_target:
+    branches: [main] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -16,32 +19,41 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - run: true
 
   Type-Check:
+    needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.9"
+          python-version: "3.10"
           architecture: "x64"
 
-      - run: pip3 install hatch
-      - run: hatch run tests.py3.9-2.8-1.9:type-check
+      - run: pip3 install "hatch>=1.14.2"
+      - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
+    needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
-        dbt-version: ["1.9"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
+        dbt-version: ["1.10"]
         exclude:
           - python-version: "3.11"
             airflow-version: "2.4"
@@ -63,16 +75,13 @@ jobs:
             airflow-version: "2.8"
           # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
           # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.8"
-            airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
-          - python-version: "3.8"
-            airflow-version: "3.0"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
 
       - uses: actions/cache@v4
         with:
@@ -82,14 +91,14 @@ jobs:
           key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -106,12 +115,14 @@ jobs:
   Run-Integration-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
-        dbt-version: ["1.9"]
+        python-version: ["3.9", "3.10", "3.11"]
+        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
+        dbt-version: ["1.10"]
         exclude:
           - python-version: "3.11"
             airflow-version: "2.4"
@@ -119,15 +130,18 @@ jobs:
             airflow-version: "2.5"
           # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
           # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.8"
-            airflow-version: "2.7"
           - python-version: "3.9"
             airflow-version: "2.7"
           - python-version: "3.8"
             airflow-version: "3.0"
+          # since 1.9, dbt no longer supports Python 3.8
+          - python-version: "3.8"
+            dbt-version: "1.9"
+          - python-version: "3.8"
+            dbt-version: "1.10"
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -138,9 +152,10 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
 
       - uses: actions/cache@v4
         with:
@@ -150,14 +165,14 @@ jobs:
           key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -198,15 +213,17 @@ jobs:
   Run-Integration-Tests-Expensive:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ["3.11"]
-        airflow-version: ["2.6"]
+        airflow-version: ["2.9"]
         dbt-version: ["1.9"]
 
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -218,9 +235,11 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -229,14 +248,14 @@ jobs:
           key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -280,6 +299,8 @@ jobs:
   Run-Integration-Tests-DBT-1-5-4:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -288,7 +309,7 @@ jobs:
         dbt-version: [ "1.5" ]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -300,9 +321,11 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -311,14 +334,14 @@ jobs:
           key: integration-dbt-1-5-4-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
@@ -346,19 +369,23 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+          DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+          TEST_SINGLE_DAG: "basic_cosmos_task_group.py"  # There are circumstances when we only need to run a single DAG, but we were parsing all the DAGs. This change is to avoid parsing all the DAGs.
 
   Run-Integration-Tests-DBT-Async:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.10", "3.0" ]
-        dbt-version: ["1.5", "1.6", "1.7", "1.8", "1.9"]
+        airflow-version: [ "2.11", "3.0" ]
+        dbt-version: ["1.6", "1.7", "1.8", "1.9", "1.10"]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -370,9 +397,11 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -381,29 +410,19 @@ jobs:
           key: integration-dbt-async-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
-        env:
-          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
-          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
-          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
-          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-          AIRFLOW__COSMOS__ENABLE_CACHE: 0
-          AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
-          AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -414,22 +433,127 @@ jobs:
 
     env:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+
+      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+      AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: 0 # The altered_jaffle_shop project has non-ASCII characters which raise an exception in earlier versions of Airflow, as documented in https://github.com/astronomer/astronomer-cosmos/issues/1802
+      AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
+      AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
+      AIRFLOW__COSMOS__ENABLE_CACHE: 0
+      AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
+      AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+      DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
+
+      # The following are only required because the profiles.yml file references them. They are not used by the tests selected by this job.
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_SCHEMA: public
+      POSTGRES_PORT: 5432
+
+  Run-Integration-dbt-fusion-Tests:
+    needs: Authorize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+        airflow-version: ["2.10", "3.0"]
+        dbt-version: ["2.0"]  # dbt Fusion
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: integration-dbtf-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Set RESOURCE_PREFIX without periods
+        id: set-resource-prefix
+        run: |
+          PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
+          AIRFLOW_VER=$(echo "${{ matrix.airflow-version }}" | tr -d '.')
+          DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.')
+          PREFIX="COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}"
+          echo "prefix=${PREFIX}" >> $GITHUB_OUTPUT
+
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf-setup
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf
+        env:
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
+          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
+
+      - name: Upload coverage to Github
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          path: .coverage
+          include-hidden-files: true
+
+      - name: Clean up Snowflake resources
+        if: always()
+        run: |
+         pip install snowflake-connector-python
+         # Trigger a python script to delete the resources
+         python scripts/ci_dbtf_delete_snowflake_resources.py
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
+
 
   Run-Performance-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11"]
-        airflow-version: ["2.8", "3.0" ]
+        airflow-version: ["2.10", "3.0" ]
         dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     services:
       postgres:
-        image: postgres
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -440,9 +564,11 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -451,14 +577,14 @@ jobs:
           key: perf-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run performance tests against against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -491,16 +617,20 @@ jobs:
   Run-Kubernetes-Tests:
     needs: Authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         python-version: [ "3.12" ]
         airflow-version: [ "2.10", "3.0" ]
-        dbt-version: [ "1.9" ]
+        dbt-version: [ "1.10" ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -509,17 +639,17 @@ jobs:
           key: coverage-integration-kubernetes-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Create KinD cluster
-        uses: container-tools/kind-action@v2
+        uses: container-tools/kind-action@0ad70e2299366b0e1552c7240f4e4567148f723e  # v2.0.4
 
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run kubernetes tests
@@ -558,24 +688,29 @@ jobs:
   Code-Coverage:
     if: github.event.action != 'labeled'
     needs:
+      - Authorize
       - Run-Unit-Tests
       - Run-Integration-Tests
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install coverage
         run: |
           pip3 install coverage
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ./coverage
       - name: Combine coverage
@@ -584,7 +719,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7  # v5.5.1
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

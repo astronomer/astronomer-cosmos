@@ -1,9 +1,11 @@
+import base64
 import json
 import logging
 import os
 import shutil
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -30,6 +32,7 @@ from cosmos.dbt.parser.output import (
 )
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
+from cosmos.io import _construct_dest_file_path
 from cosmos.operators.local import (
     AbstractDbtLocalBase,
     DbtBuildLocalOperator,
@@ -531,7 +534,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
-
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
@@ -592,7 +594,7 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
     caplog.set_level(logging.ERROR)
     caplog.clear()
-    run_test_dag(dag)
+    run_test_dag(dag, expect_success=False)
 
     assert "AirflowCompatibilityError" in caplog.text
     assert "ERROR" in caplog.text
@@ -626,7 +628,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_vi
 )
 @pytest.mark.integration
 def test_run_operator_dataset_emission_is_skipped(caplog):
-
     with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
             profile_config=real_profile_config,
@@ -760,8 +761,32 @@ def test_run_operator_caches_partial_parsing(caplog, tmp_path):
     assert not "Unable to do partial parsing" in caplog.text
 
 
-def test_dbt_base_operator_no_partial_parse() -> None:
+@pytest.mark.integration
+def test_run_operator_copies_manifest_file(caplog, tmp_path):
+    manifest_filepath = DBT_PROJ_DIR / "target/manifest.json"
+    assert manifest_filepath.exists()
+    caplog.clear()
+    caplog.set_level(logging.DEBUG)
+    with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+            cache_dir=cache._obtain_cache_dir_path("test-partial-parsing", tmp_path),
+            invocation_mode=InvocationMode.SUBPROCESS,
+            manifest_filepath=manifest_filepath,
+        )
+        seed_operator
 
+    run_test_dag(dag)
+
+    assert caplog.text.count("Copying the manifest from") == 1
+
+
+def test_dbt_base_operator_no_partial_parse() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -1109,19 +1134,52 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     [
         (
             DbtSeedLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "full_refresh",
+            ),
         ),
         (
             DbtRunLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "full_refresh",
+            ),
         ),
         (
             DbtBuildLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness", "full_refresh"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "full_refresh",
+            ),
         ),
         (
             DbtSourceLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "compiled_sql", "freshness"),
+            ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags", "compiled_sql", "freshness"),
         ),
     ],
 )
@@ -1158,6 +1216,7 @@ def test_dbt_docs_gcs_local_operator():
         mock_hook.upload.assert_has_calls(expected_upload_calls)
 
 
+@pytest.mark.integration
 @patch("cosmos.operators.local.AbstractDbtLocalBase._upload_sql_files")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._override_rtif")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception_subprocess")
@@ -1204,7 +1263,7 @@ def test_operator_execute_deps_parameters(
     )
     mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {"ENV_VAR": "value"})
     mock_temporary_directory.return_value.__enter__.return_value = project_dir.as_posix()
-    task.execute(context={"task_instance": MagicMock()})
+    task.execute(context={"task_instance": MagicMock(), "run_id": "test_run_id"})
     if invocation_mode == InvocationMode.SUBPROCESS:
         assert mock_subprocess.call_args_list[0].kwargs["command"] == expected_call_kwargs
     elif invocation_mode == InvocationMode.DBT_RUNNER:
@@ -1239,7 +1298,6 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
 def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
-
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -1255,7 +1313,6 @@ def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigterm")
 def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
-
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
@@ -1505,7 +1562,30 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
 
+def test_upload_sql_files_xcom(tmp_path):
+    sql_query = "SELECT 1;"
+    sql_file = tmp_path / "target" / "models" / "dest.sql"
+    sql_file.parent.mkdir(parents=True, exist_ok=True)
+    sql_file.write_text(sql_query)
+
+    mock_context = {"ti": MagicMock()}
+
+    obj = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    obj._construct_dest_file_path = lambda a, b, c, d: "dest.sql"
+
+    obj._upload_sql_files_xcom(mock_context, str(tmp_path), "models")
+
+    compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+    compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+    mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value=compressed_b64_sql)
+
+
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("airflow.io.path.ObjectStoragePath.copy")
 @patch("airflow.io.path.ObjectStoragePath")
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
@@ -1534,12 +1614,13 @@ def test_upload_compiled_sql_should_upload(mock_configure_remote, mock_object_st
 
     files = [file1, file2]
 
+    operator.extra_context["run_id"] = "test_run_id"
     with patch.object(Path, "rglob", return_value=files):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
         for file_path in files:
             rel_path = os.path.relpath(str(file_path), str(source_compiled_dir))
-            expected_dest_path = f"mock_remote_path/test_dag/compiled/{rel_path.lstrip('/')}"
+            expected_dest_path = f"mock_remote_path/test_dag/test_run_id/compiled/{rel_path.lstrip('/')}"
             mock_object_storage_path.assert_any_call(expected_dest_path, conn_id="mock_conn_id")
             mock_object_storage_path.return_value.copy.assert_any_call(mock_object_storage_path.return_value)
 
@@ -1645,26 +1726,6 @@ def test_build_and_run_cmd_with_full_refresh_in_async_mode():
                 assert "--full-refresh" in cmd_flags_arg
 
 
-@pytest.mark.integration
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("pathlib.Path.rglob")
-@patch("cosmos.operators.local.AbstractDbtLocalBase._construct_dest_file_path")
-@patch("airflow.io.path.ObjectStoragePath.unlink")
-def test_async_execution_teardown_delete_files(mock_unlink, mock_construct_dest_file_path, mock_rglob):
-    mock_file = MagicMock()
-    mock_file.is_file.return_value = True
-    mock_file.__str__.return_value = "/altered_jaffle_shop/target/run/file1.sql"
-    mock_rglob.return_value = [mock_file]
-    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
-    operator = DbtRunLocalOperator(
-        task_id="test",
-        project_dir=project_dir,
-        profile_config=profile_config,
-    )
-    operator._handle_async_execution(project_dir, {}, {"profile_type": "bigquery", "teardown_task": True})
-    mock_unlink.assert_called()
-
-
 def test_read_run_sql_from_target_dir():
     tmp_project_dir = "/tmp/project"
     sql_context = {"dbt_node_config": {"file_path": "/path/to/file.sql"}, "package_name": "package_name"}
@@ -1709,7 +1770,6 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
 def test_handle_post_execution_with_multiple_callbacks(
     mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json
 ):
-
     multiple_callbacks = [MagicMock(), MagicMock(), MagicMock()]
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
@@ -1724,3 +1784,421 @@ def test_handle_post_execution_with_multiple_callbacks(
 
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+def test_construct_dest_file_path_with_run_id():
+    """Test _construct_dest_file_path uses run_id correctly."""
+    dest_target_dir = Path("/dest")
+    source_target_dir = Path("/project_dir/target")
+    file_path = "/project_dir/target/subdir/file.txt"
+    source_subpath = "target"
+
+    expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
+    context = {
+        "dag": MagicMock(dag_id="test_dag"),
+        "run_id": "test_run_id",
+        "task_instance": MagicMock(task_id="test_task", try_number=1),
+    }
+    result = _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, source_subpath, context=context)
+
+    assert result == expected_path
+    assert "test_run_id" in result
+
+
+@patch("cosmos.settings.upload_sql_to_xcom", False)
+def test_operator_construct_dest_file_path_with_run_id():
+    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
+    operator = ConcreteDbtLocalBaseOperator(
+        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
+    )
+
+    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
+
+    dest_target_dir = Path("/dest")
+    source_compiled_dir = Path("/project_dir/target/compiled")
+    file_path = "/project_dir/target/compiled/models/my_model.sql"
+    resource_type = "compiled"
+
+    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
+    result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
+
+    assert result == expected_path
+    assert "test_run_id" in result
+
+
+@patch("cosmos.settings.upload_sql_to_xcom", False)
+def test_construct_dest_file_path_in_operator():
+    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
+    operator = ConcreteDbtLocalBaseOperator(
+        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
+    )
+
+    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
+
+    dest_target_dir = Path("/dest")
+    source_compiled_dir = Path("/project_dir/target/compiled")
+    file_path = "/project_dir/target/compiled/models/my_model.sql"
+    resource_type = "compiled"
+
+    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
+
+    with patch.object(
+        operator, "_construct_dest_file_path", wraps=operator._construct_dest_file_path
+    ) as mock_construct:
+        result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
+
+        assert result == expected_path
+        assert "test_run_id" in result
+
+        mock_construct.assert_called_once_with(dest_target_dir, file_path, source_compiled_dir, resource_type)
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
+    """Test that parent directories are created during file uploads."""
+
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir="test/dir",
+    )
+
+    with patch.object(
+        operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
+    ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
+        "pathlib.Path.rglob", return_value=[Path("file.sql")]
+    ), patch(
+        "pathlib.Path.is_file", return_value=True
+    ):
+        mock_dest_path = MagicMock()
+        mock_dest_path.parent = MagicMock()
+        mock_object_storage_path.return_value = mock_dest_path
+
+        operator._upload_sql_files("tmp_dir", "compiled")
+
+        mock_dest_path.parent.mkdir.assert_called_with(parents=True, exist_ok=True)
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
+@patch("airflow.io.path.ObjectStoragePath")
+def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote):
+    """Test the _delete_sql_files method when the remote directory doesn't exist."""
+    mock_path = MagicMock()
+    mock_path.exists.return_value = False
+    mock_object_storage_path.return_value = mock_path
+    mock_configure_remote.return_value = (Path("/mock/path"), "mock_conn_id")
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/project/dir",
+        profile_config=profile_config,
+        extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
+    )
+
+    with patch.object(operator.log, "debug") as mock_log_debug:
+        operator._delete_sql_files()
+        mock_log_debug.assert_called_once()
+        log_format, log_path = mock_log_debug.call_args[0]
+        assert "Remote run directory does not exist, skipping deletion: %s" == log_format
+        assert "/mock/path/test_dag_task_group/test_run_id" == log_path
+
+    mock_path.rmdir.assert_not_called()
+
+
+@pytest.mark.integration
+def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir=tmp_path,
+    )
+    operator.invocation_mode = InvocationMode.DBT_RUNNER
+    tmp_project_dir = str(tmp_path)
+    profile_path = tmp_path / "profiles.yml"
+    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
+    assert "--no-static-parser" in flags
+
+
+def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_path):
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir=tmp_path,
+    )
+    operator.invocation_mode = InvocationMode.SUBPROCESS
+    tmp_project_dir = str(tmp_path)
+    profile_path = tmp_path / "profiles.yml"
+    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
+    assert "--no-static-parser" not in flags
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
+def test_delete_sql_files_no_remote_target_configured(mock_configure_remote):
+    """Test that _delete_sql_files exits early with a warning when remote path is not configured."""
+    mock_configure_remote.return_value = (None, None)
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/project/dir",
+        profile_config=profile_config,
+        extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
+    )
+
+    with patch.object(operator.log, "warning") as mock_log_warning:
+        operator._delete_sql_files()
+        expected_log_message = "Remote target path or connection ID not configured. Skipping deletion."
+        mock_log_warning.assert_called_once_with(expected_log_message)
+
+    mock_configure_remote.return_value = (Path("/mock/path"), None)
+    with patch.object(operator.log, "warning") as mock_log_warning:
+        operator._delete_sql_files()
+        mock_log_warning.assert_called_once_with(expected_log_message)
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
+def test_override_rtif_airflow2_with_should_store_compiled_sql_false():
+    """Test that _override_rtif does nothing in Airflow 2 when should_store_compiled_sql is False"""
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    context = {"task_instance": MagicMock()}
+
+    operator._override_rtif(context)
+    assert not context["task_instance"].called
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
+def test_override_rtif_airflow3_with_should_store_compiled_sql_false():
+    """Test that _override_rtif sets overwrite_rtif_after_execution to False in Airflow 3 when should_store_compiled_sql is False"""
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        profile_config=None,
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    context = {"task_instance": MagicMock()}
+    operator._override_rtif(context)
+    assert operator.overwrite_rtif_after_execution is False
+
+
+def test_dbt_cmd_flags_templating():
+    """Test that dbt_cmd_flags supports Jinja templating."""
+    from datetime import datetime
+
+    from airflow import DAG
+
+    dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
+
+    operator = DbtRunLocalOperator(
+        task_id="test_templating",
+        project_dir="my/dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=[
+            "--warn-error",
+            "{% if params.event_time_start %}--event-time-start{% endif %}",
+            "{% if params.event_time_start %}{{ params.event_time_start }}{% endif %}",
+            "{% if params.event_time_end %}--event-time-end{% endif %}",
+            "{% if params.event_time_end %}{{ params.event_time_end }}{% endif %}",
+            "--select",
+            "{{ params.model_name if params.model_name else 'default_model' }}",
+        ],
+        dag=dag,
+    )
+
+    # Test with parameters
+    context = {
+        "params": {"event_time_start": "2024-01-01", "event_time_end": "2024-01-31", "model_name": "stg_funnel_events"}
+    }
+
+    # Render templates
+    operator.render_template_fields(context)
+
+    # Verify the flags were templated correctly
+    expected_flags = [
+        "--warn-error",
+        "--event-time-start",
+        "2024-01-01",
+        "--event-time-end",
+        "2024-01-31",
+        "--select",
+        "stg_funnel_events",
+    ]
+
+    assert operator.dbt_cmd_flags == expected_flags
+
+
+def test_dbt_cmd_flags_empty_template():
+    """Test that empty template results are filtered out."""
+    from datetime import datetime
+
+    from airflow import DAG
+
+    dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
+
+    operator = DbtRunLocalOperator(
+        task_id="test_empty",
+        project_dir="my/dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=[
+            "--warn-error",
+            "{% if params.get('missing_param') %}--some-flag{% endif %}",  # Will be empty
+            "{% if params.get('missing_param') %}{{ params.get('missing_param') }}{% endif %}",  # Will be empty
+            "--select",
+            "{{ params.model_name if params.model_name else 'default_model' }}",
+        ],
+        dag=dag,
+    )
+
+    context = {"params": {"model_name": "test_model"}}  # No missing_param
+
+    # Render templates
+    operator.render_template_fields(context)
+
+    # Build command to test filtering
+    dbt_cmd, _ = operator.build_cmd(context, [])
+
+    # Verify empty flags are filtered out and only non-empty flags remain
+    # The command should contain the non-empty flags but not the empty ones
+    cmd_str = " ".join(dbt_cmd)
+    assert "--warn-error" in cmd_str
+    assert "--select" in cmd_str
+    assert "test_model" in cmd_str
+    assert "--some-flag" not in cmd_str  # Empty template should be filtered out
+
+
+def test_dbt_cmd_flags_mixed_static_and_templated():
+    """Test that dbt_cmd_flags works with a mix of static and templated values."""
+    from datetime import datetime
+
+    from airflow import DAG
+
+    dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
+
+    operator = DbtRunLocalOperator(
+        task_id="test_mixed",
+        project_dir="my/dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=[
+            "--full-refresh",  # Static flag
+            "--select",
+            "{{ params.model_name }}",  # Templated value
+            "{% if params.use_cache %}--cache{% endif %}",  # Conditional templated flag
+            "--threads",
+            "4",  # Static value
+        ],
+        dag=dag,
+    )
+
+    context = {"params": {"model_name": "my_model", "use_cache": True}}
+
+    # Render templates
+    operator.render_template_fields(context)
+
+    expected_flags = ["--full-refresh", "--select", "my_model", "--cache", "--threads", "4"]
+
+    assert operator.dbt_cmd_flags == expected_flags
+
+
+def test_push_run_results_to_xcom_missing_file():
+    """Test that _push_run_results_to_xcom raises AirflowException when run_results.json doesn't exist."""
+    from airflow.exceptions import AirflowException
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._push_run_results_to_xcom("/tmp", mock_context)
+    assert "run_results.json not found" in str(exc_info.value)
+
+
+def test_push_run_results_to_xcom_invalid_json(tmp_path):
+    """Test that _push_run_results_to_xcom raises AirflowException when run_results.json is invalid JSON."""
+    from airflow.exceptions import AirflowException
+
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    run_results_path = target_dir / "run_results.json"
+    run_results_path.write_text("invalid json{")
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=str(tmp_path),
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._push_run_results_to_xcom(str(tmp_path), mock_context)
+    assert "Invalid JSON in run_results.json" in str(exc_info.value)
+
+
+def test_push_run_results_to_xcom_success(tmp_path):
+    """Test that _push_run_results_to_xcom successfully pushes valid JSON to XCom."""
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    run_results_path = target_dir / "run_results.json"
+    test_data = {"results": [{"status": "success"}]}
+    run_results_path.write_text(json.dumps(test_data))
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=str(tmp_path),
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    operator._push_run_results_to_xcom(str(tmp_path), mock_context)
+
+    mock_ti.xcom_push.assert_called_once()
+    key, value = mock_ti.xcom_push.call_args[1]["key"], mock_ti.xcom_push.call_args[1]["value"]
+    assert key == "run_results"
+
+    decompressed = json.loads(zlib.decompress(base64.b64decode(value)).decode())
+    assert decompressed == test_data
+
+
+def test_dbt_cmd_flags_all_templated():
+    """Test that dbt_cmd_flags works when all values are templated."""
+    from datetime import datetime
+
+    from airflow import DAG
+
+    dag = DAG("test_dag", start_date=datetime(2023, 1, 1))
+
+    operator = DbtRunLocalOperator(
+        task_id="test_all_templated",
+        project_dir="my/dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=[
+            "{{ params.flag1 }}",
+            "{{ params.flag2 }}",
+            "{{ params.value1 }}",
+            "{{ params.value2 }}",
+        ],
+        dag=dag,
+    )
+
+    context = {"params": {"flag1": "--select", "flag2": "--exclude", "value1": "model1", "value2": "model2"}}
+
+    # Render templates
+    operator.render_template_fields(context)
+
+    expected_flags = ["--select", "--exclude", "model1", "model2"]
+
+    assert operator.dbt_cmd_flags == expected_flags

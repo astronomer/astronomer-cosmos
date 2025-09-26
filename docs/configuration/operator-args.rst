@@ -97,6 +97,7 @@ dbt-related
 - ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
 - ``copy_dbt_packages``: (new in v1.10) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``install_deps``: (deprecated in v1.9, use ``ProjectConfig.install_dbt_deps`` onwards) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, run ``dbt deps`` every time a task is executed.
+- ``manifest_filepath`` (new in v1.10.1):  When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, use the user-defined ``manifest.json`` file.
 
 
 Airflow-related
@@ -146,9 +147,33 @@ The following operator args support templating, and are accessible both through 
 - ``env``
 - ``vars``
 - ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
+- ``dbt_cmd_flags``
 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+
+Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-time ranges:
+
+.. code-block:: python
+
+    DbtDag(
+        # ... other parameters
+        operator_args={
+            "dbt_cmd_flags": [
+                "{% if params.EVENT_TIME_START %}--event-time-start{% endif %}",
+                "{% if params.EVENT_TIME_START %}{{ params.EVENT_TIME_START }}{% endif %}",
+                "{% if params.EVENT_TIME_END %}--event-time-end{% endif %}",
+                "{% if params.EVENT_TIME_END %}{{ params.EVENT_TIME_END }}{% endif %}",
+                "--select",
+                "{{ params.MODEL_NAME }}",
+            ]
+        },
+        params={
+            "EVENT_TIME_START": Param(default=None, type=["null", "string"]),
+            "EVENT_TIME_END": Param(default=None, type=["null", "string"]),
+            "MODEL_NAME": Param(default=None, type=["null", "string"]),
+        },
+    )
 
 The following template fields are only selectable when using the operators in a standalone context (starting in Cosmos 1.4):
 

@@ -39,7 +39,6 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     DatabricksOauthProfileMapping,
     DuckDBUserPasswordProfileMapping,
     OracleUserPasswordProfileMapping,
-    DuckDBUserPasswordProfileMapping,
     PostgresUserPasswordProfileMapping,
     RedshiftUserPasswordProfileMapping,
     SnowflakeUserPasswordProfileMapping,

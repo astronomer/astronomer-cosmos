@@ -1041,6 +1041,31 @@ def test_load_via_load_via_custom_parser(project_name, nodes_count):
     assert len(dbt_graph.nodes) == nodes_count
 
 
+@pytest.mark.parametrize("project_name", [("altered_jaffle_shop"), ("jaffle_shop_python")])
+def test_validate_load_via_load_via_custom_parser_deprecated(project_name):
+    """Deprecating warnings should be raised when using load_mode CUSTOM."""
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+    execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
+    render_config = RenderConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / project_name / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    with pytest.deprecated_call():
+        dbt_graph.load_via_custom_parser()
+
+
 def test_load_via_load_via_custom_parser_select_rendering_config():
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / "jaffle_shop")
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
@@ -1301,6 +1326,7 @@ def test_run_command_forcing_subprocess(mock_dbt_runner, mock_subprocess, tmp_db
     assert not mock_dbt_runner.called
 
 
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
 @patch("cosmos.dbt.graph.run_command_with_subprocess")
 @patch("cosmos.dbt.graph.run_command_with_dbt_runner")
 def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir):
@@ -1881,9 +1907,10 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        assert hash_dir == "391db5c7e1fb90214d829dd0476059a1"
+        # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
+        assert hash_dir in ("481324dabe926f5cf6352b05e5ebe5d7", "60c08a4730a39d03d89f0f87a8ff3931")
     else:
-        assert hash_dir == "0148da6f5f7fd260c9fa55c3b3c45168"
+        assert hash_dir == "60c08a4730a39d03d89f0f87a8ff3931"
 
 
 @pytest.mark.integration
@@ -2063,3 +2090,83 @@ def test__normalize_path():
     original_value = "seeds\\seed_ifs_util_manual_event_id.csv"
     expected_value = "seeds/seed_ifs_util_manual_event_id.csv"
     assert _normalize_path(original_value) == expected_value
+
+
+@pytest.mark.parametrize(
+    "pre_dbt_fusion_value,source_rendering_behaviour_value,expected_args_count",
+    [
+        (True, SourceRenderingBehavior.NONE, 4),
+        (False, SourceRenderingBehavior.NONE, 13),
+        (True, SourceRenderingBehavior.ALL, 13),
+        (False, SourceRenderingBehavior.ALL, 13),
+    ],
+)
+@patch("cosmos.dbt.graph.settings")
+@patch("cosmos.dbt.graph.run_command")
+def test_run_dbt_ls(
+    mock_run_command, mock_settings, pre_dbt_fusion_value, source_rendering_behaviour_value, expected_args_count
+):
+    mock_settings.pre_dbt_fusion = pre_dbt_fusion_value
+    graph = DbtGraph(
+        project=ProjectConfig(dbt_project_path="/tmp"),
+        render_config=RenderConfig(source_rendering_behavior=source_rendering_behaviour_value),
+    )
+    graph.local_flags = []
+    graph.run_dbt_ls(dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={})
+    assert len(mock_run_command.call_args[0][0]) == expected_args_count
+
+
+# ------------------------------------------------------------------------------
+# Tests for handling `tags` field edge cases (null or missing) in manifest nodes
+# ------------------------------------------------------------------------------
+
+
+def _create_manifest_with_tags(tmp_path: Path, tags_value):
+    """Helper to create a minimal manifest with configurable `tags` value."""
+    manifest_content = {
+        "nodes": {
+            "model.test_project.my_model": {
+                "unique_id": "model.test_project.my_model",
+                "resource_type": "model",
+                "package_name": "test_project",
+                "depends_on": {"nodes": []},
+                "original_file_path": "models/my_model.sql",
+                # The key/value below is the part we vary across tests
+                **({"tags": tags_value} if tags_value is not _MISSING_TAGS else {}),
+                "config": {},
+            }
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+    return manifest_path
+
+
+_MISSING_TAGS = object()
+
+
+@pytest.mark.parametrize("tags_value", [None, _MISSING_TAGS])
+def test_load_manifest_handles_null_or_missing_tags(tags_value, tmp_path):
+    """Ensure that null or absent `tags` result in an empty list on the DbtNode object."""
+
+    project_path = tmp_path / "project"
+    (project_path / "models").mkdir(parents=True, exist_ok=True)
+
+    manifest_path = _create_manifest_with_tags(tmp_path, tags_value)
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    render_config = RenderConfig(source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    node = dbt_graph.nodes["model.test_project.my_model"]
+    assert node.tags == []

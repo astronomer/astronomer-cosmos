@@ -27,6 +27,10 @@ from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
 
+def _sanitize_xcom_key(file_path: str) -> str:
+    return file_path.replace("/", "_").replace("\\", "_")
+
+
 class AbstractDbtBase(metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
@@ -76,7 +80,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
     :param extra_context: A dictionary of values to add to the TaskInstance's Context
     """
 
-    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models")
+    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags")
     global_flags = (
         "project_dir",
         "select",
@@ -148,7 +152,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self.partial_parse = partial_parse
         self.cancel_query_on_kill = cancel_query_on_kill
         self.dbt_executable_path = dbt_executable_path
-        self.dbt_cmd_flags = dbt_cmd_flags
+        self.dbt_cmd_flags = dbt_cmd_flags or []
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
@@ -287,7 +291,9 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
         # add user-supplied args
         if self.dbt_cmd_flags:
-            dbt_cmd.extend(self.dbt_cmd_flags)
+            # Filter out empty strings that might result from template rendering
+            filtered_flags = [flag for flag in self.dbt_cmd_flags if flag and str(flag).strip()]
+            dbt_cmd.extend(filtered_flags)
 
         env = self.get_env(context)
 

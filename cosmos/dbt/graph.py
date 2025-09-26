@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import tempfile
+import warnings
 import zlib
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -89,7 +90,8 @@ class DbtNode:
         Extract node-specific configuration declared in the model dbt YAML configuration.
         These will be used while instantiating Airflow tasks.
         """
-        value = self.config.get("meta", {}).get("cosmos", {})
+        meta_cfg = self.config.get("meta") or {}
+        value = meta_cfg.get("cosmos", {})
         if not isinstance(value, dict):
             raise CosmosLoadDbtException(
                 f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'cosmos' in meta must be a dict."
@@ -148,7 +150,9 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        return str(self.config.get("meta", {}).get("owner", ""))
+        config_dict = self.config or {}
+        meta_cfg = config_dict.get("meta") or {}
+        return str(meta_cfg.get("owner", ""))
 
     @property
     def context_dict(self) -> dict[str, Any]:
@@ -304,9 +308,10 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=base_path / node_dict["original_file_path"],
-                    tags=node_dict.get("tags", []),
-                    config=node_dict.get("config", {}),
+                    # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
+                    file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
+                    tags=node_dict.get("tags") or [],
+                    config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
@@ -565,7 +570,16 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+
+        # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
+        # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
+        # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
+        # Users can force previous Cosmos behaviour by setting pre_dbt_fusion to True.
+        specify_output_keys = (
+            not settings.pre_dbt_fusion or self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+        )
+
+        if specify_output_keys:
             ls_command = [
                 dbt_cmd,
                 "ls",
@@ -582,7 +596,12 @@ class DbtGraph:
                 "freshness",
             ]
         else:
-            ls_command = [dbt_cmd, "ls", "--output", "json"]
+            ls_command = [
+                dbt_cmd,
+                "ls",
+                "--output",
+                "json",
+            ]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
@@ -818,6 +837,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         self.load_method = LoadMode.CUSTOM
+        warnings.warn(
+            "Using `load_method` = `LoadMode.CUSTOM` is deprecated in current version and will"
+            " be removed in Cosmos 2.0",
+            DeprecationWarning,
+        )
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
         if self.render_config.selector:
@@ -907,8 +931,8 @@ class DbtGraph:
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
-                    tags=node_dict["tags"],
-                    config=node_dict["config"],
+                    tags=node_dict.get("tags") or [],
+                    config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE

@@ -28,7 +28,6 @@ from cosmos.cache import (
     _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
-    _create_folder_version_hash,
     _get_latest_cached_package_lockfile,
     _get_latest_partial_parse,
     _get_or_create_profile_cache_dir,
@@ -51,6 +50,8 @@ from cosmos.settings import AIRFLOW_IO_AVAILABLE, dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
+example_dag_with_dots = DAG("dag.with.dots", start_date=START_DATE)
+
 SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.msgpack"
 
 
@@ -58,6 +59,7 @@ SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.ms
     "dag, task_group, result_identifier",
     [
         (example_dag, None, "dag"),
+        (example_dag_with_dots, None, "dag___with___dots"),
         (None, TaskGroup(dag=example_dag, group_id="inner_tg"), "dag__inner_tg"),
         (
             None,
@@ -121,38 +123,6 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
         _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
-
-
-def test__create_folder_version_hash(tmp_path, caplog):
-    """
-    Test that Cosmos is still able to create the hash of a dbt project folder even when
-    there is a symbolic link referencing a no longer existing file.
-
-    This test addresses the issue:
-    https://github.com/astronomer/astronomer-cosmos/issues/1096
-    """
-    caplog.set_level(logging.INFO)
-
-    # Create a source folder with two files
-    source_dir = tmp_path / "original_dbt_folder"
-    source_dir.mkdir()
-    file_1 = Path(source_dir / "file_1.sql")
-    file_1.touch()
-    file_2 = Path(source_dir / "file_2.sql")
-    file_2.touch()
-
-    # Create a target folder with symbolic links to the two files in the source folder
-    target_dir = tmp_path / "cosmos_dbt_folder"
-    target_dir.mkdir()
-    file_1_symlink = Path(target_dir / "file_1.sql")
-    file_1_symlink.symlink_to(file_1)
-    file_2_symlink = Path(target_dir / "file_2.sql")
-    file_2_symlink.symlink_to(file_2)
-
-    # Delete one of the original files from the source folder
-    file_1.unlink()
-
-    _create_folder_version_hash(target_dir)
 
 
 @patch("cosmos.cache.shutil.copyfile")

@@ -106,6 +106,11 @@ as ``max_active_tasks``, ``max_active_runs`` and ``default_args``.
 With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
 
+Getting Started with Airflow Async Execution Mode
+-------------------------------------------------
+
+See our :doc:`Getting Started with Airflow Async Execution Mode <getting_started/async-execution-mode>` for details.
+
 
 Airflow 3 compatibility
 -----------------------

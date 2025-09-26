@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import base64
 import time
+import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 import airflow
+
+from cosmos.operators.base import _sanitize_xcom_key
 
 try:
     from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -14,7 +18,7 @@ except ImportError:
         "with with `pip install apache-airflow-providers-google`."
     )
 
-from airflow.utils.context import Context
+from airflow.utils.context import Context  # type: ignore
 from packaging.version import Version
 
 from cosmos import settings
@@ -128,6 +132,19 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def base_cmd(self) -> list[str]:
         return ["run"]
 
+    def get_sql_from_xcom(self, context: Context) -> str:
+        start_time = time.time()
+        file_path = self.async_context["dbt_node_config"]["file_path"]
+        project_dir_parent = str(Path(self.project_dir).parent)
+        sql_model_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        compressed_b64_sql = context["ti"].xcom_pull(task_ids="dbt_setup_async", key=_sanitize_xcom_key(sql_model_path))
+        compressed_b64_sql = base64.b64decode(compressed_b64_sql)
+        sql_query = zlib.decompress(compressed_b64_sql).decode("utf-8")
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
+        return sql_query  # type: ignore
+
     def get_remote_sql(self) -> str:
         start_time = time.time()
 
@@ -137,6 +154,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
         dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
+        run_id = self.async_context["run_id"]
 
         remote_target_path_str = str(remote_target_path).rstrip("/")
 
@@ -145,7 +163,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         project_dir_parent = str(Path(self.project_dir).parent)
         relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        remote_model_path = f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/run/{relative_file_path}"
+        remote_model_path = (
+            f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/{run_id}/run/{relative_file_path}"
+        )
 
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
         with object_storage_path.open() as fp:  # type: ignore
@@ -155,10 +175,19 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             return sql  # type: ignore
 
     def execute(self, context: Context, **kwargs: Any) -> None:
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
         if settings.enable_setup_async_task:
+
+            if settings.upload_sql_to_xcom:
+                sql_query = self.get_sql_from_xcom(context)
+            else:
+                sql_query = self.get_remote_sql()
+
             self.configuration = {
                 "query": {
-                    "query": self.get_remote_sql(),
+                    "query": sql_query,
                     "useLegacySql": False,
                 }
             }
@@ -171,7 +200,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         if not settings.enable_setup_async_task:
             self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
             return
-        sql = self.get_remote_sql().strip()
+        if settings.upload_sql_to_xcom:
+            sql = self.get_sql_from_xcom(context)
+        else:
+            sql = self.get_remote_sql().strip()
         self.log.debug("Executed SQL is: %s", sql)
         self.compiled_sql = sql
 
@@ -193,6 +225,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         This returns immediately. It relies on trigger to throw an exception,
         otherwise it assumes execution was successful.
         """
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)

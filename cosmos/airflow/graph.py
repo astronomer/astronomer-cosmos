@@ -13,6 +13,7 @@ from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
 from airflow.utils.task_group import TaskGroup
 
+from cosmos import settings
 from cosmos.config import RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
@@ -31,7 +32,6 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
-from cosmos.settings import enable_setup_async_task, enable_teardown_async_task
 
 logger = get_logger(__name__)
 
@@ -129,6 +129,7 @@ def create_test_task_metadata(
     node: DbtNode | None = None,
     render_config: RenderConfig | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
+    enable_owner_inheritance: bool | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -151,9 +152,7 @@ def create_test_task_metadata(
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
-        if node.resource_type == DbtResourceType.MODEL:
-            task_args["models"] = node.resource_name
-        elif node.resource_type == DbtResourceType.SOURCE:
+        if node.resource_type == DbtResourceType.SOURCE:
             task_args["select"] = f"source:{node.resource_name}"
         elif is_detached_test(node):
             task_args["select"] = node.resource_name.split(".")[0]
@@ -162,7 +161,6 @@ def create_test_task_metadata(
 
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
-
     elif render_config is not None:  # TestBehavior.AFTER_ALL
         task_args["select"] = render_config.select
         task_args["selector"] = render_config.selector
@@ -171,6 +169,9 @@ def create_test_task_metadata(
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
         _override_profile_if_needed(task_args, node.profile_config_to_override)
+
+    if not enable_owner_inheritance:
+        task_owner = ""
 
     args_to_override: dict[str, Any] = {}
     if node:
@@ -193,6 +194,7 @@ def _get_task_id_and_args(
     args: dict[str, Any],
     use_task_group: bool,
     normalize_task_id: Callable[..., Any] | None,
+    normalize_task_display_name: Callable[..., Any] | None,
     resource_suffix: str,
     include_resource_type: bool = False,
 ) -> tuple[str, dict[str, Any]]:
@@ -200,16 +202,26 @@ def _get_task_id_and_args(
     Generate task ID and update args with display name if needed.
     """
     args_update = args
-    task_display_name = f"{node.name}_{resource_suffix}"
+    task_name = f"{node.name}_{resource_suffix}"
+
     if include_resource_type:
-        task_display_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
+        task_name = f"{node.name}_{node.resource_type.value}_{resource_suffix}"
+
     if use_task_group:
         task_id = resource_suffix
-    elif normalize_task_id:
+
+    elif normalize_task_id and not normalize_task_display_name:
         task_id = normalize_task_id(node)
-        args_update["task_display_name"] = task_display_name
+        args_update["task_display_name"] = task_name
+    elif not normalize_task_id and normalize_task_display_name:
+        task_id = task_name
+        args_update["task_display_name"] = normalize_task_display_name(node)
+    elif normalize_task_id and normalize_task_display_name:
+        task_id = normalize_task_id(node)
+        args_update["task_display_name"] = normalize_task_display_name(node)
     else:
-        task_id = task_display_name
+        task_id = task_name
+
     return task_id, args_update
 
 
@@ -246,10 +258,12 @@ def create_task_metadata(
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
     normalize_task_id: Callable[..., Any] | None = None,
+    normalize_task_display_name: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
+    enable_owner_inheritance: bool | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -268,7 +282,8 @@ def create_task_metadata(
     """
     dbt_resource_to_class = create_dbt_resource_to_class(test_behavior)
 
-    args = {**args, **{"models": node.resource_name}}
+    # Make a copy to avoid issues with mutable arguments
+    args = {**args}
 
     if DbtResourceType(node.resource_type) in DEFAULT_DBT_RESOURCES and node.resource_type in dbt_resource_to_class:
         extra_context: dict[str, Any] = {
@@ -276,18 +291,36 @@ def create_task_metadata(
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
             "package_name": node.package_name,
         }
+        resource_suffix_map = {TestBehavior.BUILD: "build", DbtResourceType.MODEL: "run"}
+        resource_suffix = (
+            resource_suffix_map.get(test_behavior)
+            or resource_suffix_map.get(node.resource_type)
+            or node.resource_type.value
+        )
+        # Since Cosmos 1.11, it selects models using --select, instead of --models. The reason for this is that
+        # this flag was deprecated in dbt-core 1.10 (https://github.com/dbt-labs/dbt-core/issues/11561)
+        # and dbt fusion (2.0.0-beta26) does not support it.
+        # Users can still force Cosmos to use `--models` by setting the environment variable
+        # `AIRFLOW__COSMOS__PRE_DBT_FUSION=1`.
+        models_select_key = "models" if settings.pre_dbt_fusion else "select"
 
         if test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+            args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, "build", include_resource_type=True
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=resource_suffix,
+                include_resource_type=True,
             )
-        elif node.resource_type == DbtResourceType.MODEL:
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "run")
         elif node.resource_type == DbtResourceType.SOURCE:
+            args["select"] = f"source:{node.resource_name}"
             args["on_warning_callback"] = on_warning_callback
 
             if (source_rendering_behavior == SourceRenderingBehavior.NONE) or (
@@ -296,9 +329,10 @@ def create_task_metadata(
                 and node.has_test is False
             ):
                 return None
-            args["select"] = f"source:{node.resource_name}"
-            args.pop("models")
-            task_id, args = _get_task_id_and_args(node, args, use_task_group, normalize_task_id, "source")
+
+            task_id, args = _get_task_id_and_args(
+                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
+            )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
                 # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
@@ -307,16 +341,27 @@ def create_task_metadata(
                 else:
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
-        else:
+        else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
+            args[models_select_key] = node.resource_name
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, node.resource_type.value
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=resource_suffix,
             )
 
         _override_profile_if_needed(args, node.profile_config_to_override)
 
+        task_owner = node.owner
+
+        if not enable_owner_inheritance:
+            task_owner = ""
+
         task_metadata = TaskMetadata(
             id=task_id,
-            owner=node.owner,
+            owner=task_owner,
             operator_class=calculate_operator_class(
                 execution_mode=execution_mode, dbt_class=dbt_resource_to_class[node.resource_type]
             ),
@@ -413,7 +458,9 @@ def generate_task_or_group(
     node_converters: dict[DbtResourceType, Callable[..., Any]],
     on_warning_callback: Callable[..., Any] | None,
     normalize_task_id: Callable[..., Any] | None = None,
+    normalize_task_display_name: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
+    enable_owner_inheritance: bool | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -433,10 +480,12 @@ def generate_task_or_group(
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
         normalize_task_id=normalize_task_id,
+        normalize_task_display_name=normalize_task_display_name,
         test_behavior=test_behavior,
         test_indirect_selection=test_indirect_selection,
         on_warning_callback=on_warning_callback,
         detached_from_parent=detached_from_parent,
+        enable_owner_inheritance=enable_owner_inheritance,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -470,6 +519,7 @@ def generate_task_or_group(
                     node=node,
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
+                    enable_owner_inheritance=enable_owner_inheritance,
                 )
                 test_task = generate_or_convert_task(
                     node_converters=node_converters,
@@ -648,7 +698,7 @@ def _add_teardown_task(
     tasks_map[DBT_TEARDOWN_ASYNC_TASK_ID] = teardown_airflow_task
 
 
-def build_airflow_graph(
+def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astronomer-cosmos/issues/1943
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
@@ -688,6 +738,8 @@ def build_airflow_graph(
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
     normalize_task_id = render_config.normalize_task_id
+    normalize_task_display_name = render_config.normalize_task_display_name
+    enable_owner_inheritance = render_config.enable_owner_inheritance
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
     task_or_group: TaskGroup | BaseOperator
 
@@ -696,6 +748,10 @@ def build_airflow_graph(
     detached_nodes: dict[str, DbtNode] = OrderedDict()
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
+
+    virtualenv_dir = None
+    if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
+        virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
     for node_id, node in nodes.items():
         task_or_group = generate_task_or_group(  # type: ignore
@@ -711,7 +767,9 @@ def build_airflow_graph(
             dbt_project_name=dbt_project_name,
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
+            normalize_task_display_name=normalize_task_display_name,
             detached_from_parent=detached_from_parent,
+            enable_owner_inheritance=enable_owner_inheritance,
         )
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
@@ -726,6 +784,7 @@ def build_airflow_graph(
             task_args=task_args,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
+            enable_owner_inheritance=enable_owner_inheritance,
         )
         test_task = generate_or_convert_task(
             node_converters=node_converters,
@@ -759,6 +818,7 @@ def build_airflow_graph(
                 on_warning_callback=on_warning_callback,
                 render_config=render_config,
                 node=node,
+                enable_owner_inheritance=enable_owner_inheritance,
             )
             test_task = generate_or_convert_task(
                 node_converters=node_converters,
@@ -780,17 +840,17 @@ def build_airflow_graph(
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    if enable_setup_async_task:
+    if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(
             dag,
             execution_mode,
-            task_args,
+            {**task_args, "virtualenv_dir": virtualenv_dir},
             tasks_map,
             task_group,
             render_config=render_config,
             async_py_requirements=async_py_requirements,
         )
-    if enable_teardown_async_task:
+    if settings.enable_teardown_async_task:
         _add_teardown_task(
             dag,
             execution_mode,

@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -x
 set -v
+set -x
+set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
@@ -16,7 +17,12 @@ fi
 
 echo "${VIRTUAL_ENV}"
 
-CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
+if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.2/constraints-$PYTHON_VERSION.txt"
+else
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
+fi;
+
 curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
 # Workaround to remove PyYAML constraint that will work on both Linux and MacOS
 sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
@@ -26,12 +32,11 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install pip --upgrade
 
-uv pip install "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
-uv pip install apache-airflow-providers-docker --constraint /tmp/constraint.txt
-uv pip install apache-airflow-providers-postgres --constraint /tmp/constraint.txt
+uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docker apache-airflow-providers-postgres --constraint /tmp/constraint.txt
 
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 uv pip install "gcsfs<2025.3.0"
+
 
 if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
   uv pip install "apache-airflow-providers-amazon" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
@@ -39,15 +44,32 @@ if [ "$AIRFLOW_VERSION" = "2.4" ] || [ "$AIRFLOW_VERSION" = "2.5" ] || [ "$AIRFL
   uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install pyopenssl --upgrade
+elif [ "$AIRFLOW_VERSION" = "2.6" ] ; then
+  uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
+  uv pip install "pydantic<2.0"
 elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install  "apache-airflow-providers-google>10.11" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
-else
+elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-
+  uv pip install "apache-airflow-providers-google<=10.26" "apache-airflow==$AIRFLOW_VERSION"
+  # The Airflow 2.8 constraints file at
+  # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
+  # specifies apache-airflow-providers-microsoft-azure==8.4.0. However, our Azure connection setup in the CI,
+  # previously led to authentication issues with this version. This issue got resolved in
+  # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
+  # and skipping installation with constraints, as the specified version does not meet our requirements.
+  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"
+elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   # The Airflow 2.9 constraints file at
   # https://raw.githubusercontent.com/apache/airflow/constraints-2.9.0/constraints-3.11.txt
   # specifies apache-airflow-providers-google==10.16.0. However, our CI setup uses a Google connection without a token,
@@ -56,14 +78,11 @@ else
   # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
   # version does not meet our requirements.
   uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION"
-
-  # The Airflow 2.8 constraints file at
-  # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
-  # specifies apache-airflow-providers-microsoft-azure==8.4.0. However, our Azure connection setup in the CI,
-  # previously led to authentication issues with this version. This issue got resolved in
-  # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
-  # and skipping installation with constraints, as the specified version does not meet our requirements.
-  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"
+else
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
 fi
 
 rm /tmp/constraint.txt

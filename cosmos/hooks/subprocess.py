@@ -14,7 +14,7 @@ from typing import NamedTuple
 try:
     from airflow.sdk.bases.hook import BaseHook
 except ImportError:
-    from airflow.hooks.base import BaseHook
+    from airflow.hooks.base import BaseHook  # type: ignore[no-redef, attr-defined]
 
 
 class FullOutputSubprocessResult(NamedTuple):

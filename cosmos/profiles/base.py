@@ -12,7 +12,12 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
 import yaml
-from airflow.hooks.base import BaseHook
+
+try:
+    from airflow.sdk.bases.hook import BaseHook
+except ImportError:
+    from airflow.hooks.base import BaseHook  # type: ignore[no-redef, attr-defined]
+
 from pydantic import dataclasses
 
 from cosmos.exceptions import CosmosValueError
@@ -147,9 +152,9 @@ class BaseProfileMapping(ABC):
             if not conn:
                 raise CosmosValueError(f"Could not find connection {self.conn_id}.")
 
-            self._conn = conn
+            self._conn = conn  # type: ignore[assignment]
 
-        return self._conn
+        return self._conn  # type: ignore[return-value]
 
     def can_claim_connection(self) -> bool:
         """

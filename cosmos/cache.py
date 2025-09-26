@@ -372,7 +372,7 @@ def delete_unused_dbt_ls_cache(
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for var_key in vars_keys:
                 logger.info(f"Removing the dbt ls cache {var_key}")
-                Variable.delete(var_key)
+                Variable.delete(var_key)  # type: ignore[arg-type]
                 deleted_cosmos_variables += 1
 
     logger.info(

@@ -1,5 +1,5 @@
 import os.path as op
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, NoReturn, Optional, Tuple
 from urllib.parse import urlsplit
 
 from airflow.configuration import conf
@@ -146,6 +146,11 @@ iframe_script = """
 """
 
 
+def _abort() -> NoReturn:
+    abort(404)
+    assert False  # makes mypy happy
+
+
 class DbtDocsView(AirflowBaseView):  # type: ignore
     default_view = "dbt_docs"
     route_base = "/cosmos"
@@ -169,11 +174,11 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
-            abort(404)
+            _abort()
         try:
             html = open_file(op.join(dbt_docs_dir, dbt_docs_index_file_name), conn_id=dbt_docs_conn_id)
         except FileNotFoundError:
-            abort(404)
+            _abort()
         else:
             html = html.replace("</head>", f"{iframe_script}</head>")
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
@@ -182,11 +187,11 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
-            abort(404)
+            _abort()
         try:
             data = open_file(op.join(dbt_docs_dir, "catalog.json"), conn_id=dbt_docs_conn_id)
         except FileNotFoundError:
-            abort(404)
+            _abort()
         else:
             return data, 200, {"Content-Type": "application/json"}
 
@@ -194,11 +199,11 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
-            abort(404)
+            _abort()
         try:
             data = open_file(op.join(dbt_docs_dir, "manifest.json"), conn_id=dbt_docs_conn_id)
         except FileNotFoundError:
-            abort(404)
+            _abort()
         else:
             return data, 200, {"Content-Type": "application/json"}
 

@@ -1158,6 +1158,15 @@ def test_add_teardown_task_raises_error_without_async_py_requirements():
         _add_teardown_task(sample_dag, ExecutionMode.AIRFLOW_ASYNC, task_args, sample_tasks_map, None, None)
 
 
+@pytest.mark.parametrize(
+    "enable_owner_inheritance,node_owner,expected_owner",
+    [
+        (True, "dbt-owner", "dbt-owner"),  # Default behavior - inherit owner
+        (False, "dbt-owner", ""),  # Disable inheritance - empty string
+        (True, "", ""),  # No owner to inherit - empty string
+        (False, "", ""),  # No owner to inherit, disable inheritance - empty string
+    ],
+)
 def test_create_task_metadata_disable_owner_inheritance(enable_owner_inheritance, node_owner, expected_owner):
     """Test that enable_owner_inheritance parameter works correctly in create_task_metadata."""
     node = DbtNode(
@@ -1543,6 +1552,7 @@ def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, e
                 test_behavior=test_behavior,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
                 node_converters=node_converters,
+                node_conversion_by_task_group=False,
             ),
             dbt_project_name="astro_shop",
         )

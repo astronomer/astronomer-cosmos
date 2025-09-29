@@ -390,9 +390,7 @@ def is_detached_test(node: DbtNode) -> bool:
 
 
 def generate_or_convert_task(
-    node_converters: dict[DbtResourceType, Callable[..., Any]],
     task_meta: TaskMetadata,
-    dbt_project_name: str,
     dag: DAG,
     task_group: TaskGroup | None,
     node: DbtNode,
@@ -403,6 +401,8 @@ def generate_or_convert_task(
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
     on_warning_callback: Callable[..., Any] | None,
+    dbt_project_name: str | None = None,
+    node_converters: dict[DbtResourceType, Callable[..., Any]] = {},
     normalize_task_id: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
     **kwargs: Any,
@@ -415,8 +415,8 @@ def generate_or_convert_task(
     """
     task: BaseOperator
 
-    conversion_function = node_converters.get(resource_type, create_airflow_task)
-    if conversion_function != create_airflow_task:
+    conversion_function = node_converters.get(resource_type, None)
+    if conversion_function is not None:
         task_id = task_meta.id
         logger.warning(
             "The `node_converters` attribute is an experimental feature. "
@@ -454,23 +454,26 @@ def generate_task_or_group(
     test_behavior: TestBehavior,
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
-    dbt_project_name: str,
-    node_converters: dict[DbtResourceType, Callable[..., Any]],
     on_warning_callback: Callable[..., Any] | None,
+    dbt_project_name: str | None = None,
+    node_converters: dict[DbtResourceType, Callable[..., Any]] = {},
     normalize_task_id: Callable[..., Any] | None = None,
     normalize_task_display_name: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
     enable_owner_inheritance: bool | None = None,
+    node_conversion_by_task_group: bool | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
     detached_from_parent = detached_from_parent or {}
+    node_converters = node_converters or {}
 
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
         and test_behavior == TestBehavior.AFTER_EACH
         and node.has_test is True
     )
+    convert_entire_task_group = node_conversion_by_task_group and node.resource_type in node_converters
 
     task_meta = create_task_metadata(
         node=node,
@@ -492,7 +495,7 @@ def generate_task_or_group(
     # The exception are the test nodes, since it would be too slow to run test tasks individually.
     # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
     if task_meta and not node.resource_type == DbtResourceType.TEST:
-        if use_task_group:
+        if use_task_group and (not convert_entire_task_group):
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
                 task = generate_or_convert_task(
                     node_converters=node_converters,
@@ -698,7 +701,7 @@ def _add_teardown_task(
     tasks_map[DBT_TEARDOWN_ASYNC_TASK_ID] = teardown_airflow_task
 
 
-def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astronomer-cosmos/issues/1943
+def build_airflow_graph(
     nodes: dict[str, DbtNode],
     dag: DAG,  # Airflow-specific - parent DAG where to associate tasks and (optional) task groups
     execution_mode: ExecutionMode,  # Cosmos-specific - decide what which class to use
@@ -741,7 +744,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     normalize_task_display_name = render_config.normalize_task_display_name
     enable_owner_inheritance = render_config.enable_owner_inheritance
     tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
-    task_or_group: TaskGroup | BaseOperator
+    task_or_group: TaskGroup | BaseOperator | None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
@@ -754,7 +757,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
     for node_id, node in nodes.items():
-        task_or_group = generate_task_or_group(  # type: ignore
+        task_or_group = generate_task_or_group(
             dag=dag,
             task_group=task_group,
             node=node,
@@ -770,6 +773,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             normalize_task_display_name=normalize_task_display_name,
             detached_from_parent=detached_from_parent,
             enable_owner_inheritance=enable_owner_inheritance,
+            node_conversion_by_task_group=render_config.node_conversion_by_task_group,
         )
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
@@ -802,6 +806,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
             detached_from_parent=detached_from_parent,
+            node_conversion_by_task_group=render_config.node_conversion_by_task_group,
         )
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
@@ -836,6 +841,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
                 on_warning_callback=on_warning_callback,
                 normalize_task_id=normalize_task_id,
                 detached_from_parent=detached_from_parent,
+                node_conversion_by_task_group=render_config.node_conversion_by_task_group,
             )
             tasks_map[node_id] = test_task
 

@@ -12,8 +12,15 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+try:
+    from airflow.sdk.bases.sensor import BaseSensorOperator
+except ImportError:
+    from airflow.sensors.base import BaseSensorOperator
+from airflow.exceptions import AirflowException
+
+from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtLocalBaseOperator
+from cosmos.operators.local import DbtLocalBaseOperator, DbtRunLocalOperator
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -124,3 +131,151 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         except Exception:
             context["ti"].xcom_push(key="task_status", value="completed")
             raise
+
+
+class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
+    template_fields = ("model_unique_id",)
+
+    def __init__(
+        self,
+        *,
+        profile_config: ProfileConfig | None = None,
+        project_dir: str | None = None,
+        profiles_dir: str | None = None,
+        producer_task_id: str = "dbt_producer_watcher",
+        poke_interval: int = 20,
+        timeout: int = 60 * 60,  # 1 h safety valve
+        **kwargs: Any,
+    ) -> None:
+        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
+        super().__init__(
+            poke_interval=poke_interval,
+            timeout=timeout,
+            profile_config=profile_config,
+            project_dir=project_dir,
+            profiles_dir=profiles_dir,
+            **kwargs,
+        )
+        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
+        self.producer_task_id = producer_task_id
+
+    @staticmethod
+    def _filter_flags(flags: list[str]) -> list[str]:
+        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
+        filtered = []
+        skip_next = False
+        for token in flags:
+            if skip_next:
+                if token.startswith("--"):
+                    skip_next = False
+                else:
+                    continue  # skip value of previous flag
+            if token in ("--select", "--exclude"):
+                skip_next = True
+                continue
+            filtered.append(token)
+        return filtered
+
+    def _handle_task_retry(self, try_number: int, context: Context) -> bool:
+        """
+        Handles logic for retrying a failed dbt model execution.
+        Reconstructs the dbt command by cloning the project and re-running the model
+        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+        """
+        self.log.info(
+            "Retry attempt #%s – Re-running model '%s' from project '%s'",
+            try_number - 1,
+            self.model_unique_id,
+            self.project_dir,
+        )
+
+        upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
+
+        extra_flags: list[str] = []
+        if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
+            raw_flags = upstream_task.add_cmd_flags()
+            extra_flags = self._filter_flags(raw_flags)
+
+        model_selector = self.model_unique_id.split(".")[-1]
+        cmd_flags = extra_flags + ["--select", model_selector]
+
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+
+        self.log.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
+        return True
+
+    def _get_status_from_events(self, ti: Any) -> Any:
+
+        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
+        if dbt_startup_events:  # pragma: no cover
+            self.log.info("Dbt Startup Event: %s", dbt_startup_events)
+
+        node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
+        compressed_b64_event_msg = ti.xcom_pull(task_ids=self.producer_task_id, key=node_finished_key)
+
+        if not compressed_b64_event_msg:
+            return None
+
+        compressed_bytes = base64.b64decode(compressed_b64_event_msg)
+        event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
+        event_json = json.loads(event_json_str)
+
+        self.log.info("Node Info: %s", event_json_str)
+
+        return event_json.get("data", {}).get("run_result", {}).get("status")
+
+    def _get_status_from_run_results(self, ti: Any) -> Any:
+        compressed_b64_run_results = ti.xcom_pull(task_ids=self.producer_task_id, key="run_results")
+
+        if not compressed_b64_run_results:
+            return None
+
+        compressed_bytes = base64.b64decode(compressed_b64_run_results)
+        run_results_str = zlib.decompress(compressed_bytes).decode("utf-8")
+        run_results_json = json.loads(run_results_str)
+
+        self.log.debug("Run results: %s", run_results_json)
+
+        results = run_results_json.get("results", [])
+        node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
+
+        if not node_result:  # pragma: no cover
+            self.log.warning("No matching result found for unique_id '%s'", self.model_unique_id)
+            return None
+
+        self.log.info("Node Info: %s", run_results_str)
+        return node_result.get("status")
+
+    def poke(self, context: Context) -> bool:
+        """
+        Checks the status of a dbt model run by pulling relevant XComs from the master task.
+        Handles retries and checks for successful completion of the model execution.
+        """
+        ti = context["ti"]
+        try_number = ti.try_number
+
+        if try_number > 1:
+            return self._handle_task_retry(try_number, context)
+
+        self.log.info(
+            "Pulling status from task_id '%s' for model '%s'",
+            self.producer_task_id,
+            self.model_unique_id,
+        )
+
+        # We have assumption here that both the build producer and the sensor task will have same invocation mode
+        if not self.invocation_mode:
+            self._discover_invocation_mode()
+        use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
+
+        if use_events:
+            status = self._get_status_from_events(ti)
+        else:
+            status = self._get_status_from_run_results(ti)
+
+        if status is None:
+            return False
+        elif status == "success":
+            return True
+        else:
+            raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

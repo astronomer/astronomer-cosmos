@@ -7,8 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.exceptions import AirflowException
 
-import pytest
-
 from cosmos.config import InvocationMode
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,

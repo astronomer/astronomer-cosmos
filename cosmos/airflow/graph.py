@@ -337,12 +337,13 @@ def create_task_metadata(
                 return None
 
             task_id, args = _get_task_id_and_args(
-                node,
-                args,
-                use_task_group,
-                normalize_task_id,
-                normalize_task_display_name,
-                "source",
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=r"source",
+                include_resource_type=True,
                 execution_mode=execution_mode,
             )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
@@ -540,11 +541,11 @@ def _add_producer(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
 
-    # If we trigger_rule="always" (https://github.com/astronomer/astronomer-cosmos/issues/1959),
-    # the producer task becomes the parent to the root nodes of the remaining DAG
-    # for task_id, task in tasks_map.items():
-    #    if not task.upstream_list:
-    #        producer_airflow_task >> task
+    for task_id, task in tasks_map.items():
+        # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+        if not task.upstream_list:
+            producer_airflow_task >> task
+            task.trigger_rule = "always"
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
 

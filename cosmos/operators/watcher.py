@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import base64
 import json
 import logging
@@ -45,7 +44,9 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 
+CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
 PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
+WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
 
 
 class DbtProducerWatcherOperator(DbtLocalBaseOperator):
@@ -77,7 +78,8 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-        kwargs["priority_weight"] = kwargs.get("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("weight_rule", WEIGHT_RULE)
         super().__init__(task_id=task_id, *args, **kwargs)
 
     @staticmethod
@@ -149,12 +151,14 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         profile_config: ProfileConfig | None = None,
         project_dir: str | None = None,
         profiles_dir: str | None = None,
-        producer_task_id: str = "dbt_producer_watcher",
+        producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 20,
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
     ) -> None:
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
+        kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("weight_rule", WEIGHT_RULE)
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -297,23 +301,23 @@ class DbtBuildWatcherOperator:
         )
 
 
-class DbtSeedWatcherOperator(DbtSeedMixin, DbtModelStatusSensor):  # type: ignore[misc]
+class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtModelStatusSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtModelStatusSensor):
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtModelStatusSensor.template_fields  # type: ignore[operator]
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -330,12 +334,12 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunWatcherOperator(DbtModelStatusSensor):
+class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     """
     Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtModelStatusSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

@@ -168,7 +168,7 @@ TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtReso
 DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 
-PRODUCER_WATCHER_TASK_ID = "dbt_producer"
+PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
 
 TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}/{execution_modes}"
 TELEMETRY_VERSION = "v2"

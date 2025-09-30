@@ -224,9 +224,6 @@ def _get_task_id_and_args(
     else:
         task_id = task_name
 
-    if execution_mode == ExecutionMode.WATCHER:
-        args_update["model_unique_id"] = node.unique_id
-
     return task_id, args_update
 
 
@@ -343,7 +340,6 @@ def create_task_metadata(
                 normalize_task_id=normalize_task_id,
                 normalize_task_display_name=normalize_task_display_name,
                 resource_suffix=r"source",
-                include_resource_type=True,
                 execution_mode=execution_mode,
             )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
@@ -519,13 +515,13 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
-def _add_producer(
+def _add_producer_watcher(
     dag: DAG,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
-) -> None:
+) -> str:
 
     producer_task_args = task_args.copy()
 
@@ -548,6 +544,7 @@ def _add_producer(
             task.trigger_rule = "always"
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
+    return producer_airflow_task.task_id
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
@@ -692,6 +689,16 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
+    if execution_mode == ExecutionMode.WATCHER:
+        producer_watcher_task_id = _add_producer_watcher(
+            dag,
+            task_args,
+            tasks_map,
+            task_group,
+            render_config=render_config,
+        )
+        task_args["producer_watcher_task_id"] = producer_watcher_task_id
+
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
@@ -754,14 +761,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-
-    if execution_mode == ExecutionMode.WATCHER:
-        _add_producer(
-            dag,
-            task_args,
-            tasks_map,
-            task_group,
-        )
 
     if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(

@@ -83,6 +83,7 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+    has_non_detached_test: bool = False
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -168,6 +169,7 @@ class DbtNode:
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,
+            "has_non_detached_test": self.has_test,
             "resource_name": self.resource_name,
             "name": self.name,
         }
@@ -952,7 +954,8 @@ class DbtGraph:
 
     def update_node_dependency(self) -> None:
         """
-        This will update the property `has_test` if node has `dbt` test
+        This will update the property `has_test` if node has `dbt` test and update the property
+        `has_non_detached_test` if there's at least one non-detached `dbt` test
 
         Updates in-place:
         * self.filtered_nodes
@@ -963,3 +966,8 @@ class DbtGraph:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node
+                        if (
+                            len(node.depends_on) == 1
+                            or self.render_config.should_detach_multiple_parents_tests is False
+                        ):
+                            self.filtered_nodes[node_id].has_non_detached_test = True

@@ -411,7 +411,7 @@ def generate_task_or_group(
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
         and test_behavior == TestBehavior.AFTER_EACH
-        and node.has_test is True
+        and node.has_non_detached_test is True
     )
 
     task_meta = create_task_metadata(

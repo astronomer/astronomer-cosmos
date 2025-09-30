@@ -1123,13 +1123,18 @@ def test_update_node_dependency_target_exist():
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
-    dbt_graph = DbtGraph(project=project_config, execution_config=execution_config, profile_config=profile_config)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
     dbt_graph.load()
 
     for _, nodes in dbt_graph.nodes.items():
         if nodes.resource_type == DbtResourceType.TEST:
             for node_id in nodes.depends_on:
                 assert dbt_graph.nodes[node_id].has_test is True
+                assert dbt_graph.nodes[node_id].has_non_detached_test is True
 
 
 def test_update_node_dependency_test_not_exist():
@@ -1156,6 +1161,7 @@ def test_update_node_dependency_test_not_exist():
 
     for _, nodes in dbt_graph.filtered_nodes.items():
         assert nodes.has_test is False
+        assert nodes.has_non_detached_test is False
 
 
 def test_tag_selected_node_test_exist():
@@ -1182,6 +1188,7 @@ def test_tag_selected_node_test_exist():
         assert node.tags == ["test_tag"]
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
+            assert node.has_non_detached_test is True
 
 
 @pytest.mark.integration

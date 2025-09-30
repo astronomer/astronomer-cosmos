@@ -166,3 +166,15 @@ def test_profile_env_vars(
     assert profile_mapping.env_vars == {
         "COSMOS_CONN_MYSQL_PASSWORD": mock_mysql_conn.password,
     }
+
+
+def test_mock_profile(
+    mock_mysql_conn: Connection,
+) -> None:
+    """
+    Tests that the mock profile is generated correctly.
+    """
+    profile_mapping = MysqlUserPasswordProfileMapping(mock_mysql_conn.conn_id, {"schema": "my_schema"})
+    mock_profile = profile_mapping.mock_profile
+    assert mock_profile["port"] == 3306
+    assert mock_profile["schema"] == "my_schema"

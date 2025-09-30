@@ -8,12 +8,14 @@ from packaging import version
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
 
 if TYPE_CHECKING:  # pragma: no cover
+    from .af3_plugin_impl import CosmosAF3Plugin as _CosmosAF3PluginType
     from .plugin_impl import CosmosPlugin as _CosmosPluginType
 
-CosmosPlugin: _CosmosPluginType | None = None
-# The plugin is only loaded if the Airflow version is less than 3.0. This is because the plugin is incompatible with
-# Airflow 3.0 and above. Once the compatibility issue is resolved as part of
-# https://github.com/astronomer/astronomer-cosmos/issues/1587, the import statement can be moved outside of the
-# conditional block.
+CosmosPlugin: _CosmosPluginType | _CosmosAF3PluginType | None = None
+
+# Airflow 2.x (FAB/Flask) plugin
 if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
     from .plugin_impl import CosmosPlugin as CosmosPlugin  # type: ignore[assignment]
+else:
+    # Airflow 3.x (FastAPI) plugin
+    from .af3_plugin_impl import CosmosAF3Plugin as CosmosPlugin  # type: ignore[assignment]

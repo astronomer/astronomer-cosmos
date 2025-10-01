@@ -256,7 +256,7 @@ class ProjectConfig:
         If the project path is not provided, we have a scenario 2
         """
 
-        mandatory_paths: dict[str, Path | ObjectStoragePath | None] = {}
+        mandatory_paths: dict[str, Path | "ObjectStoragePath" | None] = {}
         # We validate the existence of paths added to the `mandatory_paths` map by calling the `exists()` method on each
         # one. Starting with Cosmos 1.6.0, if the Airflow version is `>= 2.8.0` and a `manifest_path` is provided, we
         # cast it to an `airflow.io.path.ObjectStoragePath` instance during `ProjectConfig` initialisation, and it

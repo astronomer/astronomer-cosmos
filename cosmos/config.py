@@ -179,7 +179,7 @@ class ProjectConfig:
     dbt_project_path: Path | None = None
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
-    manifest_path: Path | ObjectStoragePath | None = None
+    manifest_path: Path | "ObjectStoragePath" | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None

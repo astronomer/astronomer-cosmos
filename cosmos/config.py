@@ -8,12 +8,18 @@ import tempfile
 import warnings
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 import yaml
 from airflow.version import version as airflow_version
 
 from cosmos import settings
+
+if TYPE_CHECKING:
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
     DEFAULT_PROFILES_FILE_NAME,
@@ -173,7 +179,7 @@ class ProjectConfig:
     dbt_project_path: Path | None = None
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
-    manifest_path: Path | None = None
+    manifest_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
@@ -250,7 +256,7 @@ class ProjectConfig:
         If the project path is not provided, we have a scenario 2
         """
 
-        mandatory_paths = {}
+        mandatory_paths: dict[str, Path | ObjectStoragePath | None] = {}
         # We validate the existence of paths added to the `mandatory_paths` map by calling the `exists()` method on each
         # one. Starting with Cosmos 1.6.0, if the Airflow version is `>= 2.8.0` and a `manifest_path` is provided, we
         # cast it to an `airflow.io.path.ObjectStoragePath` instance during `ProjectConfig` initialisation, and it
@@ -259,10 +265,12 @@ class ProjectConfig:
         # map works correctly for all paths, thereby validating the project.
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
-            mandatory_paths = {
-                "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
-                "models directory ": Path(self.models_path) if self.models_path else None,
-            }
+            mandatory_paths.update(
+                {
+                    "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
+                    "models directory ": Path(self.models_path) if self.models_path else None,
+                }
+            )
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 

@@ -294,7 +294,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.compiled_sql = self.compiled_sql.strip()
 
     @staticmethod
-    def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:
+    def _configure_remote_target_path() -> tuple[Path | "ObjectStoragePath", str] | tuple[None, None]:
         """Configure the remote target path if it is provided."""
         if not remote_target_path:
             return None, None

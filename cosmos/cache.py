@@ -26,7 +26,12 @@ from cosmos import settings
 
 if TYPE_CHECKING:
     try:
-        from airflow.io.path import ObjectStoragePath
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
     except ImportError:
         pass
 from cosmos.constants import (

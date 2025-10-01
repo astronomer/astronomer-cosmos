@@ -26,6 +26,11 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
 from airflow.version import version as airflow_version
 from attrs import define
 from packaging.version import Version
@@ -289,7 +294,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.compiled_sql = self.compiled_sql.strip()
 
     @staticmethod
-    def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
+    def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:
         """Configure the remote target path if it is provided."""
         if not remote_target_path:
             return None, None
@@ -325,7 +330,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return _configured_target_path, remote_conn_id
 
     def _construct_dest_file_path(
-        self, dest_target_dir: Path, file_path: str, source_compiled_dir: Path, resource_type: str
+        self, dest_target_dir: Path | ObjectStoragePath, file_path: str, source_compiled_dir: Path, resource_type: str
     ) -> str:
         """
         Construct the destination path for the compiled SQL files to be uploaded to the remote store.

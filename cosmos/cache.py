@@ -10,6 +10,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import msgpack
 import yaml
@@ -22,6 +23,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
+
+if TYPE_CHECKING:
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
 from cosmos.constants import (
     DBT_MANIFEST_FILE_NAME,
     DBT_TARGET_DIR_NAME,
@@ -48,12 +55,12 @@ logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
 
 
-def _configure_remote_cache_dir() -> Path | None:
+def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
     """Configure the remote cache dir if it is provided."""
     if not settings_remote_cache_dir:
         return None
 
-    _configured_cache_dir: Path | None = None
+    _configured_cache_dir: Path | ObjectStoragePath | None = None
 
     cache_dir_str = str(settings_remote_cache_dir)
 

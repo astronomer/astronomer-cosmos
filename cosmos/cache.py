@@ -60,7 +60,7 @@ def _configure_remote_cache_dir() -> Path | "ObjectStoragePath" | None:
     if not settings_remote_cache_dir:
         return None
 
-    _configured_cache_dir: Path | ObjectStoragePath | None = None
+    _configured_cache_dir: Path | "ObjectStoragePath" | None = None
 
     cache_dir_str = str(settings_remote_cache_dir)
 

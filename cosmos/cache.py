@@ -55,7 +55,7 @@ logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
 
 
-def _configure_remote_cache_dir() -> Path | "ObjectStoragePath" | None:
+def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
     """Configure the remote cache dir if it is provided."""
     if not settings_remote_cache_dir:
         return None

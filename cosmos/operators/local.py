@@ -330,7 +330,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return _configured_target_path, remote_conn_id
 
     def _construct_dest_file_path(
-        self, dest_target_dir: Path | "ObjectStoragePath", file_path: str, source_compiled_dir: Path, resource_type: str
+        self, dest_target_dir: Path | ObjectStoragePath, file_path: str, source_compiled_dir: Path, resource_type: str
     ) -> str:
         """
         Construct the destination path for the compiled SQL files to be uploaded to the remote store.

@@ -18,6 +18,12 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
+if TYPE_CHECKING:
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
+
 import cosmos.dbt.runner as dbt_runner
 from cosmos import cache, settings
 from cosmos.cache import (
@@ -477,7 +483,7 @@ class DbtGraph:
         else:
             Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
 
-    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path) -> dict[str, str]:
+    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
         cache_dict: dict[str, str] = {}
         remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"

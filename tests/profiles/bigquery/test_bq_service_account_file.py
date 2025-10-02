@@ -27,7 +27,7 @@ def mock_bigquery_conn():  # type: ignore
         extra=json.dumps(extra),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -58,7 +58,7 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
             assert not profile_mapping.can_claim_connection()
 
@@ -68,7 +68,7 @@ def test_connection_claiming() -> None:
         conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
         assert not profile_mapping.can_claim_connection()
 
@@ -79,7 +79,7 @@ def test_connection_claiming() -> None:
         conn_type="google_cloud_platform",
         extra=json.dumps({**extra, **dataset_dict}),
     )
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {})
         assert profile_mapping.can_claim_connection()
 
@@ -89,7 +89,7 @@ def test_connection_claiming() -> None:
         conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = GoogleCloudServiceAccountFileProfileMapping(conn, {"dataset": "my_dataset"})
         assert profile_mapping.can_claim_connection()
 

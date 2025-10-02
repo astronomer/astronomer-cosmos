@@ -97,32 +97,40 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             ti.xcom_push(key="dbt_startup_events", value=startup_events)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
-        if not self.invocation_mode:
-            self._discover_invocation_mode()
+        try:
+            if not self.invocation_mode:
+                self._discover_invocation_mode()
 
-        use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-        self.log.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
+            use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
+            self.log.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
 
-        startup_events: list[dict[str, Any]] = []
+            startup_events: list[dict[str, Any]] = []
 
-        if use_events:
+            if use_events:
 
-            def _callback(ev: EventMsg) -> None:
-                name = ev.info.name
-                if name in {"MainReportVersion", "AdapterRegistered"}:
-                    self._handle_startup_event(ev, startup_events)
-                elif name == "NodeFinished":
-                    self._handle_node_finished(ev, context)
+                def _callback(ev: EventMsg) -> None:
+                    name = ev.info.name
+                    if name in {"MainReportVersion", "AdapterRegistered"}:
+                        self._handle_startup_event(ev, startup_events)
+                    elif name == "NodeFinished":
+                        self._handle_node_finished(ev, context)
 
-            self._dbt_runner_callbacks = [_callback]
-            result = super().execute(context=context, **kwargs)
+                self._dbt_runner_callbacks = [_callback]
+                result = super().execute(context=context, **kwargs)
 
-            self._finalize(context, startup_events)
-            return result
+                self._finalize(context, startup_events)
+                return_value = result
+            else:
+                # Fallback – push run_results.json via base class helper
+                kwargs["push_run_results_to_xcom"] = True
+                return_value = super().execute(context=context, **kwargs)
 
-        # Fallback – push run_results.json via base class helper
-        kwargs["push_run_results_to_xcom"] = True
-        return super().execute(context=context, **kwargs)
+            context["ti"].xcom_push(key="task_status", value="completed")
+            return return_value
+
+        except Exception:
+            context["ti"].xcom_push(key="task_status", value="completed")
+            raise
 
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]

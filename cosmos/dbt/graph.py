@@ -175,7 +175,7 @@ class DbtNode:
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,
-            "has_non_detached_test": self.has_test,
+            "has_non_detached_test": self.has_non_detached_test,
             "resource_name": self.resource_name,
             "name": self.name,
         }

@@ -28,7 +28,6 @@ profile_config = ProfileConfig(
     ),
 )
 
-
 # [START local_example]
 basic_cosmos_dag = DbtDag(
     # dbt/cosmos-specific parameters

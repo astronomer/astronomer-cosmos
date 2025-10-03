@@ -65,6 +65,24 @@ def calculate_operator_class(
     )
 
 
+def _is_source_used_by_filtered_nodes(source_node: DbtNode, filtered_nodes: dict[str, DbtNode]) -> bool:
+    """
+    Check if a source node is referenced by any of the filtered nodes.
+
+    :param source_node: The source node to check
+    :param filtered_nodes: Dictionary of filtered nodes
+    :returns: True if the source is used by any filtered node, False otherwise
+    """
+    source_id = source_node.unique_id
+
+    # Check if any filtered node depends on this source
+    for node in filtered_nodes.values():
+        if source_id in node.depends_on:
+            return True
+
+    return False
+
+
 def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[str]:
     """
     Return a list of unique_ids for nodes that are not parents (don't have dependencies on other tasks).
@@ -259,6 +277,7 @@ def create_task_metadata(
     dbt_dag_task_group_identifier: str,
     use_task_group: bool = False,
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE,
+    source_pruning: bool = False,
     normalize_task_id: Callable[..., Any] | None = None,
     normalize_task_display_name: Callable[..., Any] | None = None,
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
@@ -266,6 +285,7 @@ def create_task_metadata(
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
     enable_owner_inheritance: bool | None = None,
+    filtered_nodes: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata | None:
     """
     Create the metadata that will be used to instantiate the Airflow Task used to run the Dbt node.
@@ -333,6 +353,8 @@ def create_task_metadata(
             ):
                 return None
 
+            if source_pruning and filtered_nodes and not _is_source_used_by_filtered_nodes(node, filtered_nodes):
+                return None
             task_id, args = _get_task_id_and_args(
                 node=node,
                 args=args,
@@ -408,11 +430,13 @@ def generate_task_or_group(
     test_behavior: TestBehavior,
     source_rendering_behavior: SourceRenderingBehavior,
     test_indirect_selection: TestIndirectSelection,
-    on_warning_callback: Callable[..., Any] | None,
+    source_pruning: bool = False,
+    on_warning_callback: Callable[..., Any] | None = None,
     normalize_task_id: Callable[..., Any] | None = None,
     normalize_task_display_name: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, DbtNode] | None = None,
     enable_owner_inheritance: bool | None = None,
+    filtered_nodes: dict[str, DbtNode] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -431,6 +455,7 @@ def generate_task_or_group(
         dbt_dag_task_group_identifier=_get_dbt_dag_task_group_identifier(dag, task_group),
         use_task_group=use_task_group,
         source_rendering_behavior=source_rendering_behavior,
+        source_pruning=source_pruning,
         normalize_task_id=normalize_task_id,
         normalize_task_display_name=normalize_task_display_name,
         test_behavior=test_behavior,
@@ -438,6 +463,7 @@ def generate_task_or_group(
         on_warning_callback=on_warning_callback,
         detached_from_parent=detached_from_parent,
         enable_owner_inheritance=enable_owner_inheritance,
+        filtered_nodes=filtered_nodes,
     )
 
     # In most cases, we'll  map one DBT node to one Airflow task
@@ -673,6 +699,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     node_converters = render_config.node_converters or {}
     test_behavior = render_config.test_behavior
     source_rendering_behavior = render_config.source_rendering_behavior
+    source_pruning = render_config.source_pruning
     normalize_task_id = render_config.normalize_task_id
     normalize_task_display_name = render_config.normalize_task_display_name
     enable_owner_inheritance = render_config.enable_owner_inheritance
@@ -715,6 +742,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             task_args=task_args,
             test_behavior=test_behavior,
             source_rendering_behavior=source_rendering_behavior,
+            source_pruning=source_pruning,
             test_indirect_selection=test_indirect_selection,
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
@@ -722,6 +750,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             node=node,
             detached_from_parent=detached_from_parent,
             enable_owner_inheritance=enable_owner_inheritance,
+            filtered_nodes=nodes,
         )
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")

@@ -70,6 +70,40 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
+def test_dbt_producer_watcher_operator_pushes_completion_status():
+    """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti}
+
+    # Test success case
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        op.execute(context=context)
+
+        # Verify status was pushed
+        assert mock_ti.store.get("task_status") == "completed"
+        # Verify parent execute was called
+        mock_execute.assert_called_once()
+
+    # Reset mock and store
+    mock_ti.store.clear()
+
+    # Test failure case
+    class TestException(Exception):
+        pass
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        mock_execute.side_effect = TestException("test error")
+
+        with pytest.raises(TestException):
+            op.execute(context=context)
+
+        # Verify completed status was pushed even in failure case
+        assert mock_ti.store.get("task_status") == "completed"
+        # Verify parent execute was called
+        mock_execute.assert_called_once()
+
+
 def test_handle_startup_event():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     lst: list[dict] = []

@@ -320,7 +320,7 @@ class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: i
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """

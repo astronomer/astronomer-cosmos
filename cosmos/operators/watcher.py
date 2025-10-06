@@ -327,9 +327,6 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
 
     template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-
 
 class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     """
@@ -337,9 +334,6 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     """
 
     template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields
-
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

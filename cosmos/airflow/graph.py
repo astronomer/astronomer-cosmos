@@ -562,12 +562,11 @@ def _add_producer_watcher(
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
-
     for task_id, task in tasks_map.items():
         # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         if not task.upstream_list:
             producer_airflow_task >> task
-            task.trigger_rule = "always"
+            task.trigger_rule = task_args.get("trigger_rule", "always")
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
     return producer_airflow_task.task_id
@@ -716,16 +715,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
-    if execution_mode == ExecutionMode.WATCHER:
-        producer_watcher_task_id = _add_producer_watcher(
-            dag,
-            task_args,
-            tasks_map,
-            task_group,
-            render_config=render_config,
-        )
-        task_args["producer_watcher_task_id"] = producer_watcher_task_id
-
     for node_id, node in nodes.items():
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
@@ -755,6 +744,16 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         if task_or_group is not None:
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
+
+    if execution_mode == ExecutionMode.WATCHER:
+        producer_watcher_task_id = _add_producer_watcher(
+            dag,
+            task_args,
+            tasks_map,
+            task_group,
+            render_config=render_config,
+        )
+        task_args["producer_watcher_task_id"] = producer_watcher_task_id
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)

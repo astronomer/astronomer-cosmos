@@ -3,7 +3,7 @@ An example DAG that uses Cosmos to render a dbt project into an Airflow DAG.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # [START cosmos_init_imports]
@@ -29,7 +29,16 @@ profile_config = ProfileConfig(
     ),
 )
 
-# [START local_example]
+
+operator_args = {
+    "install_deps": True,  # install any necessary dependencies before running any dbt command
+    "execution_timeout": timedelta(seconds=120),
+    # Currently airflow dags test ignores priority_weight and  weight_rule, for this reason, we're setting the following in the CI only:
+    "trigger_rule": "all_success" if os.getenv("CI", False) else "always",
+}
+
+
+# [START example_watcher]
 example_watcher = DbtDag(
     # dbt/cosmos-specific parameters
     execution_config=ExecutionConfig(
@@ -37,10 +46,7 @@ example_watcher = DbtDag(
     ),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
-    operator_args={
-        "install_deps": True,  # install any necessary dependencies before running any dbt command
-        "full_refresh": True,  # used only in dbt commands that support this flag
-    },
+    operator_args=operator_args,
     # normal dag parameters
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
@@ -48,4 +54,4 @@ example_watcher = DbtDag(
     dag_id="example_watcher",
     default_args={"retries": 0},
 )
-# [END local_example]
+# [END example_watcher]

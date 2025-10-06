@@ -160,7 +160,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         project_dir: str | None = None,
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
-        poke_interval: int = 20,
+        poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
     ) -> None:

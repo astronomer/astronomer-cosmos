@@ -10,6 +10,7 @@ from airflow.exceptions import AirflowException
 from cosmos.config import InvocationMode
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
+    DbtBuildWatcherOperator,
     DbtConsumerWatcherSensor,
     DbtProducerWatcherOperator,
 )
@@ -380,3 +381,15 @@ class TestDbtConsumerWatcherSensor:
 
         result = sensor._get_status_from_events(ti)
         assert result is None
+
+
+class TestDbtBuildWatcherOperator:
+
+    def test_dbt_build_watcher_operator_raises_not_implemented_error(self):
+        expected_message = (
+            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
+            "since the build command is executed by the producer task."
+        )
+
+        with pytest.raises(NotImplementedError, match=expected_message):
+            DbtBuildWatcherOperator()

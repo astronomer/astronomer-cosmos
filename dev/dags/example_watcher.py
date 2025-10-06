@@ -34,9 +34,10 @@ operator_args = {
     "install_deps": True,  # install any necessary dependencies before running any dbt command
     "execution_timeout": timedelta(seconds=120),
 }
+
 # Currently airflow dags test ignores priority_weight and  weight_rule, for this reason, we're setting the following in the CI only:
-# if os.getenv("CI"):
-#    operator_args["trigger_rule"] = "all_success"
+if os.getenv("CI"):
+    operator_args["trigger_rule"] = "all_success"
 
 
 # [START example_watcher]

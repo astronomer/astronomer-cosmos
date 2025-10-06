@@ -10,7 +10,7 @@ import pytest
 from airflow.exceptions import AirflowException
 from airflow.utils.state import DagRunState
 
-from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.config import InvocationMode
 from cosmos.constants import ExecutionMode
 from cosmos.operators.watcher import (
@@ -439,6 +439,7 @@ def test_dbt_dag_with_watcher():
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
         ),
+        render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
     )
     outcome = watcher_dag.test()

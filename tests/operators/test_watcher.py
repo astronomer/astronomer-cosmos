@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.exceptions import AirflowException
 from airflow.utils.state import DagRunState
+from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.config import InvocationMode
@@ -23,6 +24,7 @@ from cosmos.operators.watcher import (
     DbtTestWatcherOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import AIRFLOW_VERSION
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
@@ -422,6 +424,7 @@ class TestDbtBuildWatcherOperator:
             DbtBuildWatcherOperator()
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
 def test_dbt_dag_with_watcher():
     """

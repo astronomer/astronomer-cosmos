@@ -19,6 +19,7 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
@@ -211,6 +212,7 @@ def _get_task_id_and_args(
     node: DbtNode,
     args: dict[str, Any],
     use_task_group: bool,
+    execution_mode: ExecutionMode,
     normalize_task_id: Callable[..., Any] | None,
     normalize_task_display_name: Callable[..., Any] | None,
     resource_suffix: str,
@@ -338,6 +340,7 @@ def create_task_metadata(
                 normalize_task_display_name=normalize_task_display_name,
                 resource_suffix=resource_suffix,
                 include_resource_type=True,
+                execution_mode=execution_mode,
             )
         elif node.resource_type == DbtResourceType.SOURCE:
             args["select"] = f"source:{node.resource_name}"
@@ -353,7 +356,13 @@ def create_task_metadata(
             if source_pruning and filtered_nodes and not _is_source_used_by_filtered_nodes(node, filtered_nodes):
                 return None
             task_id, args = _get_task_id_and_args(
-                node, args, use_task_group, normalize_task_id, normalize_task_display_name, "source"
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=normalize_task_id,
+                normalize_task_display_name=normalize_task_display_name,
+                resource_suffix=r"source",
+                execution_mode=execution_mode,
             )
             if node.has_freshness is False and source_rendering_behavior == SourceRenderingBehavior.ALL:
                 # render sources without freshness as empty operators
@@ -372,6 +381,7 @@ def create_task_metadata(
                 normalize_task_id=normalize_task_id,
                 normalize_task_display_name=normalize_task_display_name,
                 resource_suffix=resource_suffix,
+                execution_mode=execution_mode,
             )
 
         _override_profile_if_needed(args, node.profile_config_to_override)
@@ -529,6 +539,37 @@ def _add_dbt_setup_async_task(
             setup_airflow_task >> task
 
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
+
+
+def _add_producer_watcher(
+    dag: DAG,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+    task_group: TaskGroup | None,
+    render_config: RenderConfig | None = None,
+) -> str:
+
+    producer_task_args = task_args.copy()
+
+    if render_config is not None:
+        producer_task_args["select"] = render_config.select
+        producer_task_args["selector"] = render_config.selector
+        producer_task_args["exclude"] = render_config.exclude
+
+    producer_task_metadata = TaskMetadata(
+        id=PRODUCER_WATCHER_TASK_ID,
+        operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
+        arguments=producer_task_args,
+    )
+    producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
+    for task_id, task in tasks_map.items():
+        # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+        if not task.upstream_list:
+            producer_airflow_task >> task
+            task.trigger_rule = task_args.get("trigger_rule", "always")
+
+    tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
+    return producer_airflow_task.task_id
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
@@ -704,6 +745,16 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
+    if execution_mode == ExecutionMode.WATCHER:
+        producer_watcher_task_id = _add_producer_watcher(
+            dag,
+            task_args,
+            tasks_map,
+            task_group,
+            render_config=render_config,
+        )
+        task_args["producer_watcher_task_id"] = producer_watcher_task_id
+
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
@@ -738,6 +789,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
+
     if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(
             dag,

@@ -1,17 +1,47 @@
 import base64
 import json
 import zlib
+from datetime import datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
+from airflow.utils.state import DagRunState
+from packaging.version import Version
 
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.config import InvocationMode
+from cosmos.constants import ExecutionMode
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
+    DbtBuildWatcherOperator,
     DbtConsumerWatcherSensor,
     DbtProducerWatcherOperator,
+    DbtRunWatcherOperator,
+    DbtSeedWatcherOperator,
+    DbtTestWatcherOperator,
+)
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import AIRFLOW_VERSION
+
+DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
+
+
+project_config = ProjectConfig(
+    dbt_project_path=DBT_PROJECT_PATH,
+)
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+        disable_event_tracking=True,
+    ),
 )
 
 
@@ -380,3 +410,76 @@ class TestDbtConsumerWatcherSensor:
 
         result = sensor._get_status_from_events(ti)
         assert result is None
+
+
+class TestDbtBuildWatcherOperator:
+
+    def test_dbt_build_watcher_operator_raises_not_implemented_error(self):
+        expected_message = (
+            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
+            "since the build command is executed by the producer task."
+        )
+
+        with pytest.raises(NotImplementedError, match=expected_message):
+            DbtBuildWatcherOperator()
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_dag_with_watcher():
+    """
+    Run a DbtDag using dbt Fusion.
+    Confirm it succeeds and has the expected amount of both:
+    - dbt resources
+    - Airflow tasks
+    And that the tasks are in the expected topological order.
+    """
+    watcher_dag = DbtDag(
+        project_config=project_config,
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+        ),
+        render_config=RenderConfig(emit_datasets=False),
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+    )
+    outcome = watcher_dag.test()
+    assert outcome.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 26
+
+    assert len(watcher_dag.task_dict) == 14
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    expected_task_names = [
+        "dbt_producer_watcher",
+        "raw_customers_seed",
+        "raw_orders_seed",
+        "raw_payments_seed",
+        "stg_customers.run",
+        "stg_customers.test",
+        "stg_orders.run",
+        "stg_orders.test",
+        "stg_payments.run",
+        "stg_payments.test",
+        "customers.run",
+        "customers.test",
+        "orders.run",
+        "orders.test",
+    ]
+    assert tasks_names == expected_task_names
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["raw_customers_seed"], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["raw_orders_seed"], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["raw_payments_seed"], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["stg_customers.run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["stg_orders.run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["stg_payments.run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["customers.run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["orders.run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["stg_customers.test"], DbtTestWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["stg_orders.test"], DbtTestWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["stg_payments.test"], DbtTestWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["customers.test"], DbtTestWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["orders.test"], DbtTestWatcherOperator)

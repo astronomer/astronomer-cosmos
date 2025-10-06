@@ -4,7 +4,7 @@ import base64
 import json
 import logging
 import zlib
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -18,9 +18,23 @@ except ImportError:
     from airflow.sensors.base import BaseSensorOperator
 from airflow.exceptions import AirflowException
 
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+
 from cosmos.config import ProfileConfig
-from cosmos.constants import InvocationMode
-from cosmos.operators.local import DbtLocalBaseOperator, DbtRunLocalOperator
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.operators.base import (
+    DbtRunMixin,
+    DbtSeedMixin,
+    DbtSnapshotMixin,
+)
+from cosmos.operators.local import (
+    DbtLocalBaseOperator,
+    DbtRunLocalOperator,
+    DbtSourceLocalOperator,
+)
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -30,7 +44,9 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 
+CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
 PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
+WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
 
 
 class DbtProducerWatcherOperator(DbtLocalBaseOperator):
@@ -62,7 +78,8 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-        kwargs["priority_weight"] = kwargs.get("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("weight_rule", WEIGHT_RULE)
         super().__init__(task_id=task_id, *args, **kwargs)
 
     @staticmethod
@@ -142,12 +159,14 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         profile_config: ProfileConfig | None = None,
         project_dir: str | None = None,
         profiles_dir: str | None = None,
-        producer_task_id: str = "dbt_producer_watcher",
-        poke_interval: int = 20,
+        producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
+        poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
         **kwargs: Any,
     ) -> None:
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
+        kwargs.setdefault("priority_weight", CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("weight_rule", WEIGHT_RULE)
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -279,3 +298,62 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             return True
         else:
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")
+
+
+# This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
+# That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD, until we have a better experience.
+class DbtBuildWatcherOperator:
+    def __init__(self, *args: Any, **kwargs: Any):
+        raise NotImplementedError(
+            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, since the build command is executed by the producer task."
+        )
+
+
+class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
+    """
+    Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
+    """
+    Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
+
+
+class DbtSourceWatcherOperator(DbtSourceLocalOperator):
+    """
+    Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
+    """
+
+    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields
+
+
+class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
+    """
+    Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtTestWatcherOperator(EmptyOperator):
+    """
+    As a starting point, this operator does nothing.
+    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        desired_keys = ("dag", "task_group", "task_id")
+        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
+        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]

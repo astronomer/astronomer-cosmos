@@ -26,3 +26,5 @@ export AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_gs_conn
 export AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target
 #export AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=s3_conn
 #export AIRFLOW__COSMOS__REMOTE_TARGET_PATH="s3://cosmos-remote-target"
+
+set +e

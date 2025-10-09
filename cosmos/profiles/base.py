@@ -12,7 +12,11 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
 import yaml
-from airflow.hooks.base import BaseHook
+
+try:
+    from airflow.sdk.bases.hook import BaseHook
+except ImportError:  # Since Airflow 3.1, the BaseHook is in the airflow.sdk.bases.hook module
+    from airflow.hooks.base import BaseHook
 from pydantic import dataclasses
 
 from cosmos.exceptions import CosmosValueError

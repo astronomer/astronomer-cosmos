@@ -17,7 +17,9 @@ fi
 
 echo "${VIRTUAL_ENV}"
 
-if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+if [ "$AIRFLOW_VERSION" = "3.1.0b2" ] ; then
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION/constraints-$PYTHON_VERSION.txt"
+elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
   CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.2/constraints-$PYTHON_VERSION.txt"
 else
   CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
@@ -32,7 +34,7 @@ mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 pip install uv
 uv pip install pip --upgrade
 
-uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docker apache-airflow-providers-postgres --constraint /tmp/constraint.txt
+uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docker apache-airflow-providers-postgres --constraint /tmp/constraint.txt --pre
 
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 uv pip install "gcsfs<2025.3.0"
@@ -88,10 +90,11 @@ fi
 rm /tmp/constraint.txt
 
 actual_version=$(airflow version | cut -d. -f1,2)
+desired_version=$(echo $AIRFLOW_VERSION | cut -d. -f1,2)
 
-if [ "$actual_version" = $AIRFLOW_VERSION ]; then
-    echo "Version is as expected: $AIRFLOW_VERSION"
+if [ "$actual_version" = $desired_version ]; then
+    echo "Version is as expected: $desired_version"
 else
-    echo "Version does not match. Expected: $AIRFLOW_VERSION, but got: $actual_version"
+    echo "Version does not match. Expected: $desired_version, but got: $actual_version"
     exit 1
 fi

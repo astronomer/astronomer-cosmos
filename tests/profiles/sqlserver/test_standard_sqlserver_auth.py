@@ -25,7 +25,7 @@ def mock_sqlserver_conn():  # type: ignore
         extra='{"database": "my_db", "driver": "ODBC Driver 18 for SQL Server"}',
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -56,7 +56,7 @@ def test_connection_claiming() -> None:
         values = required_values.copy()
         del values[missing_key]
         conn = Connection(**values)  # type: ignore
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = StandardSQLServerAuth(conn, {})
             return profile_mapping.can_claim_connection()
 
@@ -66,7 +66,7 @@ def test_connection_claiming() -> None:
 
     # if we have all the required values, it should claim
     conn = Connection(**required_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = StandardSQLServerAuth(conn, {})
         assert profile_mapping.can_claim_connection()
 

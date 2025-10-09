@@ -254,7 +254,7 @@ class DbtToAirflowConverter:
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration
         execution_config = copy.deepcopy(execution_config) if execution_config is not None else ExecutionConfig()
         render_config = copy.deepcopy(render_config) if render_config is not None else RenderConfig()
-        operator_args = copy.deepcopy(operator_args) if operator_args is not None else {}
+        operator_args = copy.copy(operator_args) if operator_args is not None else {}
 
         project_config.validate_project()
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)

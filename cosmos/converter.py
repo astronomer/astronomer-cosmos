@@ -145,8 +145,7 @@ def validate_initial_user_config(
             + "If using RenderConfig.dbt_project_path or ExecutionConfig.dbt_project_path, ProjectConfig.dbt_project_path should be None"
         )
 
-    # Cosmos 2.0 will remove the ability to pass in operator_args with 'env' and 'vars' in place of ProjectConfig.env_vars and
-    # ProjectConfig.dbt_vars.
+    # Cosmos 2.0 will remove the ability to pass in operator_args with 'env' in place of ProjectConfig.env_vars.
     if "env" in operator_args:
         warn(
             "operator_args with 'env' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",

@@ -89,6 +89,7 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+    downstream: list[str] = field(default_factory=lambda: [])
 
     @property
     def meta(self) -> Dict[str, Any]:

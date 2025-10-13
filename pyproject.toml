@@ -50,6 +50,7 @@ dbt-all = [
     "dbt-duckdb",
     "dbt-exasol",
     "dbt-duckdb",
+    "dbt-mysql",
     "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
@@ -65,6 +66,7 @@ dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
+dbt-mysql = ["dbt-mysql"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]

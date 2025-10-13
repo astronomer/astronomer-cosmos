@@ -17,9 +17,10 @@ from cosmos import settings
 
 if TYPE_CHECKING:
     try:
-        from airflow.io.path import ObjectStoragePath
+        from airflow.sdk import ObjectStoragePath
     except ImportError:
-        pass
+        from airflow.io.path import ObjectStoragePath
+
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
     DEFAULT_PROFILES_FILE_NAME,

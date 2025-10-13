@@ -46,7 +46,10 @@ def test_init_with_manifest_path_and_project_path_succeeds():
     """
     project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
     if AIRFLOW_IO_AVAILABLE:
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
 
         assert project_config.manifest_path == ObjectStoragePath("target/manifest.json")
     else:
@@ -325,8 +328,10 @@ def test_remote_manifest_path(manifest_path, given_manifest_conn_id, used_manife
         project_config = ProjectConfig(
             dbt_project_path="/tmp/some-path", manifest_path=manifest_path, manifest_conn_id=given_manifest_conn_id
         )
-
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
 
         assert project_config.manifest_path == ObjectStoragePath(manifest_path, conn_id=used_manifest_conn_id)
     else:

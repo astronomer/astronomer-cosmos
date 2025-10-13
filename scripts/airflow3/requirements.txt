@@ -8,7 +8,6 @@ apache-airflow-providers-cncf-kubernetes
 # if you want to keep remote storage as S3.
 apache-airflow-providers-amazon[s3fs]
 apache-airflow-providers-google
-psycopg2
-asyncpg
+psycopg2-binary
 dbt-postgres
 dbt-bigquery

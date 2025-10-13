@@ -36,6 +36,7 @@ dependencies = [
     "packaging>=22.0",
     "pydantic>=1.10.0",
     "virtualenv",
+    "openlineage-integration-common"  # Without this dependency, Airflow datasets/assets don't work
 ]
 
 [project.optional-dependencies]

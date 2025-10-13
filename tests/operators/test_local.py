@@ -899,9 +899,12 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
     with patch.object(dbt_base_operator.log, "info") as mock_log_info:
-        facets = dbt_base_operator.get_openlineage_facets_on_complete(
-            TaskInstance(dbt_base_operator, dag_version_id=None)
-        )
+        if version.parse(airflow_version) >= version.Version("3.1"):
+            task_instance = TaskInstance(dbt_base_operator, dag_version_id=None)
+        else:
+            task_instance = TaskInstance(dbt_base_operator)
+
+        facets = dbt_base_operator.get_openlineage_facets_on_complete(task_instance)
 
     assert facets.inputs == []
     assert facets.outputs == []

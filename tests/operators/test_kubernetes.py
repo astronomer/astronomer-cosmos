@@ -462,7 +462,11 @@ def test_dbt_kubernetes_operator_handle_warnings(
     mock_warning_callback = Mock()
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
 
-    task_instance = TaskInstance(test_operator, dag_version_id=None)
+    if version.parse(airflow_version) >= version.Version("3.1"):
+        task_instance = TaskInstance(test_operator, dag_version_id=None)
+    else:
+        task_instance = TaskInstance(test_operator)
+
     task_instance.task.pod_manager = FakePodManager(log_string)
     task_instance.task.pod = task_instance.task.remote_pod = "pod"
 
@@ -483,7 +487,10 @@ def test_dbt_kubernetes_operator_handle_warnings_noop(
 ):
     mock_warning_callback = Mock()
     run_operator = DbtRunKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
-    task_instance = TaskInstance(run_operator, dag_version_id=None)
+    if version.parse(airflow_version) >= version.Version("3.1"):
+        task_instance = TaskInstance(run_operator, dag_version_id=None)
+    else:
+        task_instance = TaskInstance(run_operator)
     context = Context(task_instance=task_instance)
 
     warning_handler_no_context = DbtTestWarningHandler(mock_warning_callback, run_operator, None)

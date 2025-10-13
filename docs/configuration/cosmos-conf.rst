@@ -19,7 +19,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 `cache_dir`_:
     The directory used for caching Cosmos data.
 
-    - Default: ``{TMPDIR}/cosmos_cache`` (where ``{TMPDIR}`` is the system temporary directory)
+    - Default: ``{TMPDIR}/cosmos`` (where ``{TMPDIR}`` is the system temporary directory)
     - Environment Variable: ``AIRFLOW__COSMOS__CACHE_DIR``
 
 .. _enable_cache:

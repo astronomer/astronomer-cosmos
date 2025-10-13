@@ -17,9 +17,7 @@ fi
 
 echo "${VIRTUAL_ENV}"
 
-if [ "$AIRFLOW_VERSION" = "3.1.0b2" ] ; then
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION/constraints-$PYTHON_VERSION.txt"
-elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
   CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.2/constraints-$PYTHON_VERSION.txt"
 else
   CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"

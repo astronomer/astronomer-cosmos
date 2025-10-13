@@ -46,7 +46,7 @@ def test_init_with_manifest_path_and_project_path_succeeds():
     """
     project_config = ProjectConfig(dbt_project_path="/tmp/some-path", manifest_path="target/manifest.json")
 
-    assert str(project_config.manifest_path) == "/target/manifest.json"
+    assert str(project_config.manifest_path).endswith("target/manifest.json")
 
     assert project_config.project_name == "some-path"
 

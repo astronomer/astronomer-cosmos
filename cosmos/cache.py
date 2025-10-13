@@ -17,7 +17,6 @@ import yaml
 from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
-from airflow.utils.task_group import TaskGroup
 from airflow.version import version as airflow_version
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,13 +26,14 @@ from cosmos import settings
 if TYPE_CHECKING:
     try:
         from airflow.sdk import ObjectStoragePath
+        from airflow.utils.task_group import TaskGroup
     except ImportError:
         try:
             from airflow.io.path import ObjectStoragePath
+            from airflow.utils.task_group import TaskGroup
         except ImportError:
             pass
-    except ImportError:
-        pass
+
 from cosmos.constants import (
     DBT_MANIFEST_FILE_NAME,
     DBT_TARGET_DIR_NAME,

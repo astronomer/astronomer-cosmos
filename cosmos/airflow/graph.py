@@ -11,7 +11,12 @@ except ImportError:  # Airflow 2
 
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
-from airflow.utils.task_group import TaskGroup
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
 from cosmos.config import RenderConfig

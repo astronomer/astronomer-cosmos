@@ -899,7 +899,9 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
     with patch.object(dbt_base_operator.log, "info") as mock_log_info:
-        facets = dbt_base_operator.get_openlineage_facets_on_complete(TaskInstance(dbt_base_operator))
+        facets = dbt_base_operator.get_openlineage_facets_on_complete(
+            TaskInstance(dbt_base_operator, dag_version_id=None)
+        )
 
     assert facets.inputs == []
     assert facets.outputs == []

@@ -130,7 +130,7 @@ except ModuleNotFoundError:
 
 
 # The following is related to the ability of Airflow to emit OpenLineage events
-# This will decide if the method `get_openlineage_facets_on_complete` will be called by the Airflow OpenLineage listener or not`
+# This will decide if the method `get_openlineage_facets_on_complete` will be called by the Airflow OpenLineage listener or not
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
 except (ImportError, ModuleNotFoundError):

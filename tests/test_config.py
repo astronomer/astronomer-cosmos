@@ -50,9 +50,9 @@ def test_init_with_manifest_path_and_project_path_succeeds():
             from airflow.sdk import ObjectStoragePath
         except ImportError:
             try:
-                from airflow.sdk import ObjectStoragePath
-            except ImportError:
                 from airflow.io.path import ObjectStoragePath
+            except ImportError:
+                pass
 
         assert project_config.manifest_path == ObjectStoragePath("target/manifest.json")
     else:
@@ -335,9 +335,9 @@ def test_remote_manifest_path(manifest_path, given_manifest_conn_id, used_manife
             from airflow.sdk import ObjectStoragePath
         except ImportError:
             try:
-                from airflow.sdk import ObjectStoragePath
-            except ImportError:
                 from airflow.io.path import ObjectStoragePath
+            except ImportError:
+                pass
 
         assert project_config.manifest_path == ObjectStoragePath(manifest_path, conn_id=used_manifest_conn_id)
     else:

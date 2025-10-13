@@ -8,7 +8,10 @@ from urllib.parse import urlparse
 try:
     from airflow.sdk import ObjectStoragePath
 except ImportError:
-    from airflow.io.path import ObjectStoragePath
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
 
 from cosmos import settings
 from cosmos.constants import DEFAULT_TARGET_PATH, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP
@@ -212,7 +215,10 @@ def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARG
     try:
         from airflow.sdk import ObjectStoragePath
     except ImportError:
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 
     source_target_dir = Path(project_dir) / f"{source_subpath}"
     files = [str(file) for file in source_target_dir.rglob("*") if file.is_file()]

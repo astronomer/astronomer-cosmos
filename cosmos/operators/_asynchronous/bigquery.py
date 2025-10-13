@@ -153,7 +153,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         try:
             from airflow.sdk import ObjectStoragePath
         except ImportError:
-            from airflow.io.path import ObjectStoragePath
+            try:
+                from airflow.io.path import ObjectStoragePath
+            except ImportError:
+                pass
 
         file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
         dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]

@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, Any
 try:
     from airflow.sdk import ObjectStoragePath
 except ImportError:
-    from airflow.io.path import ObjectStoragePath
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
 
 from cosmos.operators.local import DbtRunLocalOperator
 

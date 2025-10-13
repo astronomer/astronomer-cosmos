@@ -15,11 +15,14 @@ from airflow.version import version as airflow_version
 
 from cosmos import settings
 
-if TYPE_CHECKING:
+if settings.AIRFLOW_IO_AVAILABLE or TYPE_CHECKING:
     try:
         from airflow.sdk import ObjectStoragePath
     except ImportError:
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
@@ -235,10 +238,6 @@ class ProjectConfig:
                     f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
                     f"Airflow 2.8 or later."
                 )
-
-            if settings.AIRFLOW_IO_AVAILABLE:
-                from airflow.io.path import ObjectStoragePath
-
                 self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
             else:
                 self.manifest_path = Path(manifest_path_str)

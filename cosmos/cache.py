@@ -29,7 +29,10 @@ if TYPE_CHECKING:
         from airflow.sdk import ObjectStoragePath
         from airflow.utils.task_group import TaskGroup
     except ImportError:
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
         from airflow.utils.task_group import TaskGroup
 
 from cosmos.constants import (
@@ -84,7 +87,10 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
     try:
         from airflow.sdk import ObjectStoragePath
     except ImportError:
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 
     _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
 

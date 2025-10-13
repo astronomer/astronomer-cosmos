@@ -29,7 +29,7 @@ def build_partial_dbt_env():
 
 
 with DAG(
-    dag_id="example_taskflow",
+    dag_id="example_taskflow_project_config",
     schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,

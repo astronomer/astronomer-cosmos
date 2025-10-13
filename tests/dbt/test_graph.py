@@ -12,12 +12,15 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
+import airflow
 import pytest
 from airflow.models import Variable
+from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
     DBT_LOG_FILENAME,
     DBT_TARGET_DIR_NAME,
     DbtResourceType,
@@ -47,6 +50,13 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
+
+AIRFLOW_VERSION = Version(airflow.__version__)
+
+if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+    object_storage_path = "airflow.sdk.ObjectStoragePath"
+else:
+    object_storage_path = "airflow.io.path.ObjectStoragePath"
 
 
 @pytest.fixture
@@ -2021,7 +2031,7 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
 def test_save_dbt_ls_cache_remote_cache_dir(
@@ -2045,7 +2055,7 @@ def test_save_dbt_ls_cache_remote_cache_dir(
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
 def test_get_dbt_ls_cache_remote_cache_dir(

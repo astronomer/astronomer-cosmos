@@ -5,6 +5,11 @@ import textwrap
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+try:
+    from airflow.sdk import ObjectStoragePath
+except ImportError:
+    from airflow.io.path import ObjectStoragePath
+
 from cosmos.operators.local import DbtRunLocalOperator
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -58,8 +63,6 @@ class TeardownAsyncOperator(DbtRunLocalOperator):
     def execute(self, context: Context, **kwargs: Any) -> Any:
 
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
-
-        from airflow.io.path import ObjectStoragePath
 
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         run_id = context["run_id"]

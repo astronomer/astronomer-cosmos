@@ -25,14 +25,12 @@ from cosmos import settings
 
 if TYPE_CHECKING:
     try:
+        # Airflow 3 onwards
         from airflow.sdk import ObjectStoragePath
         from airflow.utils.task_group import TaskGroup
     except ImportError:
-        try:
-            from airflow.io.path import ObjectStoragePath
-            from airflow.utils.task_group import TaskGroup
-        except ImportError:
-            pass
+        from airflow.io.path import ObjectStoragePath
+        from airflow.utils.task_group import TaskGroup
 
 from cosmos.constants import (
     DBT_MANIFEST_FILE_NAME,
@@ -83,7 +81,10 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
             "Airflow 2.8 or later."
         )
 
-    from airflow.io.path import ObjectStoragePath
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
 
     _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
 

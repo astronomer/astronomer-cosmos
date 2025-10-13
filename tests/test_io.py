@@ -123,7 +123,7 @@ def test_upload_artifacts_to_cloud_storage_success(dummy_kwargs):
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.io.settings.remote_target_path", "s3://bucket/path/to/file")
 @patch("cosmos.io.settings.remote_target_path_conn_id", None)
-@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.io.ObjectStoragePath")
 @patch("cosmos.io.urlparse")
 def test_configure_remote_target_path_no_conn_id(mock_urlparse, mock_object_storage):
     """Test when no remote_conn_id is provided, but conn_id is resolved from scheme."""

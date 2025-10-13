@@ -28,9 +28,12 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
     try:
-        from airflow.io.path import ObjectStoragePath
+        from airflow.sdk import ObjectStoragePath
     except ImportError:
-        pass
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 from airflow.version import version as airflow_version
 from attrs import define
 from packaging.version import Version

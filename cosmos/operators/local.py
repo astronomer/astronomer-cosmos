@@ -122,11 +122,11 @@ logger = get_logger(__name__)
 try:
     import openlineage
     from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+
+    is_openlineage_common_available = True
 except ModuleNotFoundError:
     is_openlineage_common_available = False
     DbtLocalArtifactProcessor = None
-else:
-    is_openlineage_common_available = True
 
 
 # The following is related to the ability of Airflow to emit OpenLineage events
@@ -154,15 +154,6 @@ except (ImportError, ModuleNotFoundError):
 
 
 AIRFLOW_VERSION = Version(airflow.__version__)
-
-if settings.AIRFLOW_IO_AVAILABLE:
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        try:
-            from airflow.io.path import ObjectStoragePath
-        except ImportError:
-            pass
 
 
 class AbstractDbtLocalBase(AbstractDbtBase):

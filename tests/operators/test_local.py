@@ -1,9 +1,11 @@
+import base64
 import json
 import logging
 import os
 import shutil
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -1560,7 +1562,30 @@ def test_upload_compiled_sql_no_remote_path_raises_error(mock_configure_remote):
         operator._upload_sql_files(tmp_project_dir, "compiled")
 
 
+def test_upload_sql_files_xcom(tmp_path):
+    sql_query = "SELECT 1;"
+    sql_file = tmp_path / "target" / "models" / "dest.sql"
+    sql_file.parent.mkdir(parents=True, exist_ok=True)
+    sql_file.write_text(sql_query)
+
+    mock_context = {"ti": MagicMock()}
+
+    obj = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    obj._construct_dest_file_path = lambda a, b, c, d: "dest.sql"
+
+    obj._upload_sql_files_xcom(mock_context, str(tmp_path), "models")
+
+    compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+    compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+    mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value=compressed_b64_sql)
+
+
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("airflow.io.path.ObjectStoragePath.copy")
 @patch("airflow.io.path.ObjectStoragePath")
 @patch("cosmos.operators.local.DbtCompileLocalOperator._configure_remote_target_path")
@@ -1780,6 +1805,7 @@ def test_construct_dest_file_path_with_run_id():
     assert "test_run_id" in result
 
 
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 def test_operator_construct_dest_file_path_with_run_id():
     """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
     operator = ConcreteDbtLocalBaseOperator(
@@ -1800,6 +1826,7 @@ def test_operator_construct_dest_file_path_with_run_id():
     assert "test_run_id" in result
 
 
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 def test_construct_dest_file_path_in_operator():
     """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
     operator = ConcreteDbtLocalBaseOperator(
@@ -2079,6 +2106,71 @@ def test_dbt_cmd_flags_mixed_static_and_templated():
     expected_flags = ["--full-refresh", "--select", "my_model", "--cache", "--threads", "4"]
 
     assert operator.dbt_cmd_flags == expected_flags
+
+
+def test_push_run_results_to_xcom_missing_file():
+    """Test that _push_run_results_to_xcom raises AirflowException when run_results.json doesn't exist."""
+    from airflow.exceptions import AirflowException
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir="/tmp",
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._push_run_results_to_xcom("/tmp", mock_context)
+    assert "run_results.json not found" in str(exc_info.value)
+
+
+def test_push_run_results_to_xcom_invalid_json(tmp_path):
+    """Test that _push_run_results_to_xcom raises AirflowException when run_results.json is invalid JSON."""
+    from airflow.exceptions import AirflowException
+
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    run_results_path = target_dir / "run_results.json"
+    run_results_path.write_text("invalid json{")
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=str(tmp_path),
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._push_run_results_to_xcom(str(tmp_path), mock_context)
+    assert "Invalid JSON in run_results.json" in str(exc_info.value)
+
+
+def test_push_run_results_to_xcom_success(tmp_path):
+    """Test that _push_run_results_to_xcom successfully pushes valid JSON to XCom."""
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    run_results_path = target_dir / "run_results.json"
+    test_data = {"results": [{"status": "success"}]}
+    run_results_path.write_text(json.dumps(test_data))
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=str(tmp_path),
+        profile_config=profile_config,
+    )
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+
+    operator._push_run_results_to_xcom(str(tmp_path), mock_context)
+
+    mock_ti.xcom_push.assert_called_once()
+    key, value = mock_ti.xcom_push.call_args[1]["key"], mock_ti.xcom_push.call_args[1]["value"]
+    assert key == "run_results"
+
+    decompressed = json.loads(zlib.decompress(base64.b64decode(value)).decode())
+    assert decompressed == test_data
 
 
 def test_dbt_cmd_flags_all_templated():

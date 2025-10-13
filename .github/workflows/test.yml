@@ -40,7 +40,7 @@ jobs:
           python-version: "3.10"
           architecture: "x64"
 
-      - run: pip3 install hatch
+      - run: pip3 install "hatch>=1.14.2"
       - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
@@ -98,7 +98,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -172,7 +172,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -255,7 +255,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -341,7 +341,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
@@ -417,7 +417,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -487,7 +487,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Set RESOURCE_PREFIX without periods
@@ -584,7 +584,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run performance tests against against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -649,7 +649,7 @@ jobs:
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system hatch
+          uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run kubernetes tests

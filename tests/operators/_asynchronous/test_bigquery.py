@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import zlib
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -50,6 +52,40 @@ def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
         dbt_kwargs={"task_id": "test_task"},
     )
     assert operator.base_cmd == ["run"]
+
+
+def test_get_sql_from_xcom(profile_config_mock):
+    fake_sql = "SELECT 42;"
+    compressed_sql = zlib.compress(fake_sql.encode("utf-8"))
+    compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+
+    mock_context = {"ti": MagicMock()}
+
+    mock_context["ti"].xcom_pull.return_value = compressed_b64_sql
+
+    obj = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    obj.project_dir = "/tmp/project/subdir"
+
+    obj.async_context = {
+        "dbt_node_config": {"file_path": "/tmp/project/models_test.sql"},
+        "dbt_dag_task_group_identifier": "tg1",
+        "run_id": "rid123",
+    }
+
+    expected_key = "models_test.sql"
+
+    result = obj.get_sql_from_xcom(mock_context)
+
+    mock_context["ti"].xcom_pull.assert_called_once_with(
+        task_ids="dbt_setup_async",
+        key=expected_key,
+    )
+    assert result == fake_sql
 
 
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
@@ -116,6 +152,7 @@ def test_configure_bigquery_async_op_args_missing_sql(async_operator_mock):
         _configure_bigquery_async_op_args(async_operator_mock)
 
 
+@patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator.get_remote_sql")
 @patch("cosmos.operators._asynchronous.bigquery.DbtRunAirflowAsyncBigqueryOperator._override_rtif")
 def test_store_compiled_sql(mock_override_rtif, mock_get_remote_sql, profile_config_mock):

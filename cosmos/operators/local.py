@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import json
 import os
@@ -7,6 +8,7 @@ import tempfile
 import time
 import urllib.parse
 import warnings
+import zlib
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
@@ -24,6 +26,11 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
 from airflow.version import version as airflow_version
 from attrs import define
 from packaging.version import Version
@@ -114,6 +121,7 @@ from cosmos.operators.base import (
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
+    _sanitize_xcom_key,
 )
 
 AIRFLOW_VERSION = Version(airflow.__version__)
@@ -183,6 +191,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
+        dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -196,6 +205,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
+        self._dbt_runner_callbacks = dbt_runner_callbacks
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -284,7 +294,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.compiled_sql = self.compiled_sql.strip()
 
     @staticmethod
-    def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
+    def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:
         """Configure the remote target path if it is provided."""
         if not remote_target_path:
             return None, None
@@ -320,7 +330,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return _configured_target_path, remote_conn_id
 
     def _construct_dest_file_path(
-        self, dest_target_dir: Path, file_path: str, source_compiled_dir: Path, resource_type: str
+        self, dest_target_dir: Path | ObjectStoragePath, file_path: str, source_compiled_dir: Path, resource_type: str
     ) -> str:
         """
         Construct the destination path for the compiled SQL files to be uploaded to the remote store.
@@ -329,6 +339,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
         rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
         run_id = self.extra_context["run_id"]
+
+        if settings.upload_sql_to_xcom:
+            return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
         return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
 
@@ -353,6 +366,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
+
+    def _upload_sql_files_xcom(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
+        start_time = time.time()
+        source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
+        files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
+        for file_path in files:
+            sql_model_path = os.path.relpath(file_path, source_run_dir).lstrip("/")
+            with open(file_path, encoding="utf-8") as f:
+                sql_query = f.read()
+            compressed_sql = zlib.compress(sql_query.encode("utf-8"))
+            compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
+            context["ti"].xcom_push(key=_sanitize_xcom_key(sql_model_path), value=compressed_b64_sql)
+            self.log.debug("SQL files %s uploaded to xcom.", sql_model_path)
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)
 
     def _delete_sql_files(self) -> None:
         """Deletes the entire run-specific directory from the remote target."""
@@ -448,7 +477,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
@@ -555,13 +584,36 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if partial_parse_file.exists():
             cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 
-    def _handle_post_execution(self, tmp_project_dir: str, context: Context) -> None:
+    def _push_run_results_to_xcom(self, tmp_project_dir: str, context: Context) -> None:
+        run_results_path = Path(tmp_project_dir) / "target" / "run_results.json"
+        if not run_results_path.is_file():
+            raise AirflowException(f"run_results.json not found at {run_results_path}")
+
+        try:
+            with run_results_path.open() as fp:
+                raw = json.load(fp)
+        except json.JSONDecodeError as exc:
+            raise AirflowException("Invalid JSON in run_results.json") from exc
+        self.log.debug("Loaded run results from %s", run_results_path)
+
+        compressed = base64.b64encode(zlib.compress(json.dumps(raw).encode())).decode()
+        context["ti"].xcom_push(key="run_results", value=compressed)
+
+        self.log.info("Pushed run results to XCom")
+
+    def _handle_post_execution(
+        self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool = False
+    ) -> None:
         self.store_freshness_json(tmp_project_dir, context)
         self.store_compiled_sql(tmp_project_dir, context)
         self._override_rtif(context)
 
         if self.should_upload_compiled_sql:
             self._upload_sql_files(tmp_project_dir, "compiled")
+
+        if push_run_results_to_xcom:
+            self._push_run_results_to_xcom(tmp_project_dir, context)
+
         if self.callback:
             self.callback_args.update({"context": context})
             if isinstance(self.callback, list):
@@ -572,7 +624,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:
-            self._upload_sql_files(tmp_project_dir, "run")
+            if settings.upload_sql_to_xcom:
+                self._upload_sql_files_xcom(context, tmp_project_dir, "run")
+            else:
+                self._upload_sql_files(tmp_project_dir, "run")
         else:
             sql = self._read_run_sql_from_target_dir(tmp_project_dir, async_context)
             profile_type = async_context["profile_type"]
@@ -589,6 +644,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         context: Context,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        push_run_results_to_xcom: bool = False,
     ) -> FullOutputSubprocessResult | dbtRunnerResult | str:
         """
         Copies the dbt project to a temporary directory and runs the command.
@@ -642,7 +698,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 if self.partial_parse:
                     self._update_partial_parse_cache(tmp_dir_path)
 
-                self._handle_post_execution(tmp_project_dir, context)
+                self._handle_post_execution(tmp_project_dir, context, push_run_results_to_xcom)
                 self.handle_exception(result)
 
                 if run_as_async and async_context:
@@ -836,6 +892,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         cmd_flags: list[str] | None = None,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         # If this is an async run and we're using the setup task, make sure to include the full_refresh flag if set
         if run_as_async and settings.enable_setup_async_task and getattr(self, "full_refresh", False):
@@ -847,7 +904,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(
-            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context
+            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context, **kwargs
         )
         return result
 
@@ -949,7 +1006,7 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self.on_warning_callback and self.on_warning_callback(warning_context)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
         if self.on_warning_callback:
             self._handle_warnings(result, context)
 

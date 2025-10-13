@@ -2180,3 +2180,27 @@ def test_load_manifest_handles_null_or_missing_tags(tags_value, tmp_path):
 
     node = dbt_graph.nodes["model.test_project.my_model"]
     assert node.tags == []
+
+
+def test_add_downstream_nodes():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load()
+
+    target_node = "model.jaffle_shop.stg_payments"
+    downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
+    assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes

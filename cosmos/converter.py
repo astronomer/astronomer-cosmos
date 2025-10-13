@@ -150,8 +150,7 @@ def validate_initial_user_config(
             + "If using RenderConfig.dbt_project_path or ExecutionConfig.dbt_project_path, ProjectConfig.dbt_project_path should be None"
         )
 
-    # Cosmos 2.0 will remove the ability to pass in operator_args with 'env' and 'vars' in place of ProjectConfig.env_vars and
-    # ProjectConfig.dbt_vars.
+    # Cosmos 2.0 will remove the ability to pass in operator_args with 'env' in place of ProjectConfig.env_vars.
     if "env" in operator_args:
         warn(
             "operator_args with 'env' is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
@@ -259,7 +258,7 @@ class DbtToAirflowConverter:
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration
         execution_config = copy.deepcopy(execution_config) if execution_config is not None else ExecutionConfig()
         render_config = copy.deepcopy(render_config) if render_config is not None else RenderConfig()
-        operator_args = copy.deepcopy(operator_args) if operator_args is not None else {}
+        operator_args = copy.copy(operator_args) if operator_args is not None else {}
 
         project_config.validate_project()
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)

@@ -25,7 +25,9 @@ DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DAGS_FOLDER = Path(__file__).parent.parent.parent / "dev/dags/"
 
 
-if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+if AIRFLOW_VERSION >= Version("3.1"):
+    # Change introduced in Airflow 3.1.0
+    # https://github.com/apache/airflow/pull/55722/files
     base_operator_get_connection_path = "airflow.sdk.BaseHook.get_connection"
 else:
     base_operator_get_connection_path = "airflow.hooks.base.BaseHook.get_connection"

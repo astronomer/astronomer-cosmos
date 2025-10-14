@@ -32,16 +32,6 @@ fi
 
 uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark  "apache-airflow==$AIRFLOW_VERSION"
 
-# The DuckDB adaptor has not been actively maintained and its dependencies conflict with other latest dbt adapters and Airflow.
-# For this reason, we're installing it in a separate Python virtualenv.
-# Example of error we were getting before this isolationw as introduced:
-# dbt is raising No module named 'dbt.adapters.catalogs'
-if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; then
-  pip install 'airflow-provider-duckdb>=0.2.0'
-  python -m venv /tmp/venv-duckdb
-  /bin/bash -c ". /tmp/venv-duckdb/bin/activate; pip install install dbt-duckdb; deactivate"
-fi
-
 # To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9
 # Such as:
 # ERROR tests/operators/_asynchronous/test_base.py - pydantic.errors.PydanticUserError: A non-annotated attribute was detected: `dag_id = <class 'str'>`. All model fields require a type annotation; if `dag_id` is not meant to be a field, you may be able to resolve this error by annotating it as a `ClassVar` or updating `model_config['ignored_types']`.

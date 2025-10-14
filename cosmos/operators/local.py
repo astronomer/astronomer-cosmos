@@ -156,7 +156,6 @@ except (ImportError, ModuleNotFoundError):
             job_facets: dict[str, str] = dict()
 
 
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 class AbstractDbtLocalBase(AbstractDbtBase):

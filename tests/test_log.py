@@ -1,5 +1,3 @@
-import sys
-
 import airflow
 import pytest
 from packaging.version import Version
@@ -26,35 +24,7 @@ def test_get_logger(monkeypatch):
         bad_logger = get_logger()  # noqa
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.1"), reason="Rich logging via stdout is available before Airflow 3.1")
-def test_rich_logging(monkeypatch, capsys):
-    monkeypatch.setattr(cosmos.log, "rich_logging", False)
-    standard_logger = get_logger("test-rich-logging-example1")
-    standard_logger.info("Hello, world!")
-    out = capsys.readouterr().out
-    assert "Hello, world!" in out
-    assert "\x1b[35m(astronomer-cosmos)\x1b[0m " not in out
-    assert out.count("\n") == 1
-
-    monkeypatch.setattr(cosmos.log, "rich_logging", True)
-    custom_logger = get_logger("test-rich-logging-example2")
-    custom_logger.info("Hello, world!")
-    out = capsys.readouterr().out
-    assert "Hello, world!" in out
-    assert "\x1b[35m(astronomer-cosmos)\x1b[0m " in out
-    assert out.count("\n") == 1
-
-
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("3.1"), reason="Airflow 3.1 and above use structlog instead of stdout")
-def test_structlog_logging(monkeypatch, caplog):
-    import structlog
-
-    structlog.configure(
-        processors=[
-            structlog.processors.KeyValueRenderer(key_order=["event"]),
-        ],
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
-    )
+def test_rich_logging(monkeypatch, caplog):
     monkeypatch.setattr(cosmos.log, "rich_logging", False)
     standard_logger = get_logger("test-rich-logging-example1")
 

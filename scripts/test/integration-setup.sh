@@ -30,7 +30,7 @@ else
     airflow db init
 fi
 
-uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark 'pendulum<3.0.0' 'protobuf<6'
+uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark 'pendulum<3.0.0'
 
 # To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9
 # Such as:
@@ -42,6 +42,7 @@ if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
 fi
 
 pip install -U apache-airflow==$AIRFLOW_VERSION
+pip install'5<=protobuf<6'
 
 #openlineage-airflow
 

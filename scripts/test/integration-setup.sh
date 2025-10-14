@@ -41,6 +41,8 @@ if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
   pip freeze | grep -i pydantic
 fi
 
-pip install -U openlineage-airflow apache-airflow==$AIRFLOW_VERSION "pendulum<3.0.0"
+pip install -U apache-airflow==$AIRFLOW_VERSION
+
+#openlineage-airflow
 
 uv pip freeze

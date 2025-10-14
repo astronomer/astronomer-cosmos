@@ -9,7 +9,7 @@ NEXT_MINOR_VERSION=$(echo "$DBT_VERSION" | awk -F. '{print $1"."$2+1}')
 
 # we install using the following workaround to overcome installation conflicts, such as:
 # apache-airflow 2.3.0 and dbt-core [0.13.0 - 1.5.2] and jinja2>=3.0.0 because these package versions have conflicting dependencies
-pip uninstall -y 'dbt-bigquery' 'dbt-duckdb' 'dbt-databricks' 'dbt-postgres' 'dbt-vertica' 'dbt-core'
+pip uninstall -y 'dbt-bigquery' 'dbt-databricks' 'dbt-duckdb' 'dbt-postgres' 'dbt-vertica' 'dbt-core'
 
 rm -f $AIRFLOW_HOME/airflow.cfg
 rm -f $AIRFLOW_HOME/airflow.db

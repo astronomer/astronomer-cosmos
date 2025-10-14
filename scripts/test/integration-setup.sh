@@ -30,7 +30,7 @@ else
     airflow db init
 fi
 
-uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark  "apache-airflow==$AIRFLOW_VERSION"
+uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
 
 # The DuckDB adaptor has not been actively maintained and its dependencies conflict with other latest dbt adapters and Airflow.
 # For this reason, we're installing it in a separate Python virtualenv.

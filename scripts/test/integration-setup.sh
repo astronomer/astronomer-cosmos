@@ -42,7 +42,7 @@ if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
 fi
 
 pip install -U apache-airflow==$AIRFLOW_VERSION
-pip install'5<=protobuf<6'
+pip install'6<=protobuf<7'
 
 #openlineage-airflow
 

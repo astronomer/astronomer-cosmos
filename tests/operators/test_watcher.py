@@ -448,7 +448,7 @@ def test_dbt_dag_with_watcher():
     outcome = watcher_dag.test()
     assert outcome.state == DagRunState.SUCCESS
 
-    assert len(watcher_dag.dbt_graph.filtered_nodes) == 26
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 23
 
     assert len(watcher_dag.task_dict) == 14
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]

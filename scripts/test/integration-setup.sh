@@ -38,7 +38,7 @@ uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica
 # dbt is raising No module named 'dbt.adapters.catalogs'
 if python3 -c "import sys; print(sys.version_info >= (3, 9))" | grep -q 'True'; then
   python -m venv /tmp/venv-duckdb
-  source /tmp/venv-duckdb/bin/activate; pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"; deactivate
+  . /tmp/venv-duckdb/bin/activate; pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"; deactivate
 fi
 
 # To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9

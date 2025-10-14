@@ -6,7 +6,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import ExecutionMode, InvocationMode
 from cosmos.profiles import DuckDBUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -16,6 +17,12 @@ profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=DuckDBUserPasswordProfileMapping(conn_id="duckdb_default", disable_event_tracking=True),
+)
+
+execution_config = ExecutionConfig(
+    execution_mode=ExecutionMode.LOCAL,
+    invocation_mode=InvocationMode.SUBPROCESS,
+    dbt_executable_path="/tmp/venv-duckdb/bin/dbt",
 )
 
 # [START local_example]
@@ -31,6 +38,8 @@ example_duckdb_dag = DbtDag(
     },
     render_config=RenderConfig(
         select=["path:seeds/raw_customers.csv", "path:models/staging/stg_customers.sql"],
+        invocation_mode=InvocationMode.SUBPROCESS,
+        dbt_executable_path="/tmp/venv-duckdb/bin/dbt",
     ),
     # normal dag parameters
     schedule="@daily",

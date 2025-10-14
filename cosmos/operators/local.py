@@ -156,8 +156,6 @@ except (ImportError, ModuleNotFoundError):
             job_facets: dict[str, str] = dict()
 
 
-
-
 class AbstractDbtLocalBase(AbstractDbtBase):
     """
     Executes a dbt core cli command locally.

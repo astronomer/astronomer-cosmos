@@ -115,6 +115,7 @@ from cosmos.operators.base import (
     _sanitize_xcom_key,
 )
 
+AIRFLOW_VERSION = Version(airflow.__version__)
 logger = get_logger(__name__)
 
 # The following is related to the ability of Cosmos parsing dbt artifacts and generating OpenLineage URIs

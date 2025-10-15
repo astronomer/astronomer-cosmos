@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from airflow import __version__ as airflow_version
-from airflow.models import DAG
+from airflow.models import DAG, DagRun
 from airflow.utils.state import State
 from packaging import version
 
@@ -82,6 +82,32 @@ def test_not_cosmos_dag():
     assert total_cosmos_tasks(dag) == 0
 
 
+def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
+    from airflow.utils.types import DagRunTriggeredByType, DagRunType
+
+    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
+        # Airflow 2
+        dag_run = dag.create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+            run_after=run_after,
+            run_type=DagRunType.MANUAL,
+            triggered_by=DagRunTriggeredByType.TIMETABLE,
+        )
+    else:
+        # Airflow 3
+        from tests_common.test_utils.dag import create_scheduler_dag
+
+        dag_run = create_scheduler_dag(dag).create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+            run_after=run_after,
+            run_type=DagRunType.MANUAL,
+            triggered_by=DagRunTriggeredByType.TIMETABLE,
+        )
+    return dag_run
+
+
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
@@ -98,23 +124,7 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
     run_id = str(uuid.uuid1())
 
     run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
-    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
-        # Airflow 2
-        dag_run = dag.create_dagrun(
-            state=State.NONE,
-            run_id=run_id,
-        )
-    else:
-        # Airflow 3
-        from airflow.utils.types import DagRunTriggeredByType, DagRunType
-
-        dag_run = dag.create_dagrun(
-            state=State.NONE,
-            run_id=run_id,
-            run_after=run_after,
-            run_type=DagRunType.MANUAL,
-            triggered_by=DagRunTriggeredByType.TIMETABLE,
-        )
+    dag_run = create_dag_run(dag, run_id, run_after)
 
     on_dag_run_success(dag_run, msg="test success")
     assert "Running on_dag_run_success" in caplog.text

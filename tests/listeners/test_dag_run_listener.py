@@ -83,19 +83,16 @@ def test_not_cosmos_dag():
 
 
 def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
-    from airflow.utils.types import DagRunTriggeredByType, DagRunType
 
     if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
         # Airflow 2
         dag_run = dag.create_dagrun(
             state=State.NONE,
             run_id=run_id,
-            run_after=run_after,
-            run_type=DagRunType.MANUAL,
-            triggered_by=DagRunTriggeredByType.TIMETABLE,
         )
     else:
         # Airflow 3
+        from airflow.utils.types import DagRunTriggeredByType, DagRunType
         from tests_common.test_utils.dag import create_scheduler_dag
 
         dag_run = create_scheduler_dag(dag).create_dagrun(

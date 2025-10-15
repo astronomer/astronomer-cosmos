@@ -43,7 +43,9 @@ def check_dag_success(dag_run: DagRun | None, expect_success: bool = True) -> bo
 
 def new_test_dag(dag: DAG) -> DagRun:
     if AIRFLOW_VERSION >= version.Version("3.0"):
-        dag.disable_bundle_versioning = True
+        from airflow.models.serialized_dag import SerializedDagModel
+
+        SerializedDagModel.write_dag(dag)
         dr = dag.test(logical_date=timezone.utcnow())
     else:
         dr = dag.test()

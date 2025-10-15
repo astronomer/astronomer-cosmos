@@ -656,7 +656,7 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "project_dir,node_count",
-    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 39), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
+    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 40), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
 )
 def test_load_via_dbt_ls_without_exclude(project_dir, node_count, postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=project_dir)
@@ -1917,7 +1917,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("481324dabe926f5cf6352b05e5ebe5d7", "60c08a4730a39d03d89f0f87a8ff3931")
+        assert hash_dir in ("7f64aab068fb7fcf912765605210bf02", "60c08a4730a39d03d89f0f87a8ff3931")
     else:
         assert hash_dir == "60c08a4730a39d03d89f0f87a8ff3931"
 
@@ -2179,3 +2179,27 @@ def test_load_manifest_handles_null_or_missing_tags(tags_value, tmp_path):
 
     node = dbt_graph.nodes["model.test_project.my_model"]
     assert node.tags == []
+
+
+def test_add_downstream_nodes():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load()
+
+    target_node = "model.jaffle_shop.stg_payments"
+    downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
+    assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes

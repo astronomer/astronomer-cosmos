@@ -90,6 +90,7 @@ class DbtNode:
     has_freshness: bool = False
     has_test: bool = False
     has_non_detached_test: bool = False
+    downstream: list[str] = field(default_factory=lambda: [])
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -977,3 +978,8 @@ class DbtGraph:
                             or self.render_config.should_detach_multiple_parents_tests is False
                         ):
                             self.filtered_nodes[node_id].has_non_detached_test = True
+            else:
+                for parent_node_id in node.depends_on:
+                    parent_node = self.nodes.get(parent_node_id)
+                    if parent_node is not None:
+                        parent_node.downstream.append(node.unique_id)

@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
 keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt"]
 classifiers = [
@@ -21,7 +21,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -166,7 +165,7 @@ dependencies = [
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.9", "3.10", "3.11", "3.12"]
+python = ["3.10", "3.11", "3.12"]
 airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0"]
 dbt = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "2.0"]
 

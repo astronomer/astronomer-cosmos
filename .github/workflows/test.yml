@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  SCARF_NO_ANALYTICS: "true"
+
 jobs:
   Authorize:
     environment: ${{ github.event_name == 'pull_request_target' &&
@@ -202,7 +205,6 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
-          SCARF_NO_ANALYTICS: False
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -282,7 +284,6 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          SCARF_NO_ANALYTICS: False
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -373,7 +374,6 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
           TEST_SINGLE_DAG: "basic_cosmos_task_group.py"  # There are circumstances when we only need to run a single DAG, but we were parsing all the DAGs. This change is to avoid parsing all the DAGs.
-          SCARF_NO_ANALYTICS: False
 
   Run-Integration-Tests-DBT-Async:
     needs: Authorize
@@ -456,7 +456,6 @@ jobs:
       POSTGRES_DB: postgres
       POSTGRES_SCHEMA: public
       POSTGRES_PORT: 5432
-      SCARF_NO_ANALYTICS: False
 
   Run-Integration-dbt-fusion-Tests:
     needs: Authorize
@@ -519,7 +518,6 @@ jobs:
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
-          SCARF_NO_ANALYTICS: False
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4
@@ -618,7 +616,6 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-      SCARF_NO_ANALYTICS: False
 
   Run-Kubernetes-Tests:
     needs: Authorize
@@ -683,7 +680,6 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          SCARF_NO_ANALYTICS: False
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@v4

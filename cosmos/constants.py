@@ -79,6 +79,8 @@ class TestBehavior(Enum):
     Behavior of the tests.
     """
 
+    __test__ = False
+
     BUILD = "build"
     NONE = "none"
     AFTER_EACH = "after_each"
@@ -115,6 +117,8 @@ class TestIndirectSelection(Enum):
     """
     Modes to configure the test behavior when performing indirect selection.
     """
+
+    __test__ = False
 
     EAGER = "eager"
     CAUTIOUS = "cautious"

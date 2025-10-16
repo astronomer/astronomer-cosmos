@@ -76,6 +76,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
     """
 
     base_cmd = ["build"]
+    template_fields = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
@@ -152,7 +153,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
-    template_fields = ("model_unique_id",)
+    template_fields = ("model_unique_id",)  # type: ignore[operator]
 
     def __init__(
         self,
@@ -163,7 +164,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
-        execution_timeout: timedelta(hours=1),
+        execution_timeout: timedelta = timedelta(hours=1),
         **kwargs: Any,
     ) -> None:
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
@@ -329,7 +330,7 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
+    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields
 
 
 class DbtSourceWatcherOperator(DbtSourceLocalOperator):

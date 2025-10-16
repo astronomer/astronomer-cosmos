@@ -552,6 +552,7 @@ def _add_producer_watcher_and_dependencies(
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
+    nodes: dict[str, DbtNode] | None = None,
 ) -> str:
     producer_task_args = task_args.copy()
 
@@ -566,21 +567,26 @@ def _add_producer_watcher_and_dependencies(
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
-    for task_or_taskgroup in tasks_map.values():
+
+    # Consumer tasks will need to be updated to use the producer task as a dependency
+    for node_id, task_or_taskgroup in tasks_map.items():
         # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         node_tasks = (
-            task_or_taskgroup.children.values() if isinstance(task_or_taskgroup, TaskGroup) else [task_or_taskgroup]
+            list(task_or_taskgroup.children.values())
+            if isinstance(task_or_taskgroup, TaskGroup)
+            else [task_or_taskgroup]
         )
 
         # First, we tackle dbt graph nodes that are root nodes
-        if not task_or_taskgroup.upstream_list:
+        if nodes and node_id in nodes and not nodes[node_id].depends_on:
             producer_airflow_task >> task_or_taskgroup
             for root_task in node_tasks:
-                root_task.trigger_rule = task_args.get("trigger_rule", "always")
+                if hasattr(root_task, "trigger_rule"):
+                    root_task.trigger_rule = task_args.get("trigger_rule", "always")
 
         # We also need to set the producer task id too all consumer tasks, regardless if they are root or not
         for task in node_tasks:
-            task.producer_task_id = producer_airflow_task.task_id
+            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
     return producer_airflow_task.task_id
@@ -801,6 +807,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map=tasks_map,
             task_group=task_group,
             render_config=render_config,
+            nodes=nodes,
         )
 
     if settings.enable_setup_async_task:

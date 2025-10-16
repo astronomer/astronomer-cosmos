@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import zlib
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
-PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
+PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 1000
 WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
 
 
@@ -162,6 +163,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
+        execution_timeout: timedelta(hours=1),
         **kwargs: Any,
     ) -> None:
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
@@ -170,6 +172,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
+            execution_timeout=execution_timeout,
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,
@@ -230,6 +233,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self.log.info("Dbt Startup Event: %s", dbt_startup_events)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
+        self.log.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)
         compressed_b64_event_msg = ti.xcom_pull(task_ids=self.producer_task_id, key=node_finished_key)
 
         if not compressed_b64_event_msg:

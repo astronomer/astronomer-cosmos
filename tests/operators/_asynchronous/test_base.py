@@ -151,7 +151,7 @@ def test_setup_run_subprocess_py_bin_unset(
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.8"), reason="ObjectStoragePath requires Apache Airflow >= 2.8")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch("cosmos.operators._asynchronous.ObjectStoragePath")
 def test_execute_removes_existing_path(mock_object_storage_path):
     mock_path_instance = MagicMock()
     mock_path_instance.exists.return_value = True

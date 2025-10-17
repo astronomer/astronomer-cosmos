@@ -21,7 +21,7 @@ def test_profile_args() -> None:
         extra=json.dumps({"session_properties": {"my_property": "my_value"}}),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TrinoBaseProfileMapping(
             conn,
             profile_args={
@@ -58,7 +58,7 @@ def test_profile_args_overrides() -> None:
         extra=json.dumps({"session_properties": {"my_property": "my_value"}}),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TrinoBaseProfileMapping(
             conn,
             profile_args={

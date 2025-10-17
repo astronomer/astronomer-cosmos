@@ -24,7 +24,7 @@ def mock_clickhouse_conn():  # type: ignore
         extra='{"clickhouse": "True"}',
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -53,7 +53,7 @@ def test_connection_claiming1() -> None:
         values = required_values.copy()
         del values[missing_key]
         conn = Connection(**values)  # type: ignore
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = ClickhouseUserPasswordProfileMapping(conn, {})
             return profile_mapping.can_claim_connection()
 
@@ -63,7 +63,7 @@ def test_connection_claiming1() -> None:
 
     # if we have all the required values, it should claim
     conn = Connection(**required_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = ClickhouseUserPasswordProfileMapping(conn, {})
         assert profile_mapping.can_claim_connection()
 

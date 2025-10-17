@@ -24,6 +24,15 @@ DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
 DAGS_FOLDER = Path(__file__).parent.parent.parent / "dev/dags/"
 
+
+if AIRFLOW_VERSION >= Version("3.1"):
+    # Change introduced in Airflow 3.1.0
+    # https://github.com/apache/airflow/pull/55722/files
+    base_operator_get_connection_path = "airflow.sdk.BaseHook.get_connection"
+else:
+    base_operator_get_connection_path = "airflow.hooks.base.BaseHook.get_connection"
+
+
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
@@ -64,7 +73,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
+@patch(base_operator_get_connection_path)
 def test_run_command_without_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,
@@ -140,7 +149,7 @@ def test_run_command_without_virtualenv_dir(
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
+@patch(base_operator_get_connection_path)
 def test_run_command_with_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,

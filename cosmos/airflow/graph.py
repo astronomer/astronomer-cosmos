@@ -577,8 +577,10 @@ def _add_producer_watcher_and_dependencies(
             else [task_or_taskgroup]
         )
 
-        # First, we tackle dbt graph nodes that are root nodes
-        if nodes and node_id in nodes and not nodes[node_id].depends_on:
+        # the following only works with DbtDag. It does not work with DbtTaskGroup due to an Airflow bug
+        if "DbtDag" in dag.__class__.__name__:
+            # First, we tackle dbt graph nodes that are root nodes
+            # if nodes and node_id in nodes and not nodes[node_id].depends_on:
             producer_airflow_task >> task_or_taskgroup
             for root_task in node_tasks:
                 if hasattr(root_task, "trigger_rule"):

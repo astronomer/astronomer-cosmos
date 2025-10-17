@@ -75,15 +75,6 @@ except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
 
-try:
-    import openlineage
-    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
-except ModuleNotFoundError:
-    is_openlineage_available = False
-    DbtLocalArtifactProcessor = None
-else:
-    is_openlineage_available = True
-
 if TYPE_CHECKING:  # pragma: no cover
     import openlineage  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
@@ -131,6 +122,20 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 
 logger = get_logger(__name__)
 
+# The following is related to the ability of Cosmos parsing dbt artifacts and generating OpenLineage URIs
+# It is used for emitting Airflow assets and not necessarily OpenLineage events
+try:
+    import openlineage
+    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+
+    is_openlineage_common_available = True
+except ModuleNotFoundError:
+    is_openlineage_common_available = False
+    DbtLocalArtifactProcessor = None
+
+
+# The following is related to the ability of Airflow to emit OpenLineage events
+# This will decide if the method `get_openlineage_facets_on_complete` will be called by the Airflow OpenLineage listener or not
 try:
     from airflow.providers.openlineage.extractors.base import OperatorLineage
 except (ImportError, ModuleNotFoundError):
@@ -141,10 +146,9 @@ except (ImportError, ModuleNotFoundError):
             "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
         )
         logger.debug(
-            "Further details on lack of Openlineage:",
+            "Further details on lack of Openlineage Airflow provider:",
             stack_info=True,
         )
-        is_openlineage_available = False
 
         @define
         class OperatorLineage:  # type: ignore
@@ -692,7 +696,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     env=env,
                     cwd=tmp_project_dir,
                 )
-                if is_openlineage_available:
+                if is_openlineage_common_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
                     if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
                         # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,

@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  SCARF_NO_ANALYTICS: "true"
+
 jobs:
   Authorize:
     environment: ${{ github.event_name == 'pull_request_target' &&

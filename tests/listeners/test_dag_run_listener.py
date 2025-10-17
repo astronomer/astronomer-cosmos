@@ -20,7 +20,8 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 
-AIRFLOW_VERSION_MAJOR = version.parse(airflow_version).major
+AIRFLOW_VERSION = version.parse(airflow_version)
+AIRFLOW_VERSION_MAJOR = AIRFLOW_VERSION.major
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -84,7 +85,7 @@ def test_not_cosmos_dag():
 
 def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
 
-    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
+    if AIRFLOW_VERSION >= version.Version("3.1.0"):
         # Airflow 2
         dag_run = dag.create_dagrun(
             state=State.NONE,

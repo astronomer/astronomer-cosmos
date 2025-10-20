@@ -84,7 +84,7 @@ def test_not_cosmos_dag():
 
 
 def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
-    if AIRFLOW_VERSION < version.Version("3.1.0"):
+    if AIRFLOW_VERSION < version.Version("3.0"):
         # Airflow 2 and 3.0
         dag_run = dag.create_dagrun(
             state=State.NONE,

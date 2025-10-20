@@ -6,12 +6,17 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# [START cosmos_init_imports]
-from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
-from cosmos.constants import ExecutionMode
+from airflow import DAG
 
-# [END cosmos_init_imports]
+from cosmos import DbtDag, DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
+from cosmos.constants import ExecutionMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+try:  # Airflow 3+
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:  # Airflow 2
+    from airflow.operators.empty import EmptyOperator
+
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
@@ -57,3 +62,26 @@ example_watcher = DbtDag(
     default_args={"retries": 0},
 )
 # [END example_watcher]
+
+with DAG(
+    dag_id="example_watcher_taskgroup",
+    schedule="@daily",
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+):
+    """
+    The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+    """
+    pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+    first_dbt_task_group = DbtTaskGroup(
+        group_id="first_dbt_task_group",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+        ),
+        project_config=ProjectConfig(DBT_PROJECT_PATH),
+        profile_config=profile_config,
+        operator_args=operator_args,
+    )
+
+    pre_dbt >> first_dbt_task_group

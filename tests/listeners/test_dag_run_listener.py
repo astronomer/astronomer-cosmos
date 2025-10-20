@@ -108,7 +108,9 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
     return dag_run
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION >= version.Version("3.1.0"), "We need to fix create_dag_run")
+@pytest.mark.skipif(
+    AIRFLOW_VERSION >= version.Version("3.1.0"), reason="TODO: Fix create_dag_run in AF 3.1 and remove this skip."
+)
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):

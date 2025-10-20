@@ -469,6 +469,7 @@ def test_dbt_dag_with_watcher():
         "orders.test",
     ]
     assert tasks_names == expected_task_names
+
     assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
     assert isinstance(watcher_dag.task_dict["raw_customers_seed"], DbtSeedWatcherOperator)
     assert isinstance(watcher_dag.task_dict["raw_orders_seed"], DbtSeedWatcherOperator)
@@ -483,3 +484,9 @@ def test_dbt_dag_with_watcher():
     assert isinstance(watcher_dag.task_dict["stg_payments.test"], DbtTestWatcherOperator)
     assert isinstance(watcher_dag.task_dict["customers.test"], DbtTestWatcherOperator)
     assert isinstance(watcher_dag.task_dict["orders.test"], DbtTestWatcherOperator)
+
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
+        "raw_payments_seed",
+        "raw_orders_seed",
+        "raw_customers_seed",
+    }

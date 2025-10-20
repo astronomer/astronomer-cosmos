@@ -90,15 +90,40 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
             state=State.NONE,
             run_id=run_id,
         )
-    else:
-        # Airflow 3.1
-        # We are not being able to use the following:
-        # uv pip install "apache-airflow-devel-common"
-        # ModuleNotFoundError: No module named 'tests_common'
+    elif AIRFLOW_VERSION.major == 3 and AIRFLOW_VERSION.minor == 0:
         from airflow.utils.types import DagRunTriggeredByType, DagRunType
-        from tests_common.test_utils.dag import create_scheduler_dag
 
-        dag_run = create_scheduler_dag(dag).create_dagrun(
+        dag_run = dag.create_dagrun(
+            state=State.NONE,
+            run_id=run_id,
+            run_after=run_after,
+            run_type=DagRunType.MANUAL,
+            triggered_by=DagRunTriggeredByType.TIMETABLE,
+        )
+    else:
+        # This is not currently working.
+        # We need to find a way of testing this in Airflow 3.1 onwards
+        #
+        # Airflow 3.1.0+ requires DAG to be serialized to database before calling dag.create_dagrun()
+        # because create_dagrun() checks for DagVersion and DagModel records
+        from airflow.models.dagbag import DagBag, sync_bag_to_db
+        from airflow.models.dagbundle import DagBundleModel
+        from airflow.utils.session import create_session
+        from airflow.utils.types import DagRunTriggeredByType, DagRunType
+
+        # Create DagBundle if it doesn't exist (required for DagModel foreign key)
+        # This mimics what get_bagged_dag does via manager.sync_bundles_to_db()
+        with create_session() as session:
+            dag_bundle = DagBundleModel(name="test_bundle_listener")
+            session.merge(dag_bundle)
+            session.commit()
+
+        # This creates both DagModel and DagVersion records
+        dagbag = DagBag(include_examples=False)
+        dagbag.bag_dag(dag)
+        sync_bag_to_db(dagbag, bundle_name="test_bundle_listener", bundle_version="1")
+
+        dag_run = dag.create_dagrun(
             state=State.NONE,
             run_id=run_id,
             run_after=run_after,

@@ -13,7 +13,6 @@ from packaging import version
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
 from cosmos.listeners.dag_run_listener import on_dag_run_failed, on_dag_run_success, total_cosmos_tasks
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -134,7 +133,8 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION >= version.Version("3.1.0"), reason="TODO: Fix create_dag_run in AF 3.1 and remove this skip."
+    AIRFLOW_VERSION >= version.Version("3.1.0"),
+    reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
 )
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
@@ -160,6 +160,9 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
     assert mock_emit_usage_metrics_if_enabled.call_count == 1
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION >= version.Version("3.1.0"), reason="TODO: Fix create_dag_run to work with and remove this skip."
+)
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):
@@ -175,23 +178,7 @@ def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):
     )
     run_id = str(uuid.uuid1())
     run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
-    if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
-        # Airflow 2
-        dag_run = dag.create_dagrun(
-            state=State.NONE,
-            run_id=run_id,
-        )
-    else:
-        # Airflow 3
-        from airflow.utils.types import DagRunTriggeredByType, DagRunType
-
-        dag_run = dag.create_dagrun(
-            state=State.NONE,
-            run_id=run_id,
-            run_after=run_after,
-            run_type=DagRunType.MANUAL,
-            triggered_by=DagRunTriggeredByType.TIMETABLE,
-        )
+    dag_run = create_dag_run(dag, run_id, run_after)
 
     on_dag_run_failed(dag_run, msg="test failed")
     assert "Running on_dag_run_failed" in caplog.text

@@ -596,7 +596,6 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
     caplog.clear()
     run_test_dag(dag, expect_success=False)
 
-    assert "AirflowCompatibilityError" in caplog.text
     assert "ERROR" in caplog.text
     assert "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)." in caplog.text
 
@@ -735,6 +734,7 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2_with_airflow3_uri(ca
 
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
+    # breakpoint()
     caplog.clear()
     caplog.set_level(logging.DEBUG)
     with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:

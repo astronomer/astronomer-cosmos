@@ -5,7 +5,7 @@ import json
 import logging
 import zlib
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, List, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Sequence, Union
 
 import airflow
 from packaging.version import Version
@@ -324,7 +324,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         if producer_task_state == "failed":
             raise AirflowException(
-                f"""The build command failed in producer task. Please check the log of task{self.producer_task_id} for details."""
+                f"""The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."""
             )
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode

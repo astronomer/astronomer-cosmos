@@ -102,7 +102,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ev: EventMsg,
         context: Context,
     ) -> None:
-        self.log.debug("DbtProducerWatcherOperator: handling node finished event: %s", ev)
+        logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", ev)
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)
@@ -121,7 +121,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
                 self._discover_invocation_mode()
 
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-            self.log.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
+            logger.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
 
             startup_events: list[dict[str, Any]] = []
 
@@ -205,7 +205,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         Reconstructs the dbt command by cloning the project and re-running the model
         with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
         """
-        self.log.info(
+        logger.info(
             "Retry attempt #%s – Re-running model '%s' from project '%s'",
             try_number - 1,
             self.model_unique_id,
@@ -224,17 +224,17 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
 
-        self.log.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
+        logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True
 
     def _get_status_from_events(self, ti: Any) -> Any:
 
         dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
-            self.log.info("Dbt Startup Event: %s", dbt_startup_events)
+            logger.info("Dbt Startup Event: %s", dbt_startup_events)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-        self.log.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)
+        logger.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)
         compressed_b64_event_msg = ti.xcom_pull(task_ids=self.producer_task_id, key=node_finished_key)
 
         if not compressed_b64_event_msg:
@@ -244,7 +244,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
         event_json = json.loads(event_json_str)
 
-        self.log.info("Node Info: %s", event_json_str)
+        logger.info("Node Info: %s", event_json_str)
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
@@ -258,16 +258,16 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         run_results_str = zlib.decompress(compressed_bytes).decode("utf-8")
         run_results_json = json.loads(run_results_str)
 
-        self.log.debug("Run results: %s", run_results_json)
+        logger.debug("Run results: %s", run_results_json)
 
         results = run_results_json.get("results", [])
         node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
 
         if not node_result:  # pragma: no cover
-            self.log.warning("No matching result found for unique_id '%s'", self.model_unique_id)
+            logger.warning("No matching result found for unique_id '%s'", self.model_unique_id)
             return None
 
-        self.log.info("Node Info: %s", run_results_str)
+        logger.info("Node Info: %s", run_results_str)
         return node_result.get("status")
 
     def poke(self, context: Context) -> bool:
@@ -281,7 +281,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if try_number > 1:
             return self._handle_task_retry(try_number, context)
 
-        self.log.info(
+        logger.info(
             "Pulling status from task_id '%s' for model '%s'",
             self.producer_task_id,
             self.model_unique_id,

@@ -27,18 +27,19 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        try:
-            from airflow.io.path import ObjectStoragePath
-        except ImportError:
-            pass
 from airflow.version import version as airflow_version
 from attrs import define
 from packaging.version import Version
 
 from cosmos import cache, settings
+
+if settings.AIRFLOW_IO_AVAILABLE:
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
+    pass
+
 from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
@@ -157,20 +158,6 @@ except (ImportError, ModuleNotFoundError):
             outputs: list[str] = list()
             run_facets: dict[str, str] = dict()
             job_facets: dict[str, str] = dict()
-
-
-if settings.AIRFLOW_IO_AVAILABLE:
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        from airflow.io.path import ObjectStoragePath
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        try:
-            from airflow.io.path import ObjectStoragePath
-        except ImportError:
-            pass
 
 
 class AbstractDbtLocalBase(AbstractDbtBase):

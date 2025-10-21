@@ -4,7 +4,7 @@ import zlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
@@ -232,6 +232,37 @@ def test_execute_fallback_mode(tmp_path):
     assert data["results"][0]["status"] == "success"
 
 
+@pytest.mark.parametrize(
+    "user_callback, expected_behavior",
+    [
+        (None, "none"),
+        ([Mock(name="cb1")], "list"),
+        (Mock(name="cb2"), "single"),
+    ],
+)
+def test_set_on_failure_callback_with_actual_airflow(user_callback, expected_behavior, tmp_path):
+
+    instance = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
+    result = instance._set_on_failure_callback(user_callback)
+
+    if AIRFLOW_VERSION < Version("2.6.0"):
+        # Always returns single callable regardless of input
+        assert callable(result)
+        assert result == instance._store_producer_task_state
+    else:
+        # Returns list depending on input
+        assert isinstance(result, list)
+        assert result[-1] == instance._store_producer_task_state
+
+        if expected_behavior == "none":
+            assert len(result) == 1
+        elif expected_behavior == "list":
+            assert len(result) == 2
+        elif expected_behavior == "single":
+            assert len(result) == 2
+            assert result[0] == user_callback
+
+
 @patch("cosmos.dbt.runner.is_available", return_value=False)
 @patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")
 def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
@@ -410,6 +441,22 @@ class TestDbtConsumerWatcherSensor:
 
         result = sensor._get_status_from_events(ti)
         assert result is None
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    def test_producer_state_failed(self, mock_run_result):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        mock_run_result.return_value = None
+        ti.xcom_pull.return_value = "failed"
+
+        context = self.make_context(ti)
+
+        with pytest.raises(
+            AirflowException,
+            match="The dbt build command failed in producer task. Please check the log of task dbt_producer_watcher for details.",
+        ):
+            sensor.poke(context)
 
 
 class TestDbtBuildWatcherOperator:

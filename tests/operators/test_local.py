@@ -53,6 +53,7 @@ from cosmos.operators.local import (
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from cosmos.settings import AIRFLOW_IO_AVAILABLE
+from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
@@ -566,7 +567,8 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
         seed_operator >> run_operator >> test_operator
 
     caplog.clear()
-    dag.test()
+
+    new_test_dag(dag)
     assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
     assert (
         "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"

@@ -17,6 +17,7 @@ from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import test_dag as run_test_dag
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
@@ -410,10 +411,11 @@ def test_integration_virtualenv_operator(caplog):
     dag_bag = DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
     dag = dag_bag.get_dag("example_virtualenv_mini")
 
-    dag.test()
-
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
+    dag_run = run_test_dag(dag)
+    assert dag_run.state == "success"
+    assert caplog.text.count("Trying to run the command") == 2
+    assert "/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
+    assert "/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
 
 
 def test_dbt_clone_virtualenv_operator_initialisation():

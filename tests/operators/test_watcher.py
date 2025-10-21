@@ -24,7 +24,7 @@ from cosmos.operators.watcher import (
     DbtTestWatcherOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from tests.utils import AIRFLOW_VERSION
+from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
@@ -445,7 +445,7 @@ def test_dbt_dag_with_watcher():
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
     )
-    outcome = watcher_dag.test()
+    outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 23

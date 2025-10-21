@@ -88,11 +88,11 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
-        on_failure_callback = self._set_on_failure_callback(kwargs)
+        on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
         super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
 
     def _set_on_failure_callback(
-        self, kwargs: Any
+        self, user_callback: Any
     ) -> Union[Callable[[Context], None], List[Callable[[Context], None]]]:
         default_callback = self._store_producer_task_state
 
@@ -100,9 +100,6 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             # Older versions only support a single callable
             return default_callback
         else:
-            # Airflow >= 2.6.0 supports a list of callbacks
-            user_callback = kwargs.get("on_failure_callback")
-
             if user_callback is None:
                 # No callback provided — use default in a list
                 return [default_callback]
@@ -320,13 +317,6 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self.model_unique_id,
         )
 
-        producer_task_state = ti.xcom_pull(task_ids=self.producer_task_id, key="state")
-
-        if producer_task_state == "failed":
-            raise AirflowException(
-                f"""The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."""
-            )
-
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         if not self.invocation_mode:
             self._discover_invocation_mode()
@@ -338,6 +328,11 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             status = self._get_status_from_run_results(ti)
 
         if status is None:
+            producer_task_state = ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+            if producer_task_state == "failed":
+                raise AirflowException(
+                    f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                )
             return False
         elif status == "success":
             return True

@@ -546,14 +546,14 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
-def _add_producer_watcher_and_dependencies(
+def _add_producer_watcher(
     dag: DAG,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
-    nodes: dict[str, DbtNode] | None = None,
 ) -> str:
+
     producer_task_args = task_args.copy()
 
     if render_config is not None:
@@ -567,28 +567,11 @@ def _add_producer_watcher_and_dependencies(
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
-
-    # Consumer tasks will need to be updated to use the producer task as a dependency
-    for node_id, task_or_taskgroup in tasks_map.items():
+    for task_id, task in tasks_map.items():
         # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
-        node_tasks = (
-            list(task_or_taskgroup.children.values())
-            if isinstance(task_or_taskgroup, TaskGroup)
-            else [task_or_taskgroup]
-        )
-
-        # the following only works with DbtDag. It does not work with DbtTaskGroup due to an Airflow bug
-        if "DbtDag" in dag.__class__.__name__:
-            # First, we tackle dbt graph nodes that are root nodes
-            # if nodes and node_id in nodes and not nodes[node_id].depends_on:
-            producer_airflow_task >> task_or_taskgroup
-            for root_task in node_tasks:
-                if hasattr(root_task, "trigger_rule"):
-                    root_task.trigger_rule = task_args.get("trigger_rule", "always")
-
-        # We also need to set the producer task id too all consumer tasks, regardless if they are root or not
-        for task in node_tasks:
-            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+        if not task.upstream_list:
+            producer_airflow_task >> task
+            task.trigger_rule = task_args.get("trigger_rule", "always")
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
     return producer_airflow_task.task_id
@@ -767,6 +750,16 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
+    if execution_mode == ExecutionMode.WATCHER:
+        producer_watcher_task_id = _add_producer_watcher(
+            dag,
+            task_args,
+            tasks_map,
+            task_group,
+            render_config=render_config,
+        )
+        task_args["producer_watcher_task_id"] = producer_watcher_task_id
+
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
@@ -801,16 +794,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
-
-    if execution_mode == ExecutionMode.WATCHER:
-        _add_producer_watcher_and_dependencies(
-            dag=dag,
-            task_args=task_args,
-            tasks_map=tasks_map,
-            task_group=task_group,
-            render_config=render_config,
-            nodes=nodes,
-        )
 
     if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(

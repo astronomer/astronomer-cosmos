@@ -1890,8 +1890,6 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
 @patch("cosmos.operators.local.ObjectStoragePath")
 def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote, caplog):
     """Test the _delete_sql_files method when the remote directory doesn't exist."""
-    caplog.set_level(logging.DEBUG)
-
     mock_path = MagicMock()
     mock_path.exists.return_value = False
     mock_object_storage_path.return_value = mock_path

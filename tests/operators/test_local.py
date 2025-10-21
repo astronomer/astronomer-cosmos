@@ -898,19 +898,19 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
         should_store_compiled_sql=False,
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
-    with patch.object(dbt_base_operator.log, "info") as mock_log_info:
-        if version.parse(airflow_version) >= version.Version("3.1"):
-            task_instance = TaskInstance(dbt_base_operator, dag_version_id=None)
-        else:
-            task_instance = TaskInstance(dbt_base_operator)
 
-        facets = dbt_base_operator.get_openlineage_facets_on_complete(task_instance)
+    if version.parse(airflow_version) >= version.Version("3.1"):
+        task_instance = TaskInstance(dbt_base_operator, dag_version_id=None)
+    else:
+        task_instance = TaskInstance(dbt_base_operator)
+
+    facets = dbt_base_operator.get_openlineage_facets_on_complete(task_instance)
 
     assert facets.inputs == []
     assert facets.outputs == []
     assert facets.run_facets == {}
     assert facets.job_facets == {}
-    mock_log_info.assert_called_with("Unable to emit OpenLineage events due to lack of dependencies or data.")
+    assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
@@ -1127,11 +1127,10 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
         should_store_compiled_sql=False,
     )
 
-    with patch.object(dbt_base_operator.log, "debug") as mock_log_debug:
-        dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
 
     assert instance.parse.called
-    mock_log_debug.assert_called_with("Unable to parse OpenLineage events", stack_info=True)
+    assert "Unable to parse OpenLineage events" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -1331,10 +1330,11 @@ def test_dbt_local_operator_on_kill_sigterm(mock_send_sigterm) -> None:
     mock_send_sigterm.assert_called_once()
 
 
-def test_handle_exception_subprocess():
+def test_handle_exception_subprocess(caplog):
     """
     Test the handle_exception_subprocess method of the DbtLocalBaseOperator class for non-zero dbt exit code.
     """
+    caplog.set_level(logging.ERROR)
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=None,
         task_id="my-task",
@@ -1344,12 +1344,11 @@ def test_handle_exception_subprocess():
     result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output)
 
     # Test when exit_code is non-zero
-    with patch.object(operator.log, "error") as mock_log_error:
-        with pytest.raises(AirflowException) as err_context:
-            operator.handle_exception_subprocess(result)
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
 
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
-    mock_log_error.assert_called_with("\n".join(full_output))
+    assert "\n".join(full_output) in caplog.text
 
 
 @pytest.fixture
@@ -1889,8 +1888,10 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("cosmos.operators.local.ObjectStoragePath")
-def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote):
+def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote, caplog):
     """Test the _delete_sql_files method when the remote directory doesn't exist."""
+    caplog.set_level(logging.DEBUG)
+
     mock_path = MagicMock()
     mock_path.exists.return_value = False
     mock_object_storage_path.return_value = mock_path
@@ -1903,12 +1904,9 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
         extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
 
-    with patch.object(operator.log, "debug") as mock_log_debug:
-        operator._delete_sql_files()
-        mock_log_debug.assert_called_once()
-        log_format, log_path = mock_log_debug.call_args[0]
-        assert "Remote run directory does not exist, skipping deletion: %s" == log_format
-        assert "/mock/path/test_dag_task_group/test_run_id" == log_path
+    operator._delete_sql_files()
+    assert "Remote run directory does not exist, skipping deletion: %s" in caplog.text
+    assert "/mock/path/test_dag_task_group/test_run_id" in caplog.text
 
     mock_path.rmdir.assert_not_called()
 
@@ -1943,8 +1941,9 @@ def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_p
 @pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
-def test_delete_sql_files_no_remote_target_configured(mock_configure_remote):
+def test_delete_sql_files_no_remote_target_configured(mock_configure_remote, caplog):
     """Test that _delete_sql_files exits early with a warning when remote path is not configured."""
+    caplog.set_level(logging.WARNING)
     mock_configure_remote.return_value = (None, None)
     operator = DbtRunLocalOperator(
         task_id="test",
@@ -1953,15 +1952,13 @@ def test_delete_sql_files_no_remote_target_configured(mock_configure_remote):
         extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
 
-    with patch.object(operator.log, "warning") as mock_log_warning:
-        operator._delete_sql_files()
-        expected_log_message = "Remote target path or connection ID not configured. Skipping deletion."
-        mock_log_warning.assert_called_once_with(expected_log_message)
+    operator._delete_sql_files()
+    expected_log_message = "Remote target path or connection ID not configured. Skipping deletion."
+    assert expected_log_message in caplog.text
 
     mock_configure_remote.return_value = (Path("/mock/path"), None)
-    with patch.object(operator.log, "warning") as mock_log_warning:
-        operator._delete_sql_files()
-        mock_log_warning.assert_called_once_with(expected_log_message)
+    operator._delete_sql_files()
+    assert expected_log_message in caplog.text
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")

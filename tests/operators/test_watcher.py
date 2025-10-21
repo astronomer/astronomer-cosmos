@@ -291,7 +291,7 @@ class TestDbtConsumerWatcherSensor:
         sensor.invocation_mode = InvocationMode.DBT_RUNNER
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.side_effect = [None, None]  # no event msg found
+        ti.xcom_pull.side_effect = [None, None, None]  # no event msg found
         context = self.make_context(ti)
 
         result = sensor.poke(context)

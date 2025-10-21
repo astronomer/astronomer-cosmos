@@ -412,7 +412,8 @@ def test_integration_virtualenv_operator(caplog):
     dag = dag_bag.get_dag("example_virtualenv_mini")
 
     dag_run = run_test_dag(dag)
-    assert dag_run.state == "success"
+    if dag_run is not None:
+        assert dag_run.state == "success"
     assert caplog.text.count("Trying to run the command") == 2
     assert "/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
     assert "/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text

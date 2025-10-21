@@ -1890,6 +1890,7 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
 @patch("cosmos.operators.local.ObjectStoragePath")
 def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote, caplog):
     """Test the _delete_sql_files method when the remote directory doesn't exist."""
+    caplog.set_level(logging.DEBUG)
     mock_path = MagicMock()
     mock_path.exists.return_value = False
     mock_object_storage_path.return_value = mock_path
@@ -1901,10 +1902,11 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
         profile_config=profile_config,
         extra_context={"dbt_dag_task_group_identifier": "test_dag_task_group", "run_id": "test_run_id"},
     )
-
     operator._delete_sql_files()
-    assert "Remote run directory does not exist, skipping deletion: %s" in caplog.text
-    assert "/mock/path/test_dag_task_group/test_run_id" in caplog.text
+    assert (
+        "Remote run directory does not exist, skipping deletion: /mock/path/test_dag_task_group/test_run_id"
+        in caplog.text
+    )
 
     mock_path.rmdir.assert_not_called()
 

@@ -262,8 +262,12 @@ The consequence is that tasks may take longer to be updated if they are not sens
 We plan to review this behaviour and alternative approaches in the future.
 
 
-Asynchronous sensor execution
-...................................
+Synchronous sensor execution
+............................
+
+In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
+
+An improvement is to change this behaviour and implement an asynchronous sensor execution, so that the worker slot is released until the condition, validated by the Airflow triggerer, is met.
 
 
 

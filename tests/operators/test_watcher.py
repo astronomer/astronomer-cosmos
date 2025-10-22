@@ -282,6 +282,16 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
     assert op.invocation_mode == InvocationMode.SUBPROCESS
 
 
+def test_store_producer_task_state_pushes_failed_state():
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+    instance = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+    instance._store_producer_task_state(mock_context)
+
+    mock_ti.xcom_push.assert_called_once_with(key="state", value="failed")
+
+
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
 ENCODED_RUN_RESULTS = base64.b64encode(
     zlib.compress(b'{"results":[{"unique_id":"model.jaffle_shop.stg_orders","status":"success"}]}')

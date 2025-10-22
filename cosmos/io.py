@@ -212,7 +212,6 @@ def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARG
     if not dest_target_dir:
         raise CosmosValueError("You're trying to upload artifact files, but the remote target path is not configured.")
 
-
     source_target_dir = Path(project_dir) / f"{source_subpath}"
     files = [str(file) for file in source_target_dir.rglob("*") if file.is_file()]
     for file_path in files:

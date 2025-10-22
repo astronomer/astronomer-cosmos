@@ -586,7 +586,7 @@ def _add_producer_watcher_and_dependencies(
                 if hasattr(root_task, "trigger_rule"):
                     root_task.trigger_rule = task_args.get("trigger_rule", "always")
 
-        # We also need to set the producer task id too all consumer tasks, regardless if they are root or not
+        # We also need to set the producer task ID to all consumer tasks, regardless of whether they are root or not
         for task in node_tasks:
             task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
 

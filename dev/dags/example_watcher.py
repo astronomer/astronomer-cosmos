@@ -6,17 +6,14 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from airflow import DAG
-
-from cosmos import DbtDag, DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
-from cosmos.config import RenderConfig
-from cosmos.constants import ExecutionMode, TestBehavior
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
+from cosmos.constants import ExecutionMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 try:  # Airflow 3+
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # Airflow 2
-    from airflow.operators.empty import EmptyOperator
+    pass
 
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"

@@ -10,12 +10,6 @@ from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
 from cosmos.constants import ExecutionMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
-try:  # Airflow 3+
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:  # Airflow 2
-    pass
-
-
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "jaffle_shop")

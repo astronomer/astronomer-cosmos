@@ -76,6 +76,8 @@ The last line represents the performance improvement in a real-world Airflow dep
 
 Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
 
+We plan to repeat these benchmarks and share the code with the community in the future.
+
 -------------------------------------------------------------------------------
 
 Example Usage of ``ExecutionMode.WATCHER``
@@ -182,7 +184,7 @@ This is a starting point and we consider implementing a more sophisticated retry
 Known Limitations
 -------------------
 
-These limitations will be revisited once the core watcher mode stabilizes.
+These limitations will be revisited as the feature matures.
 
 Producer task implementation
 ............................
@@ -229,6 +231,17 @@ Overriding operator_args
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
 We plan to support different ``operator_args`` for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators in the future.
+
+Test behavior
+..............
+
+By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
+
+As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator``s, a starting point, so the transition to the new mode can be seamless.
+
+The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
+
+Users can still use  the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
 
 -------------------------------------------------------------------------------
 

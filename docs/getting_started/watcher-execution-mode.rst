@@ -262,6 +262,11 @@ The consequence is that tasks may take longer to be updated if they are not sens
 We plan to review this behaviour and alternative approaches in the future.
 
 
+Asynchronous sensor execution
+...................................
+
+
+
 -------------------------------------------------------------------------------
 
 

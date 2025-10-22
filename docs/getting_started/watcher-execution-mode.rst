@@ -170,15 +170,16 @@ How retries work
 ................
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
-The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor`` , will retry the dbt command by themselves using the same behaviour as ```ExecutionMode.LOCAL``.
+The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, will retry the dbt command by themselves using the same behaviour as ``ExecutionMode.LOCAL``.
+
+Currently, we do not support retrying the ``DbtProducerWatcherOperator`` task itself.
 
 This is a starting point and we consider implementing a more sophisticated retry mechanism in the future.
 
 
-
 -------------------------------------------------------------------------------
 
-Current Limitations
+Known Limitations
 -------------------
 
 These limitations will be revisited once the core watcher mode stabilizes.
@@ -215,17 +216,17 @@ You can still invoke these operators using the default ``ExecutionMode.LOCAL`` m
 Callback support
 ................
 
-The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators support the same callback support as the ``ExecutionMode.LOCAL`` mode.
+The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
-This means that you can use the same callback functions and callback operators as you would with the ``ExecutionMode.LOCAL`` mode.
+This means that you can define a single callback function for all ``ExecutionMode.WATCHER`` tasks. The behaviour will be similar to the ``ExecutionMode.LOCAL`` mode, except that there will be unified ``results.txt`` file.
 
-If there is demand, we will consider having different callback support for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
+If there is demand, we will supporting different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
 
 
 Overriding operator_args
 ........................
 
-The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  as the ``ExecutionMode.LOCAL`` mode.
+The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
 We plan to support different ``operator_args`` for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators in the future.
 

@@ -3,9 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
+import airflow
+from packaging.version import Version
+
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 @dataclass
@@ -58,6 +64,10 @@ class Task(CosmosEntity):
     """
 
     owner: str = ""
-    operator_class: str = "airflow.operators.empty.EmptyOperator"
+    operator_class: str = (
+        "airflow.operators.empty.EmptyOperator"
+        if AIRFLOW_VERSION < Version("3.0")
+        else "airflow.providers.standard.operators.empty.EmptyOperator"
+    )
     arguments: Dict[str, Any] = field(default_factory=dict)
     extra_context: Dict[str, Any] = field(default_factory=dict)

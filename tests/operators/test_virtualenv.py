@@ -17,12 +17,22 @@ from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import test_dag as run_test_dag
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
 DAGS_FOLDER = Path(__file__).parent.parent.parent / "dev/dags/"
+
+
+if AIRFLOW_VERSION >= Version("3.1"):
+    # Change introduced in Airflow 3.1.0
+    # https://github.com/apache/airflow/pull/55722/files
+    base_operator_get_connection_path = "airflow.sdk.BaseHook.get_connection"
+else:
+    base_operator_get_connection_path = "airflow.hooks.base.BaseHook.get_connection"
+
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -64,7 +74,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
+@patch(base_operator_get_connection_path)
 def test_run_command_without_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,
@@ -140,7 +150,7 @@ def test_run_command_without_virtualenv_dir(
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
+@patch(base_operator_get_connection_path)
 def test_run_command_with_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,
@@ -401,10 +411,12 @@ def test_integration_virtualenv_operator(caplog):
     dag_bag = DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
     dag = dag_bag.get_dag("example_virtualenv_mini")
 
-    dag.test()
-
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
+    dag_run = run_test_dag(dag)
+    if dag_run is not None:
+        assert dag_run.state == "success"
+    assert caplog.text.count("Trying to run the command") == 2
+    assert "/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
+    assert "/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
 
 
 def test_dbt_clone_virtualenv_operator_initialisation():

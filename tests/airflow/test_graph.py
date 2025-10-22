@@ -6,8 +6,14 @@ from unittest.mock import Mock, patch
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
-from airflow.models.abstractoperator import DEFAULT_OWNER
-from airflow.utils.task_group import TaskGroup
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+    from airflow.sdk.definitions._internal.abstractoperator import DEFAULT_OWNER
+except ImportError:
+    from airflow.models.abstractoperator import DEFAULT_OWNER
+    from airflow.utils.task_group import TaskGroup
 from packaging import version
 
 from cosmos.airflow.graph import (

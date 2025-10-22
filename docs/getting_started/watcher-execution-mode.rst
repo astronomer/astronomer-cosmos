@@ -186,6 +186,14 @@ Known Limitations
 
 These limitations will be revisited as the feature matures.
 
+Installation of Airflow and dbt
+...............................
+
+The ``ExecutionMode.WATCHER`` works better when dbt and Airflow are installed in the same Python virtual environment, since it uses dbt `callback features <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_.
+In case that is not possible, the producer task will only trigger the consumer tasks by the end of the execution, after it generated the ``run_results.json`` file.
+
+We plan to improve this behaviour in the future by leveraging `dbt structured logging <https://docs.getdbt.com/reference/events-logging#structured-logging>`_.
+
 Producer task implementation
 ............................
 
@@ -242,6 +250,17 @@ As a starting point, this execution mode does not support the ``TestBehavior.AFT
 The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
 
 Users can still use  the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
+
+Sensor slot allocation and polling
+...................................
+
+Each ``DbtDag`` or ``DbtTaskGroup`` root node will startup during DAG runs  at - potentially - the same time as the DAG Run. This may not happen, since it is dependent on the
+concurrency settings and available task slots in the Airflow deployment.
+
+The consequence is that tasks may take longer to be updated if they are not sensing at the moment that the transformation happens.
+
+We plan to review this behaviour and alternative approaches in the future.
+
 
 -------------------------------------------------------------------------------
 

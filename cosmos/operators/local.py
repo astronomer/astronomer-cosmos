@@ -38,8 +38,6 @@ if settings.AIRFLOW_IO_AVAILABLE:
         from airflow.sdk import ObjectStoragePath
     except ImportError:
         from airflow.io.path import ObjectStoragePath
-    pass
-
 from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,

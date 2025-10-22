@@ -63,28 +63,3 @@ example_watcher = DbtDag(
     default_args={"retries": 0},
 )
 # [END example_watcher]
-
-
-with DAG(
-    dag_id="example_watcher_taskgroup",
-    schedule="@daily",
-    start_date=datetime(2023, 1, 1),
-    catchup=False,
-):
-    """
-    The simplest example of using Cosmos to render a dbt project as a TaskGroup.
-    """
-    pre_dbt = EmptyOperator(task_id="pre_dbt")
-
-    dbt_task_group = DbtTaskGroup(
-        group_id="dbt_task_group",
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.WATCHER,
-        ),
-        project_config=ProjectConfig(DBT_PROJECT_PATH),
-        render_config=RenderConfig(test_behavior=TestBehavior.NONE),
-        profile_config=profile_config,
-        operator_args=operator_args,
-    )
-
-    pre_dbt >> dbt_task_group

@@ -736,7 +736,6 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2_with_airflow3_uri(ca
 
 @pytest.mark.integration
 def test_run_operator_caches_partial_parsing(caplog, tmp_path):
-    # breakpoint()
     caplog.clear()
     caplog.set_level(logging.DEBUG)
     with DAG("test-partial-parsing", start_date=datetime(2022, 1, 1)) as dag:

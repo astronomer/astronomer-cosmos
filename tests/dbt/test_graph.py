@@ -12,12 +12,15 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
+import airflow
 import pytest
 from airflow.models import Variable
+from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
     DBT_LOG_FILENAME,
     DBT_TARGET_DIR_NAME,
     DbtResourceType,
@@ -47,6 +50,13 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
+
+AIRFLOW_VERSION = Version(airflow.__version__)
+
+if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+    object_storage_path = "airflow.sdk.ObjectStoragePath"
+else:
+    object_storage_path = "airflow.io.path.ObjectStoragePath"
 
 
 @pytest.fixture
@@ -1908,9 +1918,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("7f64aab068fb7fcf912765605210bf02", "60c08a4730a39d03d89f0f87a8ff3931")
+        assert hash_dir in ("7abb868ed1c22e78de1c00429d950a77", "85cba4ef17dd7c161938da6980a6ff85")
     else:
-        assert hash_dir == "60c08a4730a39d03d89f0f87a8ff3931"
+        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
 
 
 @pytest.mark.integration
@@ -2021,7 +2031,7 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
 def test_save_dbt_ls_cache_remote_cache_dir(
@@ -2045,7 +2055,7 @@ def test_save_dbt_ls_cache_remote_cache_dir(
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
 def test_get_dbt_ls_cache_remote_cache_dir(

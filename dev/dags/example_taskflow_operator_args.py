@@ -3,7 +3,11 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
-from airflow.decorators import task
+
+try:
+    from airflow.sdk import task
+except ImportError:
+    from airflow.decorators import task
 
 from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping

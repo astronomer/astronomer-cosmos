@@ -7,7 +7,11 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, LoadMode, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import DbtProfileConfigVars, PostgresUserPasswordProfileMapping

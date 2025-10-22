@@ -67,7 +67,7 @@ def mock_athena_conn():  # type: ignore
     Sets the connection as an environment variable.
     """
     conn = mock_conn_value(token="token123")
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -77,7 +77,7 @@ def mock_athena_conn_without_token():  # type: ignore
     Sets the connection as an environment variable.
     """
     conn = mock_conn_value(token=None)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -119,14 +119,14 @@ def test_athena_connection_claiming() -> None:
             "cosmos.profiles.athena.access_key.AthenaAccessKeyProfileMapping._get_temporary_credentials",
             return_value=mock_missing_credentials,
         ):
-            with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+            with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
                 # should raise an InvalidMappingException
                 profile_mapping = AthenaAccessKeyProfileMapping(conn, {})
                 assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = AthenaAccessKeyProfileMapping(conn, {})
         assert profile_mapping.can_claim_connection()
 

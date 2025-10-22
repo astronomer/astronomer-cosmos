@@ -120,6 +120,10 @@ As it can be observed, the only difference with the default ``ExecutionMode.LOCA
 * Model-level Airflow tasks act as watchers, updating their state as dbt completes each model.
 * The DAG remains fully observable and retryable, with **dramatically improved runtime performance** (often 5× faster than ``ExecutionMode.LOCAL``).
 
+.. image:: /_static/jaffle_shop_watcher_dbt_dag_dag_run.png
+    :alt: Cosmos DbtDag with `ExecutionMode.WATCHER`
+    :align: center
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Example 2 — Using ``DbtTaskGroup`` with WATCHER Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -162,6 +166,10 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
 * Integrates seamlessly into complex Airflow DAGs.
 * Uses the same high-performance producer/consumer execution model.
 * Each ``DbtTaskGroup`` behaves independently — allowing modular dbt runs within larger workflows.
+
+.. image:: /_static/jaffle_shop_watcher_dbt_taskgroup_dag_run.png
+    :alt: Cosmos DbtDag with `ExecutionMode.WATCHER`
+    :align: center
 
 -------------------------------------------------------------------------------
 

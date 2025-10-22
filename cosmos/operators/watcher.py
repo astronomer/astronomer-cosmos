@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
-PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 1000
+PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
 WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
 
 

@@ -11,6 +11,7 @@ from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
 
 
 class TestProfileMapping(BaseProfileMapping):
+    __test__ = False
     dbt_profile_method: str = "fake-method"
     dbt_profile_type: str = "fake-type"
 

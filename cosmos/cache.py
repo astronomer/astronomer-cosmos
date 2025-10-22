@@ -17,7 +17,6 @@ import yaml
 from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
-from airflow.utils.task_group import TaskGroup
 from airflow.version import version as airflow_version
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,14 +25,16 @@ from cosmos import settings
 
 if TYPE_CHECKING:
     try:
+        # Airflow 3 onwards
         from airflow.sdk import ObjectStoragePath
+        from airflow.utils.task_group import TaskGroup
     except ImportError:
         try:
             from airflow.io.path import ObjectStoragePath
         except ImportError:
             pass
-    except ImportError:
-        pass
+        from airflow.utils.task_group import TaskGroup
+
 from cosmos.constants import (
     DBT_MANIFEST_FILE_NAME,
     DBT_TARGET_DIR_NAME,
@@ -83,7 +84,13 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
             "Airflow 2.8 or later."
         )
 
-    from airflow.io.path import ObjectStoragePath
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 
     _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
 

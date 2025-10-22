@@ -4,7 +4,11 @@ from pathlib import Path
 from typing import Any
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+
+try:
+    from airflow.providers.standard.operators.python import PythonOperator
+except ImportError:
+    from airflow.operators.python import PythonOperator
 
 from cosmos import DbtCloneLocalOperator, DbtRunLocalOperator, DbtSeedLocalOperator, ProfileConfig
 from cosmos.io import upload_to_aws_s3

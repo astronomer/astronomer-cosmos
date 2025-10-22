@@ -46,7 +46,7 @@ def mock_bigquery_conn_with_dict(request):  # type: ignore
         conn_type="google_cloud_platform",
         extra=json.dumps(extra),
     )
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 

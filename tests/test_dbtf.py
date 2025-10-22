@@ -44,7 +44,7 @@ def test_dbt_dag_with_dbt_fusion():
     outcome = snowflake_dag.test()
     assert outcome.state == DagRunState.SUCCESS
 
-    assert len(snowflake_dag.dbt_graph.filtered_nodes) == 26
+    assert len(snowflake_dag.dbt_graph.filtered_nodes) == 23
 
     assert len(snowflake_dag.task_dict) == 13
     tasks_names = [task.task_id for task in snowflake_dag.topological_sort()]

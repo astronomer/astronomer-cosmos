@@ -5,6 +5,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+try:
+    from airflow.sdk import ObjectStoragePath
+except ImportError:
+    try:
+        from airflow.io.path import ObjectStoragePath
+    except ImportError:
+        pass
+
 from cosmos import settings
 from cosmos.constants import DEFAULT_TARGET_PATH, FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP
 from cosmos.exceptions import CosmosValueError
@@ -158,9 +166,6 @@ def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
             f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
             "Airflow 2.8 or later."
         )
-
-    from airflow.io.path import ObjectStoragePath
-
     _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
     if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
@@ -206,8 +211,6 @@ def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARG
 
     if not dest_target_dir:
         raise CosmosValueError("You're trying to upload artifact files, but the remote target path is not configured.")
-
-    from airflow.io.path import ObjectStoragePath
 
     source_target_dir = Path(project_dir) / f"{source_subpath}"
     files = [str(file) for file in source_target_dir.rglob("*") if file.is_file()]

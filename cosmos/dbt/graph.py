@@ -20,9 +20,13 @@ from airflow.models import Variable
 
 if TYPE_CHECKING:
     try:
-        from airflow.io.path import ObjectStoragePath
+        # Airflow 3 onwards
+        from airflow.sdk import ObjectStoragePath
     except ImportError:
-        pass
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 
 import cosmos.dbt.runner as dbt_runner
 from cosmos import cache, settings

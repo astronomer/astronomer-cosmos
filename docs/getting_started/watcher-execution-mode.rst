@@ -21,7 +21,7 @@ Consider the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-anal
 +======================================+==================================+==================+
 | Single ``dbt run`` (dbt CLI)             | Runs the whole DAG in one command | ~5m 30s          |
 +--------------------------------------+----------------------------------+------------------+
-| One ``dbt run`` per model (184 cmds) | Each model is its own task        | ~32m             |
+| One ``dbt run`` per model, totalling 184 commands (dbt CLI) | Each model is its own task        | ~32m             |
 +--------------------------------------+----------------------------------+------------------+
 
 This difference motivated a rethinking of how Cosmos interacts with dbt.

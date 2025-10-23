@@ -294,4 +294,4 @@ Summary
 
 This is an experimental feature and we are looking for feedback from the community.
 
-Stay tuned for further documentation and base image support for WATCHER mode in upcoming releases.
+Stay tuned for further documentation and base image support for the Watcher Exection Mode in upcoming releases.

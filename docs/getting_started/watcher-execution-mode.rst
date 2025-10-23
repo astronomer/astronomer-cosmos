@@ -7,7 +7,7 @@ Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime *
 
 -------------------------------------------------------------------------------
 
-Background: The Problem with Traditional dbt Task Execution
+Background: The Problem with the Local Execution Mode in Cosmos
 -----------------------------------------------------------
 
 When running dbt via Cosmos using the default ``ExecutionMode.LOCAL``, each dbt model is executed as a separate Airflow task.

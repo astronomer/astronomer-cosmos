@@ -5,8 +5,9 @@ import mimetypes
 import os
 import os.path as op
 from contextlib import contextmanager
-from typing import Any, Generator, Optional, Tuple, TypeVar
+from typing import Any, Generator, Optional, TypeVar
 from unittest.mock import patch
+from urllib.parse import urlsplit
 
 from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
@@ -18,13 +19,8 @@ from fastapi.staticfiles import StaticFiles
 S = TypeVar("S")
 
 
-def bucket_and_key(path: str) -> Tuple[str, str]:
-    from urllib.parse import urlsplit
-
-    parsed_url = urlsplit(path)
-    bucket = parsed_url.netloc
-    key = parsed_url.path.lstrip("/")
-    return bucket, key
+API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_URL
+API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
 
 @contextmanager
@@ -163,23 +159,8 @@ def create_cosmos_fastapi_app() -> FastAPI:
             if not cfg_local.get("dir"):
                 return "<div>dbt Docs are not configured.</div>"
             iframe_src = f"/cosmos/{slug_alias}/dbt_docs_index.html"
-            docs_dir_local = cfg_local.get("dir") or ""
-            index_local = cfg_local.get("index") or "index.html"
-            conn_id_local = cfg_local.get("conn_id") or ""
-            mode = "local" if _is_local_path(docs_dir_local) else "remote"
-            debug_panel = (
-                f'<div style="padding:8px;margin-bottom:6px;background:#fff7cc;border:1px solid #f0d000;">'
-                f"<strong>Cosmos dbt docs debug</strong>: slug=<code>{slug_alias}</code>, "
-                f"dir=<code>{docs_dir_local}</code>, index=<code>{index_local}</code>, mode=<code>{mode}</code>, "
-                f"conn_id=<code>{conn_id_local}</code>. "
-                f'Index URL: <a href="{iframe_src}">{iframe_src}</a>. '
-                f'Try <a href="/cosmos/{slug_alias}/manifest.json">manifest.json</a> and '
-                f'<a href="/cosmos/{slug_alias}/catalog.json">catalog.json</a>.'
-                f"</div>"
-            )
             return (
                 '<div style="height:100%;display:flex;flex-direction:column;">'
-                f"{debug_panel}"
                 f'<iframe src="{iframe_src}" style="border:0;flex:1 1 auto;"></iframe>'
                 "</div>"
             )
@@ -349,6 +330,6 @@ class CosmosAF3Plugin(AirflowPlugin):
                 {
                     "name": display_name,
                     "category": "Browse",
-                    "href": f"/cosmos/{slug}/dbt_docs",
+                    "href": f"{API_BASE_PATH}/cosmos/{slug}/dbt_docs_index.html",
                 }
             )

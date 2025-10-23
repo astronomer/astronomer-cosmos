@@ -582,9 +582,7 @@ def _add_producer_watcher_and_dependencies(
             # First, we tackle dbt graph nodes that are root nodes
             if nodes and node_id in nodes and not nodes[node_id].depends_on:
                 producer_airflow_task >> task_or_taskgroup
-                root_task = nodes[node_id]
-                if hasattr(root_task, "trigger_rule"):
-                    root_task.trigger_rule = task_args.get("trigger_rule", "always")
+                setattr(nodes[node_id], "trigger_rule", "always")
 
         # We also need to set the producer task ID to all consumer tasks, regardless of whether they are root or not
         for task in node_tasks:

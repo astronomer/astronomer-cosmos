@@ -206,7 +206,7 @@ Producer task implementation
 ............................
 
 The producer task is implemented as a ``DbtProducerWatcherOperator`` operator and it currently relies on dbt being installed alongside the Airflow deployment, similar to the ``ExecutionMode.LOCAL`` implementation.
-There are discussions about allowing this node to implemented as the ``ExecutionMode.VIRTUALEV`` and ``ExecutionMode.KUBERNETES`` execution modes, so that there is a higher isolationg between dbt and Airflow dependencies.
+There are discussions about allowing this node to implemented as the ``ExecutionMode.VIRTUALEV`` and ``ExecutionMode.KUBERNETES`` execution modes, so that there is a higher isolation between dbt and Airflow dependencies.
 
 Individual dbt Operators
 ........................

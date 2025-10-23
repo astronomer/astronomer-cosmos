@@ -1,7 +1,7 @@
 Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Execution in Cosmos
 ===============================================================================
 
-With the release of **Cosmos 1.11**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
+With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
 
 Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**.
 

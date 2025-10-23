@@ -477,22 +477,45 @@ def generate_task_or_group(
     if task_meta and not node.resource_type == DbtResourceType.TEST:
         if use_task_group:
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                task = create_airflow_task(task_meta, dag, task_group=model_task_group)
-                test_meta = create_test_task_metadata(
-                    "test",
-                    execution_mode,
-                    test_indirect_selection,
-                    task_args=task_args,
-                    node=node,
-                    on_warning_callback=on_warning_callback,
-                    detached_from_parent=detached_from_parent,
-                    enable_owner_inheritance=enable_owner_inheritance,
-                )
-                test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
+                if execution_mode == execution_mode.WATCHER and test_behavior == TestBehavior.AFTER_ALL:
+                    task_metadata = TaskMetadata(
+                        "test",
+                        operator_class="cosmos.operators.local.DbtTestLocalOperator",
+                        arguments=task_args,
+                        extra_context={
+                            "dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)
+                        },
+                    )
+                    test_task = create_airflow_task(task_metadata, dag, task_group=task_group)
+
+                else:
+                    task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                    test_meta = create_test_task_metadata(
+                        "test",
+                        execution_mode,
+                        test_indirect_selection,
+                        task_args=task_args,
+                        node=node,
+                        on_warning_callback=on_warning_callback,
+                        detached_from_parent=detached_from_parent,
+                        enable_owner_inheritance=enable_owner_inheritance,
+                    )
+                    test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
                 task >> test_task
                 task_or_group = model_task_group
         else:
-            task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
+            if execution_mode == execution_mode.WATCHER and test_behavior == TestBehavior.AFTER_ALL:
+                task_metadata = TaskMetadata(
+                    "test",
+                    operator_class="cosmos.operators.local.DbtTestLocalOperator",
+                    arguments=task_args,
+                    extra_context={
+                        "dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)
+                    },
+                )
+                task_or_group = create_airflow_task(task_metadata, dag, task_group=task_group)
+            else:
+                task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
 
     return task_or_group
 
@@ -552,6 +575,7 @@ def _add_producer_watcher(
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
+    test_behavior: TestBehavior = TestBehavior.AFTER_EACH,
 ) -> str:
 
     producer_task_args = task_args.copy()
@@ -561,6 +585,7 @@ def _add_producer_watcher(
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
 
+    producer_task_args["test_behavior"] = test_behavior
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,
         operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
@@ -626,6 +651,28 @@ def calculate_detached_node_name(node: DbtNode) -> str:
         node_name = f"detached_{_counter}_test"
         _counter += 1
     return node_name
+
+
+def _add_test_task(
+    dag: DAG,
+    execution_mode: ExecutionMode,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+    task_group: TaskGroup | None,
+    render_config: RenderConfig | None = None,
+) -> BaseOperator:
+    if render_config is not None:
+        task_args["select"] = render_config.select
+        task_args["selector"] = render_config.selector
+        task_args["exclude"] = render_config.exclude
+
+    teardown_task_metadata = TaskMetadata(
+        id="dbt_test",
+        operator_class="cosmos.operators.local.DbtTestLocalOperator",
+        arguments=task_args,
+        extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
+    )
+    return create_airflow_task(teardown_task_metadata, dag, task_group=task_group)
 
 
 def _add_teardown_task(
@@ -757,6 +804,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map,
             task_group,
             render_config=render_config,
+            test_behavior=test_behavior,
         )
         task_args["producer_watcher_task_id"] = producer_watcher_task_id
 
@@ -815,6 +863,15 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             render_config=render_config,
             async_py_requirements=async_py_requirements,
         )
+    # if execution_mode == ExecutionMode.WATCHER and test_behavior == TestBehavior.AFTER_ALL:
+    #     _add_test_task(
+    #         dag,
+    #         execution_mode,
+    #         task_args,
+    #         tasks_map,
+    #         task_group,
+    #         render_config=render_config,
+    #     )
     return tasks_map
 
 

@@ -313,7 +313,11 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if self.extra_context:
             context_merge(context, self.extra_context)
 
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        cmd_flags = self.add_cmd_flags()
+        if "dbt_flag_no_test" in kwargs:
+            cmd_flags = kwargs.pop("dbt_flag_no_test") + cmd_flags
+
+        self.build_and_run_cmd(context=context, cmd_flags=cmd_flags)
 
 
 class DbtBuildMixin:

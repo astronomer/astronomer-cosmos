@@ -86,7 +86,7 @@ Example Usage of ``ExecutionMode.WATCHER``
 There are two main ways to use the new execution mode in Cosmos — directly within a ``DbtDag``, or embedded as part of a ``DbtTaskGroup`` inside a larger DAG.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Example 1 — Using ``DbtDag`` with WATCHER Mode
+Example 1 — Using ``DbtDag`` with Wacther Execution Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.

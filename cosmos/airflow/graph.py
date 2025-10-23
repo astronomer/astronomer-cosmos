@@ -552,6 +552,7 @@ def _add_producer_watcher(
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
+    test_behavior: TestBehavior = TestBehavior.AFTER_EACH,
 ) -> str:
 
     producer_task_args = task_args.copy()
@@ -560,6 +561,10 @@ def _add_producer_watcher(
         producer_task_args["select"] = render_config.select
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
+
+    producer_task_args["test_behavior"] = (
+        test_behavior  # "resource_type:model resource_type:seed resource_type:snapshot"
+    )
 
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,
@@ -752,11 +757,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     if execution_mode == ExecutionMode.WATCHER:
         producer_watcher_task_id = _add_producer_watcher(
-            dag,
-            task_args,
-            tasks_map,
-            task_group,
-            render_config=render_config,
+            dag, task_args, tasks_map, task_group, render_config=render_config, test_behavior=test_behavior
         )
         task_args["producer_watcher_task_id"] = producer_watcher_task_id
 

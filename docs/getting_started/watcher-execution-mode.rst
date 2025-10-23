@@ -184,7 +184,6 @@ The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, will r
 
 Currently, we do not support retrying the ``DbtProducerWatcherOperator`` task itself.
 
-This is a starting point and we consider implementing a more sophisticated retry mechanism in the future.
 
 
 -------------------------------------------------------------------------------

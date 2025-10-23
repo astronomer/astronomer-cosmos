@@ -440,7 +440,7 @@ class ExecutionConfig:
             ExecutionMode.VIRTUALENV,
         ):
             raise CosmosValueError(
-                "ExecutionConfig.invocation_mode is only configurable for ExecutionMode.LOCAL and ExecutionMode.VIRTUALENV."
+                "ExecutionConfig.invocation_mode is only configurable for ExecutionMode.WATCHER, ExecutionMode.LOCAL, and ExecutionMode.VIRTUALENV."
             )
         if self.execution_mode == ExecutionMode.VIRTUALENV:
             if self.invocation_mode == InvocationMode.DBT_RUNNER:

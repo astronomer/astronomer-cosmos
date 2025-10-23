@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import os.path as op
-from typing import Any, Optional, Tuple
+from contextlib import contextmanager
+from typing import Any, Generator, Optional, Tuple, TypeVar
+from unittest.mock import patch
 
 from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
+from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+
+S = TypeVar("S")
 
 
 def bucket_and_key(path: str) -> Tuple[str, str]:
@@ -21,93 +27,29 @@ def bucket_and_key(path: str) -> Tuple[str, str]:
     return bucket, key
 
 
-def open_s3_file(path: str, conn_id: Optional[str]) -> str:
-    """Read file from S3.
-
-    If conn_id is provided, use Airflow's S3Hook (connection-managed). Otherwise, fall back to boto3
-    default credential chain (env/instance profile), avoiding SDK-time Connection loading in web requests.
+@contextmanager
+def connection_env(conn_id: str) -> Generator[None, None, None]:
     """
-    bucket, key = bucket_and_key(path)
+    Temporarily expose a connection as AIRFLOW_CONN_{CONN_ID} in the environment.
 
-    if conn_id:
-        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-        from botocore.exceptions import ClientError
+    This allows hooks and SDK code resolving connections via the environment
+    variables backend to find the connection during the scope of the context.
+    """
+    from airflow.models.connection import Connection as ORMConnection
 
-        hook = S3Hook(aws_conn_id=conn_id)
-        try:
-            content = hook.read_key(key=key, bucket_name=bucket)
-        except ClientError as e:
-            if e.response.get("Error", {}).get("Code", "") == "NoSuchKey":
-                raise FileNotFoundError(f"{path} does not exist")
-            raise e
-        return content  # type: ignore[no-any-return]
-
-    # boto3 fallback path
-    import boto3
-    from botocore.exceptions import ClientError, NoCredentialsError
-
-    s3 = boto3.client("s3")
-    try:
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        body = obj["Body"].read()
-        return body.decode("utf-8") if isinstance(body, (bytes, bytearray)) else str(body)  # type: ignore[no-any-return]
-    except NoCredentialsError as e:
-        raise RuntimeError("S3 credentials not found; set AWS_* env or provide conn_id") from e
-    except ClientError as e:
-        if e.response.get("Error", {}).get("Code", "") in {"NoSuchKey", "404"}:
-            raise FileNotFoundError(f"{path} does not exist")
-        raise
+    conn = ORMConnection.get_connection_from_secrets(conn_id)
+    env_name = f"AIRFLOW_CONN_{conn_id.upper()}"
+    env_value = conn.get_uri()
+    with patch.dict(os.environ, {env_name: env_value}, clear=False):
+        yield
 
 
-def open_gcs_file(path: str, conn_id: Optional[str]) -> str:
-    from airflow.providers.google.cloud.hooks.gcs import GCSHook
-    from google.cloud.exceptions import NotFound
-
-    hook = GCSHook(gcp_conn_id=conn_id)
-    bucket, blob = bucket_and_key(path)
-    try:
-        content = hook.download(bucket_name=bucket, object_name=blob)
-    except NotFound:
-        raise FileNotFoundError(f"{path} does not exist")
-    return content.decode("utf-8")  # type: ignore[no-any-return]
-
-
-def open_azure_file(path: str, conn_id: Optional[str]) -> str:
-    from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
-    from azure.core.exceptions import ResourceNotFoundError
-
-    hook = WasbHook(wasb_conn_id=conn_id)
-
-    container, blob = bucket_and_key(path)
-    try:
-        content = hook.read_file(container_name=container, blob_name=blob)
-    except ResourceNotFoundError:
-        raise FileNotFoundError(f"{path} does not exist")
-    return content  # type: ignore[no-any-return]
-
-
-def open_http_file(path: str, conn_id: Optional[str]) -> str:
-    if conn_id:
-        from airflow.providers.http.hooks.http import HttpHook
-        from requests.exceptions import HTTPError
-
-        hook = HttpHook(method="GET", http_conn_id=conn_id)
-        try:
-            res = hook.run(endpoint=path)
-            hook.check_response(res)
-        except HTTPError as e:
-            if str(e).startswith("404"):
-                raise FileNotFoundError(f"{path} does not exist")
-            raise e
-        return res.text  # type: ignore[no-any-return]
-    else:
-        import requests
-
-        resp = requests.get(path, timeout=30)
-        if resp.status_code == 404:
-            raise FileNotFoundError(f"{path} does not exist")
-        resp.raise_for_status()
-        return resp.text
+def _read_text_via_object_storage(path: str, conn_id: Optional[str]) -> str:
+    with connection_env(conn_id):
+        p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
+        with p.open("r") as f:
+            content = f.read()  # type: ignore[no-any-return]
+        return content
 
 
 def open_file(path: str, conn_id: Optional[str] = None) -> str:
@@ -116,15 +58,8 @@ def open_file(path: str, conn_id: Optional[str] = None) -> str:
 
     Raise a (base Python) FileNotFoundError if the file is not found.
     """
-    if path.strip().startswith("s3://"):
-        # If no conn_id is provided, rely on boto3 environment/instance role credentials
-        return open_s3_file(path, conn_id=conn_id if conn_id else None)
-    elif path.strip().startswith("gs://"):
-        return open_gcs_file(path, conn_id=conn_id)
-    elif path.strip().startswith("wasb://"):
-        return open_azure_file(path, conn_id=conn_id)
-    elif path.strip().startswith("http://") or path.strip().startswith("https://"):
-        return open_http_file(path, conn_id=conn_id)
+    if path.strip().startswith(("s3://", "gs://", "gcs://", "wasb://", "abfs://", "az://", "http://", "https://")):
+        return _read_text_via_object_storage(path, conn_id=conn_id)
     else:
         with open(path) as f:
             content = f.read()

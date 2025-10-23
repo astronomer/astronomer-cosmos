@@ -134,3 +134,9 @@ Examples:
             load_method=LoadMode.DBT_LS,
         )
     )
+
+Interaction with test tasks
+--------------------------------
+When using exclusions, the exclusions are passed into the test task command for all test behaviours.  This way you can exclude one specific test for a model, everything of a specific resource type, etc.  This is easy because exclusions are purely additive.
+
+When using selections, this gets passed in for the test behaviour after_all, but NOT for after_each or for build as this would be too tricky to make work, especially since cosmos allows union / intersection set operators.

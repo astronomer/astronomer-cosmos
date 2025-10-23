@@ -33,7 +33,7 @@ Concept: ``ExecutionMode.WATCHER``
 
 ``ExecutionMode.WATCHER`` combines the **speed of a single dbt run** with the **observability and task management of Airflow**.
 
-It is built on two new operator types introduced in recent PRs:
+It is built on two operator types:
 
 * **``DbtProducerWatcherOperator``** (`#1982 <https://github.com/astronomer/astronomer-cosmos/pull/1982>`_)
   Runs dbt **once** across the entire pipeline and sends model progress updates via Airflow **XComs**.

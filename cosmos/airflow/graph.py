@@ -561,6 +561,7 @@ def _add_producer_watcher_and_dependencies(
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
 
+    # First, we create the producer task
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,
         operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
@@ -568,25 +569,37 @@ def _add_producer_watcher_and_dependencies(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
 
-    # Consumer tasks will need to be updated to use the producer task as a dependency
+    # Second, we need to set the producer task ID in all consumer tasks (and their children tasks)
     for node_id, task_or_taskgroup in tasks_map.items():
-        # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+
         node_tasks = (
             list(task_or_taskgroup.children.values())
             if isinstance(task_or_taskgroup, TaskGroup)
             else [task_or_taskgroup]
         )
-
-        # the following only works with DbtDag. It does not work with DbtTaskGroup due to an Airflow bug
-        if "DbtDag" in dag.__class__.__name__:
-            # First, we tackle dbt graph nodes that are root nodes
-            if nodes and node_id in nodes and not nodes[node_id].depends_on:
-                producer_airflow_task >> task_or_taskgroup
-                setattr(nodes[node_id], "trigger_rule", "always")
-
-        # We also need to set the producer task ID to all consumer tasks, regardless of whether they are root or not
         for task in node_tasks:
             task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+
+        # Third, we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+        # We only managed to do this in the case of DbtDag.
+        # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
+        if "DbtDag" in dag.__class__.__name__:
+
+            # Is this dbt node a root of the (subset of the) dbt project?
+            # Note: this may happen in one scenarios:
+            # - the dbt node not having any `depends_on` within the user-selected `nodes`
+            if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(nodes):
+                producer_airflow_task >> task_or_taskgroup
+                if isinstance(task_or_taskgroup, TaskGroup):
+                    taskgroup = task_or_taskgroup
+                    always_run_tasks = [
+                        task for task in node_tasks if not set(task.upstream_task_ids).intersection(taskgroup.children)
+                    ]
+                else:
+                    always_run_tasks = [task_or_taskgroup]
+
+                for task in always_run_tasks:
+                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
     return producer_airflow_task.task_id

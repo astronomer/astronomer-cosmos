@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -45,6 +45,7 @@ example_watcher = DbtDag(
     execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
+    render_config=RenderConfig(exclude=["raw_payments"]),
     operator_args=operator_args,
     # normal dag parameters
     schedule="@daily",
@@ -54,3 +55,39 @@ example_watcher = DbtDag(
     default_args={"retries": 0},
 )
 # [END example_watcher]
+
+
+from airflow.models import DAG
+
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
+
+from cosmos import DbtTaskGroup
+
+# [START example_watcher_taskgroup]
+with DAG(
+    dag_id="example_watcher_taskgroup",
+    schedule="@daily",
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+):
+    """
+    The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+    """
+    pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+    first_dbt_task_group = DbtTaskGroup(
+        group_id="first_dbt_task_group",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+        ),
+        render_config=RenderConfig(select=["*customers*"], exclude=["path:seeds"]),
+        project_config=ProjectConfig(DBT_PROJECT_PATH),
+        profile_config=profile_config,
+        operator_args=operator_args,
+    )
+
+    pre_dbt >> first_dbt_task_group
+# [END example_watcher_taskgroup]

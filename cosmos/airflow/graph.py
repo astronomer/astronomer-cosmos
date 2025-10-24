@@ -562,9 +562,7 @@ def _add_producer_watcher(
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
 
-    producer_task_args["test_behavior"] = (
-        test_behavior  # "resource_type:model resource_type:seed resource_type:snapshot"
-    )
+    producer_task_args["test_behavior"] = test_behavior
 
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,

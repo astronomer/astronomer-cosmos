@@ -100,8 +100,8 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
-@patch("cosmos.operators.local.AbstractDbtBase.execute")
-def test_execute_with_test_behavior_none(mock_super_execute):
+@patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
+def test_execute_with_test_behavior_none(mock_build_and_run_cmd):
     # Mock context and task instance
     context = {"ti": MagicMock()}
 
@@ -119,11 +119,11 @@ def test_execute_with_test_behavior_none(mock_super_execute):
     # Patch super().execute to just return a known value
     operator.execute(context=context)
 
-    mock_super_execute.assert_called_once()
+    mock_build_and_run_cmd.assert_called_once()
 
-    args, kwargs = mock_super_execute.call_args
-    assert "dbt_flag_no_test" in kwargs
-    assert kwargs["dbt_flag_no_test"] == ["--exclude", "resource_type:test"]
+    args, kwargs = mock_build_and_run_cmd.call_args
+    assert "cmd_flags" in kwargs
+    assert kwargs["cmd_flags"] == ["--exclude", "resource_type:test"]
 
 
 def test_dbt_producer_watcher_operator_pushes_completion_status():

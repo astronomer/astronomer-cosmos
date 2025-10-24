@@ -1102,8 +1102,8 @@ def test_owner(dbt_extra_config, expected_owner):
     assert output.leaves[0].owner == expected_owner
 
 
-@pytest.mark.parametrize("test_behaviour", [TestBehavior.NONE, TestBehavior.AFTER_EACH])
-def test_test_behaviour_for_watcher_mode(test_behaviour):
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH])
+def test_test_behavior_for_watcher_mode(test_behavior):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
@@ -1125,16 +1125,16 @@ def test_test_behaviour_for_watcher_mode(test_behaviour):
         test_indirect_selection=TestIndirectSelection.EAGER,
         task_args=task_args,
         render_config=RenderConfig(
-            test_behavior=test_behaviour,
+            test_behavior=test_behavior,
         ),
         dbt_project_name="astro_shop",
     )
     tasks = dag.tasks
-    if test_behaviour == TestBehavior.NONE:
+    if test_behavior == TestBehavior.NONE:
         for task in tasks:
             assert not isinstance(task, DbtTestWatcherOperator)
         assert len(tasks) == 5
-    if test_behaviour == TestBehavior.AFTER_EACH:
+    if test_behavior == TestBehavior.AFTER_EACH:
         assert len(tasks) == 6
 
 

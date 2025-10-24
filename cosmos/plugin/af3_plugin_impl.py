@@ -170,7 +170,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             try:
-                html = open_file(op.join(docs_dir_local, index_local), conn_id=conn_id_local)
+                html_content = open_file(op.join(docs_dir_local, index_local), conn_id=conn_id_local)
             except FileNotFoundError:
                 return HTMLResponse(
                     content=(
@@ -188,8 +188,8 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     ),
                     status_code=500,
                 )
-            html = html.replace("</head>", f"{iframe_script}</head>")
-            return HTMLResponse(content=html, headers={"Content-Security-Policy": "frame-ancestors 'self'"})
+            html_content = html_content.replace("</head>", f"{iframe_script}</head>")
+            return HTMLResponse(content=html_content, headers={"Content-Security-Policy": "frame-ancestors 'self'"})
 
         # JSON artifacts
         @app.get(f"/{slug}/manifest.json")

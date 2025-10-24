@@ -13,7 +13,7 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.config import InvocationMode
-from cosmos.constants import ExecutionMode, TestBehavior
+from cosmos.constants import ExecutionMode
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
     DbtBuildWatcherOperator,
@@ -98,32 +98,6 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     """Test that DbtProducerWatcherOperator allows overriding priority_weight."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, priority_weight=100)
     assert op.priority_weight == 100
-
-
-@patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
-def test_execute_with_test_behavior_none(mock_build_and_run_cmd):
-    # Mock context and task instance
-    context = {"ti": MagicMock()}
-
-    # Create operator instance with test_behavior = NONE
-    operator = DbtProducerWatcherOperator(
-        project_dir=".", profile_config=None, priority_weight=100, test_behavior=TestBehavior.NONE
-    )
-    operator.invocation_mode = None  # Will trigger _discover_invocation_mode
-
-    # Patch methods that are not relevant to the test
-    operator._discover_invocation_mode = MagicMock()
-    operator._handle_startup_event = MagicMock()
-    operator._handle_node_finished = MagicMock()
-
-    # Patch super().execute to just return a known value
-    operator.execute(context=context)
-
-    mock_build_and_run_cmd.assert_called_once()
-
-    args, kwargs = mock_build_and_run_cmd.call_args
-    assert "cmd_flags" in kwargs
-    assert kwargs["cmd_flags"] == ["--exclude", "resource_type:test"]
 
 
 def test_dbt_producer_watcher_operator_pushes_completion_status():

@@ -755,7 +755,12 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     if execution_mode == ExecutionMode.WATCHER:
         producer_watcher_task_id = _add_producer_watcher(
-            dag, task_args, tasks_map, task_group, render_config=render_config, test_behavior=test_behavior
+            dag,
+            task_args,
+            tasks_map,
+            task_group,
+            render_config=render_config,
+            test_behavior=test_behavior,
         )
         task_args["producer_watcher_task_id"] = producer_watcher_task_id
 

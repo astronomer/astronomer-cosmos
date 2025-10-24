@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import json
-
 import os
 import os.path as op
 from contextlib import contextmanager

@@ -171,7 +171,9 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             index_local = cfg_local.get("index") or "index.html"
             if not docs_dir_local:
                 return HTMLResponse(
-                    content=(f"<pre>Cosmos dbt docs error: slug={html.escape(slug_alias, quote=True)} not configured (missing dir)</pre>"),
+                    content=(
+                        f"<pre>Cosmos dbt docs error: slug={html.escape(slug_alias, quote=True)} not configured (missing dir)</pre>"
+                    ),
                     status_code=404,
                 )
             try:

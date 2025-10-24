@@ -40,12 +40,12 @@ if os.getenv("CI"):
     operator_args["trigger_rule"] = "all_success"
 
 
+from cosmos.constants import InvocationMode
+
 # [START example_watcher]
 example_watcher = DbtDag(
     # dbt/cosmos-specific parameters
-    execution_config=ExecutionConfig(
-        execution_mode=ExecutionMode.WATCHER,
-    ),
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     operator_args=operator_args,

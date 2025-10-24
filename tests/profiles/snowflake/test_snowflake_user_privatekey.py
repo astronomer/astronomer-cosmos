@@ -36,7 +36,7 @@ def mock_snowflake_conn_base64():  # type: ignore
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -60,7 +60,7 @@ def mock_snowflake_conn():  # type: ignore
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -117,7 +117,7 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = SnowflakePrivateKeyPemProfileMapping(
                 conn,
             )
@@ -127,7 +127,7 @@ def test_connection_claiming() -> None:
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = '{"database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
@@ -135,7 +135,7 @@ def test_connection_claiming() -> None:
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = '{"account": "my_account", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
@@ -143,13 +143,13 @@ def test_connection_claiming() -> None:
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = '{"account": "my_account", "database": "my_database", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
         assert profile_mapping.can_claim_connection()
 
@@ -259,7 +259,7 @@ def test_old_snowflake_format() -> None:
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
         assert profile_mapping.profile == {
             "type": conn.conn_type,
@@ -292,7 +292,7 @@ def test_appends_region() -> None:
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakePrivateKeyPemProfileMapping(conn)
         assert profile_mapping.profile == {
             "type": conn.conn_type,

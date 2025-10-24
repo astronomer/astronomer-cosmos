@@ -1,10 +1,11 @@
 import inspect
+from importlib.metadata import version
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pkg_resources
 import pytest
 from airflow.utils.context import Context
+from packaging.version import Version
 from pendulum import datetime
 
 from cosmos import ProfileConfig
@@ -67,15 +68,15 @@ def test_overrides_missing():
     The overrides parameter needed to pass the dbt command was added in apache-airflow-providers-google==10.11.0.
     We need to check if the parameter is actually present in required version.
     """
-    required_version = "10.11.0"
+    required_version = Version("10.11.0")
     package_name = "apache-airflow-providers-google"
 
     from airflow.providers.google.cloud.operators.cloud_run import CloudRunExecuteJobOperator
 
-    installed_version = pkg_resources.get_distribution(package_name).version
+    installed_version = Version(version(package_name))
     init_signature = inspect.signature(CloudRunExecuteJobOperator.__init__)
 
-    if pkg_resources.parse_version(installed_version) < pkg_resources.parse_version(required_version):
+    if installed_version < required_version:
         assert "overrides" not in init_signature.parameters
     else:
         assert "overrides" in init_signature.parameters

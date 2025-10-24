@@ -8,7 +8,12 @@ try:  # Airflow 3
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
 from airflow.models.dag import DAG
-from airflow.utils.task_group import TaskGroup
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos.core.graph.entities import Task
 from cosmos.log import get_logger

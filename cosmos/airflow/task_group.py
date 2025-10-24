@@ -6,7 +6,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from airflow.utils.task_group import TaskGroup
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos.converter import DbtToAirflowConverter, airflow_kwargs, specific_kwargs
 

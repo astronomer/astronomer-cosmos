@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from airflow import DAG
-from airflow.utils.task_group import TaskGroup
+
+if TYPE_CHECKING:
+    try:
+        # Airflow 3.1 onwards
+        from airflow.utils.task_group import TaskGroup
+    except ImportError:
+        from airflow.utils.task_group import TaskGroup
 
 
 def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_id: str) -> str:

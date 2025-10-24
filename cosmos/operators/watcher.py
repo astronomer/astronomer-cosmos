@@ -7,8 +7,6 @@ import zlib
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Sequence
 
-from cosmos.constants import TestBehavior
-
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
@@ -82,7 +80,6 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-        self.test_behavior = kwargs.pop("test_behavior", None)
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
         super().__init__(task_id=task_id, *args, **kwargs)
@@ -119,9 +116,6 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             ti.xcom_push(key="dbt_startup_events", value=startup_events)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
-        if self.test_behavior == TestBehavior.AFTER_ALL:
-            dbt_flag_no_test = ["--exclude", "resource_type:test"]
-            kwargs["dbt_flag_no_test"] = dbt_flag_no_test
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()

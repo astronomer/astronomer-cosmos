@@ -772,7 +772,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
                 task_args["selector"] = render_config.selector
                 task_args["exclude"] = render_config.exclude
             test_meta = TaskMetadata(
-                id="dbt_test",
+                id=f"{dbt_project_name}_test",
                 operator_class="cosmos.operators.local.DbtTestLocalOperator",
                 arguments=task_args,
                 extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},

@@ -179,8 +179,10 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     ),
                     status_code=404,
                 )
-            except Exception as e:
-                logging.exception(f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}")
+            except Exception:
+                logging.exception(
+                    f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}"
+                )
                 return HTMLResponse(
                     content=(
                         f"<pre>Cosmos dbt docs error: An internal error occurred loading index for slug={html.escape(slug_alias, quote=True)}</pre>"

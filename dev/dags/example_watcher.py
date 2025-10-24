@@ -57,6 +57,8 @@ example_watcher = DbtDag(
 # [END example_watcher]
 
 
+# This is not being executed in the CI, but it works in Airflow locally via standalone and in Astro CLI
+"""
 from airflow.models import DAG
 
 try:
@@ -73,9 +75,6 @@ with DAG(
     start_date=datetime(2023, 1, 1),
     catchup=False,
 ):
-    """
-    The simplest example of using Cosmos to render a dbt project as a TaskGroup.
-    """
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
     first_dbt_task_group = DbtTaskGroup(
@@ -91,3 +90,4 @@ with DAG(
 
     pre_dbt >> first_dbt_task_group
 # [END example_watcher_taskgroup]
+"""

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 import json
-import mimetypes
+
 import os
 import os.path as op
 from contextlib import contextmanager
@@ -15,7 +15,6 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
 
 S = TypeVar("S")
 
@@ -25,31 +24,34 @@ API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
 
 @contextmanager
-def connection_env(conn_id: str) -> Generator[None, None, None]:
+def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:
     """
     Temporarily expose a connection as AIRFLOW_CONN_{CONN_ID} in the environment.
 
     This allows hooks and SDK code resolving connections via the environment
     variables backend to find the connection during the scope of the context.
     """
+    if conn_id is None:
+        yield
+
     from airflow.models.connection import Connection as ORMConnection
 
-    conn = ORMConnection.get_connection_from_secrets(conn_id)
-    env_name = f"AIRFLOW_CONN_{conn_id.upper()}"
+    conn = ORMConnection.get_connection_from_secrets(conn_id)  # type: ignore[arg-type]
+    env_name = f"AIRFLOW_CONN_{conn_id.upper()}"  # type: ignore[union-attr]
     env_value = conn.get_uri()
     with patch.dict(os.environ, {env_name: env_value}, clear=False):
         yield
 
 
-def _read_text_via_object_storage(path: str, conn_id: Optional[str]) -> str:
+def _read_text_via_object_storage(path: str, conn_id: str | None = None) -> Any:
     with connection_env(conn_id):
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
-        with p.open("r") as f:
+        with p.open("r") as f:  # type: ignore[no-untyped-call]
             content = f.read()  # type: ignore[no-any-return]
         return content
 
 
-def open_file(path: str, conn_id: Optional[str] = None) -> str:
+def open_file(path: str, conn_id: str | None = None) -> Any:
     """
     Retrieve a file from http, https, gs, s3, or wasb.
 
@@ -87,11 +89,6 @@ iframe_script = """
   });
 </script>
 """
-
-
-def _guess_mime(path: str) -> str:
-    mime, _ = mimetypes.guess_type(path)
-    return mime or "application/octet-stream"
 
 
 def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
@@ -142,17 +139,13 @@ def _is_local_path(path: str) -> bool:
     return not any(path.strip().startswith(p) for p in prefixes)
 
 
-def create_cosmos_fastapi_app() -> FastAPI:
+def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     app = FastAPI()
 
     projects = _load_projects_from_conf()
 
     # Dynamic endpoints for each project
     for slug, cfg in projects.items():
-        docs_dir = cfg.get("dir") or ""
-        conn_id = cfg.get("conn_id")
-        index_name = cfg.get("index") or "index.html"
-
         # Simple HTML wrapper to embed the dbt docs UI
         @app.get(f"/{slug}/dbt_docs", response_class=HTMLResponse)
         def dbt_docs_view(slug_alias: str = slug) -> str:  # type: ignore[no-redef]
@@ -268,42 +261,6 @@ def create_cosmos_fastapi_app() -> FastAPI:
                     status_code=500,
                 )
             return JSONResponse(content=json.loads(data))
-
-        # Static assets: prefer a StaticFiles mount for local paths; otherwise proxy via open_file
-        if docs_dir and _is_local_path(docs_dir):
-            assets_dir = op.join(docs_dir, "assets")
-            if op.isdir(assets_dir):
-                app.mount(f"/{slug}/assets", StaticFiles(directory=assets_dir), name=f"{slug}_assets")
-        else:
-
-            @app.get(f"/{slug}/assets/{{path:path}}")
-            def remote_asset(path: str, slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
-                cfg_local = projects.get(slug_alias, {})
-                docs_dir_local = cfg_local.get("dir")
-                conn_id_local = cfg_local.get("conn_id")
-                if not docs_dir_local:
-                    return Response(
-                        content=f"not configured slug={slug_alias}", status_code=404, media_type="text/plain"
-                    )
-                full = op.join(docs_dir_local, "assets", path)
-                try:
-                    data = open_file(full, conn_id=conn_id_local)
-                except FileNotFoundError:
-                    return Response(
-                        content=f"asset not found slug={slug_alias} path={full}",
-                        status_code=404,
-                        media_type="text/plain",
-                    )
-                except Exception as e:
-                    return Response(
-                        content=(
-                            f"asset read failed slug={slug_alias} path={full} conn_id={conn_id_local or ''} "
-                            f"exception={type(e).__name__}: {e}"
-                        ),
-                        status_code=500,
-                        media_type="text/plain",
-                    )
-                return Response(content=data, media_type=_guess_mime(full))
 
     return app
 

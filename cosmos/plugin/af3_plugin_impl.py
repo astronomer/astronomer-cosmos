@@ -14,6 +14,7 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+import logging
 
 S = TypeVar("S")
 
@@ -251,13 +252,15 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except Exception as e:
+                logging.exception(
+                    f"Error reading catalog for slug '{slug_alias}', path '{op.join(docs_dir_local, 'catalog.json')}', conn_id '{conn_id_local}': {e}"
+                )
                 return JSONResponse(
                     content={
                         "error": "catalog read failed",
                         "slug": slug_alias,
                         "path": op.join(docs_dir_local, "catalog.json"),
                         "conn_id": conn_id_local,
-                        "exception": f"{type(e).__name__}: {e}",
                     },
                     status_code=500,
                 )

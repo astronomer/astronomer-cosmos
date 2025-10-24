@@ -13,7 +13,7 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.config import InvocationMode
-from cosmos.constants import ExecutionMode
+from cosmos.constants import ExecutionMode, TestBehavior
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
     DbtBuildWatcherOperator,
@@ -98,6 +98,32 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     """Test that DbtProducerWatcherOperator allows overriding priority_weight."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, priority_weight=100)
     assert op.priority_weight == 100
+
+
+@patch("cosmos.operators.local.AbstractDbtBase.execute")
+def test_execute_with_test_behavior_none(mock_super_execute):
+    # Mock context and task instance
+    context = {"ti": MagicMock()}
+
+    # Create operator instance with test_behavior = NONE
+    operator = DbtProducerWatcherOperator(
+        project_dir=".", profile_config=None, priority_weight=100, test_behavior=TestBehavior.NONE
+    )
+    operator.invocation_mode = None  # Will trigger _discover_invocation_mode
+
+    # Patch methods that are not relevant to the test
+    operator._discover_invocation_mode = MagicMock()
+    operator._handle_startup_event = MagicMock()
+    operator._handle_node_finished = MagicMock()
+
+    # Patch super().execute to just return a known value
+    operator.execute(context=context)
+
+    mock_super_execute.assert_called_once()
+
+    args, kwargs = mock_super_execute.call_args
+    assert "dbt_flag_no_test" in kwargs
+    assert kwargs["dbt_flag_no_test"] == ["--exclude", "resource_type:test"]
 
 
 def test_dbt_producer_watcher_operator_pushes_completion_status():

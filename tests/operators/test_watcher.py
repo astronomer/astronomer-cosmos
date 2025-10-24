@@ -428,11 +428,9 @@ class TestDbtBuildWatcherOperator:
 @pytest.mark.integration
 def test_dbt_dag_with_watcher():
     """
-    Run a DbtDag using dbt Fusion.
-    Confirm it succeeds and has the expected amount of both:
-    - dbt resources
-    - Airflow tasks
-    And that the tasks are in the expected topological order.
+    Run a DbtDag using `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
     """
     watcher_dag = DbtDag(
         project_config=project_config,
@@ -469,6 +467,7 @@ def test_dbt_dag_with_watcher():
         "orders.test",
     ]
     assert tasks_names == expected_task_names
+
     assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
     assert isinstance(watcher_dag.task_dict["raw_customers_seed"], DbtSeedWatcherOperator)
     assert isinstance(watcher_dag.task_dict["raw_orders_seed"], DbtSeedWatcherOperator)
@@ -483,3 +482,95 @@ def test_dbt_dag_with_watcher():
     assert isinstance(watcher_dag.task_dict["stg_payments.test"], DbtTestWatcherOperator)
     assert isinstance(watcher_dag.task_dict["customers.test"], DbtTestWatcherOperator)
     assert isinstance(watcher_dag.task_dict["orders.test"], DbtTestWatcherOperator)
+
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
+        "raw_payments_seed",
+        "raw_orders_seed",
+        "raw_customers_seed",
+    }
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_task_group_with_watcher():
+    """
+    Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    from airflow import DAG
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    from cosmos import DbtTaskGroup, ExecutionConfig
+    from cosmos.config import RenderConfig
+    from cosmos.constants import ExecutionMode, TestBehavior
+
+    operator_args = {
+        "install_deps": True,  # install any necessary dependencies before running any dbt command
+        "execution_timeout": timedelta(seconds=120),
+    }
+
+    with DAG(
+        dag_id="example_watcher_taskgroup",
+        start_date=datetime(2025, 1, 1),
+    ) as dag_dbt_task_group_watcher:
+        """
+        The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+        """
+        pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+        dbt_task_group = DbtTaskGroup(
+            group_id="dbt_task_group",
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.WATCHER,
+            ),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+
+        pre_dbt >> dbt_task_group
+
+    # Unfortunately, due to a bug in Airflow, we are not being able to set the producer task as an upstream task of the other TaskGroup tasks:
+    # https://github.com/apache/airflow/issues/56723
+    # When we run dag.test(), non-producer tasks are being executed before the producer task was scheduled.
+    # For this reason, we are commenting out these two lines for now:
+    # outcome = dag_dbt_task_group_watcher.test()
+    # assert outcome.state == DagRunState.SUCCESS
+    # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
+
+    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
+
+    expected_task_names = [
+        "pre_dbt",
+        "dbt_task_group.raw_customers_seed",
+        "dbt_task_group.raw_orders_seed",
+        "dbt_task_group.raw_payments_seed",
+        "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.stg_customers_run",
+        "dbt_task_group.stg_orders_run",
+        "dbt_task_group.stg_payments_run",
+        "dbt_task_group.customers_run",
+        "dbt_task_group.orders_run",
+    ]
+    assert tasks_names == expected_task_names
+
+    assert isinstance(
+        dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"], DbtProducerWatcherOperator
+    )
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_customers_seed"], DbtSeedWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_orders_seed"], DbtSeedWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_payments_seed"], DbtSeedWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_customers_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_orders_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_payments_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
+
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()

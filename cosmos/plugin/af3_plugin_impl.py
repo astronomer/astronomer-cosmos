@@ -6,7 +6,7 @@ import logging
 import os
 import os.path as op
 from contextlib import contextmanager
-from typing import Any, Generator, Optional, TypeVar
+from typing import Any, Generator, Optional
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
@@ -16,15 +16,12 @@ from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
-S = TypeVar("S")
-
-
 API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_URL
 API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
 
 @contextmanager
-def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:
+def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  # pragma: no cover
     """
     Temporarily expose a connection as AIRFLOW_CONN_{CONN_ID} in the environment.
 
@@ -43,7 +40,7 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:
         yield
 
 
-def _read_text_via_object_storage(path: str, conn_id: str | None = None) -> Any:
+def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
     with connection_env(conn_id):
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
         with p.open("r") as f:  # type: ignore[no-untyped-call]
@@ -58,7 +55,7 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
     Raise a (base Python) FileNotFoundError if the file is not found.
     """
     if path.strip().startswith(("s3://", "gs://", "gcs://", "wasb://", "abfs://", "az://", "http://", "https://")):
-        return _read_text_via_object_storage(path, conn_id=conn_id)
+        return _read_content_via_object_storage(path, conn_id=conn_id)
     else:
         with open(path) as f:
             content = f.read()
@@ -106,7 +103,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
             parsed = json.loads(projects_raw)
             if isinstance(parsed, dict):
                 for key, value in parsed.items():
-                    if not isinstance(value, dict):
+                    if not isinstance(value, dict):  # pragma: no cover
                         continue
                     projects[str(key)] = {
                         "dir": value.get("dir"),
@@ -132,11 +129,6 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
             }
 
     return projects
-
-
-def _is_local_path(path: str) -> bool:
-    prefixes = ("s3://", "gs://", "wasb://", "http://", "https://")
-    return not any(path.strip().startswith(p) for p in prefixes)
 
 
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901

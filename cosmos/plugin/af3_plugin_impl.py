@@ -171,7 +171,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             index_local = cfg_local.get("index") or "index.html"
             if not docs_dir_local:
                 return HTMLResponse(
-                    content=(f"<pre>Cosmos dbt docs error: slug={slug_alias} not configured (missing dir)</pre>"),
+                    content=(f"<pre>Cosmos dbt docs error: slug={html.escape(slug_alias, quote=True)} not configured (missing dir)</pre>"),
                     status_code=404,
                 )
             try:
@@ -179,17 +179,17 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             except FileNotFoundError:
                 return HTMLResponse(
                     content=(
-                        f"<pre>Cosmos dbt docs error: index not found for slug={slug_alias}\n"
-                        f"path={op.join(docs_dir_local, index_local)} conn_id={conn_id_local or ''}</pre>"
+                        f"<pre>Cosmos dbt docs error: index not found for slug={html.escape(slug_alias, quote=True)}\n"
+                        f"path={html.escape(op.join(docs_dir_local, index_local), quote=True)} conn_id={html.escape(conn_id_local or '', quote=True)}</pre>"
                     ),
                     status_code=404,
                 )
             except Exception as e:
                 return HTMLResponse(
                     content=(
-                        f"<pre>Cosmos dbt docs error: index read failed for slug={slug_alias}\n"
-                        f"path={op.join(docs_dir_local, index_local)} conn_id={conn_id_local or ''}\n"
-                        f"exception={type(e).__name__}: {e}</pre>"
+                        f"<pre>Cosmos dbt docs error: index read failed for slug={html.escape(slug_alias, quote=True)}\n"
+                        f"path={html.escape(op.join(docs_dir_local, index_local), quote=True)} conn_id={html.escape(conn_id_local or '', quote=True)}\n"
+                        f"exception={html.escape(type(e).__name__, quote=True)}: {html.escape(str(e), quote=True)}</pre>"
                     ),
                     status_code=500,
                 )

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import html
 import json
 import mimetypes
 import os
-import html
 import os.path as op
 from contextlib import contextmanager
 from typing import Any, Generator, Optional, TypeVar

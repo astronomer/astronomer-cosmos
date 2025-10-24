@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import html
 import os.path as op
 from contextlib import contextmanager
 from typing import Any, Generator, Optional, TypeVar
@@ -159,9 +160,10 @@ def create_cosmos_fastapi_app() -> FastAPI:
             if not cfg_local.get("dir"):
                 return "<div>dbt Docs are not configured.</div>"
             iframe_src = f"/cosmos/{slug_alias}/dbt_docs_index.html"
+            safe_iframe_src = html.escape(iframe_src, quote=True)
             return (
                 '<div style="height:100%;display:flex;flex-direction:column;">'
-                f'<iframe src="{iframe_src}" style="border:0;flex:1 1 auto;"></iframe>'
+                f'<iframe src="{safe_iframe_src}" style="border:0;flex:1 1 auto;"></iframe>'
                 "</div>"
             )
 

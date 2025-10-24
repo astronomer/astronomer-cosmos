@@ -268,7 +268,7 @@ def test_index_raises_exception_returns_500(tmp_path: Path):
     with patch("cosmos.plugin.af3_plugin_impl.open_file", side_effect=RuntimeError("boom")):
         r = client.get("/core/dbt_docs_index.html")
     assert r.status_code == 500
-    assert "index read failed" in r.text
+    assert "Cosmos dbt docs error" in r.text
 
 
 def test_catalog_not_configured_returns_404():

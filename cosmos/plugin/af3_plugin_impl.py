@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import os
 import os.path as op
 from contextlib import contextmanager
@@ -14,7 +15,6 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-import logging
 
 S = TypeVar("S")
 

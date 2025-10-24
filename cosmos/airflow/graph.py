@@ -201,13 +201,22 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
+    if (
+        execution_mode == ExecutionMode.WATCHER
+        and render_config is not None
+        and render_config.test_behavior == TestBehavior.AFTER_ALL
+    ):
+        operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+    else:
+        operator_class = calculate_operator_class(
+            execution_mode=execution_mode,
+            dbt_class="DbtTest",
+        )
+
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
-        operator_class=calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        ),
+        operator_class=operator_class,
         arguments={**task_args, **args_to_override},
         extra_context=extra_context,
     )
@@ -766,27 +775,15 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
-        if execution_mode == ExecutionMode.WATCHER:
-            if render_config is not None:
-                task_args["select"] = render_config.select
-                task_args["selector"] = render_config.selector
-                task_args["exclude"] = render_config.exclude
-            test_meta = TaskMetadata(
-                id=f"{dbt_project_name}_test",
-                operator_class="cosmos.operators.local.DbtTestLocalOperator",
-                arguments=task_args,
-                extra_context={"dbt_dag_task_group_identifier": _get_dbt_dag_task_group_identifier(dag, task_group)},
-            )
-        else:
-            test_meta = create_test_task_metadata(
-                f"{dbt_project_name}_test",
-                execution_mode,
-                test_indirect_selection,
-                task_args=task_args,
-                on_warning_callback=on_warning_callback,
-                render_config=render_config,
-                enable_owner_inheritance=enable_owner_inheritance,
-            )
+        test_meta = create_test_task_metadata(
+            f"{dbt_project_name}_test",
+            execution_mode,
+            test_indirect_selection,
+            task_args=task_args,
+            on_warning_callback=on_warning_callback,
+            render_config=render_config,
+            enable_owner_inheritance=enable_owner_inheritance,
+        )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:

@@ -570,8 +570,11 @@ def _add_producer_watcher_and_dependencies(
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
 
-        if render_config.test_behavior == TestBehavior.AFTER_ALL:
-            producer_task_args["exclude"] = producer_task_args["exclude"] + ["--exclude", "resource_type:test"]
+        if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
+            producer_task_args["exclude"] = producer_task_args["exclude"] + [
+                "resource_type:test",
+                "resource_type:unit_test",
+            ]
 
     # First, we create the producer task
     producer_task_metadata = TaskMetadata(

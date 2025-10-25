@@ -7,6 +7,8 @@ import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 
+from cosmos.operators.watcher import DbtTestWatcherOperator
+
 try:
     # Airflow 3.1 onwards
     from airflow.sdk import TaskGroup
@@ -1098,6 +1100,42 @@ def test_owner(dbt_extra_config, expected_owner):
 
     assert len(output.leaves) == 1
     assert output.leaves[0].owner == expected_owner
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH])
+def test_test_behavior_for_watcher_mode(test_behavior):
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+        ),
+        dbt_project_name="astro_shop",
+    )
+    tasks = dag.tasks
+    if test_behavior == TestBehavior.NONE:
+        for task in tasks:
+            assert not isinstance(task, DbtTestWatcherOperator)
+        assert len(tasks) == 5
+    if test_behavior == TestBehavior.AFTER_EACH:
+        assert len(tasks) == 6
 
 
 def test_custom_meta():

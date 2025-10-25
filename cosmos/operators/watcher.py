@@ -5,7 +5,10 @@ import json
 import logging
 import zlib
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Callable, List, Sequence, Union
+
+import airflow
+from packaging.version import Version
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -36,6 +39,9 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
+
+AIRFLOW_VERSION = Version(airflow.__version__)
+
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -82,7 +88,27 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
-        super().__init__(task_id=task_id, *args, **kwargs)
+        on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
+        super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
+
+    def _set_on_failure_callback(
+        self, user_callback: Any
+    ) -> Union[Callable[[Context], None], List[Callable[[Context], None]]]:
+        default_callback = self._store_producer_task_state
+
+        if AIRFLOW_VERSION < Version("2.6.0"):
+            # Older versions only support a single callable
+            return default_callback
+        else:
+            if user_callback is None:
+                # No callback provided — use default in a list
+                return [default_callback]
+            elif isinstance(user_callback, list):
+                # Append to existing list of callbacks (make a copy to avoid side effects)
+                return user_callback + [default_callback]
+            else:
+                # Single callable provided — wrap it in a list and append ours
+                return [user_callback, default_callback]
 
     @staticmethod
     def _serialize_event(ev: EventMsg) -> dict[str, Any]:
@@ -114,6 +140,10 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
             ti.xcom_push(key="dbt_startup_events", value=startup_events)
+
+    def _store_producer_task_state(self, context: Context) -> None:
+        ti = context["ti"]
+        ti.xcom_push(key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         try:
@@ -298,6 +328,11 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             status = self._get_status_from_run_results(ti)
 
         if status is None:
+            producer_task_state = ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+            if producer_task_state == "failed":
+                raise AirflowException(
+                    f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                )
             return False
         elif status == "success":
             return True

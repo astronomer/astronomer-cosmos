@@ -7,6 +7,7 @@ import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 
+from cosmos import DbtTestLocalOperator
 from cosmos.operators.watcher import DbtTestWatcherOperator
 
 try:
@@ -1102,7 +1103,7 @@ def test_owner(dbt_extra_config, expected_owner):
     assert output.leaves[0].owner == expected_owner
 
 
-@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH])
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH, TestBehavior.AFTER_ALL])
 def test_test_behavior_for_watcher_mode(test_behavior):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
@@ -1132,9 +1133,12 @@ def test_test_behavior_for_watcher_mode(test_behavior):
     tasks = dag.tasks
     if test_behavior == TestBehavior.NONE:
         for task in tasks:
-            assert not isinstance(task, DbtTestWatcherOperator)
+            assert not isinstance(task, DbtTestWatcherOperator or DbtTestLocalOperator)
         assert len(tasks) == 5
     if test_behavior == TestBehavior.AFTER_EACH:
+        assert len(tasks) == 6
+    if test_behavior == TestBehavior.AFTER_ALL:
+        assert any(isinstance(task, DbtTestLocalOperator) for task in tasks)
         assert len(tasks) == 6
 
 

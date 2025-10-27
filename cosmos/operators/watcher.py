@@ -335,7 +335,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             status = self._get_status_from_run_results(ti)
 
         if status is None:
-          
+
             if producer_task_state == "failed":
                 if self.poke_retry_number > 0:
                     raise AirflowException(

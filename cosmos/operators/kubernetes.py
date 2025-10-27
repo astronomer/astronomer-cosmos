@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import inspect
 import re
-from abc import ABC
+import warnings
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from os import PathLike
 from typing import TYPE_CHECKING, Any
@@ -416,3 +417,116 @@ class DbtCloneKubernetesOperator(DbtCloneMixin, DbtKubernetesBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
+
+
+class DbtDocsKubernetesOperator(DbtKubernetesBaseOperator):
+    """
+    Executes `dbt docs generate` command.
+    Use the `callback` parameter to specify a callback function to run after the command completes.
+    """
+
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields  # type: ignore[operator]
+
+    ui_color = "#8194E0"
+    required_files = ["index.html", "manifest.json", "catalog.json"]
+    base_cmd = ["docs", "generate"]
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.check_static_flag()
+
+    def check_static_flag(self) -> None:
+        if self.dbt_cmd_flags:
+            if "--static" in self.dbt_cmd_flags:
+                # For the --static flag we only upload the generated static_index.html file
+                self.required_files = ["static_index.html"]
+        if self.dbt_cmd_global_flags:
+            if "--no-write-json" in self.dbt_cmd_global_flags and "graph.gpickle" in self.required_files:
+                self.required_files.remove("graph.gpickle")
+
+
+class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
+    """
+    Abstract class for operators that upload the generated documentation to cloud storage.
+    """
+
+    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields  # type: ignore[operator]
+
+    def __init__(
+        self,
+        connection_id: str,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initializes the operator."""
+        self.connection_id = connection_id
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+
+        super().__init__(**kwargs)
+
+        # override the callback with our own
+        self.callback = self.upload_to_cloud_storage
+
+    @abstractmethod
+    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
+        """Abstract method to upload the generated documentation to cloud storage."""
+
+
+class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
+    """
+    Executes `dbt docs generate` command and upload to S3 storage.
+
+    :param connection_id: S3's Airflow connection ID
+    :param bucket_name: S3's bucket name
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
+        uploaded.
+    """
+
+    ui_color = "#FF9900"
+
+    def __init__(
+        self,
+        *args: Any,
+        aws_conn_id: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if aws_conn_id:
+            warnings.warn(
+                "Please, use `connection_id` instead of `aws_conn_id`. The argument `aws_conn_id` will be"
+                " deprecated in Cosmos 2.0",
+                DeprecationWarning,
+            )
+            kwargs["connection_id"] = aws_conn_id
+        super().__init__(*args, **kwargs)
+
+    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
+        """Uploads the generated documentation to S3."""
+        self.log.info(
+            'Attempting to upload generated docs to S3 using S3Hook("%s")',
+            self.connection_id,
+        )
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+        target_dir = f"{project_dir}/target"
+
+        hook = S3Hook(
+            self.connection_id,
+            extra_args={
+                "ContentType": "text/html",
+            },
+        )
+
+        for filename in self.required_files:
+            key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
+            s3_path = f"s3://{self.bucket_name}/{key}"
+            self.log.info("Uploading %s to %s", filename, s3_path)
+
+            hook.load_file(
+                filename=f"{target_dir}/{filename}",
+                bucket_name=self.bucket_name,
+                key=key,
+                replace=True,
+            )

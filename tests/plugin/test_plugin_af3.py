@@ -33,7 +33,7 @@ def _isolate_env():
 def _reload_af3_module(api_base: str | None = None):
     # Reload module to recompute API_BASE_PATH under patched env
     with patch.dict(os.environ, {"AIRFLOW__API__BASE_URL": api_base or ""}, clear=False):
-        import cosmos.plugin.af3_plugin_impl as af3
+        import cosmos.plugin.airflow3 as af3
 
         importlib.reload(af3)
         return af3
@@ -41,7 +41,7 @@ def _reload_af3_module(api_base: str | None = None):
 
 def _app_with_projects(projects: dict[str, dict[str, str]]):
     af3 = _reload_af3_module()
-    with patch("cosmos.plugin.af3_plugin_impl._load_projects_from_conf", return_value=projects):
+    with patch("cosmos.plugin.airflow3._load_projects_from_conf", return_value=projects):
         app = af3.create_cosmos_fastapi_app()
     return af3, app
 
@@ -104,7 +104,7 @@ def test_manifest_and_catalog_error_500(tmp_path: Path):
     client = TestClient(app)
 
     # Patch open_file to raise generic Exception to trigger 500 paths
-    with patch("cosmos.plugin.af3_plugin_impl.open_file", side_effect=RuntimeError("boom")):
+    with patch("cosmos.plugin.airflow3.open_file", side_effect=RuntimeError("boom")):
         r = client.get("/core/manifest.json")
         assert r.status_code == 500
         assert "manifest read failed" in r.text
@@ -119,10 +119,10 @@ def test_external_view_href_uses_api_base_path():
     _reload_af3_module(api_base="https://host/prefix/")
     # Stub projects before constructing plugin
     with patch(
-        "cosmos.plugin.af3_plugin_impl._load_projects_from_conf",
+        "cosmos.plugin.airflow3._load_projects_from_conf",
         return_value={"core": {"dir": "/x", "index": "index.html"}},
     ):
-        from cosmos.plugin.af3_plugin_impl import CosmosAF3Plugin
+        from cosmos.plugin.airflow3 import CosmosAF3Plugin
 
         plugin = CosmosAF3Plugin()
         assert plugin.external_views
@@ -133,10 +133,10 @@ def test_external_view_href_uses_api_base_path():
 def test_external_view_href_no_base_path():
     _reload_af3_module(api_base="")
 
-    from cosmos.plugin.af3_plugin_impl import CosmosAF3Plugin
+    from cosmos.plugin.airflow3 import CosmosAF3Plugin
 
     with patch(
-        "cosmos.plugin.af3_plugin_impl._load_projects_from_conf",
+        "cosmos.plugin.airflow3._load_projects_from_conf",
         return_value={"core": {"dir": "/x", "index": "index.html"}},
     ):
         plugin = CosmosAF3Plugin()
@@ -186,8 +186,8 @@ def test_open_file_remote_uses_objectstorage():
             return _FakeFile("REMOTE_CONTENT")
 
     # Avoid touching real connection_env/ObjectStoragePath
-    with patch("cosmos.plugin.af3_plugin_impl.connection_env", side_effect=lambda *_a, **_k: nullcontext()):
-        with patch("cosmos.plugin.af3_plugin_impl.ObjectStoragePath", _FakePath):
+    with patch("cosmos.plugin.airflow3.connection_env", side_effect=lambda *_a, **_k: nullcontext()):
+        with patch("cosmos.plugin.airflow3.ObjectStoragePath", _FakePath):
             assert af3.open_file("http://example", conn_id="my_conn") == "REMOTE_CONTENT"
 
 
@@ -216,8 +216,8 @@ def test_open_file_gcs_uses_objectstorage():
             assert mode == "r"
             return _FakeFile("GCS_CONTENT")
 
-    with patch("cosmos.plugin.af3_plugin_impl.connection_env", side_effect=lambda *_a, **_k: nullcontext()):
-        with patch("cosmos.plugin.af3_plugin_impl.ObjectStoragePath", _FakePath):
+    with patch("cosmos.plugin.airflow3.connection_env", side_effect=lambda *_a, **_k: nullcontext()):
+        with patch("cosmos.plugin.airflow3.ObjectStoragePath", _FakePath):
             assert af3.open_file("gs://bucket/obj", conn_id=None) == "GCS_CONTENT"
 
 
@@ -236,28 +236,6 @@ def test_load_projects_from_conf_valid_json():
     assert projects["core"]["name"] == "Core"
 
 
-def test_load_projects_from_conf_malformed_then_legacy():
-    af3 = _reload_af3_module()
-
-    def fake_get(section, key, fallback=None):
-        if section == "cosmos" and key == "dbt_docs_projects":
-            return "{malformed json}"
-        if section == "cosmos" and key == "dbt_docs_dir":
-            return "/legacy"
-        if section == "cosmos" and key == "dbt_docs_conn_id":
-            return "my_conn"
-        if section == "cosmos" and key == "dbt_docs_index_file_name":
-            return "index.html"
-        return fallback
-
-    with patch.object(af3.conf, "get", side_effect=fake_get):
-        projects = af3._load_projects_from_conf()
-    assert "default" in projects
-    assert projects["default"]["dir"] == "/legacy"
-    assert projects["default"]["conn_id"] == "my_conn"
-    assert projects["default"]["index"] == "index.html"
-
-
 def test_index_raises_exception_returns_500(tmp_path: Path):
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)
@@ -265,7 +243,7 @@ def test_index_raises_exception_returns_500(tmp_path: Path):
     af3, app = _app_with_projects(projects)
     client = TestClient(app)
 
-    with patch("cosmos.plugin.af3_plugin_impl.open_file", side_effect=RuntimeError("boom")):
+    with patch("cosmos.plugin.airflow3.open_file", side_effect=RuntimeError("boom")):
         r = client.get("/core/dbt_docs_index.html")
     assert r.status_code == 500
     assert "Cosmos dbt docs error" in r.text

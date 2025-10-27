@@ -16,10 +16,17 @@ from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
+from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
+from cosmos.plugin.snippets import IFRAME_SCRIPT
+
 API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_URL
 API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
 
+# TODO: This context manager and its usage in the method "_read_content_via_object_storage" has been added due
+# to the current limitation in Airflow 3.1.0 where plugins are not able to resolve connections via the API server.
+# Once this is fixed, potentially in PR https://github.com/apache/airflow/pull/56602 planned to be released in
+# Airflow 3.1.1, test the fix and remove this context manager and its usage.
 @contextmanager
 def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  # pragma: no cover
     """
@@ -54,38 +61,12 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
 
     Raise a (base Python) FileNotFoundError if the file is not found.
     """
-    if path.strip().startswith(("s3://", "gs://", "gcs://", "wasb://", "abfs://", "az://", "http://", "https://")):
+    if path.strip().startswith(AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES):
         return _read_content_via_object_storage(path, conn_id=conn_id)
     else:
         with open(path) as f:
             content = f.read()
         return content  # type: ignore[no-any-return]
-
-
-iframe_script = """
-<script>
-  // Prevent parent hash changes from sending a message back to the parent.
-  // This is necessary for making sure the browser back button works properly.
-  let hashChangeLock = true;
-
-  window.addEventListener('hashchange', function () {
-    if (!hashChangeLock) {
-      window.parent.postMessage(window.location.hash);
-    }
-    hashChangeLock = false;
-  });
-
-  window.addEventListener('message', function (event) {
-    let msgData = event.data;
-    if (typeof msgData === 'string' && msgData.startsWith('#!')) {
-      let updateUrl = new URL(window.location);
-      updateUrl.hash = msgData;
-      hashChangeLock = true;
-      history.replaceState(null, null, updateUrl);
-    }
-  });
-</script>
-"""
 
 
 def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
@@ -99,34 +80,23 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
     projects_raw = conf.get("cosmos", "dbt_docs_projects", fallback=None)
     projects: dict[str, dict[str, Optional[str]]] = {}
     if projects_raw:
+        parsed = None
         try:
             parsed = json.loads(projects_raw)
-            if isinstance(parsed, dict):
-                for key, value in parsed.items():
-                    if not isinstance(value, dict):  # pragma: no cover
-                        continue
-                    projects[str(key)] = {
-                        "dir": value.get("dir"),
-                        "conn_id": value.get("conn_id"),
-                        "index": value.get("index", "index.html"),
-                        "name": value.get("name"),
-                    }
-        except Exception:
-            # Ignore malformed config; fall back to legacy
-            projects = {}
+        except json.JSONDecodeError:
+            logging.exception("Invalid JSON in [cosmos] dbt_docs_projects: %s", projects_raw)
+            raise
 
-    if not projects:
-        # Legacy single-project support
-        legacy_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
-        if legacy_dir:
-            projects = {
-                "default": {
-                    "dir": legacy_dir,
-                    "conn_id": conf.get("cosmos", "dbt_docs_conn_id", fallback=None),
-                    "index": conf.get("cosmos", "dbt_docs_index_file_name", fallback="index.html"),
-                    "name": "dbt Docs",
+        if isinstance(parsed, dict):
+            for key, value in parsed.items():
+                if not isinstance(value, dict):  # pragma: no cover
+                    continue
+                projects[str(key)] = {
+                    "dir": value.get("dir"),
+                    "conn_id": value.get("conn_id"),
+                    "index": value.get("index", "index.html"),
+                    "name": value.get("name"),
                 }
-            }
 
     return projects
 
@@ -179,7 +149,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     ),
                     status_code=404,
                 )
-            except Exception:
+            except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
                 logging.exception(
                     f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}"
                 )
@@ -189,7 +159,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     ),
                     status_code=500,
                 )
-            html_content = html_content.replace("</head>", f"{iframe_script}</head>")
+            html_content = html_content.replace("</head>", f"{IFRAME_SCRIPT}</head>")
             return HTMLResponse(content=html_content, headers={"Content-Security-Policy": "frame-ancestors 'self'"})
 
         # JSON artifacts
@@ -212,7 +182,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     },
                     status_code=404,
                 )
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
                 logging.exception(
                     f"Error reading manifest for slug '{slug_alias}', path '{op.join(docs_dir_local, 'manifest.json')}', conn_id '{conn_id_local}': {e}"
                 )
@@ -246,7 +216,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     },
                     status_code=404,
                 )
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
                 logging.exception(
                     f"Error reading catalog for slug '{slug_alias}', path '{op.join(docs_dir_local, 'catalog.json')}', conn_id '{conn_id_local}': {e}"
                 )

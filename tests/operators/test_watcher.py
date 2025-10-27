@@ -397,14 +397,14 @@ class TestDbtConsumerWatcherSensor:
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
 
-    def test_handle_task_retry(self):
+    def test_fallback_to_local_run(self):
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
-        result = sensor._handle_task_retry(2, context)
+        result = sensor._fallback_to_local_run(2, context)
 
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()

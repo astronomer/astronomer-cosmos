@@ -7,3 +7,4 @@ pydata-sphinx-theme
 sphinx
 sphinx-autoapi
 sphinx-autobuild
+structlog<24.0

@@ -70,8 +70,8 @@ You can set the same mapping via the Airflow config environment variable ``AIRFL
 
 .. code-block:: dockerfile
 
-   # Dockerfile (ENV does not require outer quotes)
-   ENV AIRFLOW__COSMOS__DBT_DOCS_PROJECTS={"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}
+   # Dockerfile
+   ENV AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
 
 .. code-block:: yaml
 

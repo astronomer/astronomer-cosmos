@@ -3,22 +3,105 @@
 Hosting Docs
 ============
 
-dbt docs can be served directly from the `Apache Airflow® <https://airflow.apache.org/>`_ webserver with the Cosmos Airflow plugin, without requiring the user to set up anything outside of Airflow. This page describes how to host docs in the Airflow webserver directly, although some users may opt to host docs externally.
+dbt docs can be served directly from the `Apache Airflow® <https://airflow.apache.org/>`_ webserver(Airflow 2) or API server(Airflow 3) with the Cosmos Airflow plugin, without requiring the user to set up anything outside of Airflow. This page describes how to host docs in the Airflow webserver/API server directly, although some users may opt to host docs externally.
 
-.. note::
-    The CosmosPlugin is not available for Airflow 3 yet as the compatibility is still being worked on. Hence, the dbt docs cannot be hosted and used in Airflow 3 yet.
+
+Airflow 2 and Airflow 3 use different UI plugin systems.
+
+- Airflow 2: Cosmos uses a FAB/Flask view under ``Browse > dbt Docs``. Supports only a single project.
+- Airflow 3: Cosmos registers a FastAPI external view for each configured dbt project and a sub-application under ``/cosmos``.
 
 
 Overview
 ~~~~~~~~
 
+
+Airflow 3
+~~~~~~~~~
+
+The dbt docs are available in the Airflow menu under ``Browse``:
+
+.. image:: /_static/location_of_dbt_docs_in_airflow3.png
+    :alt: Airflow UI - Location of dbt docs in menu in Airflow 3
+    :align: center
+
+For Airflow 3, Cosmos exposes the docs under a FastAPI sub-app and external view entries under **Browse**.
+You can configure one or more projects via ``[cosmos].dbt_docs_projects``:
+
+.. code-block:: ini
+
+   [cosmos]
+   dbt_docs_projects = {
+     "core": {"dir": "/path/to/core/target", "index": "index.html", "name": "dbt Docs (Core)"},
+     "mart": {"dir": "s3://bucket/path/to/mart/target", "conn_id": "aws_default", "name": "dbt Docs (Mart)"}
+   }
+
+Or using environment variables (recommended for containers):
+
+.. code-block:: bash
+
+   export AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
+Endpoints per project (``<slug>``):
+
+- ``/cosmos/<slug>/dbt_docs`` (wrapper page)
+- ``/cosmos/<slug>/dbt_docs_index.html`` (docs index)
+- ``/cosmos/<slug>/manifest.json`` and ``/cosmos/<slug>/catalog.json``
+
+
+Local vs Remote docs (Airflow 3)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Local docs (filesystem paths)
+''''''''''''''''''''''''''''''
+
+- When a project's ``dir`` is a local path (e.g. ``/usr/local/airflow/dbt/jaffle_shop/target``):
+  - The plugin serves ``/cosmos/<slug>/dbt_docs_index.html`` by reading ``<dir>/<index>`` (default ``index.html``).
+  - Example:
+
+    .. code-block:: ini
+
+       [cosmos]
+       dbt_docs_projects = {
+         "core": {"dir": "/usr/local/airflow/dbt/jaffle_shop/target", "index": "index.html"}
+       }
+
+Remote docs (S3, GCS, Azure, HTTP[S])
+''''''''''''''''''''''''''''''''''''''
+
+- When ``dir`` is a remote URI (e.g. ``s3://...``, ``gs://...``, ``abfs://...``, ``wasb://...``, ``http(s)://...``):
+  - Files (index, manifest.json, catalog.json) are read via Airflow ObjectStorage (uPath/fsspec).
+  - For cloud object storage, set ``conn_id`` or embed it inline (e.g. ``s3://aws_default@my-bucket/path``).
+  - HTTP/HTTPS does not require a connection (an Airflow HTTP connection can be used if desired).
+  - Example (S3):
+
+    .. code-block:: ini
+
+       [cosmos]
+       dbt_docs_projects = {
+         "mart": {"dir": "s3://my-bucket/dbt/mart/target", "conn_id": "aws_default"}
+       }
+
+Notes and behavior
+''''''''''''''''''
+
+- Missing artifacts return HTTP 404 with the attempted path; other IO errors return HTTP 500 and are logged.
+- The docs iframe page (``/cosmos/<slug>/dbt_docs``) links to the index and shows within the Airflow UI; the index adds a small inline script to keep browser back/forward behavior intuitive.
+- If you deploy behind a path prefix (e.g. Astronomer hosted Airflow deployments), menu links include the prefix automatically using ``AIRFLOW__API__BASE_URL``.
+
+Airflow 2
+~~~~~~~~~
+
+.. important::
+   The remainder of this page applies to Airflow 2 (FAB/Flask) plugins only.
+
 The dbt docs are available in the Airflow menu under ``Browse > dbt docs``:
 
-.. image:: /_static/location_of_dbt_docs_in_airflow.png
+.. image:: /_static/location_of_dbt_docs_in_airflow2.png
     :alt: Airflow UI - Location of dbt docs in menu
     :align: center
 
-In order to access the dbt docs, you must specify the following config variables:
+In order to access the dbt docs in Airflow 2, you must specify the following config variables:
 
 - ``cosmos.dbt_docs_dir``: A path to where the docs are being hosted.
 - (Optional) ``cosmos.dbt_docs_conn_id``: A conn ID to use for a cloud storage deployment. If not specified _and_ the URI points to a cloud storage platform, then the default conn ID for the AWS/Azure/GCP hook will be used.

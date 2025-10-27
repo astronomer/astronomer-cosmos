@@ -1,10 +1,9 @@
 aenum
 deprecation
 msgpack
-apache-airflow
+apache-airflow==2.10
 pydantic
 pydata-sphinx-theme
 sphinx
 sphinx-autoapi
 sphinx-autobuild
-structlog<24.0

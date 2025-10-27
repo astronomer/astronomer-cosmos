@@ -613,7 +613,8 @@ def test_dbt_task_group_with_watcher():
             operator_args=operator_args,
         )
 
-        pre_dbt >> dbt_task_group
+        pre_dbt 
+        dbt_task_group
 
     # Unfortunately, due to a bug in Airflow, we are not being able to set the producer task as an upstream task of the other TaskGroup tasks:
     # https://github.com/apache/airflow/issues/56723

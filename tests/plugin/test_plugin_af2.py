@@ -72,7 +72,7 @@ def module_monkeypatch():
 def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
     module_monkeypatch.setenv("ASTRONOMER_ENVIRONMENT", "cloud")
     importlib.reload(cosmos.settings)
-    importlib.reload(cosmos.plugin.plugin_impl)
+    importlib.reload(cosmos.plugin.airflow2)
     importlib.reload(cosmos)
     initdb()
 

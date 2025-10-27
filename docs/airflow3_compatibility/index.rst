@@ -46,23 +46,10 @@ functionality with Airflow 3 by extending our CI infrastructure:
 These additions ensure that all core functionality, workflows, and integrations provided by Cosmos continue to operate
 reliably under Airflow 3.
 
-Validation in Progress
-----------------------
-
-We are actively validating the combined support for `Assets <https://airflow.apache.org/docs/apache-airflow/3.0.0/authoring-and-scheduling/assets.html>`_
-and `OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_ with Airflow 3.
-This may be **unstable** in Cosmos 1.10.0. Bug reports are very welcome.
-We encourage users to try it out and provide feedback, but note that certain edge cases may still be under
-investigation.
-
-Known Limitations
------------------
-
-There have been significant changes to how plugins work in Airflow 3.x. Cosmos now supports Airflow 3 FastAPI plugins for UI integration and hosting dbt docs via external views.
-
 Multiple dbt docs in Airflow 3 UI
 ---------------------------------
 
+There have been significant changes to how plugins work in Airflow 3.x. Cosmos now supports Airflow 3 FastAPI plugins for UI integration and hosting dbt docs via external views.
 Cosmos registers a FastAPI sub-application at ``/cosmos`` and adds menu entries under **Browse**. Configure one or more projects in ``airflow.cfg`` under the ``[cosmos]`` section:
 
 .. code-block:: ini
@@ -74,16 +61,37 @@ Cosmos registers a FastAPI sub-application at ``/cosmos`` and adds menu entries 
      "mart": {"dir": "s3://bucket/path/to/mart/target", "conn_id": "aws_default", "name": "dbt Docs (Mart)"}
    }
 
-Alternatively, legacy single-project settings are still honored:
+You can set the same mapping via the Airflow config environment variable ``AIRFLOW__COSMOS__DBT_DOCS_PROJECTS``.
 
-.. code-block:: ini
+.. code-block:: bash
 
-   [cosmos]
-   dbt_docs_dir = /path/to/target
-   dbt_docs_conn_id = my_conn
-   dbt_docs_index_file_name = index.html
+   # Shell (note the single quotes to preserve JSON)
+   export AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
 
-Docs are available at ``/cosmos/<slug>/dbt_docs``. Static assets are served directly for local directories or proxied for remote storage (S3/GCS/Azure/HTTP).
+.. code-block:: dockerfile
+
+   # Dockerfile (ENV does not require outer quotes)
+   ENV AIRFLOW__COSMOS__DBT_DOCS_PROJECTS={"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}
+
+.. code-block:: yaml
+
+   # Docker Compose / Kubernetes
+   environment:
+     AIRFLOW__COSMOS__DBT_DOCS_PROJECTS: '{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
+Docs are available at ``/cosmos/<slug>/dbt_docs_index.html``. Static assets are served directly for local directories or proxied for remote storage (S3/GCS/Azure/HTTP).
+
+Validation in Progress
+----------------------
+
+We are actively validating the combined support for `Assets <https://airflow.apache.org/docs/apache-airflow/3.0.0/authoring-and-scheduling/assets.html>`_
+and `OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_ with Airflow 3.
+This may be **unstable** in Cosmos 1.10.0. Bug reports are very welcome.
+We encourage users to try it out and provide feedback, but note that certain edge cases may still be under
+investigation.
+
+Known Limitations
+-----------------
 
 Airflow 3 DatasetAlias no longer support ASCII characters. This issue has been reported to the `Airflow community <https://github.com/apache/airflow/issues/51566>`_
 and we are also tracking it in the `Cosmos repository <https://github.com/astronomer/astronomer-cosmos/issues/1802>`_.

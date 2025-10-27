@@ -303,3 +303,19 @@ def test_catalog_missing_includes_path_and_connid(tmp_path: Path):
     assert body["slug"] == "core"
     assert body["conn_id"] == "my_conn"
     assert body["path"].endswith("/target/catalog.json")
+
+
+def test_dbt_docs_projects_malformed_json_raises(caplog):
+    import cosmos.plugin.airflow3 as af3
+
+    importlib.reload(af3)
+
+    def fake_get(section, key, fallback=None):
+        if (section, key) == ("cosmos", "dbt_docs_projects"):
+            return "{bad json}"
+        return fallback
+
+    with patch.object(af3.conf, "get", side_effect=fake_get), caplog.at_level("ERROR"):
+        with pytest.raises(json.JSONDecodeError):
+            af3._load_projects_from_conf()
+        assert "Invalid JSON in [cosmos] dbt_docs_projects:" in caplog.text

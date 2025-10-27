@@ -301,6 +301,9 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         logger.info("Node Info: %s", run_results_str)
         return node_result.get("status")
 
+    def _get_producer_task_state(self, ti: Any) -> Any:
+        return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -325,7 +328,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self._discover_invocation_mode()
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
-        producer_task_state = ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+        producer_task_state = self._get_producer_task_state(ti)
         if use_events:
             status = self._get_status_from_events(ti)
         else:

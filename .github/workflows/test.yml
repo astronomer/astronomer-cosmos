@@ -109,7 +109,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-cov
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -207,7 +207,7 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -286,7 +286,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -428,7 +428,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-integration-dbt-async-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -520,7 +520,7 @@ jobs:
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -682,7 +682,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -713,7 +713,7 @@ jobs:
         run: |
           pip3 install coverage
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: ./coverage
       - name: Combine coverage

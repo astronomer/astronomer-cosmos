@@ -201,13 +201,22 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
+    if (
+        execution_mode == ExecutionMode.WATCHER
+        and render_config is not None
+        and render_config.test_behavior == TestBehavior.AFTER_ALL
+    ):
+        operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+    else:
+        operator_class = calculate_operator_class(
+            execution_mode=execution_mode,
+            dbt_class="DbtTest",
+        )
+
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
-        operator_class=calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        ),
+        operator_class=operator_class,
         arguments={**task_args, **args_to_override},
         extra_context=extra_context,
     )
@@ -560,6 +569,12 @@ def _add_producer_watcher_and_dependencies(
         producer_task_args["select"] = render_config.select
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
+
+        if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
+            producer_task_args["exclude"] = producer_task_args["exclude"] + [
+                "resource_type:test",
+                "resource_type:unit_test",
+            ]
 
     # First, we create the producer task
     producer_task_metadata = TaskMetadata(

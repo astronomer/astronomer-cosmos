@@ -11,6 +11,7 @@ from flask import abort
 from flask_appbuilder import AppBuilder, expose
 
 from cosmos.listeners import dag_run_listener
+from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name, in_astro_cloud
 
 if in_astro_cloud:
@@ -120,32 +121,6 @@ def open_file(path: str, conn_id: Optional[str] = None) -> str:
         return content  # type: ignore[no-any-return]
 
 
-iframe_script = """
-<script>
-  // Prevent parent hash changes from sending a message back to the parent.
-  // This is necessary for making sure the browser back button works properly.
-  let hashChangeLock = true;
-
-  window.addEventListener('hashchange', function () {
-    if (!hashChangeLock) {
-      window.parent.postMessage(window.location.hash);
-    }
-    hashChangeLock = false;
-  });
-
-  window.addEventListener('message', function (event) {
-    let msgData = event.data;
-    if (typeof msgData === 'string' && msgData.startsWith('#!')) {
-      let updateUrl = new URL(window.location);
-      updateUrl.hash = msgData;
-      hashChangeLock = true;
-      history.replaceState(null, null, updateUrl);
-    }
-  });
-</script>
-"""
-
-
 class DbtDocsView(AirflowBaseView):  # type: ignore
     default_view = "dbt_docs"
     route_base = "/cosmos"
@@ -175,7 +150,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         except FileNotFoundError:
             abort(404)
         else:
-            html = html.replace("</head>", f"{iframe_script}</head>")
+            html = html.replace("</head>", f"{IFRAME_SCRIPT}</head>")
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
     @expose("/catalog.json")  # type: ignore[misc]

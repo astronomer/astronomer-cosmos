@@ -121,7 +121,7 @@ This approach is best when your Airflow DAG is fully dedicated to a dbt project.
        default_args={"retries": 0},
    )
 
-As it can be observed, the only difference with the default ``ExecutionMode.LOCAL`` is the addition of the ``execution_config`` parameter with the ``execution_mode`` set to ``ExecutionMode.WATCHER``. For more information on the ``ExecutionMode.LOCAL``, please, check the `dedicated page <execution-modes.html#local>`__
+As it can be observed, the only difference with the default ``ExecutionMode.LOCAL`` is the addition of the ``execution_config`` parameter with the ``execution_mode`` set to ``ExecutionMode.WATCHER``. The ``ExecutionMode`` enum can be imported from ``cosmos.constants``. For more information on the ``ExecutionMode.LOCAL``, please, check the `dedicated page <execution-modes.html#local>`__
 
 **How it works:**
 

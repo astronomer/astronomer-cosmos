@@ -93,7 +93,7 @@ Airflow 2
 ~~~~~~~~~
 
 .. important::
-   The remainder of this page applies to Airflow 2 (FAB/Flask) plugins only.
+   The remainder of this page applies to Airflow 2 (Flask-AppBuilder) plugins only.
 
 The dbt docs are available in the Airflow menu under ``Browse > dbt docs``:
 

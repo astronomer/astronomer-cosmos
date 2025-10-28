@@ -8,7 +8,7 @@ dbt docs can be served directly from the `Apache Airflow® <https://airflow.apac
 
 Airflow 2 and Airflow 3 use different UI plugin systems.
 
-- Airflow 2: Cosmos uses a FAB/Flask view under ``Browse > dbt Docs``. Supports only a single project.
+- Airflow 2: Cosmos uses a FAB(Flask-AppBuilder)/Flask view under ``Browse > dbt Docs``. Supports only a single project.
 - Airflow 3: Cosmos registers a FastAPI external view for each configured dbt project and a sub-application under ``/cosmos``.
 
 

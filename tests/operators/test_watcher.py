@@ -350,7 +350,8 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is True
 
-    def test_invocation_mode_none(self):
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_state", return_value=None)
+    def _fallback_to_local_run(self, mock_get_producer_task_state):
         sensor = self.make_sensor()
         sensor.invocation_mode = None
 
@@ -358,7 +359,6 @@ class TestDbtConsumerWatcherSensor:
         ti.try_number = 1
         ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
         context = self.make_context(ti)
-
         result = sensor.poke(context)
         assert result is True
 
@@ -397,14 +397,14 @@ class TestDbtConsumerWatcherSensor:
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
 
-    def test_handle_task_retry(self):
+    def test_fallback_to_local_run(self):
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
-        result = sensor._handle_task_retry(2, context)
+        result = sensor._fallback_to_local_run(2, context)
 
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
@@ -457,6 +457,7 @@ class TestDbtConsumerWatcherSensor:
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.try_number = 1
+        sensor.poke_retry_number = 1
         mock_run_result.return_value = None
         ti.xcom_pull.return_value = "failed"
 
@@ -467,6 +468,27 @@ class TestDbtConsumerWatcherSensor:
             match="The dbt build command failed in producer task. Please check the log of task dbt_producer_watcher for details.",
         ):
             sensor.poke(context)
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_local_run")
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    def test_producer_state_does_not_fail_if_previously_upstream_failed(
+        self, mock_run_result, mock_fallback_to_local_run
+    ):
+        """
+        Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
+        More details: https://github.com/astronomer/astronomer-cosmos/pull/2062
+        """
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        sensor.poke_retry_number = 0
+        mock_run_result.return_value = None
+        ti.xcom_pull.return_value = "failed"
+
+        context = self.make_context(ti)
+
+        sensor.poke(context)
+        mock_fallback_to_local_run.assert_called_once()
 
 
 class TestDbtBuildWatcherOperator:
@@ -591,7 +613,8 @@ def test_dbt_task_group_with_watcher():
             operator_args=operator_args,
         )
 
-        pre_dbt >> dbt_task_group
+        pre_dbt
+        dbt_task_group
 
     # Unfortunately, due to a bug in Airflow, we are not being able to set the producer task as an upstream task of the other TaskGroup tasks:
     # https://github.com/apache/airflow/issues/56723

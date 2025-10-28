@@ -144,7 +144,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
                 / "models"
                 / str(ev.data.node_info.node_path)
             )
-            logger.info("Compile sql path: %s, exists: %s", compiled_sql_path, Path.exists(compiled_sql_path))
+            logger.debug("Compiled sql path: %s, exists: %s", compiled_sql_path, Path.exists(compiled_sql_path))
             with compiled_sql_path.open("r") as f:
                 compiled_sql = f.read()
             if compiled_sql:

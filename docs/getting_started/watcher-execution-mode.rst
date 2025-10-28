@@ -1,3 +1,5 @@
+.. _watcher-execution-mode:
+
 Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Execution in Cosmos
 ===============================================================================
 

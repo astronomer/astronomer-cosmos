@@ -907,7 +907,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(
-            cmd=dbt_cmd, env=env, context=context, run_as_async=run_as_async, async_context=async_context, **kwargs
+            cmd=dbt_cmd,
+            env=env,
+            context=context,
+            run_as_async=run_as_async,
+            async_context=async_context,
+            push_run_results_to_xcom=kwargs.get("push_run_results_to_xcom") or False,
         )
         return result
 

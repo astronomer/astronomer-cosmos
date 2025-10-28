@@ -54,27 +54,34 @@ Together, these operators let you:
 Performance Gains
 -----------------
 
-Initial benchmarks illustrate significant improvements:
+We used a dbt project developed by Google, the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project, that interfaces with BigQuery. It contains:
+* 2 seeds
+* 52 sources
+* 185 models
 
-+---------------------------------------------+-----------+--------------------+
-| Environment                                 | Threads   | Execution Time (s) |
-+=============================================+===========+====================+
-| dbt build (dbt CLI)                             | 4         | 6–7                |
-+---------------------------------------------+-----------+--------------------+
-| dbt run per model, similar to the Cosmos Local Execution Mode (dbt CLI)                   | —         | 30                 |
-+---------------------------------------------+-----------+--------------------+
-| Cosmos LOCAL (Astro CLI)                    | —         | 10–15              |
-+---------------------------------------------+-----------+--------------------+
-| Cosmos WATCHER (Astro CLI)                  | 1         | 26                 |
-|                                             | 2         | 14                 |
-|                                             | 4         | 7                  |
-|                                             | 8         | 4                  |
-|                                             | 16        | 2                  |
-+---------------------------------------------+-----------+--------------------+
-| Cosmos WATCHER (Airflow / Astro Deployment) | 8         | ≈5                 |
-+---------------------------------------------+-----------+--------------------+
+Initial benchmarks, using  illustrate significant improvements:
 
-The last line represents the performance improvement in a real-world Airflow deployment.
++-----------------------------------------------+-----------+--------------------+
+| Environment                                   | Threads   | Execution Time (s) |
++===============================================+===========+====================+
+| dbt build (dbt CLI)                           | 4         | 6–7                |
++-----------------------------------------------+-----------+--------------------+
+| dbt run per model (dbt CLI)                   | —         | 30                 |
+| similar to the Cosmos ``ExecutionMode.LOCAL`` |           |                    |
++-----------------------------------------------+-----------+--------------------+
+| Cosmos ``ExecutionMode.LOCAL`` (Astro CLI)    | —         | 10–15              |
++-----------------------------------------------+-----------+--------------------+
+| Cosmos ``ExecutionMode.WATCHER`` (Astro CLI)  | 1         | 26                 |
+|                                               | 2         | 14                 |
+|                                               | 4         | 7                  |
+|                                               | 8         | 4                  |
+|                                               | 16        | 2                  |
++-----------------------------------------------+-----------+--------------------+
+| Cosmos ``ExecutionMode.WATCHER`` (Astro Cloud | 8         | ≈5                 |
+| Standard Deployment with A10 workers          |           |                    |
++-----------------------------------------------+-----------+--------------------+
+
+The last line represents the performance improvement in a real-world Airflow deployment, using `Astro Cloud <https://www.astronomer.io/>`_.
 
 Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
 
@@ -88,7 +95,7 @@ Example Usage of ``ExecutionMode.WATCHER``
 There are two main ways to use the new execution mode in Cosmos — directly within a ``DbtDag``, or embedded as part of a ``DbtTaskGroup`` inside a larger DAG.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Example 1 — Using ``DbtDag`` with Wacther Execution Mode
+Example 1 — Using ``DbtDag`` with ``ExecutionMode.WATCHER``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.
@@ -119,7 +126,7 @@ As it can be observed, the only difference with the default ``ExecutionMode.LOCA
 **How it works:**
 
 * Cosmos executes your dbt project once via a producer task.
-* Model-level Airflow tasks act as watchers, updating their state as dbt completes each model.
+* Model-level Airflow tasks act as watchers or sensors, updating their state as dbt completes each model.
 * The DAG remains fully observable and retryable, with **dramatically improved runtime performance** (often 5× faster than ``ExecutionMode.LOCAL``).
 
 .. image:: /_static/jaffle_shop_watcher_dbt_dag_dag_run.png
@@ -127,7 +134,7 @@ As it can be observed, the only difference with the default ``ExecutionMode.LOCA
     :align: center
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Example 2 — Using ``DbtTaskGroup`` with WATCHER Mode
+Example 2 — Using ``DbtTaskGroup`` with ``ExecutionMode.WATCHER``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If your Airflow DAG includes multiple stages or integrations (e.g., data ingestion → dbt → reporting), use ``DbtTaskGroup`` to embed your dbt project into a larger DAG — still benefiting from WATCHER performance.
@@ -312,4 +319,4 @@ Summary
 
 This is an experimental feature and we are looking for feedback from the community.
 
-Stay tuned for further documentation and base image support for the Watcher Execution Mode in upcoming releases.
+Stay tuned for further documentation and base image support for the ``ExecutionMode.WATCHER`` in upcoming releases.

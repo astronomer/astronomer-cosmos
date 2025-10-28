@@ -924,7 +924,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             on_warning_callback=on_warning_callback,
             normalize_task_id=normalize_task_id,
             detached_from_parent=detached_from_parent,
-            node_conversion_by_task_group=render_config.node_conversion_by_task_group,
         )
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
@@ -959,7 +958,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
                 on_warning_callback=on_warning_callback,
                 normalize_task_id=normalize_task_id,
                 detached_from_parent=detached_from_parent,
-                node_conversion_by_task_group=render_config.node_conversion_by_task_group,
             )
             tasks_map[node_id] = test_task
 

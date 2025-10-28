@@ -133,7 +133,6 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         compiled_sql_path = Path.cwd() / "target" / "compiled" / package / "models" / node_path
         if compiled_sql_path.exists():
             return compiled_sql_path.read_text(encoding="utf-8").strip() or None
-        return None
 
     def _handle_node_finished(
         self,

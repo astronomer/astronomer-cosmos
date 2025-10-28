@@ -3,8 +3,10 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import os
 import zlib
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, List, Sequence, Union
 
 import airflow
@@ -132,6 +134,22 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)
+        if ev.data.node_info.resource_type == "model":
+            project_root = Path(os.getcwd())
+            compiled_sql_path = (
+                project_root
+                / "target"
+                / "compiled"
+                / str(uid).split(".")[1]
+                / "models"
+                / str(ev.data.node_info.node_path)
+            )
+            logger.info("Compile sql path: %s, exists: %s", compiled_sql_path, Path.exists(compiled_sql_path))
+            with compiled_sql_path.open("r") as f:
+                compiled_sql = f.read()
+            if compiled_sql:
+                logger.info("Uid: %s, Compiled sql: %s", uid, compiled_sql)
+                ev_dict["compiled_sql"] = compiled_sql
         payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
@@ -183,7 +201,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
-    template_fields = ("model_unique_id",)  # type: ignore[operator]
+    template_fields = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
 
     def __init__(
         self,
@@ -257,7 +275,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True
 
-    def _get_status_from_events(self, ti: Any) -> Any:
+    def _get_status_from_events(self, ti: Any, context: Context) -> Any:
 
         dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
@@ -275,6 +293,10 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         event_json = json.loads(event_json_str)
 
         logger.info("Node Info: %s", event_json_str)
+
+        self.compiled_sql = event_json.get("compiled_sql", "")
+        if self.compiled_sql:
+            self._override_rtif(context)
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
@@ -323,7 +345,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
         if use_events:
-            status = self._get_status_from_events(ti)
+            status = self._get_status_from_events(ti, context)
         else:
             status = self._get_status_from_run_results(ti)
 
@@ -354,7 +376,7 @@ class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: i
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -365,7 +387,7 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields
+    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields
 
 
 class DbtSourceWatcherOperator(DbtSourceLocalOperator):
@@ -381,7 +403,7 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

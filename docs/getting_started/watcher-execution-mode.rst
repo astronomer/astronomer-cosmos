@@ -211,6 +211,16 @@ In case that is not possible, the producer task will only trigger the consumer t
 
 We plan to improve this behaviour in the future by leveraging `dbt structured logging <https://docs.getdbt.com/reference/events-logging#structured-logging>`_.
 
+In the meantime, assuming you have Cosmos installed in ```requirements.txt`` file, you would modify it to also include your dbt adapters.
+
+Example of ``requirements.txt`` file:
+
+.. code-block:: text
+
+    astronomer-cosmos==1.11.0
+    dbt-bigquery==1.10
+
+
 Producer task implementation
 ............................
 

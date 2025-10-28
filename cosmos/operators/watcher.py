@@ -184,6 +184,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
     template_fields = ("model_unique_id",)  # type: ignore[operator]
+    poke_retry_number: int = 0
 
     def __init__(
         self,
@@ -229,14 +230,14 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             filtered.append(token)
         return filtered
 
-    def _handle_task_retry(self, try_number: int, context: Context) -> bool:
+    def _fallback_to_local_run(self, try_number: int, context: Context) -> bool:
         """
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
         with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
         """
         logger.info(
-            "Retry attempt #%s – Re-running model '%s' from project '%s'",
+            "Retry attempt #%s – Running model '%s' from project '%s' using ExecutionMode.LOCAL",
             try_number - 1,
             self.model_unique_id,
             self.project_dir,
@@ -300,6 +301,9 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         logger.info("Node Info: %s", run_results_str)
         return node_result.get("status")
 
+    def _get_producer_task_state(self, ti: Any) -> Any:
+        return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -308,31 +312,41 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         ti = context["ti"]
         try_number = ti.try_number
 
-        if try_number > 1:
-            return self._handle_task_retry(try_number, context)
-
         logger.info(
-            "Pulling status from task_id '%s' for model '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s'",
+            try_number,
+            self.poke_retry_number,
             self.producer_task_id,
             self.model_unique_id,
         )
+
+        if try_number > 1:
+            return self._fallback_to_local_run(try_number, context)
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         if not self.invocation_mode:
             self._discover_invocation_mode()
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
+        producer_task_state = self._get_producer_task_state(ti)
         if use_events:
             status = self._get_status_from_events(ti)
         else:
             status = self._get_status_from_run_results(ti)
 
         if status is None:
-            producer_task_state = ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+
             if producer_task_state == "failed":
-                raise AirflowException(
-                    f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
-                )
+                if self.poke_retry_number > 0:
+                    raise AirflowException(
+                        f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                    )
+                else:
+                    # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
+                    return self._fallback_to_local_run(try_number, context)
+
+            self.poke_retry_number += 1
+
             return False
         elif status == "success":
             return True

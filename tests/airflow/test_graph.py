@@ -7,7 +7,6 @@ import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 
-from cosmos import DbtTestLocalOperator
 from cosmos.operators.watcher import DbtTestWatcherOperator
 
 try:

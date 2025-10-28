@@ -244,7 +244,7 @@ The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the
 
 This means that you can define a single callback function for all ``ExecutionMode.WATCHER`` tasks. The behaviour will be similar to the ``ExecutionMode.LOCAL`` mode, except that there will be a unified ``run_results.json`` file.
 
-If there is demand, we will supporting different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
+If there is demand, we will support different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
 
 
 Overriding ``operator_args``

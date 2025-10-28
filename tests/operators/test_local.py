@@ -989,6 +989,7 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["seed", "--full-refresh"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
         (
@@ -1000,6 +1001,7 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["build", "--full-refresh"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
         (
@@ -1011,6 +1013,7 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["run", "--full-refresh"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
         (
@@ -1022,17 +1025,32 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["clone", "--full-refresh"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
         (
             DbtTestLocalOperator,
             {},
-            {"context": {}, "env": {}, "cmd_flags": ["test"], "run_as_async": False, "async_context": None},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["test"],
+                "run_as_async": False,
+                "async_context": None,
+                "push_run_results_to_xcom": False,
+            },
         ),
         (
             DbtTestLocalOperator,
             {"select": []},
-            {"context": {}, "env": {}, "cmd_flags": ["test"], "run_as_async": False, "async_context": None},
+            {
+                "context": {},
+                "env": {},
+                "cmd_flags": ["test"],
+                "run_as_async": False,
+                "async_context": None,
+                "push_run_results_to_xcom": False,
+            },
         ),
         (
             DbtTestLocalOperator,
@@ -1043,6 +1061,7 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["test", "--select", "tag:daily", "--exclude", "tag:disabled"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
         (
@@ -1054,6 +1073,7 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["test", "--selector", "nightly_snowplow"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
         (
@@ -1065,6 +1085,7 @@ def test_store_compiled_sql_airflow3() -> None:
                 "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"],
                 "run_as_async": False,
                 "async_context": None,
+                "push_run_results_to_xcom": False,
             },
         ),
     ],

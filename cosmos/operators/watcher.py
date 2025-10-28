@@ -148,7 +148,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             with compiled_sql_path.open("r") as f:
                 compiled_sql = f.read()
             if compiled_sql:
-                logger.info("Uid: %s, Compiled sql: %s", uid, compiled_sql)
+                logger.debug("Uid: %s, Compiled sql: %s", uid, compiled_sql)
                 ev_dict["compiled_sql"] = compiled_sql
         payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)

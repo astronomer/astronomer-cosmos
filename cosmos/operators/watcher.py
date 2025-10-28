@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 import zlib
 from datetime import timedelta
 from pathlib import Path
@@ -125,6 +124,17 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]
         startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
 
+    def _extract_compiled_sql_for_node_event(self, ev: EventMsg) -> str | None:
+        if getattr(ev.data.node_info, "resource_type", None) != "model":
+            return None
+        uid = ev.data.node_info.unique_id
+        node_path = str(ev.data.node_info.node_path)
+        package = uid.split(".")[1]
+        compiled_sql_path = Path.cwd() / "target" / "compiled" / package / "models" / node_path
+        if compiled_sql_path.exists():
+            return compiled_sql_path.read_text(encoding="utf-8").strip() or None
+        return None
+
     def _handle_node_finished(
         self,
         ev: EventMsg,
@@ -134,22 +144,9 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ti = context["ti"]
         uid = ev.data.node_info.unique_id
         ev_dict = self._serialize_event(ev)
-        if ev.data.node_info.resource_type == "model":
-            project_root = Path(os.getcwd())
-            compiled_sql_path = (
-                project_root
-                / "target"
-                / "compiled"
-                / str(uid).split(".")[1]
-                / "models"
-                / str(ev.data.node_info.node_path)
-            )
-            logger.debug("Compiled sql path: %s, exists: %s", compiled_sql_path, Path.exists(compiled_sql_path))
-            with compiled_sql_path.open("r") as f:
-                compiled_sql = f.read()
-            if compiled_sql:
-                logger.debug("Uid: %s, Compiled sql: %s", uid, compiled_sql)
-                ev_dict["compiled_sql"] = compiled_sql
+        compiled_sql = self._extract_compiled_sql_for_node_event(ev)
+        if compiled_sql:
+            ev_dict["compiled_sql"] = compiled_sql
         payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 

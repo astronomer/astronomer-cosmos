@@ -187,6 +187,24 @@ def test_handle_node_finished_injects_compiled_sql(tmp_path, monkeypatch):
     assert data.get("compiled_sql") == sql_text
 
 
+def test_handle_node_finished_without_compiled_sql_does_not_inject(tmp_path, monkeypatch):
+    op = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
+    ti = _MockTI()
+    ctx = _MockContext(ti=ti)
+
+    # Ensure watcher looks up under this tmp project dir, but do NOT create compiled file
+    monkeypatch.chdir(tmp_path)
+
+    with patch.object(op, "_serialize_event", return_value={}):
+        ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
+        op._handle_node_finished(ev, ctx)
+
+    stored = list(ti.store.values())[0]
+    raw = zlib.decompress(base64.b64decode(stored)).decode()
+    data = json.loads(raw)
+    assert "compiled_sql" not in data
+
+
 def test_execute_streaming_mode():
     """Streaming path should push startup + per-model XComs."""
     from contextlib import nullcontext

@@ -19,13 +19,13 @@ if TYPE_CHECKING:  # pragma: no cover
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
-except ImportError:
+except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
 from airflow.exceptions import AirflowException
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:
+except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.config import ProfileConfig

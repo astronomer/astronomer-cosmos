@@ -101,25 +101,10 @@ Example 1 — Using ``DbtDag`` with ``ExecutionMode.WATCHER``
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.
 This approach is best when your Airflow DAG is fully dedicated to a dbt project.
 
-.. code-block:: python
-   :caption: example_watcher.py
-   :name: example_watcher
-
-   example_watcher = DbtDag(
-       # dbt/cosmos-specific parameters
-       execution_config=ExecutionConfig(
-           execution_mode=ExecutionMode.WATCHER,
-       ),
-       project_config=ProjectConfig(DBT_PROJECT_PATH),
-       profile_config=profile_config,
-       operator_args=operator_args,
-       # normal dag parameters
-       schedule="@daily",
-       start_date=datetime(2023, 1, 1),
-       catchup=False,
-       dag_id="example_watcher",
-       default_args={"retries": 0},
-   )
+.. literalinclude:: ../../dev/dags/example_watcher.py
+    :language: python
+    :start-after: [START example_watcher]
+    :end-before: [END example_watcher]
 
 As it can be observed, the only difference with the default ``ExecutionMode.LOCAL`` is the addition of the ``execution_config`` parameter with the ``execution_mode`` set to ``ExecutionMode.WATCHER``. The ``ExecutionMode`` enum can be imported from ``cosmos.constants``. For more information on the ``ExecutionMode.LOCAL``, please, check the `dedicated page <execution-modes.html#local>`__
 
@@ -230,10 +215,12 @@ There are discussions about allowing this node to implemented as the ``Execution
 Individual dbt Operators
 ........................
 
-While the efficiently implemented as part of ``ExecutionMode.WATCHER``:
+The ``ExecutionMode.WATCHER`` efficiently implements the following operators:
 * ``DbtSeedWatcherOperator``
 * ``DbtSnapshotWatcherOperator``
 * ``DbtRunWatcherOperator``
+
+However, other operators that are available in the ``ExecutionMode.LOCAL`` mode are not implemented.
 
 The ``DbtBuildWatcherOperator`` is not implemented, since the build command is executed by the producer ``DbtProducerWatcherOperator`` operator.
 

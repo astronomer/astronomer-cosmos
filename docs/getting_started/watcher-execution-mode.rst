@@ -38,7 +38,7 @@ Concept: ``ExecutionMode.WATCHER``
 It is built on two operator types:
 
 * **``DbtProducerWatcherOperator``** (`#1982 <https://github.com/astronomer/astronomer-cosmos/pull/1982>`_)
-  Runs dbt **once** across the entire pipeline and sends model progress updates via Airflow **XComs**.
+  Runs dbt **once** across the entire pipeline, register to `dbt event callbacks <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_ and sends model progress updates via Airflow **XComs**.
 
 * **``DbtConsumerWatcherSensor``** (`#1998 <https://github.com/astronomer/astronomer-cosmos/pull/1998>`_)
   Watches those XComs and marks individual Airflow tasks as complete when their corresponding dbt models finish.

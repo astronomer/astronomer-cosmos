@@ -26,7 +26,7 @@ def mock_postgres_conn():  # type: ignore
         schema="my_database",
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -45,7 +45,7 @@ def mock_postgres_conn_custom_port():  # type: ignore
         schema="my_database",
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -78,19 +78,19 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = PostgresUserPasswordProfileMapping(conn, {"schema": "my_schema"})
             assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**{k: v for k, v in potential_values.items() if k != "schema"})
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = PostgresUserPasswordProfileMapping(conn, {"schema": None})
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = PostgresUserPasswordProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
 

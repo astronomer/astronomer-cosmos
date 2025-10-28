@@ -22,7 +22,7 @@ def mock_teradata_conn():  # type: ignore
         password="my_password",
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -41,7 +41,7 @@ def mock_teradata_conn_custom_tmode():  # type: ignore
         extra='{"tmode": "TERA"}',
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -68,18 +68,18 @@ def test_connection_claiming() -> None:
         del values[key]
         conn = Connection(**values)  # type: ignore
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = TeradataUserPasswordProfileMapping(conn)
             assert not profile_mapping.can_claim_connection()
 
     # Even there is no schema, making user as schema as user itself schema in teradata
     conn = Connection(**{k: v for k, v in potential_values.items() if k != "schema"})
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TeradataUserPasswordProfileMapping(conn, {"schema": None})
         assert profile_mapping.can_claim_connection()
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TeradataUserPasswordProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
 

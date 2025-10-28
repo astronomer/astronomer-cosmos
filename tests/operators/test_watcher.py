@@ -4,7 +4,7 @@ import zlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
@@ -24,7 +24,7 @@ from cosmos.operators.watcher import (
     DbtTestWatcherOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from tests.utils import AIRFLOW_VERSION
+from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
@@ -232,6 +232,37 @@ def test_execute_fallback_mode(tmp_path):
     assert data["results"][0]["status"] == "success"
 
 
+@pytest.mark.parametrize(
+    "user_callback, expected_behavior",
+    [
+        (None, "none"),
+        ([Mock(name="cb1")], "list"),
+        (Mock(name="cb2"), "single"),
+    ],
+)
+def test_set_on_failure_callback_with_actual_airflow(user_callback, expected_behavior, tmp_path):
+
+    instance = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
+    result = instance._set_on_failure_callback(user_callback)
+
+    if AIRFLOW_VERSION < Version("2.6.0"):
+        # Always returns single callable regardless of input
+        assert callable(result)
+        assert result == instance._store_producer_task_state
+    else:
+        # Returns list depending on input
+        assert isinstance(result, list)
+        assert result[-1] == instance._store_producer_task_state
+
+        if expected_behavior == "none":
+            assert len(result) == 1
+        elif expected_behavior == "list":
+            assert len(result) == 2
+        elif expected_behavior == "single":
+            assert len(result) == 2
+            assert result[0] == user_callback
+
+
 @patch("cosmos.dbt.runner.is_available", return_value=False)
 @patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")
 def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
@@ -249,6 +280,16 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
 
     assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
+
+
+def test_store_producer_task_state_pushes_failed_state():
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti}
+    instance = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+    instance._store_producer_task_state(mock_context)
+
+    mock_ti.xcom_push.assert_called_once_with(key="state", value="failed")
 
 
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
@@ -291,7 +332,7 @@ class TestDbtConsumerWatcherSensor:
         sensor.invocation_mode = InvocationMode.DBT_RUNNER
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.side_effect = [None, None]  # no event msg found
+        ti.xcom_pull.side_effect = [None, None, None]  # no event msg found
         context = self.make_context(ti)
 
         result = sensor.poke(context)
@@ -309,7 +350,8 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is True
 
-    def test_invocation_mode_none(self):
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_state", return_value=None)
+    def _fallback_to_local_run(self, mock_get_producer_task_state):
         sensor = self.make_sensor()
         sensor.invocation_mode = None
 
@@ -317,7 +359,6 @@ class TestDbtConsumerWatcherSensor:
         ti.try_number = 1
         ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
         context = self.make_context(ti)
-
         result = sensor.poke(context)
         assert result is True
 
@@ -356,14 +397,14 @@ class TestDbtConsumerWatcherSensor:
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
 
-    def test_handle_task_retry(self):
+    def test_fallback_to_local_run(self):
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
-        result = sensor._handle_task_retry(2, context)
+        result = sensor._fallback_to_local_run(2, context)
 
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
@@ -411,6 +452,44 @@ class TestDbtConsumerWatcherSensor:
         result = sensor._get_status_from_events(ti)
         assert result is None
 
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    def test_producer_state_failed(self, mock_run_result):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        sensor.poke_retry_number = 1
+        mock_run_result.return_value = None
+        ti.xcom_pull.return_value = "failed"
+
+        context = self.make_context(ti)
+
+        with pytest.raises(
+            AirflowException,
+            match="The dbt build command failed in producer task. Please check the log of task dbt_producer_watcher for details.",
+        ):
+            sensor.poke(context)
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_local_run")
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    def test_producer_state_does_not_fail_if_previously_upstream_failed(
+        self, mock_run_result, mock_fallback_to_local_run
+    ):
+        """
+        Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
+        More details: https://github.com/astronomer/astronomer-cosmos/pull/2062
+        """
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        sensor.poke_retry_number = 0
+        mock_run_result.return_value = None
+        ti.xcom_pull.return_value = "failed"
+
+        context = self.make_context(ti)
+
+        sensor.poke(context)
+        mock_fallback_to_local_run.assert_called_once()
+
 
 class TestDbtBuildWatcherOperator:
 
@@ -428,11 +507,9 @@ class TestDbtBuildWatcherOperator:
 @pytest.mark.integration
 def test_dbt_dag_with_watcher():
     """
-    Run a DbtDag using dbt Fusion.
-    Confirm it succeeds and has the expected amount of both:
-    - dbt resources
-    - Airflow tasks
-    And that the tasks are in the expected topological order.
+    Run a DbtDag using `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
     """
     watcher_dag = DbtDag(
         project_config=project_config,
@@ -445,10 +522,10 @@ def test_dbt_dag_with_watcher():
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
     )
-    outcome = watcher_dag.test()
+    outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
-    assert len(watcher_dag.dbt_graph.filtered_nodes) == 26
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 23
 
     assert len(watcher_dag.task_dict) == 14
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
@@ -469,6 +546,7 @@ def test_dbt_dag_with_watcher():
         "orders.test",
     ]
     assert tasks_names == expected_task_names
+
     assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
     assert isinstance(watcher_dag.task_dict["raw_customers_seed"], DbtSeedWatcherOperator)
     assert isinstance(watcher_dag.task_dict["raw_orders_seed"], DbtSeedWatcherOperator)
@@ -483,3 +561,96 @@ def test_dbt_dag_with_watcher():
     assert isinstance(watcher_dag.task_dict["stg_payments.test"], DbtTestWatcherOperator)
     assert isinstance(watcher_dag.task_dict["customers.test"], DbtTestWatcherOperator)
     assert isinstance(watcher_dag.task_dict["orders.test"], DbtTestWatcherOperator)
+
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
+        "raw_payments_seed",
+        "raw_orders_seed",
+        "raw_customers_seed",
+    }
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_task_group_with_watcher():
+    """
+    Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    from airflow import DAG
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    from cosmos import DbtTaskGroup, ExecutionConfig
+    from cosmos.config import RenderConfig
+    from cosmos.constants import ExecutionMode, TestBehavior
+
+    operator_args = {
+        "install_deps": True,  # install any necessary dependencies before running any dbt command
+        "execution_timeout": timedelta(seconds=120),
+    }
+
+    with DAG(
+        dag_id="example_watcher_taskgroup",
+        start_date=datetime(2025, 1, 1),
+    ) as dag_dbt_task_group_watcher:
+        """
+        The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+        """
+        pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+        dbt_task_group = DbtTaskGroup(
+            group_id="dbt_task_group",
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.WATCHER,
+            ),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+
+        pre_dbt
+        dbt_task_group
+
+    # Unfortunately, due to a bug in Airflow, we are not being able to set the producer task as an upstream task of the other TaskGroup tasks:
+    # https://github.com/apache/airflow/issues/56723
+    # When we run dag.test(), non-producer tasks are being executed before the producer task was scheduled.
+    # For this reason, we are commenting out these two lines for now:
+    # outcome = dag_dbt_task_group_watcher.test()
+    # assert outcome.state == DagRunState.SUCCESS
+    # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
+
+    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
+
+    expected_task_names = [
+        "pre_dbt",
+        "dbt_task_group.raw_customers_seed",
+        "dbt_task_group.raw_orders_seed",
+        "dbt_task_group.raw_payments_seed",
+        "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.stg_customers_run",
+        "dbt_task_group.stg_orders_run",
+        "dbt_task_group.stg_payments_run",
+        "dbt_task_group.customers_run",
+        "dbt_task_group.orders_run",
+    ]
+    assert tasks_names == expected_task_names
+
+    assert isinstance(
+        dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"], DbtProducerWatcherOperator
+    )
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_customers_seed"], DbtSeedWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_orders_seed"], DbtSeedWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_payments_seed"], DbtSeedWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_customers_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_orders_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_payments_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
+
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()

@@ -180,11 +180,12 @@ How retries work
 ................
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
-The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, will retry the dbt command by themselves using the same behaviour as ``ExecutionMode.LOCAL``.
+
+The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, can retry the dbt command by themselves using the same behaviour as ``ExecutionMode.LOCAL``.
+
+If a branch of the DAG failed, users can clear the status of a failed consumer task, including its downstream tasks, via the Airflow UI - and each of them will run using the ``ExecutionMode.LOCAL``.
 
 Currently, we do not support retrying the ``DbtProducerWatcherOperator`` task itself.
-
-
 
 -------------------------------------------------------------------------------
 
@@ -276,11 +277,23 @@ In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a 
 
 An improvement is to change this behaviour and implement an asynchronous sensor execution, so that the worker slot is released until the condition, validated by the Airflow triggerer, is met.
 
+The ticket to implement this behaviour is `#2059 <https://github.com/astronomer/astronomer-cosmos/issues/2059>`_.
+
 Airflow Datasets and Assets
 ...........................
 
 While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
 
+Source freshness nodes
+......................
+
+Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
+
+We noticed some Cosmos users use this feature alongside `overriding Cosmos source nodes <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#customizing-how-nodes-are-rendered-experimental>`_ as sensors or another operator that allows them to skip the following branch of the DAG if the source is not fresh.
+
+This use-case is not currently supported by the ``ExecutionMode.WATCHER``, since the ``dbt build`` command does not run `source freshness checks <https://docs.getdbt.com/reference/commands/build#source-freshness-checks>`_.
+
+We have a follow up ticket to `further investigate this use-case <https://github.com/astronomer/astronomer-cosmos/issues/2053>`_.
 
 -------------------------------------------------------------------------------
 

@@ -12,13 +12,13 @@ from cosmos.operators.watcher import DbtTestWatcherOperator
 
 try:
     # Airflow 3.1 onwards
+    from airflow.providers.standard.operators.empty import EmptyOperator
     from airflow.sdk import TaskGroup
     from airflow.sdk.definitions._internal.abstractoperator import DEFAULT_OWNER
-    from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:
-    from airflow.utils.task_group import TaskGroup
     from airflow.models.abstractoperator import DEFAULT_OWNER
     from airflow.operators.empty import EmptyOperator
+    from airflow.utils.task_group import TaskGroup
 
 from packaging import version
 

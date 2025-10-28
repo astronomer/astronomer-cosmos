@@ -240,8 +240,8 @@ This means that you can define a single callback function for all ``ExecutionMod
 If there is demand, we will supporting different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
 
 
-Overriding operator_args
-........................
+Overriding ``operator_args``
+............................
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
@@ -276,6 +276,10 @@ In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a 
 
 An improvement is to change this behaviour and implement an asynchronous sensor execution, so that the worker slot is released until the condition, validated by the Airflow triggerer, is met.
 
+Airflow Datasets and Assets
+...........................
+
+While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
 
 
 -------------------------------------------------------------------------------
@@ -293,4 +297,4 @@ Summary
 
 This is an experimental feature and we are looking for feedback from the community.
 
-Stay tuned for further documentation and base image support for the Watcher Exection Mode in upcoming releases.
+Stay tuned for further documentation and base image support for the Watcher Execution Mode in upcoming releases.

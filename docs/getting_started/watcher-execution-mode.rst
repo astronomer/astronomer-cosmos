@@ -263,7 +263,7 @@ As a starting point, this execution mode does not support the ``TestBehavior.AFT
 
 The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
 
-Users can still use  the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
+Users can still use the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
 
 Sensor slot allocation and polling
 ...................................

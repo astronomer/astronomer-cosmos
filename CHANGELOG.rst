@@ -19,7 +19,7 @@ Features
   * Add initial documentation for ``ExecutionMode.WATCHER`` by @tatiana in #2046
   * Support running ``State.UPSTREAM_FAILED`` tasks when WATCHER consumer upstream tasks fail by @tatiana in #2062
   * Fail sensor tasks immediately if the ``ExecutionMode.WATCHER`` producer task fails by @pankajastro in #2040
-  * Add ``WATCHER``` to GitHub issue template by @tatiana in #2056
+  * Add ``WATCHER`` to GitHub issue template by @tatiana in #2056
   * Add support for ``TestBehavior.AFTER_ALL`` with ``ExecutionMode.WATCHER`` by @pankajastro in #2049
   * Add support for ``TestBehavior.NONE`` with ``ExecutionMode.WATCHER``  by @pankajastro in #2047
   * Fix ``ExecutionMode.WATCHER`` behaviour with ``DbtTaskGroup`` by @tatiana in #2044

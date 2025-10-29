@@ -57,7 +57,9 @@ class _MockContext(dict):
     pass
 
 
-def _fake_event(name: str = "NodeFinished", uid: str = "model.pkg.m"):
+def _fake_event(
+    name: str = "NodeFinished", uid: str = "model.pkg.m", resource_type: str | None = None, node_path: str | None = None
+):
     """Create a minimal fake EventMsg-like object suitable for helper tests."""
 
     class _Info(SimpleNamespace):
@@ -70,6 +72,10 @@ def _fake_event(name: str = "NodeFinished", uid: str = "model.pkg.m"):
         pass
 
     node_info = _NodeInfo(unique_id=uid)
+    if resource_type is not None:
+        setattr(node_info, "resource_type", resource_type)
+    if node_path is not None:
+        setattr(node_info, "node_path", node_path)
     run_result = _RunResult(status="success", message="ok")
 
     data = SimpleNamespace(node_info=node_info, run_result=run_result)
@@ -154,6 +160,49 @@ def test_handle_node_finished_pushes_xcom():
     stored = list(ti.store.values())[0]
     raw = zlib.decompress(base64.b64decode(stored)).decode()
     assert json.loads(raw) == {"foo": "bar"}
+
+
+def test_handle_node_finished_injects_compiled_sql(tmp_path, monkeypatch):
+    op = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
+    ti = _MockTI()
+    ctx = _MockContext(ti=ti)
+
+    # Create compiled SQL file at expected path: target/compiled/pkg/models/my_model.sql
+    compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+    compiled_dir.mkdir(parents=True)
+    compiled_file = compiled_dir / "my_model.sql"
+    sql_text = "select 1"
+    compiled_file.write_text(sql_text, encoding="utf-8")
+
+    # Ensure watcher looks up under this tmp project dir
+    monkeypatch.chdir(tmp_path)
+
+    with patch.object(op, "_serialize_event", return_value={}):
+        ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
+        op._handle_node_finished(ev, ctx)
+
+    stored = list(ti.store.values())[0]
+    raw = zlib.decompress(base64.b64decode(stored)).decode()
+    data = json.loads(raw)
+    assert data.get("compiled_sql") == sql_text
+
+
+def test_handle_node_finished_without_compiled_sql_does_not_inject(tmp_path, monkeypatch):
+    op = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
+    ti = _MockTI()
+    ctx = _MockContext(ti=ti)
+
+    # Ensure watcher looks up under this tmp project dir, but do NOT create compiled file
+    monkeypatch.chdir(tmp_path)
+
+    with patch.object(op, "_serialize_event", return_value={}):
+        ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
+        op._handle_node_finished(ev, ctx)
+
+    stored = list(ti.store.values())[0]
+    raw = zlib.decompress(base64.b64decode(stored)).decode()
+    data = json.loads(raw)
+    assert "compiled_sql" not in data
 
 
 def test_execute_streaming_mode():
@@ -440,17 +489,31 @@ class TestDbtConsumerWatcherSensor:
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.xcom_pull.side_effect = [None, ENCODED_EVENT]
+        context = self.make_context(ti)
 
-        result = sensor._get_status_from_events(ti)
+        result = sensor._get_status_from_events(ti, context)
         assert result == "success"
 
     def test_get_status_from_events_none(self):
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.xcom_pull.side_effect = [None, None]
+        context = self.make_context(ti)
 
-        result = sensor._get_status_from_events(ti)
+        result = sensor._get_status_from_events(ti, context)
         assert result is None
+
+    def test_get_status_from_events_sets_compiled_sql(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        event_payload = {"data": {"run_result": {"status": "success"}}, "compiled_sql": "select 42"}
+        encoded_event = base64.b64encode(zlib.compress(json.dumps(event_payload).encode())).decode("utf-8")
+        ti.xcom_pull.side_effect = [None, encoded_event]
+        context = self.make_context(ti)
+
+        result = sensor._get_status_from_events(ti, context)
+        assert result == "success"
+        assert sensor.compiled_sql == "select 42"
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
     def test_producer_state_failed(self, mock_run_result):

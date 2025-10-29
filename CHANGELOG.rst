@@ -70,7 +70,7 @@ Others
 * Disable Scarf in CI by @pankajastro in #2016
 * Fix failing dbt Fusion tests when run in parallel in CI by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1896
 * Fix MyPy issues related to ``ObjectStoragePath`` in main branch by @tatiana in #2012
-* Cleanup example dbt event JSON dictionaries kept for XCOM referencby @pankajkoti in #1997
+* Cleanup example dbt event JSON dictionaries kept for XCOM reference by @pankajkoti in #1997
 * Bump min hatch version that includes fixes for click>=8.3.0 by @pankajkoti in #1996
 * Use official postgres image from Docker hub for kubernetes setup by @pankajkoti in #1986
 * Use click<8.3.0 for hatch as click 8.3 breaks hatch by @pankajkoti in #1987

@@ -34,6 +34,7 @@ Features
 * Add Scarf metric to collect the execution mode uses by @pankajastro in #1981
 * Support Airflow 3.1 by @tatiana in #1980
 * Add MySQL profile mapping by @Lee2532 in #1977
+* Add sqlserver profile mapping by @pankajastro in #1737 
 
 Enhancement
 

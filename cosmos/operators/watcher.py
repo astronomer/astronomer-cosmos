@@ -6,7 +6,7 @@ import logging
 import zlib
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, List, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Union
 
 import airflow
 from packaging.version import Version

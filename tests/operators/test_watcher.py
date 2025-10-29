@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import json
 import zlib
@@ -474,7 +476,7 @@ class TestDbtConsumerWatcherSensor:
         ti = MagicMock()
         ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
 
-        result = sensor._get_status_from_run_results(ti)
+        result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
         assert result == "success"
 
     def test_get_status_from_run_results_none(self):
@@ -482,7 +484,7 @@ class TestDbtConsumerWatcherSensor:
         ti = MagicMock()
         ti.xcom_pull.return_value = None
 
-        result = sensor._get_status_from_run_results(ti)
+        result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
         assert result is None
 
     def test_get_status_from_events_success(self):

@@ -183,7 +183,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
-    template_fields = ("model_unique_id",)  # type: ignore[operator]
+    template_fields = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
     poke_retry_number: int = 0
 
     def __init__(
@@ -391,7 +391,7 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
@@ -399,7 +399,7 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

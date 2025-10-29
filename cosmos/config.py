@@ -76,6 +76,7 @@ class RenderConfig:
     :param normalize_task_display_name: A callable that takes a dbt node as input and returns the task display name. This allows users to assign a custom task display name separate from the node ID.
     :param should_detach_multiple_parents_tests: A boolean that allows users to decide whether to run tests with multiple parent dependencies in separate tasks.
     :param enable_owner_inheritance: A boolean that allows users to enable the owner inheritance from dbt models to airflow tasks. Defaults to True.
+    :param node_conversion_by_task_group: A boolean that allows users to do node conversion at the task group level instead of task level.  Defaults to True.
     """
 
     emit_datasets: bool = True
@@ -100,6 +101,7 @@ class RenderConfig:
     normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
     enable_owner_inheritance: bool | None = True
+    node_conversion_by_task_group: bool | None = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

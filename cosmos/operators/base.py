@@ -306,6 +306,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         cmd_flags: list[str],
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
@@ -313,7 +314,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if self.extra_context:
             context_merge(context, self.extra_context)
 
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
 
 
 class DbtBuildMixin:

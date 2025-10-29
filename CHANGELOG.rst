@@ -58,6 +58,7 @@ Documentation
 * Add docs note for param virtualenv_dir for async execution mode by @pankajastro in #1969
 * Use pepy.tech downloads badge in README by @pankajkoti in #1920
 * Correct the default value of ``cache_dir`` by @seokyun.ha in #2027
+* Improve ``ExecutionMode.WATCHER`` docs by @tatiana in #2071
 
 Others
 

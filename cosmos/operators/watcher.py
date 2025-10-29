@@ -6,7 +6,7 @@ import logging
 import zlib
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, List, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Union
 
 import airflow
 from packaging.version import Version
@@ -303,7 +303,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
-    def _get_status_from_run_results(self, ti: Any) -> Any:
+    def _get_status_from_run_results(self, ti: Any, context: Context) -> Any:
         compressed_b64_run_results = ti.xcom_pull(task_ids=self.producer_task_id, key="run_results")
 
         if not compressed_b64_run_results:
@@ -323,6 +323,10 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             return None
 
         logger.info("Node Info: %s", run_results_str)
+        self.compiled_sql = node_result.get("compiled_code")
+        if self.compiled_sql:
+            self._override_rtif(context)
+
         return node_result.get("status")
 
     def _get_producer_task_state(self, ti: Any) -> Any:
@@ -356,7 +360,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if use_events:
             status = self._get_status_from_events(ti, context)
         else:
-            status = self._get_status_from_run_results(ti)
+            status = self._get_status_from_run_results(ti, context)
 
         if status is None:
 
@@ -411,7 +415,7 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

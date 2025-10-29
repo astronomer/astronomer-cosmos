@@ -112,42 +112,46 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
                 return [user_callback, default_callback]
 
     @staticmethod
-    def _serialize_event(ev: EventMsg) -> dict[str, Any]:
+    def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
         """Convert structured dbt EventMsg to plain dict."""
         from google.protobuf.json_format import MessageToDict
 
-        return MessageToDict(ev, preserving_proto_field_name=True)  # type: ignore[no-any-return]
+        return MessageToDict(event_message, preserving_proto_field_name=True)  # type: ignore[no-any-return]
 
-    def _handle_startup_event(self, ev: EventMsg, startup_events: list[dict[str, Any]]) -> None:
-        info = ev.info  # type: ignore[attr-defined]
+    def _handle_startup_event(self, event_message: EventMsg, startup_events: list[dict[str, Any]]) -> None:
+        info = event_message.info  # type: ignore[attr-defined]
         raw_ts = getattr(info, "ts", None)
         ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]
         startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
 
-    def _extract_compiled_sql_for_node_event(self, ev: EventMsg) -> str | None:
-        if getattr(ev.data.node_info, "resource_type", None) != "model":
+    def _extract_compiled_sql_for_node_event(self, event_message: EventMsg) -> str | None:
+        if getattr(event_message.data.node_info, "resource_type", None) != "model":
             return None
-        uid = ev.data.node_info.unique_id
-        node_path = str(ev.data.node_info.node_path)
+        uid = event_message.data.node_info.unique_id
+        node_path = str(event_message.data.node_info.node_path)
         package = uid.split(".")[1]
         compiled_sql_path = Path.cwd() / "target" / "compiled" / package / "models" / node_path
-        if compiled_sql_path.exists():
-            return compiled_sql_path.read_text(encoding="utf-8").strip() or None
-        return None
+        if not compiled_sql_path.exists():
+            logger.warning(
+                "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
+                compiled_sql_path,
+            )
+            return None
+        return compiled_sql_path.read_text(encoding="utf-8").strip() or None
 
     def _handle_node_finished(
         self,
-        ev: EventMsg,
+        event_message: EventMsg,
         context: Context,
     ) -> None:
-        logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", ev)
+        logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", event_message)
         ti = context["ti"]
-        uid = ev.data.node_info.unique_id
-        ev_dict = self._serialize_event(ev)
-        compiled_sql = self._extract_compiled_sql_for_node_event(ev)
+        uid = event_message.data.node_info.unique_id
+        event_message_dict = self._serialize_event(event_message)
+        compiled_sql = self._extract_compiled_sql_for_node_event(event_message)
         if compiled_sql:
-            ev_dict["compiled_sql"] = compiled_sql
-        payload = base64.b64encode(zlib.compress(json.dumps(ev_dict).encode())).decode()
+            event_message_dict["compiled_sql"] = compiled_sql
+        payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
         ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
@@ -172,12 +176,12 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
             if use_events:
 
-                def _callback(ev: EventMsg) -> None:
-                    name = ev.info.name
+                def _callback(event_message: EventMsg) -> None:
+                    name = event_message.info.name
                     if name in {"MainReportVersion", "AdapterRegistered"}:
-                        self._handle_startup_event(ev, startup_events)
+                        self._handle_startup_event(event_message, startup_events)
                     elif name == "NodeFinished":
-                        self._handle_node_finished(ev, context)
+                        self._handle_node_finished(event_message, context)
 
                 self._dbt_runner_callbacks = [_callback]
                 result = super().execute(context=context, **kwargs)
@@ -198,7 +202,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
 
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
-    template_fields = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
+    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
     poke_retry_number: int = 0
 
     def __init__(
@@ -213,6 +217,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         execution_timeout: timedelta = timedelta(hours=1),
         **kwargs: Any,
     ) -> None:
+        self.compiled_sql = ""
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         kwargs.setdefault("priority_weight", CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
@@ -387,7 +392,7 @@ class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: i
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -398,7 +403,7 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
 
 class DbtSourceWatcherOperator(DbtSourceLocalOperator):
@@ -414,7 +419,7 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

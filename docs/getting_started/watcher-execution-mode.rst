@@ -172,6 +172,7 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
 Additional details
 -------------------
 
+~~~~~~~~~~~~~~~~
 How retries work
 ~~~~~~~~~~~~~~~~
 
@@ -190,6 +191,7 @@ Known Limitations
 
 These limitations will be revisited as the feature matures.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -208,6 +210,7 @@ Example of ``requirements.txt`` file:
     dbt-bigquery==1.10
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Producer task implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -215,6 +218,7 @@ The producer task is implemented as a ``DbtProducerWatcherOperator`` operator an
 
 There are discussions about allowing this node to be implemented as the ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.KUBERNETES`` execution modes, so that there is a higher isolation between dbt and Airflow dependencies.
 
+~~~~~~~~~~~~~~~~~~~~~~~~
 Individual dbt Operators
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -240,6 +244,7 @@ Finally, the following features are not implemented as operators under ``Executi
 
 You can still invoke these operators using the default ``ExecutionMode.LOCAL`` mode.
 
+~~~~~~~~~~~~~~~~
 Callback support
 ~~~~~~~~~~~~~~~~
 
@@ -250,6 +255,7 @@ This means that you can define a single callback function for all ``ExecutionMod
 If there is demand, we will support different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overriding ``operator_args``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -257,6 +263,7 @@ The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators ha
 
 We plan to support different ``operator_args`` for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators in the future.
 
+~~~~~~~~~~~~~
 Test behavior
 ~~~~~~~~~~~~~
 
@@ -268,6 +275,7 @@ The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWa
 
 Users can still use the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sensor slot allocation and polling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -278,7 +286,7 @@ The consequence is that tasks may take longer to be updated if they are not sens
 
 We plan to review this behaviour and alternative approaches in the future.
 
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Synchronous sensor execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -288,11 +296,13 @@ An improvement is to change this behaviour and implement an asynchronous sensor 
 
 The ticket to implement this behaviour is `#2059 <https://github.com/astronomer/astronomer-cosmos/issues/2059>`_.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Airflow Datasets and Assets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
 
+~~~~~~~~~~~~~~~~~~~~~~
 Source freshness nodes
 ~~~~~~~~~~~~~~~~~~~~~~
 

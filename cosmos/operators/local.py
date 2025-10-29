@@ -912,7 +912,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             context=context,
             run_as_async=run_as_async,
             async_context=async_context,
-            push_run_results_to_xcom=kwargs.get("push_run_results_to_xcom") or False,
+            push_run_results_to_xcom=kwargs.get("push_run_results_to_xcom", False),
         )
         return result
 

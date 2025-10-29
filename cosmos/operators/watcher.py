@@ -415,7 +415,7 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, str] = DbtConsumerWatcherSensor.template_fields
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

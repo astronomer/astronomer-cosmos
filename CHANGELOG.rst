@@ -66,7 +66,7 @@ Others
 * Add @pankajkoti and @pankajastro to ``contributors.rst`` by @tatiana in #1983
 * Update setup script for airflow3 script by @dwreeves in #2023
 * Prevent pytest from trying to test classes that aren't actually tests by @anyapriya in #2032
-* Fix ``dag.test()`` for Airflow 3.1+ by syncing DAG to database bby @kaxil in #2037
+* Fix ``dag.test()`` for Airflow 3.1+ by syncing DAG to database by @kaxil in #2037
 * Disable Scarf in CI by @pankajastro in #2016
 * Fix failing dbt Fusion tests when run in parallel in CI by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1896
 * Fix MyPy issues related to ``ObjectStoragePath`` in main branch by @tatiana in #2012

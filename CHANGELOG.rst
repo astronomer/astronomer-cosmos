@@ -6,7 +6,7 @@ Changelog
 
 Features
 
-* Introduce ``ExecutionMode.WATCHER`` to reduce DAG run time by 1/5 in several PRs, including:
+* Introduce ``ExecutionMode.WATCHER`` to reduce DAG run time by 1/5 in several PRs. Learn more about it `here <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html#watcher-execution-mode>`_. This feature was implemented via multiple PRs, including:
   * Expose new execution mode by @tatiana @pankajastro @pankajkoti in #1999
   * Add ``DbtProducerWatcherOperator`` for the proposed ``ExecutionMode.WATCHER`` by @pankajkoti in #1982
   * Add ``DbtConsumerWatcherSensor`` for the proposed ``ExecutionMode.WATCHER`` by @pankajastro in #1998
@@ -25,7 +25,7 @@ Features
   * Fix ``ExecutionMode.WATCHER`` behaviour with ``DbtTaskGroup`` by @tatiana in #2044
   * Fix Cosmos behaviour when using watcher with ``InvocationMode.DBT_RUNNER`` by @tatiana in #2048
 
-* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009
+* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009, check the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/hosting-docs.html>`_.
 * Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/configuration/dbt-fusion>`_.
 * Support to prune sources without downstream references in dbt projects by @corsettigyg in #1988
 * Allow to set task display name as a user-defined function by @corsettigyg in #1761

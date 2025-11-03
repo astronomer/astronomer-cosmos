@@ -36,8 +36,8 @@ API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_
 API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
 
-# Note: Airflow 3.1.0 and 3.1.1 had a limitation where plugins could not resolve connections via the API server.
-# The fix was shipped in Airflow 3.1.2. For 3.1.0/3.1.1 we temporarily expose the connection via env vars inside a context manager.
+# Note: Airflow 3.1.0 had a limitation where plugins could not resolve connections via the API server.
+# The fix was shipped in Airflow 3.1.1. For 3.1.0, we temporarily expose the connection via env vars inside a context manager.
 @contextmanager
 def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  # pragma: no cover
     """
@@ -59,8 +59,8 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
 
 
 def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
-    # Use connection_env only for Airflow 3.1.0 and 3.1.1
-    if Version("3.1.0") <= AIRFLOW_VERSION < Version("3.1.2"):
+    # Use connection_env only for Airflow 3.1.0
+    if AIRFLOW_VERSION == Version("3.1.0"):
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
             with p.open("r") as f:  # type: ignore[no-untyped-call]

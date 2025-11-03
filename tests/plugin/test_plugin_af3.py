@@ -22,7 +22,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-_skip_pre_31 = pytest.mark.skipif(
+skip_pre_airflow_31 = pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("3.1.0"),
     reason="AF3 plugin only supported on Airflow >= 3.1",
 )
@@ -59,7 +59,7 @@ def _app_with_projects(projects: dict[str, dict[str, str]]):
     return af3, app
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_dbt_docs_view_and_index_local(tmp_path: Path):
     # Arrange: create local docs files
     docs_dir = tmp_path / "target"
@@ -97,7 +97,7 @@ def test_dbt_docs_view_and_index_local(tmp_path: Path):
     assert r.json() == {"sources": {}}
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_index_missing_file_returns_404(tmp_path: Path):
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)
@@ -111,7 +111,7 @@ def test_index_missing_file_returns_404(tmp_path: Path):
     assert "index not found" in r.text
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_manifest_and_catalog_error_500(tmp_path: Path):
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)
@@ -130,7 +130,7 @@ def test_manifest_and_catalog_error_500(tmp_path: Path):
         assert "catalog read failed" in r.text
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_external_view_href_uses_api_base_path():
     # Ensure base path is respected (e.g., Astronomer deployment prefix)
     _reload_af3_module(api_base="https://host/prefix/")
@@ -147,7 +147,7 @@ def test_external_view_href_uses_api_base_path():
         assert plugin.external_views[0]["href"].endswith("/cosmos/core/dbt_docs_index.html")
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_external_view_href_no_base_path():
     _reload_af3_module(api_base="")
 
@@ -161,7 +161,7 @@ def test_external_view_href_no_base_path():
     assert plugin.external_views[0]["href"].startswith("/cosmos/")
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_not_configured_routes():
     af3, app = _app_with_projects({"core": {}})
     client = TestClient(app)
@@ -260,7 +260,7 @@ def test_plugin_init_raises_on_pre_31():
     "af_ver, should_use_ctx",
     [
         ("3.1.0", True),
-        ("3.1.1", True),
+        ("3.1.1", False),
         ("3.1.2", False),
         ("3.2.0", False),
     ],
@@ -322,7 +322,7 @@ def test_load_projects_from_conf_valid_json():
     assert projects["core"]["name"] == "Core"
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_index_raises_exception_returns_500(tmp_path: Path):
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)
@@ -336,7 +336,7 @@ def test_index_raises_exception_returns_500(tmp_path: Path):
     assert "Cosmos dbt docs error" in r.text
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_catalog_not_configured_returns_404():
     af3, app = _app_with_projects({"core": {}})
     client = TestClient(app)
@@ -345,7 +345,7 @@ def test_catalog_not_configured_returns_404():
     assert r.json()["error"] == "not configured"
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_manifest_missing_includes_path_and_connid(tmp_path: Path):
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)
@@ -370,7 +370,7 @@ def test_manifest_missing_includes_path_and_connid(tmp_path: Path):
     assert body["path"].endswith("/target/manifest.json")
 
 
-@_skip_pre_31
+@skip_pre_airflow_31
 def test_catalog_missing_includes_path_and_connid(tmp_path: Path):
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)

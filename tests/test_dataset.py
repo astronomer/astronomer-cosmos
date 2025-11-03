@@ -2,7 +2,12 @@ from datetime import datetime
 
 import pytest
 from airflow import DAG
-from airflow.utils.task_group import TaskGroup
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos.dataset import get_dataset_alias_name
 

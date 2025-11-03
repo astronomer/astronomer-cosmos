@@ -150,7 +150,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         if not settings.AIRFLOW_IO_AVAILABLE:  # pragma: no cover
             raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
-        from airflow.io.path import ObjectStoragePath
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
 
         file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
         dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]

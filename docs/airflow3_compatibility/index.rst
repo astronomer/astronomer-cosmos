@@ -46,6 +46,41 @@ functionality with Airflow 3 by extending our CI infrastructure:
 These additions ensure that all core functionality, workflows, and integrations provided by Cosmos continue to operate
 reliably under Airflow 3.
 
+Multiple dbt docs in Airflow 3 UI
+---------------------------------
+
+There have been significant changes to how plugins work in Airflow 3.x. Cosmos now supports Airflow 3 FastAPI plugins for UI integration and hosting dbt docs via external views.
+Cosmos registers a FastAPI sub-application at ``/cosmos`` and adds menu entries under **Browse**. Configure one or more projects in ``airflow.cfg`` under the ``[cosmos]`` section:
+
+.. code-block:: ini
+
+   [cosmos]
+   # Map of slug -> {dir, conn_id, index, name}
+   dbt_docs_projects = {
+     "core": {"dir": "/path/to/core/target", "index": "index.html", "name": "dbt Docs (Core)"},
+     "mart": {"dir": "s3://bucket/path/to/mart/target", "conn_id": "aws_default", "name": "dbt Docs (Mart)"}
+   }
+
+You can set the same mapping via the Airflow config environment variable ``AIRFLOW__COSMOS__DBT_DOCS_PROJECTS``.
+
+.. code-block:: bash
+
+   # Shell (note the single quotes to preserve JSON)
+   export AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
+.. code-block:: dockerfile
+
+   # Dockerfile
+   ENV AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
+.. code-block:: yaml
+
+   # Docker Compose / Kubernetes
+   environment:
+     AIRFLOW__COSMOS__DBT_DOCS_PROJECTS: '{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
+Docs are available at ``/cosmos/<slug>/dbt_docs_index.html``. Static assets are served directly for local directories or proxied for remote storage (S3/GCS/Azure/HTTP).
+
 Validation in Progress
 ----------------------
 
@@ -57,9 +92,6 @@ investigation.
 
 Known Limitations
 -----------------
-
-There have been significant changes to how plugins work in Airflow 3.0, and more changes are coming in Airflow 3.1.
-Even though the Cosmos dbt docs plugin is not currently working, we are actively working on supporting this feature.
 
 Airflow 3 DatasetAlias no longer support ASCII characters. This issue has been reported to the `Airflow community <https://github.com/apache/airflow/issues/51566>`_
 and we are also tracking it in the `Cosmos repository <https://github.com/astronomer/astronomer-cosmos/issues/1802>`_.

@@ -24,7 +24,7 @@ def mock_oracle_conn():  # type: ignore
         extra='{"service_name": "my_service"}',
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -43,7 +43,7 @@ def mock_oracle_conn_custom_port():  # type: ignore
         extra='{"service_name": "my_service"}',
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -63,13 +63,13 @@ def test_connection_claiming() -> None:
         del values[key]
         conn = Connection(**values)  # type: ignore
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = OracleUserPasswordProfileMapping(conn, {"schema": "my_schema"})
             assert not profile_mapping.can_claim_connection()
 
     # if we have all the required values, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = OracleUserPasswordProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
 
@@ -205,7 +205,7 @@ def test_invalid_connection_type() -> None:
     Tests that the profile mapping does not claim a non-oracle connection type.
     """
     conn = Connection(conn_id="invalid_conn", conn_type="postgres", login="my_user", password="my_password")
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = OracleUserPasswordProfileMapping(conn, {})
         assert not profile_mapping.can_claim_connection()
 

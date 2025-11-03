@@ -142,7 +142,7 @@ def upload_to_azure_wasb(
             )
 
 
-def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
+def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:
     """Configure the remote target path if it is provided."""
     from airflow.version import version as airflow_version
 
@@ -174,28 +174,35 @@ def _configure_remote_target_path() -> tuple[Path, str] | tuple[None, None]:
     return _configured_target_path, remote_conn_id
 
 
-def _construct_dest_file_path(
-    dest_target_dir: Path,
-    file_path: str,
-    source_target_dir: Path,
-    source_subpath: str,
-    **kwargs: Any,
+def construct_dest_file_path(
+    dest_root: Any | None,
+    rel_path: str,
+    *prefixes: str,
 ) -> str:
     """
-    Construct the destination path for the artifact files to be uploaded to the remote store.
+    Helper function for constructing normalized destination file paths for remote object storage uploads.
+
+    This function provides a consistent way to join multiple path segments — such as task-specific identifiers,
+    subpaths, and relative file locations — into a single, normalized path string. It is typically used alongside
+    helpers like ``upload_to_cloud_storage`` to generate fully qualified remote storage paths.
+
+    :param dest_root: Optional root prefix (e.g., S3 bucket URI or base path).
+    :param rel_path: Relative file path (e.g., "target/run_results.json").
+    :param prefixes: Optional prefix segments (e.g., DAG ID, run ID, task ID) that are prepended to the path.
+    :return: A normalized string representing the destination path for uploading or referencing in object storage.
     """
-    dest_target_dir_str = str(dest_target_dir).rstrip("/")
+    clean_prefixes = [p.strip("/") for p in prefixes if p]
+    clean_rel = rel_path.lstrip("/")
 
-    context = kwargs["context"]
-    task_run_identifier = (
-        f"{context['dag'].dag_id}"
-        f"/{context['run_id']}"
-        f"/{context['task_instance'].task_id}"
-        f"/{context['task_instance'].try_number}"
-    )
-    rel_path = os.path.relpath(file_path, source_target_dir).lstrip("/")
+    segments: list[str] = [*clean_prefixes, clean_rel]
+    if dest_root is None:
+        return "/".join(segments)
 
-    return f"{dest_target_dir_str}/{task_run_identifier}/{source_subpath}/{rel_path}"
+    root = str(dest_root).rstrip("/")
+    if not segments:
+        return root
+
+    return f"{root}/{'/'.join(segments)}"
 
 
 def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARGET_PATH, **kwargs: Any) -> None:
@@ -214,9 +221,22 @@ def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARG
 
     source_target_dir = Path(project_dir) / f"{source_subpath}"
     files = [str(file) for file in source_target_dir.rglob("*") if file.is_file()]
+
+    context = kwargs["context"]
+    task_run_identifier = (
+        f"{context['dag'].dag_id}"
+        f"/{context['run_id']}"
+        f"/{context['task_instance'].task_id}"
+        f"/{context['task_instance'].try_number}"
+    )
+
     for file_path in files:
-        dest_file_path = _construct_dest_file_path(
-            dest_target_dir, file_path, source_target_dir, source_subpath, **kwargs
+        rel_path = os.path.relpath(file_path, source_target_dir)
+        dest_file_path = construct_dest_file_path(
+            dest_target_dir,
+            rel_path,
+            task_run_identifier,
+            source_subpath,
         )
         dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
         ObjectStoragePath(file_path).copy(dest_object_storage_path)

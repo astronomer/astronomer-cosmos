@@ -149,6 +149,7 @@ def test_example_dag(session, dag_id: str):
 
 @pytest.mark.skipif(
     _PYTHON_VERSION < (3, 9)
+    or AIRFLOW_VERSION >= Version("3.1.0")  # TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/2045
     or AIRFLOW_VERSION < Version("2.8")
     or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="dbt-bigquery only supports Python 3.9 onwards. See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",

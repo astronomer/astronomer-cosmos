@@ -12,12 +12,15 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
+import airflow
 import pytest
 from airflow.models import Variable
+from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
     DBT_LOG_FILENAME,
     DBT_TARGET_DIR_NAME,
     DbtResourceType,
@@ -47,6 +50,13 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
+
+AIRFLOW_VERSION = Version(airflow.__version__)
+
+if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+    object_storage_path = "airflow.sdk.ObjectStoragePath"
+else:
+    object_storage_path = "airflow.io.path.ObjectStoragePath"
 
 
 @pytest.fixture
@@ -654,7 +664,7 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "project_dir,node_count",
-    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 39), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
+    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 40), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
 )
 def test_load_via_dbt_ls_without_exclude(project_dir, node_count, postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=project_dir)
@@ -1908,9 +1918,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("c2c47529eaec412281bdb243a479b734", "71bbf303ad4e06a7b1e2be20e0b73c0d")
+        assert hash_dir in ("7abb868ed1c22e78de1c00429d950a77", "85cba4ef17dd7c161938da6980a6ff85")
     else:
-        assert hash_dir == "71bbf303ad4e06a7b1e2be20e0b73c0d"
+        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
 
 
 @pytest.mark.integration
@@ -2021,7 +2031,7 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
 def test_save_dbt_ls_cache_remote_cache_dir(
@@ -2045,7 +2055,7 @@ def test_save_dbt_ls_cache_remote_cache_dir(
 
 
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("airflow.io.path.ObjectStoragePath")
+@patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
 def test_get_dbt_ls_cache_remote_cache_dir(
@@ -2114,3 +2124,83 @@ def test_run_dbt_ls(
     graph.local_flags = []
     graph.run_dbt_ls(dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={})
     assert len(mock_run_command.call_args[0][0]) == expected_args_count
+
+
+# ------------------------------------------------------------------------------
+# Tests for handling `tags` field edge cases (null or missing) in manifest nodes
+# ------------------------------------------------------------------------------
+
+
+def _create_manifest_with_tags(tmp_path: Path, tags_value):
+    """Helper to create a minimal manifest with configurable `tags` value."""
+    manifest_content = {
+        "nodes": {
+            "model.test_project.my_model": {
+                "unique_id": "model.test_project.my_model",
+                "resource_type": "model",
+                "package_name": "test_project",
+                "depends_on": {"nodes": []},
+                "original_file_path": "models/my_model.sql",
+                # The key/value below is the part we vary across tests
+                **({"tags": tags_value} if tags_value is not _MISSING_TAGS else {}),
+                "config": {},
+            }
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+    return manifest_path
+
+
+_MISSING_TAGS = object()
+
+
+@pytest.mark.parametrize("tags_value", [None, _MISSING_TAGS])
+def test_load_manifest_handles_null_or_missing_tags(tags_value, tmp_path):
+    """Ensure that null or absent `tags` result in an empty list on the DbtNode object."""
+
+    project_path = tmp_path / "project"
+    (project_path / "models").mkdir(parents=True, exist_ok=True)
+
+    manifest_path = _create_manifest_with_tags(tmp_path, tags_value)
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    render_config = RenderConfig(source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+
+    dbt_graph = DbtGraph(
+        project=project_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    node = dbt_graph.nodes["model.test_project.my_model"]
+    assert node.tags == []
+
+
+def test_add_downstream_nodes():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load()
+
+    target_node = "model.jaffle_shop.stg_payments"
+    downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
+    assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes

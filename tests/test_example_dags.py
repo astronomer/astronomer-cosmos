@@ -72,7 +72,6 @@ def get_dag_bag() -> DagBag:  # noqa: C901
             file.writelines([f"{dagfile}\n"])
 
         if DBT_VERSION < Version("1.6.0"):
-            file.writelines(["simple_dag_async.py\n"])
             file.writelines(["example_model_version.py\n"])
             file.writelines(["example_operators.py\n"])
 
@@ -97,13 +96,40 @@ def get_dag_bag() -> DagBag:  # noqa: C901
     return db
 
 
+def get_dag_bag_single_dag(single_dag: str) -> DagBag:
+    """Create a DagBag by adding the files that are not supported to .airflowignore"""
+    # add everything to airflow ignore that isn't performance_dag.py
+    with open(AIRFLOW_IGNORE_FILE, "w+") as f:
+        for file in EXAMPLE_DAGS_DIR.iterdir():
+            if file.is_file() and file.suffix == ".py":
+                if file.name != single_dag:
+                    print(f"Adding {file.name} to .airflowignore")
+                    f.write(f"{file.name}\n")
+    print(".airflowignore contents: ")
+    print(AIRFLOW_IGNORE_FILE.read_text())
+    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    assert db.dags
+    assert not db.import_errors
+    return db
+
+
+def get_dagbag_depending_on_single_dag() -> DagBag:
+    """Return DagBag for a single DAG or for all DAGs, depending on environment variable TEST_SINGLE_DAG"""
+    single_dag = os.getenv("TEST_SINGLE_DAG")
+    if single_dag:
+        dag_bag = get_dag_bag_single_dag(single_dag)
+    else:
+        dag_bag = get_dag_bag()
+    return dag_bag
+
+
 def get_dag_ids() -> list[str]:
-    dag_bag = get_dag_bag()
+    dag_bag = get_dagbag_depending_on_single_dag()
     return dag_bag.dag_ids
 
 
 def run_dag(dag_id: str):
-    dag_bag = get_dag_bag()
+    dag_bag = get_dagbag_depending_on_single_dag()
     dag = dag_bag.get_dag(dag_id)
     assert dag
     test_utils.run_dag(dag)
@@ -123,6 +149,7 @@ def test_example_dag(session, dag_id: str):
 
 @pytest.mark.skipif(
     _PYTHON_VERSION < (3, 9)
+    or AIRFLOW_VERSION >= Version("3.1.0")  # TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/2045
     or AIRFLOW_VERSION < Version("2.8")
     or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="dbt-bigquery only supports Python 3.9 onwards. See PR: https://github.com/apache/airflow/pull/34585 and Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",

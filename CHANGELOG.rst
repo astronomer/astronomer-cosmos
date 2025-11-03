@@ -1,14 +1,145 @@
 Changelog
 =========
 
-1.11.0a1 (2025-06-23)
+1.11.0 (2025-10-29)
 ---------------------
 
-Feature
+Features
 
+* Introduce ``ExecutionMode.WATCHER`` to reduce DAG run time by 1/5 in several PRs. Learn more about it `here <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html#watcher-execution-mode>`_. This feature was implemented via multiple PRs, including:
+  * Expose new execution mode by @tatiana @pankajastro @pankajkoti in #1999
+  * Add ``DbtProducerWatcherOperator`` for the proposed ``ExecutionMode.WATCHER`` by @pankajkoti in #1982
+  * Add ``DbtConsumerWatcherSensor`` for the proposed ``ExecutionMode.WATCHER`` by @pankajastro in #1998
+  * Push producer's task completion status to XCOM by @pankajkoti in #2000
+  * Add default priority_weight for ``DbtProducerWatcherOperator`` by @pankajkoti in #1995
+  * Add sample dbt events for the dbt watcher execution mode by @pankajkoti in #1952
+  * Add ``compiled_sql`` as a template fields on ```ExecutionMode.WATCHER``` when using ``run_results.json`` by @pankajastro in #2070
+  * Set ``push_run_results_to_xcom`` kwargs correctly for invocation mode subprocess and Watcher mode by @pankajastro in #2067
+  * Store compiled SQL as template field for dbt callback events in ``ExecutionMode.WATCHER`` by @pankajkoti in #2068
+  * Add initial documentation for ``ExecutionMode.WATCHER`` by @tatiana in #2046
+  * Support running ``State.UPSTREAM_FAILED`` tasks when WATCHER consumer upstream tasks fail by @tatiana in #2062
+  * Fail sensor tasks immediately if the ``ExecutionMode.WATCHER`` producer task fails by @pankajastro in #2040
+  * Add ``WATCHER`` to GitHub issue template by @tatiana in #2056
+  * Add support for ``TestBehavior.AFTER_ALL`` with ``ExecutionMode.WATCHER`` by @pankajastro in #2049
+  * Add support for ``TestBehavior.NONE`` with ``ExecutionMode.WATCHER``  by @pankajastro in #2047
+  * Fix ``ExecutionMode.WATCHER`` behaviour with ``DbtTaskGroup`` by @tatiana in #2044
+  * Fix Cosmos behaviour when using watcher with ``InvocationMode.DBT_RUNNER`` by @tatiana in #2048
+
+* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009, check the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/hosting-docs.html>`_.
 * Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/configuration/dbt-fusion>`_.
+* Support to prune sources without downstream references in dbt projects by @corsettigyg in #1988
+* Allow to set task display name as a user-defined function by @corsettigyg in #1761
+* Add dbt project's hash to dag docs to support dag versioning in Airflow 3 by @pankajkoti in #1907
+* feat: Add Jinja templating support for ``dbt_cmd_flags`` by @skillicinski in #1899
+* Add Scarf metric to collect the execution mode uses by @pankajastro in #1981
+* Support Airflow 3.1 by @tatiana in #1980
+* Add MySQL profile mapping by @Lee2532 in #1977
+* Add sqlserver profile mapping by @pankajastro in #1737
 
-(many other features, pending details)
+Enhancement
+
+* Use XCom to store sql when using ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajastro in #1934
+* Refactor ``AIRFLOW_ASYNC`` teardown so it doesn't install the virtualenv by @pankajastro in #1938
+* Reuse the virtual env for ``AIRFLOW_ASYNC`` setup task by @pankajastro in #1939
+* Improve dataset/asset experience in Cosmos by @tatiana in #2030
+* Add ``downstreams`` to ``DbtNode`` by @wornjs in #2028
+
+Bug fixes
+
+* Fix tags extraction by @ms32035 in #1915
+* Fix task flow operator args by @anyapriya in #2024
+
+Documentation
+
+* Add documentation for Airflow 3 Plugin supporting dbt docs for multiple dbt projects by @pankajkoti in #2063
+* Add Cosmos Deferrable Operator Guide by @pankajastro in #1922
+* Add dbt Fusion documentation by @tatiana in #1824 #1830
+* Update dbt-fusion.rst to explicitly highlight it is in alpha by @tatiana in https://github.com/astronomer/astronomer-cosmos/pull/1838
+* Fix a bunch of docs build errors and warnings by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1886
+* Add docs note for param virtualenv_dir for async execution mode by @pankajastro in #1969
+* Use pepy.tech downloads badge in README by @pankajkoti in #1920
+* Correct the default value of ``cache_dir`` by @seokyun.ha in #2027
+* Improve ``ExecutionMode.WATCHER`` docs by @tatiana in #2071
+
+Others
+
+* Promote @corsettigyg to committer by @tatiana in #1985
+* Add @pankajkoti and @pankajastro to ``contributors.rst`` by @tatiana in #1983
+* Update setup script for airflow3 script by @dwreeves in #2023
+* Prevent pytest from trying to test classes that aren't actually tests by @anyapriya in #2032
+* Fix ``dag.test()`` for Airflow 3.1+ by syncing DAG to database by @kaxil in #2037
+* Disable Scarf in CI by @pankajastro in #2016
+* Fix failing dbt Fusion tests when run in parallel in CI by @pankajkoti in https://github.com/astronomer/astronomer-cosmos/pull/1896
+* Fix MyPy issues related to ``ObjectStoragePath`` in main branch by @tatiana in #2012
+* Cleanup example dbt event JSON dictionaries kept for XCOM reference by @pankajkoti in #1997
+* Bump min hatch version that includes fixes for click>=8.3.0 by @pankajkoti in #1996
+* Use official postgres image from Docker hub for kubernetes setup by @pankajkoti in #1986
+* Use click<8.3.0 for hatch as click 8.3 breaks hatch by @pankajkoti in #1987
+* Pin Airflow version in type check CI job by @pankajastro in #2003
+* Improve comments after feedback on #1948 by @tatiana in #1963
+* Fix running tests with dbt Fusion 2.0.0 preview versions by @tatiana in #1948
+* Test hardening of dbt node having tags as unset or missing by @pankajkoti in #1918
+* Fix Sphinx issue in the main branch by @tatiana in #2064
+* pre-commit autoupdate in #2065, #2043, #2033, #2019, #1990, #2019, #2008, #1941, #1935, #1924
+* GitHub dependabot update in #2051, #2050, #2038, #2022, #1947, #1955, #1946, #1944, #1945, #1928, #1921, #1917
+
+1.10.2 (2025-08-08)
+---------------------
+
+Bug Fixes
+
+* Fix task instance ``try_number`` attribute for Airflow 3 compatibility by @pankajkoti in #1781
+* Fix rendered template override logic when ``should_store_compiled_sql=False`` to restore pre-refactor behaviour by @pankajkoti in #1777
+* Fix ``ProfileConfig`` in GCP Cloud Run job execution mode by @ramonvermeulen in #1783
+* Fix dbt Docs page height by @1cadumagalhaes in #1793
+* Add support to base64 encoded pem in Snowflake profiles by @brunocmartins in #1801
+* Allow to disable owner inheritance from dbt into airflow DAG owners by @CorsettiS in #1787
+* Fix Kubernetes Pod Operator conversion of ``container_resources`` to ``resources`` by @johnhoran in #1821
+* Fix ``dbt deps`` with project level variables by @AlexandrKhabarov in #1822
+* Fix source freshness warnings in kubernetes execution mode by @Pawel-Drabczyk in #1859
+* Fix: Harden DbtNode against null config/meta by @pankajkoti in #1877
+* Fix cache behaviour when DAG name contains "." by @tatiana in #1908
+
+Documentation
+
+* Fix ``contributing.rst`` docs by @tatiana in #1785
+* Fix docs rendering in Airflow 3 Compatibility by @pankajastro in #1790
+* Fix typo in ``selecting-excluding.rst`` by @msshroff in #1814
+* Update testing behavior file with ``ExecutionMode.KUBERNETES`` by @LuigiCerone in #1813
+* Add step to fork repo in contributing guide by @pankajastro in #1808
+* Fix ``depends_on`` attribute by @benedikt-buchert in #1837
+* Fix character name by @ThePsyjo in #1860
+* Update suggested MWAA startup script by @jaklan in #1884
+* Make implementation & docs consistent regarding ``use_dataset_airflow3_uri_standard`` by @Anti0ff in #1878
+
+Others
+
+* Set retries to 0 in example DAGs by @pankajkoti in #1782
+* Fix ``test_async_example_dag_without_setup_task`` tests by @pankajastro in #1788
+* Fix test hash value for Darwin when using Py 3.12.10 by @tatiana in #1786
+* Upgrade Python and Airflow used to run MyPy checks by @tatiana in #1796
+* Assert example DAGs' ``DagRunState`` and fix issues by @pankajkoti and @tatiana in #1778
+* Update the conflict matrix to include AF 2.10, 2.11 & 3.0 and dbt 1.9 & 1.10 by @tatiana in #1820
+* Fix broken CI due to Pydantic conflicts by @tatiana in #1809
+* Drop Python 3.8 Support by @pankajastro in #1852
+* Add Airflow 2.11 to the test matrix by @tatiana in #1807
+* Require Authorize for all jobs on pull requests from external contributors in CI by @pankajkoti in #1861
+* Leverage Trusted Publisher Management when publishing PyPI package by @tatiana in #1862
+* CI: Add back accidentally deleted python-version matrix for running unit tests by @pankajkoti in #1872
+* Remove commented code and fix mypy failures by @pankajkoti in #1876
+* Add Zizmor analysis GitHub action by @pankajkoti in #1870
+* Catch FlushError on Datasets for Airflow 2.11 dags test by @pankajkoti in #1880
+* Add deprecation warning for ``LoadMode.CUSTOM`` parser by @duongphannamhung in #1885
+* CI: Add GitHub CodeQL analysis workflow (codeql.yml) by @pankajkoti in #1871
+* Resolve 'credential persistence through GitHub Actions artifacts' warnings from Zizmor by @pankajkoti in #1890
+* Resolve 'overly broad permissions' warnings from Zizmor by @pankajkoti in #1889
+* Resolve Zizmor error alerts for unpinned image references; mark alert for pull_request_target ignored by @pankajkoti in #1888
+* Fix broken CI ``tests.py3.11-2.8-1.9:test-integration-setup`` by @tatiana in #1902
+* Add dbt-core 1.10 to test matrix by @tatiana in #1767
+* Pin package dbt-databricks by @pankajastro in #1909
+* Enable matrix test entry for dbt-1.9, python-3.9 and airflow-3.0 tests in CI by @pankajastro in #1900
+* Pre-commit updates: #1779, #1795, #1800, #1857, #1863, #1869, #1892, #1901
+* Dependabot updates: #1904
 
 
 1.10.1 (2025-05-21)

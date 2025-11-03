@@ -34,6 +34,9 @@ OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1")]
 
 
+AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES = ("s3", "gs", "gcs", "wasb", "abfs", "abfss", "az", "http", "https")
+
+
 def _default_s3_conn() -> str:
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
@@ -79,6 +82,8 @@ class TestBehavior(Enum):
     Behavior of the tests.
     """
 
+    __test__ = False
+
     BUILD = "build"
     NONE = "none"
     AFTER_EACH = "after_each"
@@ -90,6 +95,7 @@ class ExecutionMode(Enum):
     Where the Cosmos tasks should be executed.
     """
 
+    WATCHER = "watcher"
     LOCAL = "local"
     AIRFLOW_ASYNC = "airflow_async"
     DOCKER = "docker"
@@ -114,6 +120,8 @@ class TestIndirectSelection(Enum):
     """
     Modes to configure the test behavior when performing indirect selection.
     """
+
+    __test__ = False
 
     EAGER = "eager"
     CAUTIOUS = "cautious"
@@ -167,8 +175,10 @@ TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtReso
 DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 
-TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}"
-TELEMETRY_VERSION = "v1"
+PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
+
+TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}/{execution_modes}"
+TELEMETRY_VERSION = "v2"
 TELEMETRY_TIMEOUT = 1.0
 
 _AIRFLOW3_MAJOR_VERSION = 3

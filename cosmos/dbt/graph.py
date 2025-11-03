@@ -18,6 +18,16 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from airflow.models import Variable
 
+if TYPE_CHECKING:
+    try:
+        # Airflow 3 onwards
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
+
 import cosmos.dbt.runner as dbt_runner
 from cosmos import cache, settings
 from cosmos.cache import (
@@ -83,6 +93,7 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+    downstream: list[str] = field(default_factory=lambda: [])
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -310,7 +321,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
                     file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
-                    tags=node_dict.get("tags", []),
+                    tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
@@ -477,7 +488,7 @@ class DbtGraph:
         else:
             Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
 
-    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path) -> dict[str, str]:
+    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
         cache_dict: dict[str, str] = {}
         remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
@@ -931,7 +942,7 @@ class DbtGraph:
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
-                    tags=node_dict["tags"],
+                    tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
@@ -963,3 +974,8 @@ class DbtGraph:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node
+            else:
+                for parent_node_id in node.depends_on:
+                    parent_node = self.nodes.get(parent_node_id)
+                    if parent_node is not None:
+                        parent_node.downstream.append(node.unique_id)

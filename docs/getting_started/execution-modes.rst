@@ -14,6 +14,7 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 7. **gcp_cloud_run_job**: Run ``dbt`` commands from GCP Cloud Run Job instances managed by Cosmos (requires a pre-existing Docker image)
 8. **aws_ecs**: Run ``dbt`` commands from AWS ECS instances managed by Cosmos (requires a pre-existing Docker image)
 9. **airflow_async**: (stable since Cosmos 1.9.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
+10. **watcher**: (experimental since Cosmos 1.11.0) Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks. Check the :ref:`watcher-execution-mode` for more details.
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -60,6 +61,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - No
    * - Airflow Async
      - Medium
+     - None
+     - Yes
+   * - Local
+     - Very fast
      - None
      - Yes
 
@@ -360,6 +365,16 @@ This causes the BigQuery trigger to attempt accessing parameters of the Task Ins
         TaskInstance.dag_id == self.task_instance.dag_id,
     AttributeError: 'NoneType' object has no attribute 'dag_id'
 
+
+Watcher Execution Mode (Experimental)
+-------------------------------------
+
+.. versionadded:: 1.11.0
+
+The ``watcher`` execution mode is an experimental execution mode that runs a single ``dbt build`` command from a producer task and has sensor tasks to watch the progress of the producer.
+It is designed to improve DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
+
+Check the :ref:`watcher-execution-mode` for more details.
 
 
 .. _invocation_modes:

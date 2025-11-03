@@ -19,7 +19,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 `cache_dir`_:
     The directory used for caching Cosmos data.
 
-    - Default: ``{TMPDIR}/cosmos_cache`` (where ``{TMPDIR}`` is the system temporary directory)
+    - Default: ``{TMPDIR}/cosmos`` (where ``{TMPDIR}`` is the system temporary directory)
     - Environment Variable: ``AIRFLOW__COSMOS__CACHE_DIR``
 
 .. _enable_cache:
@@ -62,10 +62,37 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__PROPAGATE_LOGS``
 
+.. _dbt_docs_projects:
+
+`dbt_docs_projects`_:
+    (Introduced in Cosmos 1.11.0 and applicable to Airflow 3): JSON mapping configuring one or more dbt docs projects for the Airflow 3 UI plugin.
+
+    Structure: mapping of slug to a dict with keys ``dir`` (required), ``index`` (optional, default ``index.html``),
+    ``name`` (optional, label in the menu), and ``conn_id`` (optional connection to read remote storage).
+    A "slug" here means a short, URL-safe identifier you choose for each docs project. It's used in the path segment
+    ``/cosmos/<slug>/…`` and in the UI menu label mapping. Prefer lowercase letters, numbers, and hyphens/underscores (e.g., core, mart, jaffle-shop).
+
+
+    Example:
+
+    .. code-block:: ini
+
+       [cosmos]
+       dbt_docs_projects = {
+         "core": {"dir": "/path/to/core/target", "index": "index.html", "name": "dbt Docs (Core)"},
+         "mart": {"dir": "s3://bucket/path/to/mart/target", "conn_id": "aws_default", "name": "dbt Docs (Mart)"}
+       }
+
+    Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_PROJECTS``
+
+    .. code-block:: bash
+
+       export AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
 .. _dbt_docs_dir:
 
 `dbt_docs_dir`_:
-    The directory path for dbt documentation.
+    (Applicable to Airflow 2): The directory path for dbt documentation.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_DIR``
@@ -73,7 +100,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _dbt_docs_conn_id:
 
 `dbt_docs_conn_id`_:
-    The connection ID for dbt documentation.
+    (Applicable to Airflow 2): The connection ID for dbt documentation.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_CONN_ID``
@@ -184,6 +211,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK``
+
+.. _upload_sql_to_xcom:
+
+`upload_sql_to_xcom`_:
+    (Introduced in Cosmos 1.11.0): Enable this if the setup async task is enabled for ``ExecutionMode.AIRFLOW_ASYNC`` and you want to upload the compiled SQL to Airflow XCom instead of a remote location (e.g., S3 or GCS).
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__UPLOAD_SQL_TO_XCOM``
 
 .. _use_dataset_airflow3_uri_standard:
 

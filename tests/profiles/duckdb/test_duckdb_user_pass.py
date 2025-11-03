@@ -21,7 +21,7 @@ def mock_duckdb_conn():  # type: ignore
         conn_type="duckdb",
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -39,7 +39,7 @@ def test_connection_claiming() -> None:
 
     # if we have the conn type of duckdb, it should claim
     conn = Connection(**required_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = DuckDBUserPasswordProfileMapping(conn, profile_args={"path": "jaffle_shop.duck_db"})
         assert profile_mapping.can_claim_connection()
 

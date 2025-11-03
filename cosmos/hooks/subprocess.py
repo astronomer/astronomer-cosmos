@@ -11,7 +11,11 @@ from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
 from typing import NamedTuple
 
-from airflow.hooks.base import BaseHook
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk.bases.hook import BaseHook
+except ImportError:
+    from airflow.hooks.base import BaseHook
 
 
 class FullOutputSubprocessResult(NamedTuple):
@@ -20,7 +24,7 @@ class FullOutputSubprocessResult(NamedTuple):
     full_output: list[str]
 
 
-class FullOutputSubprocessHook(BaseHook):
+class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
     """Hook for running processes with the ``subprocess`` module."""
 
     def __init__(self) -> None:

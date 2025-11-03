@@ -27,4 +27,4 @@ pytest -vv \
     -m 'integration and not dbtFusion' \
     --ignore=tests/perf \
     --ignore=tests/test_example_k8s_dags.py \
-    -k 'basic_cosmos_task_group'
+    "tests/test_example_dags.py::test_example_dag[basic_cosmos_task_group]"

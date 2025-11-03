@@ -11,7 +11,12 @@ except ImportError:  # Airflow 2
 
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
-from airflow.utils.task_group import TaskGroup
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
 from cosmos.config import RenderConfig
@@ -197,13 +202,22 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
+    if (
+        execution_mode == ExecutionMode.WATCHER
+        and render_config is not None
+        and render_config.test_behavior == TestBehavior.AFTER_ALL
+    ):
+        operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+    else:
+        operator_class = calculate_operator_class(
+            execution_mode=execution_mode,
+            dbt_class="DbtTest",
+        )
+
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
-        operator_class=calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        ),
+        operator_class=operator_class,
         arguments={**task_args, **args_to_override},
         extra_context=extra_context,
     )
@@ -544,14 +558,14 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
-def _add_producer_watcher(
+def _add_producer_watcher_and_dependencies(
     dag: DAG,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
+    nodes: dict[str, DbtNode] | None = None,
 ) -> str:
-
     producer_task_args = task_args.copy()
 
     if render_config is not None:
@@ -559,17 +573,51 @@ def _add_producer_watcher(
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = render_config.exclude
 
+        if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
+            producer_task_args["exclude"] = producer_task_args["exclude"] + [
+                "resource_type:test",
+                "resource_type:unit_test",
+            ]
+
+    # First, we create the producer task
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,
         operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
-    for task_id, task in tasks_map.items():
-        # we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
-        if not task.upstream_list:
-            producer_airflow_task >> task
-            task.trigger_rule = task_args.get("trigger_rule", "always")
+
+    # Second, we need to set the producer task ID in all consumer tasks (and their children tasks)
+    for node_id, task_or_taskgroup in tasks_map.items():
+
+        node_tasks = (
+            list(task_or_taskgroup.children.values())
+            if isinstance(task_or_taskgroup, TaskGroup)
+            else [task_or_taskgroup]
+        )
+        for task in node_tasks:
+            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+
+        # Third, we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+        # We only managed to do this in the case of DbtDag.
+        # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
+        if "DbtDag" in dag.__class__.__name__:
+
+            # Is this dbt node a root of the (subset of the) dbt project?
+            # Note: this may happen in one scenarios:
+            # - the dbt node not having any `depends_on` within the user-selected `nodes`
+            if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(nodes):
+                producer_airflow_task >> task_or_taskgroup
+                if isinstance(task_or_taskgroup, TaskGroup):
+                    taskgroup = task_or_taskgroup
+                    always_run_tasks = [
+                        task for task in node_tasks if not set(task.upstream_task_ids).intersection(taskgroup.children)
+                    ]
+                else:
+                    always_run_tasks = [task_or_taskgroup]
+
+                for task in always_run_tasks:
+                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
 
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
     return producer_airflow_task.task_id
@@ -749,16 +797,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             logger.debug(f"Conversion of <{node.unique_id}> was successful!")
             tasks_map[node_id] = task_or_group
 
-    if execution_mode == ExecutionMode.WATCHER:
-        producer_watcher_task_id = _add_producer_watcher(
-            dag,
-            task_args,
-            tasks_map,
-            task_group,
-            render_config=render_config,
-        )
-        task_args["producer_watcher_task_id"] = producer_watcher_task_id
-
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if test_behavior == TestBehavior.AFTER_ALL:
@@ -795,6 +833,16 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)
+
+    if execution_mode == ExecutionMode.WATCHER:
+        _add_producer_watcher_and_dependencies(
+            dag=dag,
+            task_args=task_args,
+            tasks_map=tasks_map,
+            task_group=task_group,
+            render_config=render_config,
+            nodes=nodes,
+        )
 
     if settings.enable_setup_async_task:
         _add_dbt_setup_async_task(

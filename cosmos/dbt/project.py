@@ -101,6 +101,7 @@ def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder
     :param dbt_project_folder: destination dbt project folder (it will be copied to the target folder)
     """
     dbt_project_folder = Path(dbt_project_folder)
+    source_manifest = str(source_manifest)
     if source_manifest and Path(source_manifest).exists():
         logger.info(f"Copying the manifest from {source_manifest}...")
         target_folder_path = dbt_project_folder / DBT_TARGET_DIR_NAME

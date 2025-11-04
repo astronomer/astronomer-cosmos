@@ -23,7 +23,8 @@ AIRFLOW_VERSION=$(airflow version)
 AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
 if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
   # https://github.com/zmievsa/cadwyn/issues/283
-    uv pip install "cadwyn>=5.4.1"
+  # https://github.com/zmievsa/cadwyn/issues/305
+    uv pip install "cadwyn>=5.4.1" "fastapi<0.121.0"
     echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
     airflow db migrate
 else

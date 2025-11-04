@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main,test-ci]
   # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.

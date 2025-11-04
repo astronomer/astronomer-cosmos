@@ -1,15 +1,15 @@
 Changelog
 =========
 
-1.12.0 (2025-11-04)
+1.12.0a1 (2025-11-04)
 -------------------
 
 Breaking changes
 
-* The following functions are expected to be used internally only to Cosmos, so we hope these won't impact end-users, but we are documenting the changes just in case:
-  - ``generate_task_or_group`` receives ``render_config`` instead of its individual configurations, such as test_behavior, source_rendering_behavior and enable_owner_inheritance
-  - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as test_behavior, source_rendering_behavior and enable_owner_inheritance
-  - ``create_task_metadata`` expects the ``node_converters`` argument
+* Introduced in the PR #2080. The following functions are expected to be used internally only to Cosmos, so we hope these won't impact end-users, but we are documenting the changes just in case:
+  - ``generate_task_or_group`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
+  - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
+  - ``create_task_metadata`` now expects the ``node_converters`` argument
 
 Features
 
@@ -23,7 +23,7 @@ Enhancements
 Others
 
 * Fix broken CI due to fastapi incompatibility with cadwyn for Airflow 3 by @pankajkoti in #2076
-
+* Pre-commit updates: #2078
 
 1.11.0 (2025-10-29)
 ---------------------

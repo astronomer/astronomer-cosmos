@@ -6,7 +6,7 @@ Changelog
 
 Breaking changes
 
-* The follow functions are expected to be used internally only to Cosmos, so we expect these won't impact end-users, but we are documenting the changes just in case:
+* The following functions are expected to be used internally only to Cosmos, so we hope these won't impact end-users, but we are documenting the changes just in case:
   - ``generate_task_or_group`` receives ``render_config`` instead of its individual configurations, such as test_behavior, source_rendering_behavior and enable_owner_inheritance
   - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as test_behavior, source_rendering_behavior and enable_owner_inheritance
   - ``create_task_metadata`` expects the ``node_converters`` argument

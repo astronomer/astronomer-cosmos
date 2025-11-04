@@ -1,6 +1,30 @@
 Changelog
 =========
 
+1.12.0 (2025-11-04)
+-------------------
+
+Breaking changes
+
+* The follow functions are expected to be used internally only to Cosmos, so we expect these won't impact end-users, but we are documenting the changes just in case:
+  - ``generate_task_or_group`` receives ``render_config`` instead of its individual configurations, such as test_behavior, source_rendering_behavior and enable_owner_inheritance
+  - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as test_behavior, source_rendering_behavior and enable_owner_inheritance
+  - ``create_task_metadata`` expects the ``node_converters`` argument
+
+Features
+
+* Support applying ``node_converter`` at a task level instead of task group level by @anyapriya in #1759
+
+Enhancements
+
+* Remove usage of contextmanager in plugins for accessing connections in Airflow >= 3.1.2 by @pankajkoti in #2073
+* Refactor ``airflow/graph.py`` to simplify code-base by @tatiana in #2080
+
+Others
+
+* Fix broken CI due to fastapi incompatibility with cadwyn for Airflow 3 by @pankajkoti in #2076
+
+
 1.11.0 (2025-10-29)
 ---------------------
 

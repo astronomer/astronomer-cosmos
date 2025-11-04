@@ -15,7 +15,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``selector``: (new in v1.3) name of a dbt YAML selector to use for DAG parsing. Only supported when using ``load_method=LoadMode.DBT_LS``. See `Selecting & Excluding <selecting-excluding.html>`_ for more information.
 - ``dbt_deps``: (deprecated in v1.9, use ``ProjectConfig.install_dbt_deps`` onwards) A Boolean to run dbt deps when using dbt ls for dag parsing. Default True
 - ``node_converters``: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``. Find more information below.
-- ``node_conversion_by_task_group``: A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
+- ``node_conversion_by_task_group``: (new in v1.12.0) A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
 - ``dbt_executable_path``: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
 - ``dbt_ls_path``:  Should be set when using ``load_method=LoadMode.DBT_LS_OUTPUT``. Path of the user-managed output of ``dbt ls``.
 - ``enable_mock_profile``: When using ``LoadMode.DBT_LS`` with a ``ProfileMapping`` class, by default, Cosmos mocks the values of the profile. Defaults to True. In order to leverage partial parsing, this argument should be set to ``False``. Read `Partial parsing <./partial-parsing.html#profile-configuration.html>`_ for more information.
@@ -54,7 +54,7 @@ and do not want Cosmos to use the dbt version installed in the same Python Virtu
 Customizing how nodes are rendered
 ----------------------------------
 
-This feature is available in Cosmos 1.2.0 onwards.
+.. versionadded:: 1.2.0
 
 There are circumstances when choosing specific Airflow operators to represent a dbt node is helpful.
 An example could be to use an S3 sensor to represent dbt sources or to create custom operators to handle exposures.

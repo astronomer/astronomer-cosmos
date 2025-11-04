@@ -50,6 +50,10 @@ Multiple dbt docs in Airflow 3 UI
 ---------------------------------
 
 There have been significant changes to how plugins work in Airflow 3.x. Cosmos now supports Airflow 3 FastAPI plugins for UI integration and hosting dbt docs via external views.
+
+.. important::
+   The Cosmos Airflow 3 plugin (FastAPI external views) is supported on Airflow >= 3.1 only.
+
 Cosmos registers a FastAPI sub-application at ``/cosmos`` and adds menu entries under **Browse**. Configure one or more projects in ``airflow.cfg`` under the ``[cosmos]`` section:
 
 .. code-block:: ini

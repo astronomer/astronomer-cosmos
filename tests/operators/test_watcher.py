@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import json
 import zlib
@@ -474,7 +476,7 @@ class TestDbtConsumerWatcherSensor:
         ti = MagicMock()
         ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
 
-        result = sensor._get_status_from_run_results(ti)
+        result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
         assert result == "success"
 
     def test_get_status_from_run_results_none(self):
@@ -482,7 +484,7 @@ class TestDbtConsumerWatcherSensor:
         ti = MagicMock()
         ti.xcom_pull.return_value = None
 
-        result = sensor._get_status_from_run_results(ti)
+        result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
         assert result is None
 
     def test_get_status_from_events_success(self):
@@ -552,6 +554,32 @@ class TestDbtConsumerWatcherSensor:
 
         sensor.poke(context)
         mock_fallback_to_local_run.assert_called_once()
+
+    @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+    def test_get_status_from_run_results_with_compiled_sql(self, mock_override_rtif, monkeypatch):
+        sensor = self.make_sensor()
+        sensor.model_unique_id = "model.test_table"
+
+        # Create a fake run_results payload containing compiled_code and status
+        run_results = {
+            "results": [
+                {
+                    "unique_id": "model.test_table",
+                    "compiled_code": "SELECT * FROM dummy_table;",
+                    "status": "success",
+                }
+            ]
+        }
+
+        compressed = zlib.compress(json.dumps(run_results).encode())
+        encoded = base64.b64encode(compressed).decode()
+
+        # Mock TaskInstance.xcom_pull to return encoded results
+        ti = MagicMock()
+        ti.xcom_pull.return_value = encoded
+        context = {"ti": ti}
+        sensor._get_status_from_run_results(ti, context)
+        mock_override_rtif.assert_called_with(context)
 
 
 class TestDbtBuildWatcherOperator:

@@ -37,10 +37,10 @@ Concept: ``ExecutionMode.WATCHER``
 
 It is built on two operator types:
 
-* **``DbtProducerWatcherOperator``** (`#1982 <https://github.com/astronomer/astronomer-cosmos/pull/1982>`_)
+* ``DbtProducerWatcherOperator`` (`#1982 <https://github.com/astronomer/astronomer-cosmos/pull/1982>`_)
   Runs dbt **once** across the entire pipeline, register to `dbt event callbacks <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_ and sends model progress updates via Airflow **XComs**.
 
-* **``DbtConsumerWatcherSensor``** (`#1998 <https://github.com/astronomer/astronomer-cosmos/pull/1998>`_)
+* ``DbtConsumerWatcherSensor`` (`#1998 <https://github.com/astronomer/astronomer-cosmos/pull/1998>`_)
   Watches those XComs and marks individual Airflow tasks as complete when their corresponding dbt models finish.
 
 Together, these operators let you:
@@ -114,6 +114,8 @@ As it can be observed, the only difference with the default ``ExecutionMode.LOCA
 * Model-level Airflow tasks act as watchers or sensors, updating their state as dbt completes each model.
 * The DAG remains fully observable and retryable, with **dramatically improved runtime performance** (often 5× faster than ``ExecutionMode.LOCAL``).
 
+**How it looks like:**
+
 .. image:: /_static/jaffle_shop_watcher_dbt_dag_dag_run.png
     :alt: Cosmos DbtDag with `ExecutionMode.WATCHER`
     :align: center
@@ -170,8 +172,9 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
 Additional details
 -------------------
 
+~~~~~~~~~~~~~~~~
 How retries work
-................
+~~~~~~~~~~~~~~~~
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
 
@@ -188,8 +191,9 @@ Known Limitations
 
 These limitations will be revisited as the feature matures.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
-...............................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``ExecutionMode.WATCHER`` works better when dbt and Airflow are installed in the same Python virtual environment, since it uses dbt `callback features <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_.
 In case that is not possible, the producer task will only trigger the consumer tasks by the end of the execution, after it generated the ``run_results.json`` file.
@@ -206,15 +210,17 @@ Example of ``requirements.txt`` file:
     dbt-bigquery==1.10
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Producer task implementation
-............................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The producer task is implemented as a ``DbtProducerWatcherOperator`` operator and it currently relies on dbt being installed alongside the Airflow deployment, similar to the ``ExecutionMode.LOCAL`` implementation.
 
 There are discussions about allowing this node to be implemented as the ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.KUBERNETES`` execution modes, so that there is a higher isolation between dbt and Airflow dependencies.
 
+~~~~~~~~~~~~~~~~~~~~~~~~
 Individual dbt Operators
-........................
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``ExecutionMode.WATCHER`` efficiently implements the following operators:
 * ``DbtSeedWatcherOperator``
@@ -238,8 +244,9 @@ Finally, the following features are not implemented as operators under ``Executi
 
 You can still invoke these operators using the default ``ExecutionMode.LOCAL`` mode.
 
+~~~~~~~~~~~~~~~~
 Callback support
-................
+~~~~~~~~~~~~~~~~
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
@@ -248,15 +255,17 @@ This means that you can define a single callback function for all ``ExecutionMod
 If there is demand, we will support different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overriding ``operator_args``
-............................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
 We plan to support different ``operator_args`` for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators in the future.
 
+~~~~~~~~~~~~~
 Test behavior
-..............
+~~~~~~~~~~~~~
 
 By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
 
@@ -266,8 +275,9 @@ The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWa
 
 Users can still use the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sensor slot allocation and polling
-...................................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Each ``DbtDag`` or ``DbtTaskGroup`` root node will startup during DAG runs  at - potentially - the same time as the DAG Run. This may not happen, since it is dependent on the
 concurrency settings and available task slots in the Airflow deployment.
@@ -276,9 +286,9 @@ The consequence is that tasks may take longer to be updated if they are not sens
 
 We plan to review this behaviour and alternative approaches in the future.
 
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Synchronous sensor execution
-............................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
 
@@ -286,13 +296,15 @@ An improvement is to change this behaviour and implement an asynchronous sensor 
 
 The ticket to implement this behaviour is `#2059 <https://github.com/astronomer/astronomer-cosmos/issues/2059>`_.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Airflow Datasets and Assets
-...........................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
 
+~~~~~~~~~~~~~~~~~~~~~~
 Source freshness nodes
-......................
+~~~~~~~~~~~~~~~~~~~~~~
 
 Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
 

@@ -553,7 +553,12 @@ def generate_task_or_group(
     if task_meta and not node.resource_type == DbtResourceType.TEST:
         if use_task_group and (not convert_entire_task_group):
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                task = generate_or_convert_task(**generate_or_convert_task_args)  # type: ignore[arg-type]
+                task = generate_or_convert_task(
+                    **{  # type: ignore[arg-type]
+                        **generate_or_convert_task_args,
+                        "task_group": model_task_group,
+                    },
+                )
                 test_meta = create_test_task_metadata(
                     "test",
                     execution_mode,
@@ -566,6 +571,7 @@ def generate_task_or_group(
                 )
                 test_task_generate_or_convert_task_args = {
                     **generate_or_convert_task_args,
+                    "task_group": model_task_group,
                     "task_meta": test_meta,
                     "resource_type": DbtResourceType.TEST,  # type: ignore
                 }

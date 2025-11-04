@@ -468,6 +468,7 @@ def generate_or_convert_task(
             "Its syntax and behavior can be changed before a major release."
         )
         logger.debug(f"Converting node <{node.unique_id}> task <{task_id}> using <{conversion_function.__name__}>")
+        # In Cosmos 2.0 we should review this implementation and use render_config or another simpler interface:
         task = conversion_function(  # type: ignore
             dag=dag,
             task_group=task_group,
@@ -475,6 +476,7 @@ def generate_or_convert_task(
             execution_mode=execution_mode,
             task_args=task_args,
             test_behavior=render_config.test_behavior,
+            source_pruning=render_config.source_pruning,
             source_rendering_behavior=render_config.source_rendering_behavior,
             normalize_task_id=render_config.normalize_task_id,
             normalize_task_display_name=render_config.normalize_task_display_name,

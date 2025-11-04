@@ -10,23 +10,34 @@ from typing import Any, Generator, Optional
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
+import airflow
 from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.plugin.snippets import IFRAME_SCRIPT
+
+# Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
+AIRFLOW_VERSION = Version(airflow.__version__)
+
+
+def ensure_airflow_version_supported() -> None:
+    if AIRFLOW_VERSION < Version("3.1.0"):
+        raise RuntimeError(
+            "Cosmos AF3 plugin requires Airflow >= 3.1. External views are unavailable on earlier versions."
+        )
+
 
 API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_URL
 API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
 
-# TODO: This context manager and its usage in the method "_read_content_via_object_storage" has been added due
-# to the current limitation in Airflow 3.1.0 where plugins are not able to resolve connections via the API server.
-# Once this is fixed, potentially in PR https://github.com/apache/airflow/pull/56602 planned to be released in
-# Airflow 3.1.1, test the fix and remove this context manager and its usage.
+# Note: Airflow 3.1.0 had a limitation where plugins could not resolve connections via the API server.
+# The fix was shipped in Airflow 3.1.1. For 3.1.0, we temporarily expose the connection via env vars inside a context manager.
 @contextmanager
 def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  # pragma: no cover
     """
@@ -48,7 +59,14 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
 
 
 def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
-    with connection_env(conn_id):
+    # Use connection_env only for Airflow 3.1.0
+    if AIRFLOW_VERSION == Version("3.1.0"):
+        with connection_env(conn_id):
+            p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
+            with p.open("r") as f:  # type: ignore[no-untyped-call]
+                content = f.read()  # type: ignore[no-any-return]
+            return content
+    else:
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
         with p.open("r") as f:  # type: ignore[no-untyped-call]
             content = f.read()  # type: ignore[no-any-return]
@@ -102,6 +120,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
 
 
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
+    ensure_airflow_version_supported()
     app = FastAPI()
 
     projects = _load_projects_from_conf()
@@ -237,20 +256,23 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
 class CosmosAF3Plugin(AirflowPlugin):
     name = "cosmos"
 
-    # Mount our FastAPI sub-app under /cosmos
-    fastapi_apps = [
-        {
-            "name": "cosmos",
-            "app": create_cosmos_fastapi_app(),
-            "url_prefix": "/cosmos",
-        }
-    ]
+    # Mount our FastAPI sub-app under /cosmos (initialized in __init__ after version check)
+    fastapi_apps: list[dict[str, Any]] = []
 
     # Register external views for navigation
     external_views: list[dict[str, Any]] = []
 
     def __init__(self) -> None:
         super().__init__()
+        ensure_airflow_version_supported()
+        # Initialize FastAPI app only after version support is confirmed
+        self.fastapi_apps = [
+            {
+                "name": "cosmos",
+                "app": create_cosmos_fastapi_app(),
+                "url_prefix": "/cosmos",
+            }
+        ]
         projects = _load_projects_from_conf()
         for slug, cfg in projects.items():
             display_name = cfg.get("name") or f"dbt Docs ({slug})"

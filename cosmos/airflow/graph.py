@@ -289,7 +289,7 @@ def create_task_metadata(
     execution_mode: ExecutionMode,
     args: dict[str, Any],
     dbt_dag_task_group_identifier: str,
-    render_config: RenderConfig,
+    render_config: RenderConfig = RenderConfig(),
     use_task_group: bool = False,
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,

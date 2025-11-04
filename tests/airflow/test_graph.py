@@ -231,9 +231,11 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
         },
         dbt_project_name="astro_shop",
         node_converters={},
-        test_behavior=TestBehavior.AFTER_EACH,
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.AFTER_EACH,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        ),
         on_warning_callback=None,
-        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     assert isinstance(output, TaskGroup)
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
@@ -615,7 +617,9 @@ def test_create_task_metadata_source_with_rendering_options(
     metadata = create_task_metadata(
         child_node,
         execution_mode=ExecutionMode.LOCAL,
-        source_rendering_behavior=source_rendering_behavior,
+        render_config=RenderConfig(
+            source_rendering_behavior=source_rendering_behavior,
+        ),
         args={},
         dbt_dag_task_group_identifier="",
     )
@@ -922,10 +926,12 @@ def test_create_task_metadata_normalize_task_id(
         args=args,
         dbt_dag_task_group_identifier="",
         use_task_group=use_task_group,
-        normalize_task_id=normalize_task_id,
-        normalize_task_display_name=normalize_task_display_name,
-        source_rendering_behavior=SourceRenderingBehavior.ALL,
-        test_behavior=test_behavior,
+        render_config=RenderConfig(
+            normalize_task_id=normalize_task_id,
+            normalize_task_display_name=normalize_task_display_name,
+            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            test_behavior=test_behavior,
+        ),
     )
     assert metadata.id == expected_node_id
     if expected_display_name:
@@ -1105,10 +1111,12 @@ def test_owner(dbt_extra_config, expected_owner):
         },
         dbt_project_name="astro_shop",
         node_converters={},
-        test_behavior=TestBehavior.AFTER_EACH,
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.AFTER_EACH,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            enable_owner_inheritance=True,
+        ),
         on_warning_callback=None,
-        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
-        enable_owner_inheritance=True,
     )
 
     assert len(output.leaves) == 1
@@ -1232,7 +1240,9 @@ def test_create_task_metadata_disable_owner_inheritance(enable_owner_inheritance
         execution_mode=ExecutionMode.LOCAL,
         args={"project_dir": SAMPLE_PROJ_PATH},
         dbt_dag_task_group_identifier="test_dag",
-        enable_owner_inheritance=enable_owner_inheritance,
+        render_config=RenderConfig(
+            enable_owner_inheritance=enable_owner_inheritance,
+        ),
     )
 
     assert task_metadata is not None
@@ -1322,11 +1332,14 @@ def test_generate_task_or_group_disable_owner_inheritance(enable_owner_inheritan
                     ),
                 ),
             },
-            test_behavior=TestBehavior.NONE,
-            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.NONE,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                enable_owner_inheritance=enable_owner_inheritance,
+            ),
             test_indirect_selection=TestIndirectSelection.EAGER,
             on_warning_callback=None,
-            enable_owner_inheritance=enable_owner_inheritance,
+            node_converters={},
         )
 
         assert task_or_group is not None

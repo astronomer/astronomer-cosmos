@@ -1019,6 +1019,7 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         **{
             "task_arg": "value",
             "on_warning_callback": True,
+            "exclude": None,
         },
         **additional_arguments,
     }

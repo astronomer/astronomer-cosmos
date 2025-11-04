@@ -111,7 +111,7 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
 def exclude_detached_tests_if_needed(
     node: DbtNode,
     task_args: dict[str, str],
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
 ) -> None:
     """
     Add exclude statements if there are tests associated to the model that should be run detached from the model/tests.
@@ -152,8 +152,9 @@ def create_test_task_metadata(
     on_warning_callback: Callable[..., Any] | None = None,
     node: DbtNode | None = None,
     render_config: RenderConfig | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
     enable_owner_inheritance: bool | None = None,
+    exclusions: list[str] | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -173,6 +174,7 @@ def create_test_task_metadata(
     detached_from_parent = detached_from_parent or {}
     task_owner = ""
 
+    task_args["exclude"] = deepcopy(exclusions)
     if test_indirect_selection != TestIndirectSelection.EAGER:
         task_args["indirect_selection"] = test_indirect_selection.value
     if node is not None:
@@ -186,9 +188,8 @@ def create_test_task_metadata(
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
     elif render_config is not None:  # TestBehavior.AFTER_ALL
-        task_args["select"] = render_config.select
-        task_args["selector"] = render_config.selector
-        task_args["exclude"] = render_config.exclude
+        task_args["select"] = deepcopy(render_config.select)
+        task_args["selector"] = deepcopy(render_config.selector)
 
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
@@ -297,7 +298,7 @@ def create_task_metadata(
     test_behavior: TestBehavior = TestBehavior.AFTER_ALL,
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER,
     on_warning_callback: Callable[..., Any] | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
     enable_owner_inheritance: bool | None = None,
     filtered_nodes: dict[str, DbtNode] | None = None,
 ) -> TaskMetadata | None:
@@ -448,8 +449,9 @@ def generate_task_or_group(
     on_warning_callback: Callable[..., Any] | None = None,
     normalize_task_id: Callable[..., Any] | None = None,
     normalize_task_display_name: Callable[..., Any] | None = None,
-    detached_from_parent: dict[str, DbtNode] | None = None,
+    detached_from_parent: dict[str, list[DbtNode]] | None = None,
     enable_owner_inheritance: bool | None = None,
+    exclusions: list[str] | None = None,
     filtered_nodes: dict[str, DbtNode] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
@@ -496,6 +498,7 @@ def generate_task_or_group(
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
                     enable_owner_inheritance=enable_owner_inheritance,
+                    exclusions=exclusions,
                 )
                 test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
                 task >> test_task
@@ -535,9 +538,9 @@ def _add_dbt_setup_async_task(
         raise CosmosValueError("ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set")
 
     if render_config is not None:
-        task_args["select"] = render_config.select
-        task_args["selector"] = render_config.selector
-        task_args["exclude"] = render_config.exclude
+        task_args["select"] = deepcopy(render_config.select)
+        task_args["selector"] = deepcopy(render_config.selector)
+        task_args["exclude"] = deepcopy(render_config.exclude)
         task_args["py_requirements"] = async_py_requirements
 
     setup_task_metadata = TaskMetadata(
@@ -687,9 +690,9 @@ def _add_teardown_task(
         raise CosmosValueError("ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set")
 
     if render_config is not None:
-        task_args["select"] = render_config.select
-        task_args["selector"] = render_config.selector
-        task_args["exclude"] = render_config.exclude
+        task_args["select"] = deepcopy(render_config.select)
+        task_args["selector"] = deepcopy(render_config.selector)
+        task_args["exclude"] = deepcopy(render_config.exclude)
         task_args["py_requirements"] = async_py_requirements
 
     teardown_task_metadata = TaskMetadata(
@@ -787,6 +790,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             node=node,
             detached_from_parent=detached_from_parent,
             enable_owner_inheritance=enable_owner_inheritance,
+            exclusions=render_config.exclude,
             filtered_nodes=nodes,
         )
         if task_or_group is not None:
@@ -804,6 +808,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             on_warning_callback=on_warning_callback,
             render_config=render_config,
             enable_owner_inheritance=enable_owner_inheritance,
+            exclusions=render_config.exclude,
         )
         test_task = create_airflow_task(test_meta, dag, task_group=task_group)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
@@ -822,6 +827,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
                 render_config=render_config,
                 node=node,
                 enable_owner_inheritance=enable_owner_inheritance,
+                exclusions=render_config.exclude,
             )
             test_task = create_airflow_task(test_meta, dag, task_group=task_group)
             tasks_map[node_id] = test_task

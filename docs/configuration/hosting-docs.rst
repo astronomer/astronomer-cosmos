@@ -26,6 +26,10 @@ The dbt docs are available in the Airflow menu under ``Browse``:
     :align: center
 
 For Airflow 3, Cosmos exposes the docs under a FastAPI sub-app and external view entries under **Browse**.
+
+.. important::
+   The Airflow 3 plugin support in Cosmos requires Airflow >= 3.1.
+
 You can configure one or more projects via ``[cosmos].dbt_docs_projects``:
 
 .. code-block:: ini

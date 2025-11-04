@@ -51,8 +51,10 @@ Users may opt to use ``InvocationMode.SUBPROCESS`` when they have multiple Pytho
 and do not want Cosmos to use the dbt version installed in the same Python Virtualenv as Airflow to parse the DAG.
 
 
-Customizing how nodes are rendered (experimental)
--------------------------------------------------
+Customizing how nodes are rendered
+----------------------------------
+
+This feature is available in Cosmos 1.2.0 onwards.
 
 There are circumstances when choosing specific Airflow operators to represent a dbt node is helpful.
 An example could be to use an S3 sensor to represent dbt sources or to create custom operators to handle exposures.
@@ -66,3 +68,7 @@ The following example illustrates how it is possible to tell Cosmos how to conve
     :end-before: [END custom_dbt_nodes]
 
 When defining the mapping for a new type that is not part of Cosmos' ``DbtResourceType`` enumeration, users should use the syntax ``DbtResourceType("new-node-type")`` as opposed to ``DbtResourceType.EXISTING_TYPE``. It will dynamically add the new type to the enumeration ``DbtResourceType`` so that Cosmos can parse these dbt nodes and convert them into the Airflow DAG.
+
+In Cosmos 1.12.0, this feature was further improved by adding the ``RenderConfig.node_conversion_by_task_group`` parameter.
+This parameter allows users to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task),
+or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.

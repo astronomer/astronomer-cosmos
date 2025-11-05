@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Callable, List, Union
 import airflow
 from packaging.version import Version
 
+from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
+
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
@@ -291,11 +293,9 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if not compressed_b64_event_msg:
             return None
 
-        compressed_bytes = base64.b64decode(compressed_b64_event_msg)
-        event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
-        event_json = json.loads(event_json_str)
+        event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
-        logger.info("Node Info: %s", event_json_str)
+        logger.info("Node Info: %s", event_json)
 
         self.compiled_sql = event_json.get("compiled_sql", "")
         if self.compiled_sql:
@@ -309,9 +309,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if not compressed_b64_run_results:
             return None
 
-        compressed_bytes = base64.b64decode(compressed_b64_run_results)
-        run_results_str = zlib.decompress(compressed_bytes).decode("utf-8")
-        run_results_json = json.loads(run_results_str)
+        run_results_json = _parse_compressed_xcom(compressed_b64_run_results)
 
         logger.debug("Run results: %s", run_results_json)
 
@@ -322,7 +320,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             logger.warning("No matching result found for unique_id '%s'", self.model_unique_id)
             return None
 
-        logger.info("Node Info: %s", run_results_str)
+        logger.info("Node Info: %s", run_results_json)
         self.compiled_sql = node_result.get("compiled_code")
         if self.compiled_sql:
             self._override_rtif(context)
@@ -331,6 +329,29 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
     def _get_producer_task_state(self, ti: Any) -> Any:
         return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        if not self.poke(context):
+            self.defer(
+                trigger=WatcherTrigger(
+                    model_unique_id=self.model_unique_id,
+                    producer_task_id=self.producer_task_id,
+                    dag_id=self.dag_id,
+                    run_id=context["run_id"],
+                    map_index=context["task_instance"].map_index,
+                    use_event=self._use_event(),
+                ),
+                method_name=self.execute_complete.__name__,
+            )
+
+    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
+        if event.get("status") == "failed":
+            raise AirflowException("Failed")
+
+    def _use_event(self) -> bool:
+        if not self.invocation_mode:
+            self._discover_invocation_mode()
+        return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
     def poke(self, context: Context) -> bool:
         """
@@ -352,12 +373,8 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             return self._fallback_to_local_run(try_number, context)
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
-        if not self.invocation_mode:
-            self._discover_invocation_mode()
-        use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-
         producer_task_state = self._get_producer_task_state(ti)
-        if use_events:
+        if self._use_event():
             status = self._get_status_from_events(ti, context)
         else:
             status = self._get_status_from_run_results(ti, context)

@@ -81,6 +81,9 @@ Initial benchmarks, using  illustrate significant improvements:
 | Standard Deployment with A10 workers          |           |                    |
 +-----------------------------------------------+-----------+--------------------+
 
+.. note::
+   ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile, so you may need to experiment with different thread counts to balance faster DAG runtimes against the CPU and memory available in your Airflow workers.
+
 The last line represents the performance improvement in a real-world Airflow deployment, using `Astro Cloud <https://www.astronomer.io/>`_.
 
 Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.

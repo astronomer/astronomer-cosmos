@@ -347,7 +347,9 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         if event.get("status") == "failed":
-            raise AirflowException(f"Model {self.model_unique_id} failed.")
+            raise AirflowException(
+                f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+            )
 
     def _use_event(self) -> bool:
         if not self.invocation_mode:

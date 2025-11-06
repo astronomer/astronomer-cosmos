@@ -107,7 +107,7 @@ class WatcherTrigger(BaseTrigger):
         self.log.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
 
         while True:
-            dr_state = await self.get_xcom_val("state")
+            producer_task_state = await self.get_xcom_val("state")
             node_status = await self._parse_node_status()
             if node_status == "success":
                 self.log.info("Model '%s' succeeded", self.model_unique_id)
@@ -117,7 +117,7 @@ class WatcherTrigger(BaseTrigger):
                 self.log.warning("Model '%s' failed", self.model_unique_id)
                 yield TriggerEvent({"status": "failed"})  # type: ignore[no-untyped-call]
                 return
-            elif dr_state == "failed":
+            elif producer_task_state == "failed":
                 yield TriggerEvent({"status": "failed"})  # type: ignore[no-untyped-call]
                 return
 

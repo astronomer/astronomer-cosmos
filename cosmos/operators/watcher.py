@@ -347,7 +347,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         if event.get("status") == "failed":
-            raise AirflowException("Failed")
+            raise AirflowException("Model %s failed.", self.model_unique_id)
 
     def _use_event(self) -> bool:
         if not self.invocation_mode:

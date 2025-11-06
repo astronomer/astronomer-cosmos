@@ -9,11 +9,12 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, TaskDeferred
 from airflow.utils.state import DagRunState
 from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos._triggers.watcher import WatcherTrigger
 from cosmos.config import InvocationMode
 from cosmos.constants import ExecutionMode
 from cosmos.operators.watcher import (
@@ -580,6 +581,31 @@ class TestDbtConsumerWatcherSensor:
         context = {"ti": ti}
         sensor._get_status_from_run_results(ti, context)
         mock_override_rtif.assert_called_with(context)
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.poke")
+    def test_sensor_deferred(self, mock_poke):
+        mock_poke.return_value = False
+        sensor = self.make_sensor()
+        context = {"run_id": "run_id", "task_instance": Mock()}
+        with pytest.raises(TaskDeferred) as exc:
+            sensor.execute(context)
+
+        assert isinstance(exc.value.trigger, WatcherTrigger), "Trigger is not a WatcherTrigger"
+
+    @pytest.mark.parametrize(
+        "mock_event",
+        [
+            {"status": "failed"},
+            {"status": "success"},
+        ],
+    )
+    def test_execute_complete(self, mock_event):
+        sensor = self.make_sensor()
+        if mock_event.get("status") == "failed":
+            with pytest.raises(AirflowException):
+                sensor.execute_complete(context=Mock(), event=mock_event)
+        else:
+            assert sensor.execute_complete(context=Mock(), event=mock_event) is None
 
 
 class TestDbtBuildWatcherOperator:

@@ -340,6 +340,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
                     run_id=context["run_id"],
                     map_index=context["task_instance"].map_index,
                     use_event=self._use_event(),
+                    poke_interval=self.poke_interval,
                 ),
                 method_name=self.execute_complete.__name__,
             )

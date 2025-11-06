@@ -15,10 +15,6 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 class WatcherTrigger(BaseTrigger):
-    """
-    Trigger that monitors dbt model execution by polling XComs for run status.
-    Designed to be deferred by DbtConsumerWatcherSensor.
-    """
 
     def __init__(
         self,
@@ -28,6 +24,7 @@ class WatcherTrigger(BaseTrigger):
         run_id: str,
         map_index: int | None,
         use_event: bool,
+        poke_interval: float = 5.0,
     ):
         self.model_unique_id = model_unique_id
         self.producer_task_id = producer_task_id
@@ -35,9 +32,9 @@ class WatcherTrigger(BaseTrigger):
         self.run_id = run_id
         self.map_index = map_index
         self.use_event = use_event
+        self.poke_interval = poke_interval
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
-        """Serialize trigger arguments for persistence in the metadata DB."""
         return (
             "cosmos._triggers.watcher.WatcherTrigger",
             {
@@ -47,6 +44,7 @@ class WatcherTrigger(BaseTrigger):
                 "run_id": self.run_id,
                 "map_index": self.map_index,
                 "use_event": self.use_event,
+                "poke_interval": self.poke_interval,
             },
         )
 
@@ -87,7 +85,6 @@ class WatcherTrigger(BaseTrigger):
             return await self.get_xcom_val_af3(key)
 
     async def _parse_node_status(self) -> str | None:
-        """Fetch and parse the node status from XCom (event or run_results)."""
         key = f"nodefinished_{self.model_unique_id.replace('.', '__')}" if self.use_event else "run_results"
 
         compressed_xcom_val = await self.get_xcom_val(key)
@@ -125,7 +122,7 @@ class WatcherTrigger(BaseTrigger):
                 return
 
             # Sleep briefly before re-polling
-            await asyncio.sleep(2)
+            await asyncio.sleep(self.poke_interval)
             self.log.debug("Polling again for model '%s' status...", self.model_unique_id)
 
 

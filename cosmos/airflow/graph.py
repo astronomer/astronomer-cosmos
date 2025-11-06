@@ -841,7 +841,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
     for node_id, node in nodes.items():
-
         task_or_group_args = {
             # Arguments to this method:
             "dag": dag,

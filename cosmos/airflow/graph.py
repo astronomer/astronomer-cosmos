@@ -463,10 +463,6 @@ def generate_or_convert_task(
     conversion_function = node_converters.get(resource_type, None)
     if conversion_function is not None:
         task_id = task_meta.id
-        logger.warning(
-            "The `node_converters` attribute is an experimental feature. "
-            "Its syntax and behavior can be changed before a major release."
-        )
         logger.debug(f"Converting node <{node.unique_id}> task <{task_id}> using <{conversion_function.__name__}>")
         # In Cosmos 2.0 we should review this implementation and use render_config or another simpler interface:
         task = conversion_function(  # type: ignore

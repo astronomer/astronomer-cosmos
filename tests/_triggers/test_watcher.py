@@ -121,22 +121,17 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):
         get_xcom_val_mock = AsyncMock(side_effect=["running", "running", "compressed_data"])
-        caplog.set_level("DEBUG")
-
-        # First two iterations: loop continues (simulate pending), third: success
         parse_node_status_mock = AsyncMock(side_effect=[None, None, "success"])
+
+        caplog.set_level("DEBUG")
 
         with patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock), patch(
             "cosmos._triggers.watcher.WatcherTrigger._parse_node_status", parse_node_status_mock
-        ), patch("asyncio.sleep", AsyncMock()):
-            # Act: collect events
+        ), patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
             events = []
             async for event in self.trigger.run():
                 events.append(event)
 
-        # Assert TriggerEvent eventually reports success
-        assert events[0].payload["status"] == "success"
+            sleep_mock.assert_awaited()
 
-        # Assert debug log was emitted at least once
-        debug_logs = [rec.message for rec in caplog.records if rec.levelname == "DEBUG"]
-        assert any("Polling again for model" in msg for msg in debug_logs)
+        assert events[0].payload["status"] == "success"

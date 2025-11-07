@@ -1,6 +1,24 @@
 Changelog
 =========
 
+1.11.1a1 (2025-11-07)
+--------------------
+
+Bug fixes
+
+* Fix ``ExecutionMode.WATCHER`` deadlock in Airflow 3.0 & 3.1 by @tatiana in #2087
+* Fix ``ExecutionMode.AIRFLOW_ASYNC`` ``TaskGroup`` XCom issue by @tatiana in #2088
+
+Enhancements
+
+* Remove usage of contextmanager in plugins for accessing connections in Airflow >= 3.1.2 by @pankajkoti in #2073
+
+Others
+
+* Fix broken CI due to fastapi incompatibility with cadwyn for Airflow 3 by @pankajkoti in #2076
+* pre-commit autoupdate in #2078
+
+
 1.11.0 (2025-10-29)
 ---------------------
 

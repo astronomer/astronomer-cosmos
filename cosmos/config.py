@@ -102,7 +102,6 @@ class RenderConfig:
     normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
     enable_owner_inheritance: bool | None = True
-    node_conversion_by_task_group: bool | None = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

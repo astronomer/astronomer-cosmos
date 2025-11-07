@@ -2,7 +2,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import TestBehavior
 from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
@@ -22,29 +23,29 @@ profile_config = ProfileConfig(
 
 
 # [START airflow_async_execution_mode_example]
-# simple_dag_async = DbtDag(
-#     # dbt/cosmos-specific parameters
-#     project_config=ProjectConfig(
-#         DBT_PROJECT_PATH,
-#     ),
-#     profile_config=profile_config,
-#     execution_config=ExecutionConfig(
-#         execution_mode=ExecutionMode.AIRFLOW_ASYNC,
-#         async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
-#     ),
-#     render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
-#     # normal dag parameters
-#     schedule=None,
-#     start_date=datetime(2023, 1, 1),
-#     catchup=False,
-#     dag_id="simple_dag_async",
-#     tags=["simple"],
-#     operator_args={
-#         "location": "US",
-#         "install_deps": True,
-#         "full_refresh": True,
-#     },
-# )
+simple_dag_async = DbtDag(
+    # dbt/cosmos-specific parameters
+    project_config=ProjectConfig(
+        DBT_PROJECT_PATH,
+    ),
+    profile_config=profile_config,
+    execution_config=ExecutionConfig(
+        execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+        async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
+    ),
+    render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
+    # normal dag parameters
+    schedule=None,
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+    dag_id="simple_dag_async",
+    tags=["simple"],
+    operator_args={
+        "location": "US",
+        "install_deps": True,
+        "full_refresh": True,
+    },
+)
 # [END airflow_async_execution_mode_example]
 
 

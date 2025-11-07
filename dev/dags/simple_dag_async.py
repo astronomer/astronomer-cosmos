@@ -2,8 +2,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import TestBehavior
+from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
@@ -23,27 +22,65 @@ profile_config = ProfileConfig(
 
 
 # [START airflow_async_execution_mode_example]
-simple_dag_async = DbtDag(
-    # dbt/cosmos-specific parameters
-    project_config=ProjectConfig(
-        DBT_PROJECT_PATH,
-    ),
-    profile_config=profile_config,
-    execution_config=ExecutionConfig(
-        execution_mode=ExecutionMode.AIRFLOW_ASYNC,
-        async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
-    ),
-    render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
-    # normal dag parameters
-    schedule=None,
+# simple_dag_async = DbtDag(
+#     # dbt/cosmos-specific parameters
+#     project_config=ProjectConfig(
+#         DBT_PROJECT_PATH,
+#     ),
+#     profile_config=profile_config,
+#     execution_config=ExecutionConfig(
+#         execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+#         async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
+#     ),
+#     render_config=RenderConfig(select=["path:models"], test_behavior=TestBehavior.NONE),
+#     # normal dag parameters
+#     schedule=None,
+#     start_date=datetime(2023, 1, 1),
+#     catchup=False,
+#     dag_id="simple_dag_async",
+#     tags=["simple"],
+#     operator_args={
+#         "location": "US",
+#         "install_deps": True,
+#         "full_refresh": True,
+#     },
+# )
+# [END airflow_async_execution_mode_example]
+
+
+from airflow.models import DAG
+
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
+
+from cosmos import DbtTaskGroup
+
+# [START simple_dag_async_taskgroup]
+with DAG(
+    dag_id="simple_dag_async_taskgroup",
+    schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-    dag_id="simple_dag_async",
-    tags=["simple"],
-    operator_args={
-        "location": "US",
-        "install_deps": True,
-        "full_refresh": True,
-    },
-)
-# [END airflow_async_execution_mode_example]
+):
+    pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+    first_dbt_task_group = DbtTaskGroup(
+        group_id="first_dbt_task_group",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+            async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
+        ),
+        render_config=RenderConfig(select=["*customers*"], exclude=["path:seeds"]),
+        project_config=ProjectConfig(DBT_PROJECT_PATH),
+        profile_config=profile_config,
+        operator_args={
+            "location": "US",
+            "install_deps": True,
+            "full_refresh": True,
+        },
+    )
+
+    pre_dbt >> first_dbt_task_group
+# [END simple_dag_async_taskgroup]

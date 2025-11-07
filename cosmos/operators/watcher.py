@@ -217,6 +217,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
         execution_timeout: timedelta = timedelta(hours=1),
+        deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
         self.compiled_sql = ""
@@ -234,6 +235,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         )
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
         self.producer_task_id = producer_task_id
+        self.deferrable = deferrable
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
@@ -331,7 +333,9 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
 
     def execute(self, context: Context, **kwargs: Any) -> None:
-        if not self.poke(context):
+        if not self.deferrable:
+            super().execute(context)
+        elif not self.poke(context):
             self.defer(
                 trigger=WatcherTrigger(
                     model_unique_id=self.model_unique_id,
@@ -342,6 +346,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
                     use_event=self._use_event(),
                     poke_interval=self.poke_interval,
                 ),
+                timeout=self.execution_timeout,
                 method_name=self.execute_complete.__name__,
             )
 

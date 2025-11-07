@@ -365,6 +365,7 @@ class TestDbtConsumerWatcherSensor:
             task_id="model.my_model",
             project_dir="/tmp/project",
             profile_config=None,
+            deferrable=True,
             **kwargs,
         )
 
@@ -591,6 +592,14 @@ class TestDbtConsumerWatcherSensor:
             sensor.execute(context)
 
         assert isinstance(exc.value.trigger, WatcherTrigger), "Trigger is not a WatcherTrigger"
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.poke")
+    def test_sensor_not_deferred(self, mock_poke):
+        sensor = self.make_sensor()
+        sensor.deferrable = False
+        context = {"run_id": "run_id", "task_instance": Mock()}
+        sensor.execute(context=context)
+        mock_poke.assert_called_once()
 
     @pytest.mark.parametrize(
         "mock_event",

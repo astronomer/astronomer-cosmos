@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, List, Union
 
 import airflow
+import psutil
 from packaging.version import Version
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -164,10 +165,31 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         ti = context["ti"]
         ti.xcom_push(key="state", value="failed")
 
+    def consume_memory_until_error(self, chunk_mb: int = 8) -> None:
+        """
+        Gradually allocates memory to approach the container cap.
+        Stops cleanly at MemoryError or when limit_mb reached.
+        """
+        chunks, chunk = [], b"\0" * (chunk_mb * 1024 * 1024)
+        while True:
+            print("Memory usage: %s", psutil.Process().memory_info().rss // (1024 * 1024))
+            chunks.append(chunk[:])  # new bytes object
+            # time.sleep(sleep_s)
+        # except MemoryError:
+        #     return "caught"
+        # finally:
+        #     chunks.clear()  # release memory promptly
+        # return "limit_reached"
+
     def execute(self, context: Context, **kwargs: Any) -> Any:
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()
+
+            self.consume_memory_until_error()
+            # import time
+            # time.sleep(5)
+            # raise MemoryError("Simulated OOM")
 
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
             logger.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
@@ -193,11 +215,10 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
                 kwargs["push_run_results_to_xcom"] = True
                 return_value = super().execute(context=context, **kwargs)
 
-            context["ti"].xcom_push(key="task_status", value="completed")
             return return_value
 
         except Exception:
-            context["ti"].xcom_push(key="task_status", value="completed")
+            context["ti"].xcom_push(key="state", value="failed")
             raise
 
 

@@ -29,6 +29,7 @@ from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 AIRFLOW_VERSION = Version(airflow.__version__)
+DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
 
 def _mock_bigquery_adapter() -> None:
@@ -69,7 +70,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
-    producer_task_id: str = "dbt_setup_async"
+    producer_task_id: str = DEFAULT_PRODUCER_ASYNC_TASK_ID
 
     def __init__(
         self,

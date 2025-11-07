@@ -4,7 +4,10 @@ from pathlib import Path
 from typing import Callable, Dict
 
 import aenum
+import airflow
 from packaging.version import Version
+
+AIRFLOW_VERSION = Version(airflow.__version__)
 
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")

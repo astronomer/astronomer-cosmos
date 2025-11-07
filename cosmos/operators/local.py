@@ -15,11 +15,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 from urllib.parse import urlparse
 
-import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
+from packaging.version import Version
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -27,9 +27,7 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-from airflow.version import version as airflow_version
 from attrs import define
-from packaging.version import Version
 
 from cosmos import cache, settings
 
@@ -46,6 +44,7 @@ from cosmos.cache import (
 )
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
+    AIRFLOW_VERSION,
     DBT_DEPENDENCIES_FILE_NAMES,
     FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     InvocationMode,
@@ -116,8 +115,6 @@ from cosmos.operators.base import (
     DbtTestMixin,
     _sanitize_xcom_key,
 )
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 logger = get_logger(__name__)
 
@@ -321,6 +318,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return None, None
 
         if not settings.AIRFLOW_IO_AVAILABLE:
+            from airflow.version import version as airflow_version
+
             raise CosmosValueError(
                 f"You're trying to specify remote target path {target_path_str}, but the required "
                 f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "

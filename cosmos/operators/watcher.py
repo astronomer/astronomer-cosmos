@@ -8,9 +8,6 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, List, Union
 
-import airflow
-from packaging.version import Version
-
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
@@ -28,8 +25,10 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
+from packaging.version import Version
+
 from cosmos.config import ProfileConfig
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -40,9 +39,6 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-
-AIRFLOW_VERSION = Version(airflow.__version__)
-
 
 try:
     from dbt_common.events.base_types import EventMsg

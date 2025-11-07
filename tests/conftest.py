@@ -1,13 +1,11 @@
 import json
 from unittest.mock import patch
 
-import airflow
 import pytest
 from airflow.models.connection import Connection
 from packaging.version import Version
 
-AIRFLOW_VERSION = Version(airflow.__version__)
-
+from cosmos.constants import AIRFLOW_VERSION
 
 if AIRFLOW_VERSION >= Version("3.1"):
     # Change introduced in Airflow 3.1.0

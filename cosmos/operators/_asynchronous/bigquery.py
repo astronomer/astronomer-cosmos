@@ -6,8 +6,6 @@ import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
-import airflow
-
 from cosmos.operators.base import _sanitize_xcom_key
 
 try:
@@ -23,12 +21,11 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 def _mock_bigquery_adapter() -> None:

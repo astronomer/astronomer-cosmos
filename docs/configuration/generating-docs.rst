@@ -80,7 +80,7 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
     from cosmos.operators import DbtDocsGCSOperator
 
     # then, in your DAG code:
-    generate_dbt_docs_aws = DbtDocsGCSOperator(
+    generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,
@@ -113,7 +113,7 @@ The following code snippet shows how to provide this flag with the default jaffl
     from cosmos.operators import DbtDocsGCSOperator
 
     # then, in your DAG code:
-    generate_dbt_docs_aws = DbtDocsGCSOperator(
+    generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,

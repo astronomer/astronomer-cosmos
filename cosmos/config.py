@@ -64,6 +64,7 @@ class RenderConfig:
     :param selector: Name of a dbt YAML selector to use for parsing. Only supported when using ``load_method=LoadMode.DBT_LS``.
     :param dbt_deps: (deprecated) Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
+    :param node_conversion_by_task_group: A boolean that allows users to do node conversion at the task group level instead of task level.  Defaults to True.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
     :param env_vars: (Deprecated since Cosmos 1.3 use ProjectConfig.env_vars) A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
     :param dbt_project_path: Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
@@ -76,7 +77,6 @@ class RenderConfig:
     :param normalize_task_display_name: A callable that takes a dbt node as input and returns the task display name. This allows users to assign a custom task display name separate from the node ID.
     :param should_detach_multiple_parents_tests: A boolean that allows users to decide whether to run tests with multiple parent dependencies in separate tasks.
     :param enable_owner_inheritance: A boolean that allows users to enable the owner inheritance from dbt models to airflow tasks. Defaults to True.
-    :param node_conversion_by_task_group: A boolean that allows users to do node conversion at the task group level instead of task level.  Defaults to True.
     """
 
     emit_datasets: bool = True
@@ -88,6 +88,7 @@ class RenderConfig:
     selector: str | None = None
     dbt_deps: bool | None = None
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
+    node_conversion_by_task_group: bool | None = True
     dbt_executable_path: str | Path = get_system_dbt()
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
@@ -101,7 +102,6 @@ class RenderConfig:
     normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
     enable_owner_inheritance: bool | None = True
-    node_conversion_by_task_group: bool | None = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

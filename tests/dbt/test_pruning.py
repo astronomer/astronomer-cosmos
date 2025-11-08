@@ -13,7 +13,7 @@ from cosmos.airflow.graph import (
     create_task_metadata,
     generate_task_or_group,
 )
-from cosmos.config import ProfileConfig
+from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
     DbtResourceType,
     ExecutionMode,
@@ -224,9 +224,11 @@ class TestSourcePruningIntegration:
             node=self.source_with_downstream,
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
-            dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=False,  # Disabled
+            dbt_dag_task_group_identifier="tes  t",
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=False,  # Disabled
+            ),
             filtered_nodes=self.filtered_nodes_with_model,
         )
 
@@ -235,8 +237,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=False,  # Disabled
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=False,  # Disabled
+            ),
             filtered_nodes=self.filtered_nodes_empty,
         )
 
@@ -254,8 +258,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,  # Enabled
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,  # Enabled
+            ),
             filtered_nodes=self.filtered_nodes_with_model,
         )
 
@@ -265,8 +271,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,  # Enabled
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,  # Enabled
+            ),
             filtered_nodes=self.filtered_nodes_with_model,
         )
 
@@ -282,8 +290,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,
+            ),
             filtered_nodes=None,  # None means skip pruning check
         )
 
@@ -293,8 +303,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,
+            ),
             filtered_nodes={},  # Empty dict means skip pruning check
         )
 
@@ -311,8 +323,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,
+            ),
             filtered_nodes={unrelated_model.unique_id: unrelated_model},  # Non-empty but doesn't use this source
         )
 
@@ -333,11 +347,14 @@ class TestSourcePruningIntegration:
             node=self.source_with_downstream,
             execution_mode=ExecutionMode.LOCAL,
             task_args=self.task_args,
-            test_behavior=TestBehavior.NONE,
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.NONE,
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,
+            ),
             test_indirect_selection=TestIndirectSelection.EAGER,
             filtered_nodes=self.filtered_nodes_with_model,
+            node_converters={},
         )
 
         # Orphaned source should NOT generate a task
@@ -348,10 +365,13 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             task_args=self.task_args,
             test_behavior=TestBehavior.NONE,
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
-            source_pruning=True,
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                source_pruning=True,
+            ),
             test_indirect_selection=TestIndirectSelection.EAGER,
             filtered_nodes=self.filtered_nodes_with_model,
+            node_converters={},
         )
 
         assert task_with_downstream is not None
@@ -375,8 +395,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.NONE,
-            source_pruning=True,
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.NONE,
+                source_pruning=True,
+            ),
             filtered_nodes=self.filtered_nodes_with_model,
         )
 
@@ -386,8 +408,10 @@ class TestSourcePruningIntegration:
             execution_mode=ExecutionMode.LOCAL,
             args=self.task_args,
             dbt_dag_task_group_identifier="test",
-            source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
-            source_pruning=True,
+            render_config=RenderConfig(
+                source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+                source_pruning=True,
+            ),
             filtered_nodes=self.filtered_nodes_with_model,
         )
 
@@ -504,11 +528,14 @@ class TestSourcePruningEdgeCases:
             node=source,
             execution_mode=ExecutionMode.LOCAL,
             task_args=task_args,
-            test_behavior=TestBehavior.NONE,
-            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.NONE,
+                source_rendering_behavior=SourceRenderingBehavior.ALL,
+                # source_pruning not specified - should default to False
+            ),
             test_indirect_selection=TestIndirectSelection.EAGER,
-            # source_pruning not specified - should default to False
             # filtered_nodes not specified - should default to None
+            node_converters={},
         )
 
         # Should create a task because pruning is disabled by default

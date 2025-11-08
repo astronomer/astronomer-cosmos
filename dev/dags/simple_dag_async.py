@@ -47,3 +47,41 @@ simple_dag_async = DbtDag(
     },
 )
 # [END airflow_async_execution_mode_example]
+
+
+from airflow.models import DAG
+
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
+
+from cosmos import DbtTaskGroup
+
+# [START simple_dag_async_taskgroup]
+with DAG(
+    dag_id="simple_dag_async_taskgroup",
+    schedule="@daily",
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+):
+    pre_dbt = EmptyOperator(task_id="pre_dbt")
+
+    first_dbt_task_group = DbtTaskGroup(
+        group_id="first_dbt_task_group",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.AIRFLOW_ASYNC,
+            async_py_requirements=[f"dbt-bigquery=={DBT_ADAPTER_VERSION}"],
+        ),
+        render_config=RenderConfig(select=["*customers*"], exclude=["path:seeds"]),
+        project_config=ProjectConfig(DBT_PROJECT_PATH),
+        profile_config=profile_config,
+        operator_args={
+            "location": "US",
+            "install_deps": True,
+            "full_refresh": True,
+        },
+    )
+
+    pre_dbt >> first_dbt_task_group
+# [END simple_dag_async_taskgroup]

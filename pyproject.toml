@@ -162,6 +162,7 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "methodtools",
+    "pytest-asyncio",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

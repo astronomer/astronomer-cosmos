@@ -18,7 +18,7 @@ Advantages of Airflow Async Mode
 - **Better Resource Utilization:** By minimizing idle time on Airflow workers, async tasks allow more efficient use of compute resources. Workers aren't blocked waiting for external systems and can be reused for other work while waiting on async operations.
 
 Getting Started with Airflow Async Mode
-++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 

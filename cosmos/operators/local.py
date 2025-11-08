@@ -22,7 +22,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
-from cosmos.io import construct_dest_file_path
+from cosmos.io import _construct_dest_file_path
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -350,7 +350,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
         for file_path in files:
             rel_path = os.path.relpath(file_path, source_run_dir)
-            dest_file_path = construct_dest_file_path(
+            dest_file_path = _construct_dest_file_path(
                 dest_target_dir, rel_path, dag_task_group_identifier, run_id, resource_type
             )
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)

@@ -174,7 +174,7 @@ def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tu
     return _configured_target_path, remote_conn_id
 
 
-def construct_dest_file_path(
+def _construct_dest_file_path(
     dest_root: Any | None,
     rel_path: str,
     *prefixes: str,
@@ -232,7 +232,7 @@ def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARG
 
     for file_path in files:
         rel_path = os.path.relpath(file_path, source_target_dir)
-        dest_file_path = construct_dest_file_path(
+        dest_file_path = _construct_dest_file_path(
             dest_target_dir,
             rel_path,
             task_run_identifier,

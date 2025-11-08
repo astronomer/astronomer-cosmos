@@ -8,7 +8,7 @@ from cosmos.constants import DEFAULT_TARGET_PATH, _default_s3_conn
 from cosmos.exceptions import CosmosValueError
 from cosmos.io import (
     _configure_remote_target_path,
-    construct_dest_file_path,
+    _construct_dest_file_path,
     upload_to_aws_s3,
     upload_to_azure_wasb,
     upload_to_cloud_storage,
@@ -76,7 +76,7 @@ def test_configure_remote_target_path_no_remote_target():
     assert _configure_remote_target_path() == (None, None)
 
 
-def testconstruct_dest_file_path(dummy_kwargs):
+def test_construct_dest_file_path(dummy_kwargs):
     """Test construct_dest_file_path."""
     dest_target_dir = Path("/dest")
     source_target_dir = Path("/project_dir/target")
@@ -93,7 +93,7 @@ def testconstruct_dest_file_path(dummy_kwargs):
 
     expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
     assert (
-        construct_dest_file_path(dest_target_dir, rel_path, task_run_identifier, DEFAULT_TARGET_PATH) == expected_path
+        _construct_dest_file_path(dest_target_dir, rel_path, task_run_identifier, DEFAULT_TARGET_PATH) == expected_path
     )
 
 

@@ -26,6 +26,7 @@ from cosmos import (
     ProjectConfig,
     RenderConfig,
 )
+from cosmos.operators.kubernetes import DbtDocsS3KubernetesOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
@@ -80,6 +81,29 @@ with DAG(
         },
     )
     # [END kubernetes_seed_example]
+
+    # [START kubernetes_docs_to_s3_examaple]
+    docs_s3 = generate_dbt_docs_aws = DbtDocsS3KubernetesOperator(
+        task_id="generate_dbt_docs_aws",
+        project_dir=K8S_PROJECT_DIR,
+        profile_config=ProfileConfig(
+            profile_name="postgres_profile",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="postgres_default",
+                profile_args={
+                    "schema": "public",
+                },
+            ),
+        ),
+        connection_id="aws_s3_conn",
+        bucket_name="cosmos-ci-docs",
+        install_deps=True,
+        image=DBT_IMAGE,
+        get_logs=True,
+        is_delete_operator_pod=False,
+    )
+    # [END kubernetes_docs_to_s3_examaple]
 
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(

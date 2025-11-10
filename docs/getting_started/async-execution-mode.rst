@@ -5,10 +5,14 @@
 Airflow Async Execution Mode
 ============================
 
-The Airflow async execution mode in Cosmos is designed to improve pipeline performance. While this mode was introduced in Cosmos 1.9, we strongly encourage users to use Cosmos 1.11, which has significant performance improvements.
-This execution mode could be preferred when you’ve long running transformations and you want to run them asynchronously by leveraging Airflow’s `deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
-In this mode, there is a ``SetupAsyncOperator`` that precedes the remaining pipeline. It will pre-generate the SQL files for the dbt project and upload them to Airflow XCom or a remote location.
-All the models will be run using ``DbtRunAirflowAsyncOperator`` which, instead of running the ```dbt run``` command for each model, will download the SQL files from the Airflow XCom or remote location and execute them directly.
+This execution mode can reduce the runtime by 35% in comparison to Cosmos LOCAL execution mode, but is currently only supported for BigQuery. While this mode was introduced in Cosmos 1.9, we strongly encourage users to use Cosmos 1.11, which has significant performance improvements.
+
+It can be particularly useful for long-running transformations, since it leverages Airflow's `deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
+
+In this mode, there is a ``SetupAsyncOperator`` that will pre-generate the SQL files for the dbt project and upload them to Airflow XCom or a remote location. This operator is run before the remaining pipeline.
+All the pipeline dbt model transformations will be run using ``DbtRunAirflowAsyncOperator`` which, instead of running the ```dbt run``` command for each model. The will download the SQL files from the Airflow XCom or remote location and execute them directly leveraging the Airflow ``BigQueryInsertJobOperator``.
+
+Users can leverage other existing ``BigQueryInsertJobOperator`` features, such as the buttons to visualise the job in the BigQuery UI.
 
 
 Advantages of Airflow Async Mode
@@ -24,7 +28,9 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 | How the dbt pipeline was executed            | Execution Time (seconds) |
 +==============================================+==========================+
 | ``dbt run`` with dbt Core 1.10               | 13                       |
++----------------------------------------------+--------------------------+
 | Cosmos 1.11 with ExecutionMode.LOCAL         | 11                       |
++----------------------------------------------+--------------------------+
 | Cosmos 1.11 with ExecutionMode.AIRFLOW_ASYNC | 7                        |
 +----------------------------------------------+--------------------------+
 
@@ -227,6 +233,7 @@ Limitations
 
         AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
         AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
+
 
     4. When using the configuration above, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location.
 

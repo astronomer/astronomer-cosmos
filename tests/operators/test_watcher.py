@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import zlib
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -210,8 +211,6 @@ def test_handle_node_finished_without_compiled_sql_does_not_inject(tmp_path, mon
 
 def test_execute_streaming_mode():
     """Streaming path should push startup + per-model XComs."""
-    from contextlib import nullcontext
-
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     op.invocation_mode = InvocationMode.DBT_RUNNER
 
@@ -253,6 +252,41 @@ def test_execute_streaming_mode():
 
     node_key = "nodefinished_model__pkg__x"
     assert node_key in ti.store
+
+
+def test_execute_callback_exception_is_logged(caplog):
+    """Errors inside dbt callback should be logged instead of bubbling up."""
+
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    op.invocation_mode = InvocationMode.DBT_RUNNER
+
+    import cosmos.operators.watcher as _watch_mod
+
+    if _watch_mod.EventMsg is None:
+
+        class _DummyEv:
+            pass
+
+        eventmsg_patch = patch("cosmos.operators.watcher.EventMsg", _DummyEv, create=True)
+    else:
+        eventmsg_patch = nullcontext()  # type: ignore
+
+    ti = _MockTI()
+    ctx = {"ti": ti, "run_id": "dummy"}
+
+    def fake_base_execute(self, context=None, **_):  # type: ignore[override]
+        for cb in getattr(self, "_dbt_runner_callbacks", []):
+            cb(_fake_event("MainReportVersion"))
+        return "ok"
+
+    with eventmsg_patch, patch.object(
+        DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")
+    ), patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute), caplog.at_level("ERROR"):
+        result = op.execute(context=ctx)
+
+    assert result == "ok"
+    assert "error while handling dbt event" in caplog.text
+    assert ti.store.get("task_status") == "completed"
 
 
 def test_execute_fallback_mode(tmp_path):

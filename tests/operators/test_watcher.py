@@ -281,10 +281,7 @@ def test_execute_callback_exception_is_logged(caplog):
 
     with eventmsg_patch, patch.object(
         DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")
-    ), patch(
-        "cosmos.operators.watcher.DbtLocalBaseOperator.execute",
-        fake_base_execute,
-    ), caplog.at_level("ERROR"):
+    ), patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute,), caplog.at_level("ERROR"):
         result = op.execute(context=ctx)
 
     assert result == "ok"

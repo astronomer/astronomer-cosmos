@@ -81,14 +81,50 @@ Initial benchmarks, using  illustrate significant improvements:
 | Standard Deployment with A10 workers          |           |                    |
 +-----------------------------------------------+-----------+--------------------+
 
-.. note::
-   ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile, so you may need to experiment with different thread counts to balance faster DAG runtimes against the CPU and memory available in your Airflow workers.
-
 The last line represents the performance improvement in a real-world Airflow deployment, using `Astro Cloud <https://www.astronomer.io/>`_.
 
 Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
 
 We plan to repeat these benchmarks and share the code with the community in the future.
+
+
+.. note::
+   ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile. Start with a conservative value that matches the CPU capacity of your Airflow workers, then gradually increase it to find the sweet spot between faster runs and acceptable memory/CPU usage.
+
+When we ran the `astronomer/cosmos-benchmark <https://github.com/astronomer/cosmos-benchmark>`_ project with ``ExecutionMode.WATCHER``, that same ``threads`` setting directly affected runtime: moving from 1 to 8 threads reduced the end-to-end ``dbt build`` duration from roughly 26 seconds to about 4 seconds (see table above), while 16 threads squeezed it to around 2 seconds at the cost of higher CPU usage. Use those numbers as a reference point when evaluating how thread counts scale in your own environment.
+
+To increase the number of threads, edit your dbt ``profiles.yml`` (or Helm values if you manage the profile there) and update the ``threads`` key for the target you use with Cosmos:
+
+.. code-block:: yaml
+
+   your_dbt_project:
+     target: prod
+     outputs:
+       prod:
+         type: postgres
+         host: your-host
+         user: your-user
+         password: your-password
+         schema: analytics
+         threads: 8  # increase or decrease to match available resources
+
+
+If you prefer to manage threads through Cosmos profile mappings instead of editing ``profiles.yml`` directly, pass ``profile_args={"threads": <int>}`` to your ``ProfileConfig``. For example, using the built-in ``PostgresUserPasswordProfileMapping``:
+
+.. code-block:: python
+
+   from cosmos.config import ProfileConfig
+   from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+   profile_config = ProfileConfig(
+       profile_name="jaffle_shop",
+       target_name="prod",
+       profile_mapping=PostgresUserPasswordProfileMapping(
+           conn_id="postgres_connection",
+           profile_args={"threads": 8},
+       ),
+   )
+
 
 -------------------------------------------------------------------------------
 

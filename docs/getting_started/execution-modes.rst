@@ -60,11 +60,11 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - High
      - No
    * - Airflow Async
-     - Fast
+     - Very Fast
      - Medium
      - Yes
    * - Watcher
-     - Fast
+     - Very Fast
      - None
      - Yes
 

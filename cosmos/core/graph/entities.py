@@ -3,15 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
-import airflow
 from packaging.version import Version
 
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 @dataclass

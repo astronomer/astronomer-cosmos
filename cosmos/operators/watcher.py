@@ -9,9 +9,6 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, Callable, List, Union
 
-import airflow
-from packaging.version import Version
-
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -33,8 +30,10 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
+from packaging.version import Version
+
 from cosmos.config import ProfileConfig
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -45,9 +44,6 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-
-AIRFLOW_VERSION = Version(airflow.__version__)
-
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -191,11 +187,18 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             if use_events:
 
                 def _callback(event_message: EventMsg) -> None:
-                    name = event_message.info.name
-                    if name in {"MainReportVersion", "AdapterRegistered"}:
-                        self._handle_startup_event(event_message, startup_events)
-                    elif name == "NodeFinished":
-                        self._handle_node_finished(event_message, context)
+                    try:
+                        name = event_message.info.name
+                        if name in {"MainReportVersion", "AdapterRegistered"}:
+                            self._handle_startup_event(event_message, startup_events)
+                        elif name == "NodeFinished":
+                            self._handle_node_finished(event_message, context)
+                    except Exception:
+                        event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
+                        logger.exception(
+                            "DbtProducerWatcherOperator: error while handling dbt event '%s'",
+                            event_name,
+                        )
 
                 self._dbt_runner_callbacks = [_callback]
                 result = super().execute(context=context, **kwargs)

@@ -269,7 +269,7 @@ Test behavior
 
 By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
 
-As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator``s, a starting point, so the transition to the new mode can be seamless.
+As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
 
 The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
 

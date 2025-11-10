@@ -27,7 +27,6 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
-
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
 

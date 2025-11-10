@@ -28,6 +28,9 @@ from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 
+DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
+
+
 def _mock_bigquery_adapter() -> None:
     from typing import Optional, Tuple
 
@@ -66,6 +69,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
+    producer_task_id: str = DEFAULT_PRODUCER_ASYNC_TASK_ID
 
     def __init__(
         self,
@@ -83,6 +87,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.dbt_kwargs = dbt_kwargs or {}
         task_id = self.dbt_kwargs.pop("task_id")
         self.full_refresh = self.dbt_kwargs.pop("full_refresh", False)
+
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
@@ -134,7 +139,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         file_path = self.async_context["dbt_node_config"]["file_path"]
         project_dir_parent = str(Path(self.project_dir).parent)
         sql_model_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
-        compressed_b64_sql = context["ti"].xcom_pull(task_ids="dbt_setup_async", key=_sanitize_xcom_key(sql_model_path))
+        compressed_b64_sql = context["ti"].xcom_pull(
+            task_ids=self.producer_task_id, key=_sanitize_xcom_key(sql_model_path)
+        )
         compressed_b64_sql = base64.b64decode(compressed_b64_sql)
         sql_query = zlib.decompress(compressed_b64_sql).decode("utf-8")
 

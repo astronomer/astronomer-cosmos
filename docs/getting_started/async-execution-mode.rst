@@ -235,6 +235,6 @@ Limitations
     AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
 
 
-4. When using the configuration above, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location.
+4. When using the configuration above, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location, which can be a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_.
 
 For more limitations, please, check the :ref:`airflow-async-execution-mode` section.

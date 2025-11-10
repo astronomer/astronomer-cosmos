@@ -215,26 +215,26 @@ The ``run`` tasks will run asynchronously via the deferrable operator, freeing u
 Limitations
 +++++++++++
 
-.. note::
 
-   1. The deferrable operator is currently supported for dbt models only when using BigQuery. Adding support for other adapters is on the roadmap.
+1. The deferrable operator is currently supported for dbt models only when using BigQuery. Adding support for other adapters is on the roadmap.
 
-   2. By default, the ``SetupAsyncOperator`` creates and executes within a new isolated virtual environment for each task run, which can cause performance issues. To reuse an existing virtual environment, use the ``virtualenv_dir`` parameter within the ``operator_args`` of the ``DbtDag``. We have observed that for ``dbt-bigquery``, the ``SetupAsyncOperator`` executes approximately 30% faster when reusing an existing virtual environment, particularly for transformations that take around 10 minutes to complete.
+2. By default, the ``SetupAsyncOperator`` creates and executes within a new isolated virtual environment for each task run, which can cause performance issues. To reuse an existing virtual environment, use the ``virtualenv_dir`` parameter within the ``operator_args`` of the ``DbtDag``. We have observed that for ``dbt-bigquery``, the ``SetupAsyncOperator`` executes approximately 30% faster when reusing an existing virtual environment, particularly for transformations that take around 10 minutes to complete.
 
-      Example:
+    Example:
 
-      .. code-block:: python
+    .. code-block:: python
 
-         DbtDag(..., operator_args={"virtualenv_dir": "dbt_venv"})
-
-    3. It is possible to upload the SQL files to a remote object location by setting the following environment variables. We observed, however, that this introduces a significant overhead in the execution time (500s for 129 models).
-
-      .. code-block:: bash
-
-        AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
-        AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
+        DbtDag(..., operator_args={"virtualenv_dir": "dbt_venv"})
 
 
-    4. When using the configuration above, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location.
+3. It is possible to upload the SQL files to a remote object location by setting the following environment variables. We observed, however, that this introduces a significant overhead in the execution time (500s for 129 models).
 
-    For more limitations, please, check the :ref:`airflow-async-execution-mode` section.
+    .. code-block:: bash
+
+    AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
+    AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
+
+
+4. When using the configuration above, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location.
+
+For more limitations, please, check the :ref:`airflow-async-execution-mode` section.

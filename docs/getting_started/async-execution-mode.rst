@@ -20,7 +20,7 @@ Advantages of Airflow Async Mode
 
 - **Improved Task Throughput:** Async tasks free up Airflow workers by leveraging the Airflow Trigger framework. While long-running SQL transformations are executing in the data warehouse, the worker is released and can handle other tasks, increasing overall task throughput.
 - **Better Resource Utilization:** By minimizing idle time on Airflow workers, async tasks allow more efficient use of compute resources. Workers aren't blocked waiting for external systems and can be reused for other work while waiting on async operations.
-- **Faster Task Execution:** With Cosmos ``SetupAsyncOperator``, the SQL transformations are precompiled and uploaded to xcom (default behaviour) or a remote location. Instead of invoking a full dbt run during each dbt model task, the SQL files are downloaded from this XCOM or remote path and executed directly. This eliminates unnecessary overhead from running the full dbt command, resulting in faster and more efficient task execution.
+- **Faster Task Execution:** With Cosmos ``SetupAsyncOperator``, the SQL transformations are precompiled and uploaded to XCom (default behaviour) or a remote location. Instead of invoking a full dbt run during each dbt model task, the SQL files are downloaded from this XCOM or remote path and executed directly. This eliminates unnecessary overhead from running the full dbt command, resulting in faster and more efficient task execution.
 
 We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ the following performance improvements by running a dbt project with 129 models:
 
@@ -34,7 +34,6 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 | Cosmos 1.11 with ExecutionMode.AIRFLOW_ASYNC | 7                        |
 +----------------------------------------------+--------------------------+
 
-For optimal performance we encourage to not upload the SQL files to a remote object location. For this same example, there was an overhead of ~500 seconds with remote SQL file upload/download, but only ~2 seconds using xcom.
 
 Getting Started with Airflow Async Mode
 +++++++++++++++++++++++++++++++++++++++
@@ -212,29 +211,42 @@ Create an Airflow connection with following configurations
 The ``run`` tasks will run asynchronously via the deferrable operator, freeing up worker slots while waiting on I/O or long-running tasks.
 
 
+Control of where to upload the SQL files
+++++++++++++++++++++++++++++++++++++++++
+
+For optimal performance we encourage to keep Cosmos standard behaviour (introduced in 1.11), which is to upload the SQL files to XCom, instead of a remote object location.
+
+For the example described in the previous section, there was an overhead of ~500 seconds with remote SQL file upload/download, but only ~2 seconds using XCom.
+
+However, if you want to upload the SQL files to a remote object location instead of XCom, you can set the following environment variables:
+
+.. code-block:: bash
+
+    AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
+    AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
+
+
 Limitations
 +++++++++++
 
 
-1. The deferrable operator is currently supported for dbt models only when using BigQuery. Adding support for other adapters is on the roadmap.
+1. **Airflow 2.8 or higher required**: This mode relies on Airflow's `Object Storage <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`__ feature, introduced in Airflow 2.8, to store and retrieve compiled SQLs.
 
-2. By default, the ``SetupAsyncOperator`` creates and executes within a new isolated virtual environment for each task run, which can cause performance issues. To reuse an existing virtual environment, use the ``virtualenv_dir`` parameter within the ``operator_args`` of the ``DbtDag``. We have observed that for ``dbt-bigquery``, the ``SetupAsyncOperator`` executes approximately 30% faster when reusing an existing virtual environment, particularly for transformations that take around 10 minutes to complete.
+2. **Limited to dbt models**: Only dbt resource type models are run asynchronously using Airflow deferrable operators. Other resource types are executed synchronously, similar to the local execution mode.
 
-    Example:
+3. **BigQuery support only**: This mode only supports BigQuery as the target database. If a different target is specified, Cosmos will throw an error indicating the target database is unsupported in this mode. Adding support for other adapters is on the roadmap.
 
-    .. code-block:: python
+4. **ProfileMapping parameter required**: You need to specify the ``ProfileMapping`` parameter in the ``ProfileConfig`` for your DAG. Refer to the example DAG below for details on setting this parameter.
 
-        DbtDag(..., operator_args={"virtualenv_dir": "dbt_venv"})
+5. **Location parameter required**: You must specify the location of the BigQuery dataset in the ``operator_args`` of the ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
+
+6. **async_py_requirements parameter required**: If you're using the default approach of having a setup task, you must specify the necessary dbt adapter Python requirements based on your profile type for the async execution mode in the ``ExecutionConfig`` of your ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
+
+2. **Creation of new isolated virtual environment for each task run**: By default, the ``SetupAsyncOperator`` creates and executes within a new isolated virtual environment for each task run, which can cause performance issues. To reuse an existing virtual environment, use the ``virtualenv_dir`` parameter within the ``operator_args`` of the ``DbtDag``. We have observed that for ``dbt-bigquery``, the ``SetupAsyncOperator`` executes approximately 30% faster when reusing an existing virtual environment, particularly for transformations that take around 10 minutes to complete.
+
+3. **Performance degradation when uploading to remote object location**: Even though it is possible to upload the SQL files to a remote object location by setting environment variables, it is slow. We observed that this introduces a significant overhead in the execution time (500s for 129 models).
+
+4. **TeardownAsyncOperator limitation**: When using a remote object location, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location by the end of the DAG Run. This is can lead to a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_. This can be avoided by setting the ``enable_teardown_async_task`` configuration to ``False``, as described in the :ref:`enable_teardown_async_task` section.
 
 
-3. It is possible to upload the SQL files to a remote object location by setting the following environment variables. We observed, however, that this introduces a significant overhead in the execution time (500s for 129 models).
-
-    .. code-block:: bash
-
-        AIRFLOW__COSMOS__REMOTE_TARGET_PATH=gs://cosmos_remote_target_demo
-        AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID=gcp_conn
-
-
-4. When using the configuration above, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location, which can be a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_.
-
-For more limitations, please, check the :ref:`airflow-async-execution-mode` section.
+For a comparison between different Cosmos execution modes, please, check the :ref:`execution-modes-comparison` section.

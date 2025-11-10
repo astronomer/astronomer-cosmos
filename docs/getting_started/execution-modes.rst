@@ -18,6 +18,7 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
+.. _execution-modes-comparison:
 
 .. list-table:: Execution Modes Comparison
    :widths: 25 25 25 25
@@ -310,16 +311,7 @@ Example DAG:
    :start-after: [START airflow_async_execution_mode_example]
    :end-before: [END airflow_async_execution_mode_example]
 
-For a full step-by-step guide, check the :ref:`async-execution-mode` page.
-
-Note that currently, the ``airflow_async`` execution mode has the following limitations:
-
-1. **Airflow 2.8 or higher required**: This mode relies on Airflow's `Object Storage <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`__ feature, introduced in Airflow 2.8, to store and retrieve compiled SQLs.
-2. **Limited to dbt models**: Only dbt resource type models are run asynchronously using Airflow deferrable operators. Other resource types are executed synchronously, similar to the local execution mode.
-3. **BigQuery support only**: This mode only supports BigQuery as the target database. If a different target is specified, Cosmos will throw an error indicating the target database is unsupported in this mode.
-4. **ProfileMapping parameter required**: You need to specify the ``ProfileMapping`` parameter in the ``ProfileConfig`` for your DAG. Refer to the example DAG below for details on setting this parameter.
-5. **location parameter required**: You must specify the location of the BigQuery dataset in the ``operator_args`` of the ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
-6. **async_py_requirements parameter required**: If you're using the default approach of having a setup task, you must specify the necessary dbt adapter Python requirements based on your profile type for the async execution mode in the ``ExecutionConfig`` of your ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
+For a full step-by-step guide and limitations, check the :ref:`async-execution-mode` page.
 
 
 Watcher Execution Mode (Experimental)

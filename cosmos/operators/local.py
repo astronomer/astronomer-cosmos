@@ -318,9 +318,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return None, None
 
         if not settings.AIRFLOW_IO_AVAILABLE:
-raise CosmosValueError(
-f"You're trying to specify remote target path {target_path_str}, but the required "
-f"Object Storage feature is unavailable in Airflow version {AIRFLOW_VERSION}. Please upgrade to "
+            raise CosmosValueError(
+                f"You're trying to specify remote target path {target_path_str}, but the required "
+                f"Object Storage feature is unavailable in Airflow version {AIRFLOW_VERSION}. Please upgrade to "
                 "Airflow 2.8 or later."
             )
 

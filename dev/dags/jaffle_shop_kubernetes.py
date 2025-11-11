@@ -83,7 +83,7 @@ with DAG(
     # [END kubernetes_seed_example]
 
     # [START kubernetes_docs_to_s3_examaple]
-    docs_s3 = generate_dbt_docs_aws = DbtDocsS3KubernetesOperator(
+    upload_docs_to_s3 = generate_dbt_docs_aws = DbtDocsS3KubernetesOperator(
         task_id="generate_dbt_docs_aws",
         project_dir=K8S_PROJECT_DIR,
         profile_config=ProfileConfig(
@@ -136,4 +136,4 @@ with DAG(
     )
     # [END kubernetes_tg_example]
 
-    load_seeds >> run_models
+    load_seeds >> run_models >> upload_docs_to_s3

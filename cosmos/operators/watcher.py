@@ -103,7 +103,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
         # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
-        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if 
+        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
         # they have already processed output XCOMs from the first run of the producer, so we disable retries.
         default_args = dict(kwargs.get("default_args", {}) or {})
         default_args["retries"] = 0

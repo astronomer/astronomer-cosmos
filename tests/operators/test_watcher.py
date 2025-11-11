@@ -127,6 +127,7 @@ def test_dbt_producer_watcher_operator_retries_ignores_user_input():
     assert op.retries == 0
     assert user_default_args["retries"] == 5
 
+
 def test_dbt_producer_watcher_operator_pushes_completion_status():
     """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)

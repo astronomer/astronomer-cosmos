@@ -216,7 +216,7 @@ Control of where to upload the SQL files
 
 For optimal performance we encourage to keep Cosmos standard behaviour (introduced in 1.11), which is to upload the SQL files to XCom, instead of a remote object location.
 
-For the benchmakr example described in a previous section, there was an overhead of ~500 seconds with remote SQL file upload/download, but only ~2 seconds using XCom, which can outweight the performance  improvements introduced by using deferrable operators.
+For the benchmakr example described in a previous section, there was an overhead of ~500 seconds with remote SQL file upload/download, but only ~2 seconds using XCom, which can outweigh the performance  improvements introduced by using deferrable operators.
 
 However, if you want to upload the SQL files to a remote object location instead of XCom, you can set the following environment variables:
 

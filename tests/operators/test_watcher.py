@@ -110,6 +110,23 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
+def test_dbt_producer_watcher_operator_retries_forced_to_zero():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.retries == 0
+
+
+def test_dbt_producer_watcher_operator_retries_ignores_user_input():
+    user_default_args = {"retries": 5}
+    op = DbtProducerWatcherOperator(
+        project_dir=".",
+        profile_config=None,
+        default_args=user_default_args,
+        retries=3,
+    )
+
+    assert op.retries == 0
+    assert user_default_args["retries"] == 5
+
 def test_dbt_producer_watcher_operator_pushes_completion_status():
     """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)

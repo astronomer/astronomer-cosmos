@@ -12,7 +12,7 @@ It can be particularly useful for long-running transformations, since it leverag
 In this mode, there is a ``SetupAsyncOperator`` that will pre-generate the SQL files for the dbt project and upload them to Airflow XCom or a remote location. A remote location will only be used if users set ``AIRFLOW__COSMOS__REMOTE_TARGET_PATH`` and ``AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID``. This operator is run before the remaining pipeline.
 All the pipeline dbt model transformations will be run using ``DbtRunAirflowAsyncOperator`` which, instead of running the ``dbt run`` command for each model. They will download the SQL files from the Airflow XCom or remote location and execute them directly leveraging the Airflow ``BigQueryInsertJobOperator``.
 
-Users can leverage other existing ``BigQueryInsertJobOperator`` features, such as the buttons to visualise the job in the BigQuery UI.
+Users can leverage other existing ``BigQueryInsertJobOperator`` features, such as the UI controls to link to the job in the BigQuery UI.
 
 
 Advantages of Airflow Async Mode

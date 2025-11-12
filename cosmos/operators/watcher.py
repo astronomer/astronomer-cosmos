@@ -183,6 +183,25 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         safe_xcom_push(task_instance=context["ti"], key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        task_instance = context.get("ti")
+        if task_instance is None:
+            raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
+
+        try_number = getattr(task_instance, "try_number", 1)
+
+        if try_number > 1:
+            retry_message = (
+                "Dbt WATCHER producer task does not support Airflow retries. "
+                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+            )
+            self.log.error(retry_message)
+            raise AirflowException(retry_message)
+
+        self.log.info(
+            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
+            "downstream sensors own model-level retries."
+        )
+
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()

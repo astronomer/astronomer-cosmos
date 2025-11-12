@@ -300,13 +300,17 @@ def test_execute_streaming_mode():
             cb(node_evt)
         return None
 
-    with eventmsg_patch, patch.object(
-        DbtProducerWatcherOperator,
-        "_serialize_event",
-        lambda self, ev: {"dummy": True},
-    ), patch(
-        "cosmos.operators.watcher.DbtLocalBaseOperator.execute",
-        fake_base_execute,
+    with (
+        eventmsg_patch,
+        patch.object(
+            DbtProducerWatcherOperator,
+            "_serialize_event",
+            lambda self, ev: {"dummy": True},
+        ),
+        patch(
+            "cosmos.operators.watcher.DbtLocalBaseOperator.execute",
+            fake_base_execute,
+        ),
     ):
         op.execute(context=ctx)
 
@@ -341,9 +345,12 @@ def test_execute_callback_exception_is_logged(caplog):
             cb(_fake_event("MainReportVersion"))
         return "ok"
 
-    with eventmsg_patch, patch.object(
-        DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")
-    ), patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute), caplog.at_level("ERROR"):
+    with (
+        eventmsg_patch,
+        patch.object(DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")),
+        patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute),
+        caplog.at_level("ERROR"),
+    ):
         result = op.execute(context=ctx)
 
     assert result == "ok"

@@ -770,9 +770,12 @@ class DbtGraph:
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
-            with self.profile_config.ensure_profile(
-                use_mock_values=self.render_config.enable_mock_profile
-            ) as profile_values, environ(self.env_vars):
+            with (
+                self.profile_config.ensure_profile(
+                    use_mock_values=self.render_config.enable_mock_profile
+                ) as profile_values,
+                environ(self.env_vars),
+            ):
                 (profile_path, env_vars) = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)

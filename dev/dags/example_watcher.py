@@ -104,6 +104,5 @@ example_watcher_synchronous = DbtDag(
     start_date=datetime(2025, 1, 1),
     catchup=False,
     dag_id="example_watcher_synchronous",
-    default_args={"retries": 0},
 )
 # [END example_watcher_synchronous]

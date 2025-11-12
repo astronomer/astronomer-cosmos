@@ -76,10 +76,6 @@ jobs:
             airflow-version: "2.7"
           - python-version: "3.12"
             airflow-version: "2.8"
-          # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
-          # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.9"
-            airflow-version: "2.7"
     steps:
       - uses: actions/checkout@v5
         with:

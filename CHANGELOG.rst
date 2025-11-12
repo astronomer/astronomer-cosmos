@@ -4,16 +4,6 @@ Changelog
 Changelog
 =========
 
-1.12.0a1 (2025-11-12)
----------------------
-
-Features
-* Support applying ```node_converter``` at a task level instead of task group level by @anyapriya in #1759
-
-Enhancements
-* By default, use deferrable sensors when using ``ExecutionMode.WATCHER`` by @pankajastro in #2084
-* Unify airflow version handling into ``constants.py`` by @tatiana in #2089
-* Refactor ``airflow/graph.py`` to simplify code-base by @tatiana in #2080
 
 1.11.1 (2025-11-12)
 --------------------

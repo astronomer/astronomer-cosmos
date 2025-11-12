@@ -131,17 +131,6 @@ jobs:
             airflow-version: "2.4"
           - python-version: "3.11"
             airflow-version: "2.5"
-          # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
-          # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.9"
-            airflow-version: "2.7"
-          - python-version: "3.8"
-            airflow-version: "3.0"
-          # since 1.9, dbt no longer supports Python 3.8
-          - python-version: "3.8"
-            dbt-version: "1.9"
-          - python-version: "3.8"
-            dbt-version: "1.10"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18

@@ -351,7 +351,7 @@ which increases overall task throughput. By default, the sensor now runs in defe
 **Limitations:**
 
 - Deferrable execution is currently supported only for dbt model (i.e., run) commands.
-- Deferrable execution applies only to the first task attempt (try number 0). For subsequent retries, the sensor falls back to synchronous execution.
+- Deferrable execution applies only to the first task attempt (try number 1). For subsequent retries, the sensor falls back to synchronous execution.
 
 To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in the ``operator_args``.
 

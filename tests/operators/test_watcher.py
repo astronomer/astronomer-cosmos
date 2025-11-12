@@ -164,6 +164,18 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
         mock_execute.assert_called_once()
 
 
+def test_dbt_producer_watcher_operator_requires_task_instance():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    context: dict[str, object] = {}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        with pytest.raises(AirflowException) as excinfo:
+            op.execute(context=context)
+
+    mock_execute.assert_not_called()
+    assert "expects a task instance" in str(excinfo.value)
+
+
 def test_handle_startup_event():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     lst: list[dict] = []

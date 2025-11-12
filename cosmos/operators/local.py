@@ -444,12 +444,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     assert ti.task is not None
                 ti.task.template_fields = self.template_fields
                 rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
                 # delete the old records
                 session.query(RenderedTaskInstanceFields).filter(
                     RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
                     RenderedTaskInstanceFields.task_id == self.task_id,
                     RenderedTaskInstanceFields.run_id == ti.run_id,
+                    RenderedTaskInstanceFields.map_index == ti.map_index
                 ).delete()
                 session.add(rtif)
             else:

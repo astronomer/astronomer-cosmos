@@ -39,17 +39,14 @@ if os.getenv("CI"):
 
 from cosmos.constants import InvocationMode
 
-# [START example_watcher]
+# [START example_watcher_deferrable]
 example_watcher = DbtDag(
     # dbt/cosmos-specific parameters
     execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),
-    operator_args={
-        **operator_args,
-        "deferrable": False
-    },
+    operator_args=operator_args,
     # normal dag parameters
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
@@ -57,7 +54,7 @@ example_watcher = DbtDag(
     dag_id="example_watcher",
     default_args={"retries": 0},
 )
-# [END example_watcher]
+# [END example_watcher_deferrable]
 
 
 # This is not being executed in the CI, but it works in Airflow locally via standalone and in Astro CLI

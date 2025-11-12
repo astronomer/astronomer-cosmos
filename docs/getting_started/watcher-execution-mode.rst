@@ -334,12 +334,6 @@ Synchronous sensor execution
 
 In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
 
-.. TODO: Remove the following asynchronous mention when approaching the 1.12.0 release.
-
-An improvement is to change this behaviour and implement an asynchronous sensor execution, so that the worker slot is released until the condition, validated by the Airflow triggerer, is met.
-
-The ticket to implement this behaviour is `#2059 <https://github.com/astronomer/astronomer-cosmos/issues/2059>`_.
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Asynchronous sensor execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

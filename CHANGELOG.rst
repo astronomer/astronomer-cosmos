@@ -23,6 +23,7 @@ Bug fixes
 * Fix ``ExecutionMode.WATCHER`` deadlock in Airflow 3.0 & 3.1 by @tatiana in #2087
 * Fix ``ExecutionMode.AIRFLOW_ASYNC`` ``TaskGroup`` XCom issue by @tatiana in #2088
 * Guard watcher callback exceptions to avoid hanging producer tasks by @pankajkoti in #2101
+* Fix SQL templated field rendering for dynamically mapped tasks in Airflow 2 by @tatiana in #2119
 
 Enhancements
 

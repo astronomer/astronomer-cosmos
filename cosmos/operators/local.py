@@ -449,7 +449,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
                     RenderedTaskInstanceFields.task_id == self.task_id,
                     RenderedTaskInstanceFields.run_id == ti.run_id,
-                    RenderedTaskInstanceFields.map_index == ti.map_index
+                    RenderedTaskInstanceFields.map_index == ti.map_index,
                 ).delete()
                 session.add(rtif)
             else:

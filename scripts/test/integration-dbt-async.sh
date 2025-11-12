@@ -68,3 +68,9 @@ pytest -vv \
     --cov-report=term-missing \
     --cov-report=xml \
     "tests/test_async_example_dag.py::test_example_dag[simple_dag_async]"
+
+pytest -vv \
+    --cov=cosmos \
+    --cov-report=term-missing \
+    --cov-report=xml \
+    "tests/test_async_example_dag.py::test_example_dag[simple_dag_async_taskgroup]"

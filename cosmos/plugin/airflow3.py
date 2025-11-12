@@ -22,6 +22,7 @@ from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
+# Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 

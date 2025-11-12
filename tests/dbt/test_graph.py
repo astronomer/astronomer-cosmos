@@ -12,15 +12,14 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
-import airflow
 import pytest
 from airflow.models import Variable
-from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
+    AIRFLOW_VERSION,
     DBT_LOG_FILENAME,
     DBT_TARGET_DIR_NAME,
     DbtResourceType,
@@ -50,8 +49,6 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     object_storage_path = "airflow.sdk.ObjectStoragePath"

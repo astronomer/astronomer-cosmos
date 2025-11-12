@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any
 
 import sqlalchemy
-from airflow import __version__ as airflow_version
 from airflow.configuration import secrets_backend_list
 from airflow.exceptions import AirflowSkipException
 from airflow.models.dag import DAG
@@ -22,7 +21,7 @@ from packaging import version
 from packaging.version import Version
 from sqlalchemy.orm.session import Session
 
-AIRFLOW_VERSION = version.parse(airflow_version)
+from cosmos.constants import AIRFLOW_VERSION
 
 log = logging.getLogger(__name__)
 

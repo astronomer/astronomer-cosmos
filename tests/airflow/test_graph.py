@@ -1623,7 +1623,7 @@ def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, e
     for id, task in dag.task_dict.items():
         assert isinstance(task, expected_task_types[id])
 
-        
+
 def test_skip_test_task_when_only_detached_tests_exist():
     """Test that no empty test task is created when only detached tests exist with AFTER_EACH test behavior."""
     with DAG("test-skip-test-when-only-detached-tests-exist", start_date=datetime(2025, 1, 1)) as dag:

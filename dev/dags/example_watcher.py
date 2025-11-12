@@ -46,7 +46,7 @@ example_watcher = DbtDag(
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),
-    operator_args={**operator_args, "deferrable": False},
+    operator_args=operator_args,
     # normal dag parameters
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
@@ -91,3 +91,19 @@ with DAG(
     pre_dbt >> first_dbt_task_group
 # [END example_watcher_taskgroup]
 """
+
+# [START example_watcher_synchronous]
+example_watcher_synchronous = DbtDag(
+    # dbt/cosmos-specific parameters
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER),
+    project_config=ProjectConfig(DBT_PROJECT_PATH),
+    profile_config=profile_config,
+    operator_args={**operator_args, "deferrable": False},
+    # normal dag parameters
+    schedule="@daily",
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+    dag_id="example_watcher_synchronous",
+    default_args={"retries": 0},
+)
+# [END example_watcher_synchronous]

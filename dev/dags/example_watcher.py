@@ -46,10 +46,7 @@ example_watcher = DbtDag(
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),
-    operator_args={
-        **operator_args,
-        "deferrable": False
-    },
+    operator_args={**operator_args, "deferrable": False},
     # normal dag parameters
     schedule="@daily",
     start_date=datetime(2023, 1, 1),

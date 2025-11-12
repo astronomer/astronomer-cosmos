@@ -40,7 +40,7 @@ if os.getenv("CI"):
 from cosmos.constants import InvocationMode
 
 # [START example_watcher_deferrable]
-example_watcher = DbtDag(
+example_watcher_deferrable = DbtDag(
     # dbt/cosmos-specific parameters
     execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER),
     project_config=ProjectConfig(DBT_PROJECT_PATH),

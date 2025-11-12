@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import zlib
 from contextlib import nullcontext
 from datetime import datetime, timedelta
@@ -52,6 +53,7 @@ profile_config = ProfileConfig(
 class _MockTI:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
+        self.try_number = 1
 
     def xcom_push(self, key: str, value: str, **_):
         self.store[key] = value
@@ -110,6 +112,24 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
+def test_dbt_producer_watcher_operator_retries_forced_to_zero():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.retries == 0
+
+
+def test_dbt_producer_watcher_operator_retries_ignores_user_input():
+    user_default_args = {"retries": 5}
+    op = DbtProducerWatcherOperator(
+        project_dir=".",
+        profile_config=None,
+        default_args=user_default_args,
+        retries=3,
+    )
+
+    assert op.retries == 0
+    assert user_default_args["retries"] == 5
+
+
 def test_dbt_producer_watcher_operator_pushes_completion_status():
     """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -144,12 +164,54 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
         mock_execute.assert_called_once()
 
 
+def test_dbt_producer_watcher_operator_requires_task_instance():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    context: dict[str, object] = {}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        with pytest.raises(AirflowException) as excinfo:
+            op.execute(context=context)
+
+    mock_execute.assert_not_called()
+    assert "expects a task instance" in str(excinfo.value)
+
+
 def test_handle_startup_event():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     lst: list[dict] = []
     ev = _fake_event("MainReportVersion")
     op._handle_startup_event(ev, lst)
     assert lst and lst[0]["name"] == "MainReportVersion"
+
+
+def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value="ok") as mock_execute:
+        with caplog.at_level(logging.INFO):
+            op.execute(context=context)
+
+    mock_execute.assert_called_once()
+    assert any("forces Airflow retries to 0" in message for message in caplog.messages)
+
+
+def test_dbt_producer_watcher_operator_blocks_retry_attempt(caplog):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 2
+    context = {"ti": ti}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        with caplog.at_level(logging.ERROR):
+            with pytest.raises(AirflowException) as excinfo:
+                op.execute(context=context)
+
+    mock_execute.assert_not_called()
+    assert "does not support Airflow retries" in str(excinfo.value)
+    assert any("does not support Airflow retries" in message for message in caplog.messages)
 
 
 def test_handle_node_finished_pushes_xcom():

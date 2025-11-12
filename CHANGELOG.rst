@@ -30,6 +30,7 @@ Enhancements
 
 Docs
 
+* Improve ``ExecutionMode.AIRFLOW_ASYNC`` docs by @tatiana in #2103
 * Add note about experimenting threads count for the Watcher Execution mode by @pankajkoti in #2083
 * Fix minor documentation formatting issue by @dnskrv in #2098
 * Correct example YAML key from ``operator_args`` to ``operator_kwargs`` by @jx2lee in #2091

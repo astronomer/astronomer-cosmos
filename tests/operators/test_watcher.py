@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import zlib
 from contextlib import nullcontext
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace

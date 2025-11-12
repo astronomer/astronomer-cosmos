@@ -1,22 +1,43 @@
 Changelog
 =========
 
-1.11.1a1 (2025-11-07)
+Changelog
+=========
+
+1.12.0a1 (2025-11-12)
+---------------------
+
+Features
+* Support applying ```node_converter``` at a task level instead of task group level by @anyapriya in #1759
+
+Enhancements
+* By default, use deferrable sensors when using ``ExecutionMode.WATCHER`` by @pankajastro in #2084
+* Unify airflow version handling into ``constants.py`` by @tatiana in #2089
+* Refactor ``airflow/graph.py`` to simplify code-base by @tatiana in #2080
+
+1.11.1 (2025-11-12)
 --------------------
 
 Bug fixes
 
 * Fix ``ExecutionMode.WATCHER`` deadlock in Airflow 3.0 & 3.1 by @tatiana in #2087
 * Fix ``ExecutionMode.AIRFLOW_ASYNC`` ``TaskGroup`` XCom issue by @tatiana in #2088
+* Guard watcher callback exceptions to avoid hanging producer tasks by @pankajkoti in #2101
 
 Enhancements
 
 * Remove usage of contextmanager in plugins for accessing connections in Airflow >= 3.1.2 by @pankajkoti in #2073
 
+Docs
+
+* Add note about experimenting threads count for the Watcher Execution mode by @pankajkoti in #2083
+* Fix minor documentation formatting issue by @dnskrv in #2098
+* Correct example YAML key from ``operator_args`` to ``operator_kwargs`` by @jx2lee in #2091
+
 Others
 
 * Fix broken CI due to fastapi incompatibility with cadwyn for Airflow 3 by @pankajkoti in #2076
-* pre-commit autoupdate in #2078
+* pre-commit autoupdate in #2078, #2104
 
 
 1.11.0 (2025-10-29)

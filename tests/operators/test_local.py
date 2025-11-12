@@ -2054,6 +2054,7 @@ def test_override_rtif_airflow2_filters_by_map_index():
     mock_filter.delete.return_value = None
 
     with patch("airflow.utils.session.provide_session") as mock_provide_session:
+
         def session_decorator(func):
             def wrapper(*args, **kwargs):
                 return func(session=mock_session)
@@ -2067,7 +2068,7 @@ def test_override_rtif_airflow2_filters_by_map_index():
         mock_session.query.assert_called_once_with(RenderedTaskInstanceFields)
         mock_query.filter.assert_called_once()
         filter_call_arg_map_index = str(mock_query.filter.call_args.args[-1])
-        assert filter_call_arg_map_index =='rendered_task_instance_fields.map_index = :map_index_1'
+        assert filter_call_arg_map_index == "rendered_task_instance_fields.map_index = :map_index_1"
 
 
 def test_dbt_cmd_flags_templating():

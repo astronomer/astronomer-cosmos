@@ -722,11 +722,14 @@ def test_validate_converter_fetches_project_name_from_render_config(
         (ExecutionMode.KUBERNETES, {}, False, None),
         (ExecutionMode.LOCAL, {}, False, False),
         (ExecutionMode.VIRTUALENV, {}, False, False),
+        (ExecutionMode.WATCHER, {}, False, False),
         (ExecutionMode.LOCAL, {}, True, True),
         (ExecutionMode.VIRTUALENV, {}, True, True),
+        (ExecutionMode.WATCHER, {}, True, True),
         (ExecutionMode.KUBERNETES, {"install_deps": True}, False, True),
         (ExecutionMode.LOCAL, {"install_deps": True}, False, True),
         (ExecutionMode.VIRTUALENV, {"install_deps": True}, False, True),
+        (ExecutionMode.WATCHER, {"install_deps": True}, False, True),
     ],
 )
 @patch("cosmos.config.ProjectConfig.validate_project")
@@ -744,7 +747,7 @@ def test_project_config_install_dbt_deps_overrides_operator_args(
     expected,
 ):
     """Tests that the value project_config.install_dbt_deps is used to define operator_args["install_deps"] if
-    execution mode is ExecutionMode.LOCAL or ExecutionMode.VIRTUALENV and operator_args["install_deps"] is not
+    execution mode is ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, or ExecutionMode.WATCHER and operator_args["install_deps"] is not
     already defined.
     """
     project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")

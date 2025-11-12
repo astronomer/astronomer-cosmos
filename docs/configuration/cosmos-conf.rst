@@ -65,7 +65,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _dbt_docs_projects:
 
 `dbt_docs_projects`_:
-    (Introduced in Cosmos 1.11.0 and applicable to Airflow 3): JSON mapping configuring one or more dbt docs projects for the Airflow 3 UI plugin.
+    (Introduced in Cosmos 1.11.0; applicable to Airflow >= 3.1): JSON mapping configuring one or more dbt docs projects for the Airflow 3 UI plugin.
 
     Structure: mapping of slug to a dict with keys ``dir`` (required), ``index`` (optional, default ``index.html``),
     ``name`` (optional, label in the menu), and ``conn_id`` (optional connection to read remote storage).

@@ -16,7 +16,7 @@ Sample dbt Model YAML
         description: description
         meta:
           cosmos:
-            operator_args:
+            operator_kwargs:
                 pool: abcd
 
 

@@ -548,9 +548,16 @@ def _add_dbt_setup_async_task(
     )
     setup_airflow_task = create_airflow_task(setup_task_metadata, dag, task_group=task_group)
 
-    for task_id, task in tasks_map.items():
-        if not task.upstream_list:
-            setup_airflow_task >> task
+    for node_id, task_or_taskgroup in tasks_map.items():
+        node_tasks = (
+            list(task_or_taskgroup.children.values())
+            if isinstance(task_or_taskgroup, TaskGroup)
+            else [task_or_taskgroup]
+        )
+        for task in node_tasks:
+            task.producer_task_id = setup_airflow_task.task_id  # type: ignore[attr-defined]
+            if not task.upstream_list:
+                setup_airflow_task >> task
 
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
@@ -844,7 +851,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             execution_mode,
             {**task_args, "virtualenv_dir": virtualenv_dir},
             tasks_map,
-            task_group,
+            task_group=task_group,
             render_config=render_config,
             async_py_requirements=async_py_requirements,
         )

@@ -102,6 +102,14 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
+        # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
+        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
+        # they have already processed output XCOMs from the first run of the producer, so we disable retries.
+        default_args = dict(kwargs.get("default_args", {}) or {})
+        default_args["retries"] = 0
+        kwargs["default_args"] = default_args
+        kwargs["retries"] = 0
+
         on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
         super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
 
@@ -175,6 +183,25 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         safe_xcom_push(task_instance=context["ti"], key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        task_instance = context.get("ti")
+        if task_instance is None:
+            raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
+
+        try_number = getattr(task_instance, "try_number", 1)
+
+        if try_number > 1:
+            retry_message = (
+                "Dbt WATCHER producer task does not support Airflow retries. "
+                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+            )
+            self.log.error(retry_message)
+            raise AirflowException(retry_message)
+
+        self.log.info(
+            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
+            "downstream sensors own model-level retries."
+        )
+
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()
@@ -366,9 +393,19 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             )
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
-        if event.get("status") == "failed":
+        status = event.get("status")
+        if status != "failed":
+            return
+
+        reason = event.get("reason")
+        if reason == "model_failed":
             raise AirflowException(
-                f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
+            )
+
+        if reason == "producer_failed":
+            raise AirflowException(
+                f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
             )
 
     def _use_event(self) -> bool:

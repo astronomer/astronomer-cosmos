@@ -917,6 +917,8 @@ def test_dbt_task_group_with_watcher():
     assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
 def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     """
     Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.

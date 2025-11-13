@@ -35,6 +35,7 @@ from packaging.version import Version
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -70,7 +71,7 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
         task_instance.xcom_push(key=key, value=value)
 
 
-class DbtProducerWatcherOperator(DbtLocalBaseOperator):
+class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
     Executes **one** ``dbt build`` covering the whole selection.
@@ -95,8 +96,7 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
     feedback and granular task-level observability downstream.
     """
 
-    base_cmd = ["build"]
-    template_fields = DbtLocalBaseOperator.template_fields
+    template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")

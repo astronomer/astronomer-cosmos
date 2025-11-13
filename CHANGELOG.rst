@@ -10,6 +10,7 @@ Breaking changes
   - ``generate_task_or_group`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
   - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
   - ``create_task_metadata`` now expects the ``node_converters`` argument
+* Drop Python 3.9 Support by @pankajastro in #2118
 
 Features
 

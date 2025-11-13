@@ -1461,9 +1461,10 @@ def test_handle_warnings(invocation_mode, expected_extract_function, mock_contex
         invocation_mode=invocation_mode,
     )
 
-    with patch(expected_extract_function) as mock_extract_issues, patch.object(
-        instance, "on_warning_callback"
-    ) as mock_on_warning_callback:
+    with (
+        patch(expected_extract_function) as mock_extract_issues,
+        patch.object(instance, "on_warning_callback") as mock_on_warning_callback,
+    ):
         mock_extract_issues.return_value = (["test_name1", "test_name2"], ["test_name1", "test_name2"])
 
         instance._handle_warnings(result, mock_context)
@@ -1890,12 +1891,11 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
         project_dir="test/dir",
     )
 
-    with patch.object(
-        operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
-    ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
-        "pathlib.Path.rglob", return_value=[Path("file.sql")]
-    ), patch(
-        "pathlib.Path.is_file", return_value=True
+    with (
+        patch.object(operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")),
+        patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"),
+        patch("pathlib.Path.rglob", return_value=[Path("file.sql")]),
+        patch("pathlib.Path.is_file", return_value=True),
     ):
         mock_dest_path = MagicMock()
         mock_dest_path.parent = MagicMock()

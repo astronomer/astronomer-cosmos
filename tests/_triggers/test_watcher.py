@@ -74,8 +74,9 @@ class TestWatcherTrigger:
     )
     async def test_parse_node_status(self, use_event, xcom_val, expected_status):
         self.trigger.use_event = use_event
-        with patch("cosmos._triggers.watcher._parse_compressed_xcom", return_value=xcom_val), patch.object(
-            self.trigger, "get_xcom_val", AsyncMock(return_value="compressed_data")
+        with (
+            patch("cosmos._triggers.watcher._parse_compressed_xcom", return_value=xcom_val),
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value="compressed_data")),
         ):
             status = await self.trigger._parse_node_status()
             assert status == expected_status
@@ -111,9 +112,12 @@ class TestWatcherTrigger:
         async def fake_get_xcom_val(key):
             return producer_state if key == "state" else "compressed_data"
 
-        with patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val), patch(
-            "cosmos._triggers.watcher._parse_compressed_xcom",
-            return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
+        with (
+            patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val),
+            patch(
+                "cosmos._triggers.watcher._parse_compressed_xcom",
+                return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
+            ),
         ):
             events = [event async for event in self.trigger.run()]
             assert events[0].payload == expected
@@ -125,9 +129,11 @@ class TestWatcherTrigger:
 
         caplog.set_level("DEBUG")
 
-        with patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock), patch(
-            "cosmos._triggers.watcher.WatcherTrigger._parse_node_status", parse_node_status_mock
-        ), patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+        with (
+            patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
+            patch("cosmos._triggers.watcher.WatcherTrigger._parse_node_status", parse_node_status_mock),
+            patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
+        ):
             events = []
             async for event in self.trigger.run():
                 events.append(event)

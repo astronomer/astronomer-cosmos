@@ -214,6 +214,44 @@ def test_dbt_producer_watcher_operator_blocks_retry_attempt(caplog):
     assert any("does not support Airflow retries" in message for message in caplog.messages)
 
 
+@pytest.mark.parametrize(
+    "event, expected_message",
+    [
+        ({"status": "success"}, None),
+        (
+            {"status": "failed", "reason": "model_failed"},
+            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
+        ),
+        (
+            {"status": "failed", "reason": "producer_failed"},
+            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
+        ),
+    ],
+)
+def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
+    sensor = DbtConsumerWatcherSensor(
+        project_dir=".",
+        profiles_dir=".",
+        profile_config=profile_config,
+        model_unique_id="model.pkg.m",
+        poke_interval=1,
+        producer_task_id="dbt_producer_watcher_operator",
+        task_id="consumer_sensor",
+    )
+    sensor.model_unique_id = "model.pkg.m"
+
+    context = {"dag_run": MagicMock()}
+
+    if expected_message is None:
+        sensor.execute_complete(context, event)
+        return
+
+    with pytest.raises(AirflowException) as excinfo:
+        sensor.execute_complete(context, event)
+
+    assert str(excinfo.value) == expected_message
+
+
 def test_handle_node_finished_pushes_xcom():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
@@ -700,7 +738,8 @@ class TestDbtConsumerWatcherSensor:
     @pytest.mark.parametrize(
         "mock_event",
         [
-            {"status": "failed"},
+            {"status": "failed", "reason": "model_failed"},
+            {"status": "failed", "reason": "producer_failed"},
             {"status": "success"},
         ],
     )

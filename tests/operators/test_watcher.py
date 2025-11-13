@@ -738,7 +738,8 @@ class TestDbtConsumerWatcherSensor:
     @pytest.mark.parametrize(
         "mock_event",
         [
-            {"status": "failed"},
+            {"status": "failed", "reason": "model_failed"},
+            {"status": "failed", "reason": "producer_failed"},
             {"status": "success"},
         ],
     )

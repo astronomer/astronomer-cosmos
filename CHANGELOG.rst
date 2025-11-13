@@ -31,6 +31,7 @@ Bug fixes
 * Fix ``ExecutionMode.AIRFLOW_ASYNC`` ``TaskGroup`` XCom issue by @tatiana in #2088
 * Guard watcher callback exceptions to avoid hanging producer tasks by @pankajkoti in #2101
 * Fix SQL templated field rendering for dynamically mapped tasks in Airflow 2 by @tatiana in #2119
+* Fix ``ExecutionMode.WATCHER`` to use ``install_dbt_deps`` from ``ProjectConfig`` by @michal-mrazek in #2112 
 
 Enhancements
 

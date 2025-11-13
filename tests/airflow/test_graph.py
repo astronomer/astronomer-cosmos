@@ -78,6 +78,7 @@ parent_node = DbtNode(
     tags=["has_child"],
     config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
+    has_non_detached_test=True,
 )
 test_parent_node = DbtNode(
     unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test_parent",
@@ -211,6 +212,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
             config={"materialized": "view"},
             depends_on=[],
             has_test=True,
+            has_non_detached_test=True,
         )
     output = generate_task_or_group(
         dag=dag,
@@ -450,6 +452,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "model",
                     "depends_on": [],
                     "file_path": ".",
+                    "has_non_detached_test": False,
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -492,6 +495,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "snapshot",
                     "depends_on": [],
                     "file_path": ".",
+                    "has_non_detached_test": False,
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -1368,6 +1372,7 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, enable_own
             config={"materialized": "view", "meta": {"owner": "test-owner"}},
             depends_on=[],
             has_test=True,
+            has_non_detached_test=True,
         )
 
         nodes = {node_with_owner.unique_id: node_with_owner}

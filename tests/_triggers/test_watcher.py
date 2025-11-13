@@ -99,24 +99,24 @@ class TestWatcherTrigger:
                     assert val == "af3"
 
     @pytest.mark.parametrize(
-        "node_status, dr_state, expected",
+        "node_status, producer_state, expected",
         [
-            ("success", "running", "success"),
-            ("failed", "running", "failed"),
-            (None, "failed", "failed"),
+            ("success", "running", {"status": "success"}),
+            ("failed", "running", {"status": "failed", "reason": "model_failed"}),
+            (None, "failed", {"status": "failed", "reason": "producer_failed"}),
         ],
     )
-    async def test_run_various_outcomes(self, node_status, dr_state, expected):
+    async def test_run_various_outcomes(self, node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
-            return dr_state if key == "state" else "compressed_data"
+            return producer_state if key == "state" else "compressed_data"
 
         with patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val), patch(
             "cosmos._triggers.watcher._parse_compressed_xcom",
             return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
         ):
             events = [event async for event in self.trigger.run()]
-            assert events[0].payload["status"] == expected
+            assert events[0].payload == expected
 
     @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):

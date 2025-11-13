@@ -513,7 +513,7 @@ def generate_task_or_group(
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
         and render_config.test_behavior == TestBehavior.AFTER_EACH
-        and node.has_test is True
+        and node.has_non_detached_test is True
     )
     convert_entire_task_group = render_config.node_conversion_by_task_group and node.resource_type in node_converters
 

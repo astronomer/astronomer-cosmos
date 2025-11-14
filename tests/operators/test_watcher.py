@@ -585,7 +585,10 @@ class TestDbtConsumerWatcherSensor:
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
     @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
-    @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states", side_effect=ImportError("missing runtime"))
+    @patch(
+        "airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states",
+        side_effect=ImportError("missing runtime"),
+    )
     def test_get_producer_task_status_airflow3_import_error(self, _mock_get_task_states):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(

@@ -329,13 +329,14 @@ class DbtToAirflowConverter:
             nodes=self.dbt_graph.filtered_nodes,
             dag=dag or (task_group and task_group.dag),
             task_group=task_group,
-            execution_mode=execution_config.execution_mode,
+            execution_mode=execution_config.execution_mode,  # TODO: Deprecate it
             task_args=task_args,
             test_indirect_selection=execution_config.test_indirect_selection,
             dbt_project_name=render_config.project_name,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
-            async_py_requirements=execution_config.async_py_requirements,
+            async_py_requirements=execution_config.async_py_requirements,  # TODO: Deprecate it
+            execution_config=execution_config,
         )
 
         current_time = time.perf_counter()

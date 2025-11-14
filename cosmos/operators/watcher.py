@@ -386,8 +386,12 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         if AIRFLOW_VERSION < Version("3.0.0"):
             # Airflow 2: Query TaskInstance from database
-            from airflow.models import TaskInstance
-            from airflow.utils.session import create_session
+            try:
+                from airflow.models import TaskInstance
+                from airflow.utils.session import create_session
+            except Exception as exc:  # pragma: no cover - defensive fallback for tests without DB
+                logger.warning("Could not import create_session to read producer state: %s", exc)
+                return None
 
             with create_session() as session:
                 producer_ti = (

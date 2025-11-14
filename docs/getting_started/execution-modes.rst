@@ -206,6 +206,7 @@ Example DAG:
 Azure Container Instance
 ------------------------
 .. versionadded:: 1.4
+
 Similar to the ``kubernetes`` approach, using ``Azure Container Instances`` as the execution mode gives a very isolated way of running ``dbt``, since the ``dbt`` run itself is run within a container running in an Azure Container Instance.
 
 This execution mode requires the user has an Azure environment that can be used to run Azure Container Groups in (see :ref:`azure-container-instance` for more details on the exact requirements). Similarly to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
@@ -233,6 +234,7 @@ Each task will create a new container on Azure, giving full isolation. This, how
 GCP Cloud Run Job
 ------------------------
 .. versionadded:: 1.7
+
 The ``gcp_cloud_run_job`` execution mode is particularly useful for users who prefer to run their ``dbt`` commands on Google Cloud infrastructure, taking advantage of Cloud Run's scalability, isolation, and managed service capabilities.
 
 For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://cloud.google.com/run/docs/create-jobs>`__ .
@@ -290,6 +292,7 @@ Please refer to the step-by-step guide for using AWS ECS as the execution mode.
     )
 
 .. _airflow-async-execution-mode:
+
 Airflow Async
 -------------
 
@@ -326,6 +329,7 @@ Check the :ref:`watcher-execution-mode` for more details.
 
 
 .. _invocation_modes:
+
 Invocation Modes
 ================
 .. versionadded:: 1.4

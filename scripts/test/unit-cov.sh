@@ -1,4 +1,3 @@
-pip install "click<=8.1.3"
 pytest \
     -vv \
     --cov=cosmos \

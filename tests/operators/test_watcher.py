@@ -976,7 +976,7 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     assert "--full-refresh" in full_cmd
 
 
-def test_sensor_args_import(mock_bigquery_conn):
+def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
     profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})
     _profile_config = ProfileConfig(
         profile_name="airflow_db",

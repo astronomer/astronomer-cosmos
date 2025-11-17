@@ -162,7 +162,7 @@ dependencies = [
     "Werkzeug<3.0.0",
     "methodtools",
     "pytest-asyncio",
-    "dbt-bigquery",
+    "dbt-bigquery<1.11",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

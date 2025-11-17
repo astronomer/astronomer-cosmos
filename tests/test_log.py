@@ -1,12 +1,8 @@
-import airflow
 import pytest
-from packaging.version import Version
 
 import cosmos.log
 from cosmos.log import CosmosRichLogger, get_logger
 from cosmos.provider_info import get_provider_info
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 def test_get_logger(monkeypatch):

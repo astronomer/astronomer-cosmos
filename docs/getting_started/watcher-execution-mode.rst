@@ -18,13 +18,13 @@ This provides strong observability and task-level retry control — but it comes
 
 Consider the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project:
 
-+--------------------------------------+----------------------------------+------------------+
-| Run Type                             | Description                      | Total Runtime    |
-+======================================+==================================+==================+
-| Single ``dbt run`` (dbt CLI)             | Runs the whole DAG in one command | ~5m 30s          |
-+--------------------------------------+----------------------------------+------------------+
++-------------------------------------------------------------+-----------------------------------+------------------+
+| Run Type                                                    | Description                       | Total Runtime    |
++=============================================================+===================================+==================+
+| Single ``dbt run`` (dbt CLI)                                | Runs the whole DAG in one command | ~5m 30s          |
++-------------------------------------------------------------+-----------------------------------+------------------+
 | One ``dbt run`` per model, totalling 184 commands (dbt CLI) | Each model is its own task        | ~32m             |
-+--------------------------------------+----------------------------------+------------------+
++-------------------------------------------------------------+-----------------------------------+------------------+
 
 This difference motivated a rethinking of how Cosmos interacts with dbt.
 
@@ -86,6 +86,45 @@ The last line represents the performance improvement in a real-world Airflow dep
 Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
 
 We plan to repeat these benchmarks and share the code with the community in the future.
+
+
+.. note::
+   ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile. Start with a conservative value that matches the CPU capacity of your Airflow workers, then gradually increase it to find the sweet spot between faster runs and acceptable memory/CPU usage.
+
+When we ran the `astronomer/cosmos-benchmark <https://github.com/astronomer/cosmos-benchmark>`_ project with ``ExecutionMode.WATCHER``, that same ``threads`` setting directly affected runtime: moving from 1 to 8 threads reduced the end-to-end ``dbt build`` duration from roughly 26 seconds to about 4 seconds (see table above), while 16 threads squeezed it to around 2 seconds at the cost of higher CPU usage. Use those numbers as a reference point when evaluating how thread counts scale in your own environment.
+
+To increase the number of threads, edit your dbt ``profiles.yml`` (or Helm values if you manage the profile there) and update the ``threads`` key for the target you use with Cosmos:
+
+.. code-block:: yaml
+
+   your_dbt_project:
+     target: prod
+     outputs:
+       prod:
+         type: postgres
+         host: your-host
+         user: your-user
+         password: your-password
+         schema: analytics
+         threads: 8  # increase or decrease to match available resources
+
+
+If you prefer to manage threads through Cosmos profile mappings instead of editing ``profiles.yml`` directly, pass ``profile_args={"threads": <int>}`` to your ``ProfileConfig``. For example, using the built-in ``PostgresUserPasswordProfileMapping``:
+
+.. code-block:: python
+
+   from cosmos.config import ProfileConfig
+   from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+   profile_config = ProfileConfig(
+       profile_name="jaffle_shop",
+       target_name="prod",
+       profile_mapping=PostgresUserPasswordProfileMapping(
+           conn_id="postgres_connection",
+           profile_args={"threads": 8},
+       ),
+   )
+
 
 -------------------------------------------------------------------------------
 
@@ -177,8 +216,11 @@ How retries work
 ~~~~~~~~~~~~~~~~
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
+Cosmos always sets the producer's Airflow task retries to ``0``; this ensures the failure surfaces immediately and avoids kicking off a second full ``dbt build`` run.
 
 The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, can retry the dbt command by themselves using the same behaviour as ``ExecutionMode.LOCAL``.
+This is also the reason why we set ``retries`` to ``0`` in the ``DbtProducerWatcherOperator`` task because rerunning the producer would repeat the full dbt build and duplicate
+watcher callbacks which may not be processed by the consumers if they have already processed output XCOMs from the first run of the producer.
 
 If a branch of the DAG failed, users can clear the status of a failed consumer task, including its downstream tasks, via the Airflow UI - and each of them will run using the ``ExecutionMode.LOCAL``.
 
@@ -269,7 +311,7 @@ Test behavior
 
 By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
 
-As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator``s, a starting point, so the transition to the new mode can be seamless.
+As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
 
 The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
 
@@ -292,9 +334,25 @@ Synchronous sensor execution
 
 In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
 
-An improvement is to change this behaviour and implement an asynchronous sensor execution, so that the worker slot is released until the condition, validated by the Airflow triggerer, is met.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Asynchronous sensor execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ticket to implement this behaviour is `#2059 <https://github.com/astronomer/astronomer-cosmos/issues/2059>`_.
+Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
+`deferrable (asynchronous) execution <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`_. Deferrable execution frees up the Airflow worker slot, while task status monitoring is handled by the Airflow triggerer component,
+which increases overall task throughput. By default, the sensor now runs in deferrable mode.
+
+**Limitations:**
+
+- Deferrable execution is currently supported only for dbt models, seeds and snapshots.
+- Deferrable execution applies only to the first task attempt (try number 1). For subsequent retries, the sensor falls back to synchronous execution.
+
+To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in the ``operator_args``.
+
+.. literalinclude:: ../../dev/dags/example_watcher.py
+   :language: python
+   :start-after: [START example_watcher_synchronous]
+   :end-before: [END example_watcher_synchronous]
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Airflow Datasets and Assets

@@ -1005,7 +1005,6 @@ def test_sensor_args_import(mock_bigquery_conn):
     )
 
     for task in dag.tasks_map.values():
-        print(task)
         if isinstance(task, DbtProducerWatcherOperator):
             assert task.execution_timeout == timedelta(seconds=2)
         else:

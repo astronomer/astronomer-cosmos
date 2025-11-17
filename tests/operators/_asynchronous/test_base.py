@@ -3,19 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
-import airflow
 import pytest
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators._asynchronous import SetupAsyncOperator, TeardownAsyncOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators._asynchronous.databricks import DbtRunAirflowAsyncDatabricksOperator
 from cosmos.operators.local import DbtRunLocalOperator
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 @pytest.mark.parametrize(

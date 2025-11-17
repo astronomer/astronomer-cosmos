@@ -219,8 +219,9 @@ def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_sess
     [(True, True, True), (True, False, False), (False, True, False), (False, False, False)],
 )
 def test_is_profile_cache_enabled(enable_cache, enable_cache_profile, expected_result):
-    with patch("cosmos.cache.enable_cache", enable_cache), patch(
-        "cosmos.cache.enable_cache_profile", enable_cache_profile
+    with (
+        patch("cosmos.cache.enable_cache", enable_cache),
+        patch("cosmos.cache.enable_cache_profile", enable_cache_profile),
     ):
         assert is_profile_cache_enabled() == expected_result
 

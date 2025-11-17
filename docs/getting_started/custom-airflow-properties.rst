@@ -6,7 +6,7 @@ Airflow Configuration Overrides with Astronomer Cosmos
 **Astronomer Cosmos** allows you to override Airflow configurations for each dbt task (dbt operator) via the dbt YAML file.
 
 Sample dbt Model YAML
-++++++++++++
++++++++++++++++++++++
 
 .. code-block:: yaml
 
@@ -16,7 +16,7 @@ Sample dbt Model YAML
         description: description
         meta:
           cosmos:
-            operator_args:
+            operator_kwargs:
                 pool: abcd
 
 

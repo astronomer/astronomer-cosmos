@@ -12,15 +12,14 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
-import airflow
 import pytest
 from airflow.models import Variable
-from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
+    AIRFLOW_VERSION,
     DBT_LOG_FILENAME,
     DBT_TARGET_DIR_NAME,
     DbtResourceType,
@@ -50,8 +49,6 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     object_storage_path = "airflow.sdk.ObjectStoragePath"
@@ -204,6 +201,7 @@ def test_dbt_profile_config_to_override():
                 "tags": [],
                 "config": {},
                 "has_test": False,
+                "has_non_detached_test": False,
                 "resource_name": "customers",
                 "name": "customers",
             },
@@ -218,6 +216,7 @@ def test_dbt_profile_config_to_override():
                 "tags": [],
                 "config": {},
                 "has_test": False,
+                "has_non_detached_test": False,
                 "resource_name": "customers.v1",
                 "name": "customers_v1",
             },
@@ -1133,13 +1132,18 @@ def test_update_node_dependency_target_exist():
         profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
     )
     execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
-    dbt_graph = DbtGraph(project=project_config, execution_config=execution_config, profile_config=profile_config)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
     dbt_graph.load()
 
     for _, nodes in dbt_graph.nodes.items():
         if nodes.resource_type == DbtResourceType.TEST:
             for node_id in nodes.depends_on:
                 assert dbt_graph.nodes[node_id].has_test is True
+                assert dbt_graph.nodes[node_id].has_non_detached_test is True
 
 
 def test_update_node_dependency_test_not_exist():
@@ -1166,6 +1170,7 @@ def test_update_node_dependency_test_not_exist():
 
     for _, nodes in dbt_graph.filtered_nodes.items():
         assert nodes.has_test is False
+        assert nodes.has_non_detached_test is False
 
 
 def test_tag_selected_node_test_exist():
@@ -1192,6 +1197,7 @@ def test_tag_selected_node_test_exist():
         assert node.tags == ["test_tag"]
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
+            assert node.has_non_detached_test is True
 
 
 @pytest.mark.integration

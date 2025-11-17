@@ -3,20 +3,17 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING
 
-from airflow import __version__ as airflow_version
 from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
     from airflow.models.dag import DAG
     from airflow.models.dagrun import DagRun
 
-from packaging import version
-
 from cosmos import telemetry
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 from cosmos.log import get_logger
 
-AIRFLOW_VERSION_MAJOR = version.parse(airflow_version).major
+AIRFLOW_VERSION_MAJOR = AIRFLOW_VERSION.major
 
 logger = get_logger(__name__)
 

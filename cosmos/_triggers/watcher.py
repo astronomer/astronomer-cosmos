@@ -115,10 +115,15 @@ class WatcherTrigger(BaseTrigger):
                 return
             elif node_status == "failed":
                 self.log.warning("Model '%s' failed", self.model_unique_id)
-                yield TriggerEvent({"status": "failed"})  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": "failed", "reason": "model_failed"})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "failed":
-                yield TriggerEvent({"status": "failed"})  # type: ignore[no-untyped-call]
+                self.log.error(
+                    "Watcher producer task '%s' failed before delivering results for model '%s'",
+                    self.producer_task_id,
+                    self.model_unique_id,
+                )
+                yield TriggerEvent({"status": "failed", "reason": "producer_failed"})  # type: ignore[no-untyped-call]
                 return
 
             # Sleep briefly before re-polling

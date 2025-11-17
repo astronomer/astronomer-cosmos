@@ -1,3 +1,4 @@
+pip install "click<=8.1.3"
 pytest \
     -vv \
     -m "not (integration or perf or dbtfusion)" \

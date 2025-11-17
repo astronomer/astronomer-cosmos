@@ -1,7 +1,7 @@
 .. _watcher-execution-mode:
 
 Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Execution in Cosmos
-===============================================================================
+============================================================================================
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
 
@@ -10,7 +10,7 @@ Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime *
 -------------------------------------------------------------------------------
 
 Background: The Problem with the Local Execution Mode in Cosmos
------------------------------------------------------------
+---------------------------------------------------------------
 
 When running dbt via Cosmos using the default ``ExecutionMode.LOCAL``, each dbt model is executed as a separate Airflow task.
 
@@ -18,13 +18,13 @@ This provides strong observability and task-level retry control — but it comes
 
 Consider the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project:
 
-+--------------------------------------+----------------------------------+------------------+
-| Run Type                             | Description                      | Total Runtime    |
-+======================================+==================================+==================+
-| Single ``dbt run`` (dbt CLI)             | Runs the whole DAG in one command | ~5m 30s          |
-+--------------------------------------+----------------------------------+------------------+
++-------------------------------------------------------------+-----------------------------------+------------------+
+| Run Type                                                    | Description                       | Total Runtime    |
++=============================================================+===================================+==================+
+| Single ``dbt run`` (dbt CLI)                                | Runs the whole DAG in one command | ~5m 30s          |
++-------------------------------------------------------------+-----------------------------------+------------------+
 | One ``dbt run`` per model, totalling 184 commands (dbt CLI) | Each model is its own task        | ~32m             |
-+--------------------------------------+----------------------------------+------------------+
++-------------------------------------------------------------+-----------------------------------+------------------+
 
 This difference motivated a rethinking of how Cosmos interacts with dbt.
 
@@ -133,9 +133,9 @@ Example Usage of ``ExecutionMode.WATCHER``
 
 There are two main ways to use the new execution mode in Cosmos — directly within a ``DbtDag``, or embedded as part of a ``DbtTaskGroup`` inside a larger DAG.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Example 1 — Using ``DbtDag`` with ``ExecutionMode.WATCHER``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.
 This approach is best when your Airflow DAG is fully dedicated to a dbt project.
@@ -159,9 +159,9 @@ As it can be observed, the only difference with the default ``ExecutionMode.LOCA
     :alt: Cosmos DbtDag with `ExecutionMode.WATCHER`
     :align: center
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Example 2 — Using ``DbtTaskGroup`` with ``ExecutionMode.WATCHER``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If your Airflow DAG includes multiple stages or integrations (e.g., data ingestion → dbt → reporting), use ``DbtTaskGroup`` to embed your dbt project into a larger DAG — still benefiting from WATCHER performance.
 

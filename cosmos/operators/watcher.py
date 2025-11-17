@@ -9,9 +9,6 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, Callable, List, Union
 
-import airflow
-from packaging.version import Version
-
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -33,9 +30,12 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
+from packaging.version import Version
+
 from cosmos.config import ProfileConfig
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -45,9 +45,6 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-
-AIRFLOW_VERSION = Version(airflow.__version__)
-
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -74,7 +71,7 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
         task_instance.xcom_push(key=key, value=value)
 
 
-class DbtProducerWatcherOperator(DbtLocalBaseOperator):
+class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
     Executes **one** ``dbt build`` covering the whole selection.
@@ -99,13 +96,20 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
     feedback and granular task-level observability downstream.
     """
 
-    base_cmd = ["build"]
-    template_fields = DbtLocalBaseOperator.template_fields
+    template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
+        # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
+        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
+        # they have already processed output XCOMs from the first run of the producer, so we disable retries.
+        default_args = dict(kwargs.get("default_args", {}) or {})
+        default_args["retries"] = 0
+        kwargs["default_args"] = default_args
+        kwargs["retries"] = 0
+
         on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
         super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
 
@@ -179,6 +183,25 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         safe_xcom_push(task_instance=context["ti"], key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        task_instance = context.get("ti")
+        if task_instance is None:
+            raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
+
+        try_number = getattr(task_instance, "try_number", 1)
+
+        if try_number > 1:
+            retry_message = (
+                "Dbt WATCHER producer task does not support Airflow retries. "
+                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+            )
+            self.log.error(retry_message)
+            raise AirflowException(retry_message)
+
+        self.log.info(
+            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
+            "downstream sensors own model-level retries."
+        )
+
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()
@@ -191,11 +214,18 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             if use_events:
 
                 def _callback(event_message: EventMsg) -> None:
-                    name = event_message.info.name
-                    if name in {"MainReportVersion", "AdapterRegistered"}:
-                        self._handle_startup_event(event_message, startup_events)
-                    elif name == "NodeFinished":
-                        self._handle_node_finished(event_message, context)
+                    try:
+                        name = event_message.info.name
+                        if name in {"MainReportVersion", "AdapterRegistered"}:
+                            self._handle_startup_event(event_message, startup_events)
+                        elif name == "NodeFinished":
+                            self._handle_node_finished(event_message, context)
+                    except Exception:
+                        event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
+                        logger.exception(
+                            "DbtProducerWatcherOperator: error while handling dbt event '%s'",
+                            event_name,
+                        )
 
                 self._dbt_runner_callbacks = [_callback]
                 result = super().execute(context=context, **kwargs)
@@ -363,9 +393,19 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             )
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
-        if event.get("status") == "failed":
+        status = event.get("status")
+        if status != "failed":
+            return
+
+        reason = event.get("reason")
+        if reason == "model_failed":
             raise AirflowException(
-                f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
+            )
+
+        if reason == "producer_failed":
+            raise AirflowException(
+                f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
             )
 
     def _use_event(self) -> bool:

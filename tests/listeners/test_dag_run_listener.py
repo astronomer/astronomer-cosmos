@@ -5,21 +5,20 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from airflow import __version__ as airflow_version
 from airflow.models import DAG, DagRun
 from airflow.utils.state import State
-from packaging import version
+from packaging.version import Version
 
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import on_dag_run_failed, on_dag_run_success, total_cosmos_tasks
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 
-AIRFLOW_VERSION = version.parse(airflow_version)
 AIRFLOW_VERSION_MAJOR = AIRFLOW_VERSION.major
 
 profile_config = ProfileConfig(
@@ -83,7 +82,7 @@ def test_not_cosmos_dag():
 
 
 def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
-    if AIRFLOW_VERSION < version.Version("3.0"):
+    if AIRFLOW_VERSION < Version("3.0"):
         # Airflow 2 and 3.0
         dag_run = dag.create_dagrun(
             state=State.NONE,
@@ -133,7 +132,7 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION >= version.Version("3.1.0"),
+    AIRFLOW_VERSION >= Version("3.1.0"),
     reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
 )
 @pytest.mark.integration
@@ -161,7 +160,7 @@ def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION >= version.Version("3.1.0"), reason="TODO: Fix create_dag_run to work with and remove this skip."
+    AIRFLOW_VERSION >= Version("3.1.0"), reason="TODO: Fix create_dag_run to work with and remove this skip."
 )
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")

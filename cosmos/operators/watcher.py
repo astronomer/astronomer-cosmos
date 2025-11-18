@@ -389,7 +389,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             try:
                 from airflow.models import TaskInstance
                 from airflow.utils.session import create_session
-            except Exception as exc:  # pragma: no cover - defensive fallback for tests without DB
+            except ImportError as exc:  # pragma: no cover - defensive fallback for tests without DB
                 logger.warning("Could not import create_session to read producer state: %s", exc)
                 return None
 
@@ -416,7 +416,10 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
                     task_ids=[self.producer_task_id],
                     run_ids=[run_id],
                 )
-                return str(task_states.get(run_id, {}).get(self.producer_task_id, ""))
+                state = task_states.get(run_id, {}).get(self.producer_task_id)
+                if state is not None:
+                    return str(state)
+                return None
             except (ImportError, NameError) as exc:
                 logger.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
             return None

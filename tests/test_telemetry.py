@@ -130,7 +130,6 @@ def test_emit_usage_metrics_if_enabled_fails(mock_should_emit, caplog):
     assert "Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True." in caplog.text
 
 
-@pytest.mark.flaky(reruns=2, reruns_delay=1)
 @patch("cosmos.telemetry.should_emit", return_value=True)
 @patch("cosmos.telemetry.collect_standard_usage_metrics", return_value={"k1": "v1", "k2": "v2", "variables": {}})
 @patch("cosmos.telemetry.emit_usage_metrics")

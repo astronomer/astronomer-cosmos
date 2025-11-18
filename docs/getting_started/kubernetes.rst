@@ -127,7 +127,7 @@ Create a Python virtual environment and install the latest version of Astronomer
     pip install --upgrade pip
     pip install "astronomer-cosmos[dbt-postgres]" apache-airflow-providers-cncf-kubernetes
 
-Make the `jaffle_shop_kubernetes.py <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/jaffle_shop_kubernetes.py>`__ file at your Airlfow DAG home:
+Make the `jaffle_shop_kubernetes.py <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/jaffle_shop_kubernetes.py>`__ file at your Airflow DAG home:
 
 .. code-block:: bash
 

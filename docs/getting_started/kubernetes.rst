@@ -21,7 +21,7 @@ To test the DbtKubernetesOperators locally, we encourage you to install the foll
 At the moment, the user is expected to add to the Docker image both:
 
 - The dbt project files
-- The dbt Profile, which contains the information for dbt to access the database
+- The dbt Profile, which contains the information for dbt to access the database while parsing the project from Apache Airflow nodes
 - Handle secrets
 
 Additional KubernetesPodOperator parameters can be added to the ``operator_args`` parameter of the ``DbtKubernetesOperator``.

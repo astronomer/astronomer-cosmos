@@ -6,6 +6,14 @@ import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
+try:
+    from airflow.datasets import Dataset as Asset
+except ImportError:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.asset import Asset  # type: ignore
+    except ImportError:  # pragma: no cover
+        Asset = None  # type: ignore
+
 from cosmos.operators.base import _sanitize_xcom_key
 
 try:
@@ -198,9 +206,12 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
                 }
             }
             super().execute(context=context)
+            self._store_template_fields(context=context)
+            self._emit_dataset_event(context)
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
-        self._store_template_fields(context=context)
+        if not settings.enable_setup_async_task:
+            self._store_template_fields(context=context)
 
     def _store_template_fields(self, context: Context) -> None:
         if not settings.enable_setup_async_task:
@@ -223,6 +234,42 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.dataset = profile["dataset"]
 
         self._override_rtif(context=context)
+
+    def _build_dataset_uri(self) -> str | None:
+        node_cfg = self.async_context.get("dbt_node_config", {})
+        schema = self.dataset or node_cfg.get("config", {}).get("schema")
+        database = self.gcp_project or node_cfg.get("database")
+        model_name = node_cfg.get("name") or node_cfg.get("resource_name") or self.task_id
+
+        if not (database and schema and model_name):
+            return None
+
+        return f"bigquery://{database}.{schema}.{model_name}"
+
+    def _emit_dataset_event(self, context: Context) -> None:
+        if not self.emit_datasets:
+            return
+        if not settings.enable_dataset_alias:
+            return
+        if Asset is None:  # pragma: no cover
+            self.log.debug("Dataset API not available; skipping dataset emission")
+            return
+
+        dataset_uri = self._build_dataset_uri()
+        if not dataset_uri:
+            self.log.debug("Skipping dataset emission for %s due to missing metadata", self.task_id)
+            return
+
+        try:
+            outlets = [Asset(dataset_uri)]
+        except Exception as exc:  # pragma: no cover
+            self.log.warning("Unable to build dataset asset for URI %s: %s", dataset_uri, exc)
+            return
+
+        try:
+            self.register_dataset([], outlets, context)
+        except Exception as exc:  # pragma: no cover
+            self.log.warning("Failed to register dataset for %s: %s", self.task_id, exc, exc_info=True)
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> Any:
         """

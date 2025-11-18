@@ -69,16 +69,6 @@ with DAG(
         image=DBT_IMAGE,
         is_delete_operator_pod=False,
         secrets=[postgres_password_secret, postgres_host_secret],
-        profile_config=ProfileConfig(
-            profile_name="postgres_profile",
-            target_name="dev",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="postgres_default",
-                profile_args={
-                    "schema": "public",
-                },
-            ),
-        ),
     )
     # [END kubernetes_seed_example]
 

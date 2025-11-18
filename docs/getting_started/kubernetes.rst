@@ -56,7 +56,7 @@ Retrieve the Postgres password and set it as an environment variable.
 
     export POSTGRES_PASSWORD=$(kubectl get secret --namespace default postgres-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)
 
-Check that the environment variable was set and that it is not empt.y
+Check that the environment variable was set and that it is not empty
 
 .. code-block:: bash
 

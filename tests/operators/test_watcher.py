@@ -15,7 +15,7 @@ from airflow.exceptions import AirflowException, TaskDeferred
 from airflow.utils.state import DagRunState
 from packaging.version import Version
 
-from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos._triggers.watcher import WatcherTrigger
 from cosmos.config import InvocationMode
 from cosmos.constants import ExecutionMode
@@ -28,7 +28,7 @@ from cosmos.operators.watcher import (
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
 )
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
@@ -974,3 +974,39 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     # Verify the command was built correctly
     assert full_cmd[1] == "build"  # dbt build command
     assert "--full-refresh" in full_cmd
+
+
+@pytest.mark.integration
+def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
+    profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})
+    _profile_config = ProfileConfig(
+        profile_name="airflow_db",
+        target_name="bq",
+        profile_mapping=profile_mapping,
+    )
+    dbt_project_path = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+
+    dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=dbt_project_path / "jaffle_shop"),
+        profile_config=_profile_config,
+        operator_args={
+            "install_deps": True,
+            "full_refresh": True,
+            "deferrable": False,
+            "execution_timeout": timedelta(seconds=1),
+        },
+        render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER, setup_operator_args={"execution_timeout": timedelta(seconds=2)}
+        ),
+        schedule="@daily",
+        start_date=datetime(2025, 1, 1),
+        catchup=False,
+        dag_id="test_sensor_args_import",
+    )
+
+    for task in dag.tasks_map.values():
+        if isinstance(task, DbtProducerWatcherOperator):
+            assert task.execution_timeout == timedelta(seconds=2)
+        else:
+            assert task.execution_timeout == timedelta(seconds=1)

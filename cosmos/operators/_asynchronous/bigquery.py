@@ -243,8 +243,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         if not (database and schema and model_name):
             return None
-
-        return f"bigquery://{database}.{schema}.{model_name}"
+        return f"bigquery/{database}.{schema}.{model_name}"
 
     def _emit_dataset_event(self, context: Context) -> None:
         if not self.emit_datasets:

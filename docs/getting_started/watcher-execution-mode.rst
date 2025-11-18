@@ -303,7 +303,23 @@ Overriding ``operator_args``
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
-We plan to support different ``operator_args`` for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators in the future.
+If you wish to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can achieve this using ``setup_operator_args``.
+
+.. code-block:: python
+
+   from datetime import timedelta
+   from cosmos.config import ExecutionConfig
+   from cosmos.constants import ExecutionMode
+
+   execution_config = ExecutionConfig(
+       execution_mode=ExecutionMode.WATCHER,
+       setup_operator_args={
+           "execution_timeout": timedelta(minutes=5),
+       },
+   )
+
+
+This allows you to customize ``DbtProducerWatcherOperator`` behavior without affecting the other sensors argument.
 
 ~~~~~~~~~~~~~
 Test behavior

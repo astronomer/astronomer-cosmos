@@ -319,7 +319,7 @@ If you wish to override ``operator_args`` for the ``DbtProducerWatcherOperator``
    )
 
 
-This allows you to customize ``DbtProducerWatcherOperator`` behavior without affecting the other sensors argument.
+This allows you to customize ``DbtProducerWatcherOperator`` behavior without affecting the other sensors' arguments.
 
 ~~~~~~~~~~~~~
 Test behavior

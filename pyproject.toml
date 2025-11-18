@@ -162,8 +162,6 @@ dependencies = [
     "Werkzeug<3.0.0",
     "methodtools",
     "pytest-asyncio",
-    "dbt-bigquery",
-    "click<8.1.0"
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

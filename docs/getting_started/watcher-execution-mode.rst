@@ -305,6 +305,8 @@ The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators ha
 
 If you wish to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can achieve this using ``setup_operator_args``.
 
+**Example:** Run the producer task using the ``dbt_producer_task_queue`` worker queue.
+
 .. code-block:: python
 
    from datetime import timedelta
@@ -314,7 +316,7 @@ If you wish to override ``operator_args`` for the ``DbtProducerWatcherOperator``
    execution_config = ExecutionConfig(
        execution_mode=ExecutionMode.WATCHER,
        setup_operator_args={
-           "execution_timeout": timedelta(minutes=5),
+           "queue": "dbt_producer_task_queue",
        },
    )
 

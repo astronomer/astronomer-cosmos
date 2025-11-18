@@ -24,7 +24,7 @@ At the moment, the user is expected to add to the Docker image both:
 - The dbt Profile, which contains the information for dbt to access the database
 - Handle secrets
 
-Additional KubernetesPodOperator parameters can be added to the operator_args parameter of the DbtKubernetesOperator.
+Additional KubernetesPodOperator parameters can be added to the ``operator_args`` parameter of the ``DbtKubernetesOperator``.
 
 For instance,
 

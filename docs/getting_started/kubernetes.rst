@@ -90,7 +90,7 @@ Clone the example repo that contains the Airflow DAG and dbt project files.
     git clone https://github.com/astronomer/cosmos-example.git
     cd cosmos-example/
 
-Create a Docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.postgres_profile_docker_k8s>`_, which will be run in K8S.
+Create a Docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.postgres_profile_docker_k8s>`_, which will be run in K8s.
 
 .. code-block:: bash
 

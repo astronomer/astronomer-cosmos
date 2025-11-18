@@ -418,9 +418,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
                 )
                 return str(task_states.get(run_id, {}).get(self.producer_task_id, ""))
             except (ImportError, NameError) as exc:
-                logger.warning(
-                    "Could not retrieve producer task status via RuntimeTaskInstance: %s", exc
-                )
+                logger.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
             return None
 
     def execute(self, context: Context, **kwargs: Any) -> None:

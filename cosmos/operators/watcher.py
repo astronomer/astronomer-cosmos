@@ -417,9 +417,11 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
                     run_ids=[run_id],
                 )
                 return str(task_states.get(run_id, {}).get(self.producer_task_id, ""))
-            except ImportError:
-                logger.warning("Could not get producer task status, falling back to XCom state check")
-                return None
+            except (ImportError, NameError) as exc:
+                logger.warning(
+                    "Could not retrieve producer task status via RuntimeTaskInstance: %s", exc
+                )
+            return None
 
     def execute(self, context: Context, **kwargs: Any) -> None:
         if not self.deferrable:

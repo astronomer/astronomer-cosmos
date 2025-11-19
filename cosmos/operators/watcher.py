@@ -378,6 +378,56 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
     def _get_producer_task_state(self, ti: Any) -> Any:
         return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
 
+    def _get_producer_task_status(self, context: Context) -> str | None:
+        """
+        Get the task status of the producer task for both Airflow 2 and Airflow 3.
+
+        Returns the state of the producer task instance, or None if not found.
+        """
+        ti = context["ti"]
+        run_id = context["run_id"]
+        dag_id = ti.dag_id
+
+        if AIRFLOW_VERSION < Version("3.0.0"):
+            # Airflow 2: Query TaskInstance from database
+            try:
+                from airflow.models import TaskInstance
+                from airflow.utils.session import create_session
+            except ImportError as exc:  # pragma: no cover - defensive fallback for tests without DB
+                logger.warning("Could not import create_session to read producer state: %s", exc)
+                return None
+
+            with create_session() as session:
+                producer_ti = (
+                    session.query(TaskInstance)
+                    .filter_by(
+                        dag_id=dag_id,
+                        task_id=self.producer_task_id,
+                        run_id=run_id,
+                    )
+                    .first()
+                )
+                if producer_ti:
+                    return str(producer_ti.state)
+                return None
+        else:
+            # Airflow 3: Use RuntimeTaskInstance.get_task_states
+            try:
+                from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
+
+                task_states = RuntimeTaskInstance.get_task_states(
+                    dag_id=dag_id,
+                    task_ids=[self.producer_task_id],
+                    run_ids=[run_id],
+                )
+                state = task_states.get(run_id, {}).get(self.producer_task_id)
+                if state is not None:
+                    return str(state)
+                return None
+            except (ImportError, NameError) as exc:
+                logger.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
+            return None
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -402,7 +452,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self._discover_invocation_mode()
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
-        producer_task_state = self._get_producer_task_state(ti)
+        producer_task_state = self._get_producer_task_status(context)
         if use_events:
             status = self._get_status_from_events(ti, context)
         else:

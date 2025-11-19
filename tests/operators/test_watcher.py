@@ -585,6 +585,27 @@ class TestDbtConsumerWatcherSensor:
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
     @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
+    def test_get_producer_task_status_airflow3_missing_state(self, mock_get_task_states):
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_3_missing")
+
+        mock_get_task_states.return_value = {"run_3_missing": {}}
+
+        status = sensor._get_producer_task_status(context)
+
+        assert status is None
+        mock_get_task_states.assert_called_once_with(
+            dag_id="example_dag", task_ids=[sensor.producer_task_id], run_ids=["run_3_missing"]
+        )
+
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
+    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
     @patch(
         "airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states",
         side_effect=ImportError("missing runtime"),

@@ -8,7 +8,7 @@ from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
 from airflow.exceptions import AirflowException, TaskDeferred
@@ -522,9 +522,8 @@ class TestDbtConsumerWatcherSensor:
         }
 
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
-    @patch("airflow.utils.session.create_session")
     @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("2.7.0"))
-    def test_get_producer_task_status_airflow2(self, mock_create_session):
+    def test_get_producer_task_status_airflow2(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
             sensor, DbtConsumerWatcherSensor
@@ -533,20 +532,24 @@ class TestDbtConsumerWatcherSensor:
         ti.dag_id = "example_dag"
         context = self.make_context(ti, run_id="run_1")
 
-        mock_state_ti = MagicMock()
-        mock_state_ti.state = "success"
-        session_cm = mock_create_session.return_value
-        session_cm.__enter__.return_value.query.return_value.filter_by.return_value.first.return_value = mock_state_ti
+        fetcher = MagicMock(return_value="success")
 
-        status = sensor._get_producer_task_status(context)
+        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=fetcher) as mock_builder:
+            status = sensor._get_producer_task_status(context)
 
+        mock_builder.assert_called_once_with(
+            airflow_version=Version('2.7.0'),
+            dag_id='example_dag',
+            run_id='run_1',
+            producer_task_id=sensor.producer_task_id,
+            logger=ANY,
+        )
+        fetcher.assert_called_once_with()
         assert status == "success"
-        mock_create_session.assert_called_once()
 
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
-    @patch("airflow.utils.session.create_session")
     @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("2.7.0"))
-    def test_get_producer_task_status_airflow2_missing_instance(self, mock_create_session):
+    def test_get_producer_task_status_airflow2_missing_instance(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
             sensor, DbtConsumerWatcherSensor
@@ -555,11 +558,12 @@ class TestDbtConsumerWatcherSensor:
         ti.dag_id = "example_dag"
         context = self.make_context(ti, run_id="run_2")
 
-        session_cm = mock_create_session.return_value
-        session_cm.__enter__.return_value.query.return_value.filter_by.return_value.first.return_value = None
+        fetcher = MagicMock(return_value=None)
 
-        status = sensor._get_producer_task_status(context)
+        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=fetcher):
+            status = sensor._get_producer_task_status(context)
 
+        fetcher.assert_called_once_with()
         assert status is None
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
@@ -606,11 +610,7 @@ class TestDbtConsumerWatcherSensor:
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
     @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
-    @patch(
-        "airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states",
-        side_effect=ImportError("missing runtime"),
-    )
-    def test_get_producer_task_status_airflow3_import_error(self, _mock_get_task_states):
+    def test_get_producer_task_status_airflow3_import_error(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
             sensor, DbtConsumerWatcherSensor
@@ -619,8 +619,16 @@ class TestDbtConsumerWatcherSensor:
         ti.dag_id = "example_dag"
         context = self.make_context(ti, run_id="run_4")
 
-        status = sensor._get_producer_task_status(context)
+        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=None) as mock_builder:
+            status = sensor._get_producer_task_status(context)
 
+        mock_builder.assert_called_once_with(
+            airflow_version=Version("3.0.0"),
+            dag_id="example_dag",
+            run_id="run_4",
+            producer_task_id=sensor.producer_task_id,
+            logger=ANY,
+        )
         assert status is None
 
     @patch("cosmos.operators.watcher.EventMsg")

@@ -1,17 +1,11 @@
 import sys
 import types
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from packaging.version import Version
 
 from cosmos._triggers.watcher import AIRFLOW_VERSION, WatcherTrigger
-
-
-def _import_side_effect(name: str, *args, **kwargs):
-    if name == "airflow.sdk.execution_time.task_runner":
-        raise ModuleNotFoundError("missing runtime")
-    return _real_import(name, *args, **kwargs)
 
 
 _real_import = __import__
@@ -68,7 +62,7 @@ class TestWatcherTrigger:
 
         mock_session = MagicMock()
         mock_query = mock_session.__enter__.return_value.query.return_value.filter_by.return_value
-        mock_query.first.side_effect = [mock_ti, None]
+        mock_query.one_or_none.side_effect = [mock_ti, None]
 
         with patch("airflow.utils.session.create_session", return_value=mock_session):
 
@@ -148,131 +142,65 @@ class TestWatcherTrigger:
 
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow2(self):
+        fetcher = MagicMock(return_value="failed")
+
         with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("2.9.0")):
-            mock_ti = MagicMock()
-            mock_ti.state = "failed"
-
-            mock_session = MagicMock()
-            mock_session.__enter__.return_value.query.return_value.filter_by.return_value.first.return_value = mock_ti
-
-            with (
-                patch("airflow.utils.session.create_session", return_value=mock_session),
-                patch("cosmos._triggers.watcher.sync_to_async", side_effect=lambda func: AsyncMock(side_effect=func)),
-            ):
+            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher) as mock_builder:
                 state = await self.trigger._get_producer_task_status()
 
+        mock_builder.assert_called_once_with(
+            airflow_version=Version("2.9.0"),
+            dag_id=self.trigger.dag_id,
+            run_id=self.trigger.run_id,
+            producer_task_id=self.trigger.producer_task_id,
+            logger=ANY,
+        )
+        fetcher.assert_called_once_with()
         assert state == "failed"
 
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow2_missing_ti(self):
+        fetcher = MagicMock(return_value=None)
+
         with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("2.9.0")):
-            mock_session = MagicMock()
-            mock_query = mock_session.__enter__.return_value.query.return_value.filter_by.return_value
-            mock_query.first.return_value = None
-
-            def wrap_sync(func):
-                async def runner(*args, **kwargs):
-                    return func(*args, **kwargs)
-
-                return runner
-
-            with (
-                patch("airflow.utils.session.create_session", return_value=mock_session),
-                patch("cosmos._triggers.watcher.sync_to_async", side_effect=wrap_sync),
-            ):
+            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()
 
+        fetcher.assert_called_once_with()
         assert state is None
 
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3(self):
+        fetcher = MagicMock(return_value="success")
+
         with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
-            mock_states = {self.trigger.run_id: {self.trigger.producer_task_id: "success"}}
+            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher):
+                state = await self.trigger._get_producer_task_status()
 
-            def fake_sync_to_async(func):
-                async def _wrapper(*args, **kwargs):
-                    return func(*args, **kwargs)
-
-                return _wrapper
-
-            fake_task_runner = types.ModuleType("airflow.sdk.execution_time.task_runner")
-
-            class FakeRuntimeTaskInstance:
-                @staticmethod
-                def get_task_states(*_args, **_kwargs):
-                    return mock_states
-
-            fake_task_runner.RuntimeTaskInstance = FakeRuntimeTaskInstance
-
-            fake_execution_time = types.ModuleType("airflow.sdk.execution_time")
-            fake_execution_time.task_runner = fake_task_runner
-            fake_sdk = types.ModuleType("airflow.sdk")
-            fake_sdk.execution_time = fake_execution_time
-
-            module_patches = {
-                "airflow.sdk": fake_sdk,
-                "airflow.sdk.execution_time": fake_execution_time,
-                "airflow.sdk.execution_time.task_runner": fake_task_runner,
-            }
-
-            with patch.dict(sys.modules, module_patches):
-                with patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async):
-                    state = await self.trigger._get_producer_task_status()
-
+        fetcher.assert_called_once_with()
         assert state == "success"
 
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3_missing_state(self):
+        fetcher = MagicMock(return_value=None)
+
         with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
-            mock_states = {self.trigger.run_id: {}}
+            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher):
+                state = await self.trigger._get_producer_task_status()
 
-            def fake_sync_to_async(func):
-                async def _wrapper(*args, **kwargs):
-                    return func(*args, **kwargs)
-
-                return _wrapper
-
-            fake_task_runner = types.ModuleType("airflow.sdk.execution_time.task_runner")
-
-            class FakeRuntimeTaskInstance:
-                @staticmethod
-                def get_task_states(*_args, **_kwargs):
-                    return mock_states
-
-            fake_task_runner.RuntimeTaskInstance = FakeRuntimeTaskInstance
-
-            fake_execution_time = types.ModuleType("airflow.sdk.execution_time")
-            fake_execution_time.task_runner = fake_task_runner
-            fake_sdk = types.ModuleType("airflow.sdk")
-            fake_sdk.execution_time = fake_execution_time
-
-            module_patches = {
-                "airflow.sdk": fake_sdk,
-                "airflow.sdk.execution_time": fake_execution_time,
-                "airflow.sdk.execution_time.task_runner": fake_task_runner,
-            }
-
-            with patch.dict(sys.modules, module_patches):
-                with patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async):
-                    state = await self.trigger._get_producer_task_status()
-
+        fetcher.assert_called_once_with()
         assert state is None
 
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="RuntimeTaskInstance import exists on Airflow >= 3.0")
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3_import_error(self):
-        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
+        def _import_side_effect(name: str, *args, **kwargs):
+            if name == "airflow.sdk.execution_time.task_runner":
+                raise ModuleNotFoundError("missing runtime")
+            return _real_import(name, *args, **kwargs)
 
-            def fake_sync_to_async(func):
-                async def _runner(*args, **kwargs):
-                    return func(*args, **kwargs)
-
-                return _runner
-
-            with (
-                patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async),
-                patch("builtins.__import__", side_effect=_import_side_effect),
-            ):
-                state = await self.trigger._get_producer_task_status()
+        with patch("builtins.__import__", side_effect=_import_side_effect):
+            state = await self.trigger._get_producer_task_status()
 
         assert state is None
 

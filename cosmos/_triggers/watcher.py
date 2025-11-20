@@ -11,6 +11,8 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
+from cosmos._utils.watcher_state import build_producer_state_fetcher
+
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 
@@ -72,7 +74,7 @@ class WatcherTrigger(BaseTrigger):
                         task_id=self.producer_task_id,
                         run_id=self.run_id,
                     )
-                    .first()
+                    .one_or_none()
                 )
                 if ti is None:
                     return None
@@ -108,49 +110,17 @@ class WatcherTrigger(BaseTrigger):
     async def _get_producer_task_status(self) -> str | None:
         """Retrieve the producer task state for both Airflow 2 and Airflow 3."""
 
-        if AIRFLOW_VERSION < Version("3.0.0"):
-            try:
-                from airflow.models import TaskInstance
-                from airflow.utils.session import create_session
-            except ImportError as exc:  # pragma: no cover - defensive fallback for limited test envs
-                self.log.warning("Could not import create_session to read producer state: %s", exc)
-                return None
-
-            def _fetch_state() -> str | None:
-                with create_session() as session:
-                    ti = (
-                        session.query(TaskInstance)
-                        .filter_by(
-                            dag_id=self.dag_id,
-                            task_id=self.producer_task_id,
-                            run_id=self.run_id,
-                        )
-                        .first()
-                    )
-                    if ti is not None:
-                        return str(ti.state)
-                    return None
-
-            return await sync_to_async(_fetch_state)()
-
-        try:
-            from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
-        except (ImportError, NameError) as exc:
-            self.log.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
+        fetch_state = build_producer_state_fetcher(
+            airflow_version=AIRFLOW_VERSION,
+            dag_id=self.dag_id,
+            run_id=self.run_id,
+            producer_task_id=self.producer_task_id,
+            logger=self.log,
+        )
+        if fetch_state is None:
             return None
 
-        def _fetch_states() -> dict[str, dict[str, Any]]:
-            return RuntimeTaskInstance.get_task_states(
-                dag_id=self.dag_id,
-                task_ids=[self.producer_task_id],
-                run_ids=[self.run_id],
-            )
-
-        task_states = await sync_to_async(_fetch_states)()
-        state = task_states.get(self.run_id, {}).get(self.producer_task_id)
-        if state is not None:
-            return str(state)
-        return None
+        return await sync_to_async(fetch_state)()
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
         self.log.info("Starting WatcherTrigger for model: %s", self.model_unique_id)

@@ -7,7 +7,7 @@ import zlib
 from datetime import timedelta
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable, List, Union
+from typing import TYPE_CHECKING, Any
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
 

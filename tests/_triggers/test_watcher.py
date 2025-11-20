@@ -1,3 +1,5 @@
+import sys
+import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -110,10 +112,11 @@ class TestWatcherTrigger:
     async def test_run_various_outcomes(self, node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
-            return producer_state if key == "state" else "compressed_data"
+            return "compressed_data"
 
         with (
             patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val),
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value=producer_state)),
             patch(
                 "cosmos._triggers.watcher._parse_compressed_xcom",
                 return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
@@ -123,14 +126,107 @@ class TestWatcherTrigger:
             assert events[0].payload == expected
 
     @pytest.mark.asyncio
+    async def test_get_producer_task_status_airflow2(self):
+        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("2.9.0")):
+            mock_ti = MagicMock()
+            mock_ti.state = "failed"
+
+            mock_session = MagicMock()
+            mock_session.__enter__.return_value.query.return_value.filter_by.return_value.first.return_value = mock_ti
+
+            with (
+                patch("airflow.utils.session.create_session", return_value=mock_session),
+                patch("cosmos._triggers.watcher.sync_to_async", side_effect=lambda func: AsyncMock(side_effect=func)),
+            ):
+                state = await self.trigger._get_producer_task_status()
+
+        assert state == "failed"
+
+    @pytest.mark.asyncio
+    async def test_get_producer_task_status_airflow3(self):
+        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
+            mock_states = {self.trigger.run_id: {self.trigger.producer_task_id: "success"}}
+
+            def fake_sync_to_async(func):
+                async def _wrapper(*args, **kwargs):
+                    return func(*args, **kwargs)
+
+                return _wrapper
+
+            fake_task_runner = types.ModuleType("airflow.sdk.execution_time.task_runner")
+
+            class FakeRuntimeTaskInstance:
+                @staticmethod
+                def get_task_states(*_args, **_kwargs):
+                    return mock_states
+
+            fake_task_runner.RuntimeTaskInstance = FakeRuntimeTaskInstance
+
+            fake_execution_time = types.ModuleType("airflow.sdk.execution_time")
+            fake_execution_time.task_runner = fake_task_runner
+            fake_sdk = types.ModuleType("airflow.sdk")
+            fake_sdk.execution_time = fake_execution_time
+
+            module_patches = {
+                "airflow.sdk": fake_sdk,
+                "airflow.sdk.execution_time": fake_execution_time,
+                "airflow.sdk.execution_time.task_runner": fake_task_runner,
+            }
+
+            with patch.dict(sys.modules, module_patches):
+                with patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async):
+                    state = await self.trigger._get_producer_task_status()
+
+        assert state == "success"
+
+    @pytest.mark.asyncio
+    async def test_get_producer_task_status_airflow3_missing_state(self):
+        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
+            mock_states = {self.trigger.run_id: {}}
+
+            def fake_sync_to_async(func):
+                async def _wrapper(*args, **kwargs):
+                    return func(*args, **kwargs)
+
+                return _wrapper
+
+            fake_task_runner = types.ModuleType("airflow.sdk.execution_time.task_runner")
+
+            class FakeRuntimeTaskInstance:
+                @staticmethod
+                def get_task_states(*_args, **_kwargs):
+                    return mock_states
+
+            fake_task_runner.RuntimeTaskInstance = FakeRuntimeTaskInstance
+
+            fake_execution_time = types.ModuleType("airflow.sdk.execution_time")
+            fake_execution_time.task_runner = fake_task_runner
+            fake_sdk = types.ModuleType("airflow.sdk")
+            fake_sdk.execution_time = fake_execution_time
+
+            module_patches = {
+                "airflow.sdk": fake_sdk,
+                "airflow.sdk.execution_time": fake_execution_time,
+                "airflow.sdk.execution_time.task_runner": fake_task_runner,
+            }
+
+            with patch.dict(sys.modules, module_patches):
+                with patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async):
+                    state = await self.trigger._get_producer_task_status()
+
+        assert state is None
+
+    @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):
-        get_xcom_val_mock = AsyncMock(side_effect=["running", "running", "compressed_data"])
+        get_xcom_val_mock = AsyncMock(side_effect=["compressed_data"])
+        get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
         parse_node_status_mock = AsyncMock(side_effect=[None, None, "success"])
 
         caplog.set_level("DEBUG")
 
         with (
             patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
+            patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
             patch("cosmos._triggers.watcher.WatcherTrigger._parse_node_status", parse_node_status_mock),
             patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
         ):

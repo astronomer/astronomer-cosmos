@@ -103,11 +103,58 @@ class WatcherTrigger(BaseTrigger):
         )
         return node_result.get("status")
 
+    async def _get_producer_task_status(self) -> str | None:
+        """Retrieve the producer task state for both Airflow 2 and Airflow 3."""
+
+        if AIRFLOW_VERSION < Version("3.0.0"):
+            try:
+                from airflow.models import TaskInstance
+                from airflow.utils.session import create_session
+            except ImportError as exc:  # pragma: no cover - defensive fallback for limited test envs
+                self.log.warning("Could not import create_session to read producer state: %s", exc)
+                return None
+
+            def _fetch_state() -> str | None:
+                with create_session() as session:
+                    ti = (
+                        session.query(TaskInstance)
+                        .filter_by(
+                            dag_id=self.dag_id,
+                            task_id=self.producer_task_id,
+                            run_id=self.run_id,
+                        )
+                        .first()
+                    )
+                    if ti is not None:
+                        return str(ti.state)
+                    return None
+
+            return await sync_to_async(_fetch_state)()
+
+        try:
+            from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
+        except (ImportError, NameError) as exc:
+            self.log.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
+            return None
+
+        def _fetch_states() -> dict[str, dict[str, Any]]:
+            return RuntimeTaskInstance.get_task_states(
+                dag_id=self.dag_id,
+                task_ids=[self.producer_task_id],
+                run_ids=[self.run_id],
+            )
+
+        task_states = await sync_to_async(_fetch_states)()
+        state = task_states.get(self.run_id, {}).get(self.producer_task_id)
+        if state is not None:
+            return str(state)
+        return None
+
     async def run(self) -> AsyncIterator[TriggerEvent]:
         self.log.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
 
         while True:
-            producer_task_state = await self.get_xcom_val("state")
+            producer_task_state = await self._get_producer_task_status()
             node_status = await self._parse_node_status()
             if node_status == "success":
                 self.log.info("Model '%s' succeeded", self.model_unique_id)

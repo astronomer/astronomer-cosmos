@@ -164,6 +164,27 @@ class TestWatcherTrigger:
         assert state == "failed"
 
     @pytest.mark.asyncio
+    async def test_get_producer_task_status_airflow2_missing_ti(self):
+        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("2.9.0")):
+            mock_session = MagicMock()
+            mock_query = mock_session.__enter__.return_value.query.return_value.filter_by.return_value
+            mock_query.first.return_value = None
+
+            def wrap_sync(func):
+                async def runner(*args, **kwargs):
+                    return func(*args, **kwargs)
+
+                return runner
+
+            with (
+                patch("airflow.utils.session.create_session", return_value=mock_session),
+                patch("cosmos._triggers.watcher.sync_to_async", side_effect=wrap_sync),
+            ):
+                state = await self.trigger._get_producer_task_status()
+
+        assert state is None
+
+    @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3(self):
         with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
             mock_states = {self.trigger.run_id: {self.trigger.producer_task_id: "success"}}

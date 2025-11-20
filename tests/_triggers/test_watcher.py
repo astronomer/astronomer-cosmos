@@ -8,6 +8,15 @@ from packaging.version import Version
 from cosmos._triggers.watcher import AIRFLOW_VERSION, WatcherTrigger
 
 
+def _import_side_effect(name: str, *args, **kwargs):
+    if name == "airflow.sdk.execution_time.task_runner":
+        raise ModuleNotFoundError("missing runtime")
+    return _real_import(name, *args, **kwargs)
+
+
+_real_import = __import__
+
+
 @pytest.mark.asyncio
 class TestWatcherTrigger:
 
@@ -58,14 +67,26 @@ class TestWatcherTrigger:
         mock_ti.xcom_pull.return_value = expected_xcom
 
         mock_session = MagicMock()
-        mock_session.__enter__.return_value.query.return_value.filter_by.return_value.one.return_value = mock_ti
+        mock_query = mock_session.__enter__.return_value.query.return_value.filter_by.return_value
+        mock_query.first.side_effect = [mock_ti, None]
 
         with patch("airflow.utils.session.create_session", return_value=mock_session):
-            with patch("cosmos._triggers.watcher.sync_to_async", side_effect=lambda f: AsyncMock(side_effect=f)):
+
+            def wrap_sync(func):
+                async def runner(*args, **kwargs):
+                    return func(*args, **kwargs)
+
+                return runner
+
+            with patch("cosmos._triggers.watcher.sync_to_async", side_effect=wrap_sync):
                 result = await self.trigger.get_xcom_val_af2("test_key")
 
                 mock_ti.xcom_pull.assert_called_once_with(task_ids="task_1", key="test_key")
                 assert result == expected_xcom
+
+                # Missing TaskInstance should result in None without error
+                none_result = await self.trigger.get_xcom_val_af2("test_key")
+                assert none_result is None
 
     @pytest.mark.parametrize(
         "use_event, xcom_val, expected_status",
@@ -213,6 +234,24 @@ class TestWatcherTrigger:
             with patch.dict(sys.modules, module_patches):
                 with patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async):
                     state = await self.trigger._get_producer_task_status()
+
+        assert state is None
+
+    @pytest.mark.asyncio
+    async def test_get_producer_task_status_airflow3_import_error(self):
+        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
+
+            def fake_sync_to_async(func):
+                async def _runner(*args, **kwargs):
+                    return func(*args, **kwargs)
+
+                return _runner
+
+            with (
+                patch("cosmos._triggers.watcher.sync_to_async", side_effect=fake_sync_to_async),
+                patch("builtins.__import__", side_effect=_import_side_effect),
+            ):
+                state = await self.trigger._get_producer_task_status()
 
         assert state is None
 

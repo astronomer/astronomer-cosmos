@@ -72,8 +72,10 @@ class WatcherTrigger(BaseTrigger):
                         task_id=self.producer_task_id,
                         run_id=self.run_id,
                     )
-                    .one()
+                    .first()
                 )
+                if ti is None:
+                    return None
                 return ti.xcom_pull(task_ids=self.producer_task_id, key=key)
 
         return await sync_to_async(_get_xcom_val)()

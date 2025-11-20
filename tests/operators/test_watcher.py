@@ -425,37 +425,6 @@ def test_execute_fallback_mode(tmp_path):
     assert data["results"][0]["status"] == "success"
 
 
-@pytest.mark.parametrize(
-    "user_callback, expected_behavior",
-    [
-        (None, "none"),
-        ([Mock(name="cb1")], "list"),
-        (Mock(name="cb2"), "single"),
-    ],
-)
-def test_set_on_failure_callback_with_actual_airflow(user_callback, expected_behavior, tmp_path):
-
-    instance = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
-    result = instance._set_on_failure_callback(user_callback)
-
-    if AIRFLOW_VERSION < Version("2.6.0"):
-        # Always returns single callable regardless of input
-        assert callable(result)
-        assert result == instance._store_producer_task_state
-    else:
-        # Returns list depending on input
-        assert isinstance(result, list)
-        assert result[-1] == instance._store_producer_task_state
-
-        if expected_behavior == "none":
-            assert len(result) == 1
-        elif expected_behavior == "list":
-            assert len(result) == 2
-        elif expected_behavior == "single":
-            assert len(result) == 2
-            assert result[0] == user_callback
-
-
 @patch("cosmos.dbt.runner.is_available", return_value=False)
 @patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")
 def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
@@ -473,16 +442,6 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
 
     assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
-
-
-def test_store_producer_task_state_pushes_failed_state():
-    mock_ti = MagicMock()
-    mock_context = {"ti": mock_ti}
-    instance = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-
-    instance._store_producer_task_state(mock_context)
-
-    mock_ti.xcom_push.assert_called_once_with(key="state", value="failed")
 
 
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
@@ -652,7 +611,7 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value=None)
-    def _fallback_to_local_run(self, mock_get_producer_task_state):
+    def _fallback_to_local_run(self, mock_get_producer_task_status):
         sensor = self.make_sensor()
         sensor.invocation_mode = None
 

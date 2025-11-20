@@ -110,27 +110,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
 
-        on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
-        super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
-
-    def _set_on_failure_callback(
-        self, user_callback: Any
-    ) -> Union[Callable[[Context], None], List[Callable[[Context], None]]]:
-        default_callback = self._store_producer_task_state
-
-        if AIRFLOW_VERSION < Version("2.6.0"):
-            # Older versions only support a single callable
-            return default_callback
-        else:
-            if user_callback is None:
-                # No callback provided — use default in a list
-                return [default_callback]
-            elif isinstance(user_callback, list):
-                # Append to existing list of callbacks (make a copy to avoid side effects)
-                return user_callback + [default_callback]
-            else:
-                # Single callable provided — wrap it in a list and append ours
-                return [user_callback, default_callback]
+        super().__init__(task_id=task_id, *args, **kwargs)
 
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
@@ -178,9 +158,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
             safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
-
-    def _store_producer_task_state(self, context: Context) -> None:
-        safe_xcom_push(task_instance=context["ti"], key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
@@ -370,9 +347,6 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self._override_rtif(context)
 
         return node_result.get("status")
-
-    def _get_producer_task_state(self, ti: Any) -> Any:
-        return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
 
     def _get_producer_task_status(self, context: Context) -> str | None:
         """

@@ -38,7 +38,7 @@ def build_producer_state_fetcher(
             logger.warning("Could not import Airflow 2 state dependencies: %s", exc)
             return None
 
-        def fetch_state() -> str | None:
+        def fetch_state_airflow2() -> str | None:
             with create_session() as session:
                 ti = (
                     session.query(TaskInstance)
@@ -53,7 +53,7 @@ def build_producer_state_fetcher(
                     return str(ti.state)
                 return None
 
-        return fetch_state
+        return fetch_state_airflow2
 
     try:
         RuntimeTaskInstance = _load_airflow3_dependencies()
@@ -61,7 +61,7 @@ def build_producer_state_fetcher(
         logger.warning("Could not load Airflow 3 RuntimeTaskInstance: %s", exc)
         return None
 
-    def fetch_state() -> str | None:
+    def fetch_state_airflow3() -> str | None:
         task_states = RuntimeTaskInstance.get_task_states(
             dag_id=dag_id,
             task_ids=[producer_task_id],
@@ -72,4 +72,4 @@ def build_producer_state_fetcher(
             return str(state)
         return None
 
-    return fetch_state
+    return fetch_state_airflow3

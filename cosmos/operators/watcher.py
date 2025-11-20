@@ -32,9 +32,9 @@ except ImportError:  # pragma: no cover
 
 from packaging.version import Version
 
+from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
-from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,

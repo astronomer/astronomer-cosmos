@@ -69,9 +69,7 @@ def build_producer_state_fetcher(
                 run_ids=[run_id],
             )
         except NameError as exc:  # pragma: no cover - Airflow 3.0 missing supervisor comms
-            logger.warning(
-                "RuntimeTaskInstance.get_task_states unavailable due to NameError: %s", exc
-            )
+            logger.warning("RuntimeTaskInstance.get_task_states unavailable due to NameError: %s", exc)
             return None
         state = task_states.get(run_id, {}).get(producer_task_id)
         if state is not None:

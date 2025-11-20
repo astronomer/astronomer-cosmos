@@ -1,12 +1,9 @@
-import sys
-import types
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from packaging.version import Version
 
 from cosmos._triggers.watcher import AIRFLOW_VERSION, WatcherTrigger
-
 
 _real_import = __import__
 
@@ -191,7 +188,9 @@ class TestWatcherTrigger:
         fetcher.assert_called_once_with()
         assert state is None
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="RuntimeTaskInstance import exists on Airflow >= 3.0")
+    @pytest.mark.skipif(
+        AIRFLOW_VERSION < Version("3.0.0"), reason="RuntimeTaskInstance import exists on Airflow >= 3.0"
+    )
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3_import_error(self):
         def _import_side_effect(name: str, *args, **kwargs):

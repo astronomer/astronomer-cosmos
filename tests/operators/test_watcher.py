@@ -538,9 +538,9 @@ class TestDbtConsumerWatcherSensor:
             status = sensor._get_producer_task_status(context)
 
         mock_builder.assert_called_once_with(
-            airflow_version=Version('2.7.0'),
-            dag_id='example_dag',
-            run_id='run_1',
+            airflow_version=Version("2.7.0"),
+            dag_id="example_dag",
+            run_id="run_1",
             producer_task_id=sensor.producer_task_id,
             logger=ANY,
         )

@@ -325,8 +325,9 @@ class DbtBuildMixin:
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, log_format: str | None = None, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
+        self.log_format = log_format
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
@@ -340,6 +341,10 @@ class DbtBuildMixin:
 
         if full_refresh is True:
             flags.append("--full-refresh")
+
+        if self.log_format:
+            flags.append("--log-format")
+            flags.append(self.log_format)
 
         return flags
 

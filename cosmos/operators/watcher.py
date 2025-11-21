@@ -109,6 +109,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
+        kwargs["log_format"] = "json"
 
         super().__init__(task_id=task_id, *args, **kwargs)
 

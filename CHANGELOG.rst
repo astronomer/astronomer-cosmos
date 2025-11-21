@@ -24,12 +24,13 @@ Enhancements
 * Refactor ``airflow/graph.py`` to simplify the code base by @tatiana in #2080
 * Force watcher producer retries to zero by @pankajkoti in #2114
 * Fail ``ExecutionMode.WATCHER`` consumer sensors immediately when the producer fails using Airflow context by @pankajkoti in #2126
+* ``ExecutonMode.Watcher``: fetch producer status asynchronously from the Airflow runtime so deferrable sensors fail immediately when the producer task fails by @pankajkoti in #2144
 
 Bug fixes
 
 * Clarify watcher deferrable failure messaging by @pankajkoti in #2124
 * Remove empty test tasks when all tests are detached by @anyapriya in #2010
-* Fix forwarding DbtProducerWatcherOperator dbt build flags by @michal-mrazek in #2127
+* Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by @michal-mrazek in #2127
 
 Docs
 
@@ -40,12 +41,14 @@ Docs
 
 Others
 
-* Retry flaky telemetry success test to stabilise CI by @pankajkoti in #2138
-* Remove unused Python3.9 uses from Github action CI by @pankajastro in #2117
+* Retry flaky Telemetry success test to stabilise CI by @pankajkoti in #2138
+* Drop unused producer state xcom handling in ``ExecutionMode.WATCHER`` by @pankajkoti in #2145
 * Drop Python 3.9 support by @pankajastro in #2118
-* Bump actions/checkout from 5.0.0 to 5.0.1 by @dependabot in #2135
+* Remove unused Python3.9 uses from Github action CI by @pankajastro in #2117
+* Bump ``actions/checkout`` from ``5.0.0`` to ``5.0.1`` by @dependabot in #2135
+* Bump ``actions/checkout`` to ``6.0.0`` in GitHub workflows by @dependabot in #2147
 * pre-commit autoupdate by @pre-commit-ci[bot] in #2134
-* Bump ``actions/checkout`` to 6.0.0 in GitHub workflows by @dependabot in #2147
+
 
 1.11.1 (2025-11-12)
 --------------------

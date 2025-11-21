@@ -109,6 +109,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
+        kwargs["log_format"] = "json"
 
         on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
         super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)

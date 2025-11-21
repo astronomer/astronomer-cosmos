@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import signal
 from subprocess import PIPE, STDOUT, Popen
@@ -30,6 +31,20 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
     def __init__(self) -> None:
         self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
+
+    def _parse_log(self, line: str) -> None:
+        try:
+            log_line = json.loads(line)
+            node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
+
+            unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
+
+            if node_status in ["success" or "failed"]:
+                # TODO: push {unique_id: node_status} to xcom
+                self.log.info("%s", unique_id)
+                pass
+        except json.JSONDecodeError:
+            pass
 
     def run_command(
         self,
@@ -94,6 +109,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 last_line = line
                 log_lines.append(line)
                 self.log.info("%s", line)
+                self._parse_log(line)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

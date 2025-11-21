@@ -1,8 +1,8 @@
 Changelog
 =========
 
-1.12.0a2 (2025-11-12)
--------------------
+1.12.0a3 (2025-11-21)
+----------------------
 
 Breaking changes
 
@@ -10,18 +10,42 @@ Breaking changes
   - ``generate_task_or_group`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
   - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
   - ``create_task_metadata`` now expects the ``node_converters`` argument
-* Drop Python 3.9 Support by @pankajastro in #2118
+* Drop Python 3.9 support by @pankajastro in #2118
 
 Features
 
 * Support applying ``node_converter`` at a task level instead of task group level by @anyapriya in #1759
+* Allow overriding ``DbtProducerWatcherOperator`` parameters via ``ExecutionConfig.setup_operator_args`` by @pankajastro in #2133
+* Use deferrable sensors by default in ``ExecutionMode.WATCHER`` by @pankajastro in #2084
 
 Enhancements
 
-* By default, use deferrable sensors when using ``ExecutionMode.WATCHER`` by @pankajastro in #2084
-* Unify airflow version handling into ``constants.py`` by @tatiana in #2089
-* Refactor ``airflow/graph.py`` to simplify code-base by @tatiana in #2080
+* Unify Airflow version handling into ``constants.py`` by @tatiana in #2089
+* Refactor ``airflow/graph.py`` to simplify the code base by @tatiana in #2080
+* Force watcher producer retries to zero by @pankajkoti in #2114
+* Fail ``ExecutionMode.WATCHER`` consumer sensors immediately when the producer fails using Airflow context by @pankajkoti in #2126
 
+Bug fixes
+
+* Clarify watcher deferrable failure messaging by @pankajkoti in #2124
+* Remove empty test tasks when all tests are detached by @anyapriya in #2010
+* Fix forwarding DbtProducerWatcherOperator dbt build flags by @michal-mrazek in #2127
+
+Docs
+
+* Document dataset-event limitation when using ``ExecutionMode.AIRFLOW_ASYNC`` by @varaprasadregani in #2143
+* Expand ``ExecutionMode.KUBERNETES`` guidance by @pankajastro in #2139
+* Add docs for deferrable ``DbtConsumerWatcherSensor`` by @pankajastro in #2115
+* Fix reStructuredText formatting by @dnskr in #2132
+
+Others
+
+* Retry flaky telemetry success test to stabilise CI by @pankajkoti in #2138
+* Remove unused Python3.9 uses from Github action CI by @pankajastro in #2117
+* Drop Python 3.9 support by @pankajastro in #2118
+* Bump actions/checkout from 5.0.0 to 5.0.1 by @dependabot in #2135
+* pre-commit autoupdate by @pre-commit-ci[bot] in #2134
+* Bump ``actions/checkout`` to 6.0.0 in GitHub workflows by @dependabot in #2147
 
 1.11.1 (2025-11-12)
 --------------------

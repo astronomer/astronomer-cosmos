@@ -11,6 +11,8 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
+from cosmos._utils.watcher_state import build_producer_state_fetcher
+
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 
@@ -72,8 +74,10 @@ class WatcherTrigger(BaseTrigger):
                         task_id=self.producer_task_id,
                         run_id=self.run_id,
                     )
-                    .one()
+                    .one_or_none()
                 )
+                if ti is None:
+                    return None
                 return ti.xcom_pull(task_ids=self.producer_task_id, key=key)
 
         return await sync_to_async(_get_xcom_val)()
@@ -103,11 +107,26 @@ class WatcherTrigger(BaseTrigger):
         )
         return node_result.get("status")
 
+    async def _get_producer_task_status(self) -> str | None:
+        """Retrieve the producer task state for both Airflow 2 and Airflow 3."""
+
+        fetch_state = build_producer_state_fetcher(
+            airflow_version=AIRFLOW_VERSION,
+            dag_id=self.dag_id,
+            run_id=self.run_id,
+            producer_task_id=self.producer_task_id,
+            logger=self.log,
+        )
+        if fetch_state is None:
+            return None
+
+        return await sync_to_async(fetch_state)()
+
     async def run(self) -> AsyncIterator[TriggerEvent]:
         self.log.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
 
         while True:
-            producer_task_state = await self.get_xcom_val("state")
+            producer_task_state = await self._get_producer_task_status()
             node_status = await self._parse_node_status()
             if node_status == "success":
                 self.log.info("Model '%s' succeeded", self.model_unique_id)

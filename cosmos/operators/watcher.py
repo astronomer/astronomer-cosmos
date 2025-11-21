@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover
 
 from packaging.version import Version
 
+from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
@@ -384,45 +385,17 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         run_id = context["run_id"]
         dag_id = ti.dag_id
 
-        if AIRFLOW_VERSION < Version("3.0.0"):
-            # Airflow 2: Query TaskInstance from database
-            try:
-                from airflow.models import TaskInstance
-                from airflow.utils.session import create_session
-            except ImportError as exc:  # pragma: no cover - defensive fallback for tests without DB
-                logger.warning("Could not import create_session to read producer state: %s", exc)
-                return None
-
-            with create_session() as session:
-                producer_ti = (
-                    session.query(TaskInstance)
-                    .filter_by(
-                        dag_id=dag_id,
-                        task_id=self.producer_task_id,
-                        run_id=run_id,
-                    )
-                    .first()
-                )
-                if producer_ti:
-                    return str(producer_ti.state)
-                return None
-        else:
-            # Airflow 3: Use RuntimeTaskInstance.get_task_states
-            try:
-                from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
-
-                task_states = RuntimeTaskInstance.get_task_states(
-                    dag_id=dag_id,
-                    task_ids=[self.producer_task_id],
-                    run_ids=[run_id],
-                )
-                state = task_states.get(run_id, {}).get(self.producer_task_id)
-                if state is not None:
-                    return str(state)
-                return None
-            except (ImportError, NameError) as exc:
-                logger.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
+        fetch_state = build_producer_state_fetcher(
+            airflow_version=AIRFLOW_VERSION,
+            dag_id=dag_id,
+            run_id=run_id,
+            producer_task_id=self.producer_task_id,
+            logger=logger,
+        )
+        if fetch_state is None:
             return None
+
+        return fetch_state()
 
     def execute(self, context: Context, **kwargs: Any) -> None:
         if not self.deferrable:

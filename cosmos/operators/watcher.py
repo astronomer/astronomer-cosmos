@@ -30,7 +30,6 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
-from packaging.version import Version
 
 from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.config import ProfileConfig

@@ -458,7 +458,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         _override_rtif_airflow_2_x()
 
     def run_subprocess(
-        self, command: list[str], env: dict[str, str], cwd: str, context: Context
+        self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
     ) -> FullOutputSubprocessResult:
         logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
@@ -466,23 +466,21 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
-            context=context,
+            **kwargs,
         )
         # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:
         output = "".join(subprocess_result.full_output)
         logger.info(output)
         return subprocess_result
 
-    def run_dbt_runner(
-        self, command: list[str], env: dict[str, str], cwd: str, context: Context | None = None
-    ) -> dbtRunnerResult:
+    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, context=context)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)

@@ -10,13 +10,41 @@ import os
 import signal
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
-from typing import NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
+
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 try:
     # Airflow 3.1 onwards
     from airflow.sdk.bases.hook import BaseHook
 except ImportError:
     from airflow.hooks.base import BaseHook
+from threading import Lock
+
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.types import RuntimeTaskInstanceProtocol as TaskInstance
+    except ImportError:
+        from airflow.models.taskinstance import TaskInstance  # type: ignore[assignment]
+
+
+xcom_set_lock = Lock()
+
+
+def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
+    """
+    Safely set an XCom value in a thread-safe manner in Airflow 3.0 and 3.1.
+    We noticed that the combination of using dbt (multi-threaded) and Airflow 3.0 and 3.1 to set XCom lead to race conditions.
+    This leads the producer task to get stuck while running the dbt build command.
+    Unfortunately, since this is non-deterministic, and happens once every five runs, we were not able to have a proper test.
+    However, we applied this fix and run over 20 times a pipeline that would fail every 5 runs and this allowed us to no longer face the issue.
+    """
+    with xcom_set_lock:
+        task_instance.xcom_push(key=key, value=value)
 
 
 class FullOutputSubprocessResult(NamedTuple):
@@ -32,7 +60,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
 
-    def _parse_log(self, line: str) -> None:
+    def _parse_log(self, line: str, context: Context | None = None) -> None:
+        assert context is not None  # Make MyPy happy
         try:
             log_line = json.loads(line)
             node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
@@ -40,9 +69,9 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
             unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
 
             if node_status in ["success" or "failed"]:
-                # TODO: push {unique_id: node_status} to xcom
                 self.log.info("%s", unique_id)
-                pass
+                modified_unique_id = unique_id.replace(".", "__")
+                safe_xcom_push(task_instance=context["ti"], key=f"{modified_unique_id}_status", value=node_status)
         except json.JSONDecodeError:
             pass
 
@@ -52,6 +81,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
+        context: Context | None = None,
     ) -> FullOutputSubprocessResult:
         """
         Execute the command.
@@ -109,7 +139,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 last_line = line
                 log_lines.append(line)
                 self.log.info("%s", line)
-                self._parse_log(line)
+                self._parse_log(line, context)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

@@ -30,8 +30,8 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
-from packaging.version import Version
 
+from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
@@ -98,27 +98,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["retries"] = 0
         kwargs["log_format"] = "json"
 
-        on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
-        super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
-
-    def _set_on_failure_callback(
-        self, user_callback: Any
-    ) -> Union[Callable[[Context], None], List[Callable[[Context], None]]]:
-        default_callback = self._store_producer_task_state
-
-        if AIRFLOW_VERSION < Version("2.6.0"):
-            # Older versions only support a single callable
-            return default_callback
-        else:
-            if user_callback is None:
-                # No callback provided — use default in a list
-                return [default_callback]
-            elif isinstance(user_callback, list):
-                # Append to existing list of callbacks (make a copy to avoid side effects)
-                return user_callback + [default_callback]
-            else:
-                # Single callable provided — wrap it in a list and append ours
-                return [user_callback, default_callback]
+        super().__init__(task_id=task_id, *args, **kwargs)
 
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
@@ -166,9 +146,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
             safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
-
-    def _store_producer_task_state(self, context: Context) -> None:
-        safe_xcom_push(task_instance=context["ti"], key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
@@ -359,8 +336,27 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         return node_result.get("status")
 
-    def _get_producer_task_state(self, ti: Any) -> Any:
-        return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
+    def _get_producer_task_status(self, context: Context) -> str | None:
+        """
+        Get the task status of the producer task for both Airflow 2 and Airflow 3.
+
+        Returns the state of the producer task instance, or None if not found.
+        """
+        ti = context["ti"]
+        run_id = context["run_id"]
+        dag_id = ti.dag_id
+
+        fetch_state = build_producer_state_fetcher(
+            airflow_version=AIRFLOW_VERSION,
+            dag_id=dag_id,
+            run_id=run_id,
+            producer_task_id=self.producer_task_id,
+            logger=logger,
+        )
+        if fetch_state is None:
+            return None
+
+        return fetch_state()
 
     def execute(self, context: Context, **kwargs: Any) -> None:
         if not self.deferrable:
@@ -427,7 +423,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             return self._fallback_to_local_run(try_number, context)
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
-        producer_task_state = self._get_producer_task_state(ti)
+        producer_task_state = self._get_producer_task_status(context)
         if self._use_event():
             status = self._get_status_from_events(ti, context)
         else:

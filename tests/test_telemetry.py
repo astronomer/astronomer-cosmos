@@ -100,6 +100,7 @@ def test_emit_usage_metrics_fails(mock_httpx_get, caplog):
 
 
 @pytest.mark.integration
+@pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_emit_usage_metrics_succeeds(caplog):
     caplog.set_level(logging.DEBUG)
     sample_metrics = {

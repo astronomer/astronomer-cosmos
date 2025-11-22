@@ -149,6 +149,7 @@ dependencies = [
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",
+    "pytest-rerunfailures",
     "requests-mock",
     "pytest-cov",
     "pytest-describe",

@@ -306,6 +306,7 @@ The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators ha
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Using Custom Args for the Producer and Watcher
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. versionadded:: 1.12.0
 
 If you need to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can do so using ``setup_operator_args``.
 
@@ -331,6 +332,9 @@ When using ``ExecutionMode.WATCHER``, you may want to run the **DbtProducerWatch
    )
 
 This allows you to customize ``DbtProducerWatcherOperator`` behavior without affecting the arguments used by the other sensor tasks.
+
+.. note::
+   Please note that ``setup_operator_args`` is specific to Cosmos and is not related to Airflow ``setup`` or ``teardown`` task.
 
 For information on configuring worker queues in Astronomer, see the Astronomer `documentation <https://www.astronomer.io/docs/astro/configure-worker-queues>`_ on worker queues.
 

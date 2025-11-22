@@ -410,6 +410,12 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self._discover_invocation_mode()
         return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
+    def _get_model_status_from_xcom(self, ti: TaskInstance) -> Any:
+        modified_unique_id = self.model_unique_id.replace(".", "__")
+        self.log.info("self.model_unique_id: %s", modified_unique_id)
+        status = ti.xcom_pull(self.producer_task_id, key=f"{modified_unique_id}_status")
+        return status
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -434,7 +440,8 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if self._use_event():
             status = self._get_status_from_events(ti, context)
         else:
-            status = self._get_status_from_run_results(ti, context)
+            status = self._get_model_status_from_xcom(ti)
+            # status = self._get_status_from_run_results(ti, context)
 
         if status is None:
 

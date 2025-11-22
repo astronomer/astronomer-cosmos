@@ -110,9 +110,12 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 errors="backslashreplace",
             )
 
-            last_line: str = ""
+            if self.sub_process is None:
+                raise RuntimeError("The subprocess should be created here and is None!")
 
-            # Stream output line-by-line
+            self.log.info("Command output:")
+
+            last_line: str = ""
             assert self.sub_process.stdout is not None
             for line in self.sub_process.stdout:
                 line = line.rstrip("\n")

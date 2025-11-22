@@ -1,11 +1,10 @@
 from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:  # pragma: no cover
-    try:
-        from airflow.sdk.types import RuntimeTaskInstanceProtocol as TaskInstance
-    except ImportError:
-        from airflow.models.taskinstance import TaskInstance  # type: ignore[assignment]
+try:
+    from airflow.sdk.types import RuntimeTaskInstanceProtocol as TaskInstance
+except ImportError:
+    from airflow.models.taskinstance import TaskInstance  # type: ignore[assignment]
 
 
 xcom_set_lock = Lock()

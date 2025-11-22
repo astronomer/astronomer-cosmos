@@ -20,29 +20,17 @@ from cosmos.operators.base import (
 )
 
 
-@pytest.mark.skipif(
-    (sys.version_info.major, sys.version_info.minor) == (3, 12),
-    reason="The error message for the abstract class instantiation seems to have changed between Python 3.11 and 3.12",
-)
 def test_dbt_base_is_abstract():
-    """Tests that the abstract base operator cannot be instantiated since the base_cmd is not defined."""
-    expected_error = (
-        "Can't instantiate abstract class AbstractDbtBase with abstract methods base_cmd, build_and_run_cmd"
-    )
-    with pytest.raises(TypeError, match=expected_error):
-        AbstractDbtBase(project_dir="project_dir")
+    if sys.version_info >= (3, 12):
+        expected_error = (
+            "Can't instantiate abstract class AbstractDbtBase without an implementation for abstract methods "
+            "'base_cmd', 'build_and_run_cmd'"
+        )
+    else:
+        expected_error = (
+            "Can't instantiate abstract class AbstractDbtBase with abstract methods base_cmd, build_and_run_cmd"
+        )
 
-
-@pytest.mark.skipif(
-    (sys.version_info.major, sys.version_info.minor) != (3, 12),
-    reason="The error message for the abstract class instantiation seems to have changed between Python 3.11 and 3.12",
-)
-def test_dbt_base_operator_is_abstract_py12():
-    """Tests that the abstract base operator cannot be instantiated since the base_cmd is not defined."""
-    expected_error = (
-        "Can't instantiate abstract class AbstractDbtBase without an implementation for abstract methods "
-        "'base_cmd', 'build_and_run_cmd'"
-    )
     with pytest.raises(TypeError, match=expected_error):
         AbstractDbtBase(project_dir="project_dir")
 

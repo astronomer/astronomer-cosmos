@@ -20,3 +20,7 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     """
     with xcom_set_lock:
         task_instance.xcom_push(key=key, value=value)
+
+
+def get_xcom_val(task_instance: TaskInstance, task_ids: str | list[str], key: str) -> Any:
+    return task_instance.xcom_pull(task_ids, key=key)

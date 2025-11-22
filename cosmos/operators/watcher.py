@@ -6,10 +6,11 @@ import logging
 import zlib
 from datetime import timedelta
 from pathlib import Path
-from threading import Lock
-from typing import TYPE_CHECKING, Any
+
+from typing import TYPE_CHECKING, Any, Callable, List, Union
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
+from cosmos._utils.common import safe_xcom_push
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -52,23 +53,10 @@ except ImportError:  # pragma: no cover
     EventMsg = None
 
 logger = logging.getLogger(__name__)
-xcom_set_lock = Lock()
 
 CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
 PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
 WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
-
-
-def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
-    """
-    Safely set an XCom value in a thread-safe manner in Airflow 3.0 and 3.1.
-    We noticed that the combination of using dbt (multi-threaded) and Airflow 3.0 and 3.1 to set XCom lead to race conditions.
-    This leads the producer task to get stuck while running the dbt build command.
-    Unfortunately, since this is non-deterministic, and happens once every five runs, we were not able to have a proper test.
-    However, we applied this fix and run over 20 times a pipeline that would fail every 5 runs and this allowed us to no longer face the issue.
-    """
-    with xcom_set_lock:
-        task_instance.xcom_push(key=key, value=value)
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):

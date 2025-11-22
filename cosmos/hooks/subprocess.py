@@ -10,21 +10,15 @@ import os
 import signal
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
-from typing import TYPE_CHECKING, NamedTuple
-
-from cosmos._utils.common import safe_xcom_push
-
-if TYPE_CHECKING:  # pragma: no cover
-    try:
-        from airflow.sdk.definitions.context import Context
-    except ImportError:
-        from airflow.utils.context import Context  # type: ignore[attr-defined]
+from typing import Any, NamedTuple
 
 try:
     # Airflow 3.1 onwards
     from airflow.sdk.bases.hook import BaseHook
 except ImportError:
     from airflow.hooks.base import BaseHook
+
+from cosmos._utils.common import safe_xcom_push
 
 
 class FullOutputSubprocessResult(NamedTuple):
@@ -40,8 +34,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
 
-    def _store_dbt_resource_status_from_log(self, line: str, context: Context | None = None) -> None:
-        assert context is not None  # Make MyPy happy
+    def _store_dbt_resource_status_from_log(self, line: str, **kwargs: Any) -> None:
         try:
             log_line = json.loads(line)
             node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
@@ -50,6 +43,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
             self.log.debug("Model: %s is in %s state", unique_id, node_status)
 
             if node_status in ["success" or "failed"]:
+                context = kwargs.get("context")
+                assert context is not None  # Make MyPy happy
                 safe_xcom_push(
                     task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status
                 )
@@ -62,7 +57,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
-        context: Context | None = None,
+        **kwargs: Any,
     ) -> FullOutputSubprocessResult:
         """
         Execute the command.
@@ -123,7 +118,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 last_line = line
                 log_lines.append(line)
                 self.log.info("%s", line)
-                self._store_dbt_resource_status_from_log(line, context)
+                self._store_dbt_resource_status_from_log(line, **kwargs)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

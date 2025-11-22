@@ -47,7 +47,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
             node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
             unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
 
-            self.log.debug("Model: %s is in {node_status}", unique_id, node_status)
+            self.log.debug("Model: %s is in %s state", unique_id, node_status)
 
             if node_status in ["success" or "failed"]:
                 safe_xcom_push(

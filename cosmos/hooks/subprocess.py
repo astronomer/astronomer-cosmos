@@ -40,20 +40,21 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
 
-    def _parse_log(self, line: str, context: Context | None = None) -> None:
+    def _store_dbt_resource_status_from_log(self, line: str, context: Context | None = None) -> None:
         assert context is not None  # Make MyPy happy
         try:
             log_line = json.loads(line)
             node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
-
             unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
 
+            self.log.debug("Model: %s is in {node_status}", unique_id, node_status)
+
             if node_status in ["success" or "failed"]:
-                self.log.info("%s", unique_id)
-                modified_unique_id = unique_id.replace(".", "__")
-                safe_xcom_push(task_instance=context["ti"], key=f"{modified_unique_id}_status", value=node_status)
+                safe_xcom_push(
+                    task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status
+                )
         except json.JSONDecodeError:
-            pass
+            self.log.debug("Failed to parse log: %s", line)
 
     def run_command(
         self,
@@ -122,7 +123,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 last_line = line
                 log_lines.append(line)
                 self.log.info("%s", line)
-                self._parse_log(line, context)
+                self._store_dbt_resource_status_from_log(line, context)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

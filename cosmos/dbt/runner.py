@@ -8,6 +8,12 @@ from cosmos.dbt.project import change_working_directory, environ
 from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
 
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
+
 if "pytest" in sys.modules:
     # We set the cache limit to 0, so nothing gets cached by default when
     # running tests
@@ -61,7 +67,7 @@ def get_runner(callbacks: list[Callable] | None = None) -> dbtRunner:  # type: i
 
 
 def run_command(
-    command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None  # type: ignore[type-arg]
+    command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None, context: Context | None = None  # type: ignore[type-arg]
 ) -> dbtRunnerResult:
     """
     Invokes the dbt command programmatically.

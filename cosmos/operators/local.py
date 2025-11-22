@@ -473,14 +473,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         logger.info(output)
         return subprocess_result
 
-    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
+    def run_dbt_runner(
+        self, command: list[str], env: dict[str, str], cwd: str, context: Context | None = None
+    ) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, context=context)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)

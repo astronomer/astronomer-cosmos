@@ -4,6 +4,20 @@ Changelog
 Changelog
 =========
 
+1.11.2 (2025-11-24)
+--------------------
+
+Bug fixes
+
+* Force ``DbtProducerWatcherOperator`` retries to zero by @pankajkoti in #2114
+* Fail ``DbtConsumerWatcherSensor`` tasks immediately when the ``DbtProducerWatcherOperator`` fails using Airflow context by @pankajkoti in #2126
+* Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by by @michal-mrazek in #2127
+
+Documentation
+
+* Expand ``ExecutionMode.KUBERNETES`` guidance by @tatiana in #2139
+* Document dataset-event limitation when using ``ExecutionMode.AIRFLOW_ASYNC`` by @varaprasadregani in #2143
+
 
 1.11.1 (2025-11-12)
 --------------------

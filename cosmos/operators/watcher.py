@@ -34,6 +34,7 @@ except ImportError:  # pragma: no cover
 from cosmos.config import ProfileConfig
 from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
 from cosmos.operators.base import (
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -72,7 +73,7 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
         task_instance.xcom_push(key=key, value=value)
 
 
-class DbtProducerWatcherOperator(DbtLocalBaseOperator):
+class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
     Executes **one** ``dbt build`` covering the whole selection.
@@ -97,13 +98,20 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
     feedback and granular task-level observability downstream.
     """
 
-    base_cmd = ["build"]
-    template_fields = DbtLocalBaseOperator.template_fields
+    template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WEIGHT_RULE)
+        # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
+        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
+        # they have already processed output XCOMs from the first run of the producer, so we disable retries.
+        default_args = dict(kwargs.get("default_args", {}) or {})
+        default_args["retries"] = 0
+        kwargs["default_args"] = default_args
+        kwargs["retries"] = 0
+
         on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
         super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
 
@@ -177,6 +185,25 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         safe_xcom_push(task_instance=context["ti"], key="state", value="failed")
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        task_instance = context.get("ti")
+        if task_instance is None:
+            raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
+
+        try_number = getattr(task_instance, "try_number", 1)
+
+        if try_number > 1:
+            retry_message = (
+                "Dbt WATCHER producer task does not support Airflow retries. "
+                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+            )
+            self.log.error(retry_message)
+            raise AirflowException(retry_message)
+
+        self.log.info(
+            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
+            "downstream sensors own model-level retries."
+        )
+
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()
@@ -351,6 +378,56 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
     def _get_producer_task_state(self, ti: Any) -> Any:
         return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
 
+    def _get_producer_task_status(self, context: Context) -> str | None:
+        """
+        Get the task status of the producer task for both Airflow 2 and Airflow 3.
+
+        Returns the state of the producer task instance, or None if not found.
+        """
+        ti = context["ti"]
+        run_id = context["run_id"]
+        dag_id = ti.dag_id
+
+        if AIRFLOW_VERSION < Version("3.0.0"):
+            # Airflow 2: Query TaskInstance from database
+            try:
+                from airflow.models import TaskInstance
+                from airflow.utils.session import create_session
+            except ImportError as exc:  # pragma: no cover - defensive fallback for tests without DB
+                logger.warning("Could not import create_session to read producer state: %s", exc)
+                return None
+
+            with create_session() as session:
+                producer_ti = (
+                    session.query(TaskInstance)
+                    .filter_by(
+                        dag_id=dag_id,
+                        task_id=self.producer_task_id,
+                        run_id=run_id,
+                    )
+                    .first()
+                )
+                if producer_ti:
+                    return str(producer_ti.state)
+                return None
+        else:
+            # Airflow 3: Use RuntimeTaskInstance.get_task_states
+            try:
+                from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
+
+                task_states = RuntimeTaskInstance.get_task_states(
+                    dag_id=dag_id,
+                    task_ids=[self.producer_task_id],
+                    run_ids=[run_id],
+                )
+                state = task_states.get(run_id, {}).get(self.producer_task_id)
+                if state is not None:
+                    return str(state)
+                return None
+            except (ImportError, NameError) as exc:
+                logger.warning("Could not retrieve producer task status via RuntimeTaskInstance: %s", exc)
+            return None
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -375,7 +452,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             self._discover_invocation_mode()
         use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
-        producer_task_state = self._get_producer_task_state(ti)
+        producer_task_state = self._get_producer_task_status(context)
         if use_events:
             status = self._get_status_from_events(ti, context)
         else:

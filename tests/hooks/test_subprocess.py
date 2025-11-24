@@ -1,3 +1,4 @@
+import json
 import signal
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -76,9 +77,6 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
     hook.sub_process = MagicMock()
     hook.send_sigterm()
     mock_killpg.assert_called_with(123, signal.SIGTERM)
-
-
-import json
 
 
 @pytest.mark.parametrize(

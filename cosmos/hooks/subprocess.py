@@ -35,6 +35,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         super().__init__()  # type: ignore[no-untyped-call]
 
     def _store_dbt_resource_status_from_log(self, line: str, **kwargs: Any) -> None:
+
         try:
             log_line = json.loads(line)
             node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")

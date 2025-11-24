@@ -318,7 +318,12 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
 
 class DbtBuildMixin:
-    """Mixin for dbt build command."""
+    """
+    Mixin for dbt build command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt build command
+    :param log_format: format for dbt logs (e.g., 'json', 'text'). If provided, adds --log-format flag
+    """
 
     base_cmd = ["build"]
     ui_color = "#8194E0"

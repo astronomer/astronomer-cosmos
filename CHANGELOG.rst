@@ -35,7 +35,7 @@ Bug fixes
 Docs
 
 * Document dataset-event limitation when using ``ExecutionMode.AIRFLOW_ASYNC`` by @varaprasadregani in #2143
-* Expand ``ExecutionMode.KUBERNETES`` guidance by @pankajastro in #2139
+* Expand ``ExecutionMode.KUBERNETES`` guidance by @tatiana  in #2139
 * Add docs for deferrable ``DbtConsumerWatcherSensor`` by @pankajastro in #2115
 * Fix reStructuredText formatting by @dnskr in #2132
 

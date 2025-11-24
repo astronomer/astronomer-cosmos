@@ -6,14 +6,12 @@ import json
 import zlib
 from typing import Any, AsyncIterator
 
-import airflow
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
 from cosmos._utils.watcher_state import build_producer_state_fetcher
-
-AIRFLOW_VERSION = Version(airflow.__version__)
+from cosmos.constants import AIRFLOW_VERSION
 
 
 class WatcherTrigger(BaseTrigger):

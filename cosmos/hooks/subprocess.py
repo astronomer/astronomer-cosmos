@@ -42,7 +42,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
 
             self.log.debug("Model: %s is in %s state", unique_id, node_status)
 
-            if node_status in ["success" or "failed"]:
+            if node_status in ["success", "failed"]:
                 context = kwargs.get("context")
                 assert context is not None  # Make MyPy happy
                 safe_xcom_push(

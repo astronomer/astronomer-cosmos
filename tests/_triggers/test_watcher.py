@@ -83,6 +83,7 @@ class TestWatcherTrigger:
         "use_event, xcom_val, expected_status",
         [
             (True, {"data": {"run_result": {"status": "success"}}}, "success"),
+            (True, None, None),
             (False, "failed", "failed"),
         ],
     )
@@ -90,7 +91,7 @@ class TestWatcherTrigger:
         self.trigger.use_event = use_event
         with (
             patch("cosmos._triggers.watcher._parse_compressed_xcom", return_value=xcom_val),
-            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value="failed")),
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=xcom_val)),
         ):
             status = await self.trigger._parse_node_status()
             assert status == expected_status

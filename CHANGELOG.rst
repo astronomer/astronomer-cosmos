@@ -29,7 +29,7 @@ Bug fixes
 
 * Force ``DbtProducerWatcherOperator`` retries to zero by @pankajkoti in #2114
 * Fail ``DbtConsumerWatcherSensor`` tasks immediately when the ``DbtProducerWatcherOperator`` fails using Airflow context by @pankajkoti in #2126
-* Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by by @michal-mrazek in #2127
+* Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by @michal-mrazek in #2127
 
 Documentation
 

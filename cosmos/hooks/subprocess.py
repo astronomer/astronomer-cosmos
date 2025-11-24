@@ -49,6 +49,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
 
             self.log.debug("Model: %s is in %s state", unique_id, node_status)
 
+            # TODO: Handle and store all possible node statuses, not just the current success and failed
             if node_status in ["success", "failed"]:
                 context = kwargs.get("context")
                 assert context is not None  # Make MyPy happy

@@ -35,7 +35,13 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         super().__init__()  # type: ignore[no-untyped-call]
 
     def _store_dbt_resource_status_from_log(self, line: str, **kwargs: Any) -> None:
+        """
+        Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
 
+        This method parses each log line from dbt when --log-format json is used,
+        extracts node status information, and pushes it to XCom for consumption
+        by downstream watcher sensors.
+        """
         try:
             log_line = json.loads(line)
             node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")

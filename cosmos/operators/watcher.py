@@ -6,7 +6,6 @@ import logging
 import zlib
 from datetime import timedelta
 from pathlib import Path
-
 from typing import TYPE_CHECKING, Any
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom

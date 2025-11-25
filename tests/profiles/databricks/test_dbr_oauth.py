@@ -70,6 +70,7 @@ def test_connection_claiming() -> None:
         profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
 
+
 def test_mock_profile() -> None:
     """
     Tests that the Databricks mock profile is generated correctly.

@@ -1112,6 +1112,4 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
         execution_config=execution_config,
     )
 
-    mock_logger.debug.assert_called_once_with(
-        "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation"
-    )
+    mock_logger.debug.assert_any_call("Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation")

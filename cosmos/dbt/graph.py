@@ -576,8 +576,8 @@ class DbtGraph:
 
         self.update_node_dependency()
 
-        logger.info("Total nodes: %i", len(self.nodes))
-        logger.info("Total filtered nodes: %i", len(self.filtered_nodes))
+        logger.debug("Total nodes: %i", len(self.nodes))
+        logger.debug("Total filtered nodes: %i", len(self.filtered_nodes))
 
     def run_dbt_ls(
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
@@ -640,13 +640,13 @@ class DbtGraph:
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
-        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
+        logger.debug(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
         if self.should_use_dbt_ls_cache():
             project_path = self.project_path
 
             cache_dict = self.get_dbt_ls_cache()
             if not cache_dict:
-                logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
+                logger.debug(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
                 return False
 
             cache_version = cache_dict.get("version")
@@ -657,7 +657,7 @@ class DbtGraph:
             )
 
             if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
-                logger.info(
+                logger.debug(
                     f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.dbt_ls_cache_key} is {len(dbt_ls_cache)}"
                 )
                 self.load_method = LoadMode.DBT_LS_CACHE
@@ -665,9 +665,9 @@ class DbtGraph:
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
-                logger.info(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
+                logger.debug(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
                 return True
-        logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
+        logger.debug(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
         return False
 
     def should_use_partial_parse_cache(self) -> bool:
@@ -750,7 +750,7 @@ class DbtGraph:
         dbt_cmd = self.render_config.dbt_executable_path
         dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
 
-        logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
+        logger.debug(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
         project_path = self.project_path
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
@@ -769,7 +769,7 @@ class DbtGraph:
                     latest_partial_parse = get_partial_parse_path(project_path)
 
             if latest_partial_parse is not None and latest_partial_parse.exists():
-                logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+                logger.debug("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
             with (
@@ -825,7 +825,7 @@ class DbtGraph:
         to the airflow image.
         """
         self.load_method = LoadMode.DBT_LS_FILE
-        logger.info("Trying to parse the dbt project `%s` using a dbt ls output file...", self.project.project_name)
+        logger.debug("Trying to parse the dbt project `%s` using a dbt ls output file...", self.project.project_name)
 
         if not self.render_config.is_dbt_ls_file_available():
             raise CosmosLoadDbtException(f"Unable to load dbt ls file using {self.render_config.dbt_ls_path}")
@@ -858,7 +858,7 @@ class DbtGraph:
             " be removed in Cosmos 2.0",
             DeprecationWarning,
         )
-        logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
+        logger.debug("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
         if self.render_config.selector:
             raise CosmosLoadDbtException(
@@ -918,7 +918,7 @@ class DbtGraph:
         * self.filtered_nodes
         """
         self.load_method = LoadMode.DBT_MANIFEST
-        logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
+        logger.debug("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
 
         if self.render_config.selector:
             raise CosmosLoadDbtException(

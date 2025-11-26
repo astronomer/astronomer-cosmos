@@ -7,7 +7,7 @@ It does this by exposing a ``cosmos.config.RenderConfig`` class that you can use
 
 The ``RenderConfig`` class takes the following arguments:
 
-- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. Depends on `additional dependencies <lineage.html>`_. ``ExecutionMode.AIRFLOW_ASYNC`` does not emit datasets today, even if this flag is ``True``.
+- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. Depends on `additional dependencies <lineage.html>`_. ``ExecutionMode.AIRFLOW_ASYNC`` currently does not emit datasets, even if this flag is ``True``.
 - ``test_behavior``: how to run tests. Defaults to running a model's tests immediately after the model is run. For more information, see the `Testing Behavior <testing-behavior.html>`_ section.
 - ``load_method``: how to load your dbt project. See `Parsing Methods <parsing-methods.html>`_ for more information.
 - ``invocation_mode``: (new in v1.9) how to run ``dbt ls``, when using ``LoadMode.DBT_LS``. Learn more about this below.

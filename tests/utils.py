@@ -102,6 +102,7 @@ def test_dag(
 
 # TODO: Test operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210
 # still depends on this utility. Remove this once that test is fixed.
+# https://github.com/astronomer/astronomer-cosmos/issues/2166
 @provide_session
 def test_old_dag(
     dag,

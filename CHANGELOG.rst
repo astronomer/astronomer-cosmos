@@ -12,6 +12,7 @@ Breaking changes
   - ``create_task_metadata`` now expects the ``node_converters`` argument
 * Drop Python 3.9 Support by @pankajastro in #2118
 * Drop Airflow 2.4 support by @pankajastro in #2161
+* Drop Airflow 2.5 support by @pankajastro in #2165
 
 Features
 

@@ -31,7 +31,7 @@ By default, if using a version between Airflow 2.4 or higher is used, Cosmos emi
 
 .. important::
 
-   ``ExecutionMode.AIRFLOW_ASYNC`` currently **does not emit Dataset or DatasetAlias events** after models complete. Downstream DAGs depending on Airflow's data-aware scheduling will not trigger automatically. This limitation is tracked in `#2141 <https://github.com/astronomer/astronomer-cosmos/issues/2141>`_.
+   ``ExecutionMode.AIRFLOW_ASYNC`` currently **does not emit Dataset or DatasetAlias events** after models complete. Downstream DAGs that rely on Airflow's data-aware scheduling will not trigger automatically. This behaviour is tracked in `#2141 <https://github.com/astronomer/astronomer-cosmos/issues/2141>`_.
 
 Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
 

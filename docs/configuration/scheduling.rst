@@ -29,6 +29,10 @@ Data-Aware Scheduling
 
 By default, if using a version between Airflow 2.4 or higher is used, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
 
+.. important::
+
+   ``ExecutionMode.AIRFLOW_ASYNC`` currently **does not emit Dataset or DatasetAlias events** after models complete. Downstream DAGs depending on Airflow's data-aware scheduling will not trigger automatically. This limitation is tracked in `#2141 <https://github.com/astronomer/astronomer-cosmos/issues/2141>`_.
+
 Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
 
 This block illustrates a Cosmos-generated dataset for Postgres:

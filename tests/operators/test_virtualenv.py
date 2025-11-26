@@ -394,10 +394,6 @@ def test__release_venv_lock_current_process(tmpdir):
     assert not lockfile.exists()
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.5"),
-    reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",
-)
 @pytest.mark.integration
 def test_integration_virtualenv_operator(caplog):
     """

@@ -74,42 +74,35 @@ def test_dag(
     dr = None
     if custom_tester:
         dr = test_old_dag(dag, conn_file_path)
+    elif AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
+        dr = new_test_dag(dag)
         assert check_dag_success(dr, expect_success), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-    elif AIRFLOW_VERSION >= version.Version("2.5"):
-        if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
+    else:
+        # This is a work around until we fix the issue in Airflow:
+        # https://github.com/apache/airflow/issues/42495
+        """
+        FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
+        This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
+        Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
+        FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
+        FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
+        FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
+        """
+        try:
             dr = new_test_dag(dag)
             assert check_dag_success(
                 dr, expect_success
             ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-        else:
-            # This is a work around until we fix the issue in Airflow:
-            # https://github.com/apache/airflow/issues/42495
-            """
-            FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
-            This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
-            Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
-            FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
-            FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
-            FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
-            """
-            try:
-                dr = new_test_dag(dag)
-                assert check_dag_success(
-                    dr, expect_success
-                ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-            except sqlalchemy.exc.PendingRollbackError:
-                warnings.warn(
-                    "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"
-                )
-    else:
-        dr = test_old_dag(dag, conn_file_path)
-        assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-
+        except sqlalchemy.exc.PendingRollbackError:
+            warnings.warn(
+                "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"
+            )
     return dr
 
 
-# DAG.test() was added in Airflow version 2.5.0. And to test on older Airflow versions, we need to copy the
-# implementation here.
+# TODO: Test operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210
+# still depends on this utility. Remove this once that test is fixed.
+# https://github.com/astronomer/astronomer-cosmos/issues/2166
 @provide_session
 def test_old_dag(
     dag,

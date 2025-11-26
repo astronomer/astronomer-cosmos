@@ -514,7 +514,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
     with pytest.raises(FlushError):
-        run_test_dag(dag)
+        run_test_dag(dag, custom_tester=True)
         # This is a known limitation of Airflow 2.10.0 and 2.10.1
         # https://github.com/apache/airflow/issues/42495
 

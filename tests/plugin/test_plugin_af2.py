@@ -53,14 +53,6 @@ from cosmos.plugin.airflow2 import (
 )
 
 
-def _get_text_from_response(response) -> str:
-    # Airflow < 2.4 uses an old version of Werkzeug that does not have Response.text.
-    if not hasattr(response, "text"):
-        return response.get_data(as_text=True)
-    else:
-        return response.text
-
-
 @pytest.fixture(scope="module")
 def module_monkeypatch():
     mp = MonkeyPatch()
@@ -84,7 +76,6 @@ def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
 
     if cosmos.plugin.airflow2.dbt_docs_view not in appbuilder.baseviews:
         # unregister blueprints registered in global context
-        app._got_first_request = False  # Necessary for Airflow 2.4, Flask==2.2.2 & Flask-AppBuilder==4.1.3
         del app.blueprints["DbtDocsView"]
         keys_to_delete = [view_name for view_name in app.view_functions.keys() if view_name.startswith("DbtDocsView")]
         [app.view_functions.pop(view_name) for view_name in keys_to_delete]
@@ -122,7 +113,7 @@ def test_dbt_docs(monkeypatch, app):
     response = app.get("/cosmos/dbt_docs")
 
     assert response.status_code == 200
-    assert "<iframe" in _get_text_from_response(response)
+    assert "<iframe" in response.text
 
 
 @pytest.mark.integration
@@ -131,7 +122,7 @@ def test_dbt_docs_not_set_up(monkeypatch, app):
     response = app.get("/cosmos/dbt_docs")
 
     assert response.status_code == 200
-    assert "<iframe" not in _get_text_from_response(response)
+    assert "<iframe" not in response.text
 
 
 @pytest.mark.integration
@@ -154,7 +145,7 @@ def test_dbt_docs_artifact(mock_open_file, monkeypatch, app, artifact):
     mock_open_file.assert_called_once_with(storage_path, conn_id="mock_conn_id")
     assert response.status_code == 200
     if artifact == "dbt_docs_index.html":
-        assert IFRAME_SCRIPT in _get_text_from_response(response)
+        assert IFRAME_SCRIPT in response.text
         assert "Content-Security-Policy" in response.headers
         assert response.headers["Content-Security-Policy"] == "frame-ancestors 'self'"
 

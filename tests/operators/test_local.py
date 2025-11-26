@@ -419,10 +419,9 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) >= version.parse("2.10")
+    version.parse(airflow_version) >= version.parse("2.10")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
     "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
@@ -658,9 +657,8 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
@@ -696,9 +694,8 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),

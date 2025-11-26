@@ -98,7 +98,7 @@ class TestWatcherTrigger:
     @pytest.mark.parametrize(
         "airflow_version, expected_val",
         [
-            (Version("2.5.0"), "af2"),  # Airflow < 3 uses get_xcom_val_af2
+            (Version("2.11.0"), "af2"),  # Airflow < 3 uses get_xcom_val_af2
             (Version("3.0.0"), "af3"),  # Airflow >= 3 uses get_xcom_val_af3
         ],
     )

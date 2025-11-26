@@ -7,16 +7,12 @@ from datetime import datetime
 from typing import Any
 
 import sqlalchemy
-from airflow.configuration import secrets_backend_list
 from airflow.exceptions import AirflowSkipException
 from airflow.models.dag import DAG
 from airflow.models.dagrun import DagRun
 from airflow.models.taskinstance import TaskInstance
-from airflow.secrets.local_filesystem import LocalFilesystemBackend
 from airflow.utils import timezone
-from airflow.utils.session import NEW_SESSION, provide_session
-from airflow.utils.state import DagRunState, State
-from airflow.utils.types import DagRunType
+from airflow.utils.state import DagRunState
 from packaging import version
 from packaging.version import Version
 from sqlalchemy.orm.session import Session
@@ -72,105 +68,29 @@ def test_dag(
     dag, conn_file_path: str | None = None, custom_tester: bool = False, expect_success: bool = True
 ) -> DagRun:
     dr = None
-    if custom_tester:
-        dr = test_old_dag(dag, conn_file_path)
+    if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
+        dr = new_test_dag(dag)
         assert check_dag_success(dr, expect_success), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-    elif AIRFLOW_VERSION >= version.Version("2.5"):
-        if AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
+    else:
+        # This is a work around until we fix the issue in Airflow:
+        # https://github.com/apache/airflow/issues/42495
+        """
+        FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
+        This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
+        Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
+        FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
+        FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
+        FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
+        """
+        try:
             dr = new_test_dag(dag)
             assert check_dag_success(
                 dr, expect_success
             ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-        else:
-            # This is a work around until we fix the issue in Airflow:
-            # https://github.com/apache/airflow/issues/42495
-            """
-            FAILED tests/test_example_dags.py::test_example_dag[example_model_version] - sqlalchemy.exc.PendingRollbackError:
-            This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
-            Original exception was: Can't flush None value found in collection DatasetModel.aliases (Background on this error at: https://sqlalche.me/e/14/7s2a)
-            FAILED tests/test_example_dags.py::test_example_dag[basic_cosmos_dag]
-            FAILED tests/test_example_dags.py::test_example_dag[cosmos_profile_mapping]
-            FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
-            """
-            try:
-                dr = new_test_dag(dag)
-                assert check_dag_success(
-                    dr, expect_success
-                ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-            except sqlalchemy.exc.PendingRollbackError:
-                warnings.warn(
-                    "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"
-                )
-    else:
-        dr = test_old_dag(dag, conn_file_path)
-        assert check_dag_success(dr), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
-
-    return dr
-
-
-# DAG.test() was added in Airflow version 2.5.0. And to test on older Airflow versions, we need to copy the
-# implementation here.
-@provide_session
-def test_old_dag(
-    dag,
-    execution_date: datetime | None = None,
-    run_conf: dict[str, Any] | None = None,
-    conn_file_path: str | None = None,
-    variable_file_path: str | None = None,
-    session: Session = NEW_SESSION,
-) -> DagRun:
-    """
-    Execute one single DagRun for a given DAG and execution date.
-
-    :param execution_date: execution date for the DAG run
-    :param run_conf: configuration to pass to newly created dagrun
-    :param conn_file_path: file path to a connection file in either yaml or json
-    :param variable_file_path: file path to a variable file in either yaml or json
-    :param session: database connection (optional)
-    """
-
-    if conn_file_path or variable_file_path:
-        local_secrets = LocalFilesystemBackend(
-            variables_file_path=variable_file_path, connections_file_path=conn_file_path
-        )
-        secrets_backend_list.insert(0, local_secrets)
-
-    execution_date = execution_date or timezone.utcnow()
-
-    dag.log.debug("Clearing existing task instances for execution date %s", execution_date)
-    dag.clear(
-        start_date=execution_date,
-        end_date=execution_date,
-        dag_run_state=False,
-        session=session,
-    )
-    dag.log.debug("Getting dagrun for dag %s", dag.dag_id)
-    dr: DagRun = _get_or_create_dagrun(
-        dag=dag,
-        start_date=execution_date,
-        execution_date=execution_date,
-        run_id=DagRun.generate_run_id(DagRunType.MANUAL, execution_date),
-        session=session,
-        conf=run_conf,
-    )
-
-    tasks = dag.task_dict
-    dag.log.debug("starting dagrun")
-    # Instead of starting a scheduler, we run the minimal loop possible to check
-    # for task readiness and dependency management. This is notably faster
-    # than creating a BackfillJob and allows us to surface logs to the user
-    while dr.state == State.RUNNING:
-        schedulable_tis, _ = dr.update_state(session=session)
-        for ti in schedulable_tis:
-            add_logger_if_needed(dag, ti)
-            ti.task = tasks[ti.task_id]
-            _run_task(ti, session=session)
-    if conn_file_path or variable_file_path:
-        # Remove the local variables we have added to the secrets_backend_list
-        secrets_backend_list.pop(0)
-
-    print("conn_file_path", conn_file_path)
-
+        except sqlalchemy.exc.PendingRollbackError:
+            warnings.warn(
+                "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"
+            )
     return dr
 
 

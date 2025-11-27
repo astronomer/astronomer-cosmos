@@ -35,8 +35,7 @@ fi
 uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
 
 if python3 -c "import sys; print(sys.version_info >= (3, 10))" | grep -q 'True'; then
-  pip install  'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
-  pip install "apache-airflow==$AIRFLOW_VERSION"
+  pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
 fi
 
 # To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9

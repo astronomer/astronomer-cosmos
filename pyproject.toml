@@ -50,7 +50,6 @@ dbt-all = [
     "dbt-databricks!=1.9.0",
     "dbt-duckdb",
     "dbt-exasol",
-    "dbt-duckdb",
     "dbt-mysql",
     "dbt-oracle",
     "dbt-postgres",

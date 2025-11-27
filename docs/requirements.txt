@@ -1,7 +1,7 @@
 aenum
 deprecation
 msgpack
-apache-airflow
+apache-airflow>=2.6.0
 pydantic
 pydata-sphinx-theme
 sphinx

@@ -89,7 +89,7 @@ all = [
     "astronomer-cosmos[amazon]",
     "astronomer-cosmos[google]",
     "astronomer-cosmos[microsoft]",
-    # "astronomer-cosmos[dbt-duckdb]" Temp
+    "astronomer-cosmos[dbt-duckdb]"
 ]
 docs = [
     "sphinx",

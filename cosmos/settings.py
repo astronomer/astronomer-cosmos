@@ -79,5 +79,11 @@ def convert_to_boolean(value: str | None) -> bool:
 
 # Telemetry-related settings
 enable_telemetry = conf.getboolean("cosmos", "enable_telemetry", fallback=True)
+telemetry_backends = {
+    backend.strip().lower()
+    for backend in conf.get("cosmos", "telemetry_backends", fallback="scarf").split(",")
+    if backend.strip()
+}
+enable_statsd_telemetry = conf.getboolean("cosmos", "enable_statsd_telemetry", fallback=True)
 do_not_track = convert_to_boolean(os.getenv("DO_NOT_TRACK"))
 no_analytics = convert_to_boolean(os.getenv("SCARF_NO_ANALYTICS"))

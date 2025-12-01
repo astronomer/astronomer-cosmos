@@ -307,12 +307,6 @@ This execution mode could be preferred when you've long running resources and yo
 leveraging Airflow's deferrable operators. With that, you would be able to potentially observe higher throughput of tasks
 as more dbt nodes will be run in parallel since they won't be blocking Airflow's worker slots.
 
-.. important::
-
-   ``ExecutionMode.AIRFLOW_ASYNC`` currently **does not emit Dataset or DatasetAlias events** after models complete. Downstream
-   DAGs that rely on data-aware scheduling will not trigger automatically. This behaviour is tracked in
-   `#2141 <https://github.com/astronomer/astronomer-cosmos/issues/2141>`_.
-
 Example DAG:
 
 .. literalinclude:: ../../dev/dags/simple_dag_async.py

@@ -31,7 +31,7 @@ By default, if using a version between Airflow 2.4 or higher is used, Cosmos emi
 
 .. important::
 
-   This feature is only available for `ExecutionMode.LOCAL`, `ExecutionMode.VIRTUALENV` and `ExecutionMode.WATCHER`.
+   This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.WATCHER``.
 
 Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
 

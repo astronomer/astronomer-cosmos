@@ -28,7 +28,6 @@ DBT_PROJECT_PATH = Path(__file__).parent.parent / "dev" / "dags" / "dbt" / "jaff
 def jaffle_shop_test_dir(tmp_path):
     """Create a test directory with the local jaffle shop project and DAG file."""
     test_path = tmp_path / "jaffle_shop"
-    test_path.mkdir()
     shutil.copytree(DBT_PROJECT_PATH, test_path, dirs_exist_ok=True)
 
     dag_file = test_path / "basic_cosmos_dag.py"
@@ -56,7 +55,7 @@ def dag_version_cleaner(test_dag_id):
         """Clean up all Airflow 3 versioning-related data for a DAG."""
         try:
             for table in [TaskInstance, DagRun, SerializedDagModel, DagVersion, DagCode, DagModel]:
-                session.query(table).filter(table.dag_id == dag_id).delete()
+                session.query(table).filter(table.dag_id == dag_id).delete(synchronize_session="fetch")
             session.commit()
         except Exception:
             session.rollback()
@@ -74,15 +73,10 @@ def serialize_dag():
     @provide_session
     def _serialize(dag, bundle_name="test_bundle", bundle_version="1.0.0", session=None):
         """Serialize DAG."""
-        # Ensure bundle exists
-        if not session.get(DagBundleModel, bundle_name):
-            session.add(DagBundleModel(name=bundle_name))
-            session.flush()
-
-        # Ensure DagModel exists
-        if not session.get(DagModel, dag.dag_id):
-            session.add(DagModel(dag_id=dag.dag_id, bundle_name=bundle_name))
-            session.flush()
+        # Ensure bundle exists atomically
+        session.merge(DagBundleModel(name=bundle_name))
+        # Ensure DagModel exists atomically
+        session.merge(DagModel(dag_id=dag.dag_id, bundle_name=bundle_name))
 
         # Serialize DAG (uses scheduler's hash-based versioning)
         return SerializedDagModel.write_dag(

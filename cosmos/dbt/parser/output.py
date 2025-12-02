@@ -49,8 +49,8 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     removed_in="2.0",
     current_version=cosmos_version,
     details="Use the `cosmos.dbt.runner.parse_number_of_warnings` instead.",
-)  # type: ignore[misc]
-def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
+def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
     """
@@ -121,7 +121,7 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     removed_in="2.0",
     current_version=cosmos_version,
     details="Use the `cosmos.dbt.runner.extract_message_by_status` instead.",
-)  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
 def extract_dbt_runner_issues(
     result: dbtRunnerResult, status_levels: list[str] = ["warn"]
 ) -> tuple[list[str], list[str]]:  # type: ignore[misc]

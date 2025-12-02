@@ -9,7 +9,7 @@ import hashlib
 import json
 import warnings
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
 
@@ -40,7 +40,7 @@ class DbtProfileConfigVars:
     printer_width: int | None = None
     write_json: bool | None = None
     warn_error: bool | None = None
-    warn_error_options: Dict[Literal["include", "exclude"], Any] | None = None
+    warn_error_options: dict[Literal["include", "exclude"], Any] | None = None
     log_format: Literal["text", "json", "default"] | None = None
     debug: bool | None = None
     version_check: bool | None = None

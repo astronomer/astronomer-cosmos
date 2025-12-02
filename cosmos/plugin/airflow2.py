@@ -1,5 +1,5 @@
 import os.path as op
-from typing import Any, Dict
+from typing import Any
 from urllib.parse import urlsplit
 
 from airflow.configuration import conf
@@ -142,7 +142,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def dbt_docs_index(self) -> tuple[str, int, Dict[str, Any]]:
+    def dbt_docs_index(self) -> tuple[str, int, dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -155,7 +155,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
 
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def catalog(self) -> tuple[str, int, Dict[str, Any]]:
+    def catalog(self) -> tuple[str, int, dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -167,7 +167,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
 
     @expose("/manifest.json")  # type: ignore[misc]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def manifest(self) -> tuple[str, int, Dict[str, Any]]:
+    def manifest(self) -> tuple[str, int, dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:

@@ -5,7 +5,7 @@ import logging
 import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Sequence
 
 import yaml
 from airflow.utils.context import context_merge
@@ -270,7 +270,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-    ) -> Tuple[list[str], dict[str, str | bytes | os.PathLike[Any]]]:
+    ) -> tuple[list[str], dict[str, str | bytes | os.PathLike[Any]]]:
         dbt_cmd = [self.dbt_executable_path]
 
         dbt_cmd.extend(self.dbt_cmd_global_flags)

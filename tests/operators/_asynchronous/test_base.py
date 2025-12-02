@@ -46,6 +46,7 @@ def profile_config_mock():
 
 
 def test_create_async_operator_class_valid():
+    """Test _create_async_operator_class returns the correct async operator class if available."""
     with patch("cosmos.operators._asynchronous.base.load_method_from_module") as mock_import:
         mock_class = MagicMock()
 

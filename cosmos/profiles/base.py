@@ -9,7 +9,7 @@ import hashlib
 import json
 import warnings
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, Literal
 
 import yaml
 
@@ -33,17 +33,17 @@ logger = get_logger(__name__)
 
 @dataclasses.dataclass
 class DbtProfileConfigVars:
-    send_anonymous_usage_stats: Optional[bool] = False
-    partial_parse: Optional[bool] = None
-    use_experimental_parser: Optional[bool] = None
-    static_parser: Optional[bool] = None
-    printer_width: Optional[int] = None
-    write_json: Optional[bool] = None
-    warn_error: Optional[bool] = None
-    warn_error_options: Optional[Dict[Literal["include", "exclude"], Any]] = None
-    log_format: Optional[Literal["text", "json", "default"]] = None
-    debug: Optional[bool] = None
-    version_check: Optional[bool] = None
+    send_anonymous_usage_stats: bool | None = False
+    partial_parse: bool | None = None
+    use_experimental_parser: bool | None = None
+    static_parser: bool | None = None
+    printer_width: int | None = None
+    write_json: bool | None = None
+    warn_error: bool | None = None
+    warn_error_options: Dict[Literal["include", "exclude"], Any] | None = None
+    log_format: Literal["text", "json", "default"] | None = None
+    debug: bool | None = None
+    version_check: bool | None = None
 
     def as_dict(self) -> dict[str, Any] | None:
         result = {

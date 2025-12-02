@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict
 
 from airflow.models import Variable
 
@@ -186,7 +186,7 @@ class DbtNode:
         }
 
 
-def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
+def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
     """Function to find if a source has null freshness. Scenarios where freshness
     looks like:
     "freshness": {

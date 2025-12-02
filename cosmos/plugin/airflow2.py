@@ -1,5 +1,5 @@
 import os.path as op
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict
 from urllib.parse import urlsplit
 
 from airflow.configuration import conf
@@ -25,14 +25,14 @@ else:
     ]
 
 
-def bucket_and_key(path: str) -> Tuple[str, str]:
+def bucket_and_key(path: str) -> tuple[str, str]:
     parsed_url = urlsplit(path)
     bucket = parsed_url.netloc
     key = parsed_url.path.lstrip("/")
     return bucket, key
 
 
-def open_s3_file(path: str, conn_id: Optional[str]) -> str:
+def open_s3_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
     from botocore.exceptions import ClientError
 
@@ -50,7 +50,7 @@ def open_s3_file(path: str, conn_id: Optional[str]) -> str:
     return content  # type: ignore[no-any-return]
 
 
-def open_gcs_file(path: str, conn_id: Optional[str]) -> str:
+def open_gcs_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
     from google.cloud.exceptions import NotFound
 
@@ -66,7 +66,7 @@ def open_gcs_file(path: str, conn_id: Optional[str]) -> str:
     return content.decode("utf-8")  # type: ignore[no-any-return]
 
 
-def open_azure_file(path: str, conn_id: Optional[str]) -> str:
+def open_azure_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
     from azure.core.exceptions import ResourceNotFoundError
 
@@ -83,7 +83,7 @@ def open_azure_file(path: str, conn_id: Optional[str]) -> str:
     return content  # type: ignore[no-any-return]
 
 
-def open_http_file(path: str, conn_id: Optional[str]) -> str:
+def open_http_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.http.hooks.http import HttpHook
     from requests.exceptions import HTTPError
 
@@ -101,7 +101,7 @@ def open_http_file(path: str, conn_id: Optional[str]) -> str:
     return res.text  # type: ignore[no-any-return]
 
 
-def open_file(path: str, conn_id: Optional[str] = None) -> str:
+def open_file(path: str, conn_id: str | None = None) -> str:
     """
     Retrieve a file from http, https, gs, s3, or wasb.
 
@@ -128,7 +128,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
     static_folder = op.join(op.dirname(__file__), "static")
 
     def create_blueprint(
-        self, appbuilder: AppBuilder, endpoint: Optional[str] = None, static_folder: Optional[str] = None
+        self, appbuilder: AppBuilder, endpoint: str | None = None, static_folder: str | None = None
     ) -> None:
         # Make sure the static folder is not overwritten, as we want to use it.
         return super().create_blueprint(appbuilder, endpoint=endpoint, static_folder=self.static_folder)  # type: ignore[no-any-return]
@@ -142,7 +142,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
 
     @expose("/dbt_docs_index.html")  # type: ignore[misc]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
+    def dbt_docs_index(self) -> tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -155,7 +155,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
 
     @expose("/catalog.json")  # type: ignore[misc]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
+    def catalog(self) -> tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -167,7 +167,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
 
     @expose("/manifest.json")  # type: ignore[misc]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
+    def manifest(self) -> tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:

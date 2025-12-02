@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING
 
 import deprecation
 
@@ -61,7 +61,7 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     return num
 
 
-def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> Tuple[List[str], List[str]]:
+def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> tuple[list[str], list[str]]:
     log_list = result.full_output
 
     node_names = []
@@ -77,7 +77,7 @@ def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> Tuple[List
     return node_names, node_results
 
 
-def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
+def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     """
     Extracts warning messages from the log list and returns them as a formatted string.
 
@@ -124,7 +124,7 @@ def extract_log_issues(log_list: List[str]) -> Tuple[List[str], List[str]]:
 )  # type: ignore[untyped-decorator]
 def extract_dbt_runner_issues(
     result: dbtRunnerResult, status_levels: list[str] = ["warn"]
-) -> Tuple[List[str], List[str]]:  # type: ignore[misc]
+) -> tuple[list[str], list[str]]:  # type: ignore[misc]
     """
     Extracts messages from the dbt runner result and returns them as a formatted string.
 

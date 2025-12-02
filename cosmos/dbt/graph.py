@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
@@ -97,7 +97,7 @@ class DbtNode:
     downstream: list[str] = field(default_factory=lambda: [])
 
     @property
-    def meta(self) -> Dict[str, Any]:
+    def meta(self) -> dict[str, Any]:
         """
         Extract node-specific configuration declared in the model dbt YAML configuration.
         These will be used while instantiating Airflow tasks.
@@ -111,7 +111,7 @@ class DbtNode:
         return value
 
     @property
-    def operator_kwargs_to_override(self) -> Dict[str, Any]:
+    def operator_kwargs_to_override(self) -> dict[str, Any]:
         """
         Extract the configuration that will be used to override, at a node level, the keyword arguments passed to create
         the correspondent Airflow task (named `operator_args` at the `DbtDag` or `DbtTaskGroup` level).
@@ -128,7 +128,7 @@ class DbtNode:
         return operator_kwargs
 
     @property
-    def profile_config_to_override(self) -> Dict[str, Any]:
+    def profile_config_to_override(self) -> dict[str, Any]:
         """
         Extract the configuration that will be used to override, at a node level, the profile configuration.
 
@@ -186,7 +186,7 @@ class DbtNode:
         }
 
 
-def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
+def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
     """Function to find if a source has null freshness. Scenarios where freshness
     looks like:
     "freshness": {

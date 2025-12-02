@@ -35,10 +35,6 @@ def total_cosmos_tasks(dag: DAG) -> int:
     """
     cosmos_tasks = 0
     for task in dag.task_dict.values():
-        # In a real Airflow deployment, the following `task` is an instance of
-        # `airflow.serialization.serialized_objects.SerializedBaseOperator`
-        # and the only reference to Cosmos is in the _task_module.
-        # It is suboptimal, but works as of Airflow 2.10
         task_module = getattr(task, "_task_module", None) or task.__class__.__module__
         if task_module.startswith("cosmos."):
             cosmos_tasks += 1
@@ -53,16 +49,12 @@ def get_execution_modes(dag: DAG) -> str:
         if (getattr(task, "_task_module", None) or task.__class__.__module__).startswith("cosmos.")
     }
 
-    # Sorted to ensure consistent and predictable output
     return "__".join(sorted(modes))
 
 
 @hookimpl
 def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.debug("Running on_dag_run_success")
-    # In a real Airflow deployment, the following `serialized_dag` is an instance of
-    # `airflow.serialization.serialized_objects.SerializedDAG`
-    # and it is not a subclass of DbtDag, nor contain any references to Cosmos
     serialized_dag = dag_run.get_dag()
 
     if not total_cosmos_tasks(serialized_dag):
@@ -89,9 +81,6 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
 @hookimpl
 def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
     logger.debug("Running on_dag_run_failed")
-    # In a real Airflow deployment, the following `serialized_dag` is an instance of
-    # `airflow.serialization.serialized_objects.SerializedDAG`
-    # and it is not a subclass of DbtDag, nor contain any references to Cosmos
     serialized_dag = dag_run.get_dag()
 
     if not total_cosmos_tasks(serialized_dag):

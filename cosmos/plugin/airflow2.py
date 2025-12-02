@@ -133,15 +133,15 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         # Make sure the static folder is not overwritten, as we want to use it.
         return super().create_blueprint(appbuilder, endpoint=endpoint, static_folder=self.static_folder)  # type: ignore[no-any-return]
 
-    @expose("/dbt_docs")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
+    @expose("/dbt_docs")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def dbt_docs(self) -> str:
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
 
-    @expose("/dbt_docs_index.html")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
+    @expose("/dbt_docs_index.html")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
@@ -153,8 +153,8 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
             html = html.replace("</head>", f"{IFRAME_SCRIPT}</head>")
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
-    @expose("/catalog.json")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
+    @expose("/catalog.json")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
@@ -165,8 +165,8 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         else:
             return data, 200, {"Content-Type": "application/json"}
 
-    @expose("/manifest.json")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
+    @expose("/manifest.json")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)

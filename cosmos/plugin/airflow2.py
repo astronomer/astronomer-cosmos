@@ -139,7 +139,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
-      
+
     @expose("/dbt_docs_index.html")  # type: ignore[untyped-decorator]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def dbt_docs_index(self) -> tuple[str, int, dict[str, Any]]:
@@ -152,7 +152,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         else:
             html = html.replace("</head>", f"{IFRAME_SCRIPT}</head>")
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
-      
+
     @expose("/catalog.json")  # type: ignore[untyped-decorator]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def catalog(self) -> tuple[str, int, dict[str, Any]]:
@@ -164,7 +164,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
             abort(404)
         else:
             return data, 200, {"Content-Type": "application/json"}
-      
+
     @expose("/manifest.json")  # type: ignore[untyped-decorator]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def manifest(self) -> tuple[str, int, dict[str, Any]]:

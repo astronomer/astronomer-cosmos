@@ -6,17 +6,15 @@ import logging
 import zlib
 from datetime import timedelta
 from pathlib import Path
-from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
+from cosmos._utils.watcher_state import get_xcom_val, safe_xcom_push
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
-        from airflow.sdk.types import RuntimeTaskInstanceProtocol as TaskInstance
     except ImportError:
-        from airflow.models.taskinstance import TaskInstance  # type: ignore[assignment]
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 try:
@@ -52,23 +50,10 @@ except ImportError:  # pragma: no cover
     EventMsg = None
 
 logger = logging.getLogger(__name__)
-xcom_set_lock = Lock()
 
 CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
 PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
 WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
-
-
-def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
-    """
-    Safely set an XCom value in a thread-safe manner in Airflow 3.0 and 3.1.
-    We noticed that the combination of using dbt (multi-threaded) and Airflow 3.0 and 3.1 to set XCom lead to race conditions.
-    This leads the producer task to get stuck while running the dbt build command.
-    Unfortunately, since this is non-deterministic, and happens once every five runs, we were not able to have a proper test.
-    However, we applied this fix and run over 20 times a pipeline that would fail every 5 runs and this allowed us to no longer face the issue.
-    """
-    with xcom_set_lock:
-        task_instance.xcom_push(key=key, value=value)
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -109,6 +94,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
+        kwargs["log_format"] = "json"
 
         super().__init__(task_id=task_id, *args, **kwargs)
 
@@ -433,7 +419,7 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if self._use_event():
             status = self._get_status_from_events(ti, context)
         else:
-            status = self._get_status_from_run_results(ti, context)
+            status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
         if status is None:
 

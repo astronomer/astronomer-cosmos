@@ -318,15 +318,21 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
 
 class DbtBuildMixin:
-    """Mixin for dbt build command."""
+    """
+    Mixin for dbt build command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt build command
+    :param log_format: format for dbt logs (e.g., 'json', 'text'). If provided, adds --log-format flag
+    """
 
     base_cmd = ["build"]
     ui_color = "#8194E0"
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, log_format: str | None = None, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
+        self.log_format = log_format
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
@@ -340,6 +346,10 @@ class DbtBuildMixin:
 
         if full_refresh is True:
             flags.append("--full-refresh")
+
+        if self.log_format:
+            flags.append("--log-format")
+            flags.append(self.log_format)
 
         return flags
 

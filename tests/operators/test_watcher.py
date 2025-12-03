@@ -612,7 +612,7 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
+        ti.xcom_pull.return_value = "success"
         context = self.make_context(ti)
 
         result = sensor.poke(context)
@@ -734,14 +734,14 @@ class TestDbtConsumerWatcherSensor:
         assert result == "success"
         assert sensor.compiled_sql == "select 42"
 
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
-    def test_producer_state_failed(self, mock_run_result):
+    @patch("cosmos.operators.watcher.get_xcom_val")
+    def test_producer_state_failed(self, mock_get_xcom_val):
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 1
-        mock_run_result.return_value = None
+        mock_get_xcom_val.return_value = None
         ti.xcom_pull.return_value = "failed"
 
         context = self.make_context(ti)
@@ -753,9 +753,9 @@ class TestDbtConsumerWatcherSensor:
             sensor.poke(context)
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_local_run")
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    @patch("cosmos.operators.watcher.get_xcom_val")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_run_result, mock_fallback_to_local_run
+        self, mock_get_xcom_val, mock_fallback_to_local_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
@@ -766,7 +766,7 @@ class TestDbtConsumerWatcherSensor:
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 0
-        mock_run_result.return_value = None
+        mock_get_xcom_val.return_value = None
         ti.xcom_pull.return_value = "failed"
 
         context = self.make_context(ti)

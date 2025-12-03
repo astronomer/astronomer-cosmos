@@ -5,17 +5,20 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import signal
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 try:
     # Airflow 3.1 onwards
     from airflow.sdk.bases.hook import BaseHook
 except ImportError:
     from airflow.hooks.base import BaseHook
+
+from cosmos._utils.watcher_state import safe_xcom_push
 
 
 class FullOutputSubprocessResult(NamedTuple):
@@ -28,8 +31,33 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
     """Hook for running processes with the ``subprocess`` module."""
 
     def __init__(self) -> None:
-        self.sub_process: Popen[bytes] | None = None
+        self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
+
+    def _store_dbt_resource_status_from_log(self, line: str, **kwargs: Any) -> None:
+        """
+        Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
+
+        This method parses each log line from dbt when --log-format json is used,
+        extracts node status information, and pushes it to XCom for consumption
+        by downstream watcher sensors.
+        """
+        try:
+            log_line = json.loads(line)
+        except json.JSONDecodeError:
+            self.log.debug("Failed to parse log: %s", line)
+            log_line = {}
+
+        node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
+        unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
+
+        self.log.debug("Model: %s is in %s state", unique_id, node_status)
+
+        # TODO: Handle and store all possible node statuses, not just the current success and failed
+        if node_status in ["success", "failed"]:
+            context = kwargs.get("context")
+            assert context is not None  # Make MyPy happy
+            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
     def run_command(
         self,
@@ -37,6 +65,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
+        **kwargs: Any,
     ) -> FullOutputSubprocessResult:
         """
         Execute the command.
@@ -79,26 +108,32 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 cwd=cwd,
                 env=env if env or env == {} else os.environ,
                 preexec_fn=pre_exec,
+                bufsize=1,  # line-buffered (works only in text mode)
+                text=True,
+                encoding=output_encoding,
+                errors="backslashreplace",
             )
-
-            self.log.info("Command output:")
-            line = ""
 
             if self.sub_process is None:
                 raise RuntimeError("The subprocess should be created here and is None!")
-            if self.sub_process.stdout is not None:
-                for raw_line in iter(self.sub_process.stdout.readline, b""):
-                    line = raw_line.decode(output_encoding, errors="backslashreplace").rstrip()
-                    # storing the warn & error lines to be used later
-                    log_lines.append(line)
-                    self.log.info("%s", line)
 
-            self.sub_process.wait()
+            self.log.info("Command output:")
 
-            self.log.info("Command exited with return code %s", self.sub_process.returncode)
-            return_code: int = self.sub_process.returncode
+            last_line: str = ""
+            assert self.sub_process.stdout is not None
+            for line in self.sub_process.stdout:
+                line = line.rstrip("\n")
+                last_line = line
+                log_lines.append(line)
+                self.log.info("%s", line)
+                self._store_dbt_resource_status_from_log(line, **kwargs)
 
-        return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
+            # Wait until process completes
+            return_code = self.sub_process.wait()
+
+            self.log.info("Command exited with return code %s", return_code)
+
+        return FullOutputSubprocessResult(exit_code=return_code, output=last_line, full_output=log_lines)
 
     def send_sigterm(self) -> None:
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""

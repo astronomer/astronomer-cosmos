@@ -18,7 +18,7 @@ try:
 except ImportError:
     from airflow.hooks.base import BaseHook
 
-from cosmos._utils.common import safe_xcom_push
+from cosmos._utils.watcher_state import safe_xcom_push
 
 
 class FullOutputSubprocessResult(NamedTuple):
@@ -44,20 +44,20 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         """
         try:
             log_line = json.loads(line)
-            node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
-            unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
-
-            self.log.debug("Model: %s is in %s state", unique_id, node_status)
-
-            # TODO: Handle and store all possible node statuses, not just the current success and failed
-            if node_status in ["success", "failed"]:
-                context = kwargs.get("context")
-                assert context is not None  # Make MyPy happy
-                safe_xcom_push(
-                    task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status
-                )
         except json.JSONDecodeError:
             self.log.debug("Failed to parse log: %s", line)
+            log_line = {}
+
+        node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
+        unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
+
+        self.log.debug("Model: %s is in %s state", unique_id, node_status)
+
+        # TODO: Handle and store all possible node statuses, not just the current success and failed
+        if node_status in ["success", "failed"]:
+            context = kwargs.get("context")
+            assert context is not None  # Make MyPy happy
+            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
     def run_command(
         self,

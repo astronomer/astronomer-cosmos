@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
-from cosmos._utils.common import get_xcom_val, safe_xcom_push
+from cosmos._utils.watcher_state import get_xcom_val, safe_xcom_push
 
 if TYPE_CHECKING:  # pragma: no cover
     try:

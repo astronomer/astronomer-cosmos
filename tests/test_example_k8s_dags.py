@@ -41,4 +41,5 @@ def test_example_dag_kubernetes(session):
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
     # for dag_id in KUBERNETES_DAG_FILES:
     dag = db.get_dag("jaffle_shop_kubernetes")
+    assert not db.import_errors
     test_utils.run_dag(dag)

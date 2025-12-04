@@ -69,9 +69,9 @@ def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
-
-    node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
-    unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
+    node_info = log_line.get("data", {}).get("node_info", {})
+    node_status = node_info.get("node_status")
+    unique_id = node_info.get("unique_id")
 
     logger.debug("Model: %s is in %s state", unique_id, node_status)
 

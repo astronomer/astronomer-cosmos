@@ -5,20 +5,17 @@
 from __future__ import annotations
 
 import contextlib
-import json
 import os
 import signal
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 try:
     # Airflow 3.1 onwards
     from airflow.sdk.bases.hook import BaseHook
 except ImportError:
     from airflow.hooks.base import BaseHook
-
-from cosmos._utils.watcher_state import safe_xcom_push
 
 
 class FullOutputSubprocessResult(NamedTuple):
@@ -34,37 +31,13 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
 
-    def _store_dbt_resource_status_from_log(self, line: str, **kwargs: Any) -> None:
-        """
-        Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
-
-        This method parses each log line from dbt when --log-format json is used,
-        extracts node status information, and pushes it to XCom for consumption
-        by downstream watcher sensors.
-        """
-        try:
-            log_line = json.loads(line)
-        except json.JSONDecodeError:
-            self.log.debug("Failed to parse log: %s", line)
-            log_line = {}
-
-        node_status = log_line.get("data", {}).get("node_info", {}).get("node_status")
-        unique_id = log_line.get("data", {}).get("node_info", {}).get("unique_id")
-
-        self.log.debug("Model: %s is in %s state", unique_id, node_status)
-
-        # TODO: Handle and store all possible node statuses, not just the current success and failed
-        if node_status in ["success", "failed"]:
-            context = kwargs.get("context")
-            assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
-
     def run_command(
         self,
         command: list[str],
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
+        process_log_line: Callable[[str, Any], None] | None = None,
         **kwargs: Any,
     ) -> FullOutputSubprocessResult:
         """
@@ -126,7 +99,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 last_line = line
                 log_lines.append(line)
                 self.log.info("%s", line)
-                self._store_dbt_resource_status_from_log(line, **kwargs)
+                if process_log_line:
+                    process_log_line(line, kwargs)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

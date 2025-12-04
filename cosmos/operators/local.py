@@ -181,6 +181,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         "compiled_sql": "sql",
         "freshness": "json",
     }
+    _process_log_line_callable: Callable[[str, Any], None] | None = None
 
     def __init__(
         self,
@@ -210,6 +211,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
         self._dbt_runner_callbacks = dbt_runner_callbacks
+        self._process_log_line_callable = None
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -466,6 +468,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
+            process_log_line=self._process_log_line_callable,
             **kwargs,
         )
         # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:

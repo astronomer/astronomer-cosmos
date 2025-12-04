@@ -170,19 +170,21 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
         start_date=datetime(2025, 1, 1),
         schedule=None,
     ) as dag:
-        with patch.dict(
-            sys.modules,
-            {
-                "dbt": type("dbt", (), {}),
-                "dbt.cli": type("dbt.cli", (), {}),
-                "dbt.cli.main": type("dbt.cli.main", (), {"dbtRunner": _FakeRunner}),
-                "dbt.version": type("dbt.version", (), {"__version__": "1.9.0"}),
-            },
-        ), patch(
-            "cosmos.operators.local.DbtLocalBaseOperator.build_cmd",
-            return_value=(["dbt", "run"], {}),
-        ), patch(
-            "cosmos.operators.local.AbstractDbtLocalBase._handle_post_execution"
+        with (
+            patch.dict(
+                sys.modules,
+                {
+                    "dbt": type("dbt", (), {}),
+                    "dbt.cli": type("dbt.cli", (), {}),
+                    "dbt.cli.main": type("dbt.cli.main", (), {"dbtRunner": _FakeRunner}),
+                    "dbt.version": type("dbt.version", (), {"__version__": "1.9.0"}),
+                },
+            ),
+            patch(
+                "cosmos.operators.local.DbtLocalBaseOperator.build_cmd",
+                return_value=(["dbt", "run"], {}),
+            ),
+            patch("cosmos.operators.local.AbstractDbtLocalBase._handle_post_execution"),
         ):
             # First operator - DbtRunLocalOperator should use cached runner
             op1 = DbtRunLocalOperator(

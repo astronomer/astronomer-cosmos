@@ -28,7 +28,6 @@ DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes"]
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
-    "2.4": ["cosmos_seed_dag.py"],
     "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py", "cosmos_callback_dag.py"],
 }
 

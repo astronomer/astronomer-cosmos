@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator
@@ -19,7 +19,7 @@ except ImportError:
     from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
-from cosmos.config import RenderConfig
+from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
@@ -513,7 +513,7 @@ def generate_task_or_group(
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
         and render_config.test_behavior == TestBehavior.AFTER_EACH
-        and node.has_test is True
+        and node.has_non_detached_test is True
     )
     convert_entire_task_group = render_config.node_conversion_by_task_group and node.resource_type in node_converters
 
@@ -803,7 +803,8 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     task_group: TaskGroup | None = None,
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     async_py_requirements: list[str] | None = None,
-) -> dict[str, Union[TaskGroup, BaseOperator]]:
+    execution_config: ExecutionConfig | None = None,
+) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
 
@@ -828,7 +829,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     and “test_results” of type List.
     :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
-    tasks_map: dict[str, Union[TaskGroup, BaseOperator]] = {}
+    tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_or_group: TaskGroup | BaseOperator | None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
@@ -912,9 +913,10 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     create_airflow_task_dependencies(nodes, tasks_map)
 
     if execution_mode == ExecutionMode.WATCHER:
+        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         _add_producer_watcher_and_dependencies(
             dag=dag,
-            task_args=task_args,
+            task_args={**task_args, **setup_operator_args},
             tasks_map=tasks_map,
             task_group=task_group,
             render_config=render_config,
@@ -946,7 +948,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
 def create_airflow_task_dependencies(
     nodes: dict[str, DbtNode],
-    tasks_map: dict[str, Union[TaskGroup, BaseOperator]],
+    tasks_map: dict[str, TaskGroup | BaseOperator],
 ) -> None:
     """
     Create the Airflow task dependencies between non-test nodes.

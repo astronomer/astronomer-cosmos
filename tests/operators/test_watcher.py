@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import zlib
 from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
 from airflow.exceptions import AirflowException, TaskDeferred
 from airflow.utils.state import DagRunState
 from packaging.version import Version
 
-from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos._triggers.watcher import WatcherTrigger
 from cosmos.config import InvocationMode
 from cosmos.constants import ExecutionMode
@@ -27,7 +28,7 @@ from cosmos.operators.watcher import (
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
 )
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
@@ -52,6 +53,7 @@ profile_config = ProfileConfig(
 class _MockTI:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
+        self.try_number = 1
 
     def xcom_push(self, key: str, value: str, **_):
         self.store[key] = value
@@ -110,6 +112,24 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
+def test_dbt_producer_watcher_operator_retries_forced_to_zero():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.retries == 0
+
+
+def test_dbt_producer_watcher_operator_retries_ignores_user_input():
+    user_default_args = {"retries": 5}
+    op = DbtProducerWatcherOperator(
+        project_dir=".",
+        profile_config=None,
+        default_args=user_default_args,
+        retries=3,
+    )
+
+    assert op.retries == 0
+    assert user_default_args["retries"] == 5
+
+
 def test_dbt_producer_watcher_operator_pushes_completion_status():
     """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -144,12 +164,92 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
         mock_execute.assert_called_once()
 
 
+def test_dbt_producer_watcher_operator_requires_task_instance():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    context: dict[str, object] = {}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        with pytest.raises(AirflowException) as excinfo:
+            op.execute(context=context)
+
+    mock_execute.assert_not_called()
+    assert "expects a task instance" in str(excinfo.value)
+
+
 def test_handle_startup_event():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     lst: list[dict] = []
     ev = _fake_event("MainReportVersion")
     op._handle_startup_event(ev, lst)
     assert lst and lst[0]["name"] == "MainReportVersion"
+
+
+def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value="ok") as mock_execute:
+        with caplog.at_level(logging.INFO):
+            op.execute(context=context)
+
+    mock_execute.assert_called_once()
+    assert any("forces Airflow retries to 0" in message for message in caplog.messages)
+
+
+def test_dbt_producer_watcher_operator_blocks_retry_attempt(caplog):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 2
+    context = {"ti": ti}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+        with caplog.at_level(logging.ERROR):
+            with pytest.raises(AirflowException) as excinfo:
+                op.execute(context=context)
+
+    mock_execute.assert_not_called()
+    assert "does not support Airflow retries" in str(excinfo.value)
+    assert any("does not support Airflow retries" in message for message in caplog.messages)
+
+
+@pytest.mark.parametrize(
+    "event, expected_message",
+    [
+        ({"status": "success"}, None),
+        (
+            {"status": "failed", "reason": "model_failed"},
+            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
+        ),
+        (
+            {"status": "failed", "reason": "producer_failed"},
+            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
+        ),
+    ],
+)
+def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
+    sensor = DbtConsumerWatcherSensor(
+        project_dir=".",
+        profiles_dir=".",
+        profile_config=profile_config,
+        model_unique_id="model.pkg.m",
+        poke_interval=1,
+        producer_task_id="dbt_producer_watcher_operator",
+        task_id="consumer_sensor",
+    )
+    sensor.model_unique_id = "model.pkg.m"
+
+    context = {"dag_run": MagicMock()}
+
+    if expected_message is None:
+        sensor.execute_complete(context, event)
+        return
+
+    with pytest.raises(AirflowException) as excinfo:
+        sensor.execute_complete(context, event)
+
+    assert str(excinfo.value) == expected_message
 
 
 def test_handle_node_finished_pushes_xcom():
@@ -238,13 +338,17 @@ def test_execute_streaming_mode():
             cb(node_evt)
         return None
 
-    with eventmsg_patch, patch.object(
-        DbtProducerWatcherOperator,
-        "_serialize_event",
-        lambda self, ev: {"dummy": True},
-    ), patch(
-        "cosmos.operators.watcher.DbtLocalBaseOperator.execute",
-        fake_base_execute,
+    with (
+        eventmsg_patch,
+        patch.object(
+            DbtProducerWatcherOperator,
+            "_serialize_event",
+            lambda self, ev: {"dummy": True},
+        ),
+        patch(
+            "cosmos.operators.watcher.DbtLocalBaseOperator.execute",
+            fake_base_execute,
+        ),
     ):
         op.execute(context=ctx)
 
@@ -279,9 +383,12 @@ def test_execute_callback_exception_is_logged(caplog):
             cb(_fake_event("MainReportVersion"))
         return "ok"
 
-    with eventmsg_patch, patch.object(
-        DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")
-    ), patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute), caplog.at_level("ERROR"):
+    with (
+        eventmsg_patch,
+        patch.object(DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")),
+        patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute),
+        caplog.at_level("ERROR"),
+    ):
         result = op.execute(context=ctx)
 
     assert result == "ok"
@@ -318,37 +425,6 @@ def test_execute_fallback_mode(tmp_path):
     assert data["results"][0]["status"] == "success"
 
 
-@pytest.mark.parametrize(
-    "user_callback, expected_behavior",
-    [
-        (None, "none"),
-        ([Mock(name="cb1")], "list"),
-        (Mock(name="cb2"), "single"),
-    ],
-)
-def test_set_on_failure_callback_with_actual_airflow(user_callback, expected_behavior, tmp_path):
-
-    instance = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
-    result = instance._set_on_failure_callback(user_callback)
-
-    if AIRFLOW_VERSION < Version("2.6.0"):
-        # Always returns single callable regardless of input
-        assert callable(result)
-        assert result == instance._store_producer_task_state
-    else:
-        # Returns list depending on input
-        assert isinstance(result, list)
-        assert result[-1] == instance._store_producer_task_state
-
-        if expected_behavior == "none":
-            assert len(result) == 1
-        elif expected_behavior == "list":
-            assert len(result) == 2
-        elif expected_behavior == "single":
-            assert len(result) == 2
-            assert result[0] == user_callback
-
-
 @patch("cosmos.dbt.runner.is_available", return_value=False)
 @patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")
 def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
@@ -366,16 +442,6 @@ def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
 
     assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
-
-
-def test_store_producer_task_state_pushes_failed_state():
-    mock_ti = MagicMock()
-    mock_context = {"ti": mock_ti}
-    instance = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-
-    instance._store_producer_task_state(mock_context)
-
-    mock_ti.xcom_push.assert_called_once_with(key="state", value="failed")
 
 
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
@@ -404,10 +470,125 @@ class TestDbtConsumerWatcherSensor:
         )
 
         sensor.invocation_mode = "DBT_RUNNER"
+        sensor._get_producer_task_status = MagicMock(return_value=None)
         return sensor
 
-    def make_context(self, ti_mock):
-        return {"ti": ti_mock}
+    def make_context(self, ti_mock, *, run_id: str = "test-run", map_index: int = 0):
+        return {
+            "ti": ti_mock,
+            "run_id": run_id,
+            "task_instance": MagicMock(map_index=map_index),
+        }
+
+    @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
+    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("2.7.0"))
+    def test_get_producer_task_status_airflow2(self):
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_1")
+
+        fetcher = MagicMock(return_value="success")
+
+        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=fetcher) as mock_builder:
+            status = sensor._get_producer_task_status(context)
+
+        mock_builder.assert_called_once_with(
+            airflow_version=Version("2.7.0"),
+            dag_id="example_dag",
+            run_id="run_1",
+            producer_task_id=sensor.producer_task_id,
+            logger=ANY,
+        )
+        fetcher.assert_called_once_with()
+        assert status == "success"
+
+    @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
+    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("2.7.0"))
+    def test_get_producer_task_status_airflow2_missing_instance(self):
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_2")
+
+        fetcher = MagicMock(return_value=None)
+
+        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=fetcher):
+            status = sensor._get_producer_task_status(context)
+
+        fetcher.assert_called_once_with()
+        assert status is None
+
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
+    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
+    def test_get_producer_task_status_airflow3(self, mock_get_task_states):
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_3")
+
+        mock_get_task_states.return_value = {"run_3": {sensor.producer_task_id: "running"}}
+
+        status = sensor._get_producer_task_status(context)
+
+        assert status == "running"
+        mock_get_task_states.assert_called_once_with(
+            dag_id="example_dag", task_ids=[sensor.producer_task_id], run_ids=["run_3"]
+        )
+
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
+    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
+    def test_get_producer_task_status_airflow3_missing_state(self, mock_get_task_states):
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_3_missing")
+
+        mock_get_task_states.return_value = {"run_3_missing": {}}
+
+        status = sensor._get_producer_task_status(context)
+
+        assert status is None
+        mock_get_task_states.assert_called_once_with(
+            dag_id="example_dag", task_ids=[sensor.producer_task_id], run_ids=["run_3_missing"]
+        )
+
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
+    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    def test_get_producer_task_status_airflow3_import_error(self):
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_4")
+
+        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=None) as mock_builder:
+            status = sensor._get_producer_task_status(context)
+
+        mock_builder.assert_called_once_with(
+            airflow_version=Version("3.0.0"),
+            dag_id="example_dag",
+            run_id="run_4",
+            producer_task_id=sensor.producer_task_id,
+            logger=ANY,
+        )
+        assert status is None
 
     @patch("cosmos.operators.watcher.EventMsg")
     def test_poke_status_none_from_events(self, MockEventMsg):
@@ -431,14 +612,14 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
+        ti.xcom_pull.return_value = "success"
         context = self.make_context(ti)
 
         result = sensor.poke(context)
         assert result is True
 
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_state", return_value=None)
-    def _fallback_to_local_run(self, mock_get_producer_task_state):
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value=None)
+    def _fallback_to_local_run(self, mock_get_producer_task_status):
         sensor = self.make_sensor()
         sensor.invocation_mode = None
 
@@ -553,13 +734,14 @@ class TestDbtConsumerWatcherSensor:
         assert result == "success"
         assert sensor.compiled_sql == "select 42"
 
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
-    def test_producer_state_failed(self, mock_run_result):
+    @patch("cosmos.operators.watcher.get_xcom_val")
+    def test_producer_state_failed(self, mock_get_xcom_val):
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 1
-        mock_run_result.return_value = None
+        mock_get_xcom_val.return_value = None
         ti.xcom_pull.return_value = "failed"
 
         context = self.make_context(ti)
@@ -571,19 +753,20 @@ class TestDbtConsumerWatcherSensor:
             sensor.poke(context)
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_local_run")
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    @patch("cosmos.operators.watcher.get_xcom_val")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_run_result, mock_fallback_to_local_run
+        self, mock_get_xcom_val, mock_fallback_to_local_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
         More details: https://github.com/astronomer/astronomer-cosmos/pull/2062
         """
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 0
-        mock_run_result.return_value = None
+        mock_get_xcom_val.return_value = None
         ti.xcom_pull.return_value = "failed"
 
         context = self.make_context(ti)
@@ -638,7 +821,8 @@ class TestDbtConsumerWatcherSensor:
     @pytest.mark.parametrize(
         "mock_event",
         [
-            {"status": "failed"},
+            {"status": "failed", "reason": "model_failed"},
+            {"status": "failed", "reason": "producer_failed"},
             {"status": "success"},
         ],
     )
@@ -814,3 +998,91 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
     assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
+    """
+    Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.
+    Confirm that the dbt command flags include the expected flags.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup, ExecutionConfig
+    from cosmos.config import RenderConfig
+    from cosmos.constants import ExecutionMode, TestBehavior
+
+    context = {"ti": MagicMock(), "run_id": "test_run_id"}
+
+    operator_args = {
+        "install_deps": True,  # install any necessary dependencies before running any dbt command
+        "execution_timeout": timedelta(seconds=120),
+        "full_refresh": True,
+    }
+
+    with DAG(
+        dag_id="example_watcher_taskgroup_flags",
+        start_date=datetime(2025, 1, 1),
+    ) as dag_dbt_task_group_watcher_flags:
+        """
+        The simplest example of using Cosmos to render a dbt project as a TaskGroup.
+        """
+        DbtTaskGroup(
+            group_id="dbt_task_group",
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.WATCHER,
+            ),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+
+    producer_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.dbt_producer_watcher"]
+    assert producer_operator.base_cmd == ["build"]
+
+    cmd_flags = producer_operator.add_cmd_flags()
+
+    # Build the command without executing it
+    full_cmd, env = producer_operator.build_cmd(context=context, cmd_flags=cmd_flags)
+
+    # Verify the command was built correctly
+    assert full_cmd[1] == "build"  # dbt build command
+    assert "--full-refresh" in full_cmd
+
+
+@pytest.mark.integration
+def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
+    profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})
+    _profile_config = ProfileConfig(
+        profile_name="airflow_db",
+        target_name="bq",
+        profile_mapping=profile_mapping,
+    )
+    dbt_project_path = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+
+    dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=dbt_project_path / "jaffle_shop"),
+        profile_config=_profile_config,
+        operator_args={
+            "install_deps": True,
+            "full_refresh": True,
+            "deferrable": False,
+            "execution_timeout": timedelta(seconds=1),
+        },
+        render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER, setup_operator_args={"execution_timeout": timedelta(seconds=2)}
+        ),
+        schedule="@daily",
+        start_date=datetime(2025, 1, 1),
+        catchup=False,
+        dag_id="test_sensor_args_import",
+    )
+
+    for task in dag.tasks_map.values():
+        if isinstance(task, DbtProducerWatcherOperator):
+            assert task.execution_timeout == timedelta(seconds=2)
+        else:
+            assert task.execution_timeout == timedelta(seconds=1)

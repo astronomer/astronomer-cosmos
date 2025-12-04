@@ -6,7 +6,7 @@ import logging
 import os
 import os.path as op
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
@@ -88,7 +88,7 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
         return content  # type: ignore[no-any-return]
 
 
-def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
+def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
     """
     Load dbt docs projects configuration.
 
@@ -97,7 +97,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
     - Legacy single-project settings: dbt_docs_dir, dbt_docs_conn_id, dbt_docs_index_file_name
     """
     projects_raw = conf.get("cosmos", "dbt_docs_projects", fallback=None)
-    projects: dict[str, dict[str, Optional[str]]] = {}
+    projects: dict[str, dict[str, str | None]] = {}
     if projects_raw:
         parsed = None
         try:

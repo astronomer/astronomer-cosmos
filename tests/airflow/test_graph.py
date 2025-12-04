@@ -78,6 +78,7 @@ parent_node = DbtNode(
     tags=["has_child"],
     config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
+    has_non_detached_test=True,
 )
 test_parent_node = DbtNode(
     unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test_parent",
@@ -133,10 +134,6 @@ def test_calculate_datached_node_name_under_is_under_250():
     assert calculate_detached_node_name(node) == "detached_1_test"
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_each():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -211,6 +208,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
             config={"materialized": "view"},
             depends_on=[],
             has_test=True,
+            has_non_detached_test=True,
         )
     output = generate_task_or_group(
         dag=dag,
@@ -241,10 +239,6 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_all():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -286,10 +280,6 @@ def test_build_airflow_graph_with_after_all():
     assert dag.leaves[0].select == ["tag:some"]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_build():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -329,10 +319,6 @@ def test_build_airflow_graph_with_build():
     assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_override_profile_config():
     nodes_subset = {parent_seed.unique_id: parent_seed, parent_node.unique_id: parent_node}
@@ -450,6 +436,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "model",
                     "depends_on": [],
                     "file_path": ".",
+                    "has_non_detached_test": False,
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -492,6 +479,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "snapshot",
                     "depends_on": [],
                     "file_path": ".",
+                    "has_non_detached_test": False,
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -1368,6 +1356,7 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, enable_own
             config={"materialized": "view", "meta": {"owner": "test-owner"}},
             depends_on=[],
             has_test=True,
+            has_non_detached_test=True,
         )
 
         nodes = {node_with_owner.unique_id: node_with_owner}
@@ -1622,3 +1611,83 @@ def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, e
     assert len(dag.task_dict) == len(expected_task_types)
     for id, task in dag.task_dict.items():
         assert isinstance(task, expected_task_types[id])
+
+
+def test_skip_test_task_when_only_detached_tests_exist():
+    """Test that no empty test task is created when only detached tests exist with AFTER_EACH test behavior."""
+    with DAG("test-skip-test-when-only-detached-tests-exist", start_date=datetime(2025, 1, 1)) as dag:
+
+        parent_node1 = DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
+            resource_type=DbtResourceType.MODEL,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent1.sql",
+            config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
+            depends_on=[],
+        )
+
+        parent_node2 = DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent2",
+            resource_type=DbtResourceType.MODEL,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent2.sql",
+            config={"materialized": "view", "meta": {"owner": "parent2-owner"}},
+            depends_on=[],
+        )
+
+        parent1_test_node = DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.my_folder.test_parent1",
+            resource_type=DbtResourceType.MODEL,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/test_parent1.sql",
+            config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
+            depends_on=[parent_node1.unique_id],
+        )
+
+        detached_test_node = DbtNode(
+            unique_id=f"{DbtResourceType.TEST.value}.my_folder.test_both_parents",
+            resource_type=DbtResourceType.TEST,
+            file_path=SAMPLE_PROJ_PATH / "gen2/tests/test_both_parents.sql",
+            config={"meta": {"owner": "test-owner"}},
+            depends_on=[parent_node1.unique_id, parent_node2.unique_id],
+        )
+
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+        nodes = {
+            parent_node1.unique_id: parent_node1,
+            parent_node2.unique_id: parent_node2,
+            parent1_test_node.unique_id: parent1_test_node,
+            detached_test_node.unique_id: detached_test_node,
+        }
+
+        tasks_map = build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.AFTER_EACH,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                should_detach_multiple_parents_tests=True,
+            ),
+            dbt_project_name="test_project",
+        )
+
+        expected_task_ids = [
+            "model.my_folder.parent1",
+            "model.my_folder.parent2",
+            "model.my_folder.test_parent1",
+            "test.my_folder.test_both_parents",
+        ]
+
+        assert list(tasks_map.keys()) == expected_task_ids

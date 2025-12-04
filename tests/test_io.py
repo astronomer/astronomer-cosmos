@@ -98,12 +98,14 @@ def test_upload_artifacts_to_cloud_storage_no_remote_path():
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 def test_upload_artifacts_to_cloud_storage_success(dummy_kwargs):
     """Test upload_artifacts_to_cloud_storage with valid setup."""
-    with patch(
-        "cosmos.io._configure_remote_target_path",
-        return_value=(Path("/dest"), "conn_id"),
-    ) as mock_configure, patch("pathlib.Path.rglob") as mock_rglob, patch(
-        "cosmos.io.ObjectStoragePath.copy"
-    ) as mock_copy:
+    with (
+        patch(
+            "cosmos.io._configure_remote_target_path",
+            return_value=(Path("/dest"), "conn_id"),
+        ) as mock_configure,
+        patch("pathlib.Path.rglob") as mock_rglob,
+        patch("cosmos.io.ObjectStoragePath.copy") as mock_copy,
+    ):
         mock_file1 = MagicMock(spec=Path)
         mock_file1.is_file.return_value = True
         mock_file1.__str__.return_value = "/project_dir/target/file1.txt"

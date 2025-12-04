@@ -1,7 +1,7 @@
 .. _task-display-name:
 
 Task display name
-================
+=================
 
 .. note::
     This feature is only available for Airflow >= 2.9.

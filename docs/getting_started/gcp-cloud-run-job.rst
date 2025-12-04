@@ -3,6 +3,7 @@
 GCP Cloud Run Job Execution Mode
 =======================================
 .. versionadded:: 1.7
+
 This tutorial will guide you through the steps required to use Cloud Run Job instance as the Execution Mode for your dbt code with Astronomer Cosmos. This guide will walk you through the steps required to build the following architecture:
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_gcp_crj_schematic.png
@@ -12,7 +13,7 @@ Prerequisites
 +++++++++++++
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 2. Airflow
-3. Google Cloud SDK (install guide here: `gcloud SDK <https://cloud.google.com/sdk/docs/install>`_)
+3. Google Cloud SDK (`install guide <https://cloud.google.com/sdk/docs/install>`_)
 4. Astronomer-cosmos package containing the dbt Cloud Run Job operators
 5. GCP account with:
     1. A GCP project (`setup guide <https://cloud.google.com/resource-manager/docs/creating-managing-projects#console>`_)
@@ -202,7 +203,7 @@ Then, run below command to create Cloud Run Job instance:
 
 Now, when you have the required Google Cloud infrastructure, you still need to check Airflow configuration to ensure the infrastructure can be used. You'll need a ``google_cloud_default`` connection in order to work on GCP resources.
 
-Check out the ``airflow-settings.yml`` file `here <https://github.com/astronomer/cosmos-example/blob/main/airflow_settings.yaml>`_ for an example. If you are using Astro CLI, filling in the right values here will be enough for this to work.
+Check out an `example <https://github.com/astronomer/cosmos-example/blob/main/airflow_settings.yaml>`_ of the ``airflow-settings.yml`` file. If you are using Astro CLI, filling in the right values here will be enough for this to work.
 
 **Setup and Trigger the DAG with Airflow**
 

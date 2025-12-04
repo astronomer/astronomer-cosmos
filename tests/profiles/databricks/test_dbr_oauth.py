@@ -69,3 +69,11 @@ def test_connection_claiming() -> None:
     with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
+
+
+def test_mock_profile() -> None:
+    """
+    Tests that the Databricks mock profile is generated correctly.
+    """
+    profile_mapping = DatabricksOauthProfileMapping("conn_id", {"schema": "my_schema"})
+    assert profile_mapping.mock_profile.get("auth_type") == "oauth"

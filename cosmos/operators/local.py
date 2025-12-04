@@ -444,12 +444,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     assert ti.task is not None
                 ti.task.template_fields = self.template_fields
                 rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
                 # delete the old records
                 session.query(RenderedTaskInstanceFields).filter(
                     RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
                     RenderedTaskInstanceFields.task_id == self.task_id,
                     RenderedTaskInstanceFields.run_id == ti.run_id,
+                    RenderedTaskInstanceFields.map_index == ti.map_index,
                 ).delete()
                 session.add(rtif)
             else:
@@ -457,27 +457,30 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         _override_rtif_airflow_2_x()
 
-    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+    def run_subprocess(
+        self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
+    ) -> FullOutputSubprocessResult:
         logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
             command=command,
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
+            **kwargs,
         )
         # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:
         output = "".join(subprocess_result.full_output)
         logger.info(output)
         return subprocess_result
 
-    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
+    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
@@ -684,6 +687,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     command=full_cmd,
                     env=env,
                     cwd=tmp_project_dir,
+                    context=context,
                 )
                 if is_openlineage_common_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)

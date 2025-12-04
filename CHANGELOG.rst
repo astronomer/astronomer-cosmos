@@ -11,6 +11,8 @@ Breaking changes
   - ``create_task_metadata`` receives ``render_config`` instead of its individual configurations, such as ``test_behavior``, ``source_rendering_behavior`` and ``enable_owner_inheritance``
   - ``create_task_metadata`` now expects the ``node_converters`` argument
 * Drop Python 3.9 Support by @pankajastro in #2118
+* Drop Airflow 2.4 support by @pankajastro in #2161
+* Drop Airflow 2.5 support by @pankajastro in #2165
 
 Features
 
@@ -22,6 +24,19 @@ Enhancements
 * Unify airflow version handling into ``constants.py`` by @tatiana in #2089
 * Refactor ``airflow/graph.py`` to simplify code-base by @tatiana in #2080
 
+1.11.2 (2025-11-24)
+--------------------
+
+Bug fixes
+
+* Force ``DbtProducerWatcherOperator`` retries to zero by @pankajkoti in #2114
+* Fail ``DbtConsumerWatcherSensor`` tasks immediately when the ``DbtProducerWatcherOperator`` fails using Airflow context by @pankajkoti in #2126
+* Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by @michal-mrazek in #2127
+
+Documentation
+
+* Expand ``ExecutionMode.KUBERNETES`` guidance by @tatiana in #2139
+* Document dataset-event limitation when using ``ExecutionMode.AIRFLOW_ASYNC`` by @varaprasadregani in #2143
 
 1.11.1 (2025-11-12)
 --------------------

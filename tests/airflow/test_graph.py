@@ -134,10 +134,6 @@ def test_calculate_datached_node_name_under_is_under_250():
     assert calculate_detached_node_name(node) == "detached_1_test"
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_each():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -243,10 +239,6 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_all():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -288,10 +280,6 @@ def test_build_airflow_graph_with_after_all():
     assert dag.leaves[0].select == ["tag:some"]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_build():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -331,10 +319,6 @@ def test_build_airflow_graph_with_build():
     assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_override_profile_config():
     nodes_subset = {parent_seed.unique_id: parent_seed, parent_node.unique_id: parent_node}

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import importlib
 import logging
 from typing import Any
 
+from cosmos._utils.importer import load_method_from_module
 from cosmos.airflow.graph import _snake_case_to_camelcase
 from cosmos.config import ProfileConfig
 from cosmos.constants import ExecutionMode
@@ -27,9 +27,7 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
     class_path = f"cosmos.operators._asynchronous.{profile_type}.{dbt_class}{_snake_case_to_camelcase(execution_mode)}{profile_type.capitalize()}Operator"
     try:
         module_path, class_name = class_path.rsplit(".", 1)
-        module = importlib.import_module(module_path)
-        operator_class = getattr(module, class_name)
-        return operator_class
+        return load_method_from_module(module_path, class_name)
     except (ModuleNotFoundError, AttributeError) as e:
         raise ImportError(f"Error in loading class: {class_path}. Unable to find the specified operator class.") from e
 

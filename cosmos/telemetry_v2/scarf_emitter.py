@@ -4,7 +4,6 @@ from typing import Dict
 
 import httpx
 
-from cosmos import constants
 from cosmos.telemetry.base import TelemetryEmitter, TelemetryMetric
 from cosmos.telemetry.scarf_client import ScarfTelemetryClient
 from cosmos.telemetry.utils import build_query_params

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable
+from typing import Iterable
 
 from cosmos.telemetry.base import TelemetryEmitter, TelemetryManager
 from cosmos.telemetry.scarf_emitter import ScarfTelemetryEmitter

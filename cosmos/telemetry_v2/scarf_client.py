@@ -28,7 +28,7 @@ class ScarfTelemetryClient:
         telemetry_url = self._base_url.format(
             **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
         )
-        logger.debug("Telemetry is enabled. Emitting usage metrics to %s: %s", telemetry_url, metrics)
+        logger.info("Telemetry is enabled. Emitting usage metrics to %s: %s", telemetry_url, metrics)
 
         try:
             if self._client:
@@ -36,9 +36,7 @@ class ScarfTelemetryClient:
             else:
                 response = httpx.post(telemetry_url, timeout=self._timeout)
         except httpx.HTTPError as exc:
-            logger.warning(
-                "Unable to emit usage metrics to %s. An HTTP error occurred: %s", telemetry_url, exc
-            )
+            logger.warning("Unable to emit usage metrics to %s. An HTTP error occurred: %s", telemetry_url, exc)
             return False
 
         if not response.is_success:

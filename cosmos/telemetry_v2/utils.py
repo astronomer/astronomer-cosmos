@@ -1,4 +1,5 @@
 """Helper utilities for telemetry emitters."""
+
 from __future__ import annotations
 
 from typing import Dict
@@ -22,4 +23,3 @@ def build_query_params(event_type: str, payload: Dict[str, object]) -> Dict[str,
             params[key] = value
 
     return params
-

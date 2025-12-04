@@ -4,8 +4,8 @@ from typing import Dict, Iterable
 
 import cosmos
 from cosmos import settings
-from cosmos.telemetry.base import TelemetryManager
-from cosmos.telemetry.manager import build_default_telemetry_manager
+from cosmos.telemetry_v2.base import TelemetryManager
+from cosmos.telemetry_v2.manager import build_default_telemetry_manager
 
 
 def build_usage_payload(additional_metrics: Dict[str, object]) -> Dict[str, object]:

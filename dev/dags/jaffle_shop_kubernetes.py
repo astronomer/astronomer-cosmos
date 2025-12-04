@@ -54,6 +54,7 @@ postgres_host_secret = Secret(
     key="host",
 )
 
+
 with DAG(
     dag_id="jaffle_shop_kubernetes",
     start_date=datetime(2022, 11, 27),
@@ -69,6 +70,14 @@ with DAG(
         image=DBT_IMAGE,
         is_delete_operator_pod=False,
         secrets=[postgres_password_secret, postgres_host_secret],
+        profile_config=ProfileConfig(
+            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
+        ),
+        env_vars={
+            "POSTGRES_DB": "postgres",
+            "POSTGRES_SCHEMA": "public",
+            "POSTGRES_USER": "postgres",
+        },
     )
     # [END kubernetes_seed_example]
 
@@ -78,6 +87,8 @@ with DAG(
         profile_config=ProfileConfig(
             profile_name="postgres_profile",
             target_name="dev",
+            # The following profile mapping works for the DAG parsing
+            # However, it is not exposed during the K8s pod operators execution
             profile_mapping=PostgresUserPasswordProfileMapping(
                 conn_id="postgres_default",
                 profile_args={
@@ -92,6 +103,11 @@ with DAG(
             "get_logs": True,
             "is_delete_operator_pod": False,
             "secrets": [postgres_password_secret, postgres_host_secret],
+            "env_vars": {
+                "POSTGRES_DB": "postgres",
+                "POSTGRES_SCHEMA": "public",
+                "POSTGRES_USER": "postgres",
+            },
         },
     )
     # [END kubernetes_tg_example]

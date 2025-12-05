@@ -211,7 +211,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
         self._dbt_runner_callbacks = dbt_runner_callbacks
-        self._process_log_line_callable = None
 
         super().__init__(task_id=task_id, **kwargs)
 

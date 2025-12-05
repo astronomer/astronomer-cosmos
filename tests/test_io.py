@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -76,15 +77,23 @@ def test_configure_remote_target_path_no_remote_target():
 
 
 def test_construct_dest_file_path(dummy_kwargs):
-    """Test _construct_dest_file_path."""
+    """Test construct_dest_file_path."""
     dest_target_dir = Path("/dest")
     source_target_dir = Path("/project_dir/target")
     file_path = "/project_dir/target/subdir/file.txt"
 
+    rel_path = os.path.relpath(file_path, source_target_dir)
+    context = dummy_kwargs["context"]
+    task_run_identifier = (
+        f"{context['dag'].dag_id}"
+        f"/{context['run_id']}"
+        f"/{context['task_instance'].task_id}"
+        f"/{context['task_instance'].try_number}"
+    )
+
     expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
     assert (
-        _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, DEFAULT_TARGET_PATH, **dummy_kwargs)
-        == expected_path
+        _construct_dest_file_path(dest_target_dir, rel_path, task_run_identifier, DEFAULT_TARGET_PATH) == expected_path
     )
 
 

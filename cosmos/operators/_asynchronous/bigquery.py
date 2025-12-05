@@ -7,6 +7,14 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from attrs import define
+
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
+from airflow.models.taskinstance import TaskInstance
+from airflow.providers.common.compat.openlineage.facet import Dataset
+
 from cosmos.operators.base import _sanitize_xcom_key
 
 try:
@@ -16,6 +24,34 @@ except ImportError:
         "Could not import BigQueryInsertJobOperator. Ensure you've installed the Google Cloud provider separately or "
         "with with `pip install apache-airflow-providers-google`."
     )
+# The following is related to the ability of Airflow to emit OpenLineage events
+# This will decide if the method `get_openlineage_facets_on_complete` will be called by the Airflow OpenLineage listener or not
+try:
+    from airflow.providers.openlineage.extractors.base import OperatorLineage
+except (ImportError, ModuleNotFoundError):
+    try:
+        from openlineage.airflow.extractors.base import OperatorLineage
+    except (ImportError, ModuleNotFoundError):
+        logger.warning(
+            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
+        )
+        logger.debug(
+            "Further details on lack of Openlineage Airflow provider:",
+            stack_info=True,
+        )
+
+        @define
+        class OperatorLineage:  # type: ignore
+            inputs: list[str] = list()
+            outputs: list[str] = list()
+            run_facets: dict[str, str] = dict()
+            job_facets: dict[str, str] = dict()
+
+
+try:  # Airflow 3
+    from airflow.sdk.definitions.asset import Asset
+except (ModuleNotFoundError, ImportError):  # Airflow 2
+    from airflow.datasets import Dataset as Asset  # type: ignore
 
 from airflow.utils.context import Context  # type: ignore
 from packaging.version import Version
@@ -183,7 +219,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def execute(self, context: Context, **kwargs: Any) -> None:
         if self.async_context.get("run_id") is None:
             self.async_context["run_id"] = context["run_id"]
-
         if settings.enable_setup_async_task:
 
             if settings.upload_sql_to_xcom:
@@ -201,6 +236,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
         self._store_template_fields(context=context)
+        self._register_event(context)
 
     def _store_template_fields(self, context: Context) -> None:
         if not settings.enable_setup_async_task:
@@ -237,4 +273,51 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)
+        self._register_event(context)
         return job_id
+
+    def _get_asset_uri(self) -> str:
+        dbt_node_config = self.async_context.get("dbt_node_config", {})
+        unique_id = dbt_node_config.get("unique_id", "unknown_model")
+        asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{unique_id}"
+        return asset_uri
+
+    def _register_event(self, context: Context) -> None:
+        """
+        Register a BigQuery-style dummy asset event in Airflow 3.x,
+        ensuring outlets exists.
+        """
+        dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
+
+        output = [Asset(name=dataset_alias_name, uri=self._get_asset_uri())]
+        self.register_dataset([], output, context)
+
+    def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
+        inputs: list[Dataset] = []
+        outputs: list[Dataset] = []
+        run_facets: dict[str, Any] = {}
+        job_facets: dict[str, Any] = {}
+
+        dbt_config = self.async_context.get("dbt_node_config", {})
+        table_name = dbt_config.get("unique_id", "unknown_model")
+
+        asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{table_name}"
+
+        dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
+
+        outputs.append(
+            Dataset(
+                namespace="bigquery",
+                name=dataset_alias_name,
+                facets={"asset_uri": asset_uri},
+            )
+        )
+
+        self.log.info("Set OpenLineage output: %s", asset_uri)
+
+        return OperatorLineage(
+            inputs=inputs,
+            outputs=outputs,
+            run_facets=run_facets,
+            job_facets=job_facets,
+        )

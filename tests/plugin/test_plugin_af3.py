@@ -413,6 +413,7 @@ def test_dbt_docs_projects_malformed_json_raises(caplog):
         assert "Invalid JSON in [cosmos] dbt_docs_projects:" in caplog.text
 
 
+@skip_pre_airflow_31
 def test_plugin_registers_listeners():
     """Ensure CosmosAF3Plugin registers the listeners."""
     plugin = CosmosAF3Plugin()

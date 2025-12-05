@@ -236,7 +236,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
         self._store_template_fields(context=context)
-        self._register_event(context)
+        if self.emit_datasets:
+            self._register_event(context)
 
     def _store_template_fields(self, context: Context) -> None:
         if not settings.enable_setup_async_task:
@@ -273,7 +274,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)
-        self._register_event(context)
+        if self.emit_datasets:
+            self._register_event(context)
         return job_id
 
     def _get_asset_uri(self) -> str:

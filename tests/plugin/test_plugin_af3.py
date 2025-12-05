@@ -419,4 +419,4 @@ def test_plugin_registers_listeners():
 
     assert hasattr(plugin, "listeners"), "Plugin must define a `listeners` attribute"
 
-    assert dag_run_listener in plugin.listeners, "CosmosAF3Plugin.listeners must include airflow3_listeners module"
+    assert dag_run_listener in plugin.listeners, "CosmosAF3Plugin.listeners must include dag_run_listener module"

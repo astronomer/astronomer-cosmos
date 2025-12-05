@@ -6,10 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-try:
-    from functools import cache
-except ImportError:
-    from functools import lru_cache as cache
+from functools import cache
+
 
 import pytest
 from airflow.models.dagbag import DagBag

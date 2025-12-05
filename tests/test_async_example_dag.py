@@ -10,10 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-try:
-    from functools import cache
-except ImportError:
-    from functools import lru_cache as cache
+from functools import cache
 
 
 import pytest

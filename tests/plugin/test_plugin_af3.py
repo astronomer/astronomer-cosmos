@@ -4,8 +4,6 @@ from airflow import __version__ as airflow_version
 from packaging import version
 
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
-from cosmos.listeners import dag_run_listener
-from cosmos.plugin.airflow3 import CosmosAF3Plugin
 
 # The Cosmos AF3 plugin is only loaded if the Airflow version is greater than 3.0.
 if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
@@ -416,6 +414,9 @@ def test_dbt_docs_projects_malformed_json_raises(caplog):
 @skip_pre_airflow_31
 def test_plugin_registers_listeners():
     """Ensure CosmosAF3Plugin registers the listeners."""
+    from cosmos.listeners import dag_run_listener
+    from cosmos.plugin.airflow3 import CosmosAF3Plugin
+
     plugin = CosmosAF3Plugin()
 
     assert hasattr(plugin, "listeners"), "Plugin must define a `listeners` attribute"

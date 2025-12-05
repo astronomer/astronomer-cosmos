@@ -283,10 +283,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         return asset_uri
 
     def _register_event(self, context: Context) -> None:
-        """
-        Register a BigQuery-style dummy asset event in Airflow 3.x,
-        ensuring outlets exists.
-        """
         dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
 
         output = [Asset(name=dataset_alias_name, uri=self._get_asset_uri())]

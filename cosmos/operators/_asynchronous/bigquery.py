@@ -309,8 +309,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             )
         )
 
-        self.log.info("Set OpenLineage output: %s", asset_uri)
-
         return OperatorLineage(
             inputs=inputs,
             outputs=outputs,

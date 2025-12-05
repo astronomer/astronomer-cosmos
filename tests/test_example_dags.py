@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
+from functools import cache
 from pathlib import Path
 from unittest.mock import patch
-
-from functools import cache
-
 
 import pytest
 from airflow.models.dagbag import DagBag

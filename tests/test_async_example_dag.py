@@ -8,10 +8,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from functools import cache
-
+from pathlib import Path
 
 import pytest
 from airflow.models.dagbag import DagBag

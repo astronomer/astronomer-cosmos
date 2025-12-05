@@ -10,8 +10,8 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
-from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.constants import AIRFLOW_VERSION
+from cosmos.operators._watcher.state import build_producer_state_fetcher
 
 
 class WatcherTrigger(BaseTrigger):

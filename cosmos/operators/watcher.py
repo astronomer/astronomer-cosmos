@@ -6,10 +6,10 @@ import logging
 import zlib
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
-from cosmos._utils.watcher_state import get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher.state import get_xcom_val, safe_xcom_push
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -29,9 +29,9 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 
-from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID, InvocationMode
+from cosmos.operators._watcher.state import build_producer_state_fetcher
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
@@ -54,6 +54,32 @@ logger = logging.getLogger(__name__)
 CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
 PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
 WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
+
+
+def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
+    """
+    Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
+
+    This method parses each log line from dbt when --log-format json is used,
+    extracts node status information, and pushes it to XCom for consumption
+    by downstream watcher sensors.
+    """
+    try:
+        log_line = json.loads(line)
+    except json.JSONDecodeError:
+        logger.debug("Failed to parse log: %s", line)
+        log_line = {}
+    node_info = log_line.get("data", {}).get("node_info", {})
+    node_status = node_info.get("node_status")
+    unique_id = node_info.get("unique_id")
+
+    logger.debug("Model: %s is in %s state", unique_id, node_status)
+
+    # TODO: Handle and store all possible node statuses, not just the current success and failed
+    if node_status in ["success", "failed"]:
+        context = extra_kwargs.get("context")
+        assert context is not None  # Make MyPy happy
+        safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -82,6 +108,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = _store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")

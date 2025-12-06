@@ -10,8 +10,8 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
-from cosmos._utils.watcher_state import build_producer_state_fetcher
 from cosmos.constants import AIRFLOW_VERSION
+from cosmos.operators._watcher.state import build_producer_state_fetcher
 
 
 class WatcherTrigger(BaseTrigger):
@@ -87,23 +87,21 @@ class WatcherTrigger(BaseTrigger):
             return await self.get_xcom_val_af3(key)
 
     async def _parse_node_status(self) -> str | None:
-        key = f"nodefinished_{self.model_unique_id.replace('.', '__')}" if self.use_event else "run_results"
-
-        compressed_xcom_val = await self.get_xcom_val(key)
-        if not compressed_xcom_val:
-            return None
-
-        data_json = _parse_compressed_xcom(compressed_xcom_val)
+        key = (
+            f"nodefinished_{self.model_unique_id.replace('.', '__')}"
+            if self.use_event
+            else f"{self.model_unique_id.replace('.', '__')}_status"
+        )
 
         if self.use_event:
+            compressed_xcom_val = await self.get_xcom_val(key)
+            if not compressed_xcom_val:
+                return None
+
+            data_json = _parse_compressed_xcom(compressed_xcom_val)
             return data_json.get("data", {}).get("run_result", {}).get("status")  # type: ignore[no-any-return]
 
-        results = data_json.get("results", [])
-        node_result: dict[str, Any] = next(
-            (r for r in results if r.get("unique_id") == self.model_unique_id),
-            {},
-        )
-        return node_result.get("status")
+        return await self.get_xcom_val(key)
 
     async def _get_producer_task_status(self) -> str | None:
         """Retrieve the producer task state for both Airflow 2 and Airflow 3."""

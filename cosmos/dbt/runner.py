@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from functools import lru_cache
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from cosmos.dbt.project import change_working_directory, environ
 from cosmos.exceptions import CosmosDbtRunError
@@ -61,7 +61,7 @@ def get_runner(callbacks: list[Callable] | None = None) -> dbtRunner:  # type: i
 
 
 def run_command(
-    command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None  # type: ignore[type-arg]
+    command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None, **kwargs: Any  # type: ignore[type-arg]
 ) -> dbtRunnerResult:
     """
     Invokes the dbt command programmatically.

@@ -6,7 +6,7 @@ import logging
 import os
 import os.path as op
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
+from cosmos.listeners import dag_run_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
@@ -88,7 +89,7 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
         return content  # type: ignore[no-any-return]
 
 
-def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
+def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
     """
     Load dbt docs projects configuration.
 
@@ -97,7 +98,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
     - Legacy single-project settings: dbt_docs_dir, dbt_docs_conn_id, dbt_docs_index_file_name
     """
     projects_raw = conf.get("cosmos", "dbt_docs_projects", fallback=None)
-    projects: dict[str, dict[str, Optional[str]]] = {}
+    projects: dict[str, dict[str, str | None]] = {}
     if projects_raw:
         parsed = None
         try:
@@ -262,6 +263,8 @@ class CosmosAF3Plugin(AirflowPlugin):
 
     # Register external views for navigation
     external_views: list[dict[str, Any]] = []
+
+    listeners = [dag_run_listener]
 
     def __init__(self) -> None:
         super().__init__()

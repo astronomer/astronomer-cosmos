@@ -5,7 +5,7 @@ updates:
     schedule:
       interval: "daily"
     cooldown:
-      default-days: 1
+      default-days: 7
     labels:
       - "dependencies"
     reviewers:

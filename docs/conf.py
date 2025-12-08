@@ -4,8 +4,6 @@ import sys
 # Add the project root to the path so we can import the package
 sys.path.insert(0, os.path.abspath("../"))
 
-from docs.generate_mappings import generate_mapping_docs  # noqa: E402
-
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -51,4 +49,25 @@ html_theme_options = {
     "footer_start": ["copyright"],
 }
 
-generate_mapping_docs()
+
+def setup(app):
+    """
+    Sphinx setup function that runs after configuration is loaded and dependencies are installed.
+    This generates mapping docs by importing and calling generate_mapping_docs() lazily.
+    """
+    try:
+        from docs.generate_mappings import generate_mapping_docs  # noqa: E402
+
+        # Generate the mapping docs - this will create the profile documentation pages
+        generate_mapping_docs()
+    except (ImportError, ModuleNotFoundError) as e:
+        # If Airflow is not available, skip generating mapping docs
+        # This can happen during local development if dependencies aren't installed
+        import warnings
+
+        warnings.warn(
+            f"Could not generate mapping docs: {e}. "
+            "Make sure Airflow is installed (pip install -r docs/requirements.txt). "
+            "Documentation will be built without profile mapping pages.",
+            UserWarning,
+        )

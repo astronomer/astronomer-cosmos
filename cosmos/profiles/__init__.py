@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Type
+from typing import Any
 
 from .athena import AthenaAccessKeyProfileMapping
 from .base import BaseProfileMapping, DbtProfileConfigVars

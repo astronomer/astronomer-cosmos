@@ -58,8 +58,13 @@ def setup(app):
     try:
         from docs.generate_mappings import generate_mapping_docs  # noqa: E402
 
+        # Get the directory where conf.py is located (docs/ directory)
+        docs_dir = os.path.dirname(os.path.abspath(__file__))
+        templates_dir = os.path.join(docs_dir, "templates")
+        output_dir = os.path.join(docs_dir, "profiles")
+
         # Generate the mapping docs - this will create the profile documentation pages
-        generate_mapping_docs()
+        generate_mapping_docs(templates_dir=templates_dir, output_dir=output_dir)
     except (ImportError, ModuleNotFoundError) as e:
         # If Airflow is not available, skip generating mapping docs
         # This can happen during local development if dependencies aren't installed

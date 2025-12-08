@@ -4,9 +4,10 @@ import base64
 import json
 import logging
 import zlib
+from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
 from cosmos.operators._watcher.state import get_xcom_val, safe_xcom_push

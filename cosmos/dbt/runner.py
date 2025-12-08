@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from cosmos.dbt.project import change_working_directory, environ
 from cosmos.exceptions import CosmosDbtRunError

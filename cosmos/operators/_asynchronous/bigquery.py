@@ -3,8 +3,9 @@ from __future__ import annotations
 import base64
 import time
 import zlib
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 from cosmos.operators.base import _sanitize_xcom_key
 

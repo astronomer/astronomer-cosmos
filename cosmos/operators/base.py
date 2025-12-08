@@ -4,8 +4,9 @@ import inspect
 import logging
 import os
 from abc import ABCMeta, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from airflow.utils.context import context_merge

@@ -1,7 +1,7 @@
 import os
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Callable
 
 import aenum
 import airflow

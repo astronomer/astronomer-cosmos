@@ -10,9 +10,10 @@ import urllib.parse
 import warnings
 import zlib
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2

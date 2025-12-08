@@ -5,8 +5,9 @@ import json
 import logging
 import os
 import os.path as op
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Any
 from unittest.mock import patch
 from urllib.parse import urlsplit
 

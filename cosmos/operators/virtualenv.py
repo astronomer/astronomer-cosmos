@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import psutil
 

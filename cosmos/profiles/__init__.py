@@ -30,7 +30,7 @@ from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
 from .vertica.user_pass import VerticaUserPasswordProfileMapping
 
-profile_mappings: list[Type[BaseProfileMapping]] = [
+profile_mappings: list[type[BaseProfileMapping]] = [
     AthenaAccessKeyProfileMapping,
     ClickhouseUserPasswordProfileMapping,
     GoogleCloudServiceAccountFileProfileMapping,

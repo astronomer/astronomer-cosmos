@@ -6,9 +6,10 @@ import contextlib
 import shutil
 import tempfile
 import warnings
+from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from airflow.version import version as airflow_version

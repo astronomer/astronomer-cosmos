@@ -7,9 +7,10 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
+from collections.abc import Callable
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
-from typing import Any, Callable, NamedTuple
+from typing import Any, NamedTuple
 
 try:
     # Airflow 3.1 onwards

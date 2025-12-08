@@ -3,8 +3,9 @@ from __future__ import annotations
 import inspect
 import re
 from abc import ABC
+from collections.abc import Callable, Sequence
 from os import PathLike
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import kubernetes.client as k8s
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (

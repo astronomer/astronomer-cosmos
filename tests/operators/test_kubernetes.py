@@ -142,9 +142,6 @@ base_kwargs = {
     "no_version_check": True,
 }
 
-if version.parse(airflow_version) == version.parse("2.4"):
-    base_kwargs["name"] = "some-pod-name"
-
 result_map = {
     ("ls",): DbtLSKubernetesOperator(**base_kwargs),
     ("run",): DbtRunKubernetesOperator(**base_kwargs),

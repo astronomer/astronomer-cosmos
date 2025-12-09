@@ -77,6 +77,19 @@ Others
 * Bump ``actions/checkout`` from ``6.0.0`` to ``6.0.1`` by @dependabot in #2178
 * pre-commit autoupdate by @pre-commit-ci[bot] in #2134, #2162, #2173, #2191
 
+1.11.2 (2025-11-24)
+--------------------
+
+Bug fixes
+
+* Force ``DbtProducerWatcherOperator`` retries to zero by @pankajkoti in #2114
+* Fail ``DbtConsumerWatcherSensor`` tasks immediately when the ``DbtProducerWatcherOperator`` fails using Airflow context by @pankajkoti in #2126
+* Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by @michal-mrazek in #2127
+
+Documentation
+
+* Expand ``ExecutionMode.KUBERNETES`` guidance by @tatiana in #2139
+* Document dataset-event limitation when using ``ExecutionMode.AIRFLOW_ASYNC`` by @varaprasadregani in #2143
 
 1.11.1 (2025-11-12)
 --------------------

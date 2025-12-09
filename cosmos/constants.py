@@ -1,7 +1,7 @@
 import os
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict
 
 import aenum
 import airflow
@@ -58,7 +58,7 @@ def _default_wasb_conn() -> str:
     return WasbHook.default_conn_name  # type: ignore[no-any-return]
 
 
-FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP: Dict[str, Callable[[], str]] = {
+FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP: dict[str, Callable[[], str]] = {
     "s3": _default_s3_conn,
     "gs": _default_gcs_conn,
     "adl": _default_wasb_conn,

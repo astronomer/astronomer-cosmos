@@ -303,7 +303,40 @@ Overriding ``operator_args``
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
-We plan to support different ``operator_args`` for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators in the future.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using Custom Args for the Producer and Watcher
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. versionadded:: 1.12.0
+
+If you need to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can do so using ``setup_operator_args``.
+
+When using ``ExecutionMode.WATCHER``, you may want to run the **DbtProducerWatcherOperator** task on a **different worker queue** than the sensor tasks. This can be useful for several reasons:
+
+- **Isolating workloads** — the producer may require different CPU or memory resources than the sensors.
+- **Independent scaling** — you can scale producer workers separately if producer tasks are heavier or more frequent.
+- **Improved reliability** — separating these workloads reduces the chance of resource contention between producer and sensor tasks.
+
+**Example:** Run the producer task using the ``dbt_producer_task_queue`` worker queue.
+
+.. code-block:: python
+
+   from datetime import timedelta
+   from cosmos.config import ExecutionConfig
+   from cosmos.constants import ExecutionMode
+
+   execution_config = ExecutionConfig(
+       execution_mode=ExecutionMode.WATCHER,
+       setup_operator_args={
+           "queue": "dbt_producer_task_queue",
+       },
+   )
+
+This allows you to customize ``DbtProducerWatcherOperator`` behavior without affecting the arguments used by the other sensor tasks.
+
+.. note::
+   Please note that ``setup_operator_args`` is specific to Cosmos and is not related to Airflow ``setup`` or ``teardown`` task.
+
+For information on configuring worker queues in Astronomer, see the Astronomer `documentation <https://www.astronomer.io/docs/astro/configure-worker-queues>`_ on worker queues.
 
 ~~~~~~~~~~~~~
 Test behavior

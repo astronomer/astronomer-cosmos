@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Type
+from typing import Any
 
 from .athena import AthenaAccessKeyProfileMapping
 from .base import BaseProfileMapping, DbtProfileConfigVars
@@ -30,7 +30,7 @@ from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
 from .vertica.user_pass import VerticaUserPasswordProfileMapping
 
-profile_mappings: list[Type[BaseProfileMapping]] = [
+profile_mappings: list[type[BaseProfileMapping]] = [
     AthenaAccessKeyProfileMapping,
     ClickhouseUserPasswordProfileMapping,
     GoogleCloudServiceAccountFileProfileMapping,

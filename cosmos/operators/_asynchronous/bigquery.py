@@ -3,8 +3,9 @@ from __future__ import annotations
 import base64
 import time
 import zlib
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 from cosmos.operators.base import _sanitize_xcom_key
 
@@ -31,7 +32,6 @@ DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
 
 def _mock_bigquery_adapter() -> None:
-    from typing import Optional, Tuple
 
     import agate
     from dbt.adapters.bigquery.connections import BigQueryAdapterResponse, BigQueryConnectionManager
@@ -42,8 +42,8 @@ def _mock_bigquery_adapter() -> None:
         from dbt.clients.agate_helper import empty_table
 
     def execute(  # type: ignore[no-untyped-def]
-        self, sql, auto_begin=False, fetch=None, limit: Optional[int] = None
-    ) -> Tuple[BigQueryAdapterResponse, agate.Table]:
+        self, sql, auto_begin=False, fetch=None, limit: int | None = None
+    ) -> tuple[BigQueryAdapterResponse, agate.Table]:
         return BigQueryAdapterResponse("mock_bigquery_adapter_response"), empty_table()
 
     BigQueryConnectionManager.execute = execute

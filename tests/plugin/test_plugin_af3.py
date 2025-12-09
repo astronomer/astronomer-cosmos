@@ -409,3 +409,16 @@ def test_dbt_docs_projects_malformed_json_raises(caplog):
         with pytest.raises(json.JSONDecodeError):
             af3._load_projects_from_conf()
         assert "Invalid JSON in [cosmos] dbt_docs_projects:" in caplog.text
+
+
+@skip_pre_airflow_31
+def test_plugin_registers_listeners():
+    """Ensure CosmosAF3Plugin registers the listeners."""
+    from cosmos.listeners import dag_run_listener
+    from cosmos.plugin.airflow3 import CosmosAF3Plugin
+
+    plugin = CosmosAF3Plugin()
+
+    assert hasattr(plugin, "listeners"), "Plugin must define a `listeners` attribute"
+
+    assert dag_run_listener in plugin.listeners, "CosmosAF3Plugin.listeners must include dag_run_listener module"

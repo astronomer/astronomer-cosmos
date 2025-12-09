@@ -7,9 +7,10 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
+from collections.abc import Callable
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 try:
     # Airflow 3.1 onwards
@@ -28,7 +29,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
     """Hook for running processes with the ``subprocess`` module."""
 
     def __init__(self) -> None:
-        self.sub_process: Popen[bytes] | None = None
+        self.sub_process: Popen[str] | None = None
         super().__init__()  # type: ignore[no-untyped-call]
 
     def run_command(
@@ -37,6 +38,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         env: dict[str, str] | None = None,
         output_encoding: str = "utf-8",
         cwd: str | None = None,
+        process_log_line: Callable[[str, Any], None] | None = None,
+        **kwargs: Any,
     ) -> FullOutputSubprocessResult:
         """
         Execute the command.
@@ -79,26 +82,33 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 cwd=cwd,
                 env=env if env or env == {} else os.environ,
                 preexec_fn=pre_exec,
+                bufsize=1,  # line-buffered (works only in text mode)
+                text=True,
+                encoding=output_encoding,
+                errors="backslashreplace",
             )
-
-            self.log.info("Command output:")
-            line = ""
 
             if self.sub_process is None:
                 raise RuntimeError("The subprocess should be created here and is None!")
-            if self.sub_process.stdout is not None:
-                for raw_line in iter(self.sub_process.stdout.readline, b""):
-                    line = raw_line.decode(output_encoding, errors="backslashreplace").rstrip()
-                    # storing the warn & error lines to be used later
-                    log_lines.append(line)
-                    self.log.info("%s", line)
 
-            self.sub_process.wait()
+            self.log.info("Command output:")
 
-            self.log.info("Command exited with return code %s", self.sub_process.returncode)
-            return_code: int = self.sub_process.returncode
+            last_line: str = ""
+            assert self.sub_process.stdout is not None
+            for line in self.sub_process.stdout:
+                line = line.rstrip("\n")
+                last_line = line
+                log_lines.append(line)
+                self.log.info("%s", line)
+                if process_log_line:
+                    process_log_line(line, kwargs)
 
-        return FullOutputSubprocessResult(exit_code=return_code, output=line, full_output=log_lines)
+            # Wait until process completes
+            return_code = self.sub_process.wait()
+
+            self.log.info("Command exited with return code %s", return_code)
+
+        return FullOutputSubprocessResult(exit_code=return_code, output=last_line, full_output=log_lines)
 
     def send_sigterm(self) -> None:
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""

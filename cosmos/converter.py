@@ -8,7 +8,8 @@ import inspect
 import os
 import platform
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from warnings import warn
 
 from airflow.models.dag import DAG

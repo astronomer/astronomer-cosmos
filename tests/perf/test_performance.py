@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
-from typing import Generator
 
 import pytest
 from airflow.models.dagbag import DagBag

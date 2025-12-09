@@ -4,7 +4,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -155,7 +154,7 @@ class KeywordArgValueStr(KeywordArgValue, str):
 @dataclass
 class KeywordArg:
     key: str
-    value: KeywordArgValue | List
+    value: KeywordArgValue | list
 
 
 def test_dbtmodelconfig_extract_config_non_kwarg():

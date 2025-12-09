@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Callable
+from typing import Any
 
 try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator

@@ -196,6 +196,8 @@ def test_execute_complete(mock_store_sql, profile_config_mock):
         dbt_kwargs={"task_id": "test_task"},
     )
 
+    operator.emit_datasets = False
+
     with patch.object(BigQueryInsertJobOperator, "execute_complete", return_value="test_job") as mock_super_execute:
         result = operator.execute_complete(mock_context, mock_event)
 

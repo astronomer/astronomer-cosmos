@@ -13,7 +13,6 @@ from cosmos.log import get_logger
 
 logger = get_logger(__name__)
 from airflow.models.taskinstance import TaskInstance
-from airflow.providers.common.compat.openlineage.facet import Dataset
 
 from cosmos.operators.base import _sanitize_xcom_key
 
@@ -292,6 +291,11 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         self.register_dataset([], output, context)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
+        try:
+            from openlineage.facet import Dataset
+        except ImportError:
+            from airflow.providers.common.compat.openlineage.facet import Dataset
+
         inputs: list[Dataset] = []
         outputs: list[Dataset] = []
         run_facets: dict[str, Any] = {}

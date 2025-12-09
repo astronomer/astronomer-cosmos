@@ -281,13 +281,14 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def _get_asset_uri(self) -> str:
         dbt_node_config = self.async_context.get("dbt_node_config", {})
         unique_id = dbt_node_config.get("unique_id", "unknown_model")
-        asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{unique_id}"
-        return asset_uri
+
+        if AIRFLOW_VERSION.major >= 3:
+            return f"bigquery://{self.gcp_project}/{self.dataset}/{unique_id}"
+        else:
+            return f"bigquery://{self.gcp_project}.{self.dataset}.{unique_id}"
 
     def _register_event(self, context: Context) -> None:
-        dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
-
-        output = [Asset(name=dataset_alias_name, uri=self._get_asset_uri())]
+        output = [Asset(uri=self._get_asset_uri())]
         self.register_dataset([], output, context)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
@@ -296,18 +297,13 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         run_facets: dict[str, Any] = {}
         job_facets: dict[str, Any] = {}
 
-        dbt_config = self.async_context.get("dbt_node_config", {})
-        table_name = dbt_config.get("unique_id", "unknown_model")
-
-        asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{table_name}"
-
         dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
 
         outputs.append(
             Dataset(
                 namespace="bigquery",
                 name=dataset_alias_name,
-                facets={"asset_uri": asset_uri},
+                facets={"asset_uri": self._get_asset_uri()},
             )
         )
 

@@ -99,6 +99,8 @@ def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd,
         dbt_kwargs={"task_id": "test_task"},
     )
 
+    operator.emit_datasets = False
+
     # Mock context with run_id
     mock_context = MagicMock()
     mock_context.__getitem__.return_value = "test_run_id"  # For context["run_id"]

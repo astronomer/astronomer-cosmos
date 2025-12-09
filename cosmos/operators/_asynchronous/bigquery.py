@@ -23,29 +23,6 @@ except ImportError:
         "Could not import BigQueryInsertJobOperator. Ensure you've installed the Google Cloud provider separately or "
         "with with `pip install apache-airflow-providers-google`."
     )
-# The following is related to the ability of Airflow to emit OpenLineage events
-# This will decide if the method `get_openlineage_facets_on_complete` will be called by the Airflow OpenLineage listener or not
-try:
-    from airflow.providers.openlineage.extractors.base import OperatorLineage
-except (ImportError, ModuleNotFoundError):
-    try:
-        from openlineage.airflow.extractors.base import OperatorLineage
-    except (ImportError, ModuleNotFoundError):
-        logger.warning(
-            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
-        )
-        logger.debug(
-            "Further details on lack of Openlineage Airflow provider:",
-            stack_info=True,
-        )
-
-        @define
-        class OperatorLineage:  # type: ignore
-            inputs: list[str] = list()
-            outputs: list[str] = list()
-            run_facets: dict[str, str] = dict()
-            job_facets: dict[str, str] = dict()
-
 
 try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset
@@ -289,31 +266,3 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def _register_event(self, context: Context) -> None:
         output = [Asset(uri=self._get_asset_uri())]
         self.register_dataset([], output, context)
-
-    def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
-        try:
-            from openlineage.facet import Dataset
-        except ImportError:
-            from airflow.providers.common.compat.openlineage.facet import Dataset
-
-        inputs: list[Dataset] = []
-        outputs: list[Dataset] = []
-        run_facets: dict[str, Any] = {}
-        job_facets: dict[str, Any] = {}
-
-        dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)
-
-        outputs.append(
-            Dataset(
-                namespace="bigquery",
-                name=dataset_alias_name,
-                facets={"asset_uri": self._get_asset_uri()},
-            )
-        )
-
-        return OperatorLineage(
-            inputs=inputs,
-            outputs=outputs,
-            run_facets=run_facets,
-            job_facets=job_facets,
-        )

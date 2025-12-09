@@ -252,17 +252,14 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
     def _register_event(self, context: Context) -> None:
         dbt_node_config = self.async_context.get("dbt_node_config", {})
-        unique_id = dbt_node_config.get("unique_id")
-        if unique_id is None:
-            unique_id = f"unknown_model_{self.task_id}"
-            logger.warning(f"dbt_node_config or unique_id not found in async_context, using fallback {unique_id}")
-        else:
-            unique_id = unique_id.split(".")[-1]
+        unique_id = dbt_node_config.get("unique_id", f"unknown_model_{self.task_id}")
+
+        table_name = unique_id.split('.')[-1]
 
         if AIRFLOW_VERSION.major >= 3:
-            asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{unique_id}"
+            asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{table_name}"
         else:
-            asset_uri = f"bigquery://{self.gcp_project}.{self.dataset}.{unique_id}"
+            asset_uri = f"bigquery://{self.gcp_project}.{self.dataset}.{table_name}"
 
         output = [Asset(uri=asset_uri)]
         self.register_dataset([], output, context)

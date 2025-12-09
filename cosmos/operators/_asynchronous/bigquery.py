@@ -32,6 +32,9 @@ from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
@@ -249,7 +252,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
     def _get_asset_uri(self) -> str:
         dbt_node_config = self.async_context.get("dbt_node_config", {})
-        unique_id = dbt_node_config.get("unique_id", "unknown_model")
+        unique_id = dbt_node_config.get("unique_id")
+        if unique_id is None:
+            unique_id = f"unknown_model_{self.task_id}"
+            logger.warning(f"dbt_node_config or unique_id not found in async_context, using fallback {unique_id}")
 
         if AIRFLOW_VERSION.major >= 3:
             return f"bigquery://{self.gcp_project}/{self.dataset}/{unique_id}"

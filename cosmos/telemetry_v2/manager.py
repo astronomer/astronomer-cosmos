@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from cosmos.telemetry.base import TelemetryEmitter, TelemetryManager
-from cosmos.telemetry.scarf_emitter import ScarfTelemetryEmitter
-from cosmos.telemetry.statsd import StatsdTelemetryEmitter
+from cosmos.telemetry_v2.base import TelemetryEmitter, TelemetryManager
+from cosmos.telemetry_v2.scarf_emitter import ScarfTelemetryEmitter
+from cosmos.telemetry_v2.statsd import StatsdTelemetryEmitter
 
 
 def build_default_telemetry_manager(backends: Iterable[str]) -> TelemetryManager:
@@ -17,7 +17,7 @@ def build_default_telemetry_manager(backends: Iterable[str]) -> TelemetryManager
         emitters.append(ScarfTelemetryEmitter())
 
     if not emitters:
-        from cosmos.telemetry.base import NullTelemetryEmitter
+        from cosmos.telemetry_v2.base import NullTelemetryEmitter
 
         emitters.append(NullTelemetryEmitter())
 

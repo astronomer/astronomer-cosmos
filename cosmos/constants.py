@@ -181,6 +181,7 @@ DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
 
 TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}/{execution_modes}"
+# TELEMETRY_URL = "https://pankajkoti.gateway.scarf.sh/eventcollection/"
 TELEMETRY_VERSION = "v2"
 TELEMETRY_TIMEOUT = 1.0
 

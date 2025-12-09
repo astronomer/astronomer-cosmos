@@ -5,7 +5,7 @@ from typing import Dict
 from airflow.stats import Stats
 from airflow.utils.log.logging_mixin import LoggingMixin
 
-from cosmos.telemetry.base import MetricType, TelemetryEmitter, TelemetryMetric, sanitize_metric_name, sanitize_tags
+from cosmos.telemetry_v2.base import MetricType, TelemetryEmitter, TelemetryMetric, sanitize_metric_name, sanitize_tags
 
 
 class StatsdTelemetryEmitter(TelemetryEmitter, LoggingMixin):

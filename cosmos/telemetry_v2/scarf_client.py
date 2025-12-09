@@ -24,12 +24,13 @@ class ScarfTelemetryClient:
         self._client = http_client
 
     def post(self, metrics: dict[str, object]) -> bool:
+        logger.info("Posting usage event to Scarf: %s", metrics)
         query_string = urlencode(metrics)
-        telemetry_url = self._base_url.format(
-            **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
-        )
+        # Ensure base URL ends with / and append query string
+        base_url = self._base_url.rstrip("/") + "/"
+        telemetry_url = f"{base_url}?{query_string}"
         logger.info("Telemetry is enabled. Emitting usage metrics to %s: %s", telemetry_url, metrics)
-
+        logger.info("Telemetry URL: %s", telemetry_url)
         try:
             if self._client:
                 response = self._client.post(telemetry_url, timeout=self._timeout)

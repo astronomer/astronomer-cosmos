@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from airflow.models.dag import DAG
     from airflow.models.dagrun import DagRun
 
-from cosmos import telemetry
+from cosmos import telemetry, telemetry_v2
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 from cosmos.log import get_logger
 
@@ -54,11 +54,14 @@ def get_execution_modes(dag: DAG) -> str:
 
 @hookimpl
 def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
-    logger.debug("Running on_dag_run_success")
+    logger.info("Running on_dag_run_success")
+    # In a real Airflow deployment, the following `serialized_dag` is an instance of
+    # `airflow.serialization.serialized_objects.SerializedDAG`
+    # and it is not a subclass of DbtDag, nor contain any references to Cosmos
     serialized_dag = dag_run.get_dag()
 
     if not total_cosmos_tasks(serialized_dag):
-        logger.debug("The DAG does not use Cosmos")
+        logger.info("The DAG does not use Cosmos")
         return
 
     if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
@@ -74,17 +77,21 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         "execution_modes": get_execution_modes(serialized_dag),
     }
 
-    telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
-    logger.debug("Completed on_dag_run_success")
+    telemetry_v2.emit_usage_event(DAG_RUN, additional_telemetry_metrics)
+    # telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
+    logger.info("Completed on_dag_run_success")
 
 
 @hookimpl
 def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
-    logger.debug("Running on_dag_run_failed")
+    logger.info("Running on_dag_run_failed")
+    # In a real Airflow deployment, the following `serialized_dag` is an instance of
+    # `airflow.serialization.serialized_objects.SerializedDAG`
+    # and it is not a subclass of DbtDag, nor contain any references to Cosmos
     serialized_dag = dag_run.get_dag()
 
     if not total_cosmos_tasks(serialized_dag):
-        logger.debug("The DAG does not use Cosmos")
+        logger.info("The DAG does not use Cosmos")
         return
 
     if AIRFLOW_VERSION_MAJOR < _AIRFLOW3_MAJOR_VERSION:
@@ -101,4 +108,4 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
     }
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
-    logger.debug("Completed on_dag_run_failed")
+    logger.info("Completed on_dag_run_failed")

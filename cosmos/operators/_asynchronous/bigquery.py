@@ -254,7 +254,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         dbt_node_config = self.async_context.get("dbt_node_config", {})
         unique_id = dbt_node_config.get("unique_id", f"unknown_model_{self.task_id}")
 
-        table_name = unique_id.split('.')[-1]
+        table_name = unique_id.split(".")[-1]
 
         if AIRFLOW_VERSION.major >= 3:
             asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{table_name}"

@@ -7,12 +7,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from attrs import define
-
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-from airflow.models.taskinstance import TaskInstance
 
 from cosmos.operators.base import _sanitize_xcom_key
 

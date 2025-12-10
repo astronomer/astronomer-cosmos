@@ -30,11 +30,8 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
-from cosmos.log import get_logger
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
-
-logger = get_logger(__name__)
 
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
@@ -253,7 +250,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def _register_event(self, context: Context) -> None:
         dbt_node_config = self.async_context.get("dbt_node_config", {})
         unique_id = dbt_node_config.get("unique_id", f"unknown_model_{self.task_id}")
-
         table_name = unique_id.split(".")[-1]
 
         if AIRFLOW_VERSION.major >= 3:

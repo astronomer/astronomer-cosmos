@@ -47,7 +47,7 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
     telemetry_url = constants.TELEMETRY_URL.format(
         telemetry_version=constants.TELEMETRY_VERSION, event_type=event_type, query_string=query_string
     )
-    logger.debug("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
+    logger.debug("Telemetry is enabled. Emitting the following usage metrics for event type %s to %s: %s", event_type, telemetry_url, metrics)
     try:
         response = httpx.get(telemetry_url, timeout=constants.TELEMETRY_TIMEOUT, follow_redirects=True)
     except httpx.HTTPError as e:

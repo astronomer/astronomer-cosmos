@@ -42,9 +42,10 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
 
     The metrics must contain the necessary fields to build the TELEMETRY_URL.
     """
+    event_type = metrics.pop("event_type")
     query_string = urlencode(metrics)
     telemetry_url = constants.TELEMETRY_URL.format(
-        **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
+        telemetry_version=constants.TELEMETRY_VERSION, event_type=event_type, query_string=query_string
     )
     logger.debug("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
     try:
@@ -76,7 +77,6 @@ def emit_usage_metrics_if_enabled(event_type: str, additional_metrics: dict[str,
     if should_emit():
         metrics = collect_standard_usage_metrics()
         metrics["event_type"] = event_type
-        metrics["variables"].update(additional_metrics)  # type: ignore[attr-defined]
         metrics.update(additional_metrics)
         is_success = emit_usage_metrics(metrics)
         return is_success

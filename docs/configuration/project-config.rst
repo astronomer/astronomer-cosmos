@@ -5,12 +5,9 @@ The ``cosmos.config.ProjectConfig`` allows you to specify information about wher
 variables that should be used for rendering and execution. It takes the following arguments:
 
 - ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file
-- ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. This defaults to
-  ``models/``
-- ``seeds_relative_path``: The path to your seeds directory, relative to the ``dbt_project_path``. This defaults to
-  ``data/``
-- ``snapshots_relative_path``: The path to your snapshots directory, relative to the ``dbt_project_path``. This defaults
-  to ``snapshots/``
+- ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. This defaults to ``models``
+- ``seeds_relative_path``: The path to your seeds directory, relative to the ``dbt_project_path``. This defaults to ``seeds``
+- ``snapshots_relative_path``: The path to your snapshots directory, relative to the ``dbt_project_path``. This defaults to ``snapshots``
 - ``manifest_path``: The absolute path to your manifests directory. This is only required if you're using Cosmos' manifest
   parsing mode. Along with supporting local paths for manifest parsing, starting with Cosmos 1.6.0, if you've
   Airflow >= 2.8.0, Cosmos also supports remote paths for manifest parsing(e.g. S3 URL). See :ref:`parsing-methods` for more details.
@@ -39,9 +36,9 @@ Project Config Example
 
     config = ProjectConfig(
         dbt_project_path="/path/to/dbt/project",
-        models_relative_path="models",
-        seeds_relative_path="data",
-        snapshots_relative_path="snapshots",
+        models_relative_path="custom_models_folder",
+        seeds_relative_path="custom_seeds_folder",
+        snapshots_relative_path="custom_snapshots_folder",
         manifest_path="/path/to/manifests",
         env_vars={"MY_ENV_VAR": "my_env_value"},
         dbt_vars={

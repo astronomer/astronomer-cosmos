@@ -42,8 +42,9 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
 
     The metrics must contain the necessary fields to build the TELEMETRY_URL.
     """
-    event_type = metrics.pop("event_type")
-    query_string = urlencode(metrics)
+    event_type = metrics.get("event_type")
+    metrics_for_query = {k: v for k, v in metrics.items() if k != "event_type"}
+    query_string = urlencode(metrics_for_query)
     telemetry_url = constants.TELEMETRY_URL.format(
         telemetry_version=constants.TELEMETRY_VERSION, event_type=event_type, query_string=query_string
     )

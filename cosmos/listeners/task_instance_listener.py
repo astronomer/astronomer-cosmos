@@ -21,20 +21,32 @@ def _is_cosmos_task(task_instance: TaskInstance) -> bool:
     """Return True if the task instance is powered by Cosmos operators."""
 
     task = task_instance.task
-    module = getattr(task, "_task_module", None) or task.__class__.__module__
+    module = _operator_module(task_instance)
     return module.startswith("cosmos.") or isinstance(task, AbstractDbtBase)
 
 
 def _execution_mode_from_task(task_instance: TaskInstance) -> str | None:
     """Extract Cosmos execution mode from the task's module path."""
 
-    module = getattr(task_instance.task, "_task_module", None) or task_instance.task.__class__.__module__
+    module = _operator_module(task_instance)
     parts = module.split(".")
     if len(parts) >= 3 and parts[0] == "cosmos" and parts[1] == "operators":
         return parts[2]
     # TODO: When users subclass Cosmos operators in external modules, encode execution mode directly on the task
     # so telemetry does not rely on module inspection.
     return None
+
+
+def _operator_module(task_instance: TaskInstance) -> str:
+    """Return the module path for the operator backing the given task instance."""
+
+    return getattr(task_instance.task, "_task_module", None) or task_instance.task.__class__.__module__
+
+
+def _is_cosmos_subclass(task_instance: TaskInstance) -> bool:
+    """Return True when the task is a custom subclass extending Cosmos operators."""
+
+    return isinstance(task_instance.task, AbstractDbtBase) and not _operator_module(task_instance).startswith("cosmos.")
 
 
 def _invocation_mode(task_instance: TaskInstance) -> str | None:
@@ -56,7 +68,7 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "task_id": task_instance.task_id,
         "status": status,
         "operator_name": task_instance.task.__class__.__name__,
-        "is_cosmos_operator_subclass": isinstance(task_instance.task, AbstractDbtBase),
+        "is_cosmos_operator_subclass": _is_cosmos_subclass(task_instance),
         "invocation_mode": _invocation_mode(task_instance),
         "execution_mode": _execution_mode_from_task(task_instance),
         "queue": task_instance.queue,

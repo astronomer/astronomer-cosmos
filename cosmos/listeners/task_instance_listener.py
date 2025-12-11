@@ -77,6 +77,20 @@ def _dbt_command(task_instance: TaskInstance) -> str | None:
     return str(command)
 
 
+def _install_deps(task_instance: TaskInstance) -> bool | None:
+    """Return the effective install_deps flag when available."""
+
+    task = task_instance.task
+    if not isinstance(task, AbstractDbtBase):
+        return None
+
+    install_deps = getattr(task, "install_deps", None)
+    if install_deps is None:
+        return None
+
+    return bool(install_deps)
+
+
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""
 
@@ -96,6 +110,10 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
     dbt_command = _dbt_command(task_instance)
     if dbt_command:
         metrics["dbt_command"] = dbt_command
+
+    install_deps = _install_deps(task_instance)
+    if install_deps is not None:
+        metrics["install_deps"] = install_deps
 
     dag_run = getattr(task_instance, "dag_run", None)
     if dag_run is not None:

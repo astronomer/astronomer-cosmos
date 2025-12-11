@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
-from cosmos.listeners import dag_run_listener
+from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
@@ -265,7 +265,7 @@ class CosmosAF3Plugin(AirflowPlugin):
     # Register external views for navigation
     external_views: list[dict[str, Any]] = []
 
-    listeners = [dag_run_listener]
+    listeners = [dag_run_listener, task_instance_listener]
 
     def __init__(self) -> None:
         super().__init__()

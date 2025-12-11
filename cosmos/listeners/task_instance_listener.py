@@ -60,6 +60,23 @@ def _invocation_mode(task_instance: TaskInstance) -> str | None:
     return str(mode)
 
 
+def _dbt_command(task_instance: TaskInstance) -> str | None:
+    """Return the dbt sub-command encoded on Cosmos operators."""
+
+    task = task_instance.task
+    if not isinstance(task, AbstractDbtBase):
+        return None
+
+    command = getattr(task, "base_cmd", None)
+    if command is None:
+        return None
+
+    if isinstance(command, (list, tuple)):
+        return " ".join(str(part) for part in command if part is not None)
+
+    return str(command)
+
+
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""
 
@@ -75,6 +92,10 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "priority_weight": task_instance.priority_weight,
         "map_index": task_instance.map_index,
     }
+
+    dbt_command = _dbt_command(task_instance)
+    if dbt_command:
+        metrics["dbt_command"] = dbt_command
 
     dag_run = getattr(task_instance, "dag_run", None)
     if dag_run is not None:

@@ -42,11 +42,18 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
 
     The metrics must contain the necessary fields to build the TELEMETRY_URL.
     """
-    query_string = urlencode(metrics)
+    event_type = metrics.get("event_type")
+    metrics_for_query = {k: v for k, v in metrics.items() if k != "event_type"}
+    query_string = urlencode(metrics_for_query)
     telemetry_url = constants.TELEMETRY_URL.format(
-        **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
+        telemetry_version=constants.TELEMETRY_VERSION, event_type=event_type, query_string=query_string
     )
-    logger.debug("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
+    logger.debug(
+        "Telemetry is enabled. Emitting the following usage metrics for event type %s to %s: %s",
+        event_type,
+        telemetry_url,
+        metrics,
+    )
     try:
         response = httpx.get(telemetry_url, timeout=constants.TELEMETRY_TIMEOUT, follow_redirects=True)
     except httpx.HTTPError as e:
@@ -76,7 +83,6 @@ def emit_usage_metrics_if_enabled(event_type: str, additional_metrics: dict[str,
     if should_emit():
         metrics = collect_standard_usage_metrics()
         metrics["event_type"] = event_type
-        metrics["variables"].update(additional_metrics)  # type: ignore[attr-defined]
         metrics.update(additional_metrics)
         is_success = emit_usage_metrics(metrics)
         return is_success

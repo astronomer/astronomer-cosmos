@@ -87,7 +87,7 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
             else:
                 subpath = dbt_project_file_content.get("packages-install-path", DBT_DEFAULT_PACKAGES_FOLDER)
                 return _resolve_env_var(subpath)
-    return subpath
+    return _resolve_env_var(subpath)
 
 
 def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:

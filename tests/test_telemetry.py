@@ -119,7 +119,7 @@ def test_emit_usage_metrics_succeeds(caplog):
     is_success = telemetry.emit_usage_metrics(sample_metrics)
     assert is_success
     assert caplog.text.startswith("DEBUG")
-    assert "Telemetry is enabled. Emitting the following usage metrics to" in caplog.text
+    assert "Telemetry is enabled. Emitting the following usage metrics for event type" in caplog.text
 
 
 @patch("cosmos.telemetry.should_emit", return_value=False)

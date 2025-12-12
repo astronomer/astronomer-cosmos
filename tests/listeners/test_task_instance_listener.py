@@ -18,7 +18,9 @@ class DummyDbtOperator(AbstractDbtBase):
         if install_deps is not None:
             self.install_deps = install_deps
 
-    def build_and_run_cmd(self, context, cmd_flags, run_as_async=False, async_context=None, **kwargs):  # pragma: no cover
+    def build_and_run_cmd(
+        self, context, cmd_flags, run_as_async=False, async_context=None, **kwargs
+    ):  # pragma: no cover
         return None
 
 

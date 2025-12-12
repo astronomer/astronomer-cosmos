@@ -9,8 +9,8 @@ if TYPE_CHECKING:
 
 from cosmos import telemetry
 from cosmos.constants import InvocationMode
-from cosmos.operators.base import AbstractDbtBase
 from cosmos.log import get_logger
+from cosmos.operators.base import AbstractDbtBase
 
 logger = get_logger(__name__)
 

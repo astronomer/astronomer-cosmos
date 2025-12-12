@@ -119,8 +119,6 @@ def test_build_task_metrics_sets_has_callback_for_callable():
     assert metrics["has_callback"] is True
 
 
-
-
 @patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_task_instance_success_emits_for_cosmos_task(mock_emit):
     operator = DummyDbtOperator()

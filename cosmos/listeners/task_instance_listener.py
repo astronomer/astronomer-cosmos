@@ -6,6 +6,7 @@ from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
+    from cosmos import ProfileConfig
 
 from cosmos import telemetry
 from cosmos.constants import InvocationMode
@@ -107,6 +108,28 @@ def _has_callback(task_instance: TaskInstance) -> bool:
 
     return bool(callback)
 
+
+def get_profile_metrics(task_instance: TaskInstance) -> tuple[str, str, str]:
+    profile_config: ProfileConfig = task_instance.task.profile_config
+
+    # Determine strategy
+    profile_strategy = (
+        "yaml_file"
+        if profile_config.profiles_yml_filepath is not None
+        else "mapping"
+    )
+
+    # Default
+    profile_mapping_class = ""
+
+    # Populate mapping class only when strategy is "mapping"
+    if profile_strategy == "mapping":
+        profile_mapping_class = str(profile_config.profile_mapping)
+
+    # Get database or profile type
+    database = profile_config.get_profile_type()
+
+    return profile_strategy, profile_mapping_class, database
 
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""

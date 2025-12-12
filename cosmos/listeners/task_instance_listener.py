@@ -91,6 +91,23 @@ def _install_deps(task_instance: TaskInstance) -> bool | None:
     return bool(install_deps)
 
 
+def _has_callback(task_instance: TaskInstance) -> bool:
+    """Return True when a Cosmos operator includes user-defined callbacks."""
+
+    task = task_instance.task
+    if not isinstance(task, AbstractDbtBase):
+        return False
+
+    callback = getattr(task, "callback", None)
+    if callback is None:
+        return False
+
+    if isinstance(callback, (list, tuple)):
+        return any(callback)
+
+    return bool(callback)
+
+
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""
 
@@ -114,6 +131,8 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
     install_deps = _install_deps(task_instance)
     if install_deps is not None:
         metrics["install_deps"] = install_deps
+
+    metrics["has_callback"] = _has_callback(task_instance)
 
     dag_run = getattr(task_instance, "dag_run", None)
     if dag_run is not None:

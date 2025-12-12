@@ -99,6 +99,8 @@ def test_dbt_run_airflow_async_bigquery_operator_execute(mock_build_and_run_cmd,
         dbt_kwargs={"task_id": "test_task"},
     )
 
+    operator.emit_datasets = False
+
     # Mock context with run_id
     mock_context = MagicMock()
     mock_context.__getitem__.return_value = "test_run_id"  # For context["run_id"]
@@ -193,6 +195,8 @@ def test_execute_complete(mock_store_sql, profile_config_mock):
         profile_config=profile_config_mock,
         dbt_kwargs={"task_id": "test_task"},
     )
+
+    operator.emit_datasets = False
 
     with patch.object(BigQueryInsertJobOperator, "execute_complete", return_value="test_job") as mock_super_execute:
         result = operator.execute_complete(mock_context, mock_event)

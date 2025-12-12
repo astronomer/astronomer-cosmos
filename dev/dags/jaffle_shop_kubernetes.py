@@ -18,7 +18,6 @@ from airflow.providers.cncf.kubernetes.secret import Secret
 from pendulum import datetime
 
 from cosmos import (
-    DbtSeedKubernetesOperator,
     DbtTaskGroup,
     ExecutionConfig,
     ExecutionMode,
@@ -61,25 +60,6 @@ with DAG(
     doc_md=__doc__,
     catchup=False,
 ) as dag:
-    # [START kubernetes_seed_example]
-    load_seeds = DbtSeedKubernetesOperator(
-        task_id="load_seeds",
-        project_dir=K8S_PROJECT_DIR,
-        get_logs=True,
-        schema="public",
-        image=DBT_IMAGE,
-        is_delete_operator_pod=False,
-        secrets=[postgres_password_secret, postgres_host_secret],
-        profile_config=ProfileConfig(
-            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
-        ),
-        env_vars={
-            "POSTGRES_DB": "postgres",
-            "POSTGRES_SCHEMA": "public",
-            "POSTGRES_USER": "postgres",
-        },
-    )
-    # [END kubernetes_seed_example]
 
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(
@@ -97,19 +77,24 @@ with DAG(
             ),
         ),
         render_config=RenderConfig(dbt_project_path=AIRFLOW_PROJECT_DIR),
-        execution_config=ExecutionConfig(execution_mode=ExecutionMode.KUBERNETES, dbt_project_path=K8S_PROJECT_DIR),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER_KUBERNETES, dbt_project_path=K8S_PROJECT_DIR
+        ),
         operator_args={
+            "deferrable": False,
             "image": DBT_IMAGE,
             "get_logs": True,
             "is_delete_operator_pod": False,
+            "log_events_on_failure": True,
             "secrets": [postgres_password_secret, postgres_host_secret],
             "env_vars": {
                 "POSTGRES_DB": "postgres",
                 "POSTGRES_SCHEMA": "public",
                 "POSTGRES_USER": "postgres",
             },
+            "retry": 0,
         },
     )
     # [END kubernetes_tg_example]
 
-    load_seeds >> run_models
+    run_models

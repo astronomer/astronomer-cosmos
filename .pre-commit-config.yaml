@@ -6,6 +6,29 @@ default_language_version:
 repos:
   - repo: local
     hooks:
+      - id: check-python-version
+        name: Ensure Python ≥ 3.10
+        language: python
+        pass_filenames: false
+        always_run: true
+        entry: python
+        args:
+          - -c
+          - |
+              import sys
+
+              required_major = 3
+              required_minor = 10
+              current_major, current_minor = sys.version_info[:2]
+
+              if (current_major, current_minor) < (required_major, required_minor):
+                  print(
+                      f"ERROR: Python {current_major}.{current_minor} is too old "
+                      f"(requires ≥ {required_major}.{required_minor})."
+                  )
+                  raise SystemExit(1)
+  - repo: local
+    hooks:
       - id: check-env-file
         name: Check if .env file is empty
         entry: bash -c 'FILE=dev/.env; if [ -s "$FILE" ]; then echo "$FILE is not empty. Please remove its content."; exit 1; fi'

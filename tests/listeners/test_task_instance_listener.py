@@ -11,12 +11,23 @@ from cosmos.operators.base import AbstractDbtBase
 class DummyDbtOperator(AbstractDbtBase):
     base_cmd = ["run"]
 
-    def __init__(self, *, module: str = "cosmos.operators.local.fake", install_deps: bool | None = True) -> None:
+    def __init__(
+        self,
+        *,
+        module: str = "cosmos.operators.local.fake",
+        install_deps: bool | None = True,
+        callback=None,
+        runner_callbacks=None,
+    ) -> None:
         super().__init__(project_dir="/tmp")
         self.invocation_mode = InvocationMode.DBT_RUNNER
         self._task_module = module
         if install_deps is not None:
             self.install_deps = install_deps
+        if callback is not None:
+            self.callback = callback
+        if runner_callbacks is not None:
+            self._dbt_runner_callbacks = runner_callbacks
 
     def build_and_run_cmd(
         self, context, cmd_flags, run_as_async=False, async_context=None, **kwargs
@@ -96,6 +107,18 @@ def test_build_task_metrics_marks_custom_subclasses():
 
     assert metrics["is_cosmos_operator_subclass"] is True
     assert metrics["execution_mode"] is None
+    assert metrics["has_callback"] is False
+
+
+def test_build_task_metrics_sets_has_callback_for_callable():
+    operator = DummyDbtOperator(callback=lambda *_: None)
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["has_callback"] is True
+
+
 
 
 @patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")

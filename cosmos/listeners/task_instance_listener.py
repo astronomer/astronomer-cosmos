@@ -113,11 +113,7 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[str, str, str]:
     profile_config: ProfileConfig = task_instance.task.profile_config
 
     # Determine strategy
-    profile_strategy = (
-        "yaml_file"
-        if profile_config.profiles_yml_filepath is not None
-        else "mapping"
-    )
+    profile_strategy = "yaml_file" if profile_config.profiles_yml_filepath is not None else "mapping"
 
     # Default
     profile_mapping_class = ""

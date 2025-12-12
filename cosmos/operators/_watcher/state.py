@@ -30,7 +30,7 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
         task_instance.xcom_push(key=key, value=value)
 
 
-# TODO: Unify the Airflow call from cosmos/_triggers/watcher.py and cosmos/operators/watcher.py
+# TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerers.py and cosmos/operators/watcher.py
 def get_xcom_val(task_instance: TaskInstance, task_ids: str | list[str], key: str) -> Any:
     return task_instance.xcom_pull(task_ids, key=key)
 

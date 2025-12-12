@@ -37,7 +37,7 @@ class WatcherTrigger(BaseTrigger):
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
         return (
-            "cosmos._triggers.watcher.WatcherTrigger",
+            "cosmos.operators._watcher.triggerers.WatcherTrigger",
             {
                 "model_unique_id": self.model_unique_id,
                 "producer_task_id": self.producer_task_id,

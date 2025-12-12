@@ -202,12 +202,12 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
-    if (
-        execution_mode == ExecutionMode.WATCHER
-        and render_config is not None
-        and render_config.test_behavior == TestBehavior.AFTER_ALL
-    ):
-        operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+    if render_config is not None and render_config.test_behavior == TestBehavior.AFTER_ALL:
+        if execution_mode == ExecutionMode.WATCHER:
+            operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+        else:  # ExecutionMode.WATCHER_KUBERNETES
+            operator_class = "cosmos.operators.kubernetes.DbtTestKubernetesOperator"
+
     else:
         operator_class = calculate_operator_class(
             execution_mode=execution_mode,
@@ -648,6 +648,7 @@ def _add_producer_watcher_and_dependencies(
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
     nodes: dict[str, DbtNode] | None = None,
+    execution_mode: ExecutionMode = ExecutionMode.WATCHER,
 ) -> str:
     producer_task_args = task_args.copy()
 
@@ -662,10 +663,15 @@ def _add_producer_watcher_and_dependencies(
                 "resource_type:unit_test",
             ]
 
+    if execution_mode == ExecutionMode.WATCHER:
+        class_name = "cosmos.operators.watcher.DbtProducerWatcherOperator"
+    else:
+        class_name = "cosmos.operators.watcher_kubernetes.DbtProducerKubernetesWatcherOperator"
+
     # First, we create the producer task
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,
-        operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
+        operator_class=class_name,
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
@@ -913,7 +919,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     create_airflow_task_dependencies(nodes, tasks_map)
 
-    if execution_mode == ExecutionMode.WATCHER:
+    if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         _add_producer_watcher_and_dependencies(
             dag=dag,
@@ -922,6 +928,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             task_group=task_group,
             render_config=render_config,
             nodes=nodes,
+            execution_mode=execution_mode,
         )
 
     if settings.enable_setup_async_task:

@@ -31,7 +31,6 @@ def collect_standard_usage_metrics() -> dict[str, object]:
         "python_version": platform.python_version(),
         "platform_system": platform.system(),
         "platform_machine": platform.machine(),
-        "variables": {},
     }
     return metrics
 

@@ -34,7 +34,6 @@ def test_collect_standard_usage_metrics():
         "platform_machine",
         "platform_system",
         "python_version",
-        "variables",
     ]
     assert sorted(metrics.keys()) == expected_keys
 
@@ -131,7 +130,7 @@ def test_emit_usage_metrics_if_enabled_fails(mock_should_emit, caplog):
 
 
 @patch("cosmos.telemetry.should_emit", return_value=True)
-@patch("cosmos.telemetry.collect_standard_usage_metrics", return_value={"k1": "v1", "k2": "v2", "variables": {}})
+@patch("cosmos.telemetry.collect_standard_usage_metrics", return_value={"k1": "v1", "k2": "v2"})
 @patch("cosmos.telemetry.emit_usage_metrics")
 def test_emit_usage_metrics_if_enabled_succeeds(
     mock_emit_usage_metrics, mock_collect_standard_usage_metrics, mock_should_emit
@@ -142,5 +141,4 @@ def test_emit_usage_metrics_if_enabled_succeeds(
         "k1": "v1",
         "k2": "v2",
         "event_type": "any",
-        "variables": {},
     }

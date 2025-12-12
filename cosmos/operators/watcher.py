@@ -53,7 +53,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):

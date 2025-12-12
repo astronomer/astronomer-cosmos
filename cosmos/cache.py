@@ -306,7 +306,7 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
     hash_args = hashlib.md5("".join(cmd_args).encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
-    logger.info(
+    logger.debug(
         f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
     )
     return f"{dbt_project_hash},{hash_args}"

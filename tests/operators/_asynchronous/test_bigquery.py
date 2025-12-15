@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import base64
 import zlib
+from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
-
+from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+from packaging import version
 import pytest
+from airflow import DAG
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+from tests.utils import test_dag as run_test_dag
+from airflow import __version__ as airflow_version
 
 from cosmos.config import ProfileConfig
 from cosmos.exceptions import CosmosValueError
@@ -13,6 +19,16 @@ from cosmos.operators._asynchronous.bigquery import (
     DbtRunAirflowAsyncBigqueryOperator,
     _configure_bigquery_async_op_args,
     _mock_bigquery_adapter,
+)
+from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+real_profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+    ),
 )
 
 
@@ -216,3 +232,41 @@ def test_dbt_run_airflow_async_bigquery_operator_with_full_refresh(profile_confi
     )
 
     assert operator.full_refresh is True
+
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+)
+@pytest.mark.skipif(
+    version.parse(airflow_version) >= version.parse("3"),
+    reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
+)
+@pytest.mark.integration
+@patch("cosmos.settings.enable_dataset_alias", 0)
+def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
+    try:
+        from airflow.sdk.definitions.asset import Dataset
+    except ImportError:
+        from airflow.datasets import Dataset
+
+    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunAirflowAsyncBigqueryOperator(
+            profile_config=real_profile_config,
+            project_dir=Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop",
+            task_id="run",
+            dbt_cmd_flags=["--models", "ｍｕｌｔｉｂｙｔｅ"],
+            install_deps=True,
+            append_env=True,
+        )
+        run_operator
+
+    run_test_dag(dag)
+
+    assert run_operator.outlets == [
+        Dataset(
+            uri="postgres://0.0.0.0:5432/postgres.public.%EF%BD%8D%EF%BD%95%EF%BD%8C%EF%BD%94%EF%BD%89%EF%BD%82%EF%BD%99%EF%BD%94%EF%BD%85",
+            extra=None,
+        )
+    ]

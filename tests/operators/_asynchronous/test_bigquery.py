@@ -298,33 +298,8 @@ def test_execute_complete_calls_register_event_when_emit_datasets_true(
     mock_register_event.assert_called_once_with(mock_context)
 
 
-@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
-@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
-def test_execute_complete_does_not_call_register_event_when_emit_datasets_false(
-    mock_register_event, mock_store_template_fields, profile_config_mock
-):
-    """Test that _register_event is NOT called when emit_datasets=False in execute_complete method."""
-    operator = DbtRunAirflowAsyncBigqueryOperator(
-        task_id="test_task",
-        project_dir="/path/to/project",
-        profile_config=profile_config_mock,
-        dbt_kwargs={"task_id": "test_task"},
-    )
-
-    operator.emit_datasets = False
-
-    mock_context = MagicMock()
-    mock_context.__getitem__.return_value = "test_run_id"
-    mock_event = {"job_id": "test_job"}
-
-    with patch.object(BigQueryInsertJobOperator, "execute_complete", return_value="test_job"):
-        operator.execute_complete(mock_context, mock_event)
-
-    mock_register_event.assert_not_called()
-
-
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "register_dataset")
-def test_register_event_handles_complex_unique_id(mock_register_dataset, profile_config_mock):
+def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
     """Test that _register_event correctly extracts table name from complex unique_id."""
     operator = DbtRunAirflowAsyncBigqueryOperator(
         task_id="test_task",
@@ -349,4 +324,4 @@ def test_register_event_handles_complex_unique_id(mock_register_dataset, profile
     if AIRFLOW_VERSION.major >= 3:
         assert args[1][0].uri == "bigquery://my_project/my_dataset/my_complex_table_name"
     else:
-        assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name"
+        assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name/"

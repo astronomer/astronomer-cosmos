@@ -1052,6 +1052,78 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     assert "--full-refresh" in full_cmd
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_task_group_with_watcher_has_correct_templated_dbt_cmd():
+    """
+    Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.
+    Confirm that the dbt commands for both producer and sensor tasks include the expected templated flags.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup, ExecutionConfig
+    from cosmos.config import RenderConfig
+    from cosmos.constants import ExecutionMode, TestBehavior
+
+    context = {"ti": MagicMock(try_number=1), "run_id": "test_run_id"}
+
+    operator_args = {
+        "install_deps": True,  # install any necessary dependencies before running any dbt command
+        "execution_timeout": timedelta(seconds=120),
+        "full_refresh": True,
+        "dbt_cmd_flags": ["--threads", "{{ 1 if ti.try_number > 1 else 'x' }}"],
+    }
+
+    with DAG(
+        dag_id="example_watcher_taskgroup_flags",
+        start_date=datetime(2025, 1, 1),
+    ) as dag_dbt_task_group_watcher_flags:
+        """
+        Example DAG using a DbtTaskGroup with ExecutionMode.WATCHER, validating that templated dbt command
+        flags are rendered and passed correctly to both producer and sensor tasks.
+        """
+        DbtTaskGroup(
+            group_id="dbt_task_group",
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.WATCHER,
+            ),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+
+    # Basic check for producer task
+    producer_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.dbt_producer_watcher"]
+    producer_operator.render_template_fields(context=context)  # Render the templated fields
+    assert producer_operator.base_cmd == ["build"]
+
+    # Build the command without executing it and verify it was built correctly
+    cmd_flags = producer_operator.add_cmd_flags()
+    full_cmd, _ = producer_operator.build_cmd(context=context, cmd_flags=cmd_flags)
+    assert full_cmd[1] == "build"  # dbt build command
+
+    cmd = " ".join(full_cmd)
+    assert "--full-refresh" in full_cmd
+    assert "--threads x" in cmd
+
+    # Setup for checking the sensor task, which has templated command flags
+    context["ti"].task.dag.get_task.return_value = producer_operator
+    context["ti"].try_number = 2
+    sensor_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.stg_customers_run"]
+    sensor_operator.render_template_fields(context=context)  # Render the templated fields
+    assert sensor_operator.base_cmd == ["run"]
+
+    # Build the command without executing it and verify it was built correctly
+    cmd_flags = sensor_operator.add_cmd_flags()
+    full_cmd, _ = sensor_operator.build_cmd(context=context, cmd_flags=cmd_flags)
+    assert full_cmd[1] == "run"  # dbt run command
+
+    cmd = " ".join(full_cmd)
+    assert "--select stg_customers" in cmd
+    assert "--threads 1" in cmd
+
+
 @pytest.mark.integration
 def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
     profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})

@@ -8,6 +8,7 @@ import pytest
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
 from cosmos.config import ProfileConfig
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators._asynchronous.bigquery import (
     DbtRunAirflowAsyncBigqueryOperator,
@@ -216,3 +217,136 @@ def test_dbt_run_airflow_async_bigquery_operator_with_full_refresh(profile_confi
     )
 
     assert operator.full_refresh is True
+
+
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_execute_calls_register_event_when_emit_datasets_true(
+    mock_register_event, mock_store_template_fields, mock_build_and_run_cmd, profile_config_mock
+):
+    """Test that _register_event is called when emit_datasets=True in execute method."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    operator.emit_datasets = True
+    operator.gcp_project = "test_project"
+    operator.dataset = "test_dataset"
+
+    mock_context = MagicMock()
+    mock_context.__getitem__.return_value = "test_run_id"
+
+    operator.execute(mock_context)
+
+    mock_register_event.assert_called_once_with(mock_context)
+
+
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_execute_does_not_call_register_event_when_emit_datasets_false(
+    mock_register_event, mock_store_template_fields, mock_build_and_run_cmd, profile_config_mock
+):
+    """Test that _register_event is NOT called when emit_datasets=False in execute method."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    operator.emit_datasets = False
+
+    mock_context = MagicMock()
+    mock_context.__getitem__.return_value = "test_run_id"
+
+    operator.execute(mock_context)
+
+    mock_register_event.assert_not_called()
+
+
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+def test_execute_complete_calls_register_event_when_emit_datasets_true(
+    mock_register_event, mock_store_template_fields, profile_config_mock
+):
+    """Test that _register_event is called when emit_datasets=True in execute_complete method."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    operator.emit_datasets = True
+    operator.gcp_project = "test_project"
+    operator.dataset = "test_dataset"
+
+    mock_context = MagicMock()
+    mock_context.__getitem__.return_value = "test_run_id"
+    mock_event = {"job_id": "test_job"}
+
+    with patch.object(BigQueryInsertJobOperator, "execute_complete", return_value="test_job"):
+        operator.execute_complete(mock_context, mock_event)
+
+    mock_register_event.assert_called_once_with(mock_context)
+
+
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+def test_execute_complete_does_not_call_register_event_when_emit_datasets_false(
+    mock_register_event, mock_store_template_fields, profile_config_mock
+):
+    """Test that _register_event is NOT called when emit_datasets=False in execute_complete method."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    operator.emit_datasets = False
+
+    mock_context = MagicMock()
+    mock_context.__getitem__.return_value = "test_run_id"
+    mock_event = {"job_id": "test_job"}
+
+    with patch.object(BigQueryInsertJobOperator, "execute_complete", return_value="test_job"):
+        operator.execute_complete(mock_context, mock_event)
+
+    mock_register_event.assert_not_called()
+
+
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "register_dataset")
+def test_register_event_handles_complex_unique_id(mock_register_dataset, profile_config_mock):
+    """Test that _register_event correctly extracts table name from complex unique_id."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+
+    operator.gcp_project = "my_project"
+    operator.dataset = "my_dataset"
+    operator.async_context = {"dbt_node_config": {"unique_id": "model.my_project.my_schema.my_complex_table_name"}}
+
+    mock_context = MagicMock()
+
+    operator._register_event(mock_context)
+
+    # Verify register_dataset was called with correct table name (last part of unique_id)
+    mock_register_dataset.assert_called_once()
+    args, kwargs = mock_register_dataset.call_args
+    assert args[0] == []  # inlets
+    assert len(args[1]) == 1  # outlets
+    if AIRFLOW_VERSION.major >= 3:
+        assert args[1][0].uri == "bigquery://my_project/my_dataset/my_complex_table_name"
+    else:
+        assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name"

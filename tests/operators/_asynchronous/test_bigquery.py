@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+from packaging.version import Version
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
@@ -271,6 +272,7 @@ def test_execute_does_not_call_register_event_when_emit_datasets_false(
     mock_register_event.assert_not_called()
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), "Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
 def test_execute_complete_calls_register_event_when_emit_datasets_true(
@@ -298,6 +300,7 @@ def test_execute_complete_calls_register_event_when_emit_datasets_true(
     mock_register_event.assert_called_once_with(mock_context)
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), "Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "register_dataset")
 def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
     """Test that _register_event correctly extracts table name from complex unique_id."""
@@ -321,7 +324,7 @@ def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
     args, kwargs = mock_register_dataset.call_args
     assert args[0] == []  # inlets
     assert len(args[1]) == 1  # outlets
-    if AIRFLOW_VERSION.major >= 3:
+    if AIRFLOW_VERSION >= Version("3.0.0"):
         assert args[1][0].uri == "bigquery://my_project/my_dataset/my_complex_table_name"
     else:
         assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name/"

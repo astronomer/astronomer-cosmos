@@ -272,7 +272,7 @@ def test_execute_does_not_call_register_event_when_emit_datasets_false(
     mock_register_event.assert_not_called()
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), "Require Airflow >= 2.10")
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
 def test_execute_complete_calls_register_event_when_emit_datasets_true(
@@ -300,7 +300,7 @@ def test_execute_complete_calls_register_event_when_emit_datasets_true(
     mock_register_event.assert_called_once_with(mock_context)
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), "Require Airflow >= 2.10")
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "register_dataset")
 def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
     """Test that _register_event correctly extracts table name from complex unique_id."""

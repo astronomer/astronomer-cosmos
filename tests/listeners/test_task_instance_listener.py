@@ -138,7 +138,7 @@ def test_on_task_instance_failed_emits_failed_status(mock_emit):
     operator = DummyDbtOperator()
     ti = _make_task_instance(operator)
 
-    task_instance_listener.on_task_instance_failed(None, ti, RuntimeError("boom"), None)
+    task_instance_listener.on_task_instance_failed(None, ti, None)
 
     mock_emit.assert_called_once()
     args, _ = mock_emit.call_args

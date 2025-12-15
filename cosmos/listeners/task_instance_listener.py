@@ -159,7 +159,7 @@ def on_task_instance_success(previous_state, task_instance, session):  # type: i
 
 
 @hookimpl
-def on_task_instance_failed(previous_state, task_instance, error, session):  # type: ignore[override]
+def on_task_instance_failed(previous_state, task_instance, session):  # type: ignore[override]
     if not _is_cosmos_task(task_instance):
         return
 

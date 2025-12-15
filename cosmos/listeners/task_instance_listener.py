@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
+    from sqlalchemy.orm import Session
 
 from cosmos import telemetry
 from cosmos.constants import InvocationMode
@@ -149,7 +150,9 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
 
 
 @hookimpl
-def on_task_instance_success(previous_state, task_instance, session):  # type: ignore[override]
+def on_task_instance_success(
+    previous_state: Any, task_instance: TaskInstance, session: "Session"
+) -> None:  # type: ignore[override]
     if not _is_cosmos_task(task_instance):
         return
 
@@ -159,7 +162,9 @@ def on_task_instance_success(previous_state, task_instance, session):  # type: i
 
 
 @hookimpl
-def on_task_instance_failed(previous_state, task_instance, session):  # type: ignore[override]
+def on_task_instance_failed(
+    previous_state: Any, task_instance: TaskInstance, session: "Session"
+) -> None:  # type: ignore[override]
     if not _is_cosmos_task(task_instance):
         return
 

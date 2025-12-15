@@ -5,15 +5,15 @@ import zlib
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
-from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
-from packaging import version
+
 import pytest
 from airflow import DAG
-from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
-from tests.utils import test_dag as run_test_dag
 from airflow import __version__ as airflow_version
+from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
+from packaging import version
 
 from cosmos.config import ProfileConfig
+from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators._asynchronous.bigquery import (
     DbtRunAirflowAsyncBigqueryOperator,
@@ -21,6 +21,7 @@ from cosmos.operators._asynchronous.bigquery import (
     _mock_bigquery_adapter,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.utils import test_dag as run_test_dag
 
 real_profile_config = ProfileConfig(
     profile_name="default",
@@ -232,7 +233,6 @@ def test_dbt_run_airflow_async_bigquery_operator_with_full_refresh(profile_confi
     )
 
     assert operator.full_refresh is True
-
 
 
 @pytest.mark.skipif(

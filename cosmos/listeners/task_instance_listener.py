@@ -151,7 +151,7 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
 
 @hookimpl
 def on_task_instance_success(
-    previous_state: Any, task_instance: TaskInstance, session: "Session"
+    previous_state: Any, task_instance: TaskInstance, session: Session
 ) -> None:  # type: ignore[override]
     if not _is_cosmos_task(task_instance):
         return
@@ -163,7 +163,7 @@ def on_task_instance_success(
 
 @hookimpl
 def on_task_instance_failed(
-    previous_state: Any, task_instance: TaskInstance, session: "Session"
+    previous_state: Any, task_instance: TaskInstance, session: Session
 ) -> None:  # type: ignore[override]
     if not _is_cosmos_task(task_instance):
         return

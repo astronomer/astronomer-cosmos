@@ -9,7 +9,7 @@ Bug Fixes
 * (back-ported) Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
 
 
-1.10.2 (2025-08-07)
+1.10.2 (2025-08-08)
 ---------------------
 
 Bug Fixes

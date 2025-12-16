@@ -29,7 +29,7 @@ Enhancements
 
 Bug Fixes
 
-* (back-ported) Fix resolution of packages-install-path when it uses env_var by @tatiana in Fix resolution of packages-install-path when it uses env_var #2194
+* (back-ported) Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
 
 1.11.2 (2025-11-24)
 --------------------

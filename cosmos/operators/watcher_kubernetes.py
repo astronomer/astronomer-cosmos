@@ -4,9 +4,8 @@ import json
 import logging
 from collections.abc import Callable
 from datetime import timedelta
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
-
-from cosmos import DbtRunKubernetesOperator
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -26,6 +25,7 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
+from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
@@ -78,10 +78,10 @@ def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
 producer_task_context = None
 
 
-class WatcherKubernetesCallback(KubernetesPodOperatorCallback):
+class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
 
     @staticmethod
-    def progress_callback(*, line: str, client: client_type, mode: str, **kwargs) -> None:
+    def progress_callback(*, line: str, client: client_type, mode: str, **kwargs: Any) -> None:
         line_content = line.strip()
         logger.info(f"[progress_callback] {line_content}")
         try:
@@ -96,7 +96,7 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):
 
 class DbtProducerKubernetesWatcherOperator(DbtBuildKubernetesOperator):
 
-    template_fields = DbtBuildKubernetesOperator.template_fields + ("deferrable",)
+    template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = _store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -104,6 +104,10 @@ class DbtProducerKubernetesWatcherOperator(DbtBuildKubernetesOperator):
 
         super().__init__(task_id=task_id, *args, callbacks=WatcherKubernetesCallback, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+
+    @cached_property
+    def pod_manager(self) -> CosmosKubernetesPodManager:
+        return CosmosKubernetesPodManager(client=self.client, callbacks=self.callbacks)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         global producer_task_context
@@ -214,7 +218,7 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
         return fetch_state()
 
     # slightly modified from the original DbtConsumerWatcherSensor to check try run and use K8s run
-    def execute(self, context: Context, **kwargs: Any) -> None:
+    def execute(self, context: Context, **kwargs: Any) -> Any:
         ti = context["ti"]
         try_number = ti.try_number
         if try_number > 1:
@@ -233,6 +237,7 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
                 timeout=self.execution_timeout,
                 method_name=self.execute_complete.__name__,
             )
+        return None
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         status = event.get("status")
@@ -273,7 +278,7 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
         )
 
         if try_number > 1:
-            return self._fallback_to_local_run(try_number, context)
+            return bool(self._fallback_to_local_run(try_number, context))
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
@@ -333,7 +338,7 @@ class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, ...] = DbtSourceKubernetesOperator.template_fields
+    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)  # type: ignore[arg-type]
 
 
 class DbtRunWatcherKubernetesOperator(DbtConsumerKubernetesWatcherSensor):

@@ -1,7 +1,15 @@
 Changelog
 =========
 
-1.10.2 (2025-08-08)
+1.10.3 (2025-12-16)
+-------------------
+
+Bug Fixes
+
+* (back-ported) Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
+
+
+1.10.2 (2025-08-07)
 ---------------------
 
 Bug Fixes

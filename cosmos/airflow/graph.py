@@ -145,7 +145,7 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
-def create_test_task_metadata(
+def create_test_task_metadata(  # noqa:C901
     test_task_name: str,
     execution_mode: ExecutionMode,
     test_indirect_selection: TestIndirectSelection,
@@ -648,7 +648,7 @@ def _add_watcher_producer_task(
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
-) -> str:
+) -> BaseOperator:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
     The producer task is the task that will be used to produce the events for the watcher execution mode.
@@ -879,6 +879,17 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             execution_mode=execution_mode,
         )
 
+    if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
+        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
+        producer_task = _add_watcher_producer_task(
+            dag=dag,
+            task_args={**task_args, **setup_operator_args},
+            tasks_map=tasks_map,
+            task_group=task_group,
+            render_config=render_config,
+            execution_mode=execution_mode,
+        )
+
     for node_id, node in nodes.items():
         task_or_group_args = {
             # Arguments to this method:
@@ -952,10 +963,9 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         _add_watcher_dependencies(
             dag=dag,
             producer_airflow_task=producer_task,
-            task_args=task_args,
+            task_args={**task_args},
             tasks_map=tasks_map,
             nodes=nodes,
-            execution_mode=execution_mode,
         )
 
     if settings.enable_setup_async_task:

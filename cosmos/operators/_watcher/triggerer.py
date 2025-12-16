@@ -141,7 +141,6 @@ class WatcherTrigger(BaseTrigger):
                 )
                 yield TriggerEvent({"status": "failed", "reason": "producer_failed"})  # type: ignore[no-untyped-call]
                 return
-
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
             self.log.debug("Polling again for model '%s' status...", self.model_unique_id)

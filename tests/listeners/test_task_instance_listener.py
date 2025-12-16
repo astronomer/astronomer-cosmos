@@ -50,6 +50,18 @@ class CustomDbtSubclass(DummyDbtOperator):
         super().__init__(module="custom.pipeline.dummy")
 
 
+class DummyDbtOperatorNoCommand(DummyDbtOperator):
+    base_cmd = None
+
+
+class DummyDbtOperatorStringCommand(DummyDbtOperator):
+    base_cmd = "deps"
+
+
+class DummyDbtOperatorTupleCommand(DummyDbtOperator):
+    base_cmd = ("run", None, "--full-refresh")
+
+
 class NonCosmosOperator:
     __module__ = "airflow.operators.bash"
 
@@ -119,6 +131,80 @@ def test_build_task_metrics_sets_has_callback_for_callable():
     assert metrics["has_callback"] is True
 
 
+def test_build_task_metrics_interprets_tuple_callbacks():
+    operator = DummyDbtOperator(callback=(None, lambda *_: None))
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["has_callback"] is True
+
+
+def test_build_task_metrics_skips_dbt_command_when_missing():
+    operator = DummyDbtOperatorNoCommand()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert "dbt_command" not in metrics
+
+
+def test_build_task_metrics_handles_string_dbt_command():
+    operator = DummyDbtOperatorStringCommand()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["dbt_command"] == "deps"
+
+
+def test_build_task_metrics_flattens_iterable_commands():
+    operator = DummyDbtOperatorTupleCommand()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["dbt_command"] == "run --full-refresh"
+
+
+def test_build_task_metrics_handles_missing_invocation_mode():
+    operator = DummyDbtOperator()
+    delattr(operator, "invocation_mode")
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["invocation_mode"] is None
+
+
+def test_build_task_metrics_handles_custom_invocation_mode_string():
+    operator = DummyDbtOperator()
+    operator.invocation_mode = "custom-mode"
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["invocation_mode"] == "custom-mode"
+
+
+def test_has_callback_returns_false_for_non_cosmos_task():
+    ti = _make_task_instance(NonCosmosOperator())
+
+    assert task_instance_listener._has_callback(ti) is False
+
+
+def test_install_deps_returns_none_for_non_cosmos_task():
+    ti = _make_task_instance(NonCosmosOperator())
+
+    assert task_instance_listener._install_deps(ti) is None
+
+
+def test_dbt_command_returns_none_for_non_cosmos_task():
+    ti = _make_task_instance(NonCosmosOperator())
+
+    assert task_instance_listener._dbt_command(ti) is None
+
+
 @patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_task_instance_success_emits_for_cosmos_task(mock_emit):
     operator = DummyDbtOperator()
@@ -151,5 +237,14 @@ def test_on_task_instance_success_skips_non_cosmos_task(mock_emit):
     ti = _make_task_instance(NonCosmosOperator())
 
     task_instance_listener.on_task_instance_success(None, ti, None)
+
+    mock_emit.assert_not_called()
+
+
+@patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_task_instance_failed_skips_non_cosmos_task(mock_emit):
+    ti = _make_task_instance(NonCosmosOperator())
+
+    task_instance_listener.on_task_instance_failed(None, ti, None)
 
     mock_emit.assert_not_called()

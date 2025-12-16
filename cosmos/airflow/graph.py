@@ -145,7 +145,7 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
-def create_test_task_metadata(
+def create_test_task_metadata(  # noqa:C901
     test_task_name: str,
     execution_mode: ExecutionMode,
     test_indirect_selection: TestIndirectSelection,
@@ -641,15 +641,14 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
-def _add_producer_watcher_and_dependencies(
+def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
-    nodes: dict[str, DbtNode] | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
-) -> str:
+) -> BaseOperator:
     producer_task_args = task_args.copy()
 
     if render_config is not None:
@@ -675,7 +674,18 @@ def _add_producer_watcher_and_dependencies(
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
+    tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
 
+    return producer_airflow_task
+
+
+def _add_watcher_dependencies(
+    dag: DAG,
+    producer_airflow_task: BaseOperator,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+    nodes: dict[str, DbtNode] | None = None,
+) -> str:
     # Second, we need to set the producer task ID in all consumer tasks (and their children tasks)
     for node_id, task_or_taskgroup in tasks_map.items():
 
@@ -708,7 +718,6 @@ def _add_producer_watcher_and_dependencies(
                 for task in always_run_tasks:
                     task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
 
-    tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
     return producer_airflow_task.task_id
 
 
@@ -851,6 +860,17 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
 
+    if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
+        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
+        producer_task = _add_watcher_producer_task(
+            dag=dag,
+            task_args={**task_args, **setup_operator_args},
+            tasks_map=tasks_map,
+            task_group=task_group,
+            render_config=render_config,
+            execution_mode=execution_mode,
+        )
+
     for node_id, node in nodes.items():
         task_or_group_args = {
             # Arguments to this method:
@@ -921,14 +941,12 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
-        _add_producer_watcher_and_dependencies(
+        _add_watcher_dependencies(
             dag=dag,
+            producer_airflow_task=producer_task,
             task_args={**task_args, **setup_operator_args},
             tasks_map=tasks_map,
-            task_group=task_group,
-            render_config=render_config,
             nodes=nodes,
-            execution_mode=execution_mode,
         )
 
     if settings.enable_setup_async_task:

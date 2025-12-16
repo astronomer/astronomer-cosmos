@@ -1,19 +1,15 @@
 import math
 import time
+from collections.abc import Callable
 from datetime import timedelta
-from typing import TYPE_CHECKING
 
 import pendulum
 from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode
 from airflow.providers.cncf.kubernetes.utils.pod_manager import PodLoggingStatus, PodManager, parse_log_line
 from airflow.utils.timezone import utcnow
+from kubernetes.client.models.v1_pod import V1Pod
+from pendulum import DateTime
 from urllib3.exceptions import HTTPError, TimeoutError
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from kubernetes.client.models.v1_pod import V1Pod
-    from pendulum import DateTime
 
 
 # This is being added to overcome the issue with the KubernetesPodOperator logs repeating:
@@ -118,6 +114,8 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                             message_to_log = f"{message_to_log}\n{message}"
                             progress_callback_lines.append(line)
                 finally:
+                    for callback in self._callbacks:
+                        callback.progress_callback(line=message_to_log, client=self._client, mode=ExecutionMode.SYNC)
                     # log the last line and update the last_captured_timestamp
                     if message_to_log is not None:
                         self._log_message(

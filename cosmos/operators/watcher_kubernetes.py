@@ -24,7 +24,6 @@ try:
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
-
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID
@@ -83,7 +82,7 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
     @staticmethod
     def progress_callback(*, line: str, client: client_type, mode: str, **kwargs: Any) -> None:
         line_content = line.strip()
-        logger.info(f"[progress_callback] {line_content}")
+        logger.info(f"[xubi] {line_content}")
         try:
             k8s_timestamp, dbt_log = line_content.split(" ", 1)
         except ValueError:
@@ -107,7 +106,7 @@ class DbtProducerKubernetesWatcherOperator(DbtBuildKubernetesOperator):
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
-        return CosmosKubernetesPodManager(client=self.client, callbacks=self.callbacks)
+        return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         global producer_task_context
@@ -126,7 +125,7 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
         project_dir: str | None = None,
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
-        poke_interval: int = 10,
+        poke_interval: int = 3,
         timeout: int = 60 * 60,  # 1 h safety valve
         execution_timeout: timedelta = timedelta(hours=1),
         deferrable: bool = True,
@@ -239,12 +238,12 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
             )
         return None
 
-    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
-        status = event.get("status")
+    def execute_complete(
+        self, context: Context, status: str | None = None, reason: str | None = None, **kwargs: Any
+    ) -> None:
         if status != "failed":
             return
 
-        reason = event.get("reason")
         if reason == "model_failed":
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
@@ -270,11 +269,12 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
         try_number = ti.try_number
 
         logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s' and xcom '%s'",
             try_number,
             self.poke_retry_number,
             self.producer_task_id,
             self.model_unique_id,
+            f"{self.model_unique_id.replace('.', '__')}_status",
         )
 
         if try_number > 1:

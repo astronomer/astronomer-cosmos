@@ -237,7 +237,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
 
 class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
-    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtRunLocalOperator.template_fields + ("model_unique_id",)  # type: ignore[operator]
     poke_retry_number: int = 0
 
     def __init__(

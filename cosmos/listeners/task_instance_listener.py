@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
 
 from cosmos import telemetry
-from cosmos.constants import InvocationMode, _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
+from cosmos.constants import InvocationMode
 from cosmos.log import get_logger
 from cosmos.operators.base import AbstractDbtBase
 

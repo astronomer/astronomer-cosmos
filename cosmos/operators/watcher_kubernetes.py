@@ -238,9 +238,10 @@ class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOpe
             )
         return None
 
-    def execute_complete(
-        self, context: Context, status: str | None = None, reason: str | None = None, **kwargs: Any
-    ) -> None:
+    def execute_complete(self, context: Context, event: dict[str, Any], **kwargs: Any) -> None:
+        status = event.get("status")
+        reason = event.get("reason")
+
         if status != "failed":
             return
 

@@ -74,10 +74,8 @@ def _make_task_instance(task, **overrides) -> SimpleNamespace:
         dag_id="example_dag",
         task_id="example_task",
         task=task,
-        queue="default",
-        priority_weight=5,
         map_index=-1,
-        dag_run=SimpleNamespace(run_id="run-1", dag_hash="hash-123"),
+        dag_run=SimpleNamespace(run_id="run-1"),
         duration=7.0,
     )
     defaults.update(overrides)
@@ -97,7 +95,6 @@ def test_build_task_metrics_records_core_fields():
     assert metrics["execution_mode"] == "local"
     assert metrics["is_cosmos_operator_subclass"] is False
     assert metrics["dag_run_id"] == "run-1"
-    assert metrics["dag_hash"] == "hash-123"
 
 
 def test_build_task_metrics_ignores_missing_install_deps():

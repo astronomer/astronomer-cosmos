@@ -119,8 +119,6 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "is_cosmos_operator_subclass": _is_cosmos_subclass(task_instance),
         "invocation_mode": _invocation_mode(task_instance),
         "execution_mode": _execution_mode_from_task(task_instance),
-        "queue": task_instance.queue,
-        "priority_weight": task_instance.priority_weight,
         "map_index": task_instance.map_index,
     }
 
@@ -137,9 +135,6 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
     dag_run = getattr(task_instance, "dag_run", None)
     if dag_run is not None:
         metrics["dag_run_id"] = dag_run.run_id
-        dag_hash = getattr(dag_run, "dag_hash", None)
-        if dag_hash is not None:
-            metrics["dag_hash"] = dag_hash
 
     duration = getattr(task_instance, "duration", None)
     if duration is not None:
@@ -149,7 +144,7 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
 
 
 @hookimpl
-def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, **kwargs: Any) -> None:  # type: ignore[override]
+def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
     """Handle task instance success for both Airflow 2 (with session) and Airflow 3 (without session)."""
     if not _is_cosmos_task(task_instance):
         return
@@ -160,7 +155,7 @@ def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, *
 
 
 @hookimpl
-def on_task_instance_failed(previous_state: Any, task_instance: TaskInstance, **kwargs: Any) -> None:  # type: ignore[override]
+def on_task_instance_failed(previous_state: Any, task_instance: TaskInstance, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
     """Handle task instance failure for both Airflow 2 (with session) and Airflow 3 (with error and without session)."""
     if not _is_cosmos_task(task_instance):
         return

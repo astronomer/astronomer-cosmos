@@ -210,7 +210,7 @@ def test_on_task_instance_success_emits_for_cosmos_task(mock_emit):
     operator = DummyDbtOperator()
     ti = _make_task_instance(operator)
 
-    task_instance_listener.on_task_instance_success(None, ti, None)
+    task_instance_listener.on_task_instance_success(None, ti, session=None)
 
     mock_emit.assert_called_once()
     args, _ = mock_emit.call_args
@@ -224,7 +224,7 @@ def test_on_task_instance_failed_emits_failed_status(mock_emit):
     operator = DummyDbtOperator()
     ti = _make_task_instance(operator)
 
-    task_instance_listener.on_task_instance_failed(None, ti, None)
+    task_instance_listener.on_task_instance_failed(None, ti, error=None, session=None)
 
     mock_emit.assert_called_once()
     args, _ = mock_emit.call_args
@@ -236,7 +236,7 @@ def test_on_task_instance_failed_emits_failed_status(mock_emit):
 def test_on_task_instance_success_skips_non_cosmos_task(mock_emit):
     ti = _make_task_instance(NonCosmosOperator())
 
-    task_instance_listener.on_task_instance_success(None, ti, None)
+    task_instance_listener.on_task_instance_success(None, ti, session=None)
 
     mock_emit.assert_not_called()
 
@@ -245,6 +245,6 @@ def test_on_task_instance_success_skips_non_cosmos_task(mock_emit):
 def test_on_task_instance_failed_skips_non_cosmos_task(mock_emit):
     ti = _make_task_instance(NonCosmosOperator())
 
-    task_instance_listener.on_task_instance_failed(None, ti, None)
+    task_instance_listener.on_task_instance_failed(None, ti, error=None, session=None)
 
     mock_emit.assert_not_called()

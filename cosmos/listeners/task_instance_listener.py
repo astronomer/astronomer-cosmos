@@ -6,10 +6,9 @@ from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
-    from sqlalchemy.orm import Session
 
 from cosmos import telemetry
-from cosmos.constants import InvocationMode
+from cosmos.constants import InvocationMode, _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 from cosmos.log import get_logger
 from cosmos.operators.base import AbstractDbtBase
 
@@ -150,9 +149,8 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
 
 
 @hookimpl
-def on_task_instance_success(
-    previous_state: Any, task_instance: TaskInstance, session: Session
-) -> None:  # type: ignore[override]
+def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, **kwargs: Any) -> None:  # type: ignore[override]
+    """Handle task instance success for both Airflow 2 (with session) and Airflow 3 (without session)."""
     if not _is_cosmos_task(task_instance):
         return
 
@@ -162,9 +160,8 @@ def on_task_instance_success(
 
 
 @hookimpl
-def on_task_instance_failed(
-    previous_state: Any, task_instance: TaskInstance, session: Session
-) -> None:  # type: ignore[override]
+def on_task_instance_failed(previous_state: Any, task_instance: TaskInstance, **kwargs: Any) -> None:  # type: ignore[override]
+    """Handle task instance failure for both Airflow 2 (with session) and Airflow 3 (with error and without session)."""
     if not _is_cosmos_task(task_instance):
         return
 

@@ -202,7 +202,11 @@ def create_test_task_metadata(  # noqa:C901
     if node:
         args_to_override = node.operator_kwargs_to_override
 
-    if render_config is not None and render_config.test_behavior == TestBehavior.AFTER_ALL:
+    if (
+        render_config is not None
+        and render_config.test_behavior == TestBehavior.AFTER_ALL
+        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES)
+    ):
         if execution_mode == ExecutionMode.WATCHER:
             operator_class = "cosmos.operators.local.DbtTestLocalOperator"
         else:  # ExecutionMode.WATCHER_KUBERNETES

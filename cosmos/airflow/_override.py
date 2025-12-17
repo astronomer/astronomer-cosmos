@@ -55,6 +55,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
             Returns the last timestamp observed in logs.
             """
 
+            # CUSTOM: Introduced these four lines, modifying the 1.11.0 K8s provider code
             if Version(airflow_k8s_provider_version) >= Version("1.10.0"):
                 from airflow.providers.cncf.kubernetes.utils.pod_manager import parse_log_line
             else:
@@ -111,6 +112,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                                         container_name_log_prefix_enabled,
                                         log_formatter,
                                     )
+                                    # CUSTOM: Change where callbacks are invoked from
                                     for callback in self._callbacks:
                                         callback.progress_callback(
                                             line=line, client=self._client, mode=ExecutionMode.SYNC
@@ -122,6 +124,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                             message_to_log = f"{message_to_log}\n{message}"
                             progress_callback_lines.append(line)
                 finally:
+                    # CUSTOM: Change where callbacks are invoked from
                     for callback in self._callbacks:
                         callback.progress_callback(line=message_to_log, client=self._client, mode=ExecutionMode.SYNC)
                     # log the last line and update the last_captured_timestamp

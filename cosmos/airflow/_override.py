@@ -9,6 +9,7 @@ from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode
 from airflow.providers.cncf.kubernetes.utils.pod_manager import PodLoggingStatus, PodManager
 from airflow.utils.timezone import utcnow
 from kubernetes.client.models.v1_pod import V1Pod
+from packaging.version import Version
 from pendulum import DateTime
 from urllib3.exceptions import HTTPError, TimeoutError
 
@@ -54,7 +55,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
             Returns the last timestamp observed in logs.
             """
 
-            if airflow_k8s_provider_version >= "1.11.0":
+            if Version(airflow_k8s_provider_version) >= Version("1.10.0"):
                 from airflow.providers.cncf.kubernetes.utils.pod_manager import parse_log_line
             else:
                 parse_log_line = self.parse_log_line

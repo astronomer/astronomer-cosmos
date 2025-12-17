@@ -973,10 +973,10 @@ def test_dbt_task_group_with_watcher():
 
     expected_task_names = [
         "pre_dbt",
+        "dbt_task_group.dbt_producer_watcher",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",
-        "dbt_task_group.dbt_producer_watcher",
         "dbt_task_group.stg_customers_run",
         "dbt_task_group.stg_orders_run",
         "dbt_task_group.stg_payments_run",

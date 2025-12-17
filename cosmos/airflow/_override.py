@@ -4,8 +4,9 @@ from collections.abc import Callable
 from datetime import timedelta
 
 import pendulum
+from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode
-from airflow.providers.cncf.kubernetes.utils.pod_manager import PodLoggingStatus, PodManager, parse_log_line
+from airflow.providers.cncf.kubernetes.utils.pod_manager import PodLoggingStatus, PodManager
 from airflow.utils.timezone import utcnow
 from kubernetes.client.models.v1_pod import V1Pod
 from pendulum import DateTime
@@ -52,6 +53,12 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
 
             Returns the last timestamp observed in logs.
             """
+
+            if airflow_k8s_provider_version >= "1.11.0":
+                from airflow.providers.cncf.kubernetes.utils.pod_manager import parse_log_line
+            else:
+                parse_log_line = self.parse_log_line
+
             exception = None
             last_captured_timestamp = None
             # We timeout connections after 30 minutes because otherwise they can get

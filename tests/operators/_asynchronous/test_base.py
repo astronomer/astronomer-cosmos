@@ -47,12 +47,16 @@ def profile_config_mock():
 
 def test_create_async_operator_class_valid():
     """Test _create_async_operator_class returns the correct async operator class if available."""
-    with patch("cosmos.operators._asynchronous.base.importlib.import_module") as mock_import:
+    with patch("cosmos.operators._asynchronous.base.load_method_from_module") as mock_import:
         mock_class = MagicMock()
-        mock_import.return_value = MagicMock()
-        setattr(mock_import.return_value, "DbtRunAirflowAsyncBigqueryOperator", mock_class)
+
+        mock_import.return_value = mock_class
 
         result = _create_async_operator_class("bigquery", "DbtRun")
+
+        mock_import.assert_called_once_with(
+            "cosmos.operators._asynchronous.bigquery", "DbtRunAirflowAsyncBigqueryOperator"
+        )
         assert result == mock_class
 
 

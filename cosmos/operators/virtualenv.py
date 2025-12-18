@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import psutil
 
@@ -94,11 +95,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if not self.py_requirements:
             self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")
 
-    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+    def run_subprocess(
+        self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
+    ) -> FullOutputSubprocessResult:
         if self._py_bin is not None:
             self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
             command[0] = str(Path(self._py_bin).parent / "dbt")
-        return super().run_subprocess(command, env, cwd)
+        return super().run_subprocess(command, env, cwd, **kwargs)
 
     def run_command(
         self,

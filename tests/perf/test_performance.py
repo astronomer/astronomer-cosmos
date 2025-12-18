@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path
-from typing import Generator
-
-try:
-    from functools import cache
-except ImportError:
-    from functools import lru_cache as cache
 
 import pytest
 from airflow.models.dagbag import DagBag

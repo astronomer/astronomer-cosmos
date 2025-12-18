@@ -612,7 +612,7 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
+        ti.xcom_pull.return_value = "success"
         context = self.make_context(ti)
 
         result = sensor.poke(context)
@@ -734,14 +734,14 @@ class TestDbtConsumerWatcherSensor:
         assert result == "success"
         assert sensor.compiled_sql == "select 42"
 
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
-    def test_producer_state_failed(self, mock_run_result):
+    @patch("cosmos.operators.watcher.get_xcom_val")
+    def test_producer_state_failed(self, mock_get_xcom_val):
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 1
-        mock_run_result.return_value = None
+        mock_get_xcom_val.return_value = None
         ti.xcom_pull.return_value = "failed"
 
         context = self.make_context(ti)
@@ -753,9 +753,9 @@ class TestDbtConsumerWatcherSensor:
             sensor.poke(context)
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_local_run")
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_status_from_run_results")
+    @patch("cosmos.operators.watcher.get_xcom_val")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_run_result, mock_fallback_to_local_run
+        self, mock_get_xcom_val, mock_fallback_to_local_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
@@ -766,7 +766,7 @@ class TestDbtConsumerWatcherSensor:
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 0
-        mock_run_result.return_value = None
+        mock_get_xcom_val.return_value = None
         ti.xcom_pull.return_value = "failed"
 
         context = self.make_context(ti)
@@ -1050,6 +1050,78 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     # Verify the command was built correctly
     assert full_cmd[1] == "build"  # dbt build command
     assert "--full-refresh" in full_cmd
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_task_group_with_watcher_has_correct_templated_dbt_cmd():
+    """
+    Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.
+    Confirm that the dbt commands for both producer and sensor tasks include the expected templated flags.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup, ExecutionConfig
+    from cosmos.config import RenderConfig
+    from cosmos.constants import ExecutionMode, TestBehavior
+
+    context = {"ti": MagicMock(try_number=1), "run_id": "test_run_id"}
+
+    operator_args = {
+        "install_deps": True,  # install any necessary dependencies before running any dbt command
+        "execution_timeout": timedelta(seconds=120),
+        "full_refresh": True,
+        "dbt_cmd_flags": ["--threads", "{{ 1 if ti.try_number > 1 else 'x' }}"],
+    }
+
+    with DAG(
+        dag_id="example_watcher_taskgroup_flags",
+        start_date=datetime(2025, 1, 1),
+    ) as dag_dbt_task_group_watcher_flags:
+        """
+        Example DAG using a DbtTaskGroup with ExecutionMode.WATCHER, validating that templated dbt command
+        flags are rendered and passed correctly to both producer and sensor tasks.
+        """
+        DbtTaskGroup(
+            group_id="dbt_task_group",
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.WATCHER,
+            ),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+
+    # Basic check for producer task
+    producer_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.dbt_producer_watcher"]
+    producer_operator.render_template_fields(context=context)  # Render the templated fields
+    assert producer_operator.base_cmd == ["build"]
+
+    # Build the command without executing it and verify it was built correctly
+    cmd_flags = producer_operator.add_cmd_flags()
+    full_cmd, _ = producer_operator.build_cmd(context=context, cmd_flags=cmd_flags)
+    assert full_cmd[1] == "build"  # dbt build command
+
+    cmd = " ".join(full_cmd)
+    assert "--full-refresh" in full_cmd
+    assert "--threads x" in cmd
+
+    # Setup for checking the sensor task, which has templated command flags
+    context["ti"].task.dag.get_task.return_value = producer_operator
+    context["ti"].try_number = 2
+    sensor_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.stg_customers_run"]
+    sensor_operator.render_template_fields(context=context)  # Render the templated fields
+    assert sensor_operator.base_cmd == ["run"]
+
+    # Build the command without executing it and verify it was built correctly
+    cmd_flags = sensor_operator.add_cmd_flags()
+    full_cmd, _ = sensor_operator.build_cmd(context=context, cmd_flags=cmd_flags)
+    assert full_cmd[1] == "run"  # dbt run command
+
+    cmd = " ".join(full_cmd)
+    assert "--select stg_customers" in cmd
+    assert "--threads 1" in cmd
 
 
 @pytest.mark.integration

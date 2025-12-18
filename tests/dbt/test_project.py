@@ -7,6 +7,7 @@ import yaml
 
 from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, PACKAGE_LOCKFILE_YML
 from cosmos.dbt.project import (
+    _resolve_env_var,
     change_working_directory,
     copy_dbt_packages,
     copy_manifest_file_if_exists,
@@ -76,6 +77,57 @@ def test_returns_custom_path_when_defined(tmpdir):
     write_dbt_project_yml(tmpdir, {"packages-install-path": "custom_dbt_packages"})
     result = get_dbt_packages_subpath(tmpdir)
     assert result == "custom_dbt_packages"
+
+
+@patch.dict(os.environ, {"MY_PATH": "custom_packages"})
+def test_resolve_env_var_with_simple_env_var():
+    """Test _resolve_env_var with and without a simple env_var reference."""
+
+    result = _resolve_env_var("dbt_packages")
+    assert result == "dbt_packages"
+
+    result = _resolve_env_var('{{ env_var("MY_PATH") }}')
+    assert result == "custom_packages"
+
+
+@patch.dict(os.environ, {}, clear=False)
+def test_resolve_env_var_with_default_value():
+    """Test _resolve_env_var with env_var default when variable is not set."""
+    # Ensure the variable is not set
+    os.environ.pop("NONEXISTENT_VAR", None)
+    result = _resolve_env_var('{{ env_var("NONEXISTENT_VAR", "default_path") }}')
+    assert result == "default_path"
+
+
+@patch.dict(os.environ, {"dbt_packages_suffix": "test"})
+def test_resolve_env_var_with_complex_template():
+    """Test _resolve_env_var with complex conditional templates."""
+    template = 'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") if env_var("dbt_packages_suffix","")!="" }}'
+    result = _resolve_env_var(template)
+    assert result == "dbt_packages_test"
+
+    os.environ.pop("dbt_packages_suffix", None)
+    template = 'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") if env_var("dbt_packages_suffix","")!="" }}'
+    result = _resolve_env_var(template)
+    assert result == "dbt_packages"
+
+
+@patch.dict(os.environ, {}, clear=False)
+def test_resolve_env_var_with_complex_template_unset_var():
+    """Test _resolve_env_var with a complex conditional template when variable is not set."""
+    if "dbt_packages_suffix" in os.environ:
+        del os.environ["dbt_packages_suffix"]
+    template = 'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") if env_var("dbt_packages_suffix","")!="" }}'
+    result = _resolve_env_var(template)
+    assert result == "dbt_packages"
+
+
+@patch.dict(os.environ, {"ENV_SUFFIX": "prod"})
+def test_get_dbt_packages_subpath_with_env_var_template(tmpdir):
+    """Test get_dbt_packages_subpath with env_var in packages-install-path."""
+    write_dbt_project_yml(tmpdir, {"packages-install-path": 'dbt_packages_{{ env_var("ENV_SUFFIX") }}'})
+    result = get_dbt_packages_subpath(tmpdir)
+    assert result == "dbt_packages_prod"
 
 
 def test_create_symlinks(tmp_path):

@@ -54,5 +54,8 @@ When running **Cosmos-powered tasks**, the following information is collected:
 - Airflow version
 - Python version
 - Operating system and machine architecture
+- Whether profile mapping or YAML file is used
+- Profile mapping class
+- Datawarehouse
 
 No user-identifiable information (IP included) is stored in Scarf.

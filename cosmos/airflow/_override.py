@@ -13,6 +13,8 @@ from packaging.version import Version
 from pendulum import DateTime
 from urllib3.exceptions import HTTPError, TimeoutError
 
+from cosmos.constants import _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+
 
 # This is being added to overcome the issue with the KubernetesPodOperator logs repeating:
 # https://github.com/apache/airflow/issues/59366
@@ -59,8 +61,12 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
             # Successfully tested with Airflow 3.1.0 and K8s provider 10.11.0 and 10.10.0
             if Version(airflow_k8s_provider_version) >= Version("10.10.0"):
                 from airflow.providers.cncf.kubernetes.utils.pod_manager import parse_log_line
-            else:  # Successfully tested with Airflow 3.1.0 and K8s provider 10.8.0 and 10.9.0
+            elif (
+                Version(airflow_k8s_provider_version) >= _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+            ):  # Successfully tested with Airflow 3.1.0 and K8s provider 10.8.0 and 10.9.0
                 parse_log_line = self.parse_log_line
+            else:
+                raise ValueError(f"Unsupported K8s provider version: {airflow_k8s_provider_version}")
 
             exception = None
             last_captured_timestamp = None

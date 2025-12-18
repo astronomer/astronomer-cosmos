@@ -75,6 +75,12 @@ elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
   # version does not meet our requirements.
   uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION"
+elif [ "$AIRFLOW_VERSION" = "3.1" ] || [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  # So we can validate ExecutionMode.WATCHER_KUBERNETES
+  uv pip install "apache-airflow-providers-cncf-kubernetes>= 10.8.0"
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt

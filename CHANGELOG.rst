@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.12.0a4 (2025-12-09)
+1.12.0a5 (2025-12-18)
 ----------------------
 
 Breaking changes
@@ -20,6 +20,8 @@ Features
 * Allow overriding ``DbtProducerWatcherOperator`` parameters via ``ExecutionConfig.setup_operator_args`` by @pankajastro in #2133
 * Use deferrable sensors by default in ``ExecutionMode.WATCHER`` by @pankajastro in #2084
 * Support real-time consumer updates when using ``ExecutionMode.WATCHER`` and ``InvocationMode.SUBPROCESS`` by @pankajastro in #2152
+* Update telemetry to v3 format with query parameters by @pankajkoti in #2192
+* Add initial set of telemetry task listener metrics for Cosmos operators by @pankajkoti in #2195
 
 Enhancements
 
@@ -29,6 +31,7 @@ Enhancements
 * Fail ``ExecutionMode.WATCHER`` consumer sensors immediately when the producer fails using Airflow context by @pankajkoti in #2126
 * ``ExecutonMode.WATCHER``: fetch producer status asynchronously from the Airflow runtime so deferrable sensors fail immediately when the producer task fails by @pankajkoti in #2144
 * Refactor ``ExecutionMode.WATCHER`` ``InvocationMode.SUBPROCESS`` log parser by @tatiana in #2183
+* Replace map_index with is_mapped_task boolean in task telemetry metrics by @pankajkoti in #2210
 
 Bug fixes
 
@@ -37,6 +40,9 @@ Bug fixes
 * Fix forwarding ``DbtProducerWatcherOperator`` ``dbt build`` flags by @michal-mrazek in #2127
 * Add databricks oauth mock profile by @fjmacagno in #2164
 * Register listeners in Airflow 3 plugin implementation by @pankajastro in #2187
+* Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
+* Fix ``template_fields`` in ``DbtConsumerWatcherSensor`` to include ``DbtRunLocalOperator`` template_fields`` by @tiovader and @emanuel-luis in #2209
+* Emit asset events in ExecutionMode.AIRFLOW_ASYNC mode by @pankajastro in #2184
 
 Docs
 
@@ -70,12 +76,16 @@ Others
 * Unpin Airflow to satisfy GitHub Security tab requirements by @pankajastro in #2171
 * Update Python version for ``pyupgrade`` in ``pre-commit`` config by @pankajastro in #2190
 * Add cooldown config in ``dependabot`` config by @pankajastro in #2189
+* Adjust pre-commit so Python 3.10 or higher can be used by @tatiana in #2196
+* Remove empty variables emission from telemetry metrics by @pankajkoti in #2197
+* Reformat documented comments for historical URL formats by @pankajkoti in #2199
 * Bump ``actions/checkout`` from ``5.0.0`` to ``5.0.1`` by @dependabot in #2135
 * Bump ``actions/checkout`` to ``6.0.0`` in GitHub workflows by @dependabot in #2147
 * Bump ``zizmorcore/zizmor-action`` from ``0.2.0`` to ``0.3.0`` by @dependabot in #2156
 * Bump ``actions/checkout`` from ``5.0.1`` to ``6.0.0`` by @dependabot in #2155
 * Bump ``actions/checkout`` from ``6.0.0`` to ``6.0.1`` by @dependabot in #2178
-* pre-commit autoupdate by @pre-commit-ci[bot] in #2134, #2162, #2173, #2191
+* Bump ``codecov/codecov-action`` from ``5.5.1`` to ``5.5.2`` by @dependabot in #2208
+* pre-commit autoupdate by @pre-commit-ci[bot] in #2134, #2162, #2173, #2191, #2202
 
 1.11.2 (2025-11-24)
 --------------------

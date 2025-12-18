@@ -127,7 +127,7 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | 
 
     # Populate mapping class only when strategy is "mapping"
     if profile_strategy == "mapping":
-        profile_mapping_class = str(profile_config.profile_mapping)
+        profile_mapping_class = profile_config.profile_mapping.__class__.__name__
 
     # Get database or profile type
     database = profile_config.get_profile_type()

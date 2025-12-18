@@ -7,7 +7,6 @@ from airflow.listeners import hookimpl
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
 
-    from cosmos.config import ProfileConfig
 
 from cosmos import telemetry
 from cosmos.constants import InvocationMode
@@ -112,11 +111,13 @@ def _has_callback(task_instance: TaskInstance) -> bool:
 
 def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | None, str | None]:
 
-    task = task_instance.task
-    if not isinstance(task, AbstractDbtBase):
+    if not _is_cosmos_task(task_instance):
         return None, None, None
 
-    profile_config: ProfileConfig = getattr(task, "profile_config", None)
+    profile_config = getattr(task_instance.task, "profile_config", None)
+
+    if not profile_config:
+        return None, None, None
 
     # Determine strategy
     profile_strategy = "yaml_file" if profile_config.profiles_yml_filepath is not None else "mapping"

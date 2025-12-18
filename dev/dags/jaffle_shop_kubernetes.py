@@ -25,6 +25,7 @@ from cosmos import (
     ProjectConfig,
     RenderConfig,
 )
+from cosmos.operators.kubernetes import DbtSeedKubernetesOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
@@ -60,7 +61,25 @@ with DAG(
     doc_md=__doc__,
     catchup=False,
 ) as dag:
-
+    # [START kubernetes_seed_example]
+    load_seeds = DbtSeedKubernetesOperator(
+        task_id="load_seeds",
+        project_dir=K8S_PROJECT_DIR,
+        get_logs=True,
+        schema="public",
+        image=DBT_IMAGE,
+        is_delete_operator_pod=False,
+        secrets=[postgres_password_secret, postgres_host_secret],
+        profile_config=ProfileConfig(
+            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
+        ),
+        env_vars={
+            "POSTGRES_DB": "postgres",
+            "POSTGRES_SCHEMA": "public",
+            "POSTGRES_USER": "postgres",
+        },
+    )
+    # [END kubernetes_seed_example]
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(
         project_config=ProjectConfig(),
@@ -98,4 +117,4 @@ with DAG(
     )
     # [END kubernetes_tg_example]
 
-    run_models
+    load_seeds >> run_models

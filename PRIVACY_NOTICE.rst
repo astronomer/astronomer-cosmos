@@ -56,6 +56,6 @@ When running **Cosmos-powered tasks**, the following information is collected:
 - Operating system and machine architecture
 - Whether profile mapping or YAML file is used
 - Profile mapping class
-- Datawarehouse
+- Data warehouse
 
 No user-identifiable information (IP included) is stored in Scarf.

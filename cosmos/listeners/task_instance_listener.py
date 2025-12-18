@@ -129,8 +129,12 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | 
     if profile_strategy == "mapping":
         profile_mapping_class = profile_config.profile_mapping.__class__.__name__
 
-    # Get database or profile type
-    database = profile_config.get_profile_type()
+    # Get database or profile type, but don't let telemetry failures break tasks
+    try:
+        database = profile_config.get_profile_type()
+    except Exception as exc:
+        logger.debug("Failed to get profile type from profile_config: %s", exc)
+        database = None
 
     return profile_strategy, profile_mapping_class, database
 

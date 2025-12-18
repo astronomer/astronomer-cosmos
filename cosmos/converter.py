@@ -256,6 +256,8 @@ class DbtToAirflowConverter:
     ) -> None:
         logger.info("::group::Cosmos DAG parsing logs")
 
+        logger.info("::group::Cosmos DAG/TaskGroup Parsing")
+
         # We copy the configuration so the changes introduced in this method, such as override_configuration,
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration
         execution_config = copy.deepcopy(execution_config) if execution_config is not None else ExecutionConfig()

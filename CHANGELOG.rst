@@ -45,6 +45,7 @@ Bug fixes
 * Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
 * Fix ``template_fields`` in ``DbtConsumerWatcherSensor`` to include ``DbtRunLocalOperator`` template_fields`` by @tiovader and @emanuel-luis in #2209
 * Emit asset events in ExecutionMode.AIRFLOW_ASYNC mode by @pankajastro in #2184
+* Remove dag_run_id from telemetry tests by @tatiana in #2213
 
 Docs
 

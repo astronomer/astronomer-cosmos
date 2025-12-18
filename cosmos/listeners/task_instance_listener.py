@@ -7,6 +7,7 @@ from airflow.listeners import hookimpl
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
 
+
 from cosmos import telemetry
 from cosmos.constants import InvocationMode
 from cosmos.log import get_logger
@@ -108,8 +109,41 @@ def _has_callback(task_instance: TaskInstance) -> bool:
     return bool(callback)
 
 
+def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | None, str | None]:
+    """Extract dbt profile-related telemetry metrics for a Cosmos-powered task."""
+
+    if not _is_cosmos_task(task_instance):
+        return None, None, None
+
+    profile_config = getattr(task_instance.task, "profile_config", None)
+
+    if not profile_config:
+        return None, None, None
+
+    # Determine strategy
+    profile_strategy = "yaml_file" if profile_config.profiles_yml_filepath is not None else "mapping"
+
+    # Default
+    profile_mapping_class = None
+
+    # Populate mapping class only when strategy is "mapping"
+    if profile_strategy == "mapping":
+        profile_mapping_class = profile_config.profile_mapping.__class__.__name__
+
+    # Get database or profile type, but don't let telemetry failures break tasks
+    try:
+        database = profile_config.get_profile_type()
+    except Exception as exc:
+        logger.debug("Failed to get profile type from profile_config: %s", exc)
+        database = None
+
+    return profile_strategy, profile_mapping_class, database
+
+
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""
+
+    profile_strategy, profile_mapping_class, database = get_profile_metrics(task_instance)
 
     metrics: dict[str, object] = {
         "dag_id": task_instance.dag_id,
@@ -119,6 +153,9 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "is_cosmos_operator_subclass": _is_cosmos_subclass(task_instance),
         "invocation_mode": _invocation_mode(task_instance),
         "execution_mode": _execution_mode_from_task(task_instance),
+        "profile_strategy": profile_strategy,
+        "profile_mapping_class": profile_mapping_class,
+        "database": database,
         # map_index is -1 for non-mapped tasks, >= 0 for mapped tasks
         "is_mapped_task": task_instance.map_index >= 0,
     }

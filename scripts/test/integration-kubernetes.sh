@@ -3,6 +3,9 @@
 set -x
 set -e
 
+# So we can validate ExecutionMode.WATCHER_KUBERNETES
+pip install "apache-airflow-providers-cncf-kubernetes>=10.8.0"
+
 # Reset the Airflow database to its initial state
 airflow db reset -y
 

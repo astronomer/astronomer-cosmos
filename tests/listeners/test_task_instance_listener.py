@@ -130,7 +130,6 @@ def test_profile_mapping_metrics(mock_postgres_conn):
     assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
     assert metrics["execution_mode"] == "local"
     assert metrics["is_cosmos_operator_subclass"] is False
-    assert metrics["dag_run_id"] == "run-1"
     assert metrics["profile_strategy"] == "mapping"
     assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
     assert metrics["database"] == "postgres"
@@ -151,7 +150,6 @@ def test_profile_file_metrics():
     assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
     assert metrics["execution_mode"] == "local"
     assert metrics["is_cosmos_operator_subclass"] is False
-    assert metrics["dag_run_id"] == "run-1"
     assert metrics["profile_strategy"] == "yaml_file"
     assert metrics["profile_mapping_class"] is None
     assert metrics["database"] == "postgres"

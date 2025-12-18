@@ -29,7 +29,7 @@ Enhancements
 * Refactor ``airflow/graph.py`` to simplify the code base by @tatiana in #2080
 * Force watcher producer retries to zero by @pankajkoti in #2114
 * Fail ``ExecutionMode.WATCHER`` consumer sensors immediately when the producer fails using Airflow context by @pankajkoti in #2126
-* ``ExecutonMode.WATCHER``: fetch producer status asynchronously from the Airflow runtime so deferrable sensors fail immediately when the producer task fails by @pankajkoti in #2144
+* ``ExecutionMode.WATCHER``: fetch producer status asynchronously from the Airflow runtime so deferrable sensors fail immediately when the producer task fails by @pankajkoti in #2144
 * Refactor ``ExecutionMode.WATCHER`` ``InvocationMode.SUBPROCESS`` log parser by @tatiana in #2183
 * Replace map_index with is_mapped_task boolean in task telemetry metrics by @pankajkoti in #2210
 * Collect cosmos profile metrics in task telemetry metrics by @pankajastro in #2198

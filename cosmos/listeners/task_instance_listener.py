@@ -7,7 +7,7 @@ from airflow.listeners import hookimpl
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
 
-    from cosmos import ProfileConfig
+    from cosmos.config import ProfileConfig
 
 from cosmos import telemetry
 from cosmos.constants import InvocationMode
@@ -110,8 +110,13 @@ def _has_callback(task_instance: TaskInstance) -> bool:
     return bool(callback)
 
 
-def get_profile_metrics(task_instance: TaskInstance) -> tuple[str, str, str]:
-    profile_config: ProfileConfig = task_instance.task.profile_config
+def get_profile_metrics(task_instance: TaskInstance) -> tuple[None, None, None] | tuple[str, str, str]:
+
+    task = task_instance.task
+    if not isinstance(task, AbstractDbtBase):
+        return None, None, None
+
+    profile_config: ProfileConfig = getattr(task, "profile_config", None)
 
     # Determine strategy
     profile_strategy = "yaml_file" if profile_config.profiles_yml_filepath is not None else "mapping"
@@ -132,6 +137,8 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[str, str, str]:
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""
 
+    profile_strategy, profile_mapping_class, database = get_profile_metrics(task_instance)
+
     metrics: dict[str, object] = {
         "dag_id": task_instance.dag_id,
         "task_id": task_instance.task_id,
@@ -141,6 +148,9 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "invocation_mode": _invocation_mode(task_instance),
         "execution_mode": _execution_mode_from_task(task_instance),
         "map_index": task_instance.map_index,
+        "profile_strategy": profile_strategy,
+        "profile_mapping_class": profile_mapping_class,
+        "database": database,
     }
 
     dbt_command = _dbt_command(task_instance)

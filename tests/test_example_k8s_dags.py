@@ -6,6 +6,8 @@ from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
 
+from cosmos.constants import _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+
 from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
@@ -49,7 +51,7 @@ from packaging.version import Version
 
 
 @pytest.mark.skipif(
-    Version(airflow_k8s_provider_version) < Version("10"),
+    Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION,
     reason="This feature is only available for K8s provider 10.0 and above",
 )
 @pytest.mark.integration

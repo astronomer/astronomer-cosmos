@@ -94,7 +94,17 @@ def test_build_task_metrics_records_core_fields():
     assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
     assert metrics["execution_mode"] == "local"
     assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["is_mapped_task"] is False
     assert metrics["dag_run_id"] == "run-1"
+
+
+def test_build_task_metrics_detects_mapped_task():
+    operator = DummyDbtOperator()
+    ti = _make_task_instance(operator, map_index=2)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["is_mapped_task"] is True
 
 
 def test_build_task_metrics_ignores_missing_install_deps():

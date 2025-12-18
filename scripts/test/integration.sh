@@ -22,4 +22,4 @@ pytest -vv \
     --ignore=tests/perf \
     --ignore=tests/test_async_example_dag.py \
     --ignore=tests/test_example_k8s_dags.py \
-    -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes)'
+    -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes or jaffle_shop_watcher_kubernetes)'

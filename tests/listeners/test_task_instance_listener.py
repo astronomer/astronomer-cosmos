@@ -95,7 +95,6 @@ def test_build_task_metrics_records_core_fields():
     assert metrics["execution_mode"] == "local"
     assert metrics["is_cosmos_operator_subclass"] is False
     assert metrics["is_mapped_task"] is False
-    assert metrics["dag_run_id"] == "run-1"
 
 
 def test_build_task_metrics_detects_mapped_task():

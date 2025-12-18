@@ -112,8 +112,6 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
     """Build telemetry payload for task completion events."""
 
     metrics: dict[str, object] = {
-        "dag_id": task_instance.dag_id,
-        "task_id": task_instance.task_id,
         "status": status,
         "operator_name": task_instance.task.__class__.__name__,
         "is_cosmos_operator_subclass": _is_cosmos_subclass(task_instance),
@@ -132,10 +130,6 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         metrics["install_deps"] = install_deps
 
     metrics["has_callback"] = _has_callback(task_instance)
-
-    dag_run = getattr(task_instance, "dag_run", None)
-    if dag_run is not None:
-        metrics["dag_run_id"] = dag_run.run_id
 
     duration = getattr(task_instance, "duration", None)
     if duration is not None:

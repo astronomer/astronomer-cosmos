@@ -119,7 +119,7 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "is_cosmos_operator_subclass": _is_cosmos_subclass(task_instance),
         "invocation_mode": _invocation_mode(task_instance),
         "execution_mode": _execution_mode_from_task(task_instance),
-        "map_index": task_instance.map_index,
+        "is_mapped_task": task_instance.map_index >= 0,
     }
 
     dbt_command = _dbt_command(task_instance)

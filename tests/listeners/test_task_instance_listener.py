@@ -1,11 +1,38 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+from airflow.models.connection import Connection
+
+from cosmos import ProfileConfig
 from cosmos.constants import InvocationMode
 from cosmos.listeners import task_instance_listener
 from cosmos.operators.base import AbstractDbtBase
+from cosmos.profiles import get_automatic_profile_mapping
+
+DBT_PROJECT_PROFILE = Path(__file__).parent.parent / "sample/mini/profiles.yml"
+
+
+@pytest.fixture()
+def mock_postgres_conn():  # type: ignore
+    """
+    Sets the connection as an environment variable.
+    """
+    conn = Connection(
+        conn_id="my_postgres_connection",
+        conn_type="postgres",
+        host="my_host",
+        login="my_user",
+        password="my_password",
+        port=5432,
+        schema="my_database",
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
 
 
 class DummyDbtOperator(AbstractDbtBase):
@@ -18,10 +45,12 @@ class DummyDbtOperator(AbstractDbtBase):
         install_deps: bool | None = True,
         callback=None,
         runner_callbacks=None,
+        profile_config=None,
     ) -> None:
         super().__init__(project_dir="/tmp")
         self.invocation_mode = InvocationMode.DBT_RUNNER
         self._task_module = module
+        self.profile_config = profile_config
         if install_deps is not None:
             self.install_deps = install_deps
         if callback is not None:
@@ -82,6 +111,52 @@ def _make_task_instance(task, **overrides) -> SimpleNamespace:
     return SimpleNamespace(**defaults)
 
 
+def test_profile_mapping_metrics(mock_postgres_conn):
+    profile_mapping = get_automatic_profile_mapping(
+        mock_postgres_conn.conn_id,
+        {"schema": "my_schema"},
+    )
+
+    operator = DummyDbtOperator(
+        profile_config=ProfileConfig(profile_name="postgres", target_name="test", profile_mapping=profile_mapping)
+    )
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["operator_name"] == "DummyDbtOperator"
+    assert metrics["dbt_command"] == "run"
+    assert metrics["install_deps"] is True
+    assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
+    assert metrics["execution_mode"] == "local"
+    assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["dag_run_id"] == "run-1"
+    assert metrics["profile_strategy"] == "mapping"
+    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
+    assert metrics["database"] == "postgres"
+
+
+def test_profile_file_metrics():
+
+    operator = DummyDbtOperator(
+        profile_config=ProfileConfig(profiles_yml_filepath=DBT_PROJECT_PROFILE, profile_name="mini", target_name="dev")
+    )
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["operator_name"] == "DummyDbtOperator"
+    assert metrics["dbt_command"] == "run"
+    assert metrics["install_deps"] is True
+    assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
+    assert metrics["execution_mode"] == "local"
+    assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["dag_run_id"] == "run-1"
+    assert metrics["profile_strategy"] == "yaml_file"
+    assert metrics["profile_mapping_class"] is None
+    assert metrics["database"] == "postgres"
+
+
 def test_build_task_metrics_records_core_fields():
     operator = DummyDbtOperator()
     ti = _make_task_instance(operator)
@@ -95,7 +170,6 @@ def test_build_task_metrics_records_core_fields():
     assert metrics["execution_mode"] == "local"
     assert metrics["is_cosmos_operator_subclass"] is False
     assert metrics["is_mapped_task"] is False
-    assert metrics["dag_run_id"] == "run-1"
 
 
 def test_build_task_metrics_detects_mapped_task():

@@ -157,6 +157,8 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
         "profile_strategy": profile_strategy,
         "profile_mapping_class": profile_mapping_class,
         "database": database,
+        # map_index is -1 for non-mapped tasks, >= 0 for mapped tasks
+        "is_mapped_task": task_instance.map_index >= 0,
     }
 
     dbt_command = _dbt_command(task_instance)

@@ -180,8 +180,15 @@ DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 
 PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
 
-TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}/{execution_modes}"
-TELEMETRY_VERSION = "v2"
+# Historical telemetry endpoints retained for reference:
+# • v1 (Cosmos 1.8.0–1.10.x)
+#   URL: https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}
+# • v2 (Cosmos 1.11.0–1.11.x)
+#   URL: https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{cosmos_version}/{airflow_version}/{python_version}/{platform_system}/{platform_machine}/{event_type}/{status}/{dag_hash}/{task_count}/{cosmos_task_count}/{execution_modes}
+# • v3 (Cosmos 1.12.0+)
+#   URL: https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{event_type}?{query_string}
+TELEMETRY_URL = "https://astronomer.gateway.scarf.sh/astronomer-cosmos/{telemetry_version}/{event_type}?{query_string}"
+TELEMETRY_VERSION = "v3"
 TELEMETRY_TIMEOUT = 1.0
 
 _AIRFLOW3_MAJOR_VERSION = 3

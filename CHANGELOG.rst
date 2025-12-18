@@ -87,6 +87,13 @@ Others
 * Bump ``codecov/codecov-action`` from ``5.5.1`` to ``5.5.2`` by @dependabot in #2208
 * pre-commit autoupdate by @pre-commit-ci[bot] in #2134, #2162, #2173, #2191, #2202
 
+1.11.3 (2025-12-16)
+-------------------
+
+Bug Fixes
+
+* (back-ported) Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
+
 1.11.2 (2025-11-24)
 --------------------
 
@@ -210,6 +217,15 @@ Others
 * Fix Sphinx issue in the main branch by @tatiana in #2064
 * pre-commit autoupdate in #2065, #2043, #2033, #2019, #1990, #2019, #2008, #1941, #1935, #1924
 * GitHub dependabot update in #2051, #2050, #2038, #2022, #1947, #1955, #1946, #1944, #1945, #1928, #1921, #1917
+
+
+1.10.3 (2025-12-16)
+-------------------
+
+Bug Fixes
+
+* (back-ported) Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
+
 
 1.10.2 (2025-08-08)
 ---------------------

@@ -17,6 +17,11 @@ except ImportError:
         "with with `pip install apache-airflow-providers-google`."
     )
 
+try:  # Airflow 3
+    from airflow.sdk.definitions.asset import Asset
+except (ModuleNotFoundError, ImportError):  # Airflow 2
+    from airflow.datasets import Dataset as Asset  # type: ignore
+
 from airflow.utils.context import Context  # type: ignore
 from packaging.version import Version
 
@@ -183,7 +188,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def execute(self, context: Context, **kwargs: Any) -> None:
         if self.async_context.get("run_id") is None:
             self.async_context["run_id"] = context["run_id"]
-
         if settings.enable_setup_async_task:
 
             if settings.upload_sql_to_xcom:
@@ -201,6 +205,8 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
         self._store_template_fields(context=context)
+        if self.emit_datasets:
+            self._register_event(context)
 
     def _store_template_fields(self, context: Context) -> None:
         if not settings.enable_setup_async_task:
@@ -237,4 +243,19 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)
+        if self.emit_datasets:
+            self._register_event(context)
         return job_id
+
+    def _register_event(self, context: Context) -> None:
+        dbt_node_config = self.async_context.get("dbt_node_config", {})
+        unique_id = dbt_node_config.get("unique_id", f"unknown_model_{self.task_id}")
+        table_name = unique_id.split(".")[-1]
+
+        if AIRFLOW_VERSION.major >= 3:
+            asset_uri = f"bigquery://{self.gcp_project}/{self.dataset}/{table_name}"
+        else:
+            asset_uri = f"bigquery://{self.gcp_project}.{self.dataset}.{table_name}"
+
+        output = [Asset(uri=asset_uri)]
+        self.register_dataset([], output, context)

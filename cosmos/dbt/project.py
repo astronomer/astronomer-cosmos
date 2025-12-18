@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import yaml
+from jinja2 import Template
 
 from cosmos.constants import (
     DBT_DEFAULT_PACKAGES_FOLDER,
@@ -40,6 +41,27 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return False
 
 
+def _resolve_env_var(template_str: str) -> str:
+    """
+    Given a Jinja template string, resolve the environment variables, declared using the dbt syntax,
+    and return the rendered string.
+
+    Example:
+    - template_str = '/usr/local/airflow/dags/dbt/dbt_packages{{ "_" + env_var("env","") if env_var("env","")!="" }}'
+    - environment variable `env` is set to "test"
+
+    Then, the rendered string will be:
+    '/usr/local/airflow/dags/dbt/dbt_packages_test'
+    """
+
+    def env_var(name: str, default: str = "") -> str:
+        return os.getenv(name, default)
+
+    template = Template(template_str)
+    rendered = template.render(env_var=env_var)
+    return rendered
+
+
 def get_dbt_packages_subpath(source_folder: Path) -> str:
     """
     Return the dbt project's package installation sub path.
@@ -64,7 +86,7 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
                 logger.info(f"Unable to read the {DBT_PROJECT_FILENAME} file")
             else:
                 subpath = dbt_project_file_content.get("packages-install-path", DBT_DEFAULT_PACKAGES_FOLDER)
-    return subpath
+    return _resolve_env_var(subpath)
 
 
 def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:

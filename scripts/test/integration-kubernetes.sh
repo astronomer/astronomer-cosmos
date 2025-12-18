@@ -6,7 +6,7 @@ set -e
 # So we can validate ExecutionMode.WATCHER_KUBERNETES
 actual_version=$(airflow version | cut -d. -f1)
 if [ "$actual_version" = "3" ] ; then
-    pip install "apache-airflow-providers-cncf-kubernetes>=10.8.0" "apache-airflow==$AIRFLOW_VERSION"
+    pip install "apache-airflow-providers-cncf-kubernetes>=10.8.0"
 fi
 
 # Reset the Airflow database to its initial state

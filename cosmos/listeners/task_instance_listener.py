@@ -110,6 +110,7 @@ def _has_callback(task_instance: TaskInstance) -> bool:
 
 
 def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | None, str | None]:
+    """Extract dbt profile-related telemetry metrics for a Cosmos-powered task."""
 
     if not _is_cosmos_task(task_instance):
         return None, None, None

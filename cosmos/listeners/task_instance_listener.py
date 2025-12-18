@@ -110,7 +110,7 @@ def _has_callback(task_instance: TaskInstance) -> bool:
     return bool(callback)
 
 
-def get_profile_metrics(task_instance: TaskInstance) -> tuple[None, None, None] | tuple[str, str, str]:
+def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | None, str | None]:
 
     task = task_instance.task
     if not isinstance(task, AbstractDbtBase):
@@ -122,7 +122,7 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[None, None, None] 
     profile_strategy = "yaml_file" if profile_config.profiles_yml_filepath is not None else "mapping"
 
     # Default
-    profile_mapping_class = ""
+    profile_mapping_class = None
 
     # Populate mapping class only when strategy is "mapping"
     if profile_strategy == "mapping":

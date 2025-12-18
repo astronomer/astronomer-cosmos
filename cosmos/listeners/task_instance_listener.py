@@ -6,6 +6,7 @@ from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
+
     from cosmos import ProfileConfig
 
 from cosmos import telemetry
@@ -126,6 +127,7 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[str, str, str]:
     database = profile_config.get_profile_type()
 
     return profile_strategy, profile_mapping_class, database
+
 
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:
     """Build telemetry payload for task completion events."""

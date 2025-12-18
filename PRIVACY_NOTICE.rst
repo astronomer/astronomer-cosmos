@@ -47,7 +47,7 @@ When running **Cosmos-powered tasks**, the following information is collected:
 - Whether the task is a subclass of a Cosmos-defined class
 - Whether the task has a callback configured
 - Whether the task is an Airflow-mapped task
-- Whether `dbt deps` was installed as part of the task execution
+- Whether `dbt deps` was run as part of the task execution
 - Task status
 - Task duration
 - Cosmos version

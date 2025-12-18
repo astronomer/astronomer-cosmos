@@ -32,6 +32,8 @@ Enhancements
 * ``ExecutonMode.WATCHER``: fetch producer status asynchronously from the Airflow runtime so deferrable sensors fail immediately when the producer task fails by @pankajkoti in #2144
 * Refactor ``ExecutionMode.WATCHER`` ``InvocationMode.SUBPROCESS`` log parser by @tatiana in #2183
 * Replace map_index with is_mapped_task boolean in task telemetry metrics by @pankajkoti in #2210
+* Collect cosmos profile metrics in task telemetry metrics by @pankajastro in #2198
+* Remove unnecessary information from telemetry by @tatiana in #2211
 
 Bug fixes
 
@@ -53,6 +55,7 @@ Docs
 * Add docs for ``setup_operator_args`` param by @pankajastro in #2136
 * Remove experimental flag for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajastro in #2153
 * Clarify ``ExecutionMode.AIRFLOW_ASYNC`` dataset limits by @pankajkoti in #2167
+* Update PRIVACY_NOTICE.rst by @tatiana in #2212
 
 Others
 

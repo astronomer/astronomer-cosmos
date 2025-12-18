@@ -38,4 +38,21 @@ In addition to Scarf's default data collection, Cosmos collect the following inf
 - Total tasks
 - Total Cosmos tasks
 
+When running **Cosmos-powered tasks**, the following information is collected:
+
+- Operator name  
+- Cosmos Execution mode  
+- Cosmos Invocation method  
+- dbt command executed  
+- Whether the task is a subclass of a Cosmos-defined class  
+- Whether the task has a callback configured  
+- Whether the task is an Airflow-mapped task
+- Whether `dbt deps` was installed as part of the task execution  
+- Task status  
+- Task duration  
+- Cosmos version  
+- Airflow version  
+- Python version  
+- Operating system and machine architecture  
+
 No user-identifiable information (IP included) is stored in Scarf.

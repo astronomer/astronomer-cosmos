@@ -255,6 +255,8 @@ class DbtToAirflowConverter:
         **kwargs: Any,
     ) -> None:
 
+        logger.info("::group::Cosmos DAG/TaskGroup Parsing")
+
         # We copy the configuration so the changes introduced in this method, such as override_configuration,
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration
         execution_config = copy.deepcopy(execution_config) if execution_config is not None else ExecutionConfig()
@@ -345,6 +347,7 @@ class DbtToAirflowConverter:
         logger.info(
             f"Cosmos performance ({cache_identifier}) - [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG."
         )
+        logger.info("::endgroup::")
 
     def _add_dbt_project_hash_to_dag_docs(self, dag: DAG | None) -> None:
         """

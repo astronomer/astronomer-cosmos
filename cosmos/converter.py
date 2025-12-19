@@ -33,6 +33,8 @@ from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 
+from cosmos.constants import DbtResourceType
+
 
 def migrate_to_new_interface(
     execution_config: ExecutionConfig, project_config: ProjectConfig, render_config: RenderConfig
@@ -279,6 +281,9 @@ class DbtToAirflowConverter:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
 
+        # Store the initial load method before it gets resolved by dbt_graph.load()
+        initial_load_method = render_config.load_method
+
         previous_time = time.perf_counter()
         self.dbt_graph = DbtGraph(
             project=project_config,
@@ -293,6 +298,9 @@ class DbtToAirflowConverter:
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         self._add_dbt_project_hash_to_dag_docs(dag)
+        self._store_cosmos_telemetry_metadata_on_dag(
+            dag, render_config, execution_config, project_config, operator_args, initial_load_method
+        )
 
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
@@ -370,3 +378,91 @@ class DbtToAirflowConverter:
             logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
         except Exception as e:
             logger.warning(f"Failed to append dbt project hash to DAG documentation: {e}")
+
+    def _store_cosmos_telemetry_metadata_on_dag(  # noqa: C901
+        self,
+        dag: DAG | None,
+        render_config: RenderConfig,
+        execution_config: ExecutionConfig,
+        project_config: ProjectConfig,
+        operator_args: dict[str, Any],
+        initial_load_method: LoadMode,
+    ) -> None:
+        """
+        Store Cosmos configuration metadata on the DAG for telemetry purposes.
+
+        This metadata is used by the DAG run listener to emit telemetry metrics
+        about how Cosmos is configured and used.
+
+        :param dag: The Airflow DAG to store metadata on. If None, no action is taken.
+        :param render_config: The render configuration
+        :param execution_config: The execution configuration
+        :param project_config: The project configuration
+        :param operator_args: The operator arguments
+        :param initial_load_method: The load method specified by the user (before automatic resolution)
+        """
+        if dag is None:
+            return
+
+        metadata = {}
+
+        # Compute each metric individually with error handling
+        try:
+            metadata["used_automatic_load_mode"] = initial_load_method == LoadMode.AUTOMATIC
+        except Exception as e:
+            logger.warning(f"Failed to compute used_automatic_load_mode: {e}")
+
+        try:
+            metadata["actual_load_mode"] = self.dbt_graph.load_method.value
+        except Exception as e:
+            logger.warning(f"Failed to compute actual_load_mode: {e}")
+
+        try:
+            invocation_mode = None
+            if execution_config.invocation_mode:
+                invocation_mode = execution_config.invocation_mode.value
+            elif render_config.invocation_mode:
+                invocation_mode = render_config.invocation_mode.value
+            metadata["invocation_mode"] = invocation_mode
+        except Exception as e:
+            logger.warning(f"Failed to compute invocation_mode: {e}")
+
+        try:
+            install_deps = operator_args.get("install_deps")
+            if install_deps is None:
+                install_deps = project_config.install_dbt_deps
+            metadata["install_deps"] = bool(install_deps) if install_deps is not None else True
+        except Exception as e:
+            logger.warning(f"Failed to compute install_deps: {e}")
+
+        try:
+            metadata["uses_node_converter"] = render_config.node_converters is not None
+        except Exception as e:
+            logger.warning(f"Failed to compute uses_node_converter: {e}")
+
+        try:
+            metadata["test_behavior"] = render_config.test_behavior.value
+        except Exception as e:
+            logger.warning(f"Failed to compute test_behavior: {e}")
+
+        try:
+            metadata["source_behavior"] = render_config.source_rendering_behavior.value
+        except Exception as e:
+            logger.warning(f"Failed to compute source_behavior: {e}")
+
+        try:
+            metadata["total_dbt_models"] = sum(
+                1 for node in self.dbt_graph.nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+        except Exception as e:
+            logger.warning(f"Failed to compute total_dbt_models: {e}")
+
+        try:
+            metadata["selected_dbt_models"] = sum(
+                1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+        except Exception as e:
+            logger.warning(f"Failed to compute selected_dbt_models: {e}")
+
+        dag._cosmos_telemetry_metadata = metadata
+        logger.debug(f"Stored Cosmos telemetry metadata on DAG {dag.dag_id}: {metadata}")

@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 from airflow.models.connection import Connection
-from airflow.sdk import Context
+
+try:  # Airflow 3
+    from airflow.sdk import Context
+except ImportError:  # Airflow 2
+    from airflow.utils.context import Context
+
 
 from cosmos import ProfileConfig
 from cosmos.constants import InvocationMode

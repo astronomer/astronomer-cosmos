@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from airflow.listeners import hookimpl
 
@@ -57,6 +57,15 @@ def get_execution_modes(dag: DAG) -> str:
     return "__".join(sorted(modes))
 
 
+def get_cosmos_telemetry_metadata(dag: DAG) -> dict[str, Any]:
+    """
+    Extract Cosmos telemetry metadata from a DAG.
+
+    Returns the metadata dictionary stored by the converter, or an empty dict if not present.
+    """
+    return getattr(dag, "_cosmos_telemetry_metadata", {})
+
+
 @hookimpl
 def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.debug("Running on_dag_run_success")
@@ -81,6 +90,10 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
         "execution_modes": get_execution_modes(serialized_dag),
     }
+
+    # Add Cosmos telemetry metadata if available
+    cosmos_metadata = get_cosmos_telemetry_metadata(serialized_dag)
+    additional_telemetry_metrics.update(cosmos_metadata)
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
     logger.debug("Completed on_dag_run_success")
@@ -110,6 +123,10 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
         "execution_modes": get_execution_modes(serialized_dag),
     }
+
+    # Add Cosmos telemetry metadata if available
+    cosmos_metadata = get_cosmos_telemetry_metadata(serialized_dag)
+    additional_telemetry_metrics.update(cosmos_metadata)
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
     logger.debug("Completed on_dag_run_failed")

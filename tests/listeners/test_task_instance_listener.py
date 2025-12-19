@@ -48,9 +48,6 @@ def mock_postgres_conn():  # type: ignore
 
 
 class DummyOperator(BaseOperator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def execute(self, context: Context) -> Any:
         pass
 

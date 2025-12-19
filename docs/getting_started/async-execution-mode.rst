@@ -248,7 +248,4 @@ Limitations
 
 9. **TeardownAsyncOperator limitation**: When using a remote object location, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location by the end of the DAG Run. This is can lead to a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_. This can be avoided by setting the ``enable_teardown_async_task`` configuration to ``False``, as described in the :ref:`enable_teardown_async_task` section.
 
-10. **Dataset events not emitted**: Dataset events are not currently emitted after dbt models complete when using ``ExecutionMode.AIRFLOW_ASYNC``. This means downstream DAGs scheduled with ``Dataset`` or ``DatasetAlias`` will not trigger automatically. This behaviour is present in ``ExecutionMode.LOCAL`` but is currently missing in async mode. This issue is being tracked in `#2141 <https://github.com/astronomer/astronomer-cosmos/issues/2141>`_.
-
-
 For a comparison between different Cosmos execution modes, please, check the :ref:`execution-modes-comparison` section.

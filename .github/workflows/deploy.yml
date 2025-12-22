@@ -22,7 +22,7 @@ jobs:
       - name: Build source distribution
         run: python -m build
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: artifacts
           path: dist/*

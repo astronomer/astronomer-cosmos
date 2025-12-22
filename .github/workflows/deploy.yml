@@ -41,7 +41,7 @@ jobs:
       contents: read
     steps:
       # retrieve your distributions here
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: artifacts
           path: dist

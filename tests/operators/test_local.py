@@ -32,7 +32,6 @@ from cosmos.dbt.parser.output import (
 )
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.io import _construct_dest_file_path
 from cosmos.operators.local import (
     AbstractDbtLocalBase,
     DbtBuildLocalOperator,
@@ -1808,99 +1807,6 @@ def test_handle_post_execution_with_multiple_callbacks(
 
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
-
-
-def test_construct_dest_file_path_with_run_id():
-    """Test _construct_dest_file_path uses run_id correctly."""
-    dest_target_dir = Path("/dest")
-    source_target_dir = Path("/project_dir/target")
-    file_path = "/project_dir/target/subdir/file.txt"
-    source_subpath = "target"
-
-    expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
-    context = {
-        "dag": MagicMock(dag_id="test_dag"),
-        "run_id": "test_run_id",
-        "task_instance": MagicMock(task_id="test_task", try_number=1),
-    }
-    result = _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, source_subpath, context=context)
-
-    assert result == expected_path
-    assert "test_run_id" in result
-
-
-@patch("cosmos.settings.upload_sql_to_xcom", False)
-def test_operator_construct_dest_file_path_with_run_id():
-    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
-    operator = ConcreteDbtLocalBaseOperator(
-        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
-    )
-
-    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
-
-    dest_target_dir = Path("/dest")
-    source_compiled_dir = Path("/project_dir/target/compiled")
-    file_path = "/project_dir/target/compiled/models/my_model.sql"
-    resource_type = "compiled"
-
-    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
-    result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
-
-    assert result == expected_path
-    assert "test_run_id" in result
-
-
-@patch("cosmos.settings.upload_sql_to_xcom", False)
-def test_construct_dest_file_path_in_operator():
-    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
-    operator = ConcreteDbtLocalBaseOperator(
-        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
-    )
-
-    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
-
-    dest_target_dir = Path("/dest")
-    source_compiled_dir = Path("/project_dir/target/compiled")
-    file_path = "/project_dir/target/compiled/models/my_model.sql"
-    resource_type = "compiled"
-
-    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
-
-    with patch.object(
-        operator, "_construct_dest_file_path", wraps=operator._construct_dest_file_path
-    ) as mock_construct:
-        result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
-
-        assert result == expected_path
-        assert "test_run_id" in result
-
-        mock_construct.assert_called_once_with(dest_target_dir, file_path, source_compiled_dir, resource_type)
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.operators.local.ObjectStoragePath")
-def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
-    """Test that parent directories are created during file uploads."""
-
-    operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="test-task",
-        project_dir="test/dir",
-    )
-
-    with (
-        patch.object(operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")),
-        patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"),
-        patch("pathlib.Path.rglob", return_value=[Path("file.sql")]),
-        patch("pathlib.Path.is_file", return_value=True),
-    ):
-        mock_dest_path = MagicMock()
-        mock_dest_path.parent = MagicMock()
-        mock_object_storage_path.return_value = mock_dest_path
-
-        operator._upload_sql_files("tmp_dir", "compiled")
-
-        mock_dest_path.parent.mkdir.assert_called_with(parents=True, exist_ok=True)
 
 
 @pytest.mark.integration

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 import re
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from os import PathLike
@@ -447,86 +446,82 @@ class DbtDocsKubernetesOperator(DbtKubernetesBaseOperator):
 
 class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
     """
-    Abstract class for operators that upload the generated documentation to cloud storage.
+    Executes `dbt docs generate` inside a Kubernetes Pod and uploads
+    the generated documentation to cloud storage *also inside the Pod*.
     """
 
     template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields  # type: ignore[operator]
 
-    def __init__(
-        self,
-        connection_id: str,
-        bucket_name: str,
-        folder_dir: str | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initializes the operator."""
-        self.connection_id = connection_id
-        self.bucket_name = bucket_name
-        self.folder_dir = folder_dir
-
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        # override the callback with our own
-        self.callback = self.upload_to_cloud_storage
+        # In Kubernetes mode, we do NOT use callback-based upload on the Airflow worker.
+        self.callback = None  # type: ignore[assignment]
 
     @abstractmethod
-    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
-        """Abstract method to upload the generated documentation to cloud storage."""
+    def build_upload_shell_command(self, docs_target: str) -> str:
+        """
+        Build the shell command that will upload the generated docs from
+        `docs_target` to cloud storage. Implemented by subclasses.
+        """
+
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        # Build base Kubernetes pod args (incl. dbt CLI command)
+        self.build_kube_args(context, cmd_flags)
+
+        # self.arguments holds the dbt CLI command as list or string
+        if isinstance(self.arguments, list):
+            dbt_cmd = [str(part) for part in self.arguments]
+        else:
+            dbt_cmd = [str(self.arguments)]
+
+        dbt_cmd_str = " ".join(dbt_cmd)
+        docs_target = f"{self.project_dir}/target"
+
+        upload_cmd = self.build_upload_shell_command(docs_target)
+        shell_cmd = f"{dbt_cmd_str} && {upload_cmd}"
+
+        # Override container command and arguments
+        self.cmds = ["/bin/bash", "-c"]
+        self.arguments = [shell_cmd]
+
+        self.log.info("Running command in Kubernetes Pod: %s", self.arguments)
+        result = KubernetesPodOperator.execute(self, context)
+        self.log.info(result)
+        return result
 
 
 class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
     """
-    Executes `dbt docs generate` command and upload to S3 storage.
-
-    :param connection_id: S3's Airflow connection ID
-    :param bucket_name: S3's bucket name
-    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
-        uploaded.
+    Executes `dbt docs generate` inside a Kubernetes Pod and uploads the generated
+    documentation to S3 *also inside that Pod* using `aws s3 sync`.
+        - Airflow S3Hook and `connection_id` are NOT used in Kubernetes mode.
+        - The Kubernetes Pod must have AWS credentials (IRSA, kube2iam, Secret env).
     """
 
     ui_color = "#FF9900"
 
     def __init__(
         self,
-        *args: Any,
-        aws_conn_id: str | None = None,
+        bucket_name: str,
+        folder_dir: str | None = None,
         **kwargs: Any,
     ) -> None:
-        if aws_conn_id:
-            warnings.warn(
-                "Please, use `connection_id` instead of `aws_conn_id`. The argument `aws_conn_id` will be"
-                " deprecated in Cosmos 2.0",
-                DeprecationWarning,
-            )
-            kwargs["connection_id"] = aws_conn_id
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
 
-    def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
-        """Uploads the generated documentation to S3."""
-        self.log.info(
-            'Attempting to upload generated docs to S3 using S3Hook("%s")',
-            self.connection_id,
-        )
+    def build_upload_shell_command(self, docs_target: str) -> str:
+        if self.folder_dir:
+            s3_prefix = f"s3://{self.bucket_name}/{self.folder_dir}".rstrip("/")
+        else:
+            s3_prefix = f"s3://{self.bucket_name}"
 
-        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-
-        target_dir = f"{project_dir}/target"
-
-        hook = S3Hook(
-            self.connection_id,
-            extra_args={
-                "ContentType": "text/html",
-            },
-        )
-
-        for filename in self.required_files:
-            key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
-            s3_path = f"s3://{self.bucket_name}/{key}"
-            self.log.info("Uploading %s to %s", filename, s3_path)
-
-            hook.load_file(
-                filename=f"{target_dir}/{filename}",
-                bucket_name=self.bucket_name,
-                key=key,
-                replace=True,
-            )
+        return f"aws s3 sync {docs_target} {s3_prefix}"

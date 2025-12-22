@@ -87,7 +87,6 @@ with DAG(
         task_id="generate_dbt_docs_aws",
         project_dir=K8S_PROJECT_DIR,
         secrets=[postgres_host_secret, postgres_password_secret],
-        connection_id="aws_s3_conn",
         bucket_name="cosmos-ci-docs",
         install_deps=True,
         image=DBT_IMAGE,

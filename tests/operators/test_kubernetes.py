@@ -623,8 +623,7 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
         DbtDocsS3KubernetesOperator,
     ),
 )
-@patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_and_run_cmd")
-def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
+def test_operator_execute_without_flags(operator_class):
     operator_class_kwargs = {
         DbtDocsS3KubernetesOperator: {"aws_conn_id": "fake-conn", "bucket_name": "fake-bucket"},
     }
@@ -646,6 +645,7 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
             "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.get_or_create_pod",
             side_effect=ValueError("Mock"),
         ) as get_or_create_pod,
+        patch.object(operator_class, "build_and_run_cmd") as mock_build_and_run_cmd,
     ):
         try:
             task.execute(context={})

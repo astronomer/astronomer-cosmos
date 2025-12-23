@@ -61,9 +61,11 @@ def get_cosmos_telemetry_metadata(dag: DAG) -> dict[str, Any]:
     """
     Extract Cosmos telemetry metadata from a DAG.
 
-    Returns the metadata dictionary stored by the converter, or an empty dict if not present.
+    Returns the metadata dictionary stored by the converter in dag.params, or an empty dict if not present.
     """
-    return getattr(dag, "_cosmos_telemetry_metadata", {})
+    # Metadata is stored in dag.params to survive serialization
+    metadata = dag.params.get("__cosmos_telemetry_metadata__", {})
+    return metadata if isinstance(metadata, dict) else {}
 
 
 @hookimpl

@@ -464,5 +464,7 @@ class DbtToAirflowConverter:
         except Exception as e:
             logger.warning(f"Failed to compute selected_dbt_models: {e}")
 
-        dag._cosmos_telemetry_metadata = metadata
-        logger.debug(f"Stored Cosmos telemetry metadata on DAG {dag.dag_id}: {metadata}")
+        # Store metadata in dag.params which is preserved during serialization
+        # Using a key that's unlikely to conflict with user params
+        dag.params["__cosmos_telemetry_metadata__"] = metadata
+        logger.debug(f"Stored Cosmos telemetry metadata in DAG {dag.dag_id} params: {metadata}")

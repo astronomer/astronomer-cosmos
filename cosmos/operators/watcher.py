@@ -4,7 +4,7 @@ import base64
 import json
 import logging
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -502,7 +502,7 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
+    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields  # type: ignore[assignment]
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

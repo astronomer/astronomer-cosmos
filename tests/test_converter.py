@@ -1,7 +1,7 @@
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
 from airflow.models import DAG
@@ -1117,3 +1117,136 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
     assert any(
         "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation" in call for call in debug_calls
     )
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter.DbtGraph.load")
+def test_telemetry_metadata_exception_handling(mock_load_dbt_graph, mock_logger):
+    """Test that telemetry metadata computation handles exceptions gracefully."""
+    dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    # Create converter first
+    converter = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
+
+    # Create a mock graph where properties raise AttributeError when converting to string
+    mock_graph = Mock()
+
+    # For load_method.value - create a Mock where __str__ raises
+    mock_value = Mock()
+    mock_value.__str__ = Mock(side_effect=AttributeError("load_method error"))
+    mock_load_method = Mock()
+    mock_load_method.value = mock_value
+    mock_graph.load_method = mock_load_method
+
+    # For nodes.values() - make it raise when called
+    mock_graph.nodes = Mock()
+    mock_graph.nodes.values = Mock(side_effect=AttributeError("nodes error"))
+
+    # For filtered_nodes.values() - make it raise when called
+    mock_graph.filtered_nodes = Mock()
+    mock_graph.filtered_nodes.values = Mock(side_effect=AttributeError("filtered_nodes error"))
+
+    converter.dbt_graph = mock_graph
+
+    # Create mock render_config where properties raise
+    mock_render_config = Mock()
+
+    # invocation_mode.value - __str__ raises
+    mock_invocation_value = Mock()
+    mock_invocation_value.__str__ = Mock(side_effect=AttributeError("invocation error"))
+    mock_invocation = Mock()
+    mock_invocation.value = mock_invocation_value
+    # Make invocation_mode truthy so the if condition passes
+    mock_invocation.__bool__ = Mock(return_value=True)
+    mock_render_config.invocation_mode = mock_invocation
+
+    # Create a class that raises AttributeError for specific properties
+    class MockRenderConfigWithRaisingProperties:
+        @property
+        def node_converters(self):
+            raise AttributeError("node_converters error")
+
+        @property
+        def test_behavior(self):
+            raise AttributeError("test_behavior error")
+
+        @property
+        def source_rendering_behavior(self):
+            raise AttributeError("source_behavior error")
+
+    mock_render_config_final = Mock(wraps=MockRenderConfigWithRaisingProperties())
+    mock_render_config_final.invocation_mode = mock_render_config.invocation_mode
+
+    # test_behavior.value - __str__ raises
+    mock_test_value = Mock()
+    mock_test_value.__str__ = Mock(side_effect=AttributeError("test_behavior error"))
+    mock_test = Mock()
+    mock_test.value = mock_test_value
+    mock_render_config.test_behavior = mock_test
+
+    # source_rendering_behavior.value - __str__ raises
+    mock_source_value = Mock()
+    mock_source_value.__str__ = Mock(side_effect=AttributeError("source_behavior error"))
+    mock_source = Mock()
+    mock_source.value = mock_source_value
+    mock_render_config.source_rendering_behavior = mock_source
+
+    # Mock execution_config - invocation_mode should be falsy initially so render_config is checked
+    mock_execution_config = Mock()
+    mock_execution_config.invocation_mode = None
+
+    # Mock project_config - install_dbt_deps raises
+    mock_project_config = Mock()
+    type(mock_project_config).install_dbt_deps = PropertyMock(side_effect=AttributeError("install_dbt_deps error"))
+
+    # Mock operator_args - .get() raises
+    mock_operator_args = Mock()
+    mock_operator_args.get = Mock(side_effect=AttributeError("operator_args error"))
+
+    # Call _store_cosmos_telemetry_metadata_on_dag with mocked configs
+    # Create a mock load mode that raises on comparison
+    mock_load_mode_param = Mock()
+    mock_load_mode_param.__eq__ = Mock(side_effect=AttributeError("load_method comparison error"))
+
+    converter._store_cosmos_telemetry_metadata_on_dag(
+        dag=dag,
+        render_config=mock_render_config_final,
+        execution_config=mock_execution_config,
+        project_config=mock_project_config,
+        operator_args=mock_operator_args,
+        initial_load_method=mock_load_mode_param,
+    )
+
+    # Verify warning logs were called for exceptions
+    warning_calls = [str(call) for call in mock_logger.warning.call_args_list]
+
+    # Check that all exception handlers logged warnings
+    assert any(
+        "Failed to compute used_automatic_load_mode" in call for call in warning_calls
+    ), f"Warnings: {warning_calls}"
+    assert any("Failed to compute actual_load_mode" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute invocation_mode" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute install_deps" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute uses_node_converter" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute test_behavior" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute source_behavior" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute total_dbt_models" in call for call in warning_calls), f"Warnings: {warning_calls}"
+    assert any("Failed to compute selected_dbt_models" in call for call in warning_calls), f"Warnings: {warning_calls}"
+
+    # Metadata should still be stored even with failures
+    assert "__cosmos_telemetry_metadata__" in dag.params

@@ -413,16 +413,16 @@ class DbtToAirflowConverter:
             logger.warning(f"Failed to compute used_automatic_load_mode: {e}")
 
         try:
-            metadata["actual_load_mode"] = self.dbt_graph.load_method.value
+            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
         except Exception as e:
             logger.warning(f"Failed to compute actual_load_mode: {e}")
 
         try:
             invocation_mode = None
             if execution_config.invocation_mode:
-                invocation_mode = execution_config.invocation_mode.value
+                invocation_mode = str(execution_config.invocation_mode.value)
             elif render_config.invocation_mode:
-                invocation_mode = render_config.invocation_mode.value
+                invocation_mode = str(render_config.invocation_mode.value)
             metadata["invocation_mode"] = invocation_mode
         except Exception as e:
             logger.warning(f"Failed to compute invocation_mode: {e}")
@@ -441,12 +441,12 @@ class DbtToAirflowConverter:
             logger.warning(f"Failed to compute uses_node_converter: {e}")
 
         try:
-            metadata["test_behavior"] = render_config.test_behavior.value
+            metadata["test_behavior"] = str(render_config.test_behavior.value)
         except Exception as e:
             logger.warning(f"Failed to compute test_behavior: {e}")
 
         try:
-            metadata["source_behavior"] = render_config.source_rendering_behavior.value
+            metadata["source_behavior"] = str(render_config.source_rendering_behavior.value)
         except Exception as e:
             logger.warning(f"Failed to compute source_behavior: {e}")
 

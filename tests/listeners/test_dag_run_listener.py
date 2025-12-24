@@ -260,6 +260,7 @@ def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_en
         execution_config=ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER),
         render_config=RenderConfig(
             load_method=LoadMode.DBT_LS,
+            dbt_deps=False,
             test_behavior=TestBehavior.NONE,
             source_rendering_behavior=SourceRenderingBehavior.ALL,
         ),

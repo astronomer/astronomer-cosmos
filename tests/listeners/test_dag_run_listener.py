@@ -255,6 +255,7 @@ def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_en
     dag = DbtDag(
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
+            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
         ),
         profile_config=profile_config,
         execution_config=ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER),

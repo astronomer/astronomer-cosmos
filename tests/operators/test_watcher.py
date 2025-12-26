@@ -1287,3 +1287,16 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=2)
         else:
             assert task.execution_timeout == timedelta(seconds=1)
+
+
+def test_dbt_source_watcher_operator_template_fields():
+    """Test that DbtSourceWatcherOperator doesn't include model_unique_id in template_fields."""
+    from cosmos.operators.local import DbtSourceLocalOperator
+    from cosmos.operators.watcher import DbtSourceWatcherOperator
+
+    # DbtSourceWatcherOperator should NOT have model_unique_id in template_fields
+    # because it runs locally and doesn't watch models, it executes source freshness
+    assert "model_unique_id" not in DbtSourceWatcherOperator.template_fields
+
+    # DbtSourceWatcherOperator should inherit template_fields from DbtSourceLocalOperator
+    assert DbtSourceWatcherOperator.template_fields == DbtSourceLocalOperator.template_fields

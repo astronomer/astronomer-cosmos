@@ -27,6 +27,7 @@ from cosmos.operators.watcher import (
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
+    _store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
@@ -423,6 +424,134 @@ def test_execute_fallback_mode(tmp_path):
     assert compressed
     data = json.loads(zlib.decompress(base64.b64decode(compressed)).decode())
     assert data["results"][0]["status"] == "success"
+
+
+class TestStoreDbStatusFromLog:
+    """Tests for _store_dbt_resource_status_from_log and _process_log_line_callable."""
+
+    def test_store_dbt_resource_status_from_log_success(self):
+        """Test that success status is correctly parsed and stored in XCom."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.my_model"}}})
+
+        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        assert ti.store.get("model__pkg__my_model_status") == "success"
+
+    def test_store_dbt_resource_status_from_log_failed(self):
+        """Test that failed status is correctly parsed and stored in XCom."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps({"data": {"node_info": {"node_status": "failed", "unique_id": "model.pkg.failed_model"}}})
+
+        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        assert ti.store.get("model__pkg__failed_model_status") == "failed"
+
+    def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
+        """Test that statuses other than success/failed are ignored."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps(
+            {"data": {"node_info": {"node_status": "running", "unique_id": "model.pkg.running_model"}}}
+        )
+
+        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        assert "model__pkg__running_model_status" not in ti.store
+
+    def test_store_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
+        """Test that invalid JSON doesn't raise an exception."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        # Should not raise an exception
+        _store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
+
+        # No status should be stored
+        assert len(ti.store) == 0
+
+    def test_store_dbt_resource_status_from_log_handles_missing_node_info(self):
+        """Test that missing node_info doesn't raise an exception."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps({"data": {"other_key": "value"}})
+
+        # Should not raise an exception
+        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # No status should be stored
+        assert len(ti.store) == 0
+
+    def test_process_log_line_callable_is_not_bound_method(self):
+        """Test that _process_log_line_callable is not bound as a method when accessed through an instance.
+
+        This test verifies the fix for the bug where accessing _process_log_line_callable through
+        an instance would create a bound method, causing 'self' to be passed as the first argument.
+        """
+        import inspect
+
+        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        # Access the callable through the instance
+        callable_from_instance = op._process_log_line_callable
+
+        # Verify it's not a bound method (which would have __self__ attribute)
+        assert not inspect.ismethod(
+            callable_from_instance
+        ), "_process_log_line_callable should not be a bound method when accessed through instance"
+
+        # Verify it's the original function
+        assert callable_from_instance is _store_dbt_resource_status_from_log
+
+    def test_process_log_line_callable_accepts_two_arguments(self):
+        """Test that the callable can be called with exactly 2 arguments (line, kwargs).
+
+        This tests the integration pattern used in subprocess.py where process_log_line(line, kwargs) is called.
+        """
+        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+        callable_from_instance = op._process_log_line_callable
+
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.test_model"}}})
+
+        # This should NOT raise TypeError about wrong number of arguments
+        callable_from_instance(log_line, {"context": ctx})
+
+        assert ti.store.get("model__pkg__test_model_status") == "success"
+
+    def test_process_log_line_callable_integration_with_subprocess_pattern(self):
+        """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs)."""
+        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        # Simulate the kwargs dict that subprocess.py passes
+        kwargs = {"context": ctx, "other_param": "value"}
+
+        log_lines = [
+            json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.model_a"}}}),
+            json.dumps({"data": {"node_info": {"node_status": "failed", "unique_id": "model.pkg.model_b"}}}),
+            json.dumps({"info": {"msg": "Running with dbt=1.10.11"}}),  # Non-node log line
+        ]
+
+        # Simulate the subprocess.py pattern
+        process_log_line = op._process_log_line_callable
+        for line in log_lines:
+            if process_log_line:
+                process_log_line(line, kwargs)
+
+        assert ti.store.get("model__pkg__model_a_status") == "success"
+        assert ti.store.get("model__pkg__model_b_status") == "failed"
+        assert len(ti.store) == 2  # Only success and failed statuses are stored
 
 
 @patch("cosmos.dbt.runner.is_available", return_value=False)

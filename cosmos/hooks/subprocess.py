@@ -7,6 +7,7 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
+import types
 from collections.abc import Callable
 from subprocess import PIPE, STDOUT, Popen
 from tempfile import TemporaryDirectory, gettempdir
@@ -101,7 +102,15 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 log_lines.append(line)
                 self.log.info("%s", line)
                 if process_log_line:
-                    process_log_line(line, kwargs)
+                    # Ensure we call the function with exactly 2 arguments
+                    # If process_log_line is a bound method, extract the underlying function
+                    # to avoid passing 'self' as the first argument
+                    if isinstance(process_log_line, types.MethodType):
+                        # It's a bound method, call the underlying function directly
+                        process_log_line.__func__(line, kwargs)
+                    else:
+                        # It's a regular function or callable, call it directly
+                        process_log_line(line, kwargs)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

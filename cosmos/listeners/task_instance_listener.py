@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 
 from cosmos import telemetry
+from cosmos.config import ProfileConfig
 from cosmos.constants import InvocationMode
 from cosmos.log import get_logger
 from cosmos.operators.base import AbstractDbtBase
@@ -109,13 +110,7 @@ def _has_callback(task_instance: TaskInstance) -> bool:
     return bool(callback)
 
 
-def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | None, str | None]:
-    """Extract dbt profile-related telemetry metrics for a Cosmos-powered task."""
-
-    if not _is_cosmos_task(task_instance):
-        return None, None, None
-
-    profile_config = getattr(task_instance.task, "profile_config", None)
+def _get_profile_config_attribute(profile_config: ProfileConfig | None) -> tuple[str | None, str | None, str | None]:
 
     if not profile_config:
         return None, None, None
@@ -138,6 +133,17 @@ def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | 
         database = None
 
     return profile_strategy, profile_mapping_class, database
+
+
+def get_profile_metrics(task_instance: TaskInstance) -> tuple[str | None, str | None, str | None]:
+    """Extract dbt profile-related telemetry metrics for a Cosmos-powered task."""
+
+    if not _is_cosmos_task(task_instance):
+        return None, None, None
+
+    profile_config = getattr(task_instance.task, "profile_config", None)
+
+    return _get_profile_config_attribute(profile_config)
 
 
 def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, object]:

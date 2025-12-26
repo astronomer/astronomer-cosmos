@@ -14,6 +14,8 @@ from warnings import warn
 
 from airflow.models.dag import DAG
 
+from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
+
 try:
     # Airflow 3.1 onwards
     from airflow.sdk import TaskGroup
@@ -299,7 +301,7 @@ class DbtToAirflowConverter:
 
         self._add_dbt_project_hash_to_dag_docs(dag)
         self._store_cosmos_telemetry_metadata_on_dag(
-            dag, render_config, execution_config, project_config, operator_args, initial_load_method
+            dag, render_config, execution_config, project_config, profile_config, operator_args, initial_load_method
         )
 
         current_time = time.perf_counter()
@@ -385,6 +387,7 @@ class DbtToAirflowConverter:
         render_config: RenderConfig,
         execution_config: ExecutionConfig,
         project_config: ProjectConfig,
+        profile_config: ProfileConfig,
         operator_args: dict[str, Any],
         initial_load_method: LoadMode,
     ) -> None:
@@ -398,6 +401,7 @@ class DbtToAirflowConverter:
         :param render_config: The render configuration
         :param execution_config: The execution configuration
         :param project_config: The project configuration
+        :param profile_config: The profile configuration
         :param operator_args: The operator arguments
         :param initial_load_method: The load method specified by the user (before automatic resolution)
         """
@@ -463,6 +467,18 @@ class DbtToAirflowConverter:
             )
         except Exception as e:
             logger.warning(f"Failed to compute selected_dbt_models: {e}")
+
+        try:
+            profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
+            metadata.update(
+                {
+                    "profile_strategy": profile_strategy,
+                    "profile_mapping_class": profile_mapping_class,
+                    "database": database,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Failed to compute profile config metrics: {e}")
 
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params

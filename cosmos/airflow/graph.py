@@ -649,7 +649,7 @@ def _add_watcher_producer_task(
     render_config: RenderConfig | None = None,
 ) -> BaseOperator:
     """
-    Create the producer task for the watcher execution modeand add it to the tasks_map.
+    Create the producer task for the watcher execution mode and add it to the tasks_map.
     The producer task is the task that will be used to produce the events for the watcher execution mode.
     """
     producer_task_args = task_args.copy()

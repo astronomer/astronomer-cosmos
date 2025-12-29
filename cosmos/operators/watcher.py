@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any
 from cosmos.operators._watcher.state import get_xcom_val, safe_xcom_push
 from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
 
-
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context

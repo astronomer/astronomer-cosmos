@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from cosmos import settings
 
-
 __version__ = "1.13.0a1"
 
 

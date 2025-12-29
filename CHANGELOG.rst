@@ -1,12 +1,23 @@
 Changelog
 =========
 
-1.12.1a1 (2025-12-26)
+1.12.1a1 (2025-12-27)
 ----------------------
 
 Bug Fixes
 
-* Fix ``DbtSourceWatcherOperator.template_fields`` to inherit from ``DbtSourceLocalOperator`` instead of ``DbtConsumerWatcherSensor`` by @pankajkoti in #2214
+* Fix ``DbtSourceWatcherOperator.template_fields`` to inherit from ``DbtSourceLocalOperator`` instead of ``DbtConsumerWatcherSensor`` by @pankajkoti in #2226
+* Fix TypeError in Watcher mode with subprocess invocation by @pankajkoti in #2227
+
+Docs
+
+* Fix minor documentation typo by @dnskr in #2093
+* Fix default values in documentation by @dnskr in #2092
+* Remove emit event for ExecutionMode.AIRFLOW_ASYNC limitation in docs by @pankajastro in #2214
+
+Others
+
+* Add test to check profile metrics with non-cosmos operator by @pankajastro in #2215
 
 1.12.0 (2025-12-18)
 ----------------------

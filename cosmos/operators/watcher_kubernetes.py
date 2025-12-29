@@ -28,7 +28,7 @@ from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
-from cosmos.operators._watcher.triggerers import WatcherTrigger
+from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,

@@ -16,9 +16,9 @@ from airflow.utils.state import DagRunState
 from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
-from cosmos._triggers.watcher import WatcherTrigger
 from cosmos.config import InvocationMode
 from cosmos.constants import ExecutionMode
+from cosmos.operators._watcher import WatcherTrigger
 from cosmos.operators.watcher import (
     PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
     DbtBuildWatcherOperator,

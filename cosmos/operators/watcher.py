@@ -56,30 +56,45 @@ PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
 WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
 
 
-def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
-    """
-    Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
+def _process_json_log_line(line: str, extra_kwargs: Any) -> None:
+    """Parse a single JSON log line from dbt and push node status updates to XCom.
 
-    This method parses each log line from dbt when --log-format json is used,
-    extracts node status information, and pushes it to XCom for consumption
-    by downstream watcher sensors.
+    Processes structured log output from dbt (when --log-format json is used),
+    extracts model/node execution status, and stores it in Airflow XCom for
+    consumption by downstream watcher sensors.
+
+    :param line: A JSON-formatted log line from dbt output.
+    :param extra_kwargs: Additional context, including the Airflow task instance.
     """
+
+    def log(msg: str = "", level: str = None) -> None:
+        level = level or "info"  # default to info level
+        log_level = logging._nameToLevel[level.upper()]
+        # logger = logging.getLogger(name or __name__) # use provided name or default
+        logger.log(log_level, msg)
+
+    def store_resource_status(node_status: str = None, unique_id: str = None) -> None:
+        if not node_status or not unique_id:
+            return
+
+        logger.debug("Model: %s is in %s state", unique_id, node_status)
+        if node_status in ["success", "failed"]:
+            context = extra_kwargs.get("context")
+            assert context is not None  # Make MyPy happy
+            safe_xcom_push(
+                task_instance=context["ti"],
+                key=f"{unique_id.replace('.', '__')}_status",
+                value=node_status,
+            )
+
     try:
         log_line = json.loads(line)
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
-    node_info = log_line.get("data", {}).get("node_info", {})
-    node_status = node_info.get("node_status")
-    unique_id = node_info.get("unique_id")
 
-    logger.debug("Model: %s is in %s state", unique_id, node_status)
-
-    # TODO: Handle and store all possible node statuses, not just the current success and failed
-    if node_status in ["success", "failed"]:
-        context = extra_kwargs.get("context")
-        assert context is not None  # Make MyPy happy
-        safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+    log(**log_line.get("info", {}))
+    store_resource_status(**log_line.get("data", {}).get("node_info", {}))
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -110,7 +125,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
     # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
     # when accessed via instance, which would incorrectly pass `self` as the first argument
-    _process_log_line_callable = staticmethod(_store_dbt_resource_status_from_log)
+    _process_log_line_callable = staticmethod(_process_json_log_line)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
@@ -317,7 +332,6 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         return True
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-
         dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
             logger.info("Dbt Startup Event: %s", dbt_startup_events)
@@ -451,7 +465,6 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
         if status is None:
-
             if producer_task_state == "failed":
                 if self.poke_retry_number > 0:
                     raise AirflowException(

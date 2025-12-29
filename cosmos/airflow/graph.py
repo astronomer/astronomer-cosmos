@@ -684,7 +684,7 @@ def _add_watcher_dependencies(
     nodes: dict[str, DbtNode] | None = None,
 ) -> str:
     """
-    Iterate through the waetcher consumer tasks and:
+    Iterate through the watcher consumer tasks and:
     - set the producer task ID in all of them
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
     """

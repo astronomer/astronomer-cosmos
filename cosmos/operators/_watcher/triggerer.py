@@ -83,7 +83,7 @@ class WatcherTrigger(BaseTrigger):
 
     async def get_xcom_val(self, key: str) -> Any | None:
         self.log.info(
-            f"Trying to retrieve value using XCom key: <{key}> in task_id: <{self.producer_task_id}> and dag_id: <{self.dag_id}> and run_id: <{self.run_id}> and map_index: <{self.map_index}>"
+            f"Trying to retrieve value using XCom key <{key}> by task_id <{self.producer_task_id}>, dag_id <{self.dag_id}>, run_id <{self.run_id}> and map_index <{self.map_index}>"
         )
         if AIRFLOW_VERSION < Version("3.0.0"):
             return await self.get_xcom_val_af2(key)

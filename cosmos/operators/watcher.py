@@ -9,8 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
-from cosmos.operators._watcher.state import get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher import WatcherTrigger, _parse_compressed_xcom, get_xcom_val, safe_xcom_push
 
 if TYPE_CHECKING:  # pragma: no cover
     try:

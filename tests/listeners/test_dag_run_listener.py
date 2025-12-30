@@ -238,10 +238,6 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert metrics["source_behavior"] == "none"
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION >= Version("3.1.0"),
-    reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
-)
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, caplog):

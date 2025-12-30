@@ -72,7 +72,10 @@ def _process_json_log_line(line: str, extra_kwargs: Any) -> None:
             return
 
         level = level or "info"  # default to info level
-        log_level = logging._nameToLevel[level.upper()]
+        log_level = logging._nameToLevel.get(level.upper())
+        if log_level is None:
+            logger.warning("Unknown log level '%s'; defaulting to INFO", level)
+            log_level = logging.INFO
         logger.log(log_level, "%s", msg)
 
     def store_resource_status(node_status: str | None = None, unique_id: str | None = None, **kwargs: Any) -> None:

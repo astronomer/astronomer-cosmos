@@ -134,6 +134,23 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
         # Simple HTML wrapper to embed the dbt docs UI
         @app.get(f"/{slug}/dbt_docs", response_class=HTMLResponse)
         def dbt_docs_view(slug_alias: str = slug) -> str:  # type: ignore[no-redef]
+            cfg_local = projects.get(slug_alias, {})
+            if not cfg_local.get("dir"):
+                return "<div>dbt Docs are not configured.</div>"
+            iframe_src = f"/cosmos/{slug_alias}/dbt_docs_index.html"
+            safe_iframe_src = html.escape(iframe_src, quote=True)
+            return (
+                '<div style="height:100%;display:flex;flex-direction:column;">'
+                f'<iframe src="{safe_iframe_src}" style="border:0;flex:1 1 auto;"></iframe>'
+                "</div>"
+            )
+
+        # Serve the index with injected iframe script and CSP header
+        @app.get(
+            f"/{slug}/dbt_docs_index.html",
+            response_class=HTMLResponse,
+        )
+        def dbt_docs_index(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
             # Emit telemetry for dbt docs access
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
@@ -152,24 +169,6 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 },
             )
             
-            if not cfg_local.get("dir"):
-                return "<div>dbt Docs are not configured.</div>"
-            iframe_src = f"/cosmos/{slug_alias}/dbt_docs_index.html"
-            safe_iframe_src = html.escape(iframe_src, quote=True)
-            return (
-                '<div style="height:100%;display:flex;flex-direction:column;">'
-                f'<iframe src="{safe_iframe_src}" style="border:0;flex:1 1 auto;"></iframe>'
-                "</div>"
-            )
-
-        # Serve the index with injected iframe script and CSP header
-        @app.get(
-            f"/{slug}/dbt_docs_index.html",
-            response_class=HTMLResponse,
-        )
-        def dbt_docs_index(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
-            cfg_local = projects.get(slug_alias, {})
-            docs_dir_local = cfg_local.get("dir")
             conn_id_local = cfg_local.get("conn_id")
             index_local = cfg_local.get("index") or "index.html"
             if not docs_dir_local:

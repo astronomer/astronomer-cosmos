@@ -445,7 +445,7 @@ def test_dbt_docs_emits_telemetry(mock_emit, tmp_path: Path):
     client = TestClient(app)
 
     with patch("cosmos.plugin.airflow3.open_file", return_value="<head></head><body>dbt</body>"):
-        r = client.get("/my_project/dbt_docs")
+        r = client.get("/my_project/dbt_docs_index.html")
 
     assert r.status_code == 200
     mock_emit.assert_called_once_with(
@@ -468,7 +468,7 @@ def test_dbt_docs_emits_telemetry_not_configured(mock_emit):
     af3, app = _app_with_projects(projects)
     client = TestClient(app)
 
-    r = client.get("/empty/dbt_docs")
+    r = client.get("/empty/dbt_docs_index.html")
 
     assert r.status_code == 200
     mock_emit.assert_called_once_with(
@@ -494,7 +494,7 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
     af3, app = _app_with_projects(projects)
     client = TestClient(app)
 
-    r = client.get("/local/dbt_docs")
+    r = client.get("/local/dbt_docs_index.html")
 
     assert r.status_code == 200
     mock_emit.assert_called_once_with(

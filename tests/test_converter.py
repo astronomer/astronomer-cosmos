@@ -1206,17 +1206,13 @@ def test_telemetry_metadata_exception_handling(mock_load_dbt_graph, mock_logger)
     mock_source.value = mock_source_value
     mock_render_config.source_rendering_behavior = mock_source
 
-    # Mock execution_config - invocation_mode should be falsy initially so render_config is checked
-    mock_execution_config = Mock()
-    mock_execution_config.invocation_mode = None
+    # Mock render_config.dbt_deps to raise when accessed
+    dbt_deps_mock = PropertyMock(side_effect=AttributeError("dbt_deps error"))
+    type(mock_render_config_final).dbt_deps = dbt_deps_mock
 
-    # Mock project_config - install_dbt_deps raises
     mock_project_config = Mock()
-    type(mock_project_config).install_dbt_deps = PropertyMock(side_effect=AttributeError("install_dbt_deps error"))
 
-    # Mock operator_args - .get() raises
-    mock_operator_args = Mock()
-    mock_operator_args.get = Mock(side_effect=AttributeError("operator_args error"))
+    mock_operator_args = {}
 
     # Call _store_cosmos_telemetry_metadata_on_dag with mocked configs
     # Create a mock load mode that raises on comparison
@@ -1226,7 +1222,6 @@ def test_telemetry_metadata_exception_handling(mock_load_dbt_graph, mock_logger)
     converter._store_cosmos_telemetry_metadata_on_dag(
         dag=dag,
         render_config=mock_render_config_final,
-        execution_config=mock_execution_config,
         project_config=mock_project_config,
         operator_args=mock_operator_args,
         initial_load_method=mock_load_mode_param,

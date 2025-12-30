@@ -375,3 +375,78 @@ def test_has_access_with_permissions_in_astro_must_include_custom_menu(url_path,
 
 def test_cosmos_plugin_enabled_on_airflow2():
     assert cosmos.plugin.CosmosPlugin is not None
+
+
+@pytest.mark.integration
+@patch("cosmos.telemetry.emit_usage_metrics_if_enabled")
+def test_dbt_docs_emits_telemetry(mock_emit, monkeypatch, app):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "s3://my-bucket/docs")
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_conn_id", "my_s3_conn")
+
+    response = app.get("/cosmos/dbt_docs")
+
+    assert response.status_code == 200
+    mock_emit.assert_called_once_with(
+        event_type="dbt_docs_access",
+        additional_metrics={
+            "storage_type": "s3",
+            "is_configured": True,
+            "uses_custom_conn": True,
+        },
+    )
+
+
+@pytest.mark.integration
+@patch("cosmos.telemetry.emit_usage_metrics_if_enabled")
+def test_dbt_docs_emits_telemetry_not_configured(mock_emit, monkeypatch, app):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", None)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_conn_id", None)
+
+    response = app.get("/cosmos/dbt_docs")
+
+    assert response.status_code == 200
+    mock_emit.assert_called_once_with(
+        event_type="dbt_docs_access",
+        additional_metrics={
+            "storage_type": "not_configured",
+            "is_configured": False,
+            "uses_custom_conn": False,
+        },
+    )
+
+
+@pytest.mark.integration
+@patch("cosmos.telemetry.emit_usage_metrics_if_enabled")
+def test_dbt_docs_emits_telemetry_local_storage(mock_emit, monkeypatch, app):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "/local/path/to/docs")
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_conn_id", None)
+
+    response = app.get("/cosmos/dbt_docs")
+
+    assert response.status_code == 200
+    mock_emit.assert_called_once_with(
+        event_type="dbt_docs_access",
+        additional_metrics={
+            "storage_type": "local",
+            "is_configured": True,
+            "uses_custom_conn": False,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "path,expected_type",
+    [
+        ("s3://bucket/path", "s3"),
+        ("gs://bucket/path", "gcs"),
+        ("wasb://container/path", "azure"),
+        ("http://example.com/path", "http"),
+        ("https://example.com/path", "http"),
+        ("/local/path", "local"),
+    ],
+)
+def test_get_storage_type(path, expected_type):
+    from cosmos.plugin.airflow2 import DbtDocsView
+
+    view = DbtDocsView()
+    assert view._get_storage_type(path) == expected_type

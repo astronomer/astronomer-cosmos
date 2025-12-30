@@ -67,13 +67,15 @@ def _process_json_log_line(line: str, extra_kwargs: Any) -> None:
     :param extra_kwargs: Additional context, including the Airflow task instance.
     """
 
-    def log(msg: str = "", level: str = None) -> None:
+    def log(msg: str | None = None, level: str | None = None, **kwargs: Any) -> None:
+        if msg is None:
+            return
+
         level = level or "info"  # default to info level
         log_level = logging._nameToLevel[level.upper()]
-        # logger = logging.getLogger(name or __name__) # use provided name or default
-        logger.log(log_level, msg)
+        logger.log(log_level, "%s", msg)
 
-    def store_resource_status(node_status: str = None, unique_id: str = None) -> None:
+    def store_resource_status(node_status: str | None = None, unique_id: str | None = None, **kwargs: Any) -> None:
         if not node_status or not unique_id:
             return
 
@@ -88,10 +90,11 @@ def _process_json_log_line(line: str, extra_kwargs: Any) -> None:
             )
 
     try:
-        log_line = json.loads(line)
+        log_line: dict[str, Any] = json.loads(line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
-        log_line = {}
+        # Since it's a non-JSON line, just log it as is and return
+        logger.info("%s", line)
+        return
 
     log(**log_line.get("info", {}))
     store_resource_status(**log_line.get("data", {}).get("node_info", {}))

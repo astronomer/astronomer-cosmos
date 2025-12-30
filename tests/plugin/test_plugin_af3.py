@@ -470,7 +470,7 @@ def test_dbt_docs_emits_telemetry_not_configured(mock_emit):
 
     r = client.get("/empty/dbt_docs_index.html")
 
-    assert r.status_code == 200
+    assert r.status_code == 404
     mock_emit.assert_called_once_with(
         event_type="dbt_docs_access",
         additional_metrics={
@@ -489,6 +489,8 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
     """Test that accessing dbt docs emits telemetry for local storage."""
     docs_dir = tmp_path / "target"
     docs_dir.mkdir(parents=True)
+    index_file = docs_dir / "index.html"
+    index_file.write_text("<head></head><body>dbt</body>")
 
     projects = {"local": {"dir": str(docs_dir), "index": "index.html"}}
     af3, app = _app_with_projects(projects)

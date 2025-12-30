@@ -422,3 +422,105 @@ def test_plugin_registers_listeners():
     assert hasattr(plugin, "listeners"), "Plugin must define a `listeners` attribute"
 
     assert dag_run_listener in plugin.listeners, "CosmosAF3Plugin.listeners must include dag_run_listener module"
+
+
+@skip_pre_airflow_31
+@patch("cosmos.telemetry.emit_usage_metrics_if_enabled")
+def test_dbt_docs_emits_telemetry(mock_emit, tmp_path: Path):
+    """Test that accessing dbt docs emits telemetry."""
+    docs_dir = tmp_path / "target"
+    docs_dir.mkdir(parents=True)
+    index_file = docs_dir / "index.html"
+    index_file.write_text("<head></head><body>dbt</body>")
+
+    projects = {
+        "my_project": {
+            "dir": f"s3://my-bucket/docs",
+            "index": "index.html",
+            "name": "My Project",
+            "conn_id": "my_s3_conn",
+        }
+    }
+    af3, app = _app_with_projects(projects)
+    client = TestClient(app)
+
+    with patch("cosmos.plugin.airflow3.open_file", return_value="<head></head><body>dbt</body>"):
+        r = client.get("/my_project/dbt_docs")
+
+    assert r.status_code == 200
+    mock_emit.assert_called_once_with(
+        event_type="dbt_docs_access",
+        additional_metrics={
+            "storage_type": "s3",
+            "is_configured": True,
+            "uses_custom_conn": True,
+            "project_slug": "my_project",
+            "has_custom_name": True,
+        },
+    )
+
+
+@skip_pre_airflow_31
+@patch("cosmos.telemetry.emit_usage_metrics_if_enabled")
+def test_dbt_docs_emits_telemetry_not_configured(mock_emit):
+    """Test that accessing dbt docs emits telemetry when not configured."""
+    projects = {"empty": {}}
+    af3, app = _app_with_projects(projects)
+    client = TestClient(app)
+
+    r = client.get("/empty/dbt_docs")
+
+    assert r.status_code == 200
+    mock_emit.assert_called_once_with(
+        event_type="dbt_docs_access",
+        additional_metrics={
+            "storage_type": "not_configured",
+            "is_configured": False,
+            "uses_custom_conn": False,
+            "project_slug": "empty",
+            "has_custom_name": False,
+        },
+    )
+
+
+@skip_pre_airflow_31
+@patch("cosmos.telemetry.emit_usage_metrics_if_enabled")
+def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
+    """Test that accessing dbt docs emits telemetry for local storage."""
+    docs_dir = tmp_path / "target"
+    docs_dir.mkdir(parents=True)
+
+    projects = {"local": {"dir": str(docs_dir), "index": "index.html"}}
+    af3, app = _app_with_projects(projects)
+    client = TestClient(app)
+
+    r = client.get("/local/dbt_docs")
+
+    assert r.status_code == 200
+    mock_emit.assert_called_once_with(
+        event_type="dbt_docs_access",
+        additional_metrics={
+            "storage_type": "local",
+            "is_configured": True,
+            "uses_custom_conn": False,
+            "project_slug": "local",
+            "has_custom_name": False,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "path,expected_type",
+    [
+        ("s3://bucket/path", "s3"),
+        ("gs://bucket/path", "gcs"),
+        ("wasb://container/path", "azure"),
+        ("http://example.com/path", "http"),
+        ("https://example.com/path", "http"),
+        ("/local/path", "local"),
+    ],
+)
+def test_get_storage_type(path, expected_type):
+    """Test storage type detection from path."""
+    af3 = _reload_af3_module()
+    assert af3._get_storage_type(path) == expected_type

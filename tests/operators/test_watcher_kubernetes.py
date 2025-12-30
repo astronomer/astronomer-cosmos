@@ -1,31 +1,76 @@
-from datetime import datetime, timedelta
+import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
-from airflow import DAG
-from airflow.utils.state import DagRunState
+from airflow.providers.cncf.kubernetes.secret import Secret
 
-from cosmos import DbtTaskGroup
+from cosmos import DbtDag
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import AIRFLOW_VERSION, ExecutionMode, TestBehavior, Version
+from cosmos.constants import AIRFLOW_VERSION, ExecutionMode, LoadMode, TestBehavior, Version
 from cosmos.operators.watcher_kubernetes import (
-    DbtProducerKubernetesWatcherOperator,
-    DbtRunKubernetesWatcherOperator,
-    DbtSeedKubernetesWatcherOperator,
+    DbtProducerWatcherKubernetesOperator,
+    DbtRunWatcherKubernetesOperator,
+    DbtSeedWatcherKubernetesOperator,
+)
+from tests.utils import run_dag
+
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+AIRFLOW_DBT_PROJECT_DIR = DBT_ROOT_PATH / "jaffle_shop"
+
+K8S_PROJECT_DIR = "dags/dbt/jaffle_shop"
+KBS_DBT_PROFILES_YAML_FILEPATH = Path(K8S_PROJECT_DIR) / "profiles.yml"
+
+DBT_IMAGE = "dbt-jaffle-shop:1.0.0"
+
+project_seeds = [{"project": "jaffle_shop", "seeds": ["raw_customers", "raw_payments", "raw_orders"]}]
+
+postgres_password_secret = Secret(
+    deploy_type="env",
+    deploy_target="POSTGRES_PASSWORD",
+    secret="postgres-secrets",
+    key="password",
 )
 
-DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
-DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
+postgres_host_secret = Secret(
+    deploy_type="env",
+    deploy_target="POSTGRES_HOST",
+    secret="postgres-secrets",
+    key="host",
+)
 
+operator_args = {
+    "deferrable": False,
+    "image": DBT_IMAGE,
+    "get_logs": True,
+    "is_delete_operator_pod": False,
+    "log_events_on_failure": True,
+    "secrets": [postgres_password_secret, postgres_host_secret],
+    "env_vars": {
+        "POSTGRES_DB": "postgres",
+        "POSTGRES_SCHEMA": "public",
+        "POSTGRES_USER": "postgres",
+    },
+    "retry": 0,
+}
+
+profile_config = ProfileConfig(
+    profile_name="postgres_profile", target_name="dev", profiles_yml_filepath=KBS_DBT_PROFILES_YAML_FILEPATH
+)
 
 project_config = ProjectConfig(
     project_name="jaffle_shop",
-    manifest_path=DBT_PROJECT_PATH / "target/manifest.json",
+    manifest_path=AIRFLOW_DBT_PROJECT_DIR / "target/manifest.json",
 )
 
-profile_config = ProfileConfig(
-    profile_name="default", target_name="dev", profiles_yml_filepath=DBT_PROFILES_YAML_FILEPATH
-)
+render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
+
+
+# Currently airflow dags test ignores priority_weight and  weight_rule, for this reason, we're setting the following in the CI only:
+if os.getenv("CI"):
+    operator_args["trigger_rule"] = "all_success"
 
 
 @pytest.mark.skipif(
@@ -35,91 +80,63 @@ profile_config = ProfileConfig(
 @pytest.mark.integration
 def test_dbt_task_group_with_watcher_kubernetes():
     """
-    Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.
+    Create an Cosmos DbtDag with `ExecutionMode.WATCHER_KUBERNETES`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.
     Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
     """
 
-    try:
-        from airflow.providers.standard.operators.empty import EmptyOperator
-    except ImportError:
-        from airflow.operators.empty import EmptyOperator
+    dag_dbt_watcher_kubernetes = DbtDag(
+        dag_id="watcher_kubernetes_dag",
+        start_date=datetime(2022, 11, 27),
+        doc_md=__doc__,
+        catchup=False,
+        # Cosmos-specific parameters:
+        project_config=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER_KUBERNETES,
+            dbt_project_path=K8S_PROJECT_DIR,
+        ),
+        operator_args=operator_args,
+    )
 
-    operator_args = {
-        "install_deps": True,  # install any necessary dependencies before running any dbt command
-        "execution_timeout": timedelta(seconds=120),
-    }
+    run_dag(dag_dbt_watcher_kubernetes)
 
-    with DAG(
-        dag_id="example_watcher_taskgroup",
-        start_date=datetime(2025, 1, 1),
-    ) as dag_dbt_task_group_watcher:
-        """
-        The simplest example of using Cosmos to render a dbt project as a TaskGroup.
-        """
-        pre_dbt = EmptyOperator(task_id="pre_dbt")
-
-        dbt_task_group = DbtTaskGroup(
-            group_id="dbt_task_group",
-            execution_config=ExecutionConfig(
-                execution_mode=ExecutionMode.WATCHER,
-            ),
-            profile_config=profile_config,
-            project_config=project_config,
-            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
-            operator_args=operator_args,
-        )
-
-        pre_dbt
-        dbt_task_group
-
-    outcome = dag_dbt_task_group_watcher.test()
-    assert outcome.state == DagRunState.SUCCESS
-
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
-    tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
+    assert len(dag_dbt_watcher_kubernetes.task_dict) == 9
+    tasks_names = [task.task_id for task in dag_dbt_watcher_kubernetes.topological_sort()]
 
     expected_task_names = [
-        "pre_dbt",
-        "dbt_task_group.dbt_producer_watcher",
-        "dbt_task_group.raw_customers_seed",
-        "dbt_task_group.raw_orders_seed",
-        "dbt_task_group.raw_payments_seed",
-        "dbt_task_group.stg_customers_run",
-        "dbt_task_group.stg_orders_run",
-        "dbt_task_group.stg_payments_run",
-        "dbt_task_group.customers_run",
-        "dbt_task_group.orders_run",
+        "dbt_producer_watcher",
+        "raw_customers_seed",
+        "raw_orders_seed",
+        "raw_payments_seed",
+        "stg_customers_run",
+        "stg_orders_run",
+        "stg_payments_run",
+        "customers_run",
+        "orders_run",
     ]
     assert tasks_names == expected_task_names
 
     assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"],
-        DbtProducerKubernetesWatcherOperator,
+        dag_dbt_watcher_kubernetes.task_dict["dbt_producer_watcher"],
+        DbtProducerWatcherKubernetesOperator,
     )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_customers_seed"], DbtSeedKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_orders_seed"], DbtSeedKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_payments_seed"], DbtSeedKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_customers_run"], DbtRunKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_orders_run"], DbtRunKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.stg_payments_run"], DbtRunKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunKubernetesWatcherOperator
-    )
-    assert isinstance(
-        dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunKubernetesWatcherOperator
-    )
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["raw_customers_seed"], DbtSeedWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["raw_orders_seed"], DbtSeedWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["raw_payments_seed"], DbtSeedWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["stg_customers_run"], DbtRunWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["stg_orders_run"], DbtRunWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["stg_payments_run"], DbtRunWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["customers_run"], DbtRunWatcherKubernetesOperator)
+    assert isinstance(dag_dbt_watcher_kubernetes.task_dict["orders_run"], DbtRunWatcherKubernetesOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+    expected_downstream_task_ids = {
+        "raw_payments_seed",
+        "raw_orders_seed",
+        "raw_customers_seed",
+    }
+    assert (
+        dag_dbt_watcher_kubernetes.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids
+    )

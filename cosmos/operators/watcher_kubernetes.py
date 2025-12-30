@@ -93,7 +93,7 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
             _store_dbt_resource_status_from_log(dbt_log, kwargs)
 
 
-class DbtProducerKubernetesWatcherOperator(DbtBuildKubernetesOperator):
+class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = _store_dbt_resource_status_from_log
@@ -114,7 +114,7 @@ class DbtProducerKubernetesWatcherOperator(DbtBuildKubernetesOperator):
         return super().execute(context, **kwargs)
 
 
-class DbtConsumerKubernetesWatcherSensor(BaseSensorOperator, DbtRunKubernetesOperator):
+class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOperator):
     template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
     poke_retry_number: int = 0
 
@@ -315,23 +315,23 @@ class DbtBuildWatcherKubernetesOperator:
         )
 
 
-class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerKubernetesWatcherSensor):  # type: ignore[misc]
+class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerKubernetesWatcherSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerKubernetesWatcherSensor):  # type: ignore[misc]
+class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerKubernetesWatcherSensor.template_fields
+    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
 
 
 class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
@@ -342,12 +342,12 @@ class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
     template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)  # type: ignore[arg-type]
 
 
-class DbtRunWatcherKubernetesOperator(DbtConsumerKubernetesWatcherSensor):
+class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
     """
     Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerKubernetesWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

@@ -10,10 +10,10 @@ from airflow.www.views import AirflowBaseView
 from flask import abort
 from flask_appbuilder import AppBuilder, expose
 
+from cosmos import telemetry
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name, in_astro_cloud
-from cosmos import telemetry
 
 if in_astro_cloud:
     MENU_ACCESS_PERMISSIONS = [
@@ -141,7 +141,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         storage_type = "not_configured"
         if dbt_docs_dir is not None:
             storage_type = self._get_storage_type(dbt_docs_dir)
-            
+
         telemetry.emit_usage_metrics_if_enabled(
             event_type="dbt_docs_access",
             additional_metrics={
@@ -150,7 +150,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
                 "uses_custom_conn": dbt_docs_conn_id is not None,
             },
         )
-        
+
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]

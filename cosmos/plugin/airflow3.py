@@ -19,10 +19,10 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
 
+from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
-from cosmos import telemetry
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
@@ -157,7 +157,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             storage_type = "not_configured"
             if docs_dir_local is not None:
                 storage_type = _get_storage_type(str(docs_dir_local))
-                
+
             telemetry.emit_usage_metrics_if_enabled(
                 event_type="dbt_docs_access",
                 additional_metrics={
@@ -168,7 +168,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     "has_custom_name": cfg_local.get("name") is not None,
                 },
             )
-            
+
             conn_id_local = cfg_local.get("conn_id")
             index_local = cfg_local.get("index") or "index.html"
             if not docs_dir_local:

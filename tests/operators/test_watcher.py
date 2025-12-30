@@ -13,7 +13,6 @@ from unittest.mock import ANY, MagicMock, Mock, patch
 import pytest
 from airflow.exceptions import AirflowException, TaskDeferred
 from airflow.utils.state import DagRunState
-from cosmos._triggers.watcher import WatcherTrigger
 from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior

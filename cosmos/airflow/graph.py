@@ -869,22 +869,11 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
-    elif execution_mode == ExecutionMode.WATCHER:
-        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
+    elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
+        setup_operator_args = getattr(execution_config, "setup_operator_args", {})
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1
         # To instantiate the producer before helps having it before on the DAG topological order and scheduling this task before the consumer tasks
-        producer_task = _add_watcher_producer_task(
-            dag=dag,
-            task_args={**task_args, **setup_operator_args},
-            tasks_map=tasks_map,
-            task_group=task_group,
-            render_config=render_config,
-            execution_mode=execution_mode,
-        )
-
-    if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
-        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         producer_task = _add_watcher_producer_task(
             dag=dag,
             task_args={**task_args, **setup_operator_args},

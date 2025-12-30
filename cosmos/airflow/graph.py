@@ -670,10 +670,7 @@ def _add_watcher_producer_task(
                 "resource_type:unit_test",
             ]
 
-    if execution_mode == ExecutionMode.WATCHER:
-        class_name = "cosmos.operators.watcher.DbtProducerWatcherOperator"
-    else:
-        class_name = "cosmos.operators.watcher_kubernetes.DbtProducerWatcherKubernetesOperator"
+    class_name = calculate_operator_class(execution_mode, "DbtProducer")
 
     # First, we create the producer task
     producer_task_metadata = TaskMetadata(

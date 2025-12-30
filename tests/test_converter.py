@@ -1121,6 +1121,37 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
 
 @patch("cosmos.converter.logger")
 @patch("cosmos.converter.DbtGraph.load")
+def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
+    """Test that the converter logs group start before group end."""
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    # Get all info log calls
+    info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+
+    # Find the indices of group start and end
+    group_start_idx = info_calls.index("::group::Cosmos DAG parsing logs")
+    group_end_idx = info_calls.index("::endgroup::Cosmos DAG parsing logs")
+
+    # Verify that start comes before end
+    assert group_start_idx < group_end_idx
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter.DbtGraph.load")
 def test_telemetry_metadata_exception_handling(mock_load_dbt_graph, mock_logger):
     """Test that telemetry metadata computation handles exceptions gracefully."""
     dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))

@@ -1,6 +1,13 @@
 Changelog
 =========
 
+1.12.1a1 (2025-12-26)
+----------------------
+
+Bug Fixes
+
+* Fix ``DbtSourceWatcherOperator.template_fields`` to inherit from ``DbtSourceLocalOperator`` instead of ``DbtConsumerWatcherSensor`` by @pankajkoti in #2214
+
 1.12.0 (2025-12-18)
 ----------------------
 

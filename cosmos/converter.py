@@ -23,7 +23,7 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
@@ -32,8 +32,6 @@ from cosmos.log import get_logger
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
-
-from cosmos.constants import DbtResourceType
 
 
 def migrate_to_new_interface(

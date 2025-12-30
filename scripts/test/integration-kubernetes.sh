@@ -19,4 +19,5 @@ pytest -vv \
     --cov-report=term-missing \
     --cov-report=xml \
     -m 'integration and not dbtfusion' \
-    tests/test_example_k8s_dags.py
+    tests/test_example_k8s_dags.py \
+    tests/operators/test_watcher_kubernetes.py

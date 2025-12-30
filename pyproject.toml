@@ -229,6 +229,11 @@ serve = "sphinx-autobuild docs docs/_build"
 line-length = 120
 target-version = ["py310", "py311", "py312", "py313"]
 
+[tool.coverage.run]
+omit = [
+    "cosmos/airflow/_override.py"
+]
+
 [tool.isort]
 profile = "black"
 known_third_party = ["airflow", "jinja2"]

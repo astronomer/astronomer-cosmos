@@ -8,6 +8,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
+    from pendulum import DateTime
+
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:
@@ -17,6 +19,7 @@ try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
 except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
+import kubernetes.client as k8s
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
@@ -80,17 +83,31 @@ producer_task_context = None
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
 
     @staticmethod
-    def progress_callback(*, line: str, client: client_type, mode: str, **kwargs: Any) -> None:
-        line_content = line.strip()
-        logger.info(f"[xubi] {line_content}")
-        try:
-            k8s_timestamp, dbt_log = line_content.split(" ", 1)
-        except ValueError:
-            logger.debug(f"[XUBIRU] Failed to parse log: {line_content}")
-        else:
-            if not "context" in kwargs:
-                kwargs["context"] = producer_task_context
-            _store_dbt_resource_status_from_log(dbt_log, kwargs)
+    def progress_callback(
+        *,
+        line: str,
+        client: client_type,
+        mode: str,
+        container_name: str,
+        timestamp: DateTime | None,
+        pod: k8s.V1Pod,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Invoke this callback to process pod container logs.
+
+        :param line: the read line of log.
+        :param client: the Kubernetes client that can be used in the callback.
+        :param mode: the current execution mode, it's one of (`sync`, `async`).
+        :param container_name: the name of the container from which the log line was read.
+        :param timestamp: the timestamp of the log line.
+        :param pod: the pod from which the log line was read.
+        """
+
+        logger.info(f"[xubi] {line}")
+        if not "context" in kwargs:
+            kwargs["context"] = producer_task_context
+        _store_dbt_resource_status_from_log(line, kwargs)
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):

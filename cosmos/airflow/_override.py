@@ -56,9 +56,8 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
 
             Returns the last timestamp observed in logs.
             """
-
-            # CUSTOM: Introduced these four lines, modifying the 1.11.0 K8s provider code
-            # Successfully tested with Airflow 3.1.0 and K8s provider 10.11.0 and 10.10.0
+            # Cosmos implementation difference when compared to proposal to fix the issue in the upstream provider:
+            # https://github.com/apache/airflow/pull/59372/
             if Version(airflow_k8s_provider_version) >= Version("10.10.0"):
                 from airflow.providers.cncf.kubernetes.utils.pod_manager import parse_log_line
             elif (
@@ -67,6 +66,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                 parse_log_line = self.parse_log_line
             else:
                 raise ValueError(f"Unsupported K8s provider version: {airflow_k8s_provider_version}")
+            # Cosmos custom implementation finishes here.
 
             exception = None
             last_captured_timestamp = None
@@ -112,30 +112,40 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                                 message_timestamp = line_timestamp
                                 progress_callback_lines.append(line)
                             else:  # previous log line is complete
-                                if message_to_log is not None:
-                                    self._log_message(
-                                        message_to_log,
-                                        container_name,
-                                        container_name_log_prefix_enabled,
-                                        log_formatter,
+                                for callback in self._callbacks:
+                                    callback.progress_callback(
+                                        line=message_to_log,
+                                        client=self._client,
+                                        mode=ExecutionMode.SYNC,
+                                        container_name=container_name,
+                                        timestamp=message_timestamp,
+                                        pod=pod,
                                     )
-                                    # CUSTOM: Change where callbacks are invoked from
-                                    for callback in self._callbacks:
-                                        callback.progress_callback(
-                                            line=line, client=self._client, mode=ExecutionMode.SYNC
-                                        )
+                                self._log_message(
+                                    message_to_log,
+                                    container_name,
+                                    container_name_log_prefix_enabled,
+                                    log_formatter,
+                                )
                                 last_captured_timestamp = message_timestamp
                                 message_to_log = message
                                 message_timestamp = line_timestamp
+                                progress_callback_lines = [line]
                         else:  # continuation of the previous log line
                             message_to_log = f"{message_to_log}\n{message}"
                             progress_callback_lines.append(line)
                 finally:
-                    # CUSTOM: Change where callbacks are invoked from
-                    for callback in self._callbacks:
-                        callback.progress_callback(line=message_to_log, client=self._client, mode=ExecutionMode.SYNC)
                     # log the last line and update the last_captured_timestamp
                     if message_to_log is not None:
+                        for callback in self._callbacks:
+                            callback.progress_callback(
+                                line=message_to_log,
+                                client=self._client,
+                                mode=ExecutionMode.SYNC,
+                                container_name=container_name,
+                                timestamp=message_timestamp,
+                                pod=pod,
+                            )
                         self._log_message(
                             message_to_log, container_name, container_name_log_prefix_enabled, log_formatter
                         )

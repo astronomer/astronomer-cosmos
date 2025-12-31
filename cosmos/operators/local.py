@@ -22,6 +22,8 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
+from cosmos.io import _construct_dest_file_path
+
 if TYPE_CHECKING:  # pragma: no cover
     try:
         from airflow.sdk.definitions.context import Context
@@ -333,22 +335,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         return _configured_target_path, remote_conn_id
 
-    def _construct_dest_file_path(
-        self, dest_target_dir: Path | ObjectStoragePath, file_path: str, source_compiled_dir: Path, resource_type: str
-    ) -> str:
-        """
-        Construct the destination path for the compiled SQL files to be uploaded to the remote store.
-        """
-        dest_target_dir_str = str(dest_target_dir).rstrip("/")
-        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
-        rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
-        run_id = self.extra_context["run_id"]
-
-        if settings.upload_sql_to_xcom:
-            return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
-
-        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
-
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
 
@@ -357,10 +343,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not dest_target_dir:
             raise CosmosValueError("You're trying to upload SQL files, but the remote target path is not configured. ")
 
+        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+        run_id = self.extra_context["run_id"]
+
         source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
         for file_path in files:
-            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)
+            rel_path = os.path.relpath(file_path, source_run_dir)
+            dest_file_path = _construct_dest_file_path(
+                dest_target_dir, rel_path, dag_task_group_identifier, run_id, resource_type
+            )
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             dest_object_storage_path.parent.mkdir(parents=True, exist_ok=True)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)

@@ -3,7 +3,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 from packaging.version import Version
 
-from cosmos._triggers.watcher import AIRFLOW_VERSION, WatcherTrigger
+from cosmos.operators._watcher.triggerer import AIRFLOW_VERSION, WatcherTrigger
 
 _real_import = __import__
 
@@ -33,7 +33,7 @@ class TestWatcherTrigger:
     async def test_get_xcom_val_af3(self):
         expected_value = {"foo": "bar"}
 
-        with patch("cosmos._triggers.watcher.sync_to_async") as mock_sync_to_async:
+        with patch("cosmos.operators._watcher.triggerer.sync_to_async") as mock_sync_to_async:
             mock_get_one = AsyncMock(return_value=expected_value)
             mock_sync_to_async.return_value = mock_get_one
 
@@ -69,7 +69,7 @@ class TestWatcherTrigger:
 
                 return runner
 
-            with patch("cosmos._triggers.watcher.sync_to_async", side_effect=wrap_sync):
+            with patch("cosmos.operators._watcher.triggerer.sync_to_async", side_effect=wrap_sync):
                 result = await self.trigger.get_xcom_val_af2("test_key")
 
                 mock_ti.xcom_pull.assert_called_once_with(task_ids="task_1", key="test_key")
@@ -90,7 +90,7 @@ class TestWatcherTrigger:
     async def test_parse_node_status(self, use_event, xcom_val, expected_status):
         self.trigger.use_event = use_event
         with (
-            patch("cosmos._triggers.watcher._parse_compressed_xcom", return_value=xcom_val),
+            patch("cosmos.operators._watcher.triggerer._parse_compressed_xcom", return_value=xcom_val),
             patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=xcom_val)),
         ):
             status = await self.trigger._parse_node_status()
@@ -104,7 +104,7 @@ class TestWatcherTrigger:
         ],
     )
     async def test_get_xcom_val_branches(self, airflow_version, expected_val):
-        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", airflow_version):
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", airflow_version):
             if expected_val == "af2":
                 with patch.object(self.trigger, "get_xcom_val_af2", AsyncMock(return_value="af2")):
                     val = await self.trigger.get_xcom_val("key")
@@ -131,7 +131,7 @@ class TestWatcherTrigger:
             patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val),
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value=producer_state)),
             patch(
-                "cosmos._triggers.watcher._parse_compressed_xcom",
+                "cosmos.operators._watcher.triggerer._parse_compressed_xcom",
                 return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
             ),
         ):
@@ -142,8 +142,10 @@ class TestWatcherTrigger:
     async def test_get_producer_task_status_airflow2(self):
         fetcher = MagicMock(return_value="failed")
 
-        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("2.9.0")):
-            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher) as mock_builder:
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.9.0")):
+            with patch(
+                "cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher
+            ) as mock_builder:
                 state = await self.trigger._get_producer_task_status()
 
         mock_builder.assert_called_once_with(
@@ -160,8 +162,8 @@ class TestWatcherTrigger:
     async def test_get_producer_task_status_airflow2_missing_ti(self):
         fetcher = MagicMock(return_value=None)
 
-        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("2.9.0")):
-            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher):
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.9.0")):
+            with patch("cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()
 
         fetcher.assert_called_once_with()
@@ -171,8 +173,8 @@ class TestWatcherTrigger:
     async def test_get_producer_task_status_airflow3(self):
         fetcher = MagicMock(return_value="success")
 
-        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
-            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher):
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.0.0")):
+            with patch("cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()
 
         fetcher.assert_called_once_with()
@@ -182,8 +184,8 @@ class TestWatcherTrigger:
     async def test_get_producer_task_status_airflow3_missing_state(self):
         fetcher = MagicMock(return_value=None)
 
-        with patch("cosmos._triggers.watcher.AIRFLOW_VERSION", Version("3.0.0")):
-            with patch("cosmos._triggers.watcher.build_producer_state_fetcher", return_value=fetcher):
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.0.0")):
+            with patch("cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()
 
         fetcher.assert_called_once_with()
@@ -215,7 +217,7 @@ class TestWatcherTrigger:
         with (
             patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch("cosmos._triggers.watcher.WatcherTrigger._parse_node_status", parse_node_status_mock),
+            patch("cosmos.operators._watcher.triggerer.WatcherTrigger._parse_node_status", parse_node_status_mock),
             patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
         ):
             events = []

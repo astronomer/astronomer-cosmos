@@ -446,7 +446,6 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, monkeypatch, app):
     ],
 )
 def test_get_storage_type(path, expected_type):
-    from cosmos.plugin.airflow2 import DbtDocsView
+    from cosmos.plugin.storage import get_storage_type_from_path
 
-    view = DbtDocsView()
-    assert view._get_storage_type(path) == expected_type
+    assert get_storage_type_from_path(path) == expected_type

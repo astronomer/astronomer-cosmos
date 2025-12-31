@@ -13,6 +13,7 @@ from flask_appbuilder import AppBuilder, expose
 from cosmos import telemetry
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
+from cosmos.plugin.storage import get_storage_type_from_path
 from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name, in_astro_cloud
 
 if in_astro_cloud:
@@ -140,7 +141,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         # Emit telemetry for dbt docs access
         storage_type = "not_configured"
         if dbt_docs_dir is not None:
-            storage_type = self._get_storage_type(dbt_docs_dir)
+            storage_type = get_storage_type_from_path(dbt_docs_dir)
 
         telemetry.emit_usage_metrics_if_enabled(
             event_type="dbt_docs_access",
@@ -154,20 +155,6 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
-
-    def _get_storage_type(self, path: str) -> str:
-        """Determine the storage type from the path."""
-        path = path.strip()
-        if path.startswith("s3://"):
-            return "s3"
-        elif path.startswith("gs://"):
-            return "gcs"
-        elif path.startswith("wasb://"):
-            return "azure"
-        elif path.startswith("http://") or path.startswith("https://"):
-            return "http"
-        else:
-            return "local"
 
     @expose("/dbt_docs_index.html")  # type: ignore[untyped-decorator]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]

@@ -23,6 +23,7 @@ from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
+from cosmos.plugin.storage import get_storage_type_from_path
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
@@ -156,7 +157,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             docs_dir_local = cfg_local.get("dir")
             storage_type = "not_configured"
             if docs_dir_local is not None:
-                storage_type = _get_storage_type(str(docs_dir_local))
+                storage_type = get_storage_type_from_path(str(docs_dir_local))
 
             telemetry.emit_usage_metrics_if_enabled(
                 event_type="dbt_docs_access",
@@ -271,21 +272,6 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             return JSONResponse(content=json.loads(data))
 
     return app
-
-
-def _get_storage_type(path: str) -> str:
-    """Determine the storage type from the path."""
-    path = path.strip()
-    if path.startswith("s3://"):
-        return "s3"
-    elif path.startswith("gs://"):
-        return "gcs"
-    elif path.startswith("wasb://"):
-        return "azure"
-    elif path.startswith("http://") or path.startswith("https://"):
-        return "http"
-    else:
-        return "local"
 
 
 class CosmosAF3Plugin(AirflowPlugin):

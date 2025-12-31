@@ -524,5 +524,6 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
 )
 def test_get_storage_type(path, expected_type):
     """Test storage type detection from path."""
-    af3 = _reload_af3_module()
-    assert af3._get_storage_type(path) == expected_type
+    from cosmos.plugin.storage import get_storage_type_from_path
+
+    assert get_storage_type_from_path(path) == expected_type

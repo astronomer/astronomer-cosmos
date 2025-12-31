@@ -452,7 +452,7 @@ def test_dbt_docs_emits_telemetry(mock_emit, tmp_path: Path):
         event_type="dbt_docs_access",
         additional_metrics={
             "storage_type": "s3",
-            "is_configured": True,
+            "docs_dir_configured": True,
             "uses_custom_conn": True,
             "has_custom_name": True,
         },
@@ -474,7 +474,7 @@ def test_dbt_docs_emits_telemetry_not_configured(mock_emit):
         event_type="dbt_docs_access",
         additional_metrics={
             "storage_type": "not_configured",
-            "is_configured": False,
+            "docs_dir_configured": False,
             "uses_custom_conn": False,
             "has_custom_name": False,
         },
@@ -501,7 +501,7 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
         event_type="dbt_docs_access",
         additional_metrics={
             "storage_type": "local",
-            "is_configured": True,
+            "docs_dir_configured": True,
             "uses_custom_conn": False,
             "has_custom_name": False,
         },

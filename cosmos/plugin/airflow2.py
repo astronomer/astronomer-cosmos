@@ -147,7 +147,7 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
             event_type="dbt_docs_access",
             additional_metrics={
                 "storage_type": storage_type,
-                "is_configured": dbt_docs_dir is not None,
+                "docs_dir_configured": dbt_docs_dir is not None,
                 "uses_custom_conn": dbt_docs_conn_id is not None,
             },
         )

@@ -163,7 +163,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 event_type="dbt_docs_access",
                 additional_metrics={
                     "storage_type": storage_type,
-                    "is_configured": docs_dir_local is not None,
+                    "docs_dir_configured": docs_dir_local is not None,
                     "uses_custom_conn": cfg_local.get("conn_id") is not None,
                     "has_custom_name": cfg_local.get("name") is not None,
                 },

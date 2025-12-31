@@ -202,21 +202,20 @@ def create_test_task_metadata(  # noqa:C901
     if node:
         args_to_override = node.operator_kwargs_to_override
 
+    dbt_class = "DbtTest"
     if (
         render_config is not None
         and render_config.test_behavior == TestBehavior.AFTER_ALL
         and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES)
     ):
         if execution_mode == ExecutionMode.WATCHER:
-            operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+            test_execution_mode = ExecutionMode.LOCAL
         else:  # ExecutionMode.WATCHER_KUBERNETES
-            operator_class = "cosmos.operators.kubernetes.DbtTestKubernetesOperator"
+            test_execution_mode = ExecutionMode.KUBERNETES
 
+        calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
     else:
-        operator_class = calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        )
+        operator_class = calculate_operator_class(execution_mode=execution_mode, dbt_class=dbt_class)
 
     return TaskMetadata(
         id=test_task_name,

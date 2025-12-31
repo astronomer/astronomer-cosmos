@@ -30,7 +30,7 @@ from cosmos.config import (
     ProjectConfig,
     RenderConfig,
 )
-from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
+from cosmos.constants import ExecutionMode, LoadMode
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 
@@ -82,7 +82,7 @@ project_config = ProjectConfig(
     manifest_path=AIRFLOW_DBT_PROJECT_DIR / "target/manifest.json",
 )
 
-render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
+render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST)
 
 
 # Currently airflow dags test ignores priority_weight and  weight_rule, for this reason, we're setting the following in the CI only:

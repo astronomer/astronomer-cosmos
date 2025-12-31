@@ -9,7 +9,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cosmos.operators._watcher import WatcherTrigger, _parse_compressed_xcom, get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher.state import get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -67,19 +68,20 @@ def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     try:
         log_line = json.loads(line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
+        logger.info("Failed to parse log: %s", line)
         log_line = {}
     node_info = log_line.get("data", {}).get("node_info", {})
     node_status = node_info.get("node_status")
     unique_id = node_info.get("unique_id")
+    if unique_id is not None:
+        logger.info("Model: %s is in %s state", unique_id, node_status)
 
-    logger.debug("Model: %s is in %s state", unique_id, node_status)
-
-    # TODO: Handle and store all possible node statuses, not just the current success and failed
-    if node_status in ["success", "failed"]:
-        context = extra_kwargs.get("context")
-        assert context is not None  # Make MyPy happy
-        safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+        # TODO: Handle and store all possible node statuses, not just the current success and failed
+        if node_status in ["success", "failed"]:
+            # These lines raise an exception when using KubernetesPodOperatorCallback
+            context = extra_kwargs.get("context")
+            assert context is not None  # Make MyPy happy
+            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -403,12 +405,13 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
                 method_name=self.execute_complete.__name__,
             )
 
-    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
+    def execute_complete(self, context: Context, event: dict[str, Any], **kwargs: Any) -> None:
         status = event.get("status")
+        reason = event.get("reason")
+
         if status != "failed":
             return
 
-        reason = event.get("reason")
         if reason == "model_failed":
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."

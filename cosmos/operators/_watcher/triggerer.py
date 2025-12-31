@@ -82,6 +82,9 @@ class WatcherTrigger(BaseTrigger):
         return await sync_to_async(_get_xcom_val)()
 
     async def get_xcom_val(self, key: str) -> Any | None:
+        self.log.info(
+            f"Trying to retrieve value using XCom key <{key}> by task_id <{self.producer_task_id}>, dag_id <{self.dag_id}>, run_id <{self.run_id}> and map_index <{self.map_index}>"
+        )
         if AIRFLOW_VERSION < Version("3.0.0"):
             return await self.get_xcom_val_af2(key)
         else:
@@ -141,7 +144,6 @@ class WatcherTrigger(BaseTrigger):
                 )
                 yield TriggerEvent({"status": "failed", "reason": "producer_failed"})  # type: ignore[no-untyped-call]
                 return
-
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
             self.log.debug("Polling again for model '%s' status...", self.model_unique_id)

@@ -3,7 +3,8 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.operators._watcher.triggerer import AIRFLOW_VERSION, WatcherTrigger
+from cosmos.constants import AIRFLOW_VERSION
+from cosmos.operators._watcher.triggerer import WatcherTrigger
 
 _real_import = __import__
 
@@ -141,7 +142,6 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow2(self):
         fetcher = MagicMock(return_value="failed")
-
         with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.9.0")):
             with patch(
                 "cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher
@@ -183,7 +183,6 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3_missing_state(self):
         fetcher = MagicMock(return_value=None)
-
         with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.0.0")):
             with patch("cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()

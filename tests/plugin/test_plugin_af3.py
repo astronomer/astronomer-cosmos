@@ -454,7 +454,6 @@ def test_dbt_docs_emits_telemetry(mock_emit, tmp_path: Path):
             "storage_type": "s3",
             "is_configured": True,
             "uses_custom_conn": True,
-            "project_slug": "my_project",
             "has_custom_name": True,
         },
     )
@@ -477,7 +476,6 @@ def test_dbt_docs_emits_telemetry_not_configured(mock_emit):
             "storage_type": "not_configured",
             "is_configured": False,
             "uses_custom_conn": False,
-            "project_slug": "empty",
             "has_custom_name": False,
         },
     )
@@ -505,7 +503,6 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
             "storage_type": "local",
             "is_configured": True,
             "uses_custom_conn": False,
-            "project_slug": "local",
             "has_custom_name": False,
         },
     )

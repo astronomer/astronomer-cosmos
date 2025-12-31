@@ -165,7 +165,6 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     "storage_type": storage_type,
                     "is_configured": docs_dir_local is not None,
                     "uses_custom_conn": cfg_local.get("conn_id") is not None,
-                    "project_slug": slug_alias,
                     "has_custom_name": cfg_local.get("name") is not None,
                 },
             )

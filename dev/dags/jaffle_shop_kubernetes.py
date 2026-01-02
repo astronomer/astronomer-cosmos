@@ -82,8 +82,8 @@ with DAG(
     )
     # [END kubernetes_seed_example]
 
-    # [START kubernetes_docs_to_s3_examaple]
-    upload_docs_to_s3 = generate_dbt_docs_aws = DbtDocsS3KubernetesOperator(
+    # [START kubernetes_docs_to_s3_example]
+    upload_docs_to_s3 = DbtDocsS3KubernetesOperator(
         task_id="generate_dbt_docs_aws",
         project_dir=K8S_PROJECT_DIR,
         secrets=[postgres_host_secret, postgres_password_secret],
@@ -93,7 +93,7 @@ with DAG(
         get_logs=True,
         is_delete_operator_pod=False,
     )
-    # [END kubernetes_docs_to_s3_examaple]
+    # [END kubernetes_docs_to_s3_example]
 
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(

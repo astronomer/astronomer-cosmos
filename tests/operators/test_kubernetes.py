@@ -625,7 +625,7 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
 )
 def test_operator_execute_without_flags(operator_class):
     operator_class_kwargs = {
-        DbtDocsS3KubernetesOperator: {"aws_conn_id": "fake-conn", "bucket_name": "fake-bucket"},
+        DbtDocsS3KubernetesOperator: {"bucket_name": "fake-bucket"},
     }
     task = operator_class(
         profile_config=profile_config,

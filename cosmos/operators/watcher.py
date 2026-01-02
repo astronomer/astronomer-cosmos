@@ -129,6 +129,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
+    # when accessed via instance, which would incorrectly pass `self` as the first argument
+    _process_log_line_callable = staticmethod(_process_json_log_line)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
@@ -144,9 +147,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:
-            # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
-            # when accessed via instance, which would incorrectly pass `self` as the first argument
-            self._process_log_line_callable = staticmethod(_process_json_log_line)
             self.log_format = "json"
 
     @staticmethod

@@ -27,7 +27,7 @@ from cosmos.operators.watcher import (
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
-    _store_dbt_resource_status_from_log,
+    _process_json_log_line,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
@@ -427,7 +427,7 @@ def test_execute_fallback_mode(tmp_path):
 
 
 class TestStoreDbStatusFromLog:
-    """Tests for _store_dbt_resource_status_from_log and _process_log_line_callable."""
+    """Tests for _process_json_log_line and _process_log_line_callable."""
 
     def test_store_dbt_resource_status_from_log_success(self):
         """Test that success status is correctly parsed and stored in XCom."""
@@ -436,7 +436,7 @@ class TestStoreDbStatusFromLog:
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.my_model"}}})
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        _process_json_log_line(log_line, {"context": ctx})
 
         assert ti.store.get("model__pkg__my_model_status") == "success"
 
@@ -447,7 +447,7 @@ class TestStoreDbStatusFromLog:
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "failed", "unique_id": "model.pkg.failed_model"}}})
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        _process_json_log_line(log_line, {"context": ctx})
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
 
@@ -460,7 +460,7 @@ class TestStoreDbStatusFromLog:
             {"data": {"node_info": {"node_status": "running", "unique_id": "model.pkg.running_model"}}}
         )
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        _process_json_log_line(log_line, {"context": ctx})
 
         assert "model__pkg__running_model_status" not in ti.store
 
@@ -470,7 +470,7 @@ class TestStoreDbStatusFromLog:
         ctx = {"ti": ti}
 
         # Should not raise an exception
-        _store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
+        _process_json_log_line("not valid json {{{", {"context": ctx})
 
         # No status should be stored
         assert len(ti.store) == 0
@@ -483,7 +483,7 @@ class TestStoreDbStatusFromLog:
         log_line = json.dumps({"data": {"other_key": "value"}})
 
         # Should not raise an exception
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        _process_json_log_line(log_line, {"context": ctx})
 
         # No status should be stored
         assert len(ti.store) == 0
@@ -507,7 +507,7 @@ class TestStoreDbStatusFromLog:
         ), "_process_log_line_callable should not be a bound method when accessed through instance"
 
         # Verify it's the original function
-        assert callable_from_instance is _store_dbt_resource_status_from_log
+        assert callable_from_instance is _process_json_log_line
 
     def test_process_log_line_callable_accepts_two_arguments(self):
         """Test that the callable can be called with exactly 2 arguments (line, kwargs).

@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from airflow.exceptions import AirflowException
 
@@ -17,15 +17,10 @@ from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compresse
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
+    from airflow.sdk.definitions.context import Context
 except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
-
-
-if TYPE_CHECKING:  # pragma: no cover
-    try:
-        from airflow.sdk.definitions.context import Context
-    except ImportError:
-        from airflow.utils.context import Context  # type: ignore[attr-defined]
+    from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 
 logger = get_logger(__name__)
@@ -132,7 +127,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         model_selector = self.model_unique_id.split(".")[-1]
         cmd_flags = extra_flags + ["--select", model_selector]
 
-        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
 
         logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True
@@ -157,7 +152,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         logger.info("Node Info: %s", run_results_json)
         self.compiled_sql = node_result.get("compiled_code")
         if self.compiled_sql:
-            self._override_rtif(context)
+            self._override_rtif(context)  # type: ignore[attr-defined]
 
         return node_result.get("status")
 
@@ -222,16 +217,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
         raise NotImplementedError("Subclasses should implement this method if `_use_event` may return True")
-
-    def _override_rtif(self, context: Context) -> None:
-        raise NotImplementedError(
-            "Subclasses should implement this method, or inherit from a class that implements it (e.g. DbtRunLocalOperator)."
-        )
-
-    def build_and_run_cmd(self, context: Context, cmd_flags: list[str]) -> None:
-        raise NotImplementedError(
-            "Subclasses should implement this method, or inherit from a class that implements it (e.g. DbtRunLocalOperator)."
-        )
 
     def poke(self, context: Context) -> bool:
         """

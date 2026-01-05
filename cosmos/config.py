@@ -30,6 +30,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -78,6 +79,7 @@ class RenderConfig:
     :param normalize_task_display_name: A callable that takes a dbt node as input and returns the task display name. This allows users to assign a custom task display name separate from the node ID.
     :param should_detach_multiple_parents_tests: A boolean that allows users to decide whether to run tests with multiple parent dependencies in separate tasks.
     :param enable_owner_inheritance: A boolean that allows users to enable the owner inheritance from dbt models to airflow tasks. Defaults to True.
+    :param seed_rendering_behavior: Determines how seed nodes are rendered (ALWAYS, NONE, WHEN_SEED_CHANGES). Test behavior for seeds is controlled via test_behavior. Defaults to "NONE" (since Cosmos 1.13).
     """
 
     emit_datasets: bool = True
@@ -103,6 +105,7 @@ class RenderConfig:
     normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
     enable_owner_inheritance: bool | None = True
+    seed_rendering_behavior: SeedRenderingBehavior = SeedRenderingBehavior.NONE
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

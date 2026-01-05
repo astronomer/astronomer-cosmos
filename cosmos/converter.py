@@ -23,7 +23,7 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
@@ -280,6 +280,9 @@ class DbtToAirflowConverter:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
 
+        # Store the initial load method before it gets resolved by dbt_graph.load()
+        initial_load_method = render_config.load_method
+
         previous_time = time.perf_counter()
         self.dbt_graph = DbtGraph(
             project=project_config,
@@ -294,6 +297,7 @@ class DbtToAirflowConverter:
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         self._add_dbt_project_hash_to_dag_docs(dag)
+        self._store_cosmos_telemetry_metadata_on_dag(dag, render_config, project_config, initial_load_method)
 
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
@@ -372,3 +376,48 @@ class DbtToAirflowConverter:
             logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
         except Exception as e:
             logger.warning(f"Failed to append dbt project hash to DAG documentation: {e}")
+
+    def _store_cosmos_telemetry_metadata_on_dag(  # noqa: C901
+        self,
+        dag: DAG | None,
+        render_config: RenderConfig,
+        project_config: ProjectConfig,
+        initial_load_method: LoadMode,
+    ) -> None:
+        """
+        Store Cosmos configuration metadata on the DAG for telemetry purposes.
+
+        This metadata is used by the DAG run listener to emit telemetry metrics
+        about how Cosmos is configured and used.
+
+        :param dag: The Airflow DAG to store metadata on. If None, no action is taken.
+        :param render_config: The render configuration
+        :param project_config: The project configuration
+        """
+        if dag is None:
+            return
+
+        metadata: dict[str, Any] = {"used_automatic_load_mode": initial_load_method == LoadMode.AUTOMATIC}
+
+        if render_config is not None:
+            metadata["invocation_mode"] = str(render_config.invocation_mode.value)
+            metadata["install_deps"] = (
+                bool(render_config.dbt_deps) if render_config.dbt_deps is not None else project_config.install_dbt_deps
+            )
+            metadata["uses_node_converter"] = render_config.node_converters is not None
+            metadata["test_behavior"] = str(render_config.test_behavior.value)
+            metadata["source_behavior"] = str(render_config.source_rendering_behavior.value)
+
+        if self.dbt_graph is not None:
+            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
+            metadata["total_dbt_models"] = sum(
+                1 for node in self.dbt_graph.nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+            metadata["selected_dbt_models"] = sum(
+                1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+
+        # Store metadata in dag.params which is preserved during serialization
+        # Using a key that's unlikely to conflict with user params
+        dag.params["__cosmos_telemetry_metadata__"] = metadata
+        logger.debug(f"Stored Cosmos telemetry metadata in DAG {dag.dag_id} params: {metadata}")

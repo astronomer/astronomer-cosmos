@@ -1112,8 +1112,10 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
         execution_config=execution_config,
     )
 
-    mock_logger.debug.assert_called_once_with(
-        "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation"
+    # Check that the hash logging call was made (there are multiple debug calls now)
+    debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+    assert any(
+        "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation" in call for call in debug_calls
     )
 
 
@@ -1146,3 +1148,38 @@ def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
 
     # Verify that start comes before end
     assert group_start_idx < group_end_idx
+
+
+@patch("cosmos.converter.DbtGraph.load")
+def test_telemetry_metadata_storage(mock_load_dbt_graph):
+    """Test that telemetry metadata is stored correctly in DAG params."""
+    dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    _ = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
+
+    # Verify metadata is stored in dag.params
+    assert "__cosmos_telemetry_metadata__" in dag.params
+    metadata = dag.params["__cosmos_telemetry_metadata__"]
+
+    # Verify expected metadata keys are present
+    assert "used_automatic_load_mode" in metadata
+    assert "invocation_mode" in metadata
+    assert "install_deps" in metadata
+    assert "uses_node_converter" in metadata
+    assert "test_behavior" in metadata
+    assert "source_behavior" in metadata

@@ -2,7 +2,7 @@
 Module for handling seed change detection using Airflow Variables.
 
 This module provides utilities to compute file hashes and store them in Airflow Variables,
-enabling the WHEN_SEED_CHANGES_* seed rendering behaviors.
+enabling the WHEN_SEED_CHANGES seed rendering behavior.
 """
 
 from __future__ import annotations

@@ -25,7 +25,7 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
@@ -258,6 +258,7 @@ class DbtToAirflowConverter:
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        logger.info("::group::Cosmos DAG parsing logs")
 
         # We copy the configuration so the changes introduced in this method, such as override_configuration,
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration
@@ -301,7 +302,7 @@ class DbtToAirflowConverter:
 
         self._add_dbt_project_hash_to_dag_docs(dag)
         self._store_cosmos_telemetry_metadata_on_dag(
-            dag, render_config, execution_config, project_config, profile_config, operator_args, initial_load_method
+          dag, render_config, execution_config, project_config, profile_config, initial_load_method,
         )
 
         current_time = time.perf_counter()
@@ -355,6 +356,7 @@ class DbtToAirflowConverter:
         logger.info(
             f"Cosmos performance ({cache_identifier}) - [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG."
         )
+        logger.info("::endgroup::Cosmos DAG parsing logs")
 
     def _add_dbt_project_hash_to_dag_docs(self, dag: DAG | None) -> None:
         """
@@ -388,7 +390,6 @@ class DbtToAirflowConverter:
         execution_config: ExecutionConfig,
         project_config: ProjectConfig,
         profile_config: ProfileConfig,
-        operator_args: dict[str, Any],
         initial_load_method: LoadMode,
     ) -> None:
         """
@@ -402,74 +403,32 @@ class DbtToAirflowConverter:
         :param execution_config: The execution configuration
         :param project_config: The project configuration
         :param profile_config: The profile configuration
-        :param operator_args: The operator arguments
         :param initial_load_method: The load method specified by the user (before automatic resolution)
         """
         if dag is None:
             return
 
-        metadata = {}
+        metadata: dict[str, Any] = {"used_automatic_load_mode": initial_load_method == LoadMode.AUTOMATIC}
 
-        # Compute each metric individually with error handling
-        try:
-            metadata["used_automatic_load_mode"] = initial_load_method == LoadMode.AUTOMATIC
-        except Exception as e:
-            logger.warning(f"Failed to compute used_automatic_load_mode: {e}")
-
-        try:
-            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
-        except Exception as e:
-            logger.warning(f"Failed to compute actual_load_mode: {e}")
-
-        try:
-            invocation_mode = None
-            if execution_config.invocation_mode:
-                invocation_mode = str(execution_config.invocation_mode.value)
-            elif render_config.invocation_mode:
-                invocation_mode = str(render_config.invocation_mode.value)
-            metadata["invocation_mode"] = invocation_mode
-        except Exception as e:
-            logger.warning(f"Failed to compute invocation_mode: {e}")
-
-        try:
-            install_deps = operator_args.get("install_deps")
-            if install_deps is None:
-                install_deps = project_config.install_dbt_deps
-            metadata["install_deps"] = bool(install_deps) if install_deps is not None else True
-        except Exception as e:
-            logger.warning(f"Failed to compute install_deps: {e}")
-
-        try:
+        if render_config is not None:
+            metadata["invocation_mode"] = str(render_config.invocation_mode.value)
+            metadata["install_deps"] = (
+                bool(render_config.dbt_deps) if render_config.dbt_deps is not None else project_config.install_dbt_deps
+            )
             metadata["uses_node_converter"] = render_config.node_converters is not None
-        except Exception as e:
-            logger.warning(f"Failed to compute uses_node_converter: {e}")
-
-        try:
             metadata["test_behavior"] = str(render_config.test_behavior.value)
-        except Exception as e:
-            logger.warning(f"Failed to compute test_behavior: {e}")
-
-        try:
             metadata["source_behavior"] = str(render_config.source_rendering_behavior.value)
-        except Exception as e:
-            logger.warning(f"Failed to compute source_behavior: {e}")
 
-        try:
+        if self.dbt_graph is not None:
+            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
             metadata["total_dbt_models"] = sum(
                 1 for node in self.dbt_graph.nodes.values() if node.resource_type == DbtResourceType.MODEL
             )
-        except Exception as e:
-            logger.warning(f"Failed to compute total_dbt_models: {e}")
-
-        try:
             metadata["selected_dbt_models"] = sum(
                 1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
             )
-        except Exception as e:
-            logger.warning(f"Failed to compute selected_dbt_models: {e}")
-
-        try:
-            profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
+        if profie_config:
+           profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
             metadata.update(
                 {
                     "profile_strategy": profile_strategy,
@@ -477,9 +436,7 @@ class DbtToAirflowConverter:
                     "database": database,
                 }
             )
-        except Exception as e:
-            logger.warning(f"Failed to compute profile config metrics: {e}")
-
+            
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
         dag.params["__cosmos_telemetry_metadata__"] = metadata

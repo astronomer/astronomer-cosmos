@@ -4,13 +4,12 @@ import base64
 import json
 import logging
 import zlib
-from collections.abc import Callable
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cosmos._triggers.watcher import WatcherTrigger, _parse_compressed_xcom
-from cosmos.operators._watcher.state import get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher import WatcherTrigger, _parse_compressed_xcom, get_xcom_val, safe_xcom_push
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -109,7 +108,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
-    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = _store_dbt_resource_status_from_log
+    # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
+    # when accessed via instance, which would incorrectly pass `self` as the first argument
+    _process_log_line_callable = staticmethod(_store_dbt_resource_status_from_log)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
@@ -502,7 +503,7 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
+    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields  # type: ignore[assignment]
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

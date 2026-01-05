@@ -235,7 +235,7 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
 
     # Verify some expected values
     assert metrics["used_automatic_load_mode"] is True
-    assert metrics["invocation_mode"] == "subprocess"
+    assert metrics["invocation_mode"] == "dbt_runner"
     assert metrics["install_deps"] is True
     assert metrics["uses_node_converter"] is False
     assert metrics["test_behavior"] == "after_each"
@@ -263,8 +263,9 @@ def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_en
             load_method=LoadMode.DBT_MANIFEST,
             test_behavior=TestBehavior.NONE,
             source_rendering_behavior=SourceRenderingBehavior.ALL,
+            dbt_deps=False,
         ),
-        operator_args={"install_deps": False},
+        operator_args={"install_deps": True},
         start_date=datetime(2023, 1, 1),
         dag_id="cosmos_dag_with_metadata_failed",
     )

@@ -50,7 +50,7 @@ For example:
 Examples
 --------
 
-Always Render Seeds
+Always Render Seeds (Default)
 ~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
@@ -65,7 +65,7 @@ Always Render Seeds
         ),
     )
 
-Never Render Seeds (Default)
+Never Render Seeds
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python

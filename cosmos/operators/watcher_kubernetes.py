@@ -1,53 +1,29 @@
-from __future__ import annotations
-
 import json
-import logging
-from collections.abc import Callable
 from datetime import timedelta
-from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:  # pragma: no cover
-    from pendulum import DateTime
+from airflow.exceptions import AirflowException
 
-    try:
-        from airflow.sdk.definitions.context import Context
-    except ImportError:
-        from airflow.utils.context import Context  # type: ignore[attr-defined]
+from cosmos.config import ProfileConfig
+from cosmos.constants import (
+    AIRFLOW_VERSION,
+    CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
+    PRODUCER_WATCHER_TASK_ID,
+    WATCHER_TASK_WEIGHT_RULE,
+)
+from cosmos.log import get_logger
+from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
+    from airflow.sdk.definitions.context import Context
 except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
-import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
-from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
+    from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-try:
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:  # pragma: no cover
-    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
-from cosmos.airflow._override import CosmosKubernetesPodManager
-from cosmos.config import ProfileConfig
-from cosmos.constants import AIRFLOW_VERSION, PRODUCER_WATCHER_TASK_ID
-from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
-from cosmos.operators._watcher.triggerer import WatcherTrigger
-from cosmos.operators.base import (
-    DbtRunMixin,
-    DbtSeedMixin,
-    DbtSnapshotMixin,
-)
-from cosmos.operators.kubernetes import (
-    DbtBuildKubernetesOperator,
-    DbtRunKubernetesOperator,
-    DbtSourceKubernetesOperator,
-)
 
-logger = logging.getLogger(__name__)
-
-CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
-PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
-WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
+logger = get_logger(__name__)
 
 
 def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
@@ -61,77 +37,22 @@ def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     try:
         log_line = json.loads(line)
     except json.JSONDecodeError:
-        logger.info("Failed to parse log: %s", line)
+        logger.debug("Failed to parse log: %s", line)
         log_line = {}
     node_info = log_line.get("data", {}).get("node_info", {})
     node_status = node_info.get("node_status")
     unique_id = node_info.get("unique_id")
-    if unique_id is not None:
-        logger.info("Model: %s is in %s state", unique_id, node_status)
 
-        # TODO: Handle and store all possible node statuses, not just the current success and failed
-        if node_status in ["success", "failed"]:
-            # These lines raise an exception when using KubernetesPodOperatorCallback
-            context = extra_kwargs.get("context")
-            assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+    logger.debug("Model: %s is in %s state", unique_id, node_status)
 
-
-producer_task_context = None
+    # TODO: Handle and store all possible node statuses, not just the current success and failed
+    if node_status in ["success", "failed"]:
+        context = extra_kwargs.get("context")
+        assert context is not None  # Make MyPy happy
+        safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
 
-class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
-
-    @staticmethod
-    def progress_callback(
-        *,
-        line: str,
-        client: client_type,
-        mode: str,
-        container_name: str,
-        timestamp: DateTime | None,
-        pod: k8s.V1Pod,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Invoke this callback to process pod container logs.
-
-        :param line: the read line of log.
-        :param client: the Kubernetes client that can be used in the callback.
-        :param mode: the current execution mode, it's one of (`sync`, `async`).
-        :param container_name: the name of the container from which the log line was read.
-        :param timestamp: the timestamp of the log line.
-        :param pod: the pod from which the log line was read.
-        """
-
-        logger.info(f"[xubi] {line}")
-        if not "context" in kwargs:
-            kwargs["context"] = producer_task_context
-        _store_dbt_resource_status_from_log(line, kwargs)
-
-
-class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
-    template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
-    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = _store_dbt_resource_status_from_log
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-
-        super().__init__(task_id=task_id, *args, callbacks=WatcherKubernetesCallback, **kwargs)
-        self.dbt_cmd_flags += ["--log-format", "json"]
-
-    @cached_property
-    def pod_manager(self) -> CosmosKubernetesPodManager:
-        return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
-
-    def execute(self, context: Context, **kwargs: Any) -> Any:
-        global producer_task_context
-        producer_task_context = context
-        return super().execute(context, **kwargs)
-
-
-class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOperator):
+class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
     poke_retry_number: int = 0
 
@@ -142,7 +63,7 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
         project_dir: str | None = None,
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
-        poke_interval: int = 3,
+        poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
         execution_timeout: timedelta = timedelta(hours=1),
         deferrable: bool = True,
@@ -150,8 +71,8 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
     ) -> None:
         self.compiled_sql = ""
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
-        kwargs.setdefault("priority_weight", CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
-        kwargs.setdefault("weight_rule", WEIGHT_RULE)
+        kwargs.setdefault("priority_weight", CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -161,9 +82,10 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
             profiles_dir=profiles_dir,
             **kwargs,
         )
-        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
+        self.project_dir = project_dir
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable
+        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
@@ -182,8 +104,7 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
             filtered.append(token)
         return filtered
 
-    # minor change from original DbtConsumerWatcherSensor to use K8s run
-    def _fallback_to_k8s_run(self, try_number: int, context: Context) -> bool:
+    def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
         """
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
@@ -206,10 +127,34 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
         model_selector = self.model_unique_id.split(".")[-1]
         cmd_flags = extra_flags + ["--select", model_selector]
 
-        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
 
         logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True
+
+    def _get_status_from_run_results(self, ti: Any, context: Context) -> Any:
+        compressed_b64_run_results = ti.xcom_pull(task_ids=self.producer_task_id, key="run_results")
+
+        if not compressed_b64_run_results:
+            return None
+
+        run_results_json = _parse_compressed_xcom(compressed_b64_run_results)
+
+        logger.debug("Run results: %s", run_results_json)
+
+        results = run_results_json.get("results", [])
+        node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
+
+        if not node_result:  # pragma: no cover
+            logger.warning("No matching result found for unique_id '%s'", self.model_unique_id)
+            return None
+
+        logger.info("Node Info: %s", run_results_json)
+        self.compiled_sql = node_result.get("compiled_code")
+        if self.compiled_sql:
+            self._override_rtif(context)  # type: ignore[attr-defined]
+
+        return node_result.get("status")
 
     def _get_producer_task_status(self, context: Context) -> str | None:
         """
@@ -233,12 +178,9 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
 
         return fetch_state()
 
-    # slightly modified from the original DbtConsumerWatcherSensor to check try run and use K8s run
-    def execute(self, context: Context, **kwargs: Any) -> Any:
-        ti = context["ti"]
-        try_number = ti.try_number
-        if try_number > 1:
-            return self._fallback_to_k8s_run(try_number, context)
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        if not self.deferrable:
+            super().execute(context)
         elif not self.poke(context):
             self.defer(
                 trigger=WatcherTrigger(
@@ -247,21 +189,19 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
                     dag_id=self.dag_id,
                     run_id=context["run_id"],
                     map_index=context["task_instance"].map_index,
-                    use_event=False,
+                    use_event=self._use_event(),
                     poke_interval=self.poke_interval,
                 ),
                 timeout=self.execution_timeout,
                 method_name=self.execute_complete.__name__,
             )
-        return None
 
-    def execute_complete(self, context: Context, event: dict[str, Any], **kwargs: Any) -> None:
+    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         status = event.get("status")
-        reason = event.get("reason")
-
         if status != "failed":
             return
 
+        reason = event.get("reason")
         if reason == "model_failed":
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
@@ -272,12 +212,12 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
             )
 
-    # def _use_event(self) -> bool:
-    #     if not self.invocation_mode:
-    #         self._discover_invocation_mode()
-    #     return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
+    def _use_event(self) -> bool:
+        raise NotImplementedError("Subclasses must implement this method")
 
-    # minor change, removing event
+    def _get_status_from_events(self, ti: Any, context: Context) -> Any:
+        raise NotImplementedError("Subclasses should implement this method if `_use_event` may return True")
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -287,20 +227,22 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
         try_number = ti.try_number
 
         logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s' and xcom '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s'",
             try_number,
             self.poke_retry_number,
             self.producer_task_id,
             self.model_unique_id,
-            f"{self.model_unique_id.replace('.', '__')}_status",
         )
 
         if try_number > 1:
-            return bool(self._fallback_to_local_run(try_number, context))
+            return self._fallback_to_non_watcher_run(try_number, context)
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
-        status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        if self._use_event():
+            status = self._get_status_from_events(ti, context)
+        else:
+            status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
         if status is None:
 
@@ -310,9 +252,8 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
                         f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
                     )
                 else:
-                    return True  # TODO: remove me
                     # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
-                    return self._fallback_to_local_run(try_number, context)
+                    return self._fallback_to_non_watcher_run(try_number, context)
 
             self.poke_retry_number += 1
 
@@ -321,62 +262,3 @@ class DbtConsumerWatcherKubernetesSensor(BaseSensorOperator, DbtRunKubernetesOpe
             return True
         else:
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")
-
-
-# This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
-# That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD, until we have a better experience.
-class DbtBuildWatcherKubernetesOperator:
-    def __init__(self, *args: Any, **kwargs: Any):
-        raise NotImplementedError(
-            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, since the build command is executed by the producer task."
-        )
-
-
-class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
-    """
-    Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
-    """
-
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
-
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-
-
-class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
-    """
-    Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
-    """
-
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
-
-
-class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
-    """
-    Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
-    """
-
-    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)  # type: ignore[arg-type]
-
-
-class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
-    """
-    Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
-    """
-
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
-
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-
-
-class DbtTestWatcherKubernetesOperator(EmptyOperator):
-    """
-    As a starting point, this operator does nothing.
-    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any):
-        desired_keys = ("dag", "task_group", "task_id")
-        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]

@@ -13,7 +13,12 @@ from subprocess import PIPE, Popen
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.models import Variable
+
+try:
+    # Airflow 3 onwards
+    from airflow.sdk import Variable
+except ImportError:
+    from airflow.models import Variable
 
 from cosmos import settings
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig

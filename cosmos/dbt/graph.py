@@ -16,7 +16,11 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Any
 
-from airflow.models import Variable
+try:
+    # Airflow 3 onwards
+    from airflow.sdk import Variable
+except ImportError:
+    from airflow.models import Variable
 
 if TYPE_CHECKING:
     try:

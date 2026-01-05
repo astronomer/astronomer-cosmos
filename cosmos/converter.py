@@ -436,7 +436,7 @@ class DbtToAirflowConverter:
                     "database": database,
                 }
             )
-            
+
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
         dag.params["__cosmos_telemetry_metadata__"] = metadata

@@ -1243,8 +1243,6 @@ def test_telemetry_metadata_exception_handling(mock_load_dbt_graph, mock_logger)
 
     mock_project_config = Mock()
 
-    mock_operator_args = {}
-
     # Call _store_cosmos_telemetry_metadata_on_dag with mocked configs
     # Create a mock load mode that raises on comparison
     mock_load_mode_param = Mock()
@@ -1254,7 +1252,6 @@ def test_telemetry_metadata_exception_handling(mock_load_dbt_graph, mock_logger)
         dag=dag,
         render_config=mock_render_config_final,
         project_config=mock_project_config,
-        operator_args=mock_operator_args,
         initial_load_method=mock_load_mode_param,
     )
 

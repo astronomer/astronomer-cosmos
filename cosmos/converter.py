@@ -297,9 +297,7 @@ class DbtToAirflowConverter:
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         self._add_dbt_project_hash_to_dag_docs(dag)
-        self._store_cosmos_telemetry_metadata_on_dag(
-            dag, render_config, project_config, operator_args, initial_load_method
-        )
+        self._store_cosmos_telemetry_metadata_on_dag(dag, render_config, project_config, initial_load_method)
 
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
@@ -384,7 +382,6 @@ class DbtToAirflowConverter:
         dag: DAG | None,
         render_config: RenderConfig,
         project_config: ProjectConfig,
-        operator_args: dict[str, Any],
         initial_load_method: LoadMode,
     ) -> None:
         """
@@ -396,8 +393,6 @@ class DbtToAirflowConverter:
         :param dag: The Airflow DAG to store metadata on. If None, no action is taken.
         :param render_config: The render configuration
         :param project_config: The project configuration
-        :param operator_args: The operator arguments
-        :param initial_load_method: The load method specified by the user (before automatic resolution)
         """
         if dag is None:
             return

@@ -96,7 +96,7 @@ def test_store_dbt_resource_status_from_log_param(status, context, should_push, 
     log_line = {"data": {"node_info": {"node_status": status, "unique_id": "model.jaffle_shop.stg_orders"}}}
     line = json.dumps(log_line)
 
-    with patch("cosmos.operators.watcher.safe_xcom_push") as mock_push:
+    with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
         if expect_assert:
             with pytest.raises(AssertionError):
                 _store_dbt_resource_status_from_log(line, {"context": context})
@@ -113,6 +113,6 @@ def test_store_dbt_resource_status_from_log_param(status, context, should_push, 
 def test_store_dbt_resource_status_from_log_invalid_json():
     invalid_line = "{not a valid json}"
 
-    with patch("cosmos.operators.watcher.safe_xcom_push") as mock_push:
+    with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
         _store_dbt_resource_status_from_log(invalid_line, {"context": {"ti": MagicMock()}})
         mock_push.assert_not_called()

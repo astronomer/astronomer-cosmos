@@ -178,6 +178,9 @@ TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtReso
 DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 
+WATCHER_TASK_WEIGHT_RULE = "absolute"
+CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT = 2
+PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT = 20
 PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
 
 # Historical telemetry endpoints retained for reference:

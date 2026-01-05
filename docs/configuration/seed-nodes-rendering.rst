@@ -120,4 +120,3 @@ Full Example DAG
     :language: python
     :start-after: [START cosmos_seed_always_example]
     :end-before: [END cosmos_seed_always_example]
-

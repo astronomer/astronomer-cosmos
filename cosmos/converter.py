@@ -397,61 +397,25 @@ class DbtToAirflowConverter:
         if dag is None:
             return
 
-        metadata = {}
+        metadata: dict[str, Any] = {"used_automatic_load_mode": initial_load_method == LoadMode.AUTOMATIC}
 
-        # Compute each metric individually with error handling
-        try:
-            metadata["used_automatic_load_mode"] = initial_load_method == LoadMode.AUTOMATIC
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute used_automatic_load_mode: {e}")
-
-        try:
-            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute actual_load_mode: {e}")
-
-        try:
-            invocation_mode = None
-            if render_config.invocation_mode:
-                invocation_mode = str(render_config.invocation_mode.value)
-            metadata["invocation_mode"] = invocation_mode
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute invocation_mode: {e}")
-
-        try:
-            install_deps = render_config.dbt_deps
-            metadata["install_deps"] = bool(install_deps) if install_deps is not None else True
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute install_deps: {e}")
-
-        try:
+        if render_config is not None:
+            metadata["invocation_mode"] = str(render_config.invocation_mode.value)
+            metadata["install_deps"] = (
+                bool(render_config.dbt_deps) if render_config.dbt_deps is not None else project_config.install_dbt_deps
+            )
             metadata["uses_node_converter"] = render_config.node_converters is not None
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute uses_node_converter: {e}")
-
-        try:
             metadata["test_behavior"] = str(render_config.test_behavior.value)
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute test_behavior: {e}")
-
-        try:
             metadata["source_behavior"] = str(render_config.source_rendering_behavior.value)
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute source_behavior: {e}")
 
-        try:
+        if self.dbt_graph is not None:
+            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
             metadata["total_dbt_models"] = sum(
                 1 for node in self.dbt_graph.nodes.values() if node.resource_type == DbtResourceType.MODEL
             )
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute total_dbt_models: {e}")
-
-        try:
             metadata["selected_dbt_models"] = sum(
                 1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
             )
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to compute selected_dbt_models: {e}")
 
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params

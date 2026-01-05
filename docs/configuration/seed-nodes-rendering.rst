@@ -6,16 +6,16 @@ Seed Nodes Rendering
 .. note::
     This feature is available since Cosmos 1.13.0.
 
-By default (since Cosmos 1.13), Cosmos does not render dbt seeds automatically. Instead, you need to configure the rendering of seeds explicitly.
+By default, Cosmos renders and runs all dbt seeds in the project.
 You can control this behavior using the ``seed_rendering_behavior`` field in the ``RenderConfig`` object.
 
 Seed Rendering Behavior Options
 -------------------------------
 
-- **always**:
-  When set to ``always``, Cosmos renders and runs all seeds in the dbt project. This was the default behavior before Cosmos 1.13.
+- **always** (default):
+  When set to ``always``, Cosmos renders and runs all seeds in the dbt project.
 
-- **none** (default since Cosmos 1.13):
+- **none**:
   When set to ``none``, Cosmos does not render any seeds. This is useful when seeds are managed outside of the DAG or when seed data has already been loaded.
 
 - **when_seed_changes**:

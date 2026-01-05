@@ -82,10 +82,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             profiles_dir=profiles_dir,
             **kwargs,
         )
-        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
         self.project_dir = project_dir
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable
+        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:

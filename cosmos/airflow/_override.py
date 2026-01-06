@@ -65,7 +65,10 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
             ):  # Successfully tested with Airflow 3.1.0 and K8s provider 10.8.0 and 10.9.0
                 parse_log_line = self.parse_log_line
             else:
-                raise ValueError(f"Unsupported K8s provider version: {airflow_k8s_provider_version}")
+                raise ValueError(
+                    f"Unsupported K8s provider version: {airflow_k8s_provider_version}. "
+                    f"Minimum required version is {_K8s_WATCHER_MIN_K8S_PROVIDER_VERSION}"
+                )
             # Cosmos custom implementation finishes here.
 
             exception = None

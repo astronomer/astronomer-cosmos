@@ -13,6 +13,7 @@ from typing import Any
 from warnings import warn
 
 from airflow.models.dag import DAG
+from airflow.models.param import Param
 
 try:
     # Airflow 3.1 onwards
@@ -419,5 +420,5 @@ class DbtToAirflowConverter:
 
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
-        dag.params["__cosmos_telemetry_metadata__"] = metadata
+        dag.params["__cosmos_telemetry_metadata__"] = Param(default=metadata, const=metadata)
         logger.debug(f"Stored Cosmos telemetry metadata in DAG {dag.dag_id} params: {metadata}")

@@ -18,6 +18,7 @@ from airflow.providers.cncf.kubernetes.secret import Secret
 from pendulum import datetime
 
 from cosmos import (
+    DbtSeedKubernetesOperator,
     DbtTaskGroup,
     ExecutionConfig,
     ExecutionMode,
@@ -25,7 +26,6 @@ from cosmos import (
     ProjectConfig,
     RenderConfig,
 )
-from cosmos.operators.kubernetes import DbtSeedKubernetesOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
@@ -80,6 +80,7 @@ with DAG(
         },
     )
     # [END kubernetes_seed_example]
+
     # [START kubernetes_tg_example]
     run_models = DbtTaskGroup(
         project_config=ProjectConfig(),
@@ -96,23 +97,17 @@ with DAG(
             ),
         ),
         render_config=RenderConfig(dbt_project_path=AIRFLOW_PROJECT_DIR),
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.KUBERNETES,
-            dbt_project_path=K8S_PROJECT_DIR,
-        ),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.KUBERNETES, dbt_project_path=K8S_PROJECT_DIR),
         operator_args={
-            "deferrable": False,
             "image": DBT_IMAGE,
             "get_logs": True,
             "is_delete_operator_pod": False,
-            "log_events_on_failure": True,
             "secrets": [postgres_password_secret, postgres_host_secret],
             "env_vars": {
                 "POSTGRES_DB": "postgres",
                 "POSTGRES_SCHEMA": "public",
                 "POSTGRES_USER": "postgres",
             },
-            "retry": 0,
         },
     )
     # [END kubernetes_tg_example]

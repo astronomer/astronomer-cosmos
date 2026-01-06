@@ -423,7 +423,7 @@ class DbtToAirflowConverter:
             metadata["selected_dbt_models"] = sum(
                 1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
             )
-        if profile_config:
+        if profile_config is not None:
             profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
             metadata.update(
                 {

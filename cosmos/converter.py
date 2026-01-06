@@ -14,8 +14,6 @@ from warnings import warn
 
 from airflow.models.dag import DAG
 
-from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
-
 try:
     # Airflow 3.1 onwards
     from airflow.sdk import TaskGroup
@@ -30,6 +28,9 @@ from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
+
+# TODO: Move _get_profile_config_attribute at common place
+from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
 from cosmos.versioning import _create_folder_version_hash
 

@@ -19,7 +19,6 @@ from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, Render
 from cosmos.config import InvocationMode
 from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
 from cosmos.operators._watcher.triggerer import WatcherTrigger
-
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
     DbtConsumerWatcherSensor,

@@ -149,8 +149,8 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     return "__".join(cache_identifiers_list)
 
 
-def create_cache_key(cache_identifier: str) -> str:
-    return f"{VAR_KEY_CACHE_PREFIX}{cache_identifier}"
+def create_cache_key(cache_identifier: str, cache_suffix: str) -> str:
+    return f"{VAR_KEY_CACHE_PREFIX}{cache_identifier}_{cache_suffix}"
 
 
 def _obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:
@@ -285,6 +285,35 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     if source_manifest_filepath.exists():
         shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
+
+
+def _calculate_selectors_yaml_cache_current_version(
+    cache_identifier: str, project_dir: Path, selectors_yaml_path: Path
+) -> str:
+    """
+    Taking into account the project directory contents and the selectors yaml file, calculate the
+    hash that represents the "dbt selectors yaml" version - to be used to decide if the cache should be refreshed or not.
+
+    :param cache_identifier: Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
+    :param project_path: Path to the target dbt project directory
+    :param selectors_yaml_path: Path to the selectors yaml file
+    """
+
+    start_time = time.perf_counter()
+
+    # Combined value for when the dbt project directory files were last modified
+    # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
+    dbt_project_hash = _create_folder_version_hash(project_dir)
+
+    with selectors_yaml_path.open("r") as f:
+        selectors_yaml_content = yaml.safe_load(f)
+    hash_selectors_yaml = hashlib.md5(yaml.dump(selectors_yaml_content).encode()).hexdigest()
+
+    elapsed_time = time.perf_counter() - start_time
+    logger.info(
+        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+    )
+    return f"{dbt_project_hash},{hash_selectors_yaml}"
 
 
 def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:

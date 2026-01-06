@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 
 try:
@@ -227,10 +226,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
-        self.compiled_sql = ""
-        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
-        kwargs.setdefault("priority_weight", CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
-        kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -240,9 +235,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             profiles_dir=profiles_dir,
             **kwargs,
         )
-        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
-        self.producer_task_id = producer_task_id
-        self.deferrable = deferrable
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
 

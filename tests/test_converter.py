@@ -12,6 +12,7 @@ from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
+from cosmos.telemetry import _decompress_telemetry_metadata
 
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
@@ -1149,7 +1150,13 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph):
 
     # Verify metadata is stored in dag.params
     assert "__cosmos_telemetry_metadata__" in dag.params
-    metadata = dag.params["__cosmos_telemetry_metadata__"]
+    compressed_metadata = dag.params["__cosmos_telemetry_metadata__"]
+
+    # Verify it's compressed (should be a string)
+    assert isinstance(compressed_metadata, str)
+
+    # Decompress to verify the contents
+    metadata = _decompress_telemetry_metadata(compressed_metadata)
 
     # Verify expected metadata keys are present
     assert "used_automatic_load_mode" in metadata

@@ -33,6 +33,7 @@ from cosmos.exceptions import CosmosValueError
 # TODO: Move _get_profile_config_attribute at common place
 from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
+from cosmos.telemetry import _compress_telemetry_metadata
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
@@ -437,5 +438,8 @@ class DbtToAirflowConverter:
 
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
-        dag.params["__cosmos_telemetry_metadata__"] = Param(default=metadata, const=metadata)
-        logger.debug(f"Stored Cosmos telemetry metadata in DAG {dag.dag_id} params: {metadata}")
+        compressed_metadata = _compress_telemetry_metadata(metadata)
+        dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+        logger.debug(
+            f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+        )

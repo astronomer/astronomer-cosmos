@@ -111,7 +111,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
         """
         logger.info(
-            f"Retry attempt #%s – Running model '%s' from project '%s' using {execution_mode}",
+            f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
             try_number - 1,
             self.model_unique_id,
             self.project_dir,

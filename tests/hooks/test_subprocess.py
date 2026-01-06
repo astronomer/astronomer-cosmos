@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cosmos.hooks.subprocess import FullOutputSubprocessHook
-from cosmos.operators.watcher import _store_dbt_resource_status_from_log
+from cosmos.operators.watcher import store_dbt_resource_status_from_log
 
 OS_ENV_KEY = "SUBPROCESS_ENV_TEST"
 OS_ENV_VAL = "this-is-from-os-environ"
@@ -91,7 +91,7 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
         ("failed", None, False, True),
     ],
 )
-def test_store_dbt_resource_status_from_log_param(status, context, should_push, expect_assert):
+def teststore_dbt_resource_status_from_log_param(status, context, should_push, expect_assert):
     # Prepare log line
     log_line = {"data": {"node_info": {"node_status": status, "unique_id": "model.jaffle_shop.stg_orders"}}}
     line = json.dumps(log_line)
@@ -99,9 +99,9 @@ def test_store_dbt_resource_status_from_log_param(status, context, should_push, 
     with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
         if expect_assert:
             with pytest.raises(AssertionError):
-                _store_dbt_resource_status_from_log(line, {"context": context})
+                store_dbt_resource_status_from_log(line, {"context": context})
         else:
-            _store_dbt_resource_status_from_log(line, {"context": context})
+            store_dbt_resource_status_from_log(line, {"context": context})
             if should_push:
                 mock_push.assert_called_once_with(
                     task_instance=context["ti"], key="model__jaffle_shop__stg_orders_status", value=status
@@ -110,9 +110,9 @@ def test_store_dbt_resource_status_from_log_param(status, context, should_push, 
                 mock_push.assert_not_called()
 
 
-def test_store_dbt_resource_status_from_log_invalid_json():
+def teststore_dbt_resource_status_from_log_invalid_json():
     invalid_line = "{not a valid json}"
 
     with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
-        _store_dbt_resource_status_from_log(invalid_line, {"context": {"ti": MagicMock()}})
+        store_dbt_resource_status_from_log(invalid_line, {"context": {"ti": MagicMock()}})
         mock_push.assert_not_called()

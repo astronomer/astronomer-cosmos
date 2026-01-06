@@ -26,7 +26,7 @@ from cosmos.operators.watcher import (
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
-    _store_dbt_resource_status_from_log,
+    store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
@@ -220,11 +220,11 @@ def test_dbt_producer_watcher_operator_blocks_retry_attempt(caplog):
         ({"status": "success"}, None),
         (
             {"status": "failed", "reason": "model_failed"},
-            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
+            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher' logs for details.",
         ),
         (
             {"status": "failed", "reason": "producer_failed"},
-            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
+            "Watcher producer task 'dbt_producer_watcher' failed before reporting model results. Check its logs for the underlying error.",
         ),
     ],
 )
@@ -426,31 +426,31 @@ def test_execute_fallback_mode(tmp_path):
 
 
 class TestStoreDbStatusFromLog:
-    """Tests for _store_dbt_resource_status_from_log and _process_log_line_callable."""
+    """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 
-    def test_store_dbt_resource_status_from_log_success(self):
+    def teststore_dbt_resource_status_from_log_success(self):
         """Test that success status is correctly parsed and stored in XCom."""
         ti = _MockTI()
         ctx = {"ti": ti}
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.my_model"}}})
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         assert ti.store.get("model__pkg__my_model_status") == "success"
 
-    def test_store_dbt_resource_status_from_log_failed(self):
+    def teststore_dbt_resource_status_from_log_failed(self):
         """Test that failed status is correctly parsed and stored in XCom."""
         ti = _MockTI()
         ctx = {"ti": ti}
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "failed", "unique_id": "model.pkg.failed_model"}}})
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
 
-    def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
+    def teststore_dbt_resource_status_from_log_ignores_other_statuses(self):
         """Test that statuses other than success/failed are ignored."""
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -459,22 +459,22 @@ class TestStoreDbStatusFromLog:
             {"data": {"node_info": {"node_status": "running", "unique_id": "model.pkg.running_model"}}}
         )
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         assert "model__pkg__running_model_status" not in ti.store
 
-    def test_store_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
+    def teststore_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
         """Test that invalid JSON doesn't raise an exception."""
         ti = _MockTI()
         ctx = {"ti": ti}
 
         # Should not raise an exception
-        _store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
+        store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
 
         # No status should be stored
         assert len(ti.store) == 0
 
-    def test_store_dbt_resource_status_from_log_handles_missing_node_info(self):
+    def teststore_dbt_resource_status_from_log_handles_missing_node_info(self):
         """Test that missing node_info doesn't raise an exception."""
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -482,7 +482,7 @@ class TestStoreDbStatusFromLog:
         log_line = json.dumps({"data": {"other_key": "value"}})
 
         # Should not raise an exception
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         # No status should be stored
         assert len(ti.store) == 0
@@ -506,7 +506,7 @@ class TestStoreDbStatusFromLog:
         ), "_process_log_line_callable should not be a bound method when accessed through instance"
 
         # Verify it's the original function
-        assert callable_from_instance is _store_dbt_resource_status_from_log
+        assert callable_from_instance is store_dbt_resource_status_from_log
 
     def test_process_log_line_callable_accepts_two_arguments(self):
         """Test that the callable can be called with exactly 2 arguments (line, kwargs).

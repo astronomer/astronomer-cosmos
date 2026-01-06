@@ -212,8 +212,7 @@ def create_test_task_metadata(  # noqa:C901
             test_execution_mode = ExecutionMode.LOCAL
         else:  # ExecutionMode.WATCHER_KUBERNETES
             test_execution_mode = ExecutionMode.KUBERNETES
-
-        calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
+        operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
     else:
         operator_class = calculate_operator_class(execution_mode=execution_mode, dbt_class=dbt_class)
 

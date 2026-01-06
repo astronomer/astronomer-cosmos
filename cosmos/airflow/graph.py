@@ -695,35 +695,36 @@ def _add_watcher_dependencies(
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
     """
     for node_id, task_or_taskgroup in tasks_map.items():
-        if node_id != PRODUCER_WATCHER_TASK_ID:
-            node_tasks = (
-                list(task_or_taskgroup.children.values())
-                if isinstance(task_or_taskgroup, TaskGroup)
-                else [task_or_taskgroup]
-            )
-            for task in node_tasks:
-                task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+        # We do not want to set a dependency between the producer task and itself
+        if node_id == PRODUCER_WATCHER_TASK_ID:
+            continue
 
-            # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
-            # We only managed to do this in the case of DbtDag.
-            # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
-            if "DbtDag" in dag.__class__.__name__:
-                # Is this dbt node a root of the (subset of the) dbt project?
-                # Note: this may happen in one scenarios:
-                # - the dbt node not having any `depends_on` within the user-selected `nodes`
-                if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(nodes):
-                    producer_airflow_task >> task_or_taskgroup
-                    if isinstance(task_or_taskgroup, TaskGroup):
-                        taskgroup = task_or_taskgroup
-                        always_run_tasks = [
-                            task
-                            for task in node_tasks
-                            if not set(task.upstream_task_ids).intersection(taskgroup.children)
-                        ]
-                    else:
-                        always_run_tasks = [task_or_taskgroup]
-                    for task in always_run_tasks:
-                        task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
+        node_tasks = (
+            list(task_or_taskgroup.children.values())
+            if isinstance(task_or_taskgroup, TaskGroup)
+            else [task_or_taskgroup]
+        )
+        for task in node_tasks:
+            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+
+        # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+        # We only managed to do this in the case of DbtDag.
+        # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
+        if "DbtDag" in dag.__class__.__name__:
+            # Is this dbt node a root of the (subset of the) dbt project?
+            # Note: this may happen in one scenarios:
+            # - the dbt node not having any `depends_on` within the user-selected `nodes`
+            if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(nodes):
+                producer_airflow_task >> task_or_taskgroup
+                if isinstance(task_or_taskgroup, TaskGroup):
+                    taskgroup = task_or_taskgroup
+                    always_run_tasks = [
+                        task for task in node_tasks if not set(task.upstream_task_ids).intersection(taskgroup.children)
+                    ]
+                else:
+                    always_run_tasks = [task_or_taskgroup]
+                for task in always_run_tasks:
+                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:

@@ -232,6 +232,9 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert "source_behavior" in metrics
     assert "total_dbt_models" in metrics
     assert "selected_dbt_models" in metrics
+    assert "profile_strategy" in metrics
+    assert "profile_mapping_class" in metrics
+    assert "database" in metrics
 
     # Verify some expected values
     assert metrics["used_automatic_load_mode"] is True
@@ -240,6 +243,9 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert metrics["uses_node_converter"] is False
     assert metrics["test_behavior"] == "after_each"
     assert metrics["source_behavior"] == "none"
+    assert metrics["profile_strategy"] == "mapping"
+    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
+    assert metrics["database"] == "postgres"
 
 
 @pytest.mark.skipif(

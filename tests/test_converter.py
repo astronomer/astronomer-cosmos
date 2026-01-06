@@ -1159,3 +1159,6 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph):
     assert "uses_node_converter" in metadata
     assert "test_behavior" in metadata
     assert "source_behavior" in metadata
+    assert "profile_strategy" in metadata
+    assert "profile_mapping_class" in metadata
+    assert "database" in metadata

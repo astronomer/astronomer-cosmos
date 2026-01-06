@@ -39,7 +39,7 @@ Apache Airflow
 dbt Core
 ~~~~~~~~
 
-- **Supported versions**: 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 2.0
+- **Supported versions**: 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11
 
 .. note::
    Specific dbt adapter versions may have additional compatibility requirements. Refer to the `dbt documentation <https://docs.getdbt.com/docs/supported-data-platforms>`_ for adapter-specific version compatibility.

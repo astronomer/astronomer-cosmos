@@ -254,7 +254,7 @@ class DbtToAirflowConverter:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        logger.info("::group::Cosmos DAG parsing logs")
+        logger.info("Cosmos DAG parsing logs")
 
         logger.info("::group::Cosmos DAG/TaskGroup Parsing")
 

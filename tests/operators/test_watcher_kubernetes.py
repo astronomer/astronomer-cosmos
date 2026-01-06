@@ -81,7 +81,7 @@ if os.getenv("CI"):
     reason="We are only testing watcher Kubernetes with Airflow 3.1 and more recent versions of the K8s provider",
 )
 @pytest.mark.integration
-def test_dbt_task_group_with_watcher_kubernetes():
+def test_dbt_dag_with_watcher_kubernetes():
     """
     Create an Cosmos DbtDag with `ExecutionMode.WATCHER_KUBERNETES`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.

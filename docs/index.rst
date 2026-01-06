@@ -11,6 +11,7 @@
    Profiles <profiles/index>
    Contributing <contributing>
    Airflow 3 compatibility <airflow3_compatibility/index>
+   Compatibility Policy <compatibility-policy>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos

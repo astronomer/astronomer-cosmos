@@ -121,7 +121,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
 
-    def _use_event(self) -> bool:
+    def use_event(self) -> bool:
         return False
 
 

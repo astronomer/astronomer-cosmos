@@ -189,7 +189,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     dag_id=self.dag_id,
                     run_id=context["run_id"],
                     map_index=context["task_instance"].map_index,
-                    use_event=self._use_event(),
+                    use_event=self.use_event(),
                     poke_interval=self.poke_interval,
                 ),
                 timeout=self.execution_timeout,
@@ -212,11 +212,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
             )
 
-    def _use_event(self) -> bool:
+    def use_event(self) -> bool:
         raise NotImplementedError("Subclasses must implement this method")
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-        raise NotImplementedError("Subclasses should implement this method if `_use_event` may return True")
+        raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
     def poke(self, context: Context) -> bool:
         """
@@ -239,7 +239,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
-        if self._use_event():
+        if self.use_event():
             status = self._get_status_from_events(ti, context)
         else:
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")

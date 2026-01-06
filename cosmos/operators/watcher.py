@@ -259,7 +259,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
-    def _use_event(self) -> bool:
+    def use_event(self) -> bool:
         if not self.invocation_mode:
             self._discover_invocation_mode()
         return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None

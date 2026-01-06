@@ -98,6 +98,11 @@ def _compress_telemetry_metadata(metadata: dict[str, Any]) -> str:
     """
     Compress and encode telemetry metadata to reduce serialized DAG size.
 
+    Uses mtime=0 in gzip compression to ensure deterministic output regardless of when
+    the compression occurs. This prevents spurious Airflow Param validation errors that
+    would occur if the same metadata compressed at different times produced different
+    base64 strings.
+
     :param metadata: Telemetry metadata dictionary
     :returns: Base64-encoded gzip-compressed JSON string
     """

@@ -7,6 +7,45 @@ import pytest
 from cosmos import telemetry
 
 
+def test_compress_telemetry_metadata_is_deterministic():
+    """Test that compressing the same metadata multiple times produces identical output."""
+    metadata = {
+        "cosmos_version": "1.8.0",
+        "airflow_version": "2.10.1",
+        "python_version": "3.11",
+        "execution_mode": "local",
+        "install_deps": True,
+    }
+
+    # Compress the same metadata multiple times
+    compressed_1 = telemetry._compress_telemetry_metadata(metadata)
+    compressed_2 = telemetry._compress_telemetry_metadata(metadata)
+    compressed_3 = telemetry._compress_telemetry_metadata(metadata)
+
+    # All compressed outputs should be identical (deterministic)
+    assert compressed_1 == compressed_2
+    assert compressed_2 == compressed_3
+
+
+def test_compress_decompress_telemetry_metadata_roundtrip():
+    """Test that metadata can be compressed and decompressed correctly."""
+    original_metadata = {
+        "cosmos_version": "1.8.0",
+        "airflow_version": "2.10.1",
+        "python_version": "3.11",
+        "execution_mode": "local",
+        "install_deps": False,
+        "dbt_command": "run",
+    }
+
+    # Compress and decompress
+    compressed = telemetry._compress_telemetry_metadata(original_metadata)
+    decompressed = telemetry._decompress_telemetry_metadata(compressed)
+
+    # Should get back the original metadata
+    assert decompressed == original_metadata
+
+
 def test_should_emit_is_true_by_default():
     assert telemetry.should_emit()
 

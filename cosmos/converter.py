@@ -35,8 +35,6 @@ from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 
-from cosmos.constants import DbtResourceType
-
 
 def migrate_to_new_interface(
     execution_config: ExecutionConfig, project_config: ProjectConfig, render_config: RenderConfig
@@ -302,7 +300,12 @@ class DbtToAirflowConverter:
 
         self._add_dbt_project_hash_to_dag_docs(dag)
         self._store_cosmos_telemetry_metadata_on_dag(
-          dag, render_config, execution_config, project_config, profile_config, initial_load_method,
+            dag,
+            render_config,
+            execution_config,
+            project_config,
+            profile_config,
+            initial_load_method,
         )
 
         current_time = time.perf_counter()
@@ -387,7 +390,6 @@ class DbtToAirflowConverter:
         self,
         dag: DAG | None,
         render_config: RenderConfig,
-        execution_config: ExecutionConfig,
         project_config: ProjectConfig,
         profile_config: ProfileConfig,
         initial_load_method: LoadMode,
@@ -400,7 +402,6 @@ class DbtToAirflowConverter:
 
         :param dag: The Airflow DAG to store metadata on. If None, no action is taken.
         :param render_config: The render configuration
-        :param execution_config: The execution configuration
         :param project_config: The project configuration
         :param profile_config: The profile configuration
         :param initial_load_method: The load method specified by the user (before automatic resolution)
@@ -427,8 +428,8 @@ class DbtToAirflowConverter:
             metadata["selected_dbt_models"] = sum(
                 1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
             )
-        if profie_config:
-           profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
+        if profile_config:
+            profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
             metadata.update(
                 {
                     "profile_strategy": profile_strategy,

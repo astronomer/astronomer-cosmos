@@ -52,7 +52,7 @@ from packaging.version import Version
 
 @pytest.mark.skipif(
     Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION,
-    reason="This feature is only available for K8s provider 10.0 and above",
+    reason="This feature is only available for K8s provider 10.8.0 and above",
 )
 @pytest.mark.integration
 def test_example_dag_watcher_kubernetes(session):

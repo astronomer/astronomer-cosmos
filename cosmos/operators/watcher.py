@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 
 try:
@@ -27,7 +26,7 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, _store_dbt_resource_status_from_log
+from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
@@ -84,7 +83,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
     # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
     # when accessed via instance, which would incorrectly pass `self` as the first argument
-    _process_log_line_callable = staticmethod(_store_dbt_resource_status_from_log)
+    _process_log_line_callable = staticmethod(store_dbt_resource_status_from_log)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
@@ -227,10 +226,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
-        self.compiled_sql = ""
-        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
-        kwargs.setdefault("priority_weight", CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
-        kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -240,9 +235,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             profiles_dir=profiles_dir,
             **kwargs,
         )
-        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
-        self.producer_task_id = producer_task_id
-        self.deferrable = deferrable
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
 
@@ -267,7 +259,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
-    def _use_event(self) -> bool:
+    def use_event(self) -> bool:
         if not self.invocation_mode:
             self._discover_invocation_mode()
         return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None

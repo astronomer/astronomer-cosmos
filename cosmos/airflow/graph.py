@@ -952,7 +952,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         _add_watcher_dependencies(
             dag=dag,
             producer_airflow_task=producer_task,
-            task_args={**task_args},
+            task_args=task_args,
             tasks_map=tasks_map,
             nodes=nodes,
         )

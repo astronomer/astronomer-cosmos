@@ -733,13 +733,12 @@ def test_project_config_install_dbt_deps_overrides_operator_args(
     project_config.install_dbt_deps = install_dbt_deps
     execution_config = ExecutionConfig(execution_mode=execution_mode)
     render_config = MagicMock()
-    profile_config = MagicMock()
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         DbtToAirflowConverter(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args=operator_args,

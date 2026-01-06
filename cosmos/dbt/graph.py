@@ -9,6 +9,7 @@ import os
 import platform
 import tempfile
 import warnings
+import yaml
 import zlib
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -57,7 +58,7 @@ from cosmos.dbt.project import (
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
-from cosmos.dbt.selector import select_nodes
+from cosmos.dbt.selector import select_nodes, parse_yaml_selectors
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -920,10 +921,8 @@ class DbtGraph:
         self.load_method = LoadMode.DBT_MANIFEST
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
 
-        if self.render_config.selector:
-            raise CosmosLoadDbtException(
-                "RenderConfig.selector is not yet supported when loading dbt projects using the LoadMode.DBT_MANIFEST parser."
-            )
+        if self.render_config.selector and not self.project.is_selectors_available:
+            raise CosmosLoadDbtException(f"Unable to load selectors using {self.project.selectors_path}")
 
         if not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
@@ -957,14 +956,30 @@ class DbtGraph:
                 )
 
                 nodes[node.unique_id] = node
+            
+            if self.render_config.selector:
+                if TYPE_CHECKING:
+                    assert self.project.selectors_path is not None  # pragma: no cover
 
-            self.nodes = nodes
-            self.filtered_nodes = select_nodes(
-                project_dir=self.execution_config.project_path,
-                nodes=nodes,
-                select=self.render_config.select,
-                exclude=self.render_config.exclude,
-            )
+                with self.project.selectors_path.open() as fp2:
+                    selectors = yaml.safe_load(fp2)
+                    selections = parse_yaml_selectors(selectors)[self.render_config.selector]
+
+                    self.nodes = nodes
+                    self.filtered_nodes = select_nodes(
+                        project_dir=self.execution_config.project_path,
+                        nodes=nodes,
+                        select=selections["select"],
+                        exclude=selections["exclude"],
+                    )
+            else:
+                self.nodes = nodes
+                self.filtered_nodes = select_nodes(
+                    project_dir=self.execution_config.project_path,
+                    nodes=nodes,
+                    select=self.render_config.select,
+                    exclude=self.render_config.exclude,
+                )
 
     def update_node_dependency(self) -> None:
         """

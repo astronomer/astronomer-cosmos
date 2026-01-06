@@ -169,6 +169,8 @@ class ProjectConfig:
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to snapshots
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     :param manifest_conn_id: Name of the Airflow connection used to access the manifest file if it is not stored locally. Defaults to None
+    :param selectors_path: The absolute path to the dbt selectors file. Defaults to None
+    :param selectors_conn_id: Name of the Airflow connection used to access the selectors file if it is not stored locally. Defaults to None
     :param project_name: Allows the user to define the project name.
     Required if dbt_project_path is not defined. Defaults to the folder name of dbt_project_path.
     :param env_vars: Dictionary of environment variables that are used for both rendering and execution. Rendering with
@@ -185,6 +187,7 @@ class ProjectConfig:
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
+    selectors_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
@@ -200,6 +203,8 @@ class ProjectConfig:
         snapshots_relative_path: str | Path = "snapshots",
         manifest_path: str | Path | None = None,
         manifest_conn_id: str | None = None,
+        selectors_path: str | Path | None = None,
+        selectors_conn_id: str | None = None,
         project_name: str | None = None,
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
@@ -242,6 +247,25 @@ class ProjectConfig:
                 self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
             else:
                 self.manifest_path = Path(manifest_path_str)
+
+        if selectors_path:
+            selectors_path_str = str(selectors_path)
+            if not selectors_conn_id:
+                selectors_scheme = selectors_path_str.split("://")[0]
+                # Use the default Airflow connection ID for the scheme if it is not provided.
+                selectors_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(selectors_scheme, lambda: None)()
+
+            if selectors_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
+                raise CosmosValueError(
+                    f"The selectors path {selectors_path_str} uses a remote file scheme, but the required Object "
+                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                    f"Airflow 2.8 or later."
+                )
+
+            if settings.AIRFLOW_IO_AVAILABLE:
+                self.selectors_path = ObjectStoragePath(selectors_path_str, conn_id=selectors_conn_id)
+            else:
+                self.selectors_path = Path(selectors_path_str)
 
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars
@@ -286,6 +310,12 @@ class ProjectConfig:
         Check if the `dbt` project manifest is set and if the file exists.
         """
         return self.manifest_path.exists() if self.manifest_path else False
+
+    def is_selectors_available(self) -> bool:
+        """
+        Check if the `dbt` selectors file is set and if the file exists.
+        """
+        return self.selectors_path.exists() if self.selectors_path else False
 
 
 @dataclass

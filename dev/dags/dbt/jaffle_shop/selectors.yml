@@ -1,0 +1,50 @@
+selectors:
+  - name: staging_models
+    description: "Select all staging models"
+    definition:
+      method: path
+      value: models/staging
+
+  - name: core_models
+    description: "Select core business logic models (non-staging)"
+    definition:
+      method: tag
+      value: core
+      
+  - name: customers_and_downstream
+    description: "Select customers model and all downstream dependencies"
+    definition:
+      method: fqn
+      value: customers
+      childrens_parents: true
+
+  - name: staging_orders
+    description: "Select staging orders model specifically"
+    definition:
+      method: fqn
+      value: jaffle_shop.staging.stg_orders
+
+  - name: nightly_models
+    description: "Models tagged for nightly runs"
+    definition:
+      method: tag
+      value: nightly
+
+  - name: exclude_staging
+    description: "All models except staging"
+    definition:
+      union:
+        - method: fqn
+          value: "*"
+        - exclude:
+            - method: path
+              value: models/staging
+
+  - name: critical_path
+    description: "Critical business models"
+    definition:
+      union:
+        - method: fqn
+          value: customers
+        - method: fqn
+          value: orders

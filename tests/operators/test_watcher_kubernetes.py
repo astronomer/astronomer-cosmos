@@ -9,6 +9,7 @@ from cosmos import DbtDag
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import AIRFLOW_VERSION, ExecutionMode, LoadMode, TestBehavior, Version
 from cosmos.operators.watcher_kubernetes import (
+    DbtBuildWatcherKubernetesOperator,
     DbtProducerWatcherKubernetesOperator,
     DbtRunWatcherKubernetesOperator,
     DbtSeedWatcherKubernetesOperator,
@@ -140,3 +141,15 @@ def test_dbt_task_group_with_watcher_kubernetes():
     assert (
         dag_dbt_watcher_kubernetes.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids
     )
+
+
+class TestDbtBuildWatcherKubernetesOperator:
+
+    def test_dbt_build_watcher_kubernetes_operator_raises_not_implemented_error(self):
+        expected_message = (
+            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
+            "since the build command is executed by the producer task."
+        )
+
+        with pytest.raises(NotImplementedError, match=expected_message):
+            DbtBuildWatcherKubernetesOperator()

@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
-def _store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
+def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
 

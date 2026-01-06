@@ -26,7 +26,7 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, _store_dbt_resource_status_from_log
+from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
@@ -83,7 +83,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
     # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
     # when accessed via instance, which would incorrectly pass `self` as the first argument
-    _process_log_line_callable = staticmethod(_store_dbt_resource_status_from_log)
+    _process_log_line_callable = staticmethod(store_dbt_resource_status_from_log)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)

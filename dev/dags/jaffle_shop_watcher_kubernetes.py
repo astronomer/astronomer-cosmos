@@ -85,7 +85,7 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST)
 
 
-# Currently airflow dags test ignores priority_weight and  weight_rule, for this reason, we're setting the following in the CI only:
+# Currently airflow dags test ignores priority_weight and weight_rule, for this reason, we're setting the following in the CI only:
 if os.getenv("CI"):
     operator_args["trigger_rule"] = "all_success"
 

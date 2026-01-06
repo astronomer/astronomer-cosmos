@@ -145,7 +145,7 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
-def create_test_task_metadata(  # noqa:C901
+def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
     test_indirect_selection: TestIndirectSelection,
@@ -203,15 +203,16 @@ def create_test_task_metadata(  # noqa:C901
         args_to_override = node.operator_kwargs_to_override
 
     dbt_class = "DbtTest"
+    watcher_to_test_execution_mode = {
+        ExecutionMode.WATCHER: ExecutionMode.LOCAL,
+        ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
+    }
     if (
         render_config is not None
         and render_config.test_behavior == TestBehavior.AFTER_ALL
         and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES)
     ):
-        if execution_mode == ExecutionMode.WATCHER:
-            test_execution_mode = ExecutionMode.LOCAL
-        else:  # ExecutionMode.WATCHER_KUBERNETES
-            test_execution_mode = ExecutionMode.KUBERNETES
+        test_execution_mode = watcher_to_test_execution_mode[execution_mode]
         operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
     else:
         operator_class = calculate_operator_class(execution_mode=execution_mode, dbt_class=dbt_class)

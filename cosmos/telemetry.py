@@ -102,7 +102,7 @@ def _compress_telemetry_metadata(metadata: dict[str, Any]) -> str:
     :returns: Base64-encoded gzip-compressed JSON string
     """
     json_bytes = json.dumps(metadata).encode("utf-8")
-    compressed = gzip.compress(json_bytes, compresslevel=9)
+    compressed = gzip.compress(json_bytes, compresslevel=9, mtime=0)
     return b64encode(compressed).decode("ascii")
 
 

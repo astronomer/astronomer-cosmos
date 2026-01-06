@@ -66,7 +66,7 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
-        if not "context" in kwargs:
+        if "context" not in kwargs:
             # This global variable is used to make the task context available to the K8s callback.
             # While the callback is set during the operator initialization, the context is only created during the operator's execution.
             kwargs["context"] = producer_task_context

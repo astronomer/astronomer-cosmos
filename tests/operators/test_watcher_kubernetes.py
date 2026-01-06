@@ -1,9 +1,11 @@
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.secret import Secret
 
 from cosmos import DbtDag
@@ -143,6 +145,78 @@ def test_dbt_dag_with_watcher_kubernetes():
     assert (
         dag_dbt_watcher_kubernetes.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids
     )
+
+
+class TestDbtProducerWatcherKubernetesOperator:
+    """
+    Tests for DbtProducerWatcherKubernetesOperator.
+
+    The producer operator does not support Airflow retries because re-running
+    a dbt build would cause issues with the watcher pattern.
+    """
+
+    def test_retries_set_to_zero_on_init(self):
+        """
+        Test that the operator sets retries to 0 during initialization.
+        """
+        op = DbtProducerWatcherKubernetesOperator(
+            project_dir=".",
+            profile_config=None,
+            image="dbt-image:latest",
+        )
+        assert op.retries == 0
+
+    def test_retries_overridden_even_if_user_sets_them(self):
+        """
+        Test that even if a user explicitly sets retries, they are overridden to 0.
+        """
+        op = DbtProducerWatcherKubernetesOperator(
+            project_dir=".",
+            profile_config=None,
+            image="dbt-image:latest",
+            retries=5,
+        )
+        assert op.retries == 0
+
+    @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+    def test_blocks_retry_attempt(self, mock_execute, caplog):
+        """
+        Test that the operator raises an AirflowException when a retry is attempted (try_number > 1).
+        """
+        op = DbtProducerWatcherKubernetesOperator(
+            project_dir=".",
+            profile_config=None,
+            image="dbt-image:latest",
+        )
+
+        ti = MagicMock()
+        ti.try_number = 2
+        context = {"ti": ti}
+
+        with caplog.at_level(logging.ERROR):
+            with pytest.raises(AirflowException) as excinfo:
+                op.execute(context=context)
+
+        mock_execute.assert_not_called()
+        assert "does not support Airflow retries" in str(excinfo.value)
+        assert any("does not support Airflow retries" in message for message in caplog.messages)
+
+    def test_raises_exception_when_task_instance_missing(self):
+        """
+        Test that the operator raises an AirflowException when task instance is missing from context.
+        """
+        op = DbtProducerWatcherKubernetesOperator(
+            project_dir=".",
+            profile_config=None,
+            image="dbt-image:latest",
+        )
+
+        context = {"ti": None}
+
+        with pytest.raises(AirflowException) as excinfo:
+            op.execute(context=context)
+
+        assert "expects a task instance" in str(excinfo.value)
 
 
 class TestDbtBuildWatcherKubernetesOperator:

@@ -13,6 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
+from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
 try:
@@ -37,6 +38,8 @@ from cosmos.operators.kubernetes import (
 logger = get_logger(__name__)
 
 
+# This global variable is currently used to make the task context available to the K8s callback.
+# While the callback is set during the operator initialization, the context is only created during the operator's execution.
 producer_task_context = None
 
 
@@ -63,9 +66,9 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
-
-        logger.info(f"[xubi] {line}")
         if not "context" in kwargs:
+            # This global variable is used to make the task context available to the K8s callback.
+            # While the callback is set during the operator initialization, the context is only created during the operator's execution.
             kwargs["context"] = producer_task_context
         _store_dbt_resource_status_from_log(line, kwargs)
 
@@ -78,6 +81,12 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
 
+        # Disable retries on producer task
+        default_args = dict(kwargs.get("default_args", {}) or {})
+        default_args["retries"] = 0
+        kwargs["default_args"] = default_args
+        kwargs["retries"] = 0
+
         super().__init__(task_id=task_id, *args, callbacks=WatcherKubernetesCallback, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
@@ -86,6 +95,24 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        task_instance = context.get("ti")
+        if task_instance is None:
+            raise AirflowException(
+                "DbtProducerWatcherKubernetesOperator expects a task instance in the execution context"
+            )
+
+        try_number = getattr(task_instance, "try_number", 1)
+
+        if try_number > 1:
+            retry_message = (
+                "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
+                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+            )
+            self.log.error(retry_message)
+            raise AirflowException(retry_message)
+
+        # This global variable is used to make the task context available to the K8s callback.
+        # While the callback is set during the operator initialization, the context is only created during the operator's execution.
         global producer_task_context
         producer_task_context = context
         return super().execute(context, **kwargs)

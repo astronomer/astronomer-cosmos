@@ -18,7 +18,7 @@ from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCal
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # pragma: no cover
-    pass  # type: ignore[no-redef]
+    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger

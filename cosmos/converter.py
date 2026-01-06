@@ -300,12 +300,7 @@ class DbtToAirflowConverter:
 
         self._add_dbt_project_hash_to_dag_docs(dag)
         self._store_cosmos_telemetry_metadata_on_dag(
-            dag,
-            render_config,
-            execution_config,
-            project_config,
-            profile_config,
-            initial_load_method,
+            dag, render_config, project_config, profile_config, initial_load_method
         )
 
         current_time = time.perf_counter()

@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, _store_dbt_resource_status_from_log
+from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -70,13 +70,13 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
             # This global variable is used to make the task context available to the K8s callback.
             # While the callback is set during the operator initialization, the context is only created during the operator's execution.
             kwargs["context"] = producer_task_context
-        _store_dbt_resource_status_from_log(line, kwargs)
+        store_dbt_resource_status_from_log(line, kwargs)
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
-    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = _store_dbt_resource_status_from_log
+    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")

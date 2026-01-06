@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.providers.cncf.kubernetes.secret import Secret
@@ -10,6 +11,7 @@ from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderC
 from cosmos.constants import AIRFLOW_VERSION, ExecutionMode, LoadMode, TestBehavior, Version
 from cosmos.operators.watcher_kubernetes import (
     DbtBuildWatcherKubernetesOperator,
+    DbtConsumerWatcherKubernetesSensor,
     DbtProducerWatcherKubernetesOperator,
     DbtRunWatcherKubernetesOperator,
     DbtSeedWatcherKubernetesOperator,
@@ -153,3 +155,77 @@ class TestDbtBuildWatcherKubernetesOperator:
 
         with pytest.raises(NotImplementedError, match=expected_message):
             DbtBuildWatcherKubernetesOperator()
+
+
+class TestDbtConsumerWatcherKubernetesSensor:
+    """
+    Tests for DbtConsumerWatcherKubernetesSensor.
+
+    On first execution, it behaves as BaseConsumerSensor (pokes for status from XCom).
+    On retry (try_number > 1), it falls back to executing as DbtRunKubernetesOperator.
+    """
+
+    def make_sensor(self, **kwargs):
+        extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+        kwargs["extra_context"] = extra_context
+        sensor = DbtConsumerWatcherKubernetesSensor(
+            task_id="model.my_model",
+            project_dir="/tmp/project",
+            profile_config=None,
+            deferrable=False,
+            image="dbt-image:latest",
+            **kwargs,
+        )
+        sensor._get_producer_task_status = MagicMock(return_value=None)
+        return sensor
+
+    def make_context(self, ti_mock, *, run_id: str = "test-run", map_index: int = 0):
+        return {
+            "ti": ti_mock,
+            "run_id": run_id,
+            "task_instance": MagicMock(map_index=map_index),
+        }
+
+    def test_first_execution_behaves_as_base_consumer_sensor(self):
+        """
+        On the first execution (try_number == 1), the sensor should poke for status
+        from XCom, behaving as BaseConsumerSensor.
+        """
+        sensor = self.make_sensor()
+
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = "success"
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+
+        assert result is True
+        ti.xcom_pull.assert_called()
+
+    @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_and_run_cmd")
+    def test_retry_executes_as_dbt_run_kubernetes_operator(self, mock_build_and_run_cmd):
+        """
+        On retry (try_number > 1), the sensor should fall back to executing
+        as DbtRunKubernetesOperator by calling build_and_run_cmd.
+        """
+        sensor = self.make_sensor()
+
+        ti = MagicMock()
+        ti.try_number = 2
+        ti.xcom_pull.return_value = None
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--threads", "2"]
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+
+        assert result is True
+        mock_build_and_run_cmd.assert_called_once()
+
+    def test_use_event_returns_false(self):
+        """
+        DbtConsumerWatcherKubernetesSensor should return False for _use_event(),
+        meaning it uses XCom-based status retrieval instead of events.
+        """
+        sensor = self.make_sensor()
+        assert sensor._use_event() is False

@@ -254,9 +254,7 @@ class DbtToAirflowConverter:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        logger.info("Cosmos DAG parsing logs")
-
-        logger.info("::group::Cosmos DAG/TaskGroup Parsing")
+        logger.info("::group::Cosmos DAG parsing logs")
 
         # We copy the configuration so the changes introduced in this method, such as override_configuration,
         # do not affect other DAGs or TaskGroups that may reuse the same original configuration

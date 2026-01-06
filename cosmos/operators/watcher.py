@@ -217,8 +217,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
     def __init__(
         self,
         *,
+        project_dir: str,
         profile_config: ProfileConfig | None = None,
-        project_dir: str | None = None,
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,

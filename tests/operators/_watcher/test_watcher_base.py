@@ -18,7 +18,7 @@ class TestBaseConsumerSensor:
             project_dir="/tmp/sample_project",
         )
         with pytest.raises(NotImplementedError):
-            sensor._use_event()
+            sensor.use_event()
 
         with pytest.raises(NotImplementedError):
             assert sensor._get_status_from_events(None, None) is None

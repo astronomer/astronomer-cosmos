@@ -26,7 +26,7 @@ This policy establishes:
 Currently Supported Versions
 ----------------------------
 
-The following versions are currently tested and supported in our CI/CD pipeline.
+The following versions are currently tested and supported.
 
 Python
 ~~~~~~

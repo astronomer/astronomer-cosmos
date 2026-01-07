@@ -1691,3 +1691,24 @@ def test_skip_test_task_when_only_detached_tests_exist():
         ]
 
         assert list(tasks_map.keys()) == expected_task_ids
+
+
+def test_create_test_task_metadata_watcher_kubernetes_after_all():
+    """
+    Test that create_test_task_metadata creates a DbtTestKubernetesOperator
+    when test_behavior is AFTER_ALL and execution_mode is WATCHER_KUBERNETES.
+    """
+    render_config = RenderConfig(
+        test_behavior=TestBehavior.AFTER_ALL,
+    )
+
+    metadata = create_test_task_metadata(
+        test_task_name="my_project_test",
+        execution_mode=ExecutionMode.WATCHER_KUBERNETES,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"project_dir": SAMPLE_PROJ_PATH},
+        render_config=render_config,
+    )
+
+    assert metadata.id == "my_project_test"
+    assert metadata.operator_class == "cosmos.operators.kubernetes.DbtTestKubernetesOperator"

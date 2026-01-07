@@ -108,6 +108,7 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"
+    WATCHER_KUBERNETES = "watcher_kubernetes"
 
 
 class InvocationMode(Enum):
@@ -195,3 +196,5 @@ TELEMETRY_VERSION = "v3"
 TELEMETRY_TIMEOUT = 1.0
 
 _AIRFLOW3_MAJOR_VERSION = 3
+
+_K8s_WATCHER_MIN_K8S_PROVIDER_VERSION = Version("10.8.0")

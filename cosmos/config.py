@@ -210,6 +210,35 @@ class ProjectConfig:
         dbt_vars: dict[str, str] | None = None,
         partial_parse: bool = True,
     ):
+        if project_name:
+            self.project_name = project_name
+
+        self.env_vars = env_vars
+        self.dbt_vars = dbt_vars
+        self.partial_parse = partial_parse
+        self.install_dbt_deps = install_dbt_deps
+        self.copy_dbt_packages = copy_dbt_packages
+
+        self.validate_dbt_project_paths(
+            project_name,
+            dbt_project_path,
+            models_relative_path,
+            seeds_relative_path,
+            snapshots_relative_path,
+            manifest_path,
+        )
+        self.validate_manifest_path(manifest_path, manifest_conn_id)
+        self.validate_selectors_yaml_path(selectors_yaml_path, selectors_yaml_conn_id)
+
+    def validate_dbt_project_paths(
+        self,
+        project_name: str | None,
+        dbt_project_path: str | Path | None,
+        models_relative_path: str | Path,
+        seeds_relative_path: str | Path,
+        snapshots_relative_path: str | Path,
+        manifest_path: str | Path | None,
+    ) -> None:
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
         # We do, however, still require that both manifest_path and project_name be defined, or neither be defined.
@@ -218,9 +247,6 @@ class ProjectConfig:
                 raise CosmosValueError(
                     "If ProjectConfig.dbt_project_path is not defined, ProjectConfig.manifest_path and ProjectConfig.project_name must be defined together, or both left undefined."
                 )
-        if project_name:
-            self.project_name = project_name
-
         if dbt_project_path:
             self.dbt_project_path = Path(dbt_project_path)
             self.models_path = self.dbt_project_path / Path(models_relative_path)
@@ -229,6 +255,11 @@ class ProjectConfig:
             if not project_name:
                 self.project_name = self.dbt_project_path.stem
 
+    def validate_manifest_path(
+        self,
+        manifest_path: str | Path | None,
+        manifest_conn_id: str | None,
+    ) -> None:
         if manifest_path:
             manifest_path_str = str(manifest_path)
             if not manifest_conn_id:
@@ -248,6 +279,11 @@ class ProjectConfig:
             else:
                 self.manifest_path = Path(manifest_path_str)
 
+    def validate_selectors_yaml_path(
+        self,
+        selectors_yaml_path: str | Path | None,
+        selectors_yaml_conn_id: str | None,
+    ) -> None:
         if selectors_yaml_path:
             selectors_yaml_path_str = str(selectors_yaml_path)
             if not selectors_yaml_conn_id:
@@ -268,12 +304,6 @@ class ProjectConfig:
                 self.selectors_yaml_path = ObjectStoragePath(selectors_yaml_path_str, conn_id=selectors_yaml_conn_id)
             else:
                 self.selectors_yaml_path = Path(selectors_yaml_path_str)
-
-        self.env_vars = env_vars
-        self.dbt_vars = dbt_vars
-        self.partial_parse = partial_parse
-        self.install_dbt_deps = install_dbt_deps
-        self.copy_dbt_packages = copy_dbt_packages
 
     def validate_project(self) -> None:
         """

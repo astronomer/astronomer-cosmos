@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import binascii
-import gzip
 import hashlib
 import json
+import zlib
 from typing import TYPE_CHECKING, Any
 
 from airflow.listeners import hookimpl
@@ -75,7 +75,7 @@ def get_cosmos_telemetry_metadata(dag: DAG) -> dict[str, Any]:
 
     try:
         return _decompress_telemetry_metadata(compressed_metadata)
-    except (binascii.Error, gzip.BadGzipFile, json.JSONDecodeError, EOFError, UnicodeDecodeError) as e:
+    except (binascii.Error, zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
         logger.warning(f"Failed to decompress telemetry metadata: {type(e).__name__}: {e}")
         return {}
 

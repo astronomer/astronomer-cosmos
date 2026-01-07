@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import gzip
 import json
 import platform
+import zlib
 from base64 import b64decode, b64encode
 from typing import Any
 from urllib import parse
@@ -98,16 +98,11 @@ def _compress_telemetry_metadata(metadata: dict[str, Any]) -> str:
     """
     Compress and encode telemetry metadata to reduce serialized DAG size.
 
-    Uses mtime=0 in gzip compression to ensure deterministic output regardless of when
-    the compression occurs. This prevents spurious Airflow Param validation errors that
-    would occur if the same metadata compressed at different times produced different
-    base64 strings.
-
     :param metadata: Telemetry metadata dictionary
-    :returns: Base64-encoded gzip-compressed JSON string
+    :returns: Base64-encoded zlib-compressed JSON string
     """
     json_bytes = json.dumps(metadata).encode("utf-8")
-    compressed = gzip.compress(json_bytes, compresslevel=9, mtime=0)
+    compressed = zlib.compress(json_bytes, level=9)
     return b64encode(compressed).decode("ascii")
 
 
@@ -115,10 +110,10 @@ def _decompress_telemetry_metadata(compressed_data: str) -> dict[str, Any]:
     """
     Decompress and decode telemetry metadata.
 
-    :param compressed_data: Base64-encoded gzip-compressed JSON string
+    :param compressed_data: Base64-encoded zlib-compressed JSON string
     :returns: Original metadata dictionary
     """
     compressed_bytes = b64decode(compressed_data.encode("ascii"))
-    json_bytes = gzip.decompress(compressed_bytes)
+    json_bytes = zlib.decompress(compressed_bytes)
     result: dict[str, Any] = json.loads(json_bytes.decode("utf-8"))
     return result

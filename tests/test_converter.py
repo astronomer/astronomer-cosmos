@@ -348,6 +348,50 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_afterall():
 
 
 @pytest.mark.integration
+def test_converter_creates_dag_with_after_all_test_uses_project_name_from_project_config():
+    """
+    Validate that when using LoadMode.DBT_MANIFEST with project_name set in ProjectConfig
+    but no dbt_project_path in RenderConfig, the test task name uses project_config.project_name
+    instead of falling back to an empty string.
+    """
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="jaffle_shop")
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL,
+        dbt_project_path=SAMPLE_DBT_PROJECT,  # Required for execution, but not used for project_name
+    )
+    render_config = RenderConfig(
+        test_behavior=TestBehavior.AFTER_ALL,
+        load_method=LoadMode.DBT_MANIFEST,
+        # Note: dbt_project_path is NOT set, so render_config.project_name will be empty
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+
+    # Find the test task created with AFTER_ALL behavior
+    test_tasks = [task for task in dag.tasks if task.task_id.endswith("_test")]
+    assert len(test_tasks) == 1, "Expected exactly one test task with AFTER_ALL behavior"
+    test_task = test_tasks[0]
+
+    # Verify the test task name uses project_config.project_name instead of empty string
+    assert test_task.task_id == "jaffle_shop_test", (
+        f"Expected test task name to be 'jaffle_shop_test' but got '{test_task.task_id}'. "
+        "This validates that dbt_project_name falls back to project_config.project_name "
+        "when render_config.project_name is empty."
+    )
+
+
+@pytest.mark.integration
 def test_converter_creates_dag_with_test_with_multiple_parents_test_none():
     """
     Validate topology of a project that uses the MULTIPLE_PARENTS_TEST_DBT_PROJECT project

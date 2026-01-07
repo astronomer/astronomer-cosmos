@@ -150,7 +150,7 @@ Contributor Guidance
 --------------------
 
 Proposing Version Changes
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When proposing to add or remove version support:
 

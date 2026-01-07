@@ -47,7 +47,7 @@ dbt Core
 Version Removal Policy
 -----------------------
 
-Cosmos removes support for versions based on clear, objective criteria. There is no deprecation period—versions are removed when they meet the removal criteria.
+Cosmos removes support for versions based on clear, and objective criteria. There is no deprecation period — versions are removed when they meet the removal criteria.
 
 Python Version Removal Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,7 +61,7 @@ Python versions are removed from support when **any** of the following condition
 Apache Airflow Version Removal Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Apache Airflow versions are removed from support when:
+Apache Airflow versions are removed from support when **either** of the following conditions are met:
 
 - **Airflow EOL**: The Apache Airflow version has reached End of Life according to the `Apache Airflow release policy <https://airflow.apache.org/docs/apache-airflow/stable/security/end-of-life.html>`_
 - **Astronomer Runtime EOL**: The Astronomer Runtime version has reached End of Life according to the `Astronomer Runtime release policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_

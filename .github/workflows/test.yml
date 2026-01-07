@@ -639,7 +639,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ "3.12" ]
-        airflow-version: [ "2.10", "3.1" ]
+        airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
       - uses: actions/checkout@v6.0.1

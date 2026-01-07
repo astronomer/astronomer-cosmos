@@ -20,4 +20,4 @@ pytest -vv \
     --cov-report=xml \
     -m 'integration and not dbtfusion' \
     tests/test_example_k8s_dags.py \
-    tests/operators/test_watcher_kubernetes.py
+    tests/operators/test_watcher_kubernetes_integration.py

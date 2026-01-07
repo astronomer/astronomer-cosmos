@@ -29,6 +29,9 @@ from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
+
+# TODO: Move _get_profile_config_attribute at common place
+from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
 from cosmos.versioning import _create_folder_version_hash
 
@@ -298,7 +301,9 @@ class DbtToAirflowConverter:
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         self._add_dbt_project_hash_to_dag_docs(dag)
-        self._store_cosmos_telemetry_metadata_on_dag(dag, render_config, project_config, initial_load_method)
+        self._store_cosmos_telemetry_metadata_on_dag(
+            dag, render_config, project_config, profile_config, initial_load_method
+        )
 
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
@@ -383,6 +388,7 @@ class DbtToAirflowConverter:
         dag: DAG | None,
         render_config: RenderConfig,
         project_config: ProjectConfig,
+        profile_config: ProfileConfig,
         initial_load_method: LoadMode,
     ) -> None:
         """
@@ -394,6 +400,8 @@ class DbtToAirflowConverter:
         :param dag: The Airflow DAG to store metadata on. If None, no action is taken.
         :param render_config: The render configuration
         :param project_config: The project configuration
+        :param profile_config: The profile configuration
+        :param initial_load_method: The load method specified by the user (before automatic resolution)
         """
         if dag is None:
             return
@@ -416,6 +424,15 @@ class DbtToAirflowConverter:
             )
             metadata["selected_dbt_models"] = sum(
                 1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+        if profile_config is not None:
+            profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
+            metadata.update(
+                {
+                    "profile_strategy": profile_strategy,
+                    "profile_mapping_class": profile_mapping_class,
+                    "database": database,
+                }
             )
 
         # Store metadata in dag.params which is preserved during serialization

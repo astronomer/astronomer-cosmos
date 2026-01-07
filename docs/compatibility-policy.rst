@@ -85,7 +85,7 @@ following conditions are met:
   `Astronomer Runtime release policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
 
 dbt Core Version Removal Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 dbt Core versions are removed from support when:
 

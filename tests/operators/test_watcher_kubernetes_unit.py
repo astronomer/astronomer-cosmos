@@ -5,15 +5,24 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
+from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.secret import Secret
+from packaging.version import Version
 
 from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import LoadMode, TestBehavior
-from cosmos.operators.watcher_kubernetes import (
-    DbtBuildWatcherKubernetesOperator,
-    DbtConsumerWatcherKubernetesSensor,
-    DbtProducerWatcherKubernetesOperator,
-)
+from cosmos.constants import LoadMode, TestBehavior, _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+
+if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION:
+    pytest.skip(
+        f"Watcher Kubernetes depends on apache-airflow-providers-cncf-kubernetes >= {_K8s_WATCHER_MIN_K8S_PROVIDER_VERSION}. Currenl version: {airflow_k8s_provider_version} ",
+        allow_module_level=True,
+    )
+else:
+    from cosmos.operators.watcher_kubernetes import (
+        DbtBuildWatcherKubernetesOperator,
+        DbtConsumerWatcherKubernetesSensor,
+        DbtProducerWatcherKubernetesOperator,
+    )
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 

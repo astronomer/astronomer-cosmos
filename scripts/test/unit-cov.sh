@@ -9,4 +9,4 @@ pytest \
     --ignore=tests/test_async_example_dag.py \
     --ignore=tests/test_example_dags_no_connections.py \
     --ignore=tests/test_example_k8s_dags.py \
-    --ignore=tests/operators/test_watcher_kubernetes.py
+    --ignore=tests/operators/test_watcher_kubernetes_integration.py

@@ -296,10 +296,10 @@ class TestDbtConsumerWatcherKubernetesSensor:
         assert result is True
         mock_build_and_run_cmd.assert_called_once()
 
-    def test_use_event_returns_false(self):
+    def testuse_event_returns_false(self):
         """
-        DbtConsumerWatcherKubernetesSensor should return False for _use_event(),
+        DbtConsumerWatcherKubernetesSensor should return False for use_event(),
         meaning it uses XCom-based status retrieval instead of events.
         """
         sensor = self.make_sensor()
-        assert sensor._use_event() is False
+        assert sensor.use_event() is False

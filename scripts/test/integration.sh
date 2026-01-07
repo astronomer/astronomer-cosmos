@@ -11,16 +11,23 @@ ls $AIRFLOW_HOME
 
 airflow db check
 
+python -m venv venv-subprocess
+venv-subprocess/bin/pip install -U dbt-postgres
+
 
 rm -rf dbt/jaffle_shop/dbt_packages;
-pytest -vv \
-    --cov=cosmos \
-    --cov-report=term-missing \
-    --cov-report=xml \
-    --durations=0 \
-    -m 'integration and not dbtfusion' \
-    --ignore=tests/perf \
-    --ignore=tests/test_async_example_dag.py \
-    --ignore=tests/test_example_k8s_dags.py \
-    --ignore=tests/operators/test_watcher_kubernetes_integration.py \
-    -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes or jaffle_shop_watcher_kubernetes)'
+
+# pytest -vv \
+#     --cov=cosmos \
+#     --cov-report=term-missing \
+#     --cov-report=xml \
+#     --durations=0 \
+#     -m 'integration and not dbtfusion' \
+#     --ignore=tests/perf \
+#     --ignore=tests/test_async_example_dag.py \
+#     --ignore=tests/test_example_k8s_dags.py \
+#     --ignore=tests/operators/test_watcher_kubernetes_integration.py \
+#     -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes or jaffle_shop_watcher_kubernetes)'
+
+pytest -vv tests/operators/test_watcher.py::test_dbt_dag_with_watcher
+

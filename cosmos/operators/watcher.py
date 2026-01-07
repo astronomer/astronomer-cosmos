@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import zlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -83,7 +83,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
     # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
     # when accessed via instance, which would incorrectly pass `self` as the first argument
-    _process_log_line_callable = staticmethod(store_dbt_resource_status_from_log)
+    _process_log_line_callable: Callable[[str, Any], None] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
@@ -96,7 +96,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
-        kwargs["log_format"] = "json"
 
         super().__init__(task_id=task_id, *args, **kwargs)
 
@@ -148,6 +147,17 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        if not self.invocation_mode:
+            logger.info("No invocation mode provided, discovering it")
+            self._discover_invocation_mode()
+
+        logger.info("Invocation mode: %s", self.invocation_mode)
+
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            logger.info("Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log")
+            self.log_format = "json"
+            self._process_log_line_callable = store_dbt_resource_status_from_log
+
         task_instance = context.get("ti")
         if task_instance is None:
             raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")

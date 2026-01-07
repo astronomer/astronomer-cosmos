@@ -14,6 +14,7 @@ DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "jaffle_shop")
 DBT_PROJECT_PATH = DBT_ROOT_PATH / DBT_PROJECT_NAME
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent / "venv-subprocess/bin/dbt"
 
 
 profile_config = ProfileConfig(
@@ -42,7 +43,11 @@ from cosmos.constants import InvocationMode
 # [START example_watcher]
 example_watcher = DbtDag(
     # dbt/cosmos-specific parameters
-    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER),
+    execution_config=ExecutionConfig(
+        execution_mode=ExecutionMode.WATCHER,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        dbt_executable_path=DBT_EXECUTABLE_PATH,
+    ),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),

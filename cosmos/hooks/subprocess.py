@@ -99,9 +99,10 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 line = line.rstrip("\n")
                 last_line = line
                 log_lines.append(line)
-                self.log.info("%s", line)
                 if process_log_line:
                     process_log_line(line, kwargs)
+                else:
+                    self.log.info("%s", line)
 
             # Wait until process completes
             return_code = self.sub_process.wait()

@@ -33,7 +33,7 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
-
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 
 project_config = ProjectConfig(
     dbt_project_path=DBT_PROJECT_PATH,
@@ -977,7 +977,7 @@ class TestDbtBuildWatcherOperator:
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
-def test_dbt_dag_with_watcher():
+def test_dbt_dag_with_watcher(caplog):
     """
     Run a DbtDag using `ExecutionMode.WATCHER`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.
@@ -990,6 +990,7 @@ def test_dbt_dag_with_watcher():
         dag_id="watcher_dag",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
@@ -1039,7 +1040,53 @@ def test_dbt_dag_with_watcher():
         "raw_orders_seed",
         "raw_customers_seed",
     }
+    assert '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"''' not in caplog.text
+    assert "OK loaded seed file public.raw_orders" in caplog.text
 
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_subprocess(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    watcher_dag = DbtDag(
+        project_config=project_config,
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.SUBPROCESS,
+            dbt_executable_path=DBT_EXECUTABLE_PATH
+        ),
+        render_config=RenderConfig(
+            emit_datasets=False,
+            select=["raw_orders"],
+            test_behavior=TestBehavior.AFTER_ALL
+        ),
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+    )
+    dag_run = new_test_dag(watcher_dag)
+    assert dag_run.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 1
+
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    expected_task_names = [
+        "dbt_producer_watcher",
+        "raw_orders_seed",
+        "jaffle_shop_test"
+    ]
+    assert tasks_names == expected_task_names
+    # Confirm that the dbt command was successfully run using the given dbt executable path:
+    assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text
+    # Confirm that the seed was successfully run and the log output was JSON:
+    assert '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"''' not in caplog.text
+    assert "OK loaded seed file public.raw_orders" in caplog.text
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration

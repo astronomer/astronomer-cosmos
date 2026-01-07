@@ -10,7 +10,7 @@ selectors:
     definition:
       method: tag
       value: core
-      
+
   - name: customers_and_downstream
     description: "Select customers model and all downstream dependencies"
     definition:

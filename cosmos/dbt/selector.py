@@ -686,9 +686,9 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
 def _parse_selector_for_selections(
     selector_definition: dict[str, Any],
     all_selector_definitions: dict[str, dict[str, Any]],
-    resolved_cache: dict[str, Any],
+    resolved_cache: dict[str, dict[str, list[str] | None]],
     visiting: set[str] | None = None,
-):
+) -> dict[str, list[str] | None]:
     """
     Convert a selector definition from selectors.yml to dbt command-line syntax.
 
@@ -706,7 +706,7 @@ def _parse_selector_for_selections(
     resolved_cache = resolved_cache or {}
     visiting = visiting or set()
 
-    def resolve_selector_reference(selector_name: str) -> tuple:
+    def resolve_selector_reference(selector_name: str) -> tuple[list[str], list[str]]:
         """
         Recursively resolve a selector reference to its base components.
 
@@ -741,18 +741,23 @@ def _parse_selector_for_selections(
 
         return (result.get("select") or [], result.get("exclude") or [])
 
-    def process_method(method_def: dict[str, Any]) -> tuple:
+    def process_method(method_def: dict[str, Any]) -> tuple[list[str], list[str]]:
         """
         Process a single method definition.
         Returns tuple of (select_parts, exclude_parts)
         """
-        method = method_def.get("method")
-        value = method_def.get("value")
+        method = method_def.get("method", "METHOD_KEY_NOT_FOUND")
+        value = method_def.get("value", "VALUE_KEY_NOT_FOUND")
         parents = method_def.get("parents", False)
         children = method_def.get("children", False)
         parents_depth = method_def.get("parents_depth", 0)
         children_depth = method_def.get("children_depth", 0)
         childrens_parents = method_def.get("childrens_parents", False)
+
+        if method == "METHOD_KEY_NOT_FOUND":
+            raise CosmosValueError(f"Selector method is missing in method definition: {method_def}.")
+        if value == "VALUE_KEY_NOT_FOUND":
+            raise CosmosValueError(f"Selector value is missing in method definition: {method_def}.")
 
         # Build the selector string
         if method.startswith(TAG_SELECTOR[:-1]):
@@ -798,7 +803,7 @@ def _parse_selector_for_selections(
 
         return ([selector_str], [])
 
-    def process_definition(definition: dict[str, Any]) -> tuple:
+    def process_definition(definition: dict[str, Any]) -> tuple[list[str], list[str]]:
         """
         Process a selector definition recursively.
 
@@ -873,7 +878,7 @@ def _parse_selector_for_selections(
         # Handle intersection
         if "intersection" in definition:
             intersection_items = definition["intersection"]
-            intersection_selects = []
+            intersection_selects: list[str] = []
             for item in intersection_items:
                 item_select, item_exclude = process_definition(item)
                 intersection_selects.extend(item_select)
@@ -899,7 +904,7 @@ def _parse_selector_for_selections(
     return result
 
 
-def parse_yaml_selectors(selectors: dict[str, list[str]]) -> dict[str, dict[str, Any]]:
+def parse_yaml_selectors(selectors: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
     """
     Parse dbt YAML selectors into a dictionary of dbt command-line syntax.
 
@@ -909,18 +914,18 @@ def parse_yaml_selectors(selectors: dict[str, list[str]]) -> dict[str, dict[str,
         dict: A dictionary mapping selector names to their dbt selection syntax.
 
     """
-    selectors_root = selectors.get("selectors", [])
+    selectors_root: list[dict[str, Any]] = selectors.get("selectors", [])
 
     # Build a map of all selector definitions for reference resolution
-    all_selectors = {}
+    all_selectors: dict[str, Any] = {}
     for selector in selectors_root:
         name = selector.get("name", "")
         definition = selector.get("definition", {})
         all_selectors[name] = definition
 
     # Build result dictionary with resolved selectors
-    result = {}
-    resolved_cache = {}
+    result: dict[str, dict[str, list[str] | None]] = {}
+    resolved_cache: dict[str, dict[str, list[str] | None]] = {}
 
     for selector in selectors_root:
         name = selector.get("name", "")

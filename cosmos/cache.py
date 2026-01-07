@@ -288,7 +288,7 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
 
 def _calculate_selectors_yaml_cache_current_version(
-    cache_identifier: str, project_dir: Path, selectors_yaml_path: Path
+    cache_identifier: str, project_dir: Path, selectors_yaml_path: Path | ObjectStoragePath
 ) -> str:
     """
     Taking into account the project directory contents and the selectors yaml file, calculate the

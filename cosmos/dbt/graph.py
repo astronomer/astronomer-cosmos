@@ -914,9 +914,9 @@ class DbtGraph:
             exclude=self.render_config.exclude,
         )
 
-    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
+    def _get_selectors_yaml_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, Any]:
         """Loads the remote cache for selectors yaml."""
-        cache_dict: dict[str, str] = {}
+        cache_dict: dict[str, Any] = {}
         remote_cache_key_path = remote_cache_dir / self.selectors_yaml_cache_key / "selectors_yaml_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
@@ -973,6 +973,9 @@ class DbtGraph:
             "last_modified": "Isoformat timestamp"
         }
         """
+        if TYPE_CHECKING:
+            assert self.project.selectors_yaml_path is not None  # pragma: no cover
+
         compressed_data = zlib.compress(json.dumps(selections).encode("utf-8"))
         encoded_data = base64.b64encode(compressed_data)
         selections_compressed = encoded_data.decode("utf-8")
@@ -1021,7 +1024,10 @@ class DbtGraph:
         """
         logger.info(f"Trying to parse the dbt selector yamls using {self.selectors_yaml_cache_key}...")
 
-        def get_selections():
+        if TYPE_CHECKING:
+            assert self.project.selectors_yaml_path is not None  # pragma: no cover
+
+        def get_selections() -> dict[str, Any]:
             selections = self.parse_selectors_yaml()
 
             if self.should_use_selectors_yaml_cache():
@@ -1033,10 +1039,11 @@ class DbtGraph:
             cache_dict = self.get_selectors_yaml_cache()
             if not cache_dict:
                 logger.info(f"Cosmos performance: Cache miss for {self.selectors_yaml_cache_key}")
-                return get_selections()
 
-            cache_version = cache_dict.get("version")
-            selectors_cache = cache_dict.get("selectors")
+                cache_dict = get_selections()
+
+            cache_version = cache_dict.get("version", "")
+            selectors_cache: dict[str, Any] = cache_dict.get("selectors", {})
 
             current_version = cache._calculate_selectors_yaml_cache_current_version(
                 self.selectors_yaml_cache_key, self.project_path, self.project.selectors_yaml_path

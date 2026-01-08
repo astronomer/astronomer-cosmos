@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: raw_data
+    description: Raw source data
+    tables:
+      - name: raw_customers
+        description: Raw customer data

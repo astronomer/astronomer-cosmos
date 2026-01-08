@@ -1040,14 +1040,14 @@ class DbtGraph:
 
                 cache_dict = get_selections()
 
-            cache_version = cache_dict.get("version", "")
+            cache_version: tuple[str, str] = cache_dict.get("version", ())
             selectors_cache: dict[str, Any] = cache_dict.get("selectors", {})
 
             current_version = cache._calculate_selectors_yaml_cache_current_version(
                 self.cache_key, self.project_path, self.project.selectors_yaml_path
             )
 
-            if selectors_cache and not cache.was_project_modified(cache_version, current_version):
+            if selectors_cache and not cache.was_selectors_yaml_modified(cache_version, current_version):
                 logger.info(
                     f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(selectors_cache)}"
                 )

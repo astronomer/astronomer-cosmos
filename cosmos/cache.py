@@ -350,6 +350,15 @@ def was_project_modified(previous_version: str, current_version: str) -> bool:
     return previous_version != current_version
 
 
+@functools.lru_cache
+def was_selectors_yaml_modified(previous_version: str, current_version: str) -> bool:
+    """
+    Given the cache version of a project's selectors.yaml and the latest version
+    of the project's selectors.yaml, decides if the selectors.yaml was modified or not.
+    """
+    return previous_version != current_version
+
+
 @provide_session
 def delete_unused_dbt_ls_cache(
     max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None

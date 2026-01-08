@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
 import platform
+import zlib
+from base64 import b64decode, b64encode
+from typing import Any
 from urllib import parse
 from urllib.parse import urlencode
 
@@ -88,3 +92,28 @@ def emit_usage_metrics_if_enabled(event_type: str, additional_metrics: dict[str,
     else:
         logger.debug("Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True.")
         return False
+
+
+def _compress_telemetry_metadata(metadata: dict[str, Any]) -> str:
+    """
+    Compress and encode telemetry metadata to reduce serialized DAG size.
+
+    :param metadata: Telemetry metadata dictionary
+    :returns: Base64-encoded zlib-compressed JSON string
+    """
+    json_bytes = json.dumps(metadata).encode("utf-8")
+    compressed = zlib.compress(json_bytes, level=9)
+    return b64encode(compressed).decode("ascii")
+
+
+def _decompress_telemetry_metadata(compressed_data: str) -> dict[str, Any]:
+    """
+    Decompress and decode telemetry metadata.
+
+    :param compressed_data: Base64-encoded zlib-compressed JSON string
+    :returns: Original metadata dictionary
+    """
+    compressed_bytes = b64decode(compressed_data.encode("ascii"))
+    json_bytes = zlib.decompress(compressed_bytes)
+    result: dict[str, Any] = json.loads(json_bytes.decode("utf-8"))
+    return result

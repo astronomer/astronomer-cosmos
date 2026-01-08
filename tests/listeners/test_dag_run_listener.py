@@ -14,7 +14,12 @@ from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import AIRFLOW_VERSION, InvocationMode, LoadMode, SourceRenderingBehavior, TestBehavior
-from cosmos.listeners.dag_run_listener import on_dag_run_failed, on_dag_run_success, total_cosmos_tasks
+from cosmos.listeners.dag_run_listener import (
+    get_cosmos_telemetry_metadata,
+    on_dag_run_failed,
+    on_dag_run_success,
+    total_cosmos_tasks,
+)
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -80,6 +85,26 @@ def test_not_cosmos_dag():
         pass
 
     assert total_cosmos_tasks(dag) == 0
+
+
+def test_get_cosmos_telemetry_metadata_with_invalid_data():
+    """Test that get_cosmos_telemetry_metadata handles invalid compressed data gracefully."""
+    with DAG("test-dag", start_date=datetime(2022, 1, 1)) as dag:
+        # Set invalid base64 data that will fail decompression
+        dag.params["__cosmos_telemetry_metadata__"] = "invalid_base64_data!"
+
+    # Should return empty dict instead of raising exception
+    result = get_cosmos_telemetry_metadata(dag)
+    assert result == {}
+
+
+def test_get_cosmos_telemetry_metadata_with_no_metadata():
+    """Test that get_cosmos_telemetry_metadata returns empty dict when no metadata present."""
+    with DAG("test-dag", start_date=datetime(2022, 1, 1)) as dag:
+        pass
+
+    result = get_cosmos_telemetry_metadata(dag)
+    assert result == {}
 
 
 def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
@@ -232,6 +257,9 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert "source_behavior" in metrics
     assert "total_dbt_models" in metrics
     assert "selected_dbt_models" in metrics
+    assert "profile_strategy" in metrics
+    assert "profile_mapping_class" in metrics
+    assert "database" in metrics
 
     # Verify some expected values
     assert metrics["used_automatic_load_mode"] is True
@@ -240,6 +268,9 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert metrics["uses_node_converter"] is False
     assert metrics["test_behavior"] == "after_each"
     assert metrics["source_behavior"] == "none"
+    assert metrics["profile_strategy"] == "mapping"
+    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
+    assert metrics["database"] == "postgres"
 
 
 @pytest.mark.skipif(

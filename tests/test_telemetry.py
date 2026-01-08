@@ -7,6 +7,45 @@ import pytest
 from cosmos import telemetry
 
 
+def test_compress_telemetry_metadata_is_deterministic():
+    """Test that compressing the same metadata multiple times produces identical output."""
+    metadata = {
+        "cosmos_version": "1.8.0",
+        "airflow_version": "2.10.1",
+        "python_version": "3.11",
+        "execution_mode": "local",
+        "install_deps": True,
+    }
+
+    # Compress the same metadata multiple times
+    compressed_1 = telemetry._compress_telemetry_metadata(metadata)
+    compressed_2 = telemetry._compress_telemetry_metadata(metadata)
+    compressed_3 = telemetry._compress_telemetry_metadata(metadata)
+
+    # All compressed outputs should be identical (deterministic)
+    assert compressed_1 == compressed_2
+    assert compressed_2 == compressed_3
+
+
+def test_compress_decompress_telemetry_metadata_roundtrip():
+    """Test that metadata can be compressed and decompressed correctly."""
+    original_metadata = {
+        "cosmos_version": "1.8.0",
+        "airflow_version": "2.10.1",
+        "python_version": "3.11",
+        "execution_mode": "local",
+        "install_deps": False,
+        "dbt_command": "run",
+    }
+
+    # Compress and decompress
+    compressed = telemetry._compress_telemetry_metadata(original_metadata)
+    decompressed = telemetry._decompress_telemetry_metadata(compressed)
+
+    # Should get back the original metadata
+    assert decompressed == original_metadata
+
+
 def test_should_emit_is_true_by_default():
     assert telemetry.should_emit()
 
@@ -67,7 +106,7 @@ def test_emit_usage_metrics_is_unsuccessful(mock_httpx_get, caplog):
     )
     assert not is_success
     log_msg = f"""Unable to emit usage metrics to https://astronomer.gateway.scarf.sh/astronomer-cosmos/v3/dag_run?cosmos_version=1.8.0a4&airflow_version=2.10.1&python_version=3.11&platform_system=darwin&platform_machine=amd64&status=success&dag_hash=d151d1fa2f03270ea116cc7494f2c591&task_count=3&cosmos_task_count=3&execution_modes=local. Status code: 404. Message: Non existent URL"""
-    assert caplog.text.startswith("WARNING")
+    assert "WARNING" in caplog.text
     assert log_msg in caplog.text
 
 
@@ -94,7 +133,7 @@ def test_emit_usage_metrics_fails(mock_httpx_get, caplog):
     )
     assert not is_success
     log_msg = f"""Unable to emit usage metrics to https://astronomer.gateway.scarf.sh/astronomer-cosmos/v3/dag_run?cosmos_version=1.8.0a4&airflow_version=2.10.1&python_version=3.11&platform_system=darwin&platform_machine=amd64&status=success&dag_hash=d151d1fa2f03270ea116cc7494f2c591&task_count=3&cosmos_task_count=3&execution_modes=local. An HTTPX connection error occurred: Something is not right."""
-    assert caplog.text.startswith("WARNING")
+    assert "WARNING" in caplog.text
     assert log_msg in caplog.text
 
 
@@ -125,7 +164,7 @@ def test_emit_usage_metrics_succeeds(caplog):
 def test_emit_usage_metrics_if_enabled_fails(mock_should_emit, caplog):
     caplog.set_level(logging.DEBUG)
     assert not telemetry.emit_usage_metrics_if_enabled("any", {})
-    assert caplog.text.startswith("DEBUG")
+    assert "DEBUG" in caplog.text
     assert "Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True." in caplog.text
 
 

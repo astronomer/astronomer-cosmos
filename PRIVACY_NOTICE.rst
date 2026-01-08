@@ -37,6 +37,15 @@ In addition to Scarf's default data collection, Cosmos collect the following inf
 - The DAG hash
 - Total tasks
 - Total Cosmos tasks
+- Whether automatic load mode was specified
+- Actual load mode used (dbt_ls, dbt_manifest, custom, etc.)
+- Invocation mode (subprocess or dbt_runner)
+- Whether dbt deps installation is enabled
+- Whether custom node converters are used
+- Test behavior (after_each, after_all, none, etc.)
+- Source behavior (how dbt sources are rendered)
+- Total number of dbt models in project
+- Number of dbt models selected for rendering
 
 When running **Cosmos-powered tasks**, the following information is collected:
 
@@ -57,5 +66,12 @@ When running **Cosmos-powered tasks**, the following information is collected:
 - Whether profile mapping or YAML file is used
 - Profile mapping class
 - Data warehouse
+
+When the **dbt docs plugin** is accessed, the following information is collected:
+
+- Storage type (s3, gcs, azure, http, local, or not_configured)
+- Whether the docs directory is configured
+- Whether a custom connection ID is used
+- Whether a custom project name is set (Airflow 3 only)
 
 No user-identifiable information (IP included) is stored in Scarf.

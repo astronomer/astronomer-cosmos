@@ -202,17 +202,20 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
+    dbt_class = "DbtTest"
+    watcher_to_test_execution_mode = {
+        ExecutionMode.WATCHER: ExecutionMode.LOCAL,
+        ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
+    }
     if (
-        execution_mode == ExecutionMode.WATCHER
-        and render_config is not None
+        render_config is not None
         and render_config.test_behavior == TestBehavior.AFTER_ALL
+        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES)
     ):
-        operator_class = "cosmos.operators.local.DbtTestLocalOperator"
+        test_execution_mode = watcher_to_test_execution_mode[execution_mode]
+        operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
     else:
-        operator_class = calculate_operator_class(
-            execution_mode=execution_mode,
-            dbt_class="DbtTest",
-        )
+        operator_class = calculate_operator_class(execution_mode=execution_mode, dbt_class=dbt_class)
 
     return TaskMetadata(
         id=test_task_name,
@@ -641,14 +644,18 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
-def _add_producer_watcher_and_dependencies(
+def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
-    nodes: dict[str, DbtNode] | None = None,
-) -> str:
+    execution_mode: ExecutionMode = ExecutionMode.WATCHER,
+) -> BaseOperator:
+    """
+    Create the producer task for the watcher execution mode and add it to the tasks_map.
+    The producer task is the task that will be used to produce the events for the watcher execution mode.
+    """
     producer_task_args = task_args.copy()
 
     if render_config is not None:
@@ -662,16 +669,35 @@ def _add_producer_watcher_and_dependencies(
                 "resource_type:unit_test",
             ]
 
+    class_name = calculate_operator_class(execution_mode, "DbtProducer")
+
     # First, we create the producer task
     producer_task_metadata = TaskMetadata(
         id=PRODUCER_WATCHER_TASK_ID,
-        operator_class="cosmos.operators.watcher.DbtProducerWatcherOperator",
+        operator_class=class_name,
         arguments=producer_task_args,
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
+    tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
+    return producer_airflow_task
 
-    # Second, we need to set the producer task ID in all consumer tasks (and their children tasks)
+
+def _add_watcher_dependencies(
+    dag: DAG,
+    producer_airflow_task: BaseOperator,
+    task_args: dict[str, Any],
+    tasks_map: dict[str, Any],
+    nodes: dict[str, DbtNode] | None = None,
+) -> None:
+    """
+    Iterate through the watcher consumer tasks and:
+    - set the producer task ID in all of them
+    - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+    """
     for node_id, task_or_taskgroup in tasks_map.items():
+        # We do not want to set a dependency between the producer task and itself
+        if node_id == PRODUCER_WATCHER_TASK_ID:
+            continue
 
         node_tasks = (
             list(task_or_taskgroup.children.values())
@@ -681,11 +707,10 @@ def _add_producer_watcher_and_dependencies(
         for task in node_tasks:
             task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
 
-        # Third, we want to make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+        # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         # We only managed to do this in the case of DbtDag.
         # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
         if "DbtDag" in dag.__class__.__name__:
-
             # Is this dbt node a root of the (subset of the) dbt project?
             # Note: this may happen in one scenarios:
             # - the dbt node not having any `depends_on` within the user-selected `nodes`
@@ -698,12 +723,8 @@ def _add_producer_watcher_and_dependencies(
                     ]
                 else:
                     always_run_tasks = [task_or_taskgroup]
-
                 for task in always_run_tasks:
                     task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
-
-    tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
-    return producer_airflow_task.task_id
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
@@ -844,6 +865,19 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
+    elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
+        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
+        # We are intentionally creating the producer task ahead of the consumer tasks
+        # Airflow priority weight is not being respected in multiple versions of the library, including 3.1
+        # To instantiate the producer before helps having it before on the DAG topological order and scheduling this task before the consumer tasks
+        producer_task = _add_watcher_producer_task(
+            dag=dag,
+            task_args={**task_args, **setup_operator_args},
+            tasks_map=tasks_map,
+            task_group=task_group,
+            render_config=render_config,
+            execution_mode=execution_mode,
+        )
 
     for node_id, node in nodes.items():
         task_or_group_args = {
@@ -913,14 +947,13 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     create_airflow_task_dependencies(nodes, tasks_map)
 
-    if execution_mode == ExecutionMode.WATCHER:
+    if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
-        _add_producer_watcher_and_dependencies(
+        _add_watcher_dependencies(
             dag=dag,
-            task_args={**task_args, **setup_operator_args},
+            producer_airflow_task=producer_task,
+            task_args=task_args,
             tasks_map=tasks_map,
-            task_group=task_group,
-            render_config=render_config,
             nodes=nodes,
         )
 

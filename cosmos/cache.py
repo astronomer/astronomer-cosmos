@@ -149,8 +149,8 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
     return "__".join(cache_identifiers_list)
 
 
-def create_cache_key(cache_identifier: str, cache_suffix: str) -> str:
-    return f"{VAR_KEY_CACHE_PREFIX}{cache_identifier}_{cache_suffix}"
+def create_cache_key(cache_identifier: str) -> str:
+    return f"{VAR_KEY_CACHE_PREFIX}{cache_identifier}"
 
 
 def _obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:

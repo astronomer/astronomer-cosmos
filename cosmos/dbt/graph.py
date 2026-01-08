@@ -380,11 +380,9 @@ class DbtGraph:
         self.cache_dir = cache_dir
         self.airflow_metadata = airflow_metadata or {}
         if cache_identifier:
-            self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier, "dbt_ls")
-            self.selectors_yaml_cache_key = cache.create_cache_key(cache_identifier, "selectors_yaml")
+            self.cache_key = cache.create_cache_key(cache_identifier)
         else:
-            self.dbt_ls_cache_key = ""
-            self.selectors_yaml_cache_key = ""
+            self.cache_key = ""
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
         self.log_dir: Path | None = None
@@ -459,7 +457,7 @@ class DbtGraph:
                 airflow_vars = [var_name, Variable.get(var_name, "")]
                 cache_args.extend(airflow_vars)
 
-        logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.dbt_ls_cache_key}>: {cache_args}")
+        logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.cache_key}>: {cache_args}")
         return cache_args
 
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
@@ -479,7 +477,7 @@ class DbtGraph:
         dbt_ls_compressed = encoded_data.decode("utf-8")
         cache_dict = {
             "version": cache._calculate_dbt_ls_cache_current_version(
-                self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
+                self.cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -487,16 +485,16 @@ class DbtGraph:
         }
         remote_cache_dir = _configure_remote_cache_dir()
         if remote_cache_dir:
-            remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+            remote_cache_key_path = remote_cache_dir / self.cache_key / "dbt_ls_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
     def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
         cache_dict: dict[str, str] = {}
-        remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        remote_cache_key_path = remote_cache_dir / self.cache_key / "dbt_ls_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
                 cache_dict = json.load(fp)
@@ -528,7 +526,7 @@ class DbtGraph:
             cache_dict = (
                 self._get_dbt_ls_remote_cache(remote_cache_dir)
                 if remote_cache_dir
-                else Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
+                else Variable.get(self.cache_key, deserialize_json=True)
             )
         except tuple(airflow_variable_exceptions):
             return cache_dict
@@ -639,43 +637,43 @@ class DbtGraph:
     @functools.lru_cache
     def should_use_dbt_ls_cache(self) -> bool:
         """Identify if Cosmos should use/store dbt ls cache or not."""
-        return settings.enable_cache and settings.enable_cache_dbt_ls and bool(self.dbt_ls_cache_key)
+        return settings.enable_cache and settings.enable_cache_dbt_ls and bool(self.cache_key)
 
     @functools.lru_cache
     def should_use_selectors_yaml_cache(self) -> bool:
         """Identify if Cosmos should use/store selectors YAML cache or not."""
-        return settings.enable_cache and settings.enable_cache_selectors_yaml and bool(self.selectors_yaml_cache_key)
+        return settings.enable_cache and settings.enable_cache_selectors_yaml and bool(self.cache_key)
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
-        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
+        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_key}...")
         if self.should_use_dbt_ls_cache():
             project_path = self.project_path
 
             cache_dict = self.get_dbt_ls_cache()
             if not cache_dict:
-                logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
+                logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
                 return False
 
             cache_version = cache_dict.get("version")
             dbt_ls_cache = cache_dict.get("dbt_ls")
 
             current_version = cache._calculate_dbt_ls_cache_current_version(
-                self.dbt_ls_cache_key, project_path, self.dbt_ls_cache_key_args
+                self.cache_key, project_path, self.dbt_ls_cache_key_args
             )
 
             if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
                 logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.dbt_ls_cache_key} is {len(dbt_ls_cache)}"
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(dbt_ls_cache)}"
                 )
                 self.load_method = LoadMode.DBT_LS_CACHE
 
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
-                logger.info(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
+                logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
                 return True
-        logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
+        logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
         return False
 
     def should_use_partial_parse_cache(self) -> bool:
@@ -917,7 +915,7 @@ class DbtGraph:
     def _get_selectors_yaml_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, Any]:
         """Loads the remote cache for selectors yaml."""
         cache_dict: dict[str, Any] = {}
-        remote_cache_key_path = remote_cache_dir / self.selectors_yaml_cache_key / "selectors_yaml_cache.json"
+        remote_cache_key_path = remote_cache_dir / self.cache_key / "selectors_yaml_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
                 cache_dict = json.load(fp)
@@ -949,7 +947,7 @@ class DbtGraph:
             cache_dict = (
                 self._get_selectors_yaml_remote_cache(remote_cache_dir)
                 if remote_cache_dir
-                else Variable.get(self.selectors_yaml_cache_key, deserialize_json=True)
+                else Variable.get(self.cache_key, deserialize_json=True)
             )
         except tuple(airflow_variable_exceptions):
             return cache_dict
@@ -982,7 +980,7 @@ class DbtGraph:
 
         cache_dict = {
             "version": cache._calculate_selectors_yaml_cache_current_version(
-                self.selectors_yaml_cache_key, self.project_path, self.project.selectors_yaml_path
+                self.cache_key, self.project_path, self.project.selectors_yaml_path
             ),
             "selectors": selections_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -990,11 +988,11 @@ class DbtGraph:
         }
         remote_cache_dir = _configure_remote_cache_dir()
         if remote_cache_dir:
-            remote_cache_key_path = remote_cache_dir / self.selectors_yaml_cache_key / "selectors_yaml_cache.json"
+            remote_cache_key_path = remote_cache_dir / self.cache_key / "selectors_yaml_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.selectors_yaml_cache_key, cache_dict, serialize_json=True)
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
     def parse_selectors_yaml(self) -> dict[str, Any]:
         """
@@ -1022,7 +1020,7 @@ class DbtGraph:
         Returns:
             A dictionary containing the selections for the specified selector.
         """
-        logger.info(f"Trying to parse the dbt selector yamls using {self.selectors_yaml_cache_key}...")
+        logger.info(f"Trying to parse the dbt selector yamls using {self.cache_key}...")
 
         if TYPE_CHECKING:
             assert self.project.selectors_yaml_path is not None  # pragma: no cover
@@ -1038,7 +1036,7 @@ class DbtGraph:
         if self.should_use_selectors_yaml_cache():
             cache_dict = self.get_selectors_yaml_cache()
             if not cache_dict:
-                logger.info(f"Cosmos performance: Cache miss for {self.selectors_yaml_cache_key}")
+                logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
 
                 cache_dict = get_selections()
 
@@ -1046,18 +1044,18 @@ class DbtGraph:
             selectors_cache: dict[str, Any] = cache_dict.get("selectors", {})
 
             current_version = cache._calculate_selectors_yaml_cache_current_version(
-                self.selectors_yaml_cache_key, self.project_path, self.project.selectors_yaml_path
+                self.cache_key, self.project_path, self.project.selectors_yaml_path
             )
 
             if selectors_cache and not cache.was_project_modified(cache_version, current_version):
                 logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.selectors_yaml_cache_key} is {len(selectors_cache)}"
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(selectors_cache)}"
                 )
-                logger.info(f"Cosmos performance: Cache hit for {self.selectors_yaml_cache_key} - {current_version}")
+                logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
 
                 return selectors_cache
 
-        logger.info(f"Cosmos performance: Cache miss for {self.selectors_yaml_cache_key} - skipped")
+        logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
 
         return get_selections()
 

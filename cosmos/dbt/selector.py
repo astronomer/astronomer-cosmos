@@ -683,6 +683,9 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     return label_values
 
 
+# YAML Selectors
+
+
 def _resolve_selector_reference(
     selector_name: str,
     all_selector_definitions: dict[str, dict[str, Any]],
@@ -808,6 +811,7 @@ def _parse_selector_method_definition(
 ) -> tuple[list[str], list[str]]:
     """
     Parse a single selector method definition into select/exclude dbt command-line syntax.
+
     Args:
         method_def (dict): The selector method definition to parse.
         all_selector_definitions (dict): All selector definitions for reference resolution.
@@ -895,6 +899,9 @@ def _parse_selector_definition(
     """
     Parse a selector definition into select/exclude dbt command-line syntax.
 
+    Handles union, intersection, exclude, and method definitions. Collects any
+        parse errors encountered during processing.
+
     Args:
         selectors (dict): The selector definition to parse.
         all_selector_definitions (dict): All selector definitions for reference resolution.
@@ -902,13 +909,15 @@ def _parse_selector_definition(
         visiting (set): Set of currently visiting selectors to detect circular references.
     Returns:
         tuple: A tuple containing two lists - select parts and exclude parts.
+    Raises:
+        CosmosValueError: If there are issues parsing the selector definition.
+
     """
     select_parts = []
     exclude_parts = []
 
     _validate_selector_definition(selectors)
 
-    # Handle method + value
     if "method" in selectors:
         method_select, method_exclude = _parse_selector_method_definition(
             selectors,
@@ -975,7 +984,7 @@ def _parse_selector_definition(
 
 def parse_yaml_selectors(selectors: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
     """
-    Parse dbt YAML selectors into a dictionary of dbt command-line syntax.
+    Parse dbt YAML selectors into a dictionary of select/exclude dbt command-line syntax.
 
     Args:
         selectors (dict): The selectors dictionary loaded from selectors.yml.

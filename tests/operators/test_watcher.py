@@ -117,6 +117,18 @@ def test_dbt_producer_watcher_operator_retries_forced_to_zero():
     assert op.retries == 0
 
 
+@pytest.mark.parametrize(
+    "invocation_mode, expected_log_format",
+    (
+        (InvocationMode.SUBPROCESS, "json"),
+        (InvocationMode.DBT_RUNNER, None),
+    ),
+)
+def test_dbt_producer_log_format_adjusts_with_invocation(invocation_mode, expected_log_format):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=invocation_mode)
+    assert getattr(op, "log_format", None) == expected_log_format
+
+
 def test_dbt_producer_watcher_operator_retries_ignores_user_input():
     user_default_args = {"retries": 5}
     op = DbtProducerWatcherOperator(
@@ -487,6 +499,29 @@ class TestStoreDbtStatusFromLog:
         # No status should be stored
         assert len(ti.store) == 0
 
+    @pytest.mark.parametrize(
+        "msg, level",
+        [
+            ("Running with dbt=1.10.11", "info"),
+            ("This is a warning", "warning"),
+            ("An error occurred", "error"),
+            ("Debugging info", "debug"),
+            ("Unknown level defaults to INFO", "unknown"),  # just to ensure it defaults
+        ],
+    )
+    def test_store_dbt_resource_status_from_log_outputs_dbt_info(self, caplog, msg, level):
+        """Test that dbt info messages are logged correctly."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps({"info": {"msg": msg, "level": level}})
+        dynamic_level = getattr(logging, level.upper(), logging.INFO)
+        with caplog.at_level(dynamic_level):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        assert msg in caplog.text
+        assert any(record.levelname == logging.getLevelName(dynamic_level) for record in caplog.records)
+
     def test_process_log_line_callable_is_not_bound_method(self):
         """Test that _process_log_line_callable is not bound as a method when accessed through an instance.
 
@@ -585,7 +620,6 @@ ENCODED_EVENT = base64.b64encode(zlib.compress(b'{"data": {"run_result": {"statu
 
 
 class TestDbtConsumerWatcherSensor:
-
     def make_sensor(self, **kwargs):
         extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
         kwargs["extra_context"] = extra_context
@@ -964,7 +998,6 @@ class TestDbtConsumerWatcherSensor:
 
 
 class TestDbtBuildWatcherOperator:
-
     def test_dbt_build_watcher_operator_raises_not_implemented_error(self):
         expected_message = (
             "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "

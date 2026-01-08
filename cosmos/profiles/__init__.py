@@ -24,6 +24,7 @@ from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
 from .sqlserver.standard_sqlserver_auth import StandardSQLServerAuth
+from .starrocks import StarrocksUserPasswordProfileMapping
 from .teradata.user_pass import TeradataUserPasswordProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
@@ -47,6 +48,7 @@ profile_mappings: list[type[BaseProfileMapping]] = [
     SnowflakeEncryptedPrivateKeyFilePemProfileMapping,
     SnowflakeEncryptedPrivateKeyPemProfileMapping,
     SnowflakePrivateKeyPemProfileMapping,
+    StarrocksUserPasswordProfileMapping,
     SparkThriftProfileMapping,
     ExasolUserPasswordProfileMapping,
     TeradataUserPasswordProfileMapping,
@@ -93,6 +95,7 @@ __all__ = [
     "SnowflakeUserPasswordProfileMapping",
     "SnowflakePrivateKeyPemProfileMapping",
     "SnowflakeEncryptedPrivateKeyFilePemProfileMapping",
+    "StarrocksUserPasswordProfileMapping",
     "SparkThriftProfileMapping",
     "ExasolUserPasswordProfileMapping",
     "TeradataUserPasswordProfileMapping",

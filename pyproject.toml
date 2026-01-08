@@ -55,6 +55,7 @@ dbt-all = [
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
+    "dbt-starrocks",
     "dbt-spark",
     "dbt-sqlserver",
     "dbt-teradata",
@@ -71,6 +72,7 @@ dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
+dbt-starrocks = ["dbt-starrocks"]
 dbt-spark = ["dbt-spark"]
 dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]

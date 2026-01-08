@@ -428,7 +428,7 @@ def test_execute_fallback_mode(tmp_path):
 class TestStoreDbStatusFromLog:
     """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 
-    def teststore_dbt_resource_status_from_log_success(self):
+    def test_store_dbt_resource_status_from_log_success(self):
         """Test that success status is correctly parsed and stored in XCom."""
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -439,7 +439,7 @@ class TestStoreDbStatusFromLog:
 
         assert ti.store.get("model__pkg__my_model_status") == "success"
 
-    def teststore_dbt_resource_status_from_log_failed(self):
+    def test_store_dbt_resource_status_from_log_failed(self):
         """Test that failed status is correctly parsed and stored in XCom."""
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -450,7 +450,7 @@ class TestStoreDbStatusFromLog:
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
 
-    def teststore_dbt_resource_status_from_log_ignores_other_statuses(self):
+    def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
         """Test that statuses other than success/failed are ignored."""
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -463,7 +463,7 @@ class TestStoreDbStatusFromLog:
 
         assert "model__pkg__running_model_status" not in ti.store
 
-    def teststore_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
+    def test_store_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
         """Test that invalid JSON doesn't raise an exception."""
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -474,7 +474,7 @@ class TestStoreDbStatusFromLog:
         # No status should be stored
         assert len(ti.store) == 0
 
-    def teststore_dbt_resource_status_from_log_handles_missing_node_info(self):
+    def test_store_dbt_resource_status_from_log_handles_missing_node_info(self):
         """Test that missing node_info doesn't raise an exception."""
         ti = _MockTI()
         ctx = {"ti": ti}

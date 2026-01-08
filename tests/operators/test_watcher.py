@@ -425,7 +425,7 @@ def test_execute_fallback_mode(tmp_path):
     assert data["results"][0]["status"] == "success"
 
 
-class TestStoreDbStatusFromLog:
+class TestStoreDbtStatusFromLog:
     """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 
     def test_store_dbt_resource_status_from_log_success(self):

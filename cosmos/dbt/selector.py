@@ -694,6 +694,7 @@ def _resolve_selector_reference(
 ) -> tuple[list[str], list[str]]:
     """
     Resolve a selector reference recursively into select/exclude dbt command-line syntax.
+
     Args:
         selector_name (str): The name of the selector to resolve.
         all_selector_definitions (dict): All selector definitions for reference resolution.
@@ -738,6 +739,7 @@ def _evaluate_selector_method_definition(
 ) -> str:
     """
     Evaluate a selector method definition into dbt command-line syntax.
+
     Args:
         method (str): The selector method (e.g., "tag", "path", "source", etc.).
         value (str): The value associated with the method.
@@ -774,6 +776,7 @@ def _evaluate_selector_method_definition_modifiers(
 ) -> str:
     """
     Apply graph operator modifiers to a selector string.
+    This does NOT support the indirect_selection keyword.
 
     Args:
         selector (str): The base selector string.

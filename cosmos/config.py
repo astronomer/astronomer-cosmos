@@ -169,6 +169,8 @@ class ProjectConfig:
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to snapshots
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     :param manifest_conn_id: Name of the Airflow connection used to access the manifest file if it is not stored locally. Defaults to None
+    :param selectors_path: The absolute path to the dbt selectors file. Defaults to None
+    :param selectors_conn_id: Name of the Airflow connection used to access the selectors file if it is not stored locally. Defaults to None
     :param project_name: Allows the user to define the project name.
     Required if dbt_project_path is not defined. Defaults to the folder name of dbt_project_path.
     :param env_vars: Dictionary of environment variables that are used for both rendering and execution. Rendering with
@@ -185,6 +187,7 @@ class ProjectConfig:
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
+    selectors_yaml_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
@@ -200,11 +203,42 @@ class ProjectConfig:
         snapshots_relative_path: str | Path = "snapshots",
         manifest_path: str | Path | None = None,
         manifest_conn_id: str | None = None,
+        selectors_yaml_path: str | Path | None = None,
+        selectors_yaml_conn_id: str | None = None,
         project_name: str | None = None,
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
         partial_parse: bool = True,
     ):
+        if project_name:
+            self.project_name = project_name
+
+        self.env_vars = env_vars
+        self.dbt_vars = dbt_vars
+        self.partial_parse = partial_parse
+        self.install_dbt_deps = install_dbt_deps
+        self.copy_dbt_packages = copy_dbt_packages
+
+        self.validate_dbt_project_paths(
+            project_name,
+            dbt_project_path,
+            models_relative_path,
+            seeds_relative_path,
+            snapshots_relative_path,
+            manifest_path,
+        )
+        self.validate_manifest_path(manifest_path, manifest_conn_id)
+        self.validate_selectors_yaml_path(selectors_yaml_path, selectors_yaml_conn_id)
+
+    def validate_dbt_project_paths(
+        self,
+        project_name: str | None,
+        dbt_project_path: str | Path | None,
+        models_relative_path: str | Path,
+        seeds_relative_path: str | Path,
+        snapshots_relative_path: str | Path,
+        manifest_path: str | Path | None,
+    ) -> None:
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
         # We do, however, still require that both manifest_path and project_name be defined, or neither be defined.
@@ -213,9 +247,6 @@ class ProjectConfig:
                 raise CosmosValueError(
                     "If ProjectConfig.dbt_project_path is not defined, ProjectConfig.manifest_path and ProjectConfig.project_name must be defined together, or both left undefined."
                 )
-        if project_name:
-            self.project_name = project_name
-
         if dbt_project_path:
             self.dbt_project_path = Path(dbt_project_path)
             self.models_path = self.dbt_project_path / Path(models_relative_path)
@@ -224,6 +255,11 @@ class ProjectConfig:
             if not project_name:
                 self.project_name = self.dbt_project_path.stem
 
+    def validate_manifest_path(
+        self,
+        manifest_path: str | Path | None,
+        manifest_conn_id: str | None,
+    ) -> None:
         if manifest_path:
             manifest_path_str = str(manifest_path)
             if not manifest_conn_id:
@@ -243,11 +279,31 @@ class ProjectConfig:
             else:
                 self.manifest_path = Path(manifest_path_str)
 
-        self.env_vars = env_vars
-        self.dbt_vars = dbt_vars
-        self.partial_parse = partial_parse
-        self.install_dbt_deps = install_dbt_deps
-        self.copy_dbt_packages = copy_dbt_packages
+    def validate_selectors_yaml_path(
+        self,
+        selectors_yaml_path: str | Path | None,
+        selectors_yaml_conn_id: str | None,
+    ) -> None:
+        if selectors_yaml_path:
+            selectors_yaml_path_str = str(selectors_yaml_path)
+            if not selectors_yaml_conn_id:
+                selectors_yaml_scheme = selectors_yaml_path_str.split("://")[0]
+                # Use the default Airflow connection ID for the scheme if it is not provided.
+                selectors_yaml_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(
+                    selectors_yaml_scheme, lambda: None
+                )()
+
+            if selectors_yaml_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
+                raise CosmosValueError(
+                    f"The selectors yaml path {selectors_yaml_path_str} uses a remote file scheme, but the required Object "
+                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                    f"Airflow 2.8 or later."
+                )
+
+            if settings.AIRFLOW_IO_AVAILABLE:
+                self.selectors_yaml_path = ObjectStoragePath(selectors_yaml_path_str, conn_id=selectors_yaml_conn_id)
+            else:
+                self.selectors_yaml_path = Path(selectors_yaml_path_str)
 
     def validate_project(self) -> None:
         """
@@ -286,6 +342,12 @@ class ProjectConfig:
         Check if the `dbt` project manifest is set and if the file exists.
         """
         return self.manifest_path.exists() if self.manifest_path else False
+
+    def is_selectors_yaml_available(self) -> bool:
+        """
+        Check if the `dbt` selectors YAML file is set and if the file exists.
+        """
+        return self.selectors_yaml_path.exists() if self.selectors_yaml_path else False
 
 
 @dataclass

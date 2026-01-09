@@ -2056,7 +2056,7 @@ def test_save_dbt_ls_cache_remote_cache_dir(
 
     dbt_graph.save_dbt_ls_cache(dbt_ls_output)
 
-    mock_remote_cache_key_path = mock_remote_cache_dir_path / dbt_graph.dbt_ls_cache_key / "dbt_ls_cache.json"
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / dbt_graph.cache_key / "dbt_ls_cache.json"
     mock_remote_cache_key_path.open.assert_called_once_with("w")
 
 

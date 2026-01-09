@@ -1036,6 +1036,35 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        from cosmos.constants import SeedRenderingBehavior
+        from cosmos.dbt.seed import has_seed_changed, update_seed_hash_after_run
+
+        # Check if we should detect seed changes
+        seed_rendering_behavior_value = self.extra_context.get("seed_rendering_behavior")
+        uses_seed_change_detection = seed_rendering_behavior_value == SeedRenderingBehavior.WHEN_SEED_CHANGES.value
+
+        if uses_seed_change_detection:
+            dbt_node_config = self.extra_context.get("dbt_node_config", {})
+            seed_file_path = dbt_node_config.get("file_path")
+            node_unique_id = dbt_node_config.get("unique_id")
+            dag_task_group_identifier = self.extra_context.get("dbt_dag_task_group_identifier", "")
+
+            if seed_file_path and node_unique_id:
+                if not has_seed_changed(dag_task_group_identifier, node_unique_id, seed_file_path):
+                    logger.info(
+                        "Seed %s has not changed since last execution. Skipping seed command.",
+                        node_unique_id,
+                    )
+                    return
+
+                # Run the seed command and update the stored hash after successful execution
+                self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+                update_seed_hash_after_run(dag_task_group_identifier, node_unique_id, seed_file_path)
+                return
+
+        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     """

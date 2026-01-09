@@ -1015,7 +1015,7 @@ class DbtGraph:
 
     def load_parsed_selectors(self) -> dict[str, Any]:
         """
-        Parse the selectors YAML file and return the selections for the specified selector.
+        Load the parsed selectors from cache if available, otherwise parse the selectors YAML file.
 
         Returns:
             A dictionary containing the selections for the specified selector.

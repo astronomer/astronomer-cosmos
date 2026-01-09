@@ -921,6 +921,7 @@ def _parse_selector_definition(
 
     _validate_selector_definition(selectors)
 
+    # Handle method + value
     if "method" in selectors:
         method_select, method_exclude = _parse_selector_method_definition(
             selectors,

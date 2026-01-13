@@ -1040,7 +1040,10 @@ def test_dbt_dag_with_watcher(caplog):
         "raw_orders_seed",
         "raw_customers_seed",
     }
-    assert '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"''' not in caplog.text
+    assert (
+        '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
+        not in caplog.text
+    )
     assert "OK loaded seed file public.raw_orders" in caplog.text
 
 
@@ -1060,13 +1063,9 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
             invocation_mode=InvocationMode.SUBPROCESS,
-            dbt_executable_path=DBT_EXECUTABLE_PATH
+            dbt_executable_path=DBT_EXECUTABLE_PATH,
         ),
-        render_config=RenderConfig(
-            emit_datasets=False,
-            select=["raw_orders"],
-            test_behavior=TestBehavior.AFTER_ALL
-        ),
+        render_config=RenderConfig(emit_datasets=False, select=["raw_orders"], test_behavior=TestBehavior.AFTER_ALL),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
     )
     dag_run = new_test_dag(watcher_dag)
@@ -1076,17 +1075,17 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
 
     assert len(watcher_dag.task_dict) == 3
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
-    expected_task_names = [
-        "dbt_producer_watcher",
-        "raw_orders_seed",
-        "jaffle_shop_test"
-    ]
+    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test"]
     assert tasks_names == expected_task_names
     # Confirm that the dbt command was successfully run using the given dbt executable path:
     assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text
     # Confirm that the seed was successfully run and the log output was JSON:
-    assert '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"''' not in caplog.text
+    assert (
+        '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
+        not in caplog.text
+    )
     assert "OK loaded seed file public.raw_orders" in caplog.text
+
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration

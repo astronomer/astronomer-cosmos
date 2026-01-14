@@ -23,7 +23,8 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, LoadMode
+from cosmos.constants import ExecutionMode, InvocationMode, LoadMode
+from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
@@ -173,6 +174,16 @@ def validate_initial_user_config(
             "Both ProjectConfig.env_vars and RenderConfig.env_vars were provided. RenderConfig.env_vars is deprecated since Cosmos 1.3, "
             "please use ProjectConfig.env_vars instead."
         )
+
+    if render_config is not None and render_config.invocation_mode == InvocationMode.DBT_RUNNER:
+        if not is_dbt_installed_in_same_environment():
+            raise CosmosValueError(
+                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.DBT_SUBPROCESS instead."
+            )
+        if render_config.dbt_executable_path and render_config.dbt_executable_path != get_system_dbt():
+            raise CosmosValueError(
+                "RenderConfig.dbt_executable_path is set, but it is not the same as the system dbt executable path. Do not set render_config.dbt_executable_path when using InvocationMode.DBT_RUNNER."
+            )
 
 
 def validate_changed_config_paths(

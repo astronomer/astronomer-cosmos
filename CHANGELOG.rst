@@ -18,6 +18,7 @@ Docs
 Others
 
 * Add test to check profile metrics with non-cosmos operator by @pankajastro in #2215
+* Fix CI main branch Airflow 2.6 tests by @tatiana in #2268
 
 1.12.0 (2025-12-18)
 ----------------------

@@ -42,14 +42,11 @@ uv pip install "gcsfs<2025.3.0"
 
 
 if [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
-  pip install "uv==0.9.24"
   uv pip install "apache-airflow-providers-amazon" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
   uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
-  uv pip install "apache-airflow-providers-google==10.10.1" "google-api-python-client==2.187.0" "httplib2==0.31.0" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install "apache-airflow-providers-google<10.11" "httplib2==0.31.0" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
-  uv pip install "apache-airflow-providers-common-sql==1.12.0" "apache-airflow==$AIRFLOW_VERSION"
-  #uv pip install "pydantic<2.0"
-  #uv pip install "pyparsing==2.4.7"
+  uv pip install "pydantic<2.0"
 elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt

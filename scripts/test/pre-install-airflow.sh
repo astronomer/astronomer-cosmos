@@ -42,6 +42,7 @@ uv pip install "gcsfs<2025.3.0"
 
 
 if [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
+  pip install "uv==0.9.24"
   uv pip install "apache-airflow-providers-amazon" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
   uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-google==10.10.1" "apache-airflow==$AIRFLOW_VERSION"

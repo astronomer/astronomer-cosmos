@@ -46,6 +46,7 @@ if [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
   uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-google==10.10.1" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install "apache-airflow-providers-common-sql==1.12.0" "apache-airflow==$AIRFLOW_VERSION"
   uv pip install "pydantic<2.0"
 elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
   uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt

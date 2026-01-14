@@ -1,5 +1,5 @@
-import importlib.util
 import shutil
+from importlib.util import find_spec
 
 
 def get_system_dbt() -> str:
@@ -14,7 +14,7 @@ def is_dbt_installed_in_same_environment() -> bool:
     Checks if dbt is installed in the same environment as the current one.
     """
     try:
-        importlib.util.find_spec("dbt")
+        find_spec("dbt")
     except ImportError:
         return False
     else:

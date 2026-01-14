@@ -8,6 +8,7 @@ Bug Fixes
 
 * Fix ``DbtSourceWatcherOperator.template_fields`` to inherit from ``DbtSourceLocalOperator`` instead of ``DbtConsumerWatcherSensor`` by @pankajkoti in #2226
 * Fix TypeError in Watcher mode with subprocess invocation by @pankajkoti in #2227
+* Error when RenderConfig.invocation_mode is incorrectly set by @tatiana in #2267
 
 Docs
 

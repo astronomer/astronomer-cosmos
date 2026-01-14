@@ -3,7 +3,7 @@
 Execution Modes
 ===============
 
-Cosmos can run ``dbt`` commands using five different approaches, called ``execution modes``:
+Cosmos can run ``dbt`` commands using several different approaches, called ``execution modes``:
 
 1. **local**: Run ``dbt`` commands using a local ``dbt`` installation (default)
 2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos

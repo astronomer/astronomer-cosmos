@@ -1,0 +1,12 @@
+dbt_loom_downstream_finance:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: '{{ env_var("POSTGRES_HOST", "postgres") }}'
+      port: '{{ env_var("POSTGRES_PORT", "5432") | int }}'
+      user: '{{ env_var("POSTGRES_USER", "postgres") }}'
+      password: '{{ env_var("POSTGRES_PASSWORD", "postgres") }}'
+      dbname: '{{ env_var("POSTGRES_DB", "postgres") }}'
+      schema: finance
+      threads: 4

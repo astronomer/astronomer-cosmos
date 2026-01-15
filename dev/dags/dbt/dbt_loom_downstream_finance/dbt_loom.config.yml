@@ -1,0 +1,9 @@
+manifests:
+  - name: dbt_loom_upstream_platform
+    type: file
+    config:
+      # Use environment variable for flexibility, with fallback to relative path
+      # In production, set PLATFORM_MANIFEST_PATH to absolute path
+      path: '{{ env_var("PLATFORM_MANIFEST_PATH", "../dbt_loom_upstream_platform/target/manifest.json") }}'
+
+enable_telemetry: false

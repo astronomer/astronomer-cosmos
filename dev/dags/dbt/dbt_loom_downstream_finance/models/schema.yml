@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: fct_revenue
+    description: "Daily revenue metrics aggregated by date and product category. Uses cross-project references via dbt-loom."
+    columns:
+      - name: order_date
+        description: "Date of the orders"
+      - name: product_category
+        description: "Product category"
+      - name: gross_revenue
+        description: "Total revenue before costs"
+      - name: gross_profit
+        description: "Revenue minus cost of goods sold"
+
+  - name: fct_customer_revenue
+    description: "Customer-level revenue analysis with lifetime value and tier classification."
+    columns:
+      - name: customer_id
+        description: "Unique customer identifier"
+        tests:
+          - unique
+          - not_null
+      - name: lifetime_value
+        description: "Total amount spent by customer"
+      - name: customer_tier
+        description: "Customer tier based on LTV (Gold/Silver/Bronze/Prospect)"
+
+  - name: dim_payment_methods
+    description: "Payment method dimension with transaction statistics."
+    columns:
+      - name: payment_method
+        description: "Payment method type"
+        tests:
+          - unique
+          - not_null
+      - name: total_revenue
+        description: "Total revenue processed through this payment method"
+
+  - name: rpt_revenue_summary
+    description: "Executive summary report with key revenue and customer metrics."

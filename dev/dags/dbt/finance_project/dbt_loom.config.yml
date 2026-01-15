@@ -1,6 +1,0 @@
-manifests:
-  - name: platform_project
-    type: file
-    config:
-      path: ../platform_project/target/manifest.json
-enable_telemetry: false

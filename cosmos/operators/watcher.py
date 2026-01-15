@@ -96,9 +96,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
-        kwargs["log_format"] = "json"
-
         super().__init__(task_id=task_id, *args, **kwargs)
+
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.log_format = "json"
 
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
@@ -237,7 +238,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         )
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-
         dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
             logger.info("Dbt Startup Event: %s", dbt_startup_events)

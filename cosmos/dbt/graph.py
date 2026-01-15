@@ -315,14 +315,23 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore
             )
 
+            # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
+            # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+            node_file_path = node_dict.get("original_file_path") or node_dict.get("path")
+            if node_file_path is None:
+                logger.debug(
+                    "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                    node_dict.get("unique_id"),
+                )
+                continue
+
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
-                    file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
+                    file_path=base_path / node_file_path,
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(
@@ -941,12 +950,21 @@ class DbtGraph:
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
+                # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+                original_file_path = node_dict.get("original_file_path")
+                if original_file_path is None:
+                    logger.debug(
+                        "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                        unique_id,
+                    )
+                    continue
+
                 node = DbtNode(
                     unique_id=unique_id,
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
+                    file_path=self.execution_config.project_path / _normalize_path(original_file_path),
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(

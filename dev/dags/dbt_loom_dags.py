@@ -13,7 +13,7 @@ Architecture:
     └── int_customer_orders
 
 The downstream project uses dbt-loom to reference upstream models via:
-    {{ ref('dbt_loom_upstream_platform', 'stg_customers') }}
+    ref('dbt_loom_upstream_platform', 'stg_customers')
 
 Key Points:
 1. Upstream project must generate manifest.json first (via dbt parse/compile/ls)

@@ -31,7 +31,7 @@ from pathlib import Path
 
 from airflow import DAG
 
-from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -80,9 +80,6 @@ with DAG(
             dbt_project_path=DBT_UPSTREAM_PROJECT_PATH,
         ),
         profile_config=upstream_profile_config,
-        execution_config=ExecutionConfig(
-            dbt_project_path=DBT_UPSTREAM_PROJECT_PATH,
-        ),
         render_config=RenderConfig(
             dbt_deps=True,
         ),
@@ -118,9 +115,6 @@ with DAG(
             dbt_project_path=DBT_DOWNSTREAM_PROJECT_PATH,
         ),
         profile_config=downstream_profile_config,
-        execution_config=ExecutionConfig(
-            dbt_project_path=DBT_DOWNSTREAM_PROJECT_PATH,
-        ),
         render_config=RenderConfig(
             dbt_deps=True,
             env_vars=dbt_loom_env_vars,

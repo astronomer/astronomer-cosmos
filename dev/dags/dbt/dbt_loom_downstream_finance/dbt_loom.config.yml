@@ -3,7 +3,10 @@ manifests:
     type: file
     config:
       # Use environment variable for flexibility, with fallback to relative path
+      # path: '{{ env_var("PLATFORM_MANIFEST_PATH", "../dbt_loom_upstream_platform/target/manifest.json") }}'
       # In production, set PLATFORM_MANIFEST_PATH to absolute path
-      path: '{{ env_var("PLATFORM_MANIFEST_PATH", "../dbt_loom_upstream_platform/target/manifest.json") }}'
+
+      # For GitHub Actions Integration Tests CI run, set the path to the manifest.json file
+      path: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt/dbt_loom_upstream_platform/target/manifest.json
 
 enable_telemetry: false

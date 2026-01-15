@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import yaml
+
 from cosmos.constants import DbtResourceType
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -683,350 +685,546 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     return label_values
 
 
-# YAML Selectors
-
-
-def _resolve_selector_reference(
-    selector_name: str,
-    all_selector_definitions: dict[str, dict[str, Any]],
-    resolved_cache: dict[str, tuple[list[str], list[str]]],
-    visiting: set[str],
-) -> tuple[list[str], list[str]]:
+class YamlSelectors:
     """
-    Resolve a selector reference recursively into select/exclude dbt command-line syntax.
+    Parses and manages dbt YAML selector definitions.
 
-    Args:
-        selector_name (str): The name of the selector to resolve.
-        all_selector_definitions (dict): All selector definitions for reference resolution.
-        resolved_cache (dict): Cache for already resolved selectors.
-        visiting (set): Set of currently visiting selectors to detect circular references.
-    Returns:
-        tuple: A tuple containing two lists - select parts and exclude parts.
-    Raises:
-        CosmosValueError: If a circular reference is detected or if the selector is not found.
-    """
-    # Check cache first
-    if selector_name in resolved_cache:
-        return resolved_cache[selector_name]
+    This class handles the parsing of dbt selector YAML files, converting them from their raw
+    YAML format into a format compatible with Cosmos node selection. It supports union,
+    intersection, and method-based selector definitions as specified in dbt's selector syntax.
 
-    # Check for circular reference
-    if selector_name in visiting:
-        raise CosmosValueError(f"Circular reference detected in selector '{selector_name}'")
+    Instances of this class should be created using the `parse` class method.
 
-    # Get the selector definition
-    if selector_name not in all_selector_definitions:
-        raise CosmosValueError(f"Selector '{selector_name}' not found")
+    :param raw_selectors: dict[str, list[dict[str, Any]]] - The original, unparsed selector definitions from the YAML file
+    :param parsed_selectors: dict[str, dict[str, Any]] - The processed selector definitions converted to Cosmos format
 
-    # Mark as visiting
-    visiting.add(selector_name)
+    :property raw: dict[str, list[dict[str, Any]]]
+        The original unparsed selector definitions from the YAML file.
+    :property parsed: dict[str, dict[str, Any]]
+        The parsed selector definitions in Cosmos format.
+    :property dbt_spec_version: int
+        The dbt selector specification version being used.
 
-    # Recursively resolve the referenced selector
-    selector_def = all_selector_definitions[selector_name]
-    result = _parse_selector_definition(selector_def, all_selector_definitions, resolved_cache, visiting)
-
-    # Remove from visiting
-    visiting.discard(selector_name)
-
-    # Cache the result
-    resolved_cache[selector_name] = result
-
-    return result
-
-
-def _evaluate_selector_method_definition(
-    method: str,
-    value: str,
-) -> str:
-    """
-    Evaluate a selector method definition into dbt command-line syntax.
-
-    Args:
-        method (str): The selector method (e.g., "tag", "path", "source", etc.).
-        value (str): The value associated with the method.
-    Returns:
-        str: The dbt command-line syntax for the selector.
-    Raises:
-        CosmosValueError: If the method is unsupported.
-    """
-    if method.startswith(TAG_SELECTOR[:-1]):
-        return f"{TAG_SELECTOR}{value}"
-    elif method.startswith(PATH_SELECTOR[:-1]):
-        return f"{PATH_SELECTOR}{value}"
-    elif method.startswith(SOURCE_SELECTOR[:-1]):
-        return f"{SOURCE_SELECTOR}{value}"
-    elif method.startswith(EXPOSURE_SELECTOR[:-1]):
-        return f"{EXPOSURE_SELECTOR}{value}"
-    elif method.startswith(RESOURCE_TYPE_SELECTOR[:-1]):
-        return f"{RESOURCE_TYPE_SELECTOR}{value}"
-    elif method.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR[:-1]):
-        return f"{EXCLUDE_RESOURCE_TYPE_SELECTOR}{value}"
-    elif any([method.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG]):
-        return f"{CONFIG_SELECTOR}:{value}"
-    elif method == "fqn":
-        if value == "*":
-            return ""
-        else:
-            return value
-    else:
-        raise CosmosValueError(f"Unsupported selector method: '{method}'")
-
-
-def _evaluate_selector_method_definition_modifiers(
-    selector: str, parents: bool, children: bool, parents_depth: int, children_depth: int, childrens_parents: bool
-) -> str:
-    """
-    Apply graph operator modifiers to a selector string.
-    This does NOT support the indirect_selection keyword.
-
-    Args:
-        selector (str): The base selector string.
-        parents (bool): Whether to include parents.
-        children (bool): Whether to include children.
-        parents_depth (int): Depth of parents to include.
-        children_depth (int): Depth of children to include.
-        childrens_parents (bool): Whether to include children's parents.
-    Returns:
-        str: The modified selector string with graph operators applied.
-    """
-    if parents:
-        if parents_depth and parents_depth > 0:
-            selector = f"{parents_depth}+{selector}"
-        else:
-            selector = f"+{selector}"
-    if children:
-        if children_depth and children_depth > 0:
-            selector = f"{selector}+{children_depth}"
-        else:
-            selector = f"{selector}+"
-    if childrens_parents:
-        if parents_depth or children_depth:
-            raise CosmosValueError("childrens_parents cannot be combined with parents_depth or children_depth.")
-        else:
-            selector = f"@{selector}"
-    return selector
-
-
-def _parse_selector_method_definition(
-    method_def: dict[str, Any],
-    all_selector_definitions: dict[str, dict[str, Any]],
-    resolved_cache: dict[str, tuple[list[str], list[str]]],
-    visiting: set[str],
-) -> tuple[list[str], list[str]]:
-    """
-    Parse a single selector method definition into select/exclude dbt command-line syntax.
-
-    Args:
-        method_def (dict): The selector method definition to parse.
-        all_selector_definitions (dict): All selector definitions for reference resolution.
-        resolved_cache (dict): Cache for already resolved selectors.
-        visiting (set): Set of currently visiting selectors to detect circular references.
-    Returns:
-        tuple: A tuple containing two lists - select parts and exclude parts.
-    """
-    method = method_def.get("method", "METHOD_KEY_NOT_FOUND")
-    value = method_def.get("value", "VALUE_KEY_NOT_FOUND")
-    parents = method_def.get("parents", False)
-    children = method_def.get("children", False)
-    parents_depth = method_def.get("parents_depth", 0)
-    children_depth = method_def.get("children_depth", 0)
-    childrens_parents = method_def.get("childrens_parents", False)
-
-    if method == "METHOD_KEY_NOT_FOUND":
-        raise CosmosValueError(f"Selector method is missing in method definition: {method_def}.")
-    if value == "VALUE_KEY_NOT_FOUND":
-        raise CosmosValueError(f"Selector value is missing in method definition: {method_def}.")
-
-    if method == "selector":
-        return _resolve_selector_reference(value, all_selector_definitions, resolved_cache, visiting)
-
-    selector = _evaluate_selector_method_definition(method, value)
-
-    if not selector:
-        return ([], [])
-
-    selector = _evaluate_selector_method_definition_modifiers(
-        selector, parents, children, parents_depth, children_depth, childrens_parents
-    )
-
-    return ([selector], [])
-
-
-def _validate_selector_definition(selectors: dict[str, Any]) -> None:
-    """
-    Validate the structure of a selector definition.
-
-    Args:
-        selectors (dict): The selector definition to validate.
-    Raises:
-        CosmosValueError: If the selector definition contains CLI-style string definitions
-        or key-value definitions.
+    References:
+        https://docs.getdbt.com/reference/node-selection/yaml-selectors
     """
 
-    # Reject CLI-style string definitions (e.g., definition: "tag:my_tag")
-    # These should be structured as method-value definitions instead
-    if isinstance(selectors, str):
-        raise CosmosValueError(
-            f"CLI-style string definitions are not supported: '{selectors}'. Use method-value definitions instead."
-        )
+    def __init__(self, raw_selectors: dict[str, list[dict[str, Any]]], parsed_selectors: dict[str, dict[str, Any]]):
+        self._raw = raw_selectors
+        self._parsed = parsed_selectors
+        self._dbt_spec_version = 2
 
-    # Reject key-value definitions (e.g., tag: my_tag, path: models/, etc.)
-    # These are deprecated in favor of explicit method definitions
-    # Valid structural keys are: method, union, intersection, exclude, and method modifiers
-    supported_definitions = {
-        "method",
-        "union",
-        "intersection",
-        "exclude",
-        "value",
-        "parents",
-        "children",
-        "parents_depth",
-        "children_depth",
-        "childrens_parents",
-    }
-    key_value_definitions = set(selectors.keys()) - supported_definitions
+    @property
+    def raw(self) -> dict[str, list[dict[str, Any]]]:
+        """
+        Get the original unparsed selector definitions.
 
-    if key_value_definitions:
-        key_value_strings = ", ".join(f"{k}: {selectors[k]}" for k in key_value_definitions)
-        raise CosmosValueError(
-            f"Key-value definitions are not supported: {key_value_strings}. Use method-value definitions instead."
-        )
+        :return: dict[str, list[dict[str, Any]]] - Dictionary containing the raw YAML structure
+        """
+        return self._raw
 
+    @property
+    def parsed(self) -> dict[str, dict[str, Any]]:
+        """
+        Get the parsed selector definitions in Cosmos format.
 
-def _parse_selector_definition(
-    selectors: dict[str, Any],
-    all_selector_definitions: dict[str, dict[str, Any]],
-    resolved_cache: dict[str, tuple[list[str], list[str]]],
-    visiting: set[str],
-) -> tuple[list[str], list[str]]:
-    """
-    Parse a selector definition into select/exclude dbt command-line syntax.
+        :return: dict[str, dict[str, Any]] - Dictionary mapping selector names to their parsed definitions with select/exclude lists
+        """
+        return self._parsed
 
-    Handles union, intersection, exclude, and method definitions. Collects any
-        parse errors encountered during processing.
+    @property
+    def dbt_spec_version(self) -> int:
+        """
+        Get the dbt selector specification version being used.
 
-    Args:
-        selectors (dict): The selector definition to parse.
-        all_selector_definitions (dict): All selector definitions for reference resolution.
-        resolved_cache (dict): Cache for already resolved selectors.
-        visiting (set): Set of currently visiting selectors to detect circular references.
-    Returns:
-        tuple: A tuple containing two lists - select parts and exclude parts.
-    Raises:
-        CosmosValueError: If there are issues parsing the selector definition.
+        :return: int - The dbt spec version
+        """
+        return self._dbt_spec_version
 
-    """
-    select_parts = []
-    exclude_parts = []
+    def get_raw(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
+        """
+        Retrieve a raw selector definition by name.
 
-    _validate_selector_definition(selectors)
+        :param selector_name: str - Name of the selector to retrieve
+        :param default: Any - Default value to return if selector is not found
+        :return: dict[str, Any] | Any - The raw selector definition or the default value
+        """
+        return self.raw.get(selector_name, default)
 
-    # Handle method + value
-    if "method" in selectors:
-        method_select, method_exclude = _parse_selector_method_definition(
-            selectors,
-            all_selector_definitions,
-            resolved_cache,
-            visiting,
-        )
-        select_parts.extend(method_select)
-        exclude_parts.extend(method_exclude)
+    def get_parsed(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
+        """
+        Retrieve a parsed selector definition by name.
 
-    # Handle exclude
-    if "exclude" in selectors:
-        exclude_items = selectors["exclude"]
-        for exclude_item in exclude_items:
-            ex_select, ex_exclude = _parse_selector_definition(
-                exclude_item,
-                all_selector_definitions,
-                resolved_cache,
-                visiting,
-            )
-            # Items in exclude list should go to exclude_parts
-            exclude_parts.extend(ex_select)
-            exclude_parts.extend(ex_exclude)
+        :param selector_name: str - Name of the selector to retrieve
+        :param default: Any - Default value to return if selector is not found
+        :return: dict[str, Any] | Any - The parsed selector definition or the default value
+        """
+        return self.parsed.get(selector_name, default)
 
-    # Handle union
-    if "union" in selectors:
-        union_items = selectors["union"]
+    @staticmethod
+    def _get_list_dicts(dct: dict[str, Any], key: str) -> list[dict[str, Any]]:
+        """
+        Extract and validate a list of dictionaries from a given key in a dictionary.
 
-        for item in union_items:
-            if isinstance(item, dict):
-                item_select, item_exclude = _parse_selector_definition(
-                    item,
-                    all_selector_definitions,
-                    resolved_cache,
-                    visiting,
+        This helper method retrieves a value from a dictionary and ensures it's a list containing
+        either dictionaries with string keys or string values.
+
+        :param dct: dict[str, Any] - The dictionary to extract from
+        :param key: str - The key to look up in the dictionary
+        :return: list[dict[str, Any]] - List of dictionaries extracted from the specified key
+        :raises CosmosValueError: If the key is missing, the value is not a list, or contains invalid types
+        """
+        result: list[dict[str, Any]] = []
+        if key not in dct:
+            raise CosmosValueError(f"Expected to find key {key} in dict, only found {list(dct)}")
+        values = dct[key]
+        if not isinstance(values, list):
+            raise CosmosValueError(f'Invalid value for key "{key}". Expected a list.')
+        for value in values:
+            if isinstance(value, dict):
+                for value_key in value:
+                    if not isinstance(value_key, str):
+                        raise CosmosValueError(
+                            f'Expected all keys to "{key}" dict to be strings, '
+                            f'but "{value_key}" is a "{type(value_key)}"'
+                        )
+                result.append(value)
+            else:
+                raise CosmosValueError(
+                    f'Invalid value type {type(value)} in key "{key}", expected ' f"dict or str (value: {value})."
                 )
-                select_parts.extend(item_select)
-                exclude_parts.extend(item_exclude)
 
-    # Handle intersection
-    if "intersection" in selectors:
-        intersection_items = selectors["intersection"]
-        intersection_selects: list[str] = []
-        for item in intersection_items:
-            item_select, item_exclude = _parse_selector_definition(
-                item,
-                all_selector_definitions,
-                resolved_cache,
-                visiting,
-            )
-            intersection_selects.extend(item_select)
-            exclude_parts.extend(item_exclude)
+        return result
 
-        if intersection_selects:
-            # Join with commas for intersection
-            select_parts = [",".join(intersection_selects)]
+    @staticmethod
+    def _parse_selection_graph_operators(
+        selector: str, parents: bool, children: bool, parents_depth: int, children_depth: int, childrens_parents: bool
+    ) -> str:
+        """
+        Apply graph operator syntax to a selector string.
 
-    # Remove None values, empty strings, and duplicates while preserving order
-    select_parts = list(dict.fromkeys([s for s in select_parts if s]))
-    exclude_parts = list(dict.fromkeys([e for e in exclude_parts if e]))
+        Transforms a selector by adding graph operators (+, @) based on the specified parameters.
+        These operators control traversal of the DAG to include parents, children, or both.
 
-    return (select_parts, exclude_parts)
+        :param selector: str - The base selector string to modify
+        :param parents: bool - Whether to include parent nodes
+        :param children: bool - Whether to include child nodes
+        :param parents_depth: int - Number of parent generations to include (0 for all)
+        :param children_depth: int - Number of child generations to include (0 for all)
+        :param childrens_parents: bool - Whether to use the @ operator (all ancestors of children)
+        :return: str - The selector string with graph operators applied
+        :raises CosmosValueError: If childrens_parents is combined with depth parameters
 
+        Examples:
+            - selector="my_model", parents=True, children=False -> "+my_model"
+            - selector="my_model", parents=True, children=True, parents_depth=2 -> "2+my_model+"
+            - selector="my_model", childrens_parents=True -> "@my_model"
+        """
+        if not selector:
+            return selector
 
-def parse_yaml_selectors(selectors: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
-    """
-    Parse dbt YAML selectors into a dictionary of select/exclude dbt command-line syntax.
+        if childrens_parents and (parents_depth or children_depth):
+            raise CosmosValueError("childrens_parents cannot be combined with parents_depth or children_depth.")
 
-    Args:
-        selectors (dict): The selectors dictionary loaded from selectors.yml.
-    Returns:
-        dict: A dictionary mapping selector names to their dbt selection syntax.
+        if childrens_parents:
+            return f"@{selector}"
 
-    """
-    selectors_root: list[dict[str, Any]] = selectors.get("selectors", [])
+        if parents:
+            prefix = f"{parents_depth}+" if parents_depth > 0 else "+"
+            selector = f"{prefix}{selector}"
 
-    # Build a map of all selector definitions for reference resolution
-    all_selectors: dict[str, Any] = {}
-    for selector in selectors_root:
-        name = selector.get("name", "")
-        definition = selector.get("definition", {})
-        all_selectors[name] = definition
+        if children:
+            suffix = f"+{children_depth}" if children_depth > 0 else "+"
+            selector = f"{selector}{suffix}"
 
-    # Build result dictionary with resolved selectors
-    result: dict[str, dict[str, list[str] | None]] = {}
-    resolved_cache: dict[str, tuple[list[str], list[str]]] = {}
-    visiting: set[str] = set()
+        return selector
 
-    for selector in selectors_root:
-        name = selector.get("name", "")
-        definition = selector.get("definition", {})
+    @staticmethod
+    def _parse_selection_from_cosmos_spec(method: str, value: str) -> str:
+        """
+        Convert a dbt YAML selector method and value into Cosmos selector syntax.
 
-        select, exclude = _parse_selector_definition(
-            definition,
-            all_selectors,
-            resolved_cache,
-            visiting,
-        )
+        Maps dbt's method-based selector definitions to Cosmos's string-based selector format.
+        For example, method="tag" and value="nightly" becomes "tag:nightly".
 
-        result[name] = {
-            "select": select if select else None,
-            "exclude": exclude if exclude else None,
+        :param method: str - The selector method (e.g., "tag", "path", "config.materialized")
+        :param value: str - The value for the selector method
+        :return: str - A Cosmos-formatted selector string
+        :raises CosmosValueError: If the method is not supported
+
+        Examples:
+            - method="tag", value="nightly" -> "tag:nightly"
+            - method="path", value="models/" -> "path:models/"
+            - method="fqn", value="*" -> ""
+            - method="config.materialized", value="view" -> "config.materialized:view"
+        """
+        if method == "fqn":
+            return "" if value == "*" else value
+
+        method_mappings = {
+            TAG_SELECTOR[:-1]: TAG_SELECTOR,
+            PATH_SELECTOR[:-1]: PATH_SELECTOR,
+            SOURCE_SELECTOR[:-1]: SOURCE_SELECTOR,
+            EXPOSURE_SELECTOR[:-1]: EXPOSURE_SELECTOR,
+            RESOURCE_TYPE_SELECTOR[:-1]: RESOURCE_TYPE_SELECTOR,
+            EXCLUDE_RESOURCE_TYPE_SELECTOR[:-1]: EXCLUDE_RESOURCE_TYPE_SELECTOR,
         }
 
-    return result
+        for method_prefix, selector_prefix in method_mappings.items():
+            if method.startswith(method_prefix):
+                return f"{selector_prefix}{value}"
+
+        if any(method.startswith(f"{CONFIG_SELECTOR}{config}") for config in SUPPORTED_CONFIG):
+            return f"{CONFIG_SELECTOR}:{value}"
+
+        raise CosmosValueError(f"Unsupported selector method: '{method}'")
+
+    @classmethod
+    def _parse_selector(cls, dct: dict[str, Any]) -> str:
+        """
+        Parse a single selector definition dictionary into a Cosmos selector string.
+
+        Processes a selector definition that includes method, value, and optional graph operators
+        (parents, children, etc.) and converts it to Cosmos selector syntax.
+
+        :param dct: dict[str, Any] - Dictionary containing selector definition with keys like 'method', 'value',
+                   'parents', 'children', 'parents_depth', 'children_depth', 'childrens_parents'
+        :return: str - A Cosmos-formatted selector string
+        :raises CosmosValueError: If required keys are missing or depth values are not integers
+
+        Example Input:
+            {
+                "method": "tag",
+                "value": "nightly",
+                "children": True,
+                "children_depth": 2
+            }
+
+        Example Output:
+            "tag:nightly+2"
+        """
+        method = dct.get("method", "METHOD_KEY_NOT_FOUND")
+        value = dct.get("value", "VALUE_KEY_NOT_FOUND")
+        parents = dct.get("parents", False)
+        children = dct.get("children", False)
+        parents_depth = dct.get("parents_depth", 0)
+        children_depth = dct.get("children_depth", 0)
+        childrens_parents = dct.get("childrens_parents", False)
+        indirect_selection = dct.get("indirect_selection", False)
+
+        if method == "METHOD_KEY_NOT_FOUND":
+            raise CosmosValueError(f"Selector method is missing in method definition: {dct}.")
+        if value == "VALUE_KEY_NOT_FOUND":
+            raise CosmosValueError(f"Selector value is missing in method definition: {dct}.")
+
+        if not isinstance(parents_depth, int):
+            raise CosmosValueError(f"parents_depth must be an integer, got {type(parents_depth)}: {parents_depth}")
+        if not isinstance(children_depth, int):
+            raise CosmosValueError(f"children_depth must be an integer, got {type(children_depth)}: {children_depth}")
+
+        if indirect_selection:
+            logger.warning("The 'indirect_selection' parameter is not supported and will be ignored.")
+
+        selector = cls._parse_selection_from_cosmos_spec(method, value)
+
+        selector = cls._parse_selection_graph_operators(
+            selector, parents, children, parents_depth, children_depth, childrens_parents
+        )
+
+        return selector
+
+    @classmethod
+    def _parse_exclusions(
+        cls, definition: dict[str, Any], cache: dict[str, tuple[list[str], list[str]]] = {}
+    ) -> list[str]:
+        """
+        Parse exclusion definitions from a selector definition.
+
+        Extracts and processes 'exclude' clauses from a selector definition, recursively
+        parsing any nested definitions.
+
+        :param definition: dict[str, Any] - Dictionary containing the selector definition with an 'exclude' key
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: list[str] - List of exclusion selector strings
+        """
+        exclusions = cls._get_list_dicts(definition, "exclude")
+        exclude: list[str] = []
+
+        for exclusion in exclusions:
+            excl, _ = cls._parse_from_definition(exclusion, cache=cache)
+            exclude.extend(excl)
+
+        return exclude
+
+    @classmethod
+    def _parse_include_exclude_subdefs(
+        cls,
+        definitions: list[dict[str, Any]],
+        cache: dict[str, tuple[list[str], list[str]]],
+    ) -> tuple[list[str], list[str]]:
+        """
+        Parse a list of selector subdefinitions into include and exclude lists.
+
+        Processes a list of selector definitions, separating them into inclusions and exclusions.
+        Handles nested definitions and prevents multiple exclude clauses at the same level.
+
+        :param definitions: list[dict[str, Any]] - List of selector definition dictionaries
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str]] - Tuple of (include_list, exclude_list) containing selector strings
+        :raises CosmosValueError: If multiple exclude clauses are found at the same level
+        """
+        include: list[str] = []
+        exclude: list[str] = []
+
+        for definition in definitions:
+            if isinstance(definition, dict) and "exclude" in definition:
+                # Do not allow multiple exclude: defs at the same level
+                if exclude:
+                    yaml_sel_cfg = yaml.dump(definition)
+                    raise CosmosValueError(
+                        f"You cannot provide multiple exclude arguments to the "
+                        f"same selector set operator:\n{yaml_sel_cfg}"
+                    )
+                definition_exclude = cls._parse_exclusions(definition, cache=cache)
+                exclude.extend(definition_exclude)
+            else:
+                definition_include, _ = cls._parse_from_definition(definition, cache=cache)
+                include.extend(definition_include)
+
+        return (include, exclude)
+
+    @classmethod
+    def _parse_union_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]] = {},
+    ) -> tuple[list[str], list[str]]:
+        """
+        Parse a union selector definition.
+
+        A union combines multiple selectors with OR logic - nodes matching any of the
+        subdefinitions will be included.
+
+        :param definition: dict[str, Any] - Dictionary containing a 'union' key with a list of selector definitions
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str]] - Tuple of (include_list, exclude_list) containing selector strings
+
+        Example Input:
+            {
+                "union": [
+                    {"method": "tag", "value": "nightly"},
+                    {"method": "path", "value": "models/staging"}
+                ]
+            }
+
+        Example Output:
+            (["tag:nightly", "path:models/staging"], [])
+        """
+        union_def_parts = cls._get_list_dicts(definition, "union")
+        return cls._parse_include_exclude_subdefs(union_def_parts, cache=cache)
+
+    @classmethod
+    def _parse_intersection_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]],
+    ) -> tuple[list[str], list[str]]:
+        """
+        Parse an intersection selector definition.
+
+        An intersection combines multiple selectors with AND logic - only nodes matching all
+        subdefinitions will be included. In Cosmos syntax, this is represented by joining
+        selectors with commas.
+
+        :param definition: dict[str, Any] - Dictionary containing an 'intersection' key with a list of selector definitions
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str]] - Tuple of (include_list, exclude_list) with intersected selectors joined by commas
+
+        Example Input:
+            {
+                "intersection": [
+                    {"method": "tag", "value": "nightly"},
+                    {"method": "config.materialized", "value": "view"}
+                ]
+            }
+
+        Example Output:
+            (["tag:nightly,config.materialized:view"], [])
+        """
+        intersection_def_parts = cls._get_list_dicts(definition, "intersection")
+        include, exclude = cls._parse_include_exclude_subdefs(intersection_def_parts, cache=cache)
+
+        intersection = [",".join(include)]
+
+        return (intersection, exclude)
+
+    @classmethod
+    def _parse_method_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]],
+    ) -> tuple[list[str], list[str]]:
+        """
+        Parse a method-based selector definition.
+
+        Handles selector definitions that use the 'method' and 'value' keys, including
+        special handling for the 'selector' method which references other named selectors.
+
+        :param definition: dict[str, Any] - Dictionary containing 'method' and 'value' keys, and optionally 'exclude'
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str]] - Tuple of (include_list, exclude_list) containing selector strings
+        :raises CosmosValueError: If 'method' or 'value' keys are missing, or if a referenced
+                                  selector doesn't exist
+
+        Example Input (method-based):
+            {
+                "method": "tag",
+                "value": "nightly",
+                "exclude": [{"method": "path", "value": "models/archived"}]
+            }
+
+        Example Output:
+            (["tag:nightly"], ["path:models/archived"])
+
+        Example Input (selector reference):
+            {
+                "method": "selector",
+                "value": "my_existing_selector"
+            }
+
+        Example Output:
+            Returns the cached tuple of (include_list, exclude_list) from the referenced selector
+        """
+        exclude: list[str] = []
+
+        if definition.get("method") == "selector":
+            sel_def = definition.get("value")
+            if sel_def not in cache:
+                raise CosmosValueError(f"Existing selector definition for {sel_def} not found.")
+            return cache[definition["value"]]
+        elif "method" in definition and "value" in definition:
+            dct = definition
+            if "exclude" in definition:
+                exclude = cls._parse_exclusions(definition, cache=cache)
+                dct = {k: v for k, v in dct.items() if k != "exclude"}
+        else:
+            raise CosmosValueError(f'Expected "method" and "value" keys, but got {list(definition)}')
+
+        selector = cls._parse_selector(dct)
+
+        include = [selector] if selector else []
+
+        return (include, exclude)
+
+    @classmethod
+    def _parse_from_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]],
+        rootlevel: bool = False,
+    ) -> tuple[list[str], list[str]]:
+        """
+        Recursively parse a selector definition into include and exclude lists.
+
+        This is the main entry point for parsing selector definitions. It handles union,
+        intersection, and method-based definitions, delegating to the appropriate
+        specialized parsing method.
+
+        :param definition: dict[str, Any] - The selector definition dictionary to parse
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :param rootlevel: bool - Whether this is a root-level selector (affects validation rules)
+        :return: tuple[list[str], list[str]] - Tuple of (include_list, exclude_list) containing selector strings
+        :raises CosmosValueError: If the definition structure is invalid or uses unsupported formats
+
+        Note:
+            Root-level selectors can only have a single 'union' or 'intersection' key.
+            CLI-style string definitions and key-value pairs are not supported - use
+            method-based definitions instead.
+        """
+        if (
+            isinstance(definition, dict)
+            and ("union" in definition or "intersection" in definition)
+            and rootlevel
+            and len(definition) > 1
+        ):
+            keys = ",".join(definition.keys())
+            raise CosmosValueError(
+                f"Only a single 'union' or 'intersection' key is allowed "
+                f"in a root level selector definition; found {keys}."
+            )
+
+        if "union" in definition:
+            select, exclude = cls._parse_union_definition(definition, cache=cache)
+        elif "intersection" in definition:
+            select, exclude = cls._parse_intersection_definition(definition, cache=cache)
+        elif "method" in definition:
+            select, exclude = cls._parse_method_definition(definition, cache=cache)
+        else:
+            # Rejects CLI-style string definitions (e.g., definition: "tag:my_tag")
+            # These should be structured as method-value definitions instead
+
+            # Rejects key-value definitions (e.g., tag: my_tag, path: models/, etc.)
+            # These should be structured as method-value definitions instead
+            raise CosmosValueError(
+                f"Expected to find union, intersection, or method definition, instead "
+                f"found {type(definition)}: {definition}"
+            )
+
+        return (select, exclude)
+
+    @classmethod
+    def parse(cls, selectors: dict[str, list[dict[str, Any]]]) -> YamlSelectors:
+        """
+        Parse a complete dbt selectors YAML file into a YamlSelectors instance.
+
+        This is the main entry point for parsing YAML selectors. It processes all selector
+        definitions in the YAML file and converts them to Cosmos format.
+
+        :param selectors: dict[str, list[dict[str, Any]]] - The complete selectors YAML content as a dictionary with a 'selectors' key
+        :return: YamlSelectors - A YamlSelectors instance containing both raw and parsed selector definitions
+
+        Example Input:
+            {
+                "selectors": [
+                    {
+                        "name": "nightly_models",
+                        "definition": {
+                            "method": "tag",
+                            "value": "nightly"
+                        },
+                        "default": False
+                    }
+                ]
+            }
+
+        Example Output:
+            YamlSelectors instance with parsed definitions:
+            {
+                "nightly_models": {
+                    "select": ["tag:nightly"],
+                    "exclude": None,
+                    "default": False
+                }
+            }
+        """
+        result: dict[str, dict[str, Any]] = {}
+        cache: dict[str, tuple[list[str], list[str]]] = {}
+        selectors_root: list[dict[str, Any]] = selectors.get("selectors", [])
+
+        for selector in selectors_root:
+            name = selector.get("name", "")
+            definition = selector.get("definition", {})
+            default = selector.get("default", False)
+
+            select, exclude = cls._parse_from_definition(definition, cache=copy.deepcopy(cache), rootlevel=True)
+
+            result[name] = {
+                "select": select if select else None,
+                "exclude": exclude if exclude else None,
+                "default": default,
+            }
+
+        return cls(selectors, result)
 
 
 def select_nodes(

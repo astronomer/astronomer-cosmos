@@ -187,7 +187,7 @@ class ProjectConfig:
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
-    selectors_yaml_path: Path | ObjectStoragePath | None = None
+    yaml_selectors_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
@@ -203,8 +203,8 @@ class ProjectConfig:
         snapshots_relative_path: str | Path = "snapshots",
         manifest_path: str | Path | None = None,
         manifest_conn_id: str | None = None,
-        selectors_yaml_path: str | Path | None = None,
-        selectors_yaml_conn_id: str | None = None,
+        yaml_selectors_path: str | Path | None = None,
+        yaml_selectors_conn_id: str | None = None,
         project_name: str | None = None,
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
@@ -228,7 +228,7 @@ class ProjectConfig:
             manifest_path,
         )
         self.validate_manifest_path(manifest_path, manifest_conn_id)
-        self.validate_selectors_yaml_path(selectors_yaml_path, selectors_yaml_conn_id)
+        self.validate_yaml_selectors_path(yaml_selectors_path, yaml_selectors_conn_id)
 
     def validate_dbt_project_paths(
         self,
@@ -279,31 +279,31 @@ class ProjectConfig:
             else:
                 self.manifest_path = Path(manifest_path_str)
 
-    def validate_selectors_yaml_path(
+    def validate_yaml_selectors_path(
         self,
-        selectors_yaml_path: str | Path | None,
-        selectors_yaml_conn_id: str | None,
+        yaml_selectors_path: str | Path | None,
+        yaml_selectors_conn_id: str | None,
     ) -> None:
-        if selectors_yaml_path:
-            selectors_yaml_path_str = str(selectors_yaml_path)
-            if not selectors_yaml_conn_id:
-                selectors_yaml_scheme = selectors_yaml_path_str.split("://")[0]
+        if yaml_selectors_path:
+            yaml_selectors_path_str = str(yaml_selectors_path)
+            if not yaml_selectors_conn_id:
+                yaml_selectors_scheme = yaml_selectors_path_str.split("://")[0]
                 # Use the default Airflow connection ID for the scheme if it is not provided.
-                selectors_yaml_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(
-                    selectors_yaml_scheme, lambda: None
+                yaml_selectors_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(
+                    yaml_selectors_scheme, lambda: None
                 )()
 
-            if selectors_yaml_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
+            if yaml_selectors_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
                 raise CosmosValueError(
-                    f"The selectors yaml path {selectors_yaml_path_str} uses a remote file scheme, but the required Object "
+                    f"The selectors yaml path {yaml_selectors_path_str} uses a remote file scheme, but the required Object "
                     f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
                     f"Airflow 2.8 or later."
                 )
 
             if settings.AIRFLOW_IO_AVAILABLE:
-                self.selectors_yaml_path = ObjectStoragePath(selectors_yaml_path_str, conn_id=selectors_yaml_conn_id)
+                self.yaml_selectors_path = ObjectStoragePath(yaml_selectors_path_str, conn_id=yaml_selectors_conn_id)
             else:
-                self.selectors_yaml_path = Path(selectors_yaml_path_str)
+                self.yaml_selectors_path = Path(yaml_selectors_path_str)
 
     def validate_project(self) -> None:
         """
@@ -343,11 +343,11 @@ class ProjectConfig:
         """
         return self.manifest_path.exists() if self.manifest_path else False
 
-    def is_selectors_yaml_available(self) -> bool:
+    def is_yaml_selectors_available(self) -> bool:
         """
         Check if the `dbt` selectors YAML file is set and if the file exists.
         """
-        return self.selectors_yaml_path.exists() if self.selectors_yaml_path else False
+        return self.yaml_selectors_path.exists() if self.yaml_selectors_path else False
 
 
 @dataclass

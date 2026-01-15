@@ -287,8 +287,8 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
         shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
 
 
-def _calculate_selectors_yaml_cache_current_version(
-    cache_identifier: str, project_dir: Path, selectors_yaml_path: Path | ObjectStoragePath
+def _calculate_yaml_selectors_cache_current_version(
+    cache_identifier: str, project_dir: Path, yaml_selectors_path: Path | ObjectStoragePath
 ) -> str:
     """
     Taking into account the project directory contents and the selectors yaml file, calculate the
@@ -296,7 +296,7 @@ def _calculate_selectors_yaml_cache_current_version(
 
     :param cache_identifier: Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
     :param project_path: Path to the target dbt project directory
-    :param selectors_yaml_path: Path to the selectors yaml file
+    :param yaml_selectors_path: Path to the selectors yaml file
     """
 
     start_time = time.perf_counter()
@@ -305,15 +305,15 @@ def _calculate_selectors_yaml_cache_current_version(
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
     dbt_project_hash = _create_folder_version_hash(project_dir)
 
-    with selectors_yaml_path.open("r") as f:
-        selectors_yaml_content = yaml.safe_load(f)
-    hash_selectors_yaml = hashlib.md5(yaml.dump(selectors_yaml_content).encode()).hexdigest()
+    with yaml_selectors_path.open("r") as f:
+        yaml_selector_content = yaml.safe_load(f)
+    yaml_selector_hash = hashlib.md5(yaml.dump(yaml_selector_content).encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
         f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
     )
-    return f"{dbt_project_hash},{hash_selectors_yaml}"
+    return f"{dbt_project_hash},{yaml_selector_hash}"
 
 
 def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:
@@ -351,7 +351,7 @@ def was_project_modified(previous_version: str, current_version: str) -> bool:
 
 
 @functools.lru_cache
-def was_selectors_yaml_modified(previous_version: str, current_version: str) -> bool:
+def were_yaml_selectors_modified(previous_version: str, current_version: str) -> bool:
     """
     Given the cache version of a project's selectors.yaml and the latest version
     of the project's selectors.yaml, decides if the selectors.yaml was modified or not.

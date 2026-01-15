@@ -6,6 +6,7 @@ import functools
 import itertools
 import json
 import os
+import pickle
 import platform
 import tempfile
 import warnings
@@ -58,7 +59,7 @@ from cosmos.dbt.project import (
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
-from cosmos.dbt.selector import parse_yaml_selectors, select_nodes
+from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -640,9 +641,9 @@ class DbtGraph:
         return settings.enable_cache and settings.enable_cache_dbt_ls and bool(self.cache_key)
 
     @functools.lru_cache
-    def should_use_selectors_yaml_cache(self) -> bool:
-        """Identify if Cosmos should use/store selectors YAML cache or not."""
-        return settings.enable_cache and settings.enable_cache_selectors_yaml and bool(self.cache_key)
+    def should_use_yaml_selectors_cache(self) -> bool:
+        """Identify if Cosmos should use/store YAML selectors cache or not."""
+        return settings.enable_cache and settings.enable_cache_yaml_selectors and bool(self.cache_key)
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
@@ -912,23 +913,23 @@ class DbtGraph:
             exclude=self.render_config.exclude,
         )
 
-    def _get_selectors_yaml_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, Any]:
-        """Loads the remote cache for selectors yaml."""
+    def _get_yaml_selectors_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, Any]:
+        """Loads the remote cache for the yaml selectors."""
         cache_dict: dict[str, Any] = {}
-        remote_cache_key_path = remote_cache_dir / self.cache_key / "selectors_yaml_cache.json"
+        remote_cache_key_path = remote_cache_dir / self.cache_key / "yaml_selectors_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
                 cache_dict = json.load(fp)
         return cache_dict
 
-    def get_selectors_yaml_cache(self) -> dict[str, Any]:
+    def get_yaml_selector_cache(self) -> dict[str, Any]:
         """
-        Retrieve previously saved selectors YAML cache from an Airflow Variable.
+        Retrieve previously saved YAML selectors from an Airflow Variable.
 
         Outputs:
         {
             "version": "cache-version",
-            "selectors": uncompressed selectors dictionary,
+            "yaml_selectors": uncompressed YamlSelectors instance,
             "last_modified": "Isoformat timestamp"
         }
         """
@@ -945,119 +946,121 @@ class DbtGraph:
         try:
             remote_cache_dir = _configure_remote_cache_dir()
             cache_dict = (
-                self._get_selectors_yaml_remote_cache(remote_cache_dir)
+                self._get_yaml_selectors_remote_cache(remote_cache_dir)
                 if remote_cache_dir
                 else Variable.get(self.cache_key, deserialize_json=True)
             )
         except tuple(airflow_variable_exceptions):
             return cache_dict
         else:
-            selectors_compressed = cache_dict.pop("selectors", None)
+            selectors_compressed = cache_dict.pop("yaml_selectors", None)
             if selectors_compressed:
-                encoded_data = base64.b64decode(selectors_compressed.encode())
-                decompressed_data = zlib.decompress(encoded_data).decode("utf-8")
-                cache_dict["selectors"] = json.loads(decompressed_data)
+                encoded_data = base64.b64decode(selectors_compressed.encode("utf-8"))
+                decompressed_data = zlib.decompress(encoded_data)
+                cache_dict["yaml_selectors"] = pickle.loads(decompressed_data)
 
             return cache_dict
 
-    def save_selectors_yaml_cache(self, selections: dict[str, Any]) -> None:
+    def save_yaml_selector_cache(self, yaml_selectors: YamlSelectors) -> None:
         """
-        Store parsed selectors YAML into an Airflow Variable.
+        Store parsed YAML selectors into an Airflow Variable.
 
         Stores:
         {
             "version": "cache-version",
-            "selectors": compressed_selectors,
+            "yaml_selectors": compressed YamlSelectors instance,
             "last_modified": "Isoformat timestamp"
         }
         """
         if TYPE_CHECKING:
-            assert self.project.selectors_yaml_path is not None  # pragma: no cover
+            assert self.project.yaml_selectors_path is not None  # pragma: no cover
 
-        compressed_data = zlib.compress(json.dumps(selections).encode("utf-8"))
+        serialized_data = pickle.dumps(yaml_selectors)
+        compressed_data = zlib.compress(serialized_data)
         encoded_data = base64.b64encode(compressed_data)
         selections_compressed = encoded_data.decode("utf-8")
 
         cache_dict = {
-            "version": cache._calculate_selectors_yaml_cache_current_version(
-                self.cache_key, self.project_path, self.project.selectors_yaml_path
+            "version": cache._calculate_yaml_selectors_cache_current_version(
+                self.cache_key, self.project_path, self.project.yaml_selectors_path
             ),
-            "selectors": selections_compressed,
+            "yaml_selectors": selections_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }
         remote_cache_dir = _configure_remote_cache_dir()
         if remote_cache_dir:
-            remote_cache_key_path = remote_cache_dir / self.cache_key / "selectors_yaml_cache.json"
+            remote_cache_key_path = remote_cache_dir / self.cache_key / "yaml_selector_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
-    def parse_selectors_yaml(self) -> dict[str, Any]:
+    def parse_yaml_selectors(self) -> YamlSelectors:
         """
-        Parse the selectors YAML file and return the selections for all selectors.
+        Parse the YAML selectors file into a YamlSelctor
 
         Returns:
-            A dictionary containing all selectors and their selections.
+            A YamlSelectors instance
         """
         if TYPE_CHECKING:
-            assert self.project.selectors_yaml_path is not None  # pragma: no cover
+            assert self.project.yaml_selectors_path is not None  # pragma: no cover
 
-        with self.project.selectors_yaml_path.open() as fp:
-            selectors = yaml.safe_load(fp)
-            selections = parse_yaml_selectors(selectors)
+        with self.project.yaml_selectors_path.open() as fp:
+            yaml_selectors_definition = yaml.safe_load(fp)
+            yaml_selectors = YamlSelectors.parse(yaml_selectors_definition)
 
-            if self.should_use_selectors_yaml_cache():
-                self.save_selectors_yaml_cache(selections)
+            if self.should_use_yaml_selectors_cache():
+                self.save_yaml_selector_cache(yaml_selectors)
 
-            return selections
+            return yaml_selectors
 
-    def load_parsed_selectors(self) -> dict[str, Any]:
+    def load_parsed_selectors(self) -> YamlSelectors:
         """
-        Load the parsed selectors from cache if available, otherwise parse the selectors YAML file.
+        Load the YamlSelectors from cache if available, otherwise parse the YAML selectors file.
 
         Returns:
-            A dictionary containing the selections for the specified selector.
+            A dictionary containing the selections for the specified selectors.
         """
-        logger.info(f"Trying to parse the dbt selector yamls using {self.cache_key}...")
+        logger.info(f"Trying to parse the dbt yaml selectors using {self.cache_key}...")
 
         if TYPE_CHECKING:
-            assert self.project.selectors_yaml_path is not None  # pragma: no cover
+            assert self.project.yaml_selectors_path is not None  # pragma: no cover
 
-        def get_selections() -> dict[str, Any]:
-            selections = self.parse_selectors_yaml()
+        def get_yaml_selectors() -> YamlSelectors:
+            yaml_selectors = self.parse_yaml_selectors()
 
-            if self.should_use_selectors_yaml_cache():
-                self.save_selectors_yaml_cache(selections)
+            if self.should_use_yaml_selectors_cache():
+                self.save_yaml_selector_cache(yaml_selectors)
 
-            return selections
+            return yaml_selectors
 
-        if self.should_use_selectors_yaml_cache():
-            cache_dict = self.get_selectors_yaml_cache()
+        if self.should_use_yaml_selectors_cache():
+            cache_dict = self.get_yaml_selector_cache()
+
             if not cache_dict:
                 logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
 
-                cache_dict = get_selections()
+                return get_yaml_selectors()
 
-            cache_version: tuple[str, str] = cache_dict.get("version", ())
-            selectors_cache: dict[str, Any] = cache_dict.get("selectors", {})
+            cache_version: str = cache_dict["version"]
+            yaml_selectors: YamlSelectors = cache_dict["yaml_selectors"]
 
-            current_version = cache._calculate_selectors_yaml_cache_current_version(
-                self.cache_key, self.project_path, self.project.selectors_yaml_path
+            current_version = cache._calculate_yaml_selectors_cache_current_version(
+                self.cache_key, self.project_path, self.project.yaml_selectors_path
             )
 
-            if selectors_cache and not cache.was_selectors_yaml_modified(cache_version, current_version):
+            if cache_dict and not cache.were_yaml_selectors_modified(cache_version, current_version):
                 logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(selectors_cache)}"
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(yaml_selectors.parsed)}"
                 )
                 logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
 
-                return selectors_cache
+                return yaml_selectors
 
         logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
 
-        return get_selections()
+        return get_yaml_selectors()
 
     def load_from_dbt_manifest(self) -> None:
         """
@@ -1073,8 +1076,8 @@ class DbtGraph:
         self.load_method = LoadMode.DBT_MANIFEST
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
 
-        if self.render_config.selector and not self.project.is_selectors_yaml_available():
-            raise CosmosLoadDbtException(f"Unable to load selectors using {self.project.selectors_yaml_path}")
+        if self.render_config.selector and not self.project.is_yaml_selectors_available():
+            raise CosmosLoadDbtException(f"Unable to load yaml selectors using {self.project.yaml_selectors_path}")
 
         if not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
@@ -1110,12 +1113,12 @@ class DbtGraph:
                 nodes[node.unique_id] = node
 
             if self.render_config.selector:
-                selectors = self.load_parsed_selectors()
-                selections = selectors.get(self.render_config.selector)
+                yaml_selectors = self.load_parsed_selectors()
+                selections = yaml_selectors.get_parsed(self.render_config.selector)
 
                 if not selections:
                     raise CosmosLoadDbtException(
-                        f"Selector `{self.render_config.selector}` not found in selectors YAML `{self.project.selectors_yaml_path}`"
+                        f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{self.project.yaml_selectors_path}`"
                     )
 
                 self.nodes = nodes

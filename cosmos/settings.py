@@ -27,7 +27,7 @@ use_dataset_airflow3_uri_standard = conf.getboolean(
 enable_cache_partial_parse = conf.getboolean("cosmos", "enable_cache_partial_parse", fallback=True)
 enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_lockfile", fallback=True)
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
-enable_cache_selectors_yaml = conf.getboolean("cosmos", "enable_cache_selectors_yaml", fallback=True)
+enable_cache_yaml_selectors = conf.getboolean("cosmos", "enable_cache_yaml_selectors", fallback=True)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)

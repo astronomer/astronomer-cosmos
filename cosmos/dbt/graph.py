@@ -317,8 +317,9 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
 
             # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
             # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+            # Only skip if it looks like a valid node (has unique_id) but no file path
             node_file_path = node_dict.get("original_file_path") or node_dict.get("path")
-            if node_file_path is None:
+            if node_file_path is None and node_dict.get("unique_id"):
                 logger.debug(
                     "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
                     node_dict.get("unique_id"),
@@ -331,7 +332,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=base_path / node_file_path,
+                    file_path=base_path / node_file_path,  # type: ignore[arg-type]
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(
@@ -340,7 +341,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         else False
                     ),
                 )
-            except KeyError:
+            except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
             else:
                 nodes[node.unique_id] = node

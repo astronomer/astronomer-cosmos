@@ -687,13 +687,20 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
 
 class YamlSelectors:
     """
-    Parses and manages dbt YAML selector definitions.
+    Parses and manages dbt YAML selector definitions from the manifest.
 
-    This class handles the parsing of dbt selector YAML definitions, converting them from a dbt manifest
-    preprocessed format into syntax compatible with Cosmos node selection. Attempts to parse a selectors.yaml
-    may lead to errors. This version of the parser expects method-value selector definitions and does not have
-    support for the `default` or `indirect_selection` properties. It supports union,
-    intersection, and method-based selector definitions as specified in dbt's selector syntax.
+    This class handles the parsing of selector definitions that come from a dbt manifest file,
+    converting them into syntax compatible with Cosmos node selection. The manifest provides
+    selectors in a preprocessed format (dict keyed by selector name) rather than the original
+    selectors.yml file format (list of selector objects).
+
+    **Important**: This parser expects the manifest's preprocessed selector format and was NOT
+    designed to support parsing selectors.yml files directly. Attempting to parse a selectors.yml
+    file may result in errors.
+
+    **Limitations**: This implementation does not support the `default` or `indirect_selection`
+    properties from the dbt selector specification. It focuses on the core selection logic:
+    union, intersection, and method-based selector definitions.
 
     Instances of this class should be created using the `parse` class method.
 
@@ -704,8 +711,6 @@ class YamlSelectors:
         The original unparsed selector definitions from the manifest.
     :property parsed: dict[str, dict[str, Any]]
         The parsed selector definitions in Cosmos format.
-    :property dbt_spec_version: int
-        The dbt selector file specification version being used.
 
     References:
         https://docs.getdbt.com/reference/node-selection/yaml-selectors
@@ -714,7 +719,6 @@ class YamlSelectors:
     def __init__(self, raw_selectors: dict[str, dict[str, Any]], parsed_selectors: dict[str, dict[str, Any]]):
         self._raw = raw_selectors
         self._parsed = parsed_selectors
-        self._dbt_spec_version = 2
 
     @property
     def raw(self) -> dict[str, dict[str, Any]]:
@@ -733,15 +737,6 @@ class YamlSelectors:
         :return: dict[str, dict[str, Any]] - Dictionary mapping selector names to their parsed definitions with select/exclude lists
         """
         return self._parsed
-
-    @property
-    def dbt_spec_version(self) -> int:
-        """
-        Get the current dbt selector file specification version.
-
-        :return: int - The dbt spec version
-        """
-        return self._dbt_spec_version
 
     def get_raw(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
         """

@@ -183,7 +183,7 @@ def validate_initial_user_config(
     if render_config is not None and render_config.invocation_mode == InvocationMode.DBT_RUNNER:
         if not is_dbt_installed_in_same_environment():
             raise CosmosValueError(
-                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.DBT_SUBPROCESS instead."
+                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.SUBPROCESS instead."
             )
         if render_config.dbt_executable_path and render_config.dbt_executable_path != get_system_dbt():
             raise CosmosValueError(

@@ -1,6 +1,0 @@
-packages:
-  - package: nicholasyager/dbt_loom
-    version: ">=0.13.0"
-
-projects:
-  - name: dbt_loom_upstream_platform

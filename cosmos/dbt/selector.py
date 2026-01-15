@@ -689,37 +689,39 @@ class YamlSelectors:
     """
     Parses and manages dbt YAML selector definitions.
 
-    This class handles the parsing of dbt selector YAML files, converting them from their raw
-    YAML format into a format compatible with Cosmos node selection. It supports union,
+    This class handles the parsing of dbt selector YAML definitions, converting them from a dbt manifest
+    preprocessed format into syntax compatible with Cosmos node selection. Attempts to parse a selectors.yaml
+    may lead to errors. This version of the parser expects method-value selector definitions and does not have
+    support for the `default` or `indirect_selection` properties. It supports union,
     intersection, and method-based selector definitions as specified in dbt's selector syntax.
 
     Instances of this class should be created using the `parse` class method.
 
-    :param raw_selectors: dict[str, list[dict[str, Any]]] - The original, unparsed selector definitions from the YAML file
+    :param raw_selectors: dict[str, dict[str, Any]] - The original, unparsed selector definitions from the manifest
     :param parsed_selectors: dict[str, dict[str, Any]] - The processed selector definitions converted to Cosmos format
 
-    :property raw: dict[str, list[dict[str, Any]]]
-        The original unparsed selector definitions from the YAML file.
+    :property raw: dict[str, dict[str, Any]]
+        The original unparsed selector definitions from the manifest.
     :property parsed: dict[str, dict[str, Any]]
         The parsed selector definitions in Cosmos format.
     :property dbt_spec_version: int
-        The dbt selector specification version being used.
+        The dbt selector file specification version being used.
 
     References:
         https://docs.getdbt.com/reference/node-selection/yaml-selectors
     """
 
-    def __init__(self, raw_selectors: dict[str, list[dict[str, Any]]], parsed_selectors: dict[str, dict[str, Any]]):
+    def __init__(self, raw_selectors: dict[str, dict[str, Any]], parsed_selectors: dict[str, dict[str, Any]]):
         self._raw = raw_selectors
         self._parsed = parsed_selectors
         self._dbt_spec_version = 2
 
     @property
-    def raw(self) -> dict[str, list[dict[str, Any]]]:
+    def raw(self) -> dict[str, dict[str, Any]]:
         """
         Get the original unparsed selector definitions.
 
-        :return: dict[str, list[dict[str, Any]]] - Dictionary containing the raw YAML structure
+        :return: dict[str, dict[str, Any]] - Dictionary containing the raw YAML structure
         """
         return self._raw
 
@@ -735,7 +737,7 @@ class YamlSelectors:
     @property
     def dbt_spec_version(self) -> int:
         """
-        Get the dbt selector specification version being used.
+        Get the current dbt selector file specification version.
 
         :return: int - The dbt spec version
         """
@@ -910,7 +912,6 @@ class YamlSelectors:
         parents_depth = dct.get("parents_depth", 0)
         children_depth = dct.get("children_depth", 0)
         childrens_parents = dct.get("childrens_parents", False)
-        indirect_selection = dct.get("indirect_selection", False)
 
         if method == "METHOD_KEY_NOT_FOUND":
             raise CosmosValueError(f"Selector method is missing in method definition: {dct}.")
@@ -921,9 +922,6 @@ class YamlSelectors:
             raise CosmosValueError(f"parents_depth must be an integer, got {type(parents_depth)}: {parents_depth}")
         if not isinstance(children_depth, int):
             raise CosmosValueError(f"children_depth must be an integer, got {type(children_depth)}: {children_depth}")
-
-        if indirect_selection:
-            logger.warning("The 'indirect_selection' parameter is not supported and will be ignored.")
 
         selector = cls._parse_selection_from_cosmos_spec(method, value)
 
@@ -1173,14 +1171,14 @@ class YamlSelectors:
         return (select, exclude)
 
     @classmethod
-    def parse(cls, selectors: dict[str, list[dict[str, Any]]]) -> YamlSelectors:
+    def parse(cls, selectors: dict[str, dict[str, Any]]) -> YamlSelectors:
         """
         Parse a complete dbt selectors YAML file into a YamlSelectors instance.
 
         This is the main entry point for parsing YAML selectors. It processes all selector
         definitions in the YAML file and converts them to Cosmos format.
 
-        :param selectors: dict[str, list[dict[str, Any]]] - The complete selectors YAML content as a dictionary with a 'selectors' key
+        :param selectors: dict[str, dict[str, Any]] - The complete selectors YAML content as a dictionary with a 'selectors' key
         :return: YamlSelectors - A YamlSelectors instance containing both raw and parsed selector definitions
 
         Example Input:
@@ -1191,8 +1189,7 @@ class YamlSelectors:
                         "definition": {
                             "method": "tag",
                             "value": "nightly"
-                        },
-                        "default": False
+                        }
                     }
                 ]
             }
@@ -1202,26 +1199,23 @@ class YamlSelectors:
             {
                 "nightly_models": {
                     "select": ["tag:nightly"],
-                    "exclude": None,
-                    "default": False
-                }
+                    "exclude": None                }
             }
         """
         result: dict[str, dict[str, Any]] = {}
         cache: dict[str, tuple[list[str], list[str]]] = {}
-        selectors_root: list[dict[str, Any]] = selectors.get("selectors", [])
 
-        for selector in selectors_root:
-            name = selector.get("name", "")
-            definition = selector.get("definition", {})
-            default = selector.get("default", False)
+        for name, definition in selectors.items():
+            name = definition.get("name", "")
+            selector_definition = definition.get("definition", {})
 
-            select, exclude = cls._parse_from_definition(definition, cache=copy.deepcopy(cache), rootlevel=True)
+            select, exclude = cls._parse_from_definition(
+                selector_definition, cache=copy.deepcopy(cache), rootlevel=True
+            )
 
             result[name] = {
                 "select": select if select else None,
                 "exclude": exclude if exclude else None,
-                "default": default,
             }
 
         return cls(selectors, result)

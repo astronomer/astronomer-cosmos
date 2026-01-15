@@ -17,7 +17,6 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Any
 
-import yaml
 from airflow.models import Variable
 
 if TYPE_CHECKING:
@@ -972,8 +971,6 @@ class DbtGraph:
             "last_modified": "Isoformat timestamp"
         }
         """
-        if TYPE_CHECKING:
-            assert self.project.yaml_selectors_path is not None  # pragma: no cover
 
         serialized_data = pickle.dumps(yaml_selectors)
         compressed_data = zlib.compress(serialized_data)
@@ -982,7 +979,7 @@ class DbtGraph:
 
         cache_dict = {
             "version": cache._calculate_yaml_selectors_cache_current_version(
-                self.cache_key, self.project_path, self.project.yaml_selectors_path
+                self.cache_key, self.project_path, yaml_selectors.raw
             ),
             "yaml_selectors": selections_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -996,39 +993,38 @@ class DbtGraph:
         else:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
-    def parse_yaml_selectors(self) -> YamlSelectors:
+    def parse_yaml_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
         """
-        Parse the YAML selectors file into a YamlSelctor
+        Parse the YAML selectors definitions into a YamlSelectors instance.
+
+        Args:
+            selector_definitions (dict[str, Any]): The selector definitions from the dbt manifest.
 
         Returns:
-            A YamlSelectors instance
+            YamlSelectors: A YamlSelectors instance
         """
-        if TYPE_CHECKING:
-            assert self.project.yaml_selectors_path is not None  # pragma: no cover
 
-        with self.project.yaml_selectors_path.open() as fp:
-            yaml_selectors_definition = yaml.safe_load(fp)
-            yaml_selectors = YamlSelectors.parse(yaml_selectors_definition)
+        yaml_selectors = YamlSelectors.parse(selector_definitions)
 
-            if self.should_use_yaml_selectors_cache():
-                self.save_yaml_selector_cache(yaml_selectors)
+        if self.should_use_yaml_selectors_cache():
+            self.save_yaml_selector_cache(yaml_selectors)
 
-            return yaml_selectors
+        return yaml_selectors
 
-    def load_parsed_selectors(self) -> YamlSelectors:
+    def load_parsed_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
         """
-        Load the YamlSelectors from cache if available, otherwise parse the YAML selectors file.
+        Load the YamlSelectors from cache if available, otherwise parse the YAML selectors definitions.
+
+        Args:
+            selector_definitions (dict[str, Any]): The selector definitions from the dbt manifest.
 
         Returns:
-            A dictionary containing the selections for the specified selectors.
+            YamlSelectors: A YamlSelectors instance
         """
         logger.info(f"Trying to parse the dbt yaml selectors using {self.cache_key}...")
 
-        if TYPE_CHECKING:
-            assert self.project.yaml_selectors_path is not None  # pragma: no cover
-
-        def get_yaml_selectors() -> YamlSelectors:
-            yaml_selectors = self.parse_yaml_selectors()
+        def get_yaml_selectors(selector_definitions: dict[str, Any]) -> YamlSelectors:
+            yaml_selectors = self.parse_yaml_selectors(selector_definitions)
 
             if self.should_use_yaml_selectors_cache():
                 self.save_yaml_selector_cache(yaml_selectors)
@@ -1041,13 +1037,13 @@ class DbtGraph:
             if not cache_dict:
                 logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
 
-                return get_yaml_selectors()
+                return get_yaml_selectors(selector_definitions)
 
             cache_version: str = cache_dict["version"]
             yaml_selectors: YamlSelectors = cache_dict["yaml_selectors"]
 
             current_version = cache._calculate_yaml_selectors_cache_current_version(
-                self.cache_key, self.project_path, self.project.yaml_selectors_path
+                self.cache_key, self.project_path, selector_definitions
             )
 
             if cache_dict and not cache.were_yaml_selectors_modified(cache_version, current_version):
@@ -1060,7 +1056,7 @@ class DbtGraph:
 
         logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
 
-        return get_yaml_selectors()
+        return get_yaml_selectors(selector_definitions)
 
     def load_from_dbt_manifest(self) -> None:
         """
@@ -1075,9 +1071,6 @@ class DbtGraph:
         """
         self.load_method = LoadMode.DBT_MANIFEST
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
-
-        if self.render_config.selector and not self.project.is_yaml_selectors_available():
-            raise CosmosLoadDbtException(f"Unable to load yaml selectors using {self.project.yaml_selectors_path}")
 
         if not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
@@ -1113,12 +1106,17 @@ class DbtGraph:
                 nodes[node.unique_id] = node
 
             if self.render_config.selector:
-                yaml_selectors = self.load_parsed_selectors()
+                selector_definitions = manifest.get("selectors", {})
+
+                if not selector_definitions:
+                    raise CosmosLoadDbtException(f"Selectors not found in manifest file `{self.project.manifest_path}`")
+
+                yaml_selectors = self.load_parsed_selectors(selector_definitions)
                 selections = yaml_selectors.get_parsed(self.render_config.selector)
 
                 if not selections:
                     raise CosmosLoadDbtException(
-                        f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{self.project.yaml_selectors_path}`"
+                        f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
                     )
 
                 self.nodes = nodes

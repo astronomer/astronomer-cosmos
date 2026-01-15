@@ -10,7 +10,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import msgpack
 import yaml
@@ -288,15 +288,16 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
 
 def _calculate_yaml_selectors_cache_current_version(
-    cache_identifier: str, project_dir: Path, yaml_selectors_path: Path | ObjectStoragePath
+    cache_identifier: str, project_dir: Path, selector_definitions: dict[str, dict[str, Any]]
 ) -> str:
     """
-    Taking into account the project directory contents and the selectors yaml file, calculate the
-    hash that represents the "dbt selectors yaml" version - to be used to decide if the cache should be refreshed or not.
+    Taking into account the project directory contents and the selectors definitions, calculate the
+    hash that represents the "dbt selectors" version - to be used to decide if the cache should be refreshed or not.
 
-    :param cache_identifier: Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
-    :param project_path: Path to the target dbt project directory
-    :param yaml_selectors_path: Path to the selectors yaml file
+    :param cache_identifier: str - Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
+    :param project_dir: Path - Path to the target dbt project directory
+    :param selector_definitions: dict[str, dict[str, Any]] - Dictionary containing the selectors definitions from the manifest
+    :return: str - Combined hash string of project and selectors
     """
 
     start_time = time.perf_counter()
@@ -305,9 +306,7 @@ def _calculate_yaml_selectors_cache_current_version(
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
     dbt_project_hash = _create_folder_version_hash(project_dir)
 
-    with yaml_selectors_path.open("r") as f:
-        yaml_selector_content = yaml.safe_load(f)
-    yaml_selector_hash = hashlib.md5(yaml.dump(yaml_selector_content).encode()).hexdigest()
+    yaml_selector_hash = hashlib.md5(yaml.dump(selector_definitions).encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
@@ -321,9 +320,10 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
     Taking into account the project directory contents and the command arguments, calculate the
     hash that represents the "dbt ls" command version - to be used to decide if the cache should be refreshed or not.
 
-    :param cache_identifier: Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
-    :param project_path: Path to the target dbt project directory
-    :param cmd_args: List containing the arguments passed to the dbt ls command that would affect its output
+    :param cache_identifier: str - Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
+    :param project_dir: Path - Path to the target dbt project directory
+    :param cmd_args: list[str] - List containing the arguments passed to the dbt ls command that would affect its output
+    :return: str - Combined hash string of project and command arguments
     """
     start_time = time.perf_counter()
 

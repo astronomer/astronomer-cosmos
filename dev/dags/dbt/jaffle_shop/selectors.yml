@@ -7,6 +7,7 @@ selectors:
 
   - name: core_models
     description: "Select core business logic models (non-staging)"
+    default: true
     definition:
       method: tag
       value: core
@@ -48,3 +49,4 @@ selectors:
           value: customers
         - method: fqn
           value: orders
+          indirect_selection: cautious

@@ -49,7 +49,6 @@ with DAG(
         group_id="local_example",
         project_config=ProjectConfig(
             manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
-            yaml_selectors_path=DBT_ROOT_PATH / "jaffle_shop" / "selectors.yml",
             project_name="jaffle_shop",
         ),
         profile_config=profile_config,

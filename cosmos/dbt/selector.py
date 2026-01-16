@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import functools
+import inspect
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -737,6 +739,20 @@ class YamlSelectors:
         :return: dict[str, dict[str, Any]] - Dictionary mapping selector names to their parsed definitions with select/exclude lists
         """
         return self._parsed
+
+    @property
+    @functools.lru_cache(maxsize=1)
+    def impl_version(self) -> str:
+        """
+        Get the source code of the YamlSelectors implementation.
+
+        This property retrieves the complete source code of the YamlSelectors class, which can be
+        used to detect changes in the selector parsing logic (e.g., for cache invalidation).
+        The source code is retrieved once and cached for the lifetime of the instance.
+
+        :return: str - Complete source code of the YamlSelectors class
+        """
+        return inspect.getsource(self.__class__)
 
     def get_raw(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
         """

@@ -288,7 +288,10 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
 
 def _calculate_yaml_selectors_cache_current_version(
-    cache_identifier: str, project_dir: Path, selector_definitions: dict[str, dict[str, Any]]
+    cache_identifier: str,
+    project_dir: Path,
+    selector_definitions: dict[str, dict[str, Any]],
+    implementation_version: str,
 ) -> str:
     """
     Taking into account the project directory contents and the selectors definitions, calculate the
@@ -297,6 +300,7 @@ def _calculate_yaml_selectors_cache_current_version(
     :param cache_identifier: str - Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
     :param project_dir: Path - Path to the target dbt project directory
     :param selector_definitions: dict[str, dict[str, Any]] - Dictionary containing the selectors definitions from the manifest
+    :param implementation_version: str - The implementation version of the YamlSelectors class
     :return: str - Combined hash string of project and selectors
     """
 
@@ -307,12 +311,13 @@ def _calculate_yaml_selectors_cache_current_version(
     dbt_project_hash = _create_folder_version_hash(project_dir)
 
     yaml_selector_hash = hashlib.md5(yaml.dump(selector_definitions).encode()).hexdigest()
+    implementation_hash = hashlib.md5(implementation_version.encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
         f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
     )
-    return f"{dbt_project_hash},{yaml_selector_hash}"
+    return f"{dbt_project_hash},{yaml_selector_hash},{implementation_hash}"
 
 
 def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:

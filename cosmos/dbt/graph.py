@@ -979,7 +979,7 @@ class DbtGraph:
 
         cache_dict = {
             "version": cache._calculate_yaml_selectors_cache_current_version(
-                self.cache_key, self.project_path, yaml_selectors.raw
+                self.cache_key, self.project_path, yaml_selectors.raw, yaml_selectors.impl_version
             ),
             "yaml_selectors": selections_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -1043,7 +1043,7 @@ class DbtGraph:
             yaml_selectors: YamlSelectors = cache_dict["yaml_selectors"]
 
             current_version = cache._calculate_yaml_selectors_cache_current_version(
-                self.cache_key, self.project_path, selector_definitions
+                self.cache_key, self.project_path, selector_definitions, yaml_selectors.impl_version
             )
 
             if cache_dict and not cache.were_yaml_selectors_modified(cache_version, current_version):

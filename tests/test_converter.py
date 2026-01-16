@@ -150,6 +150,68 @@ def test_validate_user_config_fails_project_config_render_config_env_vars():
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
 
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=False)
+def test_validate_initial_user_config_dbt_runner_without_dbt_installed(mock_is_dbt_installed):
+    """Test that validation fails when using DBT_RUNNER but dbt is not installed in the same environment."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow.*"
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.get_system_dbt", return_value="/usr/local/bin/dbt")
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_with_different_dbt_executable_path(
+    mock_is_dbt_installed, mock_get_system_dbt
+):
+    """Test that validation fails when using DBT_RUNNER with a custom dbt_executable_path that differs from system dbt."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER, dbt_executable_path="/custom/path/to/dbt")
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = (
+        "RenderConfig.dbt_executable_path is set, but it is not the same as the system dbt executable path.*"
+    )
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.get_system_dbt", return_value="/usr/local/bin/dbt")
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_with_matching_dbt_executable_path(
+    mock_is_dbt_installed, mock_get_system_dbt
+):
+    """Test that validation passes when using DBT_RUNNER with a dbt_executable_path matching system dbt."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER, dbt_executable_path="/usr/local/bin/dbt")
+    profile_config = MagicMock()
+    operator_args = {}
+
+    # Should not raise any exception
+    validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_without_dbt_executable_path(mock_is_dbt_installed):
+    """Test that validation passes when using DBT_RUNNER without setting dbt_executable_path."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+    profile_config = MagicMock()
+    operator_args = {}
+
+    # Should not raise any exception
+    validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
 def test_validate_arguments_schema_in_task_args():
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL, dbt_project_path="/tmp/project-dir")
     render_config = RenderConfig()

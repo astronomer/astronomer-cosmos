@@ -7,7 +7,7 @@ With the release of **Cosmos 1.11.0**, we are introducing a powerful new experim
 
 Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**. Since this execution mode improves the performance by leveraging `dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_,  the performance gains will depend on two major factors:
 
-- The amount of ``threads`` set either via the dbt profile configuration or as a flag
+- The amount of ``threads`` set either via the dbt profile configuration or the dbt ``--threads`` flag
 - The topology of the dbt pipeline
 
 -------------------------------------------------------------------------------

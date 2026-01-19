@@ -284,10 +284,8 @@ class DbtToAirflowConverter:
         validate_changed_config_paths(execution_config, project_config, render_config)
 
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
-            logger.warning(
-                "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-            )
+            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
 
         cache_dir = None
         cache_identifier = None

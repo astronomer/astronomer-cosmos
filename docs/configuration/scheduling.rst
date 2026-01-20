@@ -233,6 +233,7 @@ When enabled, you can access the URIs in downstream tasks using XCom:
 
     from airflow.decorators import task
 
+
     @task
     def process_uris(**context):
         ti = context["ti"]

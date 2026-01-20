@@ -19,7 +19,7 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
-enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=True) # put False later
+enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=False)
 use_dataset_airflow3_uri_standard = conf.getboolean(
     "cosmos",
     "enable_dataset_airflow3_uri",

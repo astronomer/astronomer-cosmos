@@ -203,3 +203,44 @@ they can set this configuration to ``False``. It can also be set in the ``airflo
     enable_dataset_alias = False
 
 Starting in Airflow 3, Cosmos users no longer allowed to set ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS`` to ``True``.
+
+
+Emitting Dataset URIs as XCom
+.............................
+
+By default, Cosmos emits datasets as Airflow inlets/outlets but does not expose the raw dataset URIs as XCom values.
+If you need access to the dataset URIs (for example, to use them in downstream tasks or for debugging purposes),
+you can enable the ``enable_uri_xcom`` setting.
+
+When enabled, Cosmos will push the outlet URIs to XCom with the key ``uri`` after each task execution that emits datasets.
+
+To enable this feature, set the environment variable:
+
+.. code-block:: bash
+
+    export AIRFLOW__COSMOS__ENABLE_URI_XCOM=True
+
+Or in your ``airflow.cfg``:
+
+.. code-block::
+
+    [cosmos]
+    enable_uri_xcom = True
+
+When enabled, you can access the URIs in downstream tasks using XCom:
+
+.. code-block:: python
+
+    from airflow.decorators import task
+
+    @task
+    def process_uris(**context):
+        ti = context["ti"]
+        uris = ti.xcom_pull(task_ids="my_dbt_task", key="uri")
+        for uri in uris:
+            print(f"Processing dataset: {uri}")
+
+.. note::
+
+    This feature is available for all Airflow versions (2.4+) and works alongside the existing dataset emission behavior.
+    The ``uri`` XCom contains a list of URI strings, even if there is only one outlet.

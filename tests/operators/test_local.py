@@ -2186,3 +2186,128 @@ def test_dbt_cmd_flags_all_templated():
     expected_flags = ["--select", "--exclude", "model1", "model2"]
 
     assert operator.dbt_cmd_flags == expected_flags
+
+
+@patch("cosmos.settings.enable_uri_xcom", False)
+def test_handle_datasets_does_not_push_uri_xcom_when_disabled():
+    """Test that _handle_datasets does not push URI to XCom when enable_uri_xcom is False (default)."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Mock the openlineage_events_completes with a sample event
+    mock_event = MagicMock()
+    mock_output = MagicMock()
+    mock_output.namespace = "postgres://0.0.0.0:5432"
+    mock_output.name = "postgres.public.test_table"
+    mock_event.outputs = [mock_output]
+    operator.openlineage_events_completes = [mock_event]
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock register_dataset to avoid database interactions
+    with patch.object(operator, "register_dataset"):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was NOT called with "uri" key
+    uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
+    assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when enable_uri_xcom is False"
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+def test_handle_datasets_pushes_uri_xcom_when_enabled():
+    """Test that _handle_datasets pushes URI to XCom when enable_uri_xcom is True."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Mock the openlineage_events_completes with a sample event
+    mock_event = MagicMock()
+    mock_output = MagicMock()
+    mock_output.namespace = "postgres://0.0.0.0:5432"
+    mock_output.name = "postgres.public.test_table"
+    mock_event.outputs = [mock_output]
+    operator.openlineage_events_completes = [mock_event]
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock register_dataset to avoid database interactions
+    with patch.object(operator, "register_dataset"):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was called with "uri" key and the correct value
+    mock_ti.xcom_push.assert_called_once()
+    call_kwargs = mock_ti.xcom_push.call_args[1]
+    assert call_kwargs["key"] == "uri"
+    assert isinstance(call_kwargs["value"], list)
+    assert len(call_kwargs["value"]) == 1
+    # URI format depends on Airflow version, but should contain the namespace and name
+    assert "postgres" in call_kwargs["value"][0]
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+def test_handle_datasets_pushes_multiple_uris_to_xcom():
+    """Test that _handle_datasets pushes multiple URIs to XCom when there are multiple outlets."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Mock the openlineage_events_completes with multiple outputs
+    mock_event = MagicMock()
+    mock_output1 = MagicMock()
+    mock_output1.namespace = "postgres://0.0.0.0:5432"
+    mock_output1.name = "postgres.public.table1"
+    mock_output2 = MagicMock()
+    mock_output2.namespace = "postgres://0.0.0.0:5432"
+    mock_output2.name = "postgres.public.table2"
+    mock_event.outputs = [mock_output1, mock_output2]
+    operator.openlineage_events_completes = [mock_event]
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock register_dataset to avoid database interactions
+    with patch.object(operator, "register_dataset"):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was called with correct URIs
+    mock_ti.xcom_push.assert_called_once()
+    call_kwargs = mock_ti.xcom_push.call_args[1]
+    assert call_kwargs["key"] == "uri"
+    assert len(call_kwargs["value"]) == 2
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+def test_handle_datasets_does_not_push_xcom_when_no_outlets():
+    """Test that _handle_datasets does not push XCom when there are no outlets."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Mock empty openlineage_events_completes
+    operator.openlineage_events_completes = []
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock register_dataset to avoid database interactions
+    with patch.object(operator, "register_dataset"):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was NOT called (no outlets to push)
+    uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
+    assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when there are no outlets"

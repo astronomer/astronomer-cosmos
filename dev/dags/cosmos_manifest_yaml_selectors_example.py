@@ -65,9 +65,6 @@ with DAG(
             manifest_path="s3://cosmos-manifest-test/manifest.json",
             manifest_conn_id="aws_s3_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `aws_default` is used.
-            yaml_selectors_path="s3://cosmos-manifest-test/selectors.yml",
-            yaml_selectors_conn_id="aws_s3_conn",
-            # `yaml_selectors_conn_id` is optional. If not provided, the default connection ID `
             project_name="jaffle_shop",
         ),
         profile_config=profile_config,
@@ -84,9 +81,6 @@ with DAG(
             manifest_path="gs://cosmos_remote_target/manifest.json",
             manifest_conn_id="gcp_gs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
-            yaml_selectors_path="gs://cosmos_remote_target/selectors.yml",
-            yaml_selectors_conn_id="gcp_gs_conn",
-            # `yaml_selectors_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
             project_name="jaffle_shop",
         ),
         profile_config=profile_config,
@@ -103,9 +97,6 @@ with DAG(
             manifest_path="abfs://cosmos-manifest-test/manifest.json",
             manifest_conn_id="azure_abfs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
-            yaml_selectors_path="abfs://cosmos-manifest-test/selectors.yml",
-            yaml_selectors_conn_id="azure_abfs_conn",
-            # `yaml_selectors_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
             project_name="jaffle_shop",
         ),
         profile_config=profile_config,

@@ -2198,19 +2198,18 @@ def test_handle_datasets_does_not_push_uri_xcom_when_disabled():
         should_store_compiled_sql=False,
     )
 
-    # Mock the openlineage_events_completes with a sample event
-    mock_event = MagicMock()
-    mock_output = MagicMock()
-    mock_output.namespace = "postgres://0.0.0.0:5432"
-    mock_output.name = "postgres.public.test_table"
-    mock_event.outputs = [mock_output]
-    operator.openlineage_events_completes = [mock_event]
+    # Create mock Asset objects with uri attribute
+    mock_outlet = MagicMock()
+    mock_outlet.uri = "postgres://0.0.0.0:5432/postgres.public.test_table"
 
     mock_ti = MagicMock()
     mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
 
-    # Mock register_dataset to avoid database interactions
-    with patch.object(operator, "register_dataset"):
+    # Mock get_datasets to return mock assets and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], [mock_outlet]]),
+        patch.object(operator, "register_dataset"),
+    ):
         operator._handle_datasets(mock_context)
 
     # Verify xcom_push was NOT called with "uri" key
@@ -2228,19 +2227,18 @@ def test_handle_datasets_pushes_uri_xcom_when_enabled():
         should_store_compiled_sql=False,
     )
 
-    # Mock the openlineage_events_completes with a sample event
-    mock_event = MagicMock()
-    mock_output = MagicMock()
-    mock_output.namespace = "postgres://0.0.0.0:5432"
-    mock_output.name = "postgres.public.test_table"
-    mock_event.outputs = [mock_output]
-    operator.openlineage_events_completes = [mock_event]
+    # Create mock Asset objects with uri attribute
+    mock_outlet = MagicMock()
+    mock_outlet.uri = "postgres://0.0.0.0:5432/postgres.public.test_table"
 
     mock_ti = MagicMock()
     mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
 
-    # Mock register_dataset to avoid database interactions
-    with patch.object(operator, "register_dataset"):
+    # Mock get_datasets to return mock assets and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], [mock_outlet]]),
+        patch.object(operator, "register_dataset"),
+    ):
         operator._handle_datasets(mock_context)
 
     # Verify xcom_push was called with "uri" key and the correct value
@@ -2249,8 +2247,7 @@ def test_handle_datasets_pushes_uri_xcom_when_enabled():
     assert call_kwargs["key"] == "uri"
     assert isinstance(call_kwargs["value"], list)
     assert len(call_kwargs["value"]) == 1
-    # URI format depends on Airflow version, but should contain the namespace and name
-    assert "postgres" in call_kwargs["value"][0]
+    assert call_kwargs["value"][0] == "postgres://0.0.0.0:5432/postgres.public.test_table"
 
 
 @patch("cosmos.settings.enable_uri_xcom", True)
@@ -2263,22 +2260,20 @@ def test_handle_datasets_pushes_multiple_uris_to_xcom():
         should_store_compiled_sql=False,
     )
 
-    # Mock the openlineage_events_completes with multiple outputs
-    mock_event = MagicMock()
-    mock_output1 = MagicMock()
-    mock_output1.namespace = "postgres://0.0.0.0:5432"
-    mock_output1.name = "postgres.public.table1"
-    mock_output2 = MagicMock()
-    mock_output2.namespace = "postgres://0.0.0.0:5432"
-    mock_output2.name = "postgres.public.table2"
-    mock_event.outputs = [mock_output1, mock_output2]
-    operator.openlineage_events_completes = [mock_event]
+    # Create mock Asset objects with uri attribute
+    mock_outlet1 = MagicMock()
+    mock_outlet1.uri = "postgres://0.0.0.0:5432/postgres.public.table1"
+    mock_outlet2 = MagicMock()
+    mock_outlet2.uri = "postgres://0.0.0.0:5432/postgres.public.table2"
 
     mock_ti = MagicMock()
     mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
 
-    # Mock register_dataset to avoid database interactions
-    with patch.object(operator, "register_dataset"):
+    # Mock get_datasets to return mock assets and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], [mock_outlet1, mock_outlet2]]),
+        patch.object(operator, "register_dataset"),
+    ):
         operator._handle_datasets(mock_context)
 
     # Verify xcom_push was called with correct URIs
@@ -2286,6 +2281,8 @@ def test_handle_datasets_pushes_multiple_uris_to_xcom():
     call_kwargs = mock_ti.xcom_push.call_args[1]
     assert call_kwargs["key"] == "uri"
     assert len(call_kwargs["value"]) == 2
+    assert "postgres://0.0.0.0:5432/postgres.public.table1" in call_kwargs["value"]
+    assert "postgres://0.0.0.0:5432/postgres.public.table2" in call_kwargs["value"]
 
 
 @patch("cosmos.settings.enable_uri_xcom", True)
@@ -2298,14 +2295,14 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
         should_store_compiled_sql=False,
     )
 
-    # Mock empty openlineage_events_completes
-    operator.openlineage_events_completes = []
-
     mock_ti = MagicMock()
     mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
 
-    # Mock register_dataset to avoid database interactions
-    with patch.object(operator, "register_dataset"):
+    # Mock get_datasets to return empty lists and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], []]),
+        patch.object(operator, "register_dataset"),
+    ):
         operator._handle_datasets(mock_context)
 
     # Verify xcom_push was NOT called (no outlets to push)

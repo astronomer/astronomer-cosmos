@@ -414,7 +414,7 @@ Troubleshooting
 ---------------
 
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
-Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. `Check the dbt docs <dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
+Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
 
 
 

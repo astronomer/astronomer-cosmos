@@ -9,18 +9,16 @@ import warnings
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import yaml
-from airflow.version import version as airflow_version
 
 from cosmos import settings
 
-if settings.AIRFLOW_IO_AVAILABLE or TYPE_CHECKING:
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        from airflow.io.path import ObjectStoragePath
+try:
+    from airflow.sdk import ObjectStoragePath
+except ImportError:
+    from airflow.io.path import ObjectStoragePath
 
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
 from cosmos.constants import (
@@ -231,17 +229,7 @@ class ProjectConfig:
                 # Use the default Airflow connection ID for the scheme if it is not provided.
                 manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, lambda: None)()
 
-            if manifest_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
-                raise CosmosValueError(
-                    f"The manifest path {manifest_path_str} uses a remote file scheme, but the required Object "
-                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
-                    f"Airflow 2.8 or later."
-                )
-
-            if settings.AIRFLOW_IO_AVAILABLE:
-                self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
-            else:
-                self.manifest_path = Path(manifest_path_str)
+            self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
 
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars

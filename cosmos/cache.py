@@ -17,7 +17,6 @@ import yaml
 from airflow.models import DagRun, Variable
 from airflow.models.dag import DAG
 from airflow.utils.session import provide_session
-from airflow.version import version as airflow_version
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -43,10 +42,8 @@ from cosmos.constants import (
     PACKAGE_LOCKFILE_YML,
 )
 from cosmos.dbt.project import get_partial_parse_path
-from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.settings import (
-    AIRFLOW_IO_AVAILABLE,
     cache_dir,
     dbt_profile_cache_dir_name,
     enable_cache,
@@ -76,13 +73,6 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
         remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)  # type: ignore[assignment]
     if remote_cache_conn_id is None:
         return _configured_cache_dir
-
-    if not AIRFLOW_IO_AVAILABLE:
-        raise CosmosValueError(
-            f"You're trying to specify remote cache_dir {cache_dir_str}, but the required "
-            f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
-            "Airflow 2.8 or later."
-        )
 
     try:
         from airflow.sdk import ObjectStoragePath

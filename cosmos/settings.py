@@ -6,8 +6,6 @@ from pathlib import Path
 
 import airflow
 from airflow.configuration import conf
-from airflow.version import version as airflow_version
-from packaging.version import Version
 
 from cosmos.constants import (
     DEFAULT_COSMOS_CACHE_DIR_NAME,
@@ -55,8 +53,6 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 # Related to async operators
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
-
-AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"

@@ -64,8 +64,7 @@ def example_virtualenv() -> None:
             # For the sake of avoiding additional latency observed while uploading files for each of the tasks, the
             # below callback functions to be executed are commented, but you can uncomment them if you'd like to
             # enable callback execution.
-            # Callback function to upload files using Airflow Object storage and Cosmos remote_target_path setting on
-            # Airflow 2.8 and above
+            # Callback function to upload files using Airflow Object storage and Cosmos remote_target_path setting
             # "callback": upload_to_cloud_storage,
             # --------------------------------------------------------------------------
             # Callback function if you'd like to upload files from the target directory to remote store e.g. AWS S3 that

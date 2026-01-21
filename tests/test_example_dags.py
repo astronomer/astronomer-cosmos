@@ -12,7 +12,7 @@ from airflow.utils.session import provide_session
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION, PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+from cosmos.constants import AIRFLOW_VERSION
 
 from . import utils as test_utils
 
@@ -21,16 +21,7 @@ AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 
-MIN_VER_DAG_FILE: dict[str, list[str]] = {
-    "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py", "cosmos_callback_dag.py"],
-}
-
 IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubernetes.py"]
-
-# Sort descending based on Versions and convert string to an actual version
-MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
-    Version(version): MIN_VER_DAG_FILE[version] for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
-}
 
 
 @provide_session
@@ -48,15 +39,7 @@ def session():
 def get_dag_bag() -> DagBag:  # noqa: C901
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
 
-    if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
-        return DagBag(dag_folder=None, include_examples=False)
-
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
-        for min_version, files in MIN_VER_DAG_FILE_VER.items():
-            if AIRFLOW_VERSION < min_version:
-                print(f"Adding {files} to .airflowignore")
-                file.writelines([f"{file}\n" for file in files])
-
         for dagfile in IGNORED_DAG_FILES:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
@@ -67,9 +50,6 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
         if DBT_VERSION < Version("1.5.0"):
             file.writelines(["example_source_rendering.py\n"])
-
-        if AIRFLOW_VERSION < Version("2.8.0"):
-            file.writelines("example_cosmos_dbt_build.py\n")
 
         # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
         # https://github.com/apache/airflow/issues/51566
@@ -125,10 +105,6 @@ def run_dag(dag_id: str):
     test_utils.run_dag(dag)
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
-)
 @pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):
@@ -138,10 +114,8 @@ def test_example_dag(session, dag_id: str):
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION >= Version("3.1.0")  # TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/2045
-    or AIRFLOW_VERSION < Version("2.8")
-    or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs (see PR: https://github.com/apache/airflow/pull/34585), and Cosmos errors if `emit_datasets` is not False",
+    AIRFLOW_VERSION >= Version("3.1.0"),  # TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/2045
+    reason="TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/2045",
 )
 @patch.dict(
     os.environ,

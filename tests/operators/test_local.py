@@ -26,7 +26,7 @@ from pendulum import datetime
 import cosmos.dbt.runner as dbt_runner
 from cosmos import cache
 from cosmos.config import ProfileConfig
-from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
+from cosmos.constants import InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
@@ -51,7 +51,6 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
 from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
 
@@ -417,58 +416,7 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) >= version.parse("2.10")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
-    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
-@pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets(caplog):
-    from airflow.datasets import Dataset
-
-    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
-
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        test_operator = DbtTestLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="test",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        seed_operator >> run_operator >> test_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
-    assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.outlets == []
-
-
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     try:
@@ -601,10 +549,6 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
     with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
@@ -620,45 +564,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_vi
     assert run_operator.outlets == []
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-    # https://github.com/apache/airflow/issues/39486
-)
-@pytest.mark.integration
-def test_run_operator_dataset_emission_is_skipped(caplog):
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-
-        seed_operator >> run_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == []
-    assert run_operator.outlets == []
-
-
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -692,10 +597,6 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     ]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -1514,39 +1415,6 @@ def test_dbt_clone_local_operator_initialisation():
 
 
 @patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
-@patch("cosmos.settings.AIRFLOW_IO_AVAILABLE", new=False)
-def test_configure_remote_target_path_object_storage_unavailable_on_earlier_airflow_versions():
-    operator = DbtCompileLocalOperator(
-        task_id="fake-task",
-        profile_config=profile_config,
-        project_dir="fake-dir",
-    )
-    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
-        operator._configure_remote_target_path()
-
-
-@pytest.mark.parametrize(
-    "rem_target_path, rem_target_path_conn_id",
-    [
-        (None, "aws_s3_conn"),
-        ("unknown://some-bucket/cache", None),
-    ],
-)
-def test_config_remote_target_path_unset_settings(rem_target_path, rem_target_path_conn_id):
-    with patch("cosmos.operators.local.remote_target_path", new=rem_target_path):
-        with patch("cosmos.operators.local.remote_target_path_conn_id", new=rem_target_path_conn_id):
-            operator = DbtCompileLocalOperator(
-                task_id="fake-task",
-                profile_config=profile_config,
-                project_dir="fake-dir",
-            )
-            target_path, target_conn = operator._configure_remote_target_path()
-        assert target_path is None
-        assert target_conn is None
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
 @patch("cosmos.operators.local.remote_target_path_conn_id", new="aws_s3_conn")
 @patch("cosmos.operators.local.ObjectStoragePath")
 def test_configure_remote_target_path(mock_object_storage_path):
@@ -1607,7 +1475,6 @@ def test_upload_sql_files_xcom(tmp_path):
     mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value=compressed_b64_sql)
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("cosmos.operators.local.ObjectStoragePath.copy")
 @patch("cosmos.operators.local.ObjectStoragePath")
@@ -1810,7 +1677,6 @@ def test_handle_post_execution_with_multiple_callbacks(
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("cosmos.operators.local.ObjectStoragePath")
 def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote, caplog):
@@ -1864,7 +1730,6 @@ def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_p
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 def test_delete_sql_files_no_remote_target_configured(mock_configure_remote, caplog):
     """Test that _delete_sql_files exits early with a warning when remote path is not configured."""

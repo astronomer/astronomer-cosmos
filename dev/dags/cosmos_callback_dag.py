@@ -34,7 +34,7 @@ cosmos_callback_dag = DbtDag(
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag
         # --------------------------------------------------------------
-        # Callback function to upload files using Airflow Object storage and Cosmos remote_target_path setting on Airflow 2.8 and above
+        # Callback function to upload files using Airflow Object storage and Cosmos remote_target_path setting
         "callback": upload_to_cloud_storage,
         # --------------------------------------------------------------
         # Callback function to upload files to AWS S3, works for Airflow < 2.8 too

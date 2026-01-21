@@ -142,14 +142,14 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow2(self):
         fetcher = MagicMock(return_value="failed")
-        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.9.0")):
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.10.0")):
             with patch(
                 "cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher
             ) as mock_builder:
                 state = await self.trigger._get_producer_task_status()
 
         mock_builder.assert_called_once_with(
-            airflow_version=Version("2.9.0"),
+            airflow_version=Version("2.10.0"),
             dag_id=self.trigger.dag_id,
             run_id=self.trigger.run_id,
             producer_task_id=self.trigger.producer_task_id,
@@ -162,7 +162,7 @@ class TestWatcherTrigger:
     async def test_get_producer_task_status_airflow2_missing_ti(self):
         fetcher = MagicMock(return_value=None)
 
-        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.9.0")):
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.10.0")):
             with patch("cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()
 

@@ -37,8 +37,8 @@ Python
 Apache Airflow
 ~~~~~~~~~~~~~~
 
-- **Minimum required**: Apache Airflow 2.6.0
-- **Supported versions**: 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 3.0, 3.1
+- **Minimum required**: Apache Airflow 2.10.0
+- **Supported versions**: 2.10, 2.11, 3.0, 3.1
 
 dbt Core
 ~~~~~~~~

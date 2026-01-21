@@ -44,10 +44,9 @@ If you already have a ``manifest.json`` file created by dbt, Cosmos will parse t
 You can supply a ``manifest_path`` parameter on the DbtDag / DbtTaskGroup with a path to a ``manifest.json`` file.
 
 Before Cosmos 1.6.0, the path to ``manifest.json`` supplied via the ``DbtDag`` / ``DbtTaskGroup`` ``manifest_path``
-argument accepted only local paths. However, starting with Cosmos 1.6.0, if you've Airflow >= 2.8.0, you can supply a
-a remote path (e.g., an S3 URL) too. For supporting remote paths, Cosmos leverages the
+argument accepted only local paths. However, starting with Cosmos 1.6.0, you can supply a remote path (e.g., an S3 URL) too. For supporting remote paths, Cosmos leverages the
 `Airflow Object Storage <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
-feature released in Airflow 2.8.0.
+feature.
 For remote paths, you can specify a ``manifest_conn_id``, which is an
 Airflow connection ID containing the credentials to access the remote path. If you do not specify a
 ``manifest_conn_id``, Cosmos will use the default connection ID specific to the scheme, identified using the Airflow

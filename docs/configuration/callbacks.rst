@@ -42,7 +42,7 @@ using a single operator in an Airflow DAG:
 Example: Using DbtDag or DbtTaskGroup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Airflow 2.8 or later, you can leverage the :ref:`remote_target_path` configuration to upload files
+You can leverage the :ref:`remote_target_path` configuration to upload files
 from the target directory to a remote storage. Below is an example of how to define a callback helper function in your
 ``DbtDag`` that utilizes this configuration:
 

@@ -30,6 +30,7 @@ from cosmos.constants import (
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
     ExecutionMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -390,6 +391,22 @@ def create_task_metadata(
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
+            if node.resource_type == DbtResourceType.SEED:
+                if render_config.seed_rendering_behavior == SeedRenderingBehavior.NONE:
+                    return None
+
+                if (
+                    render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES
+                    and render_config.test_behavior == TestBehavior.BUILD
+                ):
+                    logger.warning(
+                        "SeedRenderingBehavior.WHEN_SEED_CHANGES is not compatible with TestBehavior.BUILD. "
+                        "The seed change detection will be ignored because dbt build runs seeds, models, "
+                        "and tests together. Consider using TestBehavior.AFTER_EACH or TestBehavior.AFTER_ALL instead."
+                    )
+
+                extra_context["seed_rendering_behavior"] = render_config.seed_rendering_behavior.value
+
             args[models_select_key] = node.resource_name
             task_id, args = _get_task_id_and_args(
                 node=node,

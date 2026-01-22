@@ -663,7 +663,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self._handle_partial_parse(tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
-                (profile_path, env_vars) = profile_values
+                profile_path, env_vars = profile_values
                 env.update(env_vars)
                 logger.debug("Using environment variables keys: %s", env.keys())
 
@@ -752,26 +752,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             if settings.use_dataset_airflow3_uri_standard:
                 dataset_uri = airflow_3_uri
             else:
-                logger.warning(
-                    f"""
+                logger.warning(f"""
                     Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) will no longer be valid.
                     Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <{airflow_3_uri}>.
                     Previously, with Airflow 2.x, the URI was <{airflow_2_uri}>.
                     If you want to use the Airflow 3 URI standard while still using Airflow 2, please, set:
                         export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
                     Remember to update any DAGs that are scheduled using this dataset.
-                    """
-                )
+                    """)
                 dataset_uri = airflow_2_uri
         else:
-            logger.warning(
-                f"""
+            logger.warning(f"""
                 Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) are no longer accepted.
                 Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <{airflow_3_uri}>.
                 Before, with Airflow 2.x, the URI used to be <{airflow_2_uri}>.
                 Please, change any DAGs that were scheduled using the old standard to the new one.
-                """
-            )
+                """)
             dataset_uri = airflow_3_uri
         return dataset_uri
 

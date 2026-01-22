@@ -5,7 +5,10 @@ Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Executi
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
 
-Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**.
+Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**. Since this execution mode improves the performance by leveraging `dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_, the performance gains will depend on two major factors:
+
+- The amount of ``threads`` set either via the dbt profile configuration or the dbt ``--threads`` flag
+- The topology of the dbt pipeline
 
 -------------------------------------------------------------------------------
 
@@ -406,6 +409,14 @@ This use-case is not currently supported by the ``ExecutionMode.WATCHER``, since
 We have a follow up ticket to `further investigate this use-case <https://github.com/astronomer/astronomer-cosmos/issues/2053>`_.
 
 -------------------------------------------------------------------------------
+
+Troubleshooting
+---------------
+
+Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
+Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
+
+
 
 
 Summary

@@ -183,7 +183,7 @@ def validate_initial_user_config(
     if render_config is not None and render_config.invocation_mode == InvocationMode.DBT_RUNNER:
         if not is_dbt_installed_in_same_environment():
             raise CosmosValueError(
-                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.DBT_SUBPROCESS instead."
+                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.SUBPROCESS instead."
             )
         if render_config.dbt_executable_path and render_config.dbt_executable_path != get_system_dbt():
             raise CosmosValueError(
@@ -284,10 +284,8 @@ class DbtToAirflowConverter:
         validate_changed_config_paths(execution_config, project_config, render_config)
 
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
-            logger.warning(
-                "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-            )
+            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
 
         cache_dir = None
         cache_identifier = None

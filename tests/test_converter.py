@@ -599,11 +599,8 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
         operator_args=operator_args,
     )
 
-    assert (
-        "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-        in caplog.text
-    )
+    assert "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text
 
 
 @pytest.mark.parametrize(

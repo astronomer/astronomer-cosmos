@@ -1229,8 +1229,9 @@ def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
     assert group_start_idx < group_end_idx
 
 
+@patch("cosmos.converter.should_emit", return_value=True)
 @patch("cosmos.converter.DbtGraph.load")
-def test_telemetry_metadata_storage(mock_load_dbt_graph):
+def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
     """Test that telemetry metadata is stored correctly in DAG params."""
     dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
 

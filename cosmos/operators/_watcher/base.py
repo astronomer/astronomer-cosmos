@@ -205,11 +205,12 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         if status == "success":
             if reason == "model_not_run":
-                status = self._get_status_from_run_results(context["ti"], context)
-                logger.info(
-                    "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
-                    self.model_unique_id,
-                )
+                run_results_status = self._get_status_from_run_results(context["ti"], context)
+                if run_results_status is None:
+                    logger.info(
+                        "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                        self.model_unique_id,
+                    )
 
         if status != "failed":
             return

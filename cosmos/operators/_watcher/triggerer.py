@@ -149,6 +149,15 @@ class WatcherTrigger(BaseTrigger):
                 )
                 yield TriggerEvent({"status": "failed", "reason": "producer_failed"})  # type: ignore[no-untyped-call]
                 return
+            elif producer_task_state == "success" and node_status is None:
+                self.log.info(
+                    "The producer task '%s' succeeded. There is no information about the model '%s' execution.",
+                    self.producer_task_id,
+                    self.model_unique_id,
+                )
+                yield TriggerEvent({"status": "success", "reason": "model_not_run"})  # type: ignore[no-untyped-call]
+                return
+
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
             self.log.debug("Polling again for model '%s' status...", self.model_unique_id)

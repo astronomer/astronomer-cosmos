@@ -203,18 +203,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         status = event.get("status")
         reason = event.get("reason")
 
-        if status == "success":
-            try:
-                run_results_status = self._get_status_from_run_results(context["ti"], context)
-            except (KeyError, TypeError):
-                logger.debug("Could not fetch run results.")
-                run_results_status = None
-
-            if reason == "model_not_run" and run_results_status is None:
-                logger.info(
-                    "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
-                    self.model_unique_id,
-                )
+        if status == "success" and reason == "model_not_run":
+            logger.info(
+                "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                self.model_unique_id,
+            )
 
         if status != "failed":
             return

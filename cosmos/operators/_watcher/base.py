@@ -206,7 +206,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if status == "success":
             try:
                 run_results_status = self._get_status_from_run_results(context["ti"], context)
-            except KeyError:
+            except (KeyError, TypeError):
                 logger.debug("Could not fetch run results.")
                 run_results_status = None
 

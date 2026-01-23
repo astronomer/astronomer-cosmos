@@ -198,20 +198,20 @@ def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
     assert any("forces Airflow retries to 0" in message for message in caplog.messages)
 
 
-def test_dbt_producer_watcher_operator_blocks_retry_attempt(caplog):
+def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
     context = {"ti": ti}
 
     with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.ERROR):
-            with pytest.raises(AirflowException) as excinfo:
-                op.execute(context=context)
+        with caplog.at_level(logging.INFO):
+            result = op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert "does not support Airflow retries" in str(excinfo.value)
+    assert result is None
     assert any("does not support Airflow retries" in message for message in caplog.messages)
+    assert any("skipping execution" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(

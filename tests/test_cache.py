@@ -35,7 +35,7 @@ from cosmos.cache import (
     _get_sha1_hash,
     _update_partial_parse_cache,
     create_cache_profile,
-    delete_unused_dbt_ls_cache,
+    delete_unused_dbt_cache,
     get_cached_profile,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
@@ -199,18 +199,18 @@ def vars_session():
 
 
 @pytest.mark.integration
-def test_delete_unused_dbt_ls_cache_deletes_a_week_ago_cache(vars_session):
+def test_delete_unused_dbt_cache_deletes_a_week_ago_cache(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
-    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
+    assert delete_unused_dbt_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
 
 
 @pytest.mark.integration
-def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_session):
+def test_delete_unused_dbt_cache_deletes_all_cache_five_minutes_ago(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
-    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
+    assert delete_unused_dbt_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
@@ -467,7 +467,7 @@ def test_calculate_yaml_selectors_cache_current_version_equals():
         result = _calculate_yaml_selectors_cache_current_version(
             "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, "yamlselectors_hash_v1"
         )
-        assert result == "dbt_project_hash_v1,dcbc007b6ea10b215d0024015f762d93,yamlselectors_hash_v1"
+        assert result == "dbt_project_hash_v1,dcbc007b6ea10b215d0024015f762d93,fbbaca69581c53891710fed3d53badcb"
 
 
 def test_were_yaml_selectors_modified_true():

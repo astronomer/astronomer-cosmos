@@ -19,7 +19,6 @@ from cosmos.profiles import DbtProfileConfigVars, PostgresUserPasswordProfileMap
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-
 execution_config = ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "jaffle_shop")
 
 profile_config = ProfileConfig(
@@ -32,7 +31,11 @@ profile_config = ProfileConfig(
     ),
 )
 
-render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, selector="critical_path")
+render_config = RenderConfig(
+    load_method=LoadMode.DBT_MANIFEST,
+    selector="critical_path",
+    airflow_vars_to_purge_dbt_yaml_selectors_cache=["purge"],
+)
 
 
 with DAG(

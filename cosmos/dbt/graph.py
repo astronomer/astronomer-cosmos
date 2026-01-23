@@ -460,6 +460,28 @@ class DbtGraph:
         logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.cache_key}>: {cache_args}")
         return cache_args
 
+    @cached_property
+    def _yaml_selectors_airflow_vars(self) -> list[str]:
+        """
+        Cached Airflow variable values used for YAML selectors cache invalidation.
+        These are expensive to retrieve and don't change during a single DAG parse.
+        """
+        cache_args = []
+        if self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
+            for var_name in self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
+                airflow_vars = [var_name, Variable.get(var_name, "")]
+                cache_args.extend(airflow_vars)
+        return cache_args
+
+    def get_dbt_yaml_selectors_cache_key_args(self, impl_version: str) -> list[str]:
+        """
+        Values that are used to represent the dbt yaml selectors cache key. If any parts are changed, the manifest selectors
+        will be reparsed and the new value will be stored.
+        """
+        cache_args = [impl_version] + self._yaml_selectors_airflow_vars
+        logger.debug(f"Value of `dbt_yaml_selectors_cache_key` for <{self.cache_key}>: {cache_args}")
+        return cache_args
+
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
         """
         Store compressed dbt ls output into an Airflow Variable.
@@ -979,7 +1001,10 @@ class DbtGraph:
 
         cache_dict = {
             "version": cache._calculate_yaml_selectors_cache_current_version(
-                self.cache_key, self.project_path, yaml_selectors.raw, yaml_selectors.impl_version
+                self.cache_key,
+                self.project_path,
+                yaml_selectors.raw,
+                self.get_dbt_yaml_selectors_cache_key_args(yaml_selectors.impl_version),
             ),
             "yaml_selectors": selectors_encoded,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -1035,7 +1060,10 @@ class DbtGraph:
             yaml_selectors: YamlSelectors = cache_dict["yaml_selectors"]
 
             current_version = cache._calculate_yaml_selectors_cache_current_version(
-                self.cache_key, self.project_path, selector_definitions, yaml_selectors.impl_version
+                self.cache_key,
+                self.project_path,
+                selector_definitions,
+                self.get_dbt_yaml_selectors_cache_key_args(yaml_selectors.impl_version),
             )
 
             if cache_dict and not cache.were_yaml_selectors_modified(cache_version, current_version):

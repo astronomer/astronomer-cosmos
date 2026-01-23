@@ -291,7 +291,7 @@ def _calculate_yaml_selectors_cache_current_version(
     cache_identifier: str,
     project_dir: Path,
     selector_definitions: dict[str, dict[str, Any]],
-    implementation_version: str,
+    cache_key: list[str],
 ) -> str:
     """
     Taking into account the project directory contents and the selectors definitions, calculate the
@@ -311,12 +311,13 @@ def _calculate_yaml_selectors_cache_current_version(
     dbt_project_hash = _create_folder_version_hash(project_dir)
 
     yaml_selector_hash = hashlib.md5(yaml.dump(selector_definitions).encode()).hexdigest()
+    cache_key_hash = hashlib.md5("".join(cache_key).encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
         f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
     )
-    return f"{dbt_project_hash},{yaml_selector_hash},{implementation_version}"
+    return f"{dbt_project_hash},{yaml_selector_hash},{cache_key_hash}"
 
 
 def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:
@@ -363,16 +364,24 @@ def were_yaml_selectors_modified(previous_version: str, current_version: str) ->
 
 
 @provide_session
-def delete_unused_dbt_ls_cache(
-    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+def delete_unused_dbt_cache(
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None, cache_type: str = "cosmos"
 ) -> int:
     """
     Delete Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
 
+    This function handles all types of Cosmos cache (dbt ls, YAML selectors, etc.) and is used by
+    specific wrapper functions for backwards compatibility.
+
+    :param max_age_last_usage: Delete cache for DAGs not run within this timeframe
+    :param session: SQLAlchemy session for Airflow metadata database (automatically provided by @provide_session)
+    :param cache_type: Type of cache being deleted, used in log messages (default: "cosmos")
+    :return: Number of Airflow Variables deleted
+
     Example usage:
 
     There are three Cosmos cache Airflow Variables:
-    1. ``cache cosmos_cache__basic_cosmos_dag``
+    1. ``cosmos_cache__basic_cosmos_dag``
     2. ``cosmos_cache__basic_cosmos_task_group__orders``
     3. ``cosmos_cache__basic_cosmos_task_group__customers``
 
@@ -385,21 +394,21 @@ def delete_unused_dbt_ls_cache(
     To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 5 days ago:
 
     ..code: python
-        >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5))
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_dag
+        >>> delete_unused_dbt_cache(max_age_last_usage=timedelta(days=5))
+        INFO - Removing the cosmos cache cosmos_cache__basic_cosmos_dag
 
     To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 minutes ago:
 
     ..code: python
-        >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=10))
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_dag
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_task_group__orders
-        INFO - Removing the dbt ls cache cosmos_cache__basic_cosmos_task_group__orders
+        >>> delete_unused_dbt_cache(max_age_last_usage=timedelta(minutes=10))
+        INFO - Removing the cosmos cache cosmos_cache__basic_cosmos_dag
+        INFO - Removing the cosmos cache cosmos_cache__basic_cosmos_task_group__orders
+        INFO - Removing the cosmos cache cosmos_cache__basic_cosmos_task_group__customers
 
-    To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 days ago
+    To delete the cache related to ``DbtDags`` and ``DbtTaskGroup`` that were run more than 10 days ago:
 
     ..code: python
-        >>> delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=10))
+        >>> delete_unused_dbt_cache(max_age_last_usage=timedelta(days=10))
 
     In this last example, nothing is deleted.
     """
@@ -431,7 +440,7 @@ def delete_unused_dbt_ls_cache(
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for var_key in vars_keys:
-                logger.info(f"Removing the dbt ls cache {var_key}")
+                logger.info(f"Removing the {cache_type} cache {var_key}")
                 Variable.delete(var_key)
                 deleted_cosmos_variables += 1
 
@@ -443,11 +452,19 @@ def delete_unused_dbt_ls_cache(
 
 # TODO: Add integration tests once remote cache is supported in the CI pipeline
 @provide_session
-def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
-    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+def delete_unused_dbt_remote_cache_files(  # pragma: no cover
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None, cache_type: str = "cosmos"
 ) -> int:
     """
     Delete Cosmos cache stored in remote storage based on the last execution of their associated DAGs.
+
+    This function handles all types of Cosmos cache (dbt ls, YAML selectors, etc.) stored in remote
+    storage and is used by specific wrapper functions for backwards compatibility.
+
+    :param max_age_last_usage: Delete cache for DAGs not run within this timeframe
+    :param session: SQLAlchemy session for Airflow metadata database (automatically provided by @provide_session)
+    :param cache_type: Type of cache being deleted, used in log messages (default: "cosmos")
+    :return: Number of remote cache files deleted
     """
     if session is None:
         return 0
@@ -458,7 +475,7 @@ def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
     configured_remote_cache_dir = _configure_remote_cache_dir()
     if not configured_remote_cache_dir:
         logger.info(
-            "No remote cache directory configured. Skipping the deletion of the dbt ls cache files in remote storage."
+            f"No remote cache directory configured. Skipping the deletion of the {cache_type} cache files in remote storage."
         )
         return 0
 
@@ -487,16 +504,85 @@ def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for file in files:
-                logger.info(f"Removing the dbt ls cache remote file {file}")
+                logger.info(f"Removing the {cache_type} cache remote file {file}")
                 file.unlink()
                 deleted_cosmos_remote_cache_files += 1
     logger.info(
-        "Deleted %s/%s dbt ls cache files in remote storage.",
+        "Deleted %s/%s %s cache files in remote storage.",
         deleted_cosmos_remote_cache_files,
         total_cosmos_remote_cache_files,
+        cache_type,
     )
 
     return deleted_cosmos_remote_cache_files
+
+
+@provide_session
+def delete_unused_dbt_ls_cache(
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+) -> int:
+    """
+    Delete all Cosmos cache stored in Airflow Variables (dbt ls, YAML selectors, etc.).
+
+    This function is maintained for backwards compatibility and API stability. It has identical behavior
+    to delete_unused_dbt_cache() and deletes all types of Cosmos cache, not just dbt ls cache.
+
+    :param max_age_last_usage: Delete cache for DAGs not run within this timeframe
+    :param session: SQLAlchemy session for Airflow metadata database (automatically provided by @provide_session)
+    :return: Number of Airflow Variables deleted
+    """
+    return delete_unused_dbt_cache(max_age_last_usage, session, cache_type="dbt ls")
+
+
+@provide_session
+def delete_unused_dbt_ls_remote_cache_files(  # pragma: no cover
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+) -> int:
+    """
+    Delete all Cosmos cache stored in remote storage (dbt ls, YAML selectors, etc.).
+
+    This function is maintained for backwards compatibility and API stability. It has identical behavior
+    to delete_unused_dbt_remote_cache_files() and deletes all types of Cosmos cache, not just dbt ls cache.
+
+    :param max_age_last_usage: Delete cache for DAGs not run within this timeframe
+    :param session: SQLAlchemy session for Airflow metadata database (automatically provided by @provide_session)
+    :return: Number of remote cache files deleted
+    """
+    return delete_unused_dbt_remote_cache_files(max_age_last_usage, session, cache_type="dbt ls")
+
+
+@provide_session
+def delete_unused_dbt_yaml_selectors_cache(
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+) -> int:
+    """
+    Delete all Cosmos cache stored in Airflow Variables (dbt ls, YAML selectors, etc.).
+
+    This function is maintained for backwards compatibility and API stability. It has identical behavior
+    to delete_unused_dbt_cache() and deletes all types of Cosmos cache, not just YAML selectors cache.
+
+    :param max_age_last_usage: Delete cache for DAGs not run within this timeframe
+    :param session: SQLAlchemy session for Airflow metadata database (automatically provided by @provide_session)
+    :return: Number of Airflow Variables deleted
+    """
+    return delete_unused_dbt_cache(max_age_last_usage, session, cache_type="dbt yaml selectors")
+
+
+@provide_session
+def delete_unused_dbt_yaml_selectors_remote_cache_files(  # pragma: no cover
+    max_age_last_usage: timedelta = timedelta(days=30), session: Session | None = None
+) -> int:
+    """
+    Delete all Cosmos cache stored in remote storage (dbt ls, YAML selectors, etc.).
+
+    This function is maintained for backwards compatibility and API stability. It has identical behavior
+    to delete_unused_dbt_remote_cache_files() and deletes all types of Cosmos cache, not just YAML selectors cache.
+
+    :param max_age_last_usage: Delete cache for DAGs not run within this timeframe
+    :param session: SQLAlchemy session for Airflow metadata database (automatically provided by @provide_session)
+    :return: Number of remote cache files deleted
+    """
+    return delete_unused_dbt_remote_cache_files(max_age_last_usage, session, cache_type="dbt yaml selectors")
 
 
 def is_profile_cache_enabled() -> bool:

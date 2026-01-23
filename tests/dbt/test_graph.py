@@ -2050,6 +2050,20 @@ def test_dbt_ls_cache_key_args_uses_airflow_vars_to_purge_dbt_ls_cache(airflow_v
     assert graph.dbt_ls_cache_key_args == [key, value]
 
 
+@pytest.mark.integration
+def test_get_dbt_yaml_selectors_cache_key_args_uses_airflow_vars_to_purge_dbt_cache(airflow_variable):
+    key, value = airflow_variable
+    graph = DbtGraph(
+        project=ProjectConfig(),
+        render_config=RenderConfig(
+            airflow_vars_to_purge_dbt_yaml_selectors_cache=[key],
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        ),
+    )
+    impl_version = "yamlselectors_hash_v1"
+    assert graph.get_dbt_yaml_selectors_cache_key_args(impl_version) == [impl_version, key, value]
+
+
 @patch("cosmos.dbt.graph.datetime")
 @patch("cosmos.dbt.graph.Variable.set")
 def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
@@ -2094,7 +2108,7 @@ def test_save_yamls_selector_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "fbfa164dd765f83c2941eeb019a7f7b4"
-    assert hash_impl == "9a2177baf050abaacec7ca1949ea7959"
+    assert hash_impl == "ec903f8592b06b28274b8847eb79bb1f"
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.

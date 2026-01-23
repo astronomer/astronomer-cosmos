@@ -235,7 +235,7 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 - In earlier versions, attempting to retry the producer task would raise an ``AirflowException``, causing the retry to fail immediately.
 - Now, the producer gracefully skips execution on retries, logging an informational message explaining that the retry was skipped to avoid running a second ``dbt build``.
-- This allows users to retry entire TaskGroups without the producer task blocking the retry flow.
+- This allows users to retry entire TaskGroups and/or DAGs without the producer task blocking the retry flow.
 
 **Important considerations:**
 

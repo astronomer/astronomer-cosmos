@@ -7,6 +7,8 @@ Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` /
 
  Since Cosmos 1.3, the ``selector`` parameter is also available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
 
+ Since Cosmos 1.13 , the ``selector`` parameter is also supported when using the ``LoadMode.DBT_MANIFEST`` to parse the dbt project into Airflow.
+
 
 Using ``select`` and ``exclude``
 --------------------------------
@@ -117,7 +119,7 @@ Examples:
 Using ``selector``
 --------------------------------
 .. note::
-    Only currently supported using the ``dbt_ls`` parsing method since Cosmos 1.3 where the selector is passed directly to the dbt CLI command. \
+    Only currently supported using the ``LoadMode.DBT_LS`` (since Cosmos 1.3) or ``LoadMode.DBT_MANIFEST`` (since Cosmos 1.13).
     If  ``select`` and/or ``exclude`` are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
 
 The ``selector`` parameter is a string that references a `dbt YAML selector <https://docs.getdbt.com/reference/node-selection/yaml-selectors>`_ already defined in a dbt project.
@@ -134,3 +136,47 @@ Examples:
             load_method=LoadMode.DBT_LS,
         )
     )
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig, LoadMode
+
+    jaffle_shop = DbtDag(
+        project_config=ProjectConfig(
+            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+            project_name="jaffle_shop",
+        ),
+        render_config=RenderConfig(
+            selector="nightly_models",  # this selector must be defined in your dbt project
+            load_method=LoadMode.DBT_MANIFEST,
+        ),
+    )
+    jaffle_shop_remote = DbtDag(
+        project_config=ProjectConfig(
+            manifest_path="s3://cosmos-manifest-test/manifest.json",
+            manifest_conn_id="aws_s3_conn",
+            project_name="jaffle_shop",
+        ),
+        render_config=RenderConfig(
+            selector="nightly_models",  # this selector must be defined in your dbt project
+            load_method=LoadMode.DBT_MANIFEST,
+        ),
+    )
+
+Using ``selector`` with ``LoadMode.DBT_MANIFEST``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Since Cosmos 1.13, the ``selector`` parameter is also supported when using the ``LoadMode.DBT_MANIFEST`` parsing method.
+
+When using this combination, Cosmos will read the preprocessed YAML selectors from the manifest file and use them to filter the dbt nodes to include in the Airflow DAG or Task Group.
+
+The YAML selection parser expects the selectors to be defined in the dbt project and will parse the preprocessed ``selectors`` found in the manifest file. Modifying the selector definitions in the manifest file in any way may lead to undefined behavior.
+The parser may or may not catch invalid selector definitions if the selectors in the manifest are altered.
+
+The YAML selection parsing logic is based off the spec defined in the `dbt documentation <https://docs.getdbt.com/reference/node-selection/yaml-selectors>`_.
+All `graph operators <https://docs.getdbt.com/reference/node-selection/graph-operators>`_ and `set operators <https://docs.getdbt.com/reference/node-selection/set-operators>`_ are supported.
+Parsing of the ``default`` and ``indirect_selection`` keywords is not currently supported.
+
+In the event the dbt YAML selector specification changes, Cosmos will attempt to keep up to date with the changes, but there may be a lag between dbt releases and Cosmos releases.
+Once a new Cosmos version is released with the updated selector parsing logic, users should update their Cosmos version to ensure compatibility with the latest dbt selector specification.
+For any subsequent updates to the YAML selector parser, existing YAML selectors caches will be invalidated the next time the DAG is parsed.

@@ -713,6 +713,8 @@ class YamlSelectors:
         The original unparsed selector definitions from the manifest.
     :property parsed: dict[str, dict[str, Any]]
         The parsed selector definitions in Cosmos format.
+    :property impl_version: str
+        The source code of the YamlSelectors implementation, used for change detection.
 
     References:
         https://docs.getdbt.com/reference/node-selection/yaml-selectors
@@ -789,10 +791,10 @@ class YamlSelectors:
         """
         result: list[dict[str, Any]] = []
         if key not in dct:
-            raise CosmosValueError(f"Expected to find key {key} in dict, only found {list(dct)}")
+            raise CosmosValueError(f"Expected to find key '{key}' in dict, only found {list(dct)}")
         values = dct[key]
         if not isinstance(values, list):
-            raise CosmosValueError(f'Invalid value for key "{key}". Expected a list.')
+            raise CosmosValueError(f"Invalid value for key '{key}'. Expected a list.")
         for value in values:
             if isinstance(value, dict):
                 for value_key in value:
@@ -840,14 +842,14 @@ class YamlSelectors:
             raise CosmosValueError("childrens_parents cannot be combined with parents_depth or children_depth.")
 
         if childrens_parents:
-            return f"@{selector}"
+            return f"{AT_SELECTOR}{selector}"
 
         if parents:
-            prefix = f"{parents_depth}+" if parents_depth > 0 else "+"
+            prefix = f"{parents_depth}{PLUS_SELECTOR}" if parents_depth > 0 else PLUS_SELECTOR
             selector = f"{prefix}{selector}"
 
         if children:
-            suffix = f"+{children_depth}" if children_depth > 0 else "+"
+            suffix = f"{PLUS_SELECTOR}{children_depth}" if children_depth > 0 else PLUS_SELECTOR
             selector = f"{selector}{suffix}"
 
         return selector
@@ -884,11 +886,11 @@ class YamlSelectors:
         }
 
         for method_prefix, selector_prefix in method_mappings.items():
-            if method.startswith(method_prefix):
+            if method == method_prefix:
                 return f"{selector_prefix}{value}"
 
         if any(method.startswith(f"{CONFIG_SELECTOR}{config}") for config in SUPPORTED_CONFIG):
-            return f"{CONFIG_SELECTOR}:{value}"
+            return f"{method}:{value}"
 
         raise CosmosValueError(f"Unsupported selector method: '{method}'")
 
@@ -903,7 +905,7 @@ class YamlSelectors:
         :param dct: dict[str, Any] - Dictionary containing selector definition with keys like 'method', 'value',
                    'parents', 'children', 'parents_depth', 'children_depth', 'childrens_parents'
         :return: str - A Cosmos-formatted selector string
-        :raises CosmosValueError: If required keys are missing or depth values are not integers
+        :raises CosmosValueError: If depth values are not integers
 
         Example Input:
             {
@@ -916,18 +918,13 @@ class YamlSelectors:
         Example Output:
             "tag:nightly+2"
         """
-        method = dct.get("method", "METHOD_KEY_NOT_FOUND")
-        value = dct.get("value", "VALUE_KEY_NOT_FOUND")
+        method = dct["method"]
+        value = dct["value"]
         parents = dct.get("parents", False)
         children = dct.get("children", False)
         parents_depth = dct.get("parents_depth", 0)
         children_depth = dct.get("children_depth", 0)
         childrens_parents = dct.get("childrens_parents", False)
-
-        if method == "METHOD_KEY_NOT_FOUND":
-            raise CosmosValueError(f"Selector method is missing in method definition: {dct}.")
-        if value == "VALUE_KEY_NOT_FOUND":
-            raise CosmosValueError(f"Selector value is missing in method definition: {dct}.")
 
         if not isinstance(parents_depth, int):
             raise CosmosValueError(f"parents_depth must be an integer, got {type(parents_depth)}: {parents_depth}")
@@ -1117,7 +1114,7 @@ class YamlSelectors:
                 exclude = cls._parse_exclusions(definition, cache=cache)
                 dct = {k: v for k, v in dct.items() if k != "exclude"}
         else:
-            raise CosmosValueError(f'Expected "method" and "value" keys, but got {list(definition)}')
+            raise CosmosValueError(f"Expected 'method' and 'value' keys, but got {list(definition)}")
 
         selector = cls._parse_selector(dct)
 
@@ -1171,7 +1168,7 @@ class YamlSelectors:
         else:
             # Rejects CLI-style string definitions (e.g., definition: "tag:my_tag")
             # These should be structured as method-value definitions instead
-
+            #
             # Rejects key-value definitions (e.g., tag: my_tag, path: models/, etc.)
             # These should be structured as method-value definitions instead
             raise CosmosValueError(
@@ -1220,14 +1217,14 @@ class YamlSelectors:
             name = definition.get("name", "")
             selector_definition = definition.get("definition", {})
 
-            select, exclude = cls._parse_from_definition(
-                selector_definition, cache=copy.deepcopy(cache), rootlevel=True
-            )
+            select, exclude = cls._parse_from_definition(selector_definition, cache=cache, rootlevel=True)
 
             result[name] = {
                 "select": select if select else None,
                 "exclude": exclude if exclude else None,
             }
+
+            cache[name] = (select, exclude)
 
         return cls(selectors, result)
 

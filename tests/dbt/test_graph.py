@@ -3,6 +3,7 @@ import importlib
 import json
 import logging
 import os
+import pickle
 import shutil
 import sys
 import tempfile
@@ -36,6 +37,7 @@ from cosmos.dbt.graph import (
     parse_dbt_ls_output,
     run_command,
 )
+from cosmos.dbt.selector import YamlSelectors
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
@@ -47,6 +49,7 @@ SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.js
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
 SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
+SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
@@ -367,6 +370,144 @@ def test_load_via_manifest_with_select(project_name, manifest_filepath, model_fi
         "model.jaffle_shop.stg_payments",
     ]
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
+
+
+def test_load_via_manifest_with_selectors_and_missing_definitions():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_MODEL_VERSION
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        load_method=LoadMode.DBT_MANIFEST,
+        selector="my_selector",
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+        assert err_info.value.args[0] == f"Selectors not found in the manifest file {project_config.manifest_path}"
+
+
+def test_load_via_manifest_with_selectors_and_missing_selector():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_SELECTORS
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        load_method=LoadMode.DBT_MANIFEST,
+        selector="my_selector",
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+        assert "Selector 'my_selector' not found in the manifest file" in err_info.value.args[0]
+
+
+def test_load_via_manifest_with_selectors():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_SELECTORS
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        load_method=LoadMode.DBT_MANIFEST,
+        selector="staging_models",
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    expected_keys = [
+        "model.jaffle_shop.customers",
+        "model.jaffle_shop.orders",
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+        "seed.jaffle_shop.raw_customers",
+        "seed.jaffle_shop.raw_orders",
+        "seed.jaffle_shop.raw_payments",
+        "test.jaffle_shop.accepted_values_orders_status__placed__shipped__completed__return_pending__returned.be6b5b5ec3",
+        "test.jaffle_shop.accepted_values_stg_orders_status__placed__shipped__completed__return_pending__returned.080fb20aad",
+        "test.jaffle_shop.accepted_values_stg_payments_payment_method__credit_card__coupon__bank_transfer__gift_card.3c3820f278",
+        "test.jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
+        "test.jaffle_shop.not_null_orders_amount.106140f9fd",
+        "test.jaffle_shop.not_null_orders_bank_transfer_amount.7743500c49",
+        "test.jaffle_shop.not_null_orders_coupon_amount.ab90c90625",
+        "test.jaffle_shop.not_null_orders_credit_card_amount.d3ca593b59",
+        "test.jaffle_shop.not_null_orders_customer_id.c5f02694af",
+        "test.jaffle_shop.not_null_orders_gift_card_amount.413a0d2d7a",
+        "test.jaffle_shop.not_null_orders_order_id.cf6c17daed",
+        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.jaffle_shop.not_null_stg_orders_order_id.81cfe2fe64",
+        "test.jaffle_shop.not_null_stg_payments_payment_id.c19cc50075",
+        "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2",
+        "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
+        "test.jaffle_shop.unique_orders_order_id.fed79b3a6e",
+        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
+        "test.jaffle_shop.unique_stg_orders_order_id.e3b841c71a",
+        "test.jaffle_shop.unique_stg_payments_payment_id.3744510712",
+    ]
+    expected_filtered_keys = [
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+        "test.jaffle_shop.accepted_values_stg_orders_status__placed__shipped__completed__return_pending__returned.080fb20aad",
+        "test.jaffle_shop.accepted_values_stg_payments_payment_method__credit_card__coupon__bank_transfer__gift_card.3c3820f278",
+        "test.jaffle_shop.not_null_stg_customers_customer_id.e2cfb1f9aa",
+        "test.jaffle_shop.not_null_stg_orders_order_id.81cfe2fe64",
+        "test.jaffle_shop.not_null_stg_payments_payment_id.c19cc50075",
+        "test.jaffle_shop.unique_stg_customers_customer_id.c7614daada",
+        "test.jaffle_shop.unique_stg_orders_order_id.e3b841c71a",
+        "test.jaffle_shop.unique_stg_payments_payment_id.3744510712",
+    ]
+
+    assert sorted(dbt_graph.nodes.keys()) == expected_keys
+    assert sorted(dbt_graph.filtered_nodes.keys()) == expected_filtered_keys
+
+    assert len(dbt_graph.nodes) == 28
+    assert len(dbt_graph.filtered_nodes) == 11
+
+    sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
+    assert sample_node.name == "customers"
+    assert sample_node.unique_id == "model.jaffle_shop.customers"
+    assert sample_node.resource_type == DbtResourceType.MODEL
+    assert sample_node.depends_on == [
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
+        "model.jaffle_shop.stg_payments",
+    ]
+    assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{DBT_PROJECT_NAME}/models/customers.sql"
 
 
 @patch("cosmos.dbt.graph.DbtGraph.load_from_dbt_manifest", return_value=None)
@@ -1708,7 +1849,7 @@ def test_load_via_dbt_ls_render_config_no_partial_parse(
     assert "--no-partial-parse" in ls_command
 
 
-@pytest.mark.parametrize("load_method", [LoadMode.DBT_MANIFEST, LoadMode.CUSTOM])
+@pytest.mark.parametrize("load_method", [LoadMode.CUSTOM])
 def test_load_method_with_unsupported_render_config_selector_arg(load_method):
     """Tests that error is raised when RenderConfig.selector is used with LoadMode.DBT_MANIFEST or LoadMode.CUSTOM."""
 
@@ -1924,7 +2065,44 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("7abb868ed1c22e78de1c00429d950a77", "85cba4ef17dd7c161938da6980a6ff85")
+        assert hash_dir in (
+            "7abb868ed1c22e78de1c00429d950a77",
+            "85cba4ef17dd7c161938da6980a6ff85",
+            "7e273d9b7569e959af96f4368b9a036e",
+        )
+    else:
+        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
+
+
+@patch("cosmos.dbt.graph.datetime")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_yamls_selector_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+    mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    graph.save_yaml_selectors_cache(selectors)
+    assert mock_variable_set.call_args[0][0] == "cosmos_cache__something"
+    assert (
+        mock_variable_set.call_args[0][1]["yaml_selectors"]
+        == "eJwtjjsKAkEQRAU/i4ImXkKTPYCHMDEykKF3p90dmI/MR00EzTuzvYync9ixkq6iXkM9J5/vqIjWrQvGhVo2sQ6osY3OMy2PYPThHwO/efviB29oIjzcsqNViNAp2wnnJWZiKC0Y5L6ihcSzsioqZ4diZjD2TjKN8xPT9Ao6Yb45CeCUAlXiAj6gLHjZwSemeUZ2BQOq8N7qJJH3KTX1D+xVTPQ="
+    )
+    assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
+    version = mock_variable_set.call_args[0][1].get("version")
+    hash_dir, hash_selectors, hash_impl = version.split(",")
+
+    assert hash_selectors == "fbfa164dd765f83c2941eeb019a7f7b4"
+    assert hash_impl == "535bf463068da8658a5183094a72545c"
+
+    if sys.platform == "darwin":
+        # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
+        assert hash_dir in (
+            "7abb868ed1c22e78de1c00429d950a77",
+            "85cba4ef17dd7c161938da6980a6ff85",
+            "7e273d9b7569e959af96f4368b9a036e",
+        )
     else:
         assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
 
@@ -1935,10 +2113,35 @@ def test_get_dbt_ls_cache_returns_empty_if_non_json_var(airflow_variable):
     assert graph.get_dbt_ls_cache() == {}
 
 
+@pytest.mark.integration
+def test_get_yaml_selectors_cache_returns_empty_if_non_json_var(airflow_variable):
+    graph = DbtGraph(project=ProjectConfig())
+    assert graph.get_yaml_selectors_cache() == {}
+
+
 @patch("cosmos.dbt.graph.Variable.get", return_value={"dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg=="})
 def test_get_dbt_ls_cache_returns_decoded_and_decompressed_value(mock_variable_get):
     graph = DbtGraph(project=ProjectConfig())
     assert graph.get_dbt_ls_cache() == {"dbt_ls": "some output"}
+
+
+@patch(
+    "cosmos.dbt.graph.Variable.get",
+    return_value={
+        "yaml_selectors": "eJwtjjsKAkEQRAU/i4ImXkKTPYCHMDEykKF3p90dmI/MR00EzTuzvYync9ixkq6iXkM9J5/vqIjWrQvGhVo2sQ6osY3OMy2PYPThHwO/efviB29oIjzcsqNViNAp2wnnJWZiKC0Y5L6ihcSzsioqZ4diZjD2TjKN8xPT9Ao6Yb45CeCUAlXiAj6gLHjZwSemeUZ2BQOq8N7qJJH3KTX1D+xVTPQ="
+    },
+)
+def test_get_yaml_selectors_cache_returns_decoded_and_decompressed_value(mock_variable_get):
+    graph = DbtGraph(project=ProjectConfig())
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    result = graph.get_yaml_selectors_cache().get("yaml_selectors")
+
+    assert result.raw == selectors.raw
+    assert result.parsed == selectors.parsed
+    assert result.impl_version == selectors.impl_version
 
 
 @patch("cosmos.dbt.graph.Variable.get", return_value={})
@@ -2036,6 +2239,30 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
         assert graph.should_use_dbt_ls_cache() == should_use
 
 
+@pytest.mark.parametrize(
+    "enable_cache,enable_cache_yaml_selectors,cache_id,should_use",
+    [
+        (False, True, "id", False),
+        (True, False, "id", False),
+        (False, False, "id", False),
+        (True, True, "", False),
+        (True, True, "id", True),
+    ],
+)
+def test_should_use_yaml_selectors_cache(enable_cache, enable_cache_yaml_selectors, cache_id, should_use):
+    with patch.dict(
+        os.environ,
+        {
+            "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
+            "AIRFLOW__COSMOS__ENABLE_CACHE_YAML_SELECTORS": str(enable_cache_yaml_selectors),
+        },
+    ):
+        importlib.reload(settings)
+        graph = DbtGraph(cache_identifier=cache_id, project=ProjectConfig(dbt_project_path="/tmp"))
+        graph.should_use_yaml_selectors_cache.cache_clear()
+        assert graph.should_use_yaml_selectors_cache() == should_use
+
+
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
@@ -2057,6 +2284,33 @@ def test_save_dbt_ls_cache_remote_cache_dir(
     dbt_graph.save_dbt_ls_cache(dbt_ls_output)
 
     mock_remote_cache_key_path = mock_remote_cache_dir_path / dbt_graph.cache_key / "dbt_ls_cache.json"
+    mock_remote_cache_key_path.open.assert_called_once_with("w")
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch(object_storage_path)
+@patch("cosmos.config.ProjectConfig")
+@patch("cosmos.dbt.graph._configure_remote_cache_dir")
+def test_save_yaml_selectors_remote_cache_dir(
+    mock_configure_remote_cache_dir, mock_project_config, mock_object_storage_path
+):
+    mock_remote_cache_dir_path = mock_object_storage_path.return_value
+    mock_remote_cache_dir_path.exists.return_value = True
+
+    mock_configure_remote_cache_dir.return_value = mock_remote_cache_dir_path
+
+    yaml_selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    mock_project_config.dbt_vars = {"var1": "value1"}
+    mock_project_config.env_vars = {"var1": "value1"}
+    mock_project_config._calculate_yaml_selectors_current_version.return_value = "mock_version"
+    dbt_graph = DbtGraph(project=mock_project_config)
+
+    dbt_graph.save_yaml_selectors_cache(yaml_selectors)
+
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / dbt_graph.cache_key / "yaml_selectors_cache.json"
     mock_remote_cache_key_path.open.assert_called_once_with("w")
 
 
@@ -2096,6 +2350,154 @@ def test_get_dbt_ls_cache_remote_cache_dir(
     }
 
     assert result == expected_result
+
+
+@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
+@patch(object_storage_path)
+@patch("cosmos.config.ProjectConfig")
+@patch("cosmos.dbt.graph._configure_remote_cache_dir")
+def test_get_yaml_selectors_remote_cache_dir(
+    mock_configure_remote_cache_dir, mock_project_config, mock_object_storage_path
+):
+    mock_remote_cache_dir_path = mock_object_storage_path.return_value
+    mock_remote_cache_dir_path.exists.return_value = True
+    mock_configure_remote_cache_dir.return_value = mock_remote_cache_dir_path
+
+    yaml_selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+
+    serialized_data = pickle.dumps(yaml_selectors)
+    compressed_data = zlib.compress(serialized_data)
+    encoded_data = base64.b64encode(compressed_data).decode("utf-8")
+
+    cache_dict = {
+        "version": "cache-version",
+        "yaml_selectors": encoded_data,
+        "last_modified": "2024-08-13T12:34:56Z",
+    }
+
+    mock_remote_cache_key_path = mock_remote_cache_dir_path / "some_cache_key" / "yaml_selectors_cache.json"
+    mock_remote_cache_key_path.exists.return_value = True
+    mock_remote_cache_key_path.open.return_value.__enter__.return_value.read.return_value = json.dumps(cache_dict)
+
+    dbt_graph = DbtGraph(project=mock_project_config)
+
+    result = dbt_graph.get_yaml_selectors_cache()
+    yaml_selectors_result = result.get("yaml_selectors")
+
+    assert result["version"] == "cache-version"
+    assert yaml_selectors_result.raw == yaml_selectors.raw
+    assert yaml_selectors_result.parsed == yaml_selectors.parsed
+    assert yaml_selectors_result.impl_version == yaml_selectors.impl_version
+    assert result["last_modified"] == "2024-08-13T12:34:56Z"
+
+
+@pytest.mark.parametrize(
+    "enable_cache,enable_cache_yaml_selectors,cache_id,should_use",
+    [
+        (False, True, "id", False),
+        (True, False, "id", False),
+        (False, False, "id", False),
+        (True, True, "", False),
+        (True, True, "id", True),
+    ],
+)
+def test_parse_yaml_selectors_saves_cache(enable_cache, enable_cache_yaml_selectors, cache_id, should_use):
+    selector_definitions = {
+        "staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}
+    }
+
+    with patch.dict(
+        os.environ,
+        {
+            "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
+            "AIRFLOW__COSMOS__ENABLE_CACHE_YAML_SELECTORS": str(enable_cache_yaml_selectors),
+        },
+    ):
+        importlib.reload(settings)
+        graph = DbtGraph(cache_identifier=cache_id, project=ProjectConfig(dbt_project_path="/tmp"))
+        graph.save_yaml_selectors_cache = MagicMock()
+        graph.should_use_yaml_selectors_cache.cache_clear()
+
+        yaml_selectors = graph.parse_yaml_selectors(selector_definitions)
+
+        if should_use:
+            graph.save_yaml_selectors_cache.assert_called_once_with(yaml_selectors)
+        else:
+            graph.save_yaml_selectors_cache.assert_not_called()
+
+
+def test_load_parsed_selectors_with_cache_miss_skipped(caplog):
+    selector_definitions = {
+        "staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}
+    }
+
+    yaml_selectors = YamlSelectors(
+        selector_definitions,
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    graph.parse_yaml_selectors = MagicMock(return_value=yaml_selectors)
+    graph.should_use_yaml_selectors_cache = MagicMock(return_value=False)
+
+    result = graph.load_parsed_selectors(selector_definitions)
+
+    graph.parse_yaml_selectors.assert_called_once()
+    assert result == yaml_selectors
+    assert "Cosmos performance: Cache miss" in caplog.text and " - skipped" in caplog.text
+
+
+def test_load_parsed_selectors_with_cache_miss(caplog):
+    selector_definitions = {
+        "staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}
+    }
+
+    yaml_selectors = YamlSelectors(
+        selector_definitions,
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    graph.parse_yaml_selectors = MagicMock(return_value=yaml_selectors)
+    graph.should_use_yaml_selectors_cache = MagicMock(return_value=True)
+    graph.get_yaml_selectors_cache = MagicMock(return_value=None)
+
+    result = graph.load_parsed_selectors(selector_definitions)
+
+    graph.parse_yaml_selectors.assert_called_once()
+    assert result == yaml_selectors
+
+    assert "Cosmos performance: Cache miss" in caplog.text and " - skipped" not in caplog.text
+
+
+def test_load_parsed_selectors_with_cache_hit(caplog):
+    selector_definitions = {
+        "staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}
+    }
+    yaml_selectors = YamlSelectors(
+        selector_definitions,
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+
+    graph = DbtGraph(project=ProjectConfig(dbt_project_path="/tmp"))
+    graph.parse_yaml_selectors = MagicMock()
+    graph.should_use_yaml_selectors_cache = MagicMock(return_value=True)
+    graph.get_yaml_selectors_cache = MagicMock(
+        return_value={"version": "dbt_project_hash_v1,yamlselectors_v1,impl_hash_v1", "yaml_selectors": yaml_selectors}
+    )
+
+    with patch(
+        "cosmos.cache._calculate_yaml_selectors_cache_current_version",
+        return_value="dbt_project_hash_v1,yamlselectors_v1,impl_hash_v1",
+    ):
+        result = graph.load_parsed_selectors(selector_definitions)
+
+        graph.parse_yaml_selectors.assert_not_called()
+        assert result == yaml_selectors
+        assert "Cosmos performance: Cache hit" in caplog.text and "The cache size" in caplog.text
 
 
 def test__normalize_path():

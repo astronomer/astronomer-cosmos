@@ -4,7 +4,7 @@ import pytest
 
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
-from cosmos.dbt.selector import NodeSelector, SelectorConfig, select_nodes
+from cosmos.dbt.selector import NodeSelector, SelectorConfig, YamlSelectors, select_nodes
 from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -1117,3 +1117,524 @@ def test_exposure_selector():
         exposure_node_match.unique_id: exposure_node_match,
     }
     assert selected == expected, f"Expected only {exposure_node_match.unique_id} to match"
+
+
+@pytest.mark.parametrize(
+    "selector_name, selector_definition, parsed_selector",
+    [
+        (
+            "path_method",
+            {"name": "path_method", "definition": {"method": "path", "value": "models/staging"}},
+            {"select": ["path:models/staging"], "exclude": None},
+        ),
+        (
+            "tag_method",
+            {"name": "tag_method", "definition": {"method": "tag", "value": "nightly"}},
+            {"select": ["tag:nightly"], "exclude": None},
+        ),
+        (
+            "fqn_method",
+            {"name": "fqn_method", "definition": {"method": "fqn", "value": "customers"}},
+            {"select": ["customers"], "exclude": None},
+        ),
+        (
+            "fqn_star_method",
+            {"name": "fqn_star_method", "definition": {"method": "fqn", "value": "*"}},
+            {"select": None, "exclude": None},
+        ),
+        (
+            "config_method_materialized",
+            {
+                "name": "config_method_materialized",
+                "definition": {"method": "config.materialized", "value": "incremental"},
+            },
+            {"select": ["config.materialized:incremental"], "exclude": None},
+        ),
+        (
+            "config_method_schema",
+            {"name": "config_method_schema", "definition": {"method": "config.schema", "value": "audit"}},
+            {"select": ["config.schema:audit"], "exclude": None},
+        ),
+        (
+            "config_method_tags",
+            {"name": "config_method_tags", "definition": {"method": "config.tags", "value": "nightly"}},
+            {"select": ["config.tags:nightly"], "exclude": None},
+        ),
+        (
+            "config_method_meta",
+            {"name": "config_method_meta", "definition": {"method": "config.meta.allow_pii", "value": "true"}},
+            {"select": ["config.meta.allow_pii:true"], "exclude": None},
+        ),
+        (
+            "source_method",
+            {"name": "source_method", "definition": {"method": "source", "value": "raw_*"}},
+            {"select": ["source:raw_*"], "exclude": None},
+        ),
+        (
+            "exposure_method",
+            {"name": "exposure_method", "definition": {"method": "exposure", "value": "daily_report"}},
+            {"select": ["exposure:daily_report"], "exclude": None},
+        ),
+        (
+            "resource_type_selector_method",
+            {"name": "resource_type_selector_method", "definition": {"method": "resource_type", "value": "source"}},
+            {"select": ["resource_type:source"], "exclude": None},
+        ),
+        (
+            "exclude_resource_type_selector_method",
+            {
+                "name": "exclude_resource_type_selector_method",
+                "definition": {"method": "exclude_resource_type", "value": "model"},
+            },
+            {"select": ["exclude_resource_type:model"], "exclude": None},
+        ),
+        (
+            "intersection_method",
+            {
+                "name": "intersection_method",
+                "definition": {
+                    "intersection": [
+                        {"method": "tag", "value": "nightly"},
+                        {"method": "config.materialized", "value": "table"},
+                    ]
+                },
+            },
+            {"select": ["tag:nightly,config.materialized:table"], "exclude": None},
+        ),
+        (
+            "union_method",
+            {
+                "name": "union_method",
+                "definition": {
+                    "union": [{"method": "tag", "value": "nightly"}, {"method": "config.materialized", "value": "view"}]
+                },
+            },
+            {"select": ["tag:nightly", "config.materialized:view"], "exclude": None},
+        ),
+        (
+            "exclude_method",
+            {
+                "name": "exclude_method",
+                "definition": {"method": "tag", "value": "", "exclude": [{"method": "tag", "value": "deprecated"}]},
+            },
+            {"select": ["tag:"], "exclude": ["tag:deprecated"]},
+        ),
+        (
+            "complex_method",
+            {
+                "name": "complex_method",
+                "definition": {
+                    "union": [
+                        {"method": "tag", "value": "nightly"},
+                        {"method": "path", "value": "models/staging"},
+                        {"exclude": [{"method": "config.materialized", "value": "ephemeral"}]},
+                    ]
+                },
+            },
+            {"select": ["tag:nightly", "path:models/staging"], "exclude": ["config.materialized:ephemeral"]},
+        ),
+    ],
+)
+def test_valid_method_yaml_selectors(selector_name, selector_definition, parsed_selector):
+    selectors = {selector_name: selector_definition}
+    yaml_selectors = YamlSelectors.parse(selectors)
+
+    result = yaml_selectors.get_parsed(selector_name)
+
+    assert result == parsed_selector
+
+
+@pytest.mark.parametrize(
+    "selector_name, selector_definition, parsed_selector",
+    [
+        (
+            "with_parents_no_children",
+            {"name": "with_parents_no_children", "definition": {"method": "tag", "value": "nightly", "parents": True}},
+            {"select": ["+tag:nightly"], "exclude": None},
+        ),
+        (
+            "with_children_no_parents",
+            {"name": "with_children_no_parents", "definition": {"method": "tag", "value": "nightly", "children": True}},
+            {"select": ["tag:nightly+"], "exclude": None},
+        ),
+        (
+            "with_parents_and_children",
+            {
+                "name": "with_parents_and_children",
+                "definition": {"method": "tag", "value": "nightly", "parents": True, "children": True},
+            },
+            {"select": ["+tag:nightly+"], "exclude": None},
+        ),
+        (
+            "with_parents_depth",
+            {
+                "name": "with_parents_depth",
+                "definition": {"method": "tag", "value": "nightly", "parents": True, "parents_depth": 2},
+            },
+            {"select": ["2+tag:nightly"], "exclude": None},
+        ),
+        (
+            "with_parents_depth_and_children",
+            {
+                "name": "with_parents_depth_and_children",
+                "definition": {
+                    "method": "tag",
+                    "value": "nightly",
+                    "parents": True,
+                    "parents_depth": 2,
+                    "children": True,
+                },
+            },
+            {"select": ["2+tag:nightly+"], "exclude": None},
+        ),
+        (
+            "with_children_depth",
+            {
+                "name": "with_children_depth",
+                "definition": {"method": "tag", "value": "nightly", "children": True, "children_depth": 3},
+            },
+            {"select": ["tag:nightly+3"], "exclude": None},
+        ),
+        (
+            "with_children_depth_and_parents",
+            {
+                "name": "with_children_depth_and_parents",
+                "definition": {
+                    "method": "tag",
+                    "value": "nightly",
+                    "parents": True,
+                    "children": True,
+                    "children_depth": 3,
+                },
+            },
+            {"select": ["+tag:nightly+3"], "exclude": None},
+        ),
+        (
+            "with_parents_depth_and_children_depth",
+            {
+                "name": "with_parents_depth_and_children_depth",
+                "definition": {
+                    "method": "tag",
+                    "value": "nightly",
+                    "parents": True,
+                    "parents_depth": 2,
+                    "children": True,
+                    "children_depth": 3,
+                },
+            },
+            {"select": ["2+tag:nightly+3"], "exclude": None},
+        ),
+        (
+            "with_childrens_parents",
+            {
+                "name": "with_childrens_parents",
+                "definition": {"method": "tag", "value": "nightly", "childrens_parents": True},
+            },
+            {"select": ["@tag:nightly"], "exclude": None},
+        ),
+    ],
+)
+def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition, parsed_selector):
+    selectors = {selector_name: selector_definition}
+    yaml_selectors = YamlSelectors.parse(selectors)
+
+    result = yaml_selectors.get_parsed(selector_name)
+
+    assert result == parsed_selector
+
+
+@pytest.mark.parametrize(
+    "selector_name, selector_definition, exception_msg",
+    [
+        # Node selector methods supported by dbt but not by Cosmos filter selection
+        (
+            "access_method",
+            {"name": "access_method", "definition": {"method": "access", "value": "public"}},
+            "Unsupported selector method: 'access'",
+        ),
+        (
+            "file_method",
+            {"name": "file_method", "definition": {"method": "file", "value": "my_model.sql"}},
+            "Unsupported selector method: 'file'",
+        ),
+        (
+            "group_method",
+            {"name": "group_method", "definition": {"method": "group", "value": "finance"}},
+            "Unsupported selector method: 'group'",
+        ),
+        (
+            "metric_method",
+            {"name": "metric_method", "definition": {"method": "metric", "value": "revenue"}},
+            "Unsupported selector method: 'metric'",
+        ),
+        (
+            "package_method",
+            {"name": "package_method", "definition": {"method": "package", "value": "dbt_utils"}},
+            "Unsupported selector method: 'package'",
+        ),
+        (
+            "result_method",
+            {"name": "result_method", "definition": {"method": "result", "value": "error"}},
+            "Unsupported selector method: 'result'",
+        ),
+        (
+            "saved_query_method",
+            {"name": "saved_query_method", "definition": {"method": "saved_query", "value": "quarterly_report"}},
+            "Unsupported selector method: 'saved_query'",
+        ),
+        (
+            "semantic_model_method",
+            {"name": "semantic_model_method", "definition": {"method": "semantic_model", "value": "customer_metrics"}},
+            "Unsupported selector method: 'semantic_model'",
+        ),
+        (
+            "source_status_method",
+            {"name": "source_status_method", "definition": {"method": "source_status", "value": "fresher"}},
+            "Unsupported selector method: 'source_status'",
+        ),
+        (
+            "state_method",
+            {"name": "state_method", "definition": {"method": "state", "value": "modified"}},
+            "Unsupported selector method: 'state'",
+        ),
+        (
+            "test_name_method",
+            {"name": "test_name_method", "definition": {"method": "test_name", "value": "unique_id"}},
+            "Unsupported selector method: 'test_name'",
+        ),
+        (
+            "test_type_method",
+            {"name": "test_type_method", "definition": {"method": "test_type", "value": "generic"}},
+            "Unsupported selector method: 'test_type'",
+        ),
+        (
+            "unit_test_method",
+            {"name": "unit_test_method", "definition": {"method": "unit_test", "value": "test_my_model"}},
+            "Unsupported selector method: 'unit_test'",
+        ),
+        (
+            "version_method",
+            {"name": "version_method", "definition": {"method": "version", "value": "latest"}},
+            "Unsupported selector method: 'version'",
+        ),
+    ],
+)
+def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition, exception_msg):
+    selectors = {selector_name: selector_definition}
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = YamlSelectors.parse(selectors)
+
+    assert err_info.value.args[0] == exception_msg
+
+
+@pytest.mark.parametrize(
+    "selector_name, selector_definition, exception_msg",
+    [
+        (
+            "multi_root_union",
+            {
+                "name": "multi_root_union",
+                "definition": {
+                    "union": [{"method": "tag", "value": "nightly"}],
+                    "intersection": [{"method": "tag", "value": "daily"}],
+                },
+            },
+            "Only a single 'union' or 'intersection' key is allowed in a root level selector definition; found union,intersection.",
+        ),
+        (
+            "multi_root_intersection",
+            {
+                "name": "multi_root_intersection",
+                "definition": {
+                    "intersection": [{"method": "tag", "value": "nightly"}],
+                    "union": [{"method": "tag", "value": "daily"}],
+                },
+            },
+            "Only a single 'union' or 'intersection' key is allowed in a root level selector definition; found intersection,union.",
+        ),
+        (
+            "cli_selector",
+            {"name": "cli_selector", "definition": "tag:nightly"},
+            "Expected to find union, intersection, or method definition, instead found <class 'str'>: tag:nightly",
+        ),
+        (
+            "key_value_selector",
+            {"name": "key_value_selector", "definition": {"tag": "nightly"}},
+            "Expected to find union, intersection, or method definition, instead found <class 'dict'>: {'tag': 'nightly'}",
+        ),
+        (
+            "circular_reference_selector",
+            {
+                "name": "circular_reference_selector",
+                "definition": {"method": "selector", "value": "circular_reference_selector"},
+            },
+            "Existing selector definition for circular_reference_selector not found.",
+        ),
+        (
+            "invalid_selector_keys",
+            {"name": "invalid_selector_keys", "definition": {"invalid_key": "invalid_value"}},
+            "Expected to find union, intersection, or method definition, instead found <class 'dict'>: {'invalid_key': 'invalid_value'}",
+        ),
+        (
+            "missing_method_key",
+            {"name": "missing_method_key", "definition": {"value": "nightly"}},
+            "Expected to find union, intersection, or method definition, instead found <class 'dict'>: {'value': 'nightly'}",
+        ),
+        (
+            "missing_value_key",
+            {"name": "missing_value_key", "definition": {"method": "tag"}},
+            "Expected 'method' and 'value' keys, but got ['method']",
+        ),
+        (
+            "missing_union_key",
+            {"name": "missing_union_key", "definition": {"union": {"method": "tag"}}},
+            "Invalid value for key 'union'. Expected a list.",
+        ),
+        (
+            "non_int_parents_depth",
+            {
+                "name": "non_int_parents_depth",
+                "definition": {"method": "tag", "value": "nightly", "parents": True, "parents_depth": "two"},
+            },
+            "parents_depth must be an integer, got <class 'str'>: two",
+        ),
+        (
+            "non_int_children_depth",
+            {
+                "name": "non_int_children_depth",
+                "definition": {"method": "tag", "value": "nightly", "children": True, "children_depth": "three"},
+            },
+            "children_depth must be an integer, got <class 'str'>: three",
+        ),
+        (
+            "childrens_parents_and_parents_depth",
+            {
+                "name": "childrens_parents_and_parents_depth",
+                "definition": {"method": "tag", "value": "nightly", "childrens_parents": True, "parents_depth": 2},
+            },
+            "childrens_parents cannot be combined with parents_depth or children_depth.",
+        ),
+        (
+            "childrens_parents_and_children_depth",
+            {
+                "name": "childrens_parents_and_children_depth",
+                "definition": {"method": "tag", "value": "nightly", "childrens_parents": True, "children_depth": 2},
+            },
+            "childrens_parents cannot be combined with parents_depth or children_depth.",
+        ),
+        (
+            "multiple_excludes_in_union",
+            {
+                "name": "multiple_excludes_in_union",
+                "definition": {
+                    "union": [
+                        {"method": "tag", "value": "nightly", "exclude": [{"method": "tag", "value": "deprecated"}]},
+                        {"method": "path", "value": "models/", "exclude": [{"method": "tag", "value": "archived"}]},
+                    ]
+                },
+            },
+            "You cannot provide multiple exclude arguments to the same selector set operator:\nexclude:\n- method: tag\n  value: archived\nmethod: path\nvalue: models/\n",
+        ),
+        (
+            "unknown_random_method",
+            {"name": "unknown_random_method", "definition": {"method": "unknown_random", "value": "test"}},
+            "Unsupported selector method: 'unknown_random'",
+        ),
+    ],
+)
+def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
+    selectors = {selector_name: selector_definition}
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = YamlSelectors.parse(selectors)
+
+    assert err_info.value.args[0] == exception_msg
+
+
+@pytest.mark.parametrize(
+    "selector_name, definition_key, invalid_value, expected_error_fragment",
+    [
+        ("union_not_a_list_string", "union", "not_a_list", "Invalid value for key 'union'. Expected a list."),
+        ("intersection_not_a_list_int", "intersection", 42, "Invalid value for key 'intersection'. Expected a list."),
+        ("union_not_a_list_dict", "union", {"nested": "dict"}, "Invalid value for key 'union'. Expected a list."),
+    ],
+)
+def test_invalid_value_type_for_list_keys(selector_name, definition_key, invalid_value, expected_error_fragment):
+    selectors = {selector_name: {"name": selector_name, "definition": {definition_key: invalid_value}}}
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = YamlSelectors.parse(selectors)
+
+    assert expected_error_fragment in err_info.value.args[0]
+
+
+@pytest.mark.parametrize(
+    "selector_name, definition_key, invalid_list_item, item_type_str",
+    [
+        ("string_in_union_list", "union", "tag:daily", "<class 'str'>"),
+        ("integer_in_union_list", "union", 42, "<class 'int'>"),
+        ("none_in_intersection_list", "intersection", None, "<class 'NoneType'>"),
+        ("boolean_in_union_list", "union", True, "<class 'bool'>"),
+        ("list_in_union_list", "union", ["nested", "list"], "<class 'list'>"),
+        ("float_in_intersection_list", "intersection", 3.14, "<class 'float'>"),
+    ],
+)
+def test_invalid_items_in_selector_lists(selector_name, definition_key, invalid_list_item, item_type_str):
+    selectors = {
+        selector_name: {
+            "name": selector_name,
+            "definition": {definition_key: [{"method": "tag", "value": "nightly"}, invalid_list_item]},
+        }
+    }
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = YamlSelectors.parse(selectors)
+
+    assert (
+        f'Invalid value type {item_type_str} in key "{definition_key}", expected dict or str (value: {invalid_list_item}).'
+        in err_info.value.args[0]
+    )
+
+
+@pytest.mark.parametrize(
+    "selector_name, definition_key, non_string_key, key_type_str",
+    [
+        ("int_key_in_union", "union", 123, "<class 'int'>"),
+        ("float_key_in_intersection", "intersection", 3.14, "<class 'float'>"),
+        ("tuple_key_in_union", "union", (1, 2), "<class 'tuple'>"),
+        ("bool_key_in_intersection", "intersection", True, "<class 'bool'>"),
+        ("none_key_in_union", "union", None, "<class 'NoneType'>"),
+    ],
+)
+def test_non_string_keys_in_selector_dicts(selector_name, definition_key, non_string_key, key_type_str):
+    selectors = {
+        selector_name: {
+            "name": selector_name,
+            "definition": {definition_key: [{non_string_key: "value", "method": "tag", "value": "nightly"}]},
+        }
+    }
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = YamlSelectors.parse(selectors)
+
+    assert f'Expected all keys to "{definition_key}" dict to be strings' in err_info.value.args[0]
+    assert f'but "{non_string_key}" is a "{key_type_str}"' in err_info.value.args[0]
+
+
+def test_selector_reference_resolves_from_cache():
+    selectors = {
+        "base_selector": {"name": "base_selector", "definition": {"method": "tag", "value": "nightly"}},
+        "reference_selector": {
+            "name": "reference_selector",
+            "definition": {"method": "selector", "value": "base_selector"},
+        },
+    }
+
+    yaml_selectors = YamlSelectors.parse(selectors)
+
+    base_result = yaml_selectors.get_parsed("base_selector")
+    reference_result = yaml_selectors.get_parsed("reference_selector")
+
+    assert base_result == {"select": ["tag:nightly"], "exclude": None}
+    assert reference_result == base_result

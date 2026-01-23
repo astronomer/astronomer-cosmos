@@ -921,7 +921,7 @@ class DbtGraph:
                 cache_dict = json.load(fp)
         return cache_dict
 
-    def get_yaml_selector_cache(self) -> dict[str, Any]:
+    def get_yaml_selectors_cache(self) -> dict[str, Any]:
         """
         Retrieve previously saved YAML selectors from an Airflow Variable.
 
@@ -960,7 +960,7 @@ class DbtGraph:
 
             return cache_dict
 
-    def save_yaml_selector_cache(self, yaml_selectors: YamlSelectors) -> None:
+    def save_yaml_selectors_cache(self, yaml_selectors: YamlSelectors) -> None:
         """
         Store parsed YAML selectors into an Airflow Variable.
 
@@ -975,19 +975,19 @@ class DbtGraph:
         serialized_data = pickle.dumps(yaml_selectors)
         compressed_data = zlib.compress(serialized_data)
         encoded_data = base64.b64encode(compressed_data)
-        selections_compressed = encoded_data.decode("utf-8")
+        selectors_encoded = encoded_data.decode("utf-8")
 
         cache_dict = {
             "version": cache._calculate_yaml_selectors_cache_current_version(
                 self.cache_key, self.project_path, yaml_selectors.raw, yaml_selectors.impl_version
             ),
-            "yaml_selectors": selections_compressed,
+            "yaml_selectors": selectors_encoded,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }
         remote_cache_dir = _configure_remote_cache_dir()
         if remote_cache_dir:
-            remote_cache_key_path = remote_cache_dir / self.cache_key / "yaml_selector_cache.json"
+            remote_cache_key_path = remote_cache_dir / self.cache_key / "yaml_selectors_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
@@ -1007,7 +1007,7 @@ class DbtGraph:
         yaml_selectors = YamlSelectors.parse(selector_definitions)
 
         if self.should_use_yaml_selectors_cache():
-            self.save_yaml_selector_cache(yaml_selectors)
+            self.save_yaml_selectors_cache(yaml_selectors)
 
         return yaml_selectors
 
@@ -1023,21 +1023,13 @@ class DbtGraph:
         """
         logger.info(f"Trying to parse the dbt yaml selectors using {self.cache_key}...")
 
-        def get_yaml_selectors(selector_definitions: dict[str, Any]) -> YamlSelectors:
-            yaml_selectors = self.parse_yaml_selectors(selector_definitions)
-
-            if self.should_use_yaml_selectors_cache():
-                self.save_yaml_selector_cache(yaml_selectors)
-
-            return yaml_selectors
-
         if self.should_use_yaml_selectors_cache():
-            cache_dict = self.get_yaml_selector_cache()
+            cache_dict = self.get_yaml_selectors_cache()
 
             if not cache_dict:
                 logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
 
-                return get_yaml_selectors(selector_definitions)
+                return self.parse_yaml_selectors(selector_definitions)
 
             cache_version: str = cache_dict["version"]
             yaml_selectors: YamlSelectors = cache_dict["yaml_selectors"]
@@ -1056,7 +1048,7 @@ class DbtGraph:
 
         logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
 
-        return get_yaml_selectors(selector_definitions)
+        return self.parse_yaml_selectors(selector_definitions)
 
     def load_from_dbt_manifest(self) -> None:
         """

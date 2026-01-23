@@ -25,6 +25,7 @@ from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
+    _calculate_yaml_selectors_cache_current_version,
     _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
@@ -38,6 +39,7 @@ from cosmos.cache import (
     get_cached_profile,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
+    were_yaml_selectors_modified,
 )
 from cosmos.constants import (
     DBT_PARTIAL_PARSE_FILE_NAME,
@@ -448,3 +450,33 @@ def test_remote_cache_path_initialization_with_conn_id(mock_object_storage_path)
     configured_remote_cache_dir = _configure_remote_cache_dir()
     mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id="my_conn_id")
     assert configured_remote_cache_dir == mock_cache_path
+
+
+def test_calculate_yaml_selectors_cache_current_version_equals():
+    mock_create_dbt_folder_version_hash = MagicMock()
+    mock_create_dbt_folder_version_hash.return_value = "dbt_project_hash_v1"
+    selector_definitions = {
+        "core_models": {
+            "definition": {"method": "tag", "value": "core"},
+            "description": "Select core business logic models (non-staging)",
+            "name": "core_models",
+        },
+    }
+
+    with patch("cosmos.cache._create_folder_version_hash", mock_create_dbt_folder_version_hash):
+        result = _calculate_yaml_selectors_cache_current_version(
+            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, "yamlselectors_v1"
+        )
+        assert result == "dbt_project_hash_v1,dcbc007b6ea10b215d0024015f762d93,d450c7fd9f02df15cd10a22ebeeca661"
+
+
+def test_were_yaml_selectors_modified_true():
+    previous_version = "dbt_project_hash_v1, yamlselectors_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_v2, impl_hash_v1"
+    assert were_yaml_selectors_modified(previous_version, current_version) is True
+
+
+def test_were_yaml_selectors_modified_false():
+    previous_version = "dbt_project_hash_v1, yamlselectors_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_v1, impl_hash_v1"
+    assert were_yaml_selectors_modified(previous_version, current_version) is False

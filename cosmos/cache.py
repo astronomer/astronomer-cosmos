@@ -325,10 +325,9 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
     Taking into account the project directory contents and the command arguments, calculate the
     hash that represents the "dbt ls" command version - to be used to decide if the cache should be refreshed or not.
 
-    :param cache_identifier: str - Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
-    :param project_dir: Path - Path to the target dbt project directory
-    :param cmd_args: list[str] - List containing the arguments passed to the dbt ls command that would affect its output
-    :return: str - Combined hash string of project and command arguments
+    :param cache_identifier: Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
+    :param project_path: Path to the target dbt project directory
+    :param cmd_args: List containing the arguments passed to the dbt ls command that would affect its output
     """
     start_time = time.perf_counter()
 

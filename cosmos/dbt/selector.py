@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import functools
+import hashlib
 import inspect
 import re
 from collections import defaultdict
@@ -746,15 +747,16 @@ class YamlSelectors:
     @functools.lru_cache(maxsize=1)
     def impl_version(self) -> str:
         """
-        Get the source code of the YamlSelectors implementation.
+        Get a hash of the YamlSelectors implementation for version detection.
 
-        This property retrieves the complete source code of the YamlSelectors class, which can be
-        used to detect changes in the selector parsing logic (e.g., for cache invalidation).
-        The source code is retrieved once and cached for the lifetime of the instance.
+        This property retrieves the source code of the YamlSelectors class and returns its MD5 hash,
+        which can be used to detect changes in the selector parsing logic (e.g., for cache invalidation).
+        The hash is computed once and cached for the lifetime of the instance.
 
-        :return: str - Complete source code of the YamlSelectors class
+        :return: str - MD5 hash (32 hex characters) of the YamlSelectors class source code
         """
-        return inspect.getsource(self.__class__)
+        source_code = inspect.getsource(self.__class__)
+        return hashlib.md5(source_code.encode()).hexdigest()
 
     def get_raw(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
         """

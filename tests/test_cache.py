@@ -465,18 +465,18 @@ def test_calculate_yaml_selectors_cache_current_version_equals():
 
     with patch("cosmos.cache._create_folder_version_hash", mock_create_dbt_folder_version_hash):
         result = _calculate_yaml_selectors_cache_current_version(
-            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, "yamlselectors_v1"
+            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, "yamlselectors_hash_v1"
         )
-        assert result == "dbt_project_hash_v1,dcbc007b6ea10b215d0024015f762d93,d450c7fd9f02df15cd10a22ebeeca661"
+        assert result == "dbt_project_hash_v1,dcbc007b6ea10b215d0024015f762d93,yamlselectors_hash_v1"
 
 
 def test_were_yaml_selectors_modified_true():
-    previous_version = "dbt_project_hash_v1, yamlselectors_v1, impl_hash_v1"
-    current_version = "dbt_project_hash_v1, yamlselectors_v2, impl_hash_v1"
+    previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_hash_v2, impl_hash_v1"
     assert were_yaml_selectors_modified(previous_version, current_version) is True
 
 
 def test_were_yaml_selectors_modified_false():
-    previous_version = "dbt_project_hash_v1, yamlselectors_v1, impl_hash_v1"
-    current_version = "dbt_project_hash_v1, yamlselectors_v1, impl_hash_v1"
+    previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
     assert were_yaml_selectors_modified(previous_version, current_version) is False

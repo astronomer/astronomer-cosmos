@@ -311,13 +311,12 @@ def _calculate_yaml_selectors_cache_current_version(
     dbt_project_hash = _create_folder_version_hash(project_dir)
 
     yaml_selector_hash = hashlib.md5(yaml.dump(selector_definitions).encode()).hexdigest()
-    implementation_hash = hashlib.md5(implementation_version.encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
         f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
     )
-    return f"{dbt_project_hash},{yaml_selector_hash},{implementation_hash}"
+    return f"{dbt_project_hash},{yaml_selector_hash},{implementation_version}"
 
 
 def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: Path, cmd_args: list[str]) -> str:

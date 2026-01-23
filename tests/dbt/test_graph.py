@@ -2094,7 +2094,7 @@ def test_save_yamls_selector_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "fbfa164dd765f83c2941eeb019a7f7b4"
-    assert hash_impl == "535bf463068da8658a5183094a72545c"
+    assert hash_impl == "9a2177baf050abaacec7ca1949ea7959"
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.

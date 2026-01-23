@@ -241,7 +241,7 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 - The producer task should still be configured with ``retries=0`` (which Cosmos enforces by default) to avoid unintended duplicate ``dbt build`` runs.
 
-- By default, Cosmos sets ``retries`` to ``0`` in``DbtProducerWatcherOperator``. Users can override this by declaring the ``retries`` parameter in ``setup_operator_args``.
+- By default, Cosmos sets ``retries`` to ``0`` in``DbtProducerWatcherOperator``. Users can retry manually by clearing the status of the producer task and all its downstream tasks, keeping in mind that the producer task will not re-run the ``dbt build`` command and will succeed.
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 

@@ -219,15 +219,29 @@ How retries work
 ~~~~~~~~~~~~~~~~
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
-Cosmos always sets the producer's Airflow task retries to ``0``; this ensures the failure surfaces immediately and avoids kicking off a second full ``dbt build`` run.
 
 The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, can retry the dbt command by themselves using the same behaviour as ``ExecutionMode.LOCAL``.
-This is also the reason why we set ``retries`` to ``0`` in the ``DbtProducerWatcherOperator`` task because rerunning the producer would repeat the full dbt build and duplicate
-watcher callbacks which may not be processed by the consumers if they have already processed output XCOMs from the first run of the producer.
 
 If a branch of the DAG failed, users can clear the status of a failed consumer task, including its downstream tasks, via the Airflow UI - and each of them will run using the ``ExecutionMode.LOCAL``.
 
-Currently, we do not support retrying the ``DbtProducerWatcherOperator`` task itself.
+**Producer retry behavior**
+
+.. versionadded:: 1.12.2
+
+When the ``DbtProducerWatcherOperator`` is triggered for a retry (try_number > 1), it will not re-run the dbt build command and will succeed. In previous versions of Cosmos, the producer task would fail during retries.
+This behavior is designed to support TaskGroup-level retries, as reported in `#2282 <https://github.com/astronomer/astronomer-cosmos/issues/2282>`_.
+
+**Why this matters:**
+
+- In earlier versions, attempting to retry the producer task would raise an ``AirflowException``, causing the retry to fail immediately.
+- Now, the producer gracefully skips execution on retries, logging an informational message explaining that the retry was skipped to avoid running a second ``dbt build``.
+- This allows users to retry entire TaskGroups without the producer task blocking the retry flow.
+
+**Important considerations:**
+
+- The producer task should still be configured with ``retries=0`` (which Cosmos enforces by default) to avoid unintended duplicate ``dbt build`` runs.
+
+This behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
 -------------------------------------------------------------------------------
 

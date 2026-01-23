@@ -1041,7 +1041,15 @@ def test_dbt_dag_with_watcher():
     }
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+# Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:
+# https://github.com/apache/airflow/issues/51816
+conditions_to_skip = (AIRFLOW_VERSION < Version("2.8"), AIRFLOW_VERSION == Version("3.0"))
+
+
+@pytest.mark.skipif(
+    conditions_to_skip,
+    reason="Airflow hangs in these versions when trying to fetch XCom from the triggerer when using dags.test()",
+)
 @pytest.mark.integration
 def test_dbt_dag_with_watcher_and_empty_model(caplog):
     """
@@ -1088,8 +1096,9 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
         render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
         operator_args={
             "trigger_rule": "all_success",
-            "execution_timeout": None,
+            "execution_timeout": timedelta(seconds=10),
         },
+        dagrun_timeout=timedelta(seconds=30),
     )
     outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS

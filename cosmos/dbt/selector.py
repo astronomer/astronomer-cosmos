@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import copy
-import functools
 import hashlib
 import inspect
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -743,8 +743,7 @@ class YamlSelectors:
         """
         return self._parsed
 
-    @property
-    @functools.lru_cache(maxsize=1)
+    @cached_property
     def impl_version(self) -> str:
         """
         Get a hash of the YamlSelectors implementation for version detection.

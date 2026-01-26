@@ -146,7 +146,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
 
         if not node_result:  # pragma: no cover
-            logger.warning("No matching result found for unique_id '%s'", self.model_unique_id)
+            logger.warning(
+                "The dbt node with unique_id '%s' was not executed by the dbt command run in the producer task. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                self.model_unique_id,
+            )
             return None
 
         logger.info("Node Info: %s", run_results_json)
@@ -198,10 +201,17 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         status = event.get("status")
+        reason = event.get("reason")
+
+        if status == "success" and reason == "model_not_run":
+            logger.info(
+                "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                self.model_unique_id,
+            )
+
         if status != "failed":
             return
 
-        reason = event.get("reason")
         if reason == "model_failed":
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."

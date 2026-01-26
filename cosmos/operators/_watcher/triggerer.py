@@ -12,7 +12,10 @@ from asgiref.sync import sync_to_async
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
+from cosmos.log import get_logger
 from cosmos.operators._watcher.state import build_producer_state_fetcher
+
+logger = get_logger(__name__)
 
 
 class WatcherTrigger(BaseTrigger):
@@ -82,7 +85,7 @@ class WatcherTrigger(BaseTrigger):
         return await sync_to_async(_get_xcom_val)()
 
     async def get_xcom_val(self, key: str) -> Any | None:
-        self.log.info(
+        logger.info(
             "Trying to retrieve value using XCom key <%s> by task_id <%s>, dag_id <%s>, run_id <%s> and map_index <%s>",
             key,
             self.producer_task_id,
@@ -120,7 +123,7 @@ class WatcherTrigger(BaseTrigger):
             dag_id=self.dag_id,
             run_id=self.run_id,
             producer_task_id=self.producer_task_id,
-            logger=self.log,
+            logger=logger,
         )
         if fetch_state is None:
             return None
@@ -128,30 +131,39 @@ class WatcherTrigger(BaseTrigger):
         return await sync_to_async(fetch_state)()
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
-        self.log.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
+        logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
 
         while True:
             producer_task_state = await self._get_producer_task_status()
             node_status = await self._parse_node_status()
             if node_status == "success":
-                self.log.info("Model '%s' succeeded", self.model_unique_id)
+                logger.info("Model '%s' succeeded", self.model_unique_id)
                 yield TriggerEvent({"status": "success"})  # type: ignore[no-untyped-call]
                 return
             elif node_status == "failed":
-                self.log.warning("Model '%s' failed", self.model_unique_id)
+                logger.warning("Model '%s' failed", self.model_unique_id)
                 yield TriggerEvent({"status": "failed", "reason": "model_failed"})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "failed":
-                self.log.error(
+                logger.error(
                     "Watcher producer task '%s' failed before delivering results for model '%s'",
                     self.producer_task_id,
                     self.model_unique_id,
                 )
                 yield TriggerEvent({"status": "failed", "reason": "producer_failed"})  # type: ignore[no-untyped-call]
                 return
+            elif producer_task_state == "success" and node_status is None:
+                logger.info(
+                    "The producer task '%s' succeeded. There is no information about the model '%s' execution.",
+                    self.producer_task_id,
+                    self.model_unique_id,
+                )
+                yield TriggerEvent({"status": "success", "reason": "model_not_run"})  # type: ignore[no-untyped-call]
+                return
+
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
-            self.log.debug("Polling again for model '%s' status...", self.model_unique_id)
+            logger.debug("Polling again for model '%s' status...", self.model_unique_id)
 
 
 def _parse_compressed_xcom(compressed_b64_event_msg: str) -> Any:

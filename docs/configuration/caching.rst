@@ -118,7 +118,7 @@ Caching the YAML selectors
 While parsing a dbt project using `LoadMode.DBT_MANIFEST <./parsing-methods.html#dbt-manifest>`_, if a ``selector`` argument is provided to the `RenderConfig <./render-config.html>`_ instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
 Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow DAG. The parsed selectors will be cached to improve performance during DAG parsing.
 
-This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``.
+This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_YAML_SELECTORS=0``.
 
 Similar to the caching of ``dbt ls`` output, users can also set a remote directory path to store this cache instead of using Airflow
 Variables. To do so, you need to configure a remote cache directory. See :ref:`remote_cache_dir` and

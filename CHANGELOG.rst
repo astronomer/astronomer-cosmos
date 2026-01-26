@@ -1,8 +1,22 @@
 Changelog
 =========
 
+1.13.0a2 (2026-01-22)
+---------------------
+
+(Includes more changes)
+
+Features
+
+- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use watcher with ``KubernetesPodOperator`` by @tatiana in #2207
+
+Bug Fixes
+
+-  Fix running empty models or ephemeral nodes in ``ExecutionMode.WATCHER`` by @tatiana in #2279
+
+
 1.12.1 (2026-01-14)
-----------------------
+-------------------
 
 Bug Fixes
 

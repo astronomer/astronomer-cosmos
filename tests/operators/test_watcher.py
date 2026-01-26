@@ -33,7 +33,7 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
-
+DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
 
 project_config = ProjectConfig(
     dbt_project_path=DBT_PROJECT_PATH,
@@ -184,6 +184,31 @@ def test_handle_startup_event():
     assert lst and lst[0]["name"] == "MainReportVersion"
 
 
+def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):
+    """Test that execute_complete logs an info message when model was skipped (model_not_run)."""
+    sensor = DbtConsumerWatcherSensor(
+        project_dir=".",
+        profiles_dir=".",
+        profile_config=profile_config,
+        model_unique_id="model.pkg.skipped_model",
+        poke_interval=1,
+        producer_task_id="dbt_producer_watcher_operator",
+        task_id="consumer_sensor",
+    )
+    sensor.model_unique_id = "model.pkg.skipped_model"
+
+    context = {"dag_run": MagicMock()}
+    event = {"status": "success", "reason": "model_not_run"}
+
+    with caplog.at_level(logging.INFO):
+        sensor.execute_complete(context, event)
+
+    assert any(
+        "Model 'model.pkg.skipped_model' was skipped by the dbt command" in message for message in caplog.messages
+    )
+    assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
+
+
 def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
@@ -218,6 +243,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     "event, expected_message",
     [
         ({"status": "success"}, None),
+        ({"status": "success", "reason": "model_not_run"}, None),
         (
             {"status": "failed", "reason": "model_failed"},
             "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher' logs for details.",
@@ -1039,6 +1065,94 @@ def test_dbt_dag_with_watcher():
         "raw_orders_seed",
         "raw_customers_seed",
     }
+
+
+# Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:
+# https://github.com/apache/airflow/issues/51816
+conditions_to_skip = (AIRFLOW_VERSION < Version("2.8"), AIRFLOW_VERSION == Version("3.0"))
+
+
+@pytest.mark.skipif(
+    conditions_to_skip,
+    reason="Airflow hangs in these versions when trying to fetch XCom from the triggerer when using dags.test()",
+)
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_empty_model(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER` and a dbt project with an empty model. This was a situation observed by an Astronomer customer.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECT_WITH_EMPTY_MODEL_PATH,
+    )
+    # There are two dbt projects defined in this folder.
+    # When we run `dbt ls`, we can see this:
+    #
+    # 10:32:30  Found 2 models, 464 macros
+    # micro_dbt_project.add_row
+    # micro_dbt_project.empty_model
+    #
+    # However, during `dbt build`, dbt skips running the empty model, and only runs the add_row model:
+    #
+    # 10:29:03  Running with dbt=1.11.2
+    # 10:29:03  Registered adapter: postgres=1.10.0
+    # 10:29:03  Found 2 models, 464 macros
+    # 10:29:03
+    # 10:29:03  Concurrency: 4 threads (target='dev')
+    # 10:29:03
+    # 10:29:03  1 of 1 START sql view model public.add_row ..................................... [RUN]
+    # 10:29:03  1 of 1 OK created sql view model public.add_row ................................ [CREATE VIEW in 0.06s]
+    # 10:29:03
+    # 10:29:03  Finished running 1 view model in 0 hours 0 minutes and 0.19 seconds (0.19s).
+    # 10:29:03
+    # 10:29:03  Completed successfully
+    # 10:29:03
+    # 10:29:03  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1
+
+    watcher_dag = DbtDag(
+        project_config=project_config,
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+        ),
+        render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+        operator_args={
+            "trigger_rule": "all_success",
+            "execution_timeout": timedelta(seconds=10),
+        },
+        dagrun_timeout=timedelta(seconds=30),
+    )
+    outcome = new_test_dag(watcher_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
+
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    expected_task_names = [
+        "dbt_producer_watcher",
+        "add_row_run",
+        "empty_model_run",
+    ]
+    assert tasks_names == expected_task_names
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["add_row_run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["empty_model_run"], DbtRunWatcherOperator)
+
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
+        "add_row_run",
+        "empty_model_run",
+    }
+
+    assert "Total filtered nodes: 2" in caplog.text
+    assert "Finished running node model.micro_dbt_project.add_row" in caplog.text
+    assert "Finished running node model.micro_dbt_project.empty_model_run" not in caplog.text
+    assert "Model 'model.micro_dbt_project.empty_model' was skipped by the dbt command" in caplog.text
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

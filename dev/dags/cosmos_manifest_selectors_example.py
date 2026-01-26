@@ -39,7 +39,7 @@ render_config = RenderConfig(
 
 
 with DAG(
-    dag_id="cosmos_manifest_yaml_selectors_example",
+    dag_id="cosmos_manifest_selectors_example",
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,

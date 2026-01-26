@@ -184,6 +184,31 @@ def test_handle_startup_event():
     assert lst and lst[0]["name"] == "MainReportVersion"
 
 
+def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):
+    """Test that execute_complete logs an info message when model was skipped (model_not_run)."""
+    sensor = DbtConsumerWatcherSensor(
+        project_dir=".",
+        profiles_dir=".",
+        profile_config=profile_config,
+        model_unique_id="model.pkg.skipped_model",
+        poke_interval=1,
+        producer_task_id="dbt_producer_watcher_operator",
+        task_id="consumer_sensor",
+    )
+    sensor.model_unique_id = "model.pkg.skipped_model"
+
+    context = {"dag_run": MagicMock()}
+    event = {"status": "success", "reason": "model_not_run"}
+
+    with caplog.at_level(logging.INFO):
+        sensor.execute_complete(context, event)
+
+    assert any(
+        "Model 'model.pkg.skipped_model' was skipped by the dbt command" in message for message in caplog.messages
+    )
+    assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
+
+
 def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
@@ -218,6 +243,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     "event, expected_message",
     [
         ({"status": "success"}, None),
+        ({"status": "success", "reason": "model_not_run"}, None),
         (
             {"status": "failed", "reason": "model_failed"},
             "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher' logs for details.",

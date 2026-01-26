@@ -2079,13 +2079,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in (
-            "7abb868ed1c22e78de1c00429d950a77",
-            "85cba4ef17dd7c161938da6980a6ff85",
-            "7e273d9b7569e959af96f4368b9a036e",
-        )
+        assert hash_dir in ("7e273d9b7569e959af96f4368b9a036e",)
     else:
-        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
+        assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2112,13 +2108,9 @@ def test_save_yamls_selector_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in (
-            "7abb868ed1c22e78de1c00429d950a77",
-            "85cba4ef17dd7c161938da6980a6ff85",
-            "7e273d9b7569e959af96f4368b9a036e",
-        )
+        assert hash_dir in ("7e273d9b7569e959af96f4368b9a036e",)
     else:
-        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
+        assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 
 
 @pytest.mark.integration

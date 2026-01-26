@@ -41,8 +41,8 @@ New minor or major releases of Cosmos may drop support for Apache Airflow versio
 
 In some cases, Cosmos may continue to support older Airflow versions, depending on the Cosmos release cycle.
 
-- **Minimum required version**: Apache Airflow 2.6.0
-- **Supported versions**: 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 3.0, 3.1
+- **Minimum required version**: Apache Airflow 2.9.0
+- **Supported versions**: 2.9, 2.10, 2.11, 3.0, 3.1
 
 dbt Core
 ~~~~~~~~

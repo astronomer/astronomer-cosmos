@@ -4,10 +4,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
-from packaging.version import Version
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import AIRFLOW_VERSION
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators._asynchronous import SetupAsyncOperator, TeardownAsyncOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
@@ -152,7 +150,6 @@ def test_setup_run_subprocess_py_bin_unset(
         op.run_subprocess(command, env, cwd)
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.8"), reason="ObjectStoragePath requires Apache Airflow >= 2.8")
 @patch("cosmos.operators._asynchronous.ObjectStoragePath")
 def test_execute_removes_existing_path(mock_object_storage_path):
     mock_path_instance = MagicMock()

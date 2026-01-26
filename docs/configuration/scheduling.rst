@@ -202,7 +202,7 @@ they can set this configuration to ``False``. It can also be set in the ``airflo
     [cosmos]
     enable_dataset_alias = False
 
-Starting in Airflow 3, Cosmos users no longer allowed to set ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS`` to ``True``.
+Starting in Airflow 3, Cosmos users are no longer allowed to set ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS`` to ``True``.
 
 
 Emitting Dataset URIs as XCom

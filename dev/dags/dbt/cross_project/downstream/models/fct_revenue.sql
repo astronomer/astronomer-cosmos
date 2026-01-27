@@ -25,10 +25,9 @@ select
     count(distinct o.order_id) as num_orders,
     sum(oi.quantity) as units_sold,
     sum(oi.line_total) as gross_revenue,
-    sum(oi.quantity * pr.cost_price) as cost_of_goods_sold,
-    sum(oi.line_total) - sum(oi.quantity * pr.cost_price) as gross_profit
+    sum(oi.quantity * p.cost_price) as cost_of_goods_sold,
+    sum(oi.line_total) - sum(oi.quantity * p.cost_price) as gross_profit
 from orders o
 inner join order_items oi on o.order_id = oi.order_id
-inner join products pr on oi.product_id = pr.product_id
-cross join (select 'All' as category) p  -- Simplified for demo
+inner join products p on oi.product_id = p.product_id
 group by 1, 2

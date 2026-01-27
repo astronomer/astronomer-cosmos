@@ -78,15 +78,15 @@ conditions are met:
 Apache Airflow Version Removal Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Apache Airflow versions are removed from support when **either** of the
+Apache Airflow versions are removed from support when **both** of the
 following conditions are met:
 
 - **Airflow EOL**: The Apache Airflow version has reached End of Life according
   to the
   `Apache Airflow release policy <https://airflow.apache.org/docs/apache-airflow/stable/security/end-of-life.html>`_
 - **Astronomer Runtime EOL**: The Astronomer Runtime version has reached End of
-  Life according to the
-  `Astronomer Runtime release policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
+  Basic Support according to the
+  `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
 
 dbt Core Version Removal Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,8 +101,8 @@ Version Removal Process
 
 When a version meets the removal criteria:
 
-1. **Evaluation**: The maintainer team verifies that the version meets one or
-   more removal criteria
+1. **Evaluation**: The maintainer team verifies that the version meets all
+   removal criteria
 2. **Documentation**: This compatibility policy document is updated to reflect
    the removal
 3. **CHANGELOG**: The removal is documented in ``CHANGELOG.rst``

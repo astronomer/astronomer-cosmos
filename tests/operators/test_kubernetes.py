@@ -11,9 +11,12 @@ from pendulum import datetime
 
 from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.constants import InvocationMode
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
     DbtCloneKubernetesOperator,
+    DbtDocsKubernetesOperator,
+    DbtDocsS3KubernetesOperator,
     DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
@@ -24,6 +27,12 @@ from cosmos.operators.kubernetes import (
     DbtTestWarningHandler,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=MagicMock(),
+)
 
 
 @pytest.fixture()
@@ -607,6 +616,46 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
     assert expected_cmd == pod_args
 
 
+@pytest.mark.parametrize(
+    "operator_class",
+    (
+        DbtDocsKubernetesOperator,
+        DbtDocsS3KubernetesOperator,
+    ),
+)
+def test_operator_execute_without_flags(operator_class):
+    operator_class_kwargs = {
+        DbtDocsS3KubernetesOperator: {"bucket_name": "fake-bucket"},
+    }
+    task = operator_class(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=InvocationMode.DBT_RUNNER,
+        **operator_class_kwargs.get(operator_class, {}),
+    )
+
+    with (
+        patch(
+            "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook",
+            is_in_cluster=False,
+        ),
+        patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.cleanup"),
+        patch(
+            "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.get_or_create_pod",
+            side_effect=ValueError("Mock"),
+        ) as get_or_create_pod,
+        patch.object(operator_class, "build_and_run_cmd") as mock_build_and_run_cmd,
+    ):
+        try:
+            task.execute(context={})
+        except ValueError as e:
+            if e != get_or_create_pod.side_effect:
+                raise
+
+    mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
+
+
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 
@@ -709,3 +758,26 @@ def test_kubernetes_pod_container_resources():
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
     )
     assert c_operator.container_resources is None
+
+
+def test_dbt_docs_kubernetes_operator_with_static_flags():
+    operator = DbtDocsKubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=["--static"],
+    )
+    assert operator.required_files == ["static_index.html"]
+
+
+def test_dbt_docs_kubernetes_operator_ignores_graph_gpickle():
+    class CustomDbtDocsLocalOperator(DbtDocsKubernetesOperator):
+        required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+
+    operator = CustomDbtDocsLocalOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_global_flags=["--no-write-json"],
+    )
+    assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]

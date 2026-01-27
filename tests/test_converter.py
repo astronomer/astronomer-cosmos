@@ -150,6 +150,68 @@ def test_validate_user_config_fails_project_config_render_config_env_vars():
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
 
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=False)
+def test_validate_initial_user_config_dbt_runner_without_dbt_installed(mock_is_dbt_installed):
+    """Test that validation fails when using DBT_RUNNER but dbt is not installed in the same environment."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow.*"
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.get_system_dbt", return_value="/usr/local/bin/dbt")
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_with_different_dbt_executable_path(
+    mock_is_dbt_installed, mock_get_system_dbt
+):
+    """Test that validation fails when using DBT_RUNNER with a custom dbt_executable_path that differs from system dbt."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER, dbt_executable_path="/custom/path/to/dbt")
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = (
+        "RenderConfig.dbt_executable_path is set, but it is not the same as the system dbt executable path.*"
+    )
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.get_system_dbt", return_value="/usr/local/bin/dbt")
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_with_matching_dbt_executable_path(
+    mock_is_dbt_installed, mock_get_system_dbt
+):
+    """Test that validation passes when using DBT_RUNNER with a dbt_executable_path matching system dbt."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER, dbt_executable_path="/usr/local/bin/dbt")
+    profile_config = MagicMock()
+    operator_args = {}
+
+    # Should not raise any exception
+    validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_without_dbt_executable_path(mock_is_dbt_installed):
+    """Test that validation passes when using DBT_RUNNER without setting dbt_executable_path."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+    profile_config = MagicMock()
+    operator_args = {}
+
+    # Should not raise any exception
+    validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
 def test_validate_arguments_schema_in_task_args():
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL, dbt_project_path="/tmp/project-dir")
     render_config = RenderConfig()
@@ -537,11 +599,8 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
         operator_args=operator_args,
     )
 
-    assert (
-        "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-        in caplog.text
-    )
+    assert "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -1170,8 +1229,9 @@ def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
     assert group_start_idx < group_end_idx
 
 
+@patch("cosmos.converter.should_emit", return_value=True)
 @patch("cosmos.converter.DbtGraph.load")
-def test_telemetry_metadata_storage(mock_load_dbt_graph):
+def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
     """Test that telemetry metadata is stored correctly in DAG params."""
     dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
 
@@ -1212,3 +1272,30 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph):
     assert "profile_strategy" in metadata
     assert "profile_mapping_class" in metadata
     assert "database" in metadata
+
+
+@patch("cosmos.converter.DbtGraph.load")
+@patch("cosmos.converter.should_emit", return_value=False)
+def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load_dbt_graph):
+    """Test that telemetry metadata is NOT stored when telemetry is disabled."""
+    dag = DAG("test_dag_telemetry_disabled", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    _ = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
+
+    # Verify metadata is NOT stored when telemetry is disabled
+    assert "__cosmos_telemetry_metadata__" not in dag.params

@@ -778,7 +778,7 @@ class DbtGraph:
                 ) as profile_values,
                 environ(self.env_vars),
             ):
-                (profile_path, env_vars) = profile_values
+                profile_path, env_vars = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)
 

@@ -216,8 +216,9 @@ def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):
     reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
 )
 @pytest.mark.integration
+@patch("cosmos.converter.should_emit", return_value=True)
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
-def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, caplog):
+def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, mock_should_emit, caplog):
     """Test that DAG run success includes Cosmos telemetry metadata."""
     caplog.set_level(logging.DEBUG)
 
@@ -278,8 +279,9 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
 )
 @pytest.mark.integration
+@patch("cosmos.converter.should_emit", return_value=True)
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
-def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, caplog):
+def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, mock_should_emit, caplog):
     """Test that DAG run failure includes Cosmos telemetry metadata."""
     caplog.set_level(logging.DEBUG)
 

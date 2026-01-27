@@ -24,7 +24,8 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
+from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
@@ -33,7 +34,7 @@ from cosmos.exceptions import CosmosValueError
 # TODO: Move _get_profile_config_attribute at common place
 from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
-from cosmos.telemetry import _compress_telemetry_metadata
+from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
@@ -179,6 +180,16 @@ def validate_initial_user_config(
             "please use ProjectConfig.env_vars instead."
         )
 
+    if render_config is not None and render_config.invocation_mode == InvocationMode.DBT_RUNNER:
+        if not is_dbt_installed_in_same_environment():
+            raise CosmosValueError(
+                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.SUBPROCESS instead."
+            )
+        if render_config.dbt_executable_path and render_config.dbt_executable_path != get_system_dbt():
+            raise CosmosValueError(
+                "RenderConfig.dbt_executable_path is set, but it is not the same as the system dbt executable path. Do not set render_config.dbt_executable_path when using InvocationMode.DBT_RUNNER."
+            )
+
 
 def validate_changed_config_paths(
     execution_config: ExecutionConfig | None, project_config: ProjectConfig, render_config: RenderConfig | None
@@ -273,10 +284,8 @@ class DbtToAirflowConverter:
         validate_changed_config_paths(execution_config, project_config, render_config)
 
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
-            logger.warning(
-                "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-            )
+            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
 
         cache_dir = None
         cache_identifier = None
@@ -404,7 +413,7 @@ class DbtToAirflowConverter:
         :param profile_config: The profile configuration
         :param initial_load_method: The load method specified by the user (before automatic resolution)
         """
-        if dag is None:
+        if dag is None or not should_emit():
             return
 
         metadata: dict[str, Any] = {"used_automatic_load_mode": initial_load_method == LoadMode.AUTOMATIC}

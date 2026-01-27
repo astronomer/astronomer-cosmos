@@ -43,11 +43,10 @@ from cosmos.constants import InvocationMode
 # [START example_watcher]
 example_watcher = DbtDag(
     # dbt/cosmos-specific parameters
-    execution_config=ExecutionConfig(
-        execution_mode=ExecutionMode.WATCHER,
-        invocation_mode=InvocationMode.SUBPROCESS,
-        dbt_executable_path=DBT_EXECUTABLE_PATH,
-    ),
+     execution_config=ExecutionConfig(
+         execution_mode=ExecutionMode.WATCHER, 
+         invocation_mode=InvocationMode.DBT_RUNNER
+     ),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),

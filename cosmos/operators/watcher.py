@@ -83,7 +83,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
     # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
     # when accessed via instance, which would incorrectly pass `self` as the first argument
-    _process_log_line_callable: Callable[[str, Any], None] = None
+    _process_log_line_callable: Callable[[str, Any], None] | None = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
@@ -146,17 +146,22 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if startup_events:
             safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
 
-    def execute(self, context: Context, **kwargs: Any) -> Any:
+    def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:
             logger.info("No invocation mode provided, discovering it")
             self._discover_invocation_mode()
 
-        logger.info("Invocation mode: %s", self.invocation_mode)
-
+    def _set_process_log_line_callable_if_subprocess(self) -> None:
         if self.invocation_mode == InvocationMode.SUBPROCESS:
-            logger.info("Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log")
+            logger.info(
+                "DbtProducerWatcherOperator: Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log"
+            )
             self.log_format = "json"
             self._process_log_line_callable = store_dbt_resource_status_from_log
+
+    def execute(self, context: Context, **kwargs: Any) -> Any:
+        self._set_invocation_mode_if_not_set()
+        self._set_process_log_line_callable_if_subprocess()
 
         task_instance = context.get("ti")
         if task_instance is None:
@@ -165,12 +170,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            retry_message = (
+            self.log.info(
                 "Dbt WATCHER producer task does not support Airflow retries. "
-                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
+                try_number,
             )
-            self.log.error(retry_message)
-            raise AirflowException(retry_message)
+            return None
 
         self.log.info(
             "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "

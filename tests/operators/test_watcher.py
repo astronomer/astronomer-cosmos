@@ -921,7 +921,7 @@ class TestDbtBuildWatcherOperator:
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
-def test_dbt_dag_with_watcher(caplog):
+def test_dbt_dag_with_watcher(capsys):
     """
     Run a DbtDag using `ExecutionMode.WATCHER`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.
@@ -984,11 +984,17 @@ def test_dbt_dag_with_watcher(caplog):
         "raw_orders_seed",
         "raw_customers_seed",
     }
+
+    # dbt runner logs are not captured by caplog, so we need to capture them using capsys
+    capsys_output = capsys.readouterr()
+    stdout = capsys_output.out
+
     assert (
         '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
-        not in caplog.text
+        not in stdout
     )
-    assert "OK loaded seed file public.raw_orders" in caplog.text
+
+    assert "OK loaded seed file public.raw_orders" in stdout
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

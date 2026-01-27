@@ -37,7 +37,11 @@ Python
 Apache Airflow
 ~~~~~~~~~~~~~~
 
-- **Minimum required**: Apache Airflow 2.6.0
+New minor or major releases of Cosmos may drop support for Apache Airflow versions that have reached **End of Basic Support**, as defined in the `Astro Runtime Lifecycle schedule <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy#astro-runtime-lifecycle-schedule>`_.
+
+In some cases, Cosmos may continue to support older Airflow versions, depending on the Cosmos release cycle.
+
+- **Minimum required version**: Apache Airflow 2.6.0
 - **Supported versions**: 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 3.0, 3.1
 
 dbt Core

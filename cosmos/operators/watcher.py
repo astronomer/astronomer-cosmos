@@ -155,12 +155,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            retry_message = (
+            self.log.info(
                 "Dbt WATCHER producer task does not support Airflow retries. "
-                f"Detected attempt #{try_number}; failing fast to avoid running a second dbt build."
+                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
+                try_number,
             )
-            self.log.error(retry_message)
-            raise AirflowException(retry_message)
+            return None
 
         self.log.info(
             "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "

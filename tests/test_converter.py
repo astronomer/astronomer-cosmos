@@ -1229,8 +1229,9 @@ def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
     assert group_start_idx < group_end_idx
 
 
+@patch("cosmos.converter.should_emit", return_value=True)
 @patch("cosmos.converter.DbtGraph.load")
-def test_telemetry_metadata_storage(mock_load_dbt_graph):
+def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
     """Test that telemetry metadata is stored correctly in DAG params."""
     dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
 
@@ -1271,3 +1272,30 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph):
     assert "profile_strategy" in metadata
     assert "profile_mapping_class" in metadata
     assert "database" in metadata
+
+
+@patch("cosmos.converter.DbtGraph.load")
+@patch("cosmos.converter.should_emit", return_value=False)
+def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load_dbt_graph):
+    """Test that telemetry metadata is NOT stored when telemetry is disabled."""
+    dag = DAG("test_dag_telemetry_disabled", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    _ = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
+
+    # Verify metadata is NOT stored when telemetry is disabled
+    assert "__cosmos_telemetry_metadata__" not in dag.params

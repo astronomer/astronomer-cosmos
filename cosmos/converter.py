@@ -34,7 +34,7 @@ from cosmos.exceptions import CosmosValueError
 # TODO: Move _get_profile_config_attribute at common place
 from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
-from cosmos.telemetry import _compress_telemetry_metadata
+from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
@@ -413,7 +413,7 @@ class DbtToAirflowConverter:
         :param profile_config: The profile configuration
         :param initial_load_method: The load method specified by the user (before automatic resolution)
         """
-        if dag is None:
+        if dag is None or not should_emit():
             return
 
         metadata: dict[str, Any] = {"used_automatic_load_mode": initial_load_method == LoadMode.AUTOMATIC}

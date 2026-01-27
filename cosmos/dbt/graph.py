@@ -663,7 +663,7 @@ class DbtGraph:
     @functools.lru_cache
     def should_use_yaml_selectors_cache(self) -> bool:
         """Identify if Cosmos should use/store YAML selectors cache or not."""
-        return settings.enable_cache and settings.enable_cache_yaml_selectors and bool(self.cache_key)
+        return settings.enable_cache and settings.enable_cache_dbt_yaml_selectors and bool(self.cache_key)
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""

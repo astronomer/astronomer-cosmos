@@ -118,7 +118,7 @@ Caching the YAML selectors
 While parsing a dbt project using `LoadMode.DBT_MANIFEST <./parsing-methods.html#dbt-manifest>`_, if a ``selector`` argument is provided to the `RenderConfig <./render-config.html>`_ instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
 Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow DAG. The parsed selectors will be cached to improve performance during DAG parsing.
 
-This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_YAML_SELECTORS=0``.
+This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``.
 
 Similar to the caching of ``dbt ls`` output, users can also set a remote directory path to store this cache instead of using Airflow
 Variables. To do so, you need to configure a remote cache directory. See :ref:`remote_cache_dir` and
@@ -186,7 +186,8 @@ The cache values contain a few properties:
 
 * ``last_modified`` timestamp, represented using the ISO 8601 format.
 * ``version`` is a hash that represents the version of the dbt project, the raw YAML selectors, and a hash of the YAML selector parser implementation version combined with the keys specified by ``airflow_vars_to_purge_dbt_yaml_selectors_cache``
-* ``yaml_selectors`` is a serialized, compressed, encoded instance of the YamlSelectors class, containing the raw and parsed YAML selectors as well as an implementation version.
+* ``raw_selectors_compressed`` represents the raw YAML selector definitions compressed using zlib and encoded to base64
+* ``parsed_selectors_compressed`` represents the parsed YAML selector definitions compressed using zlib and encoded to base64
 * ``dag_id`` is the DAG associated to this cache
 * ``task_group_id`` is the TaskGroup associated to this cache
 * ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``

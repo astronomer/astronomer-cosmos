@@ -2276,7 +2276,7 @@ def test_should_use_yaml_selectors_cache(enable_cache, enable_cache_yaml_selecto
         os.environ,
         {
             "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
-            "AIRFLOW__COSMOS__ENABLE_CACHE_YAML_SELECTORS": str(enable_cache_yaml_selectors),
+            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS": str(enable_cache_yaml_selectors),
         },
     ):
         importlib.reload(settings)
@@ -2442,7 +2442,7 @@ def test_parse_yaml_selectors_saves_cache(enable_cache, enable_cache_yaml_select
         os.environ,
         {
             "AIRFLOW__COSMOS__ENABLE_CACHE": str(enable_cache),
-            "AIRFLOW__COSMOS__ENABLE_CACHE_YAML_SELECTORS": str(enable_cache_yaml_selectors),
+            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS": str(enable_cache_yaml_selectors),
         },
     ):
         importlib.reload(settings)

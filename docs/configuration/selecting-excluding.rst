@@ -5,9 +5,9 @@ Selecting & Excluding
 
 Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select`` and ``exclude`` parameters in the ``RenderConfig`` class.
 
-Since Cosmos 1.3, the ``selector`` parameter is also available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
+    Since Cosmos 1.3, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
 
-Since Cosmos 1.13, the ``selector`` parameter is also supported when using the ``LoadMode.DBT_MANIFEST`` to parse the dbt project into Airflow.
+    Since Cosmos 1.13, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_MANIFEST`` to parse the dbt project into Airflow.
 
 
 Using ``select`` and ``exclude``
@@ -179,4 +179,4 @@ Parsing of the ``default`` and ``indirect_selection`` keywords is not currently 
 
 In the event the dbt YAML selector specification changes, Cosmos will attempt to keep up to date with the changes, but there may be a lag between dbt releases and Cosmos releases.
 Once a new Cosmos version is released with the updated selector parsing logic, users should update their Cosmos version to ensure compatibility with the latest dbt selector specification.
-For any subsequent updates to the YAML selector parser, existing YAML selectors caches will be invalidated the next time the DAG is parsed.
+For subsequent updates to the YAML selector parser, existing YAML selector caches will be invalidated the next time the DAG is parsed.

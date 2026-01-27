@@ -300,8 +300,8 @@ def _calculate_yaml_selectors_cache_current_version(
     :param cache_identifier: str - Unique identifier of the cache (may include DbtDag or DbtTaskGroup information)
     :param project_dir: Path - Path to the target dbt project directory
     :param selector_definitions: dict[str, dict[str, Any]] - Dictionary containing the selectors definitions from the manifest
-    :param implementation_version: str - The implementation version of the YamlSelectors class
-    :return: str - Combined hash string of project and selectors
+    :param cache_key: list[str] - List of strings used as part of the cache key hash calculation
+    :return: str - Combined hash string of project, selectors, and cache_key (comma-separated)
     """
 
     start_time = time.perf_counter()
@@ -310,8 +310,11 @@ def _calculate_yaml_selectors_cache_current_version(
     # This is fast (e.g. 0.01s for jaffle shop, 0.135s for a 5k models dbt folder)
     dbt_project_hash = _create_folder_version_hash(project_dir)
 
-    yaml_selector_hash = hashlib.md5(yaml.dump(selector_definitions).encode()).hexdigest()
-    cache_key_hash = hashlib.md5("".join(cache_key).encode()).hexdigest()
+    # Use JSON with sorted keys for deterministic hashing, resilient to dict ordering changes
+    yaml_selector_hash = hashlib.md5(
+        json.dumps(selector_definitions, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    cache_key_hash = hashlib.md5("".join(sorted(cache_key)).encode()).hexdigest()
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(

@@ -1541,6 +1541,21 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
             {"name": "unknown_random_method", "definition": {"method": "unknown_random", "value": "test"}},
             "Unsupported selector method: 'unknown_random'",
         ),
+        (
+            "non_dict_definition",
+            "not_a_dict",
+            "Invalid selector definition for 'non_dict_definition'. Expected a dict, got <class 'str'>: not_a_dict",
+        ),
+        (
+            "missing_name_key",
+            {"definition": {"method": "tag", "value": "nightly"}},
+            "Selector definition for 'missing_name_key' must contain 'name' and 'definition' keys.",
+        ),
+        (
+            "missing_definition_key",
+            {"name": "missing_definition_key"},
+            "Selector definition for 'missing_definition_key' must contain 'name' and 'definition' keys.",
+        ),
     ],
 )
 def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
@@ -1592,7 +1607,7 @@ def test_invalid_items_in_selector_lists(selector_name, definition_key, invalid_
         _ = YamlSelectors.parse(selectors)
 
     assert (
-        f'Invalid value type {item_type_str} in key "{definition_key}", expected dict or str (value: {invalid_list_item}).'
+        f'Invalid value type {item_type_str} in key "{definition_key}", expected dict (value: {invalid_list_item}).'
         in err_info.value.args[0]
     )
 

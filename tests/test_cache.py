@@ -465,9 +465,16 @@ def test_calculate_yaml_selectors_cache_current_version_equals():
 
     with patch("cosmos.cache._create_folder_version_hash", mock_create_dbt_folder_version_hash):
         result = _calculate_yaml_selectors_cache_current_version(
-            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, "yamlselectors_hash_v1"
+            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, ["yamlselectors_hash_v1"]
         )
-        assert result == "dbt_project_hash_v1,dcbc007b6ea10b215d0024015f762d93,fbbaca69581c53891710fed3d53badcb"
+
+        parts = result.split(",")
+
+        assert len(parts) == 3
+
+        assert parts[0] == "dbt_project_hash_v1"
+        assert parts[1] == "d424de5f9a889bd3afee43a5012f1c65"
+        assert parts[2] == "fbbaca69581c53891710fed3d53badcb"
 
 
 def test_were_yaml_selectors_modified_true():

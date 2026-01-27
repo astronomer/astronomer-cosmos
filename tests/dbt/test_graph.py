@@ -3,7 +3,6 @@ import importlib
 import json
 import logging
 import os
-import pickle
 import shutil
 import sys
 import tempfile
@@ -395,7 +394,8 @@ def test_load_via_manifest_with_selectors_and_missing_definitions():
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_from_dbt_manifest()
-        assert err_info.value.args[0] == f"Selectors not found in the manifest file {project_config.manifest_path}"
+
+    assert err_info.value.args[0] == f"Selectors not found in manifest file `{project_config.manifest_path}`"
 
 
 def test_load_via_manifest_with_selectors_and_missing_selector():
@@ -421,7 +421,8 @@ def test_load_via_manifest_with_selectors_and_missing_selector():
     )
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_from_dbt_manifest()
-        assert "Selector 'my_selector' not found in the manifest file" in err_info.value.args[0]
+
+    assert "Selector `my_selector` not found in parsed YAML selectors" in err_info.value.args[0]
 
 
 def test_load_via_manifest_with_selectors():
@@ -1851,7 +1852,7 @@ def test_load_via_dbt_ls_render_config_no_partial_parse(
 
 @pytest.mark.parametrize("load_method", [LoadMode.CUSTOM])
 def test_load_method_with_unsupported_render_config_selector_arg(load_method):
-    """Tests that error is raised when RenderConfig.selector is used with LoadMode.DBT_MANIFEST or LoadMode.CUSTOM."""
+    """Tests that error is raised when RenderConfig.selector is used with LoadMode.CUSTOM."""
 
     expected_error_msg = (
         f"RenderConfig.selector is not yet supported when loading dbt projects using the {load_method} parser."
@@ -2079,14 +2080,14 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("7e273d9b7569e959af96f4368b9a036e",)
+        assert hash_dir in ("67c608d42ca8bdeef6c3eb8fa888471b",)
     else:
         assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 
 
 @patch("cosmos.dbt.graph.datetime")
 @patch("cosmos.dbt.graph.Variable.set")
-def test_save_yamls_selector_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
     mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
     graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
     selectors = YamlSelectors(
@@ -2095,20 +2096,31 @@ def test_save_yamls_selector_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     )
     graph.save_yaml_selectors_cache(selectors)
     assert mock_variable_set.call_args[0][0] == "cosmos_cache__something"
-    assert (
-        mock_variable_set.call_args[0][1]["yaml_selectors"]
-        == "eJwtjjsKAkEQRAU/i4ImXkKTPYCHMDEykKF3p90dmI/MR00EzTuzvYync9ixkq6iXkM9J5/vqIjWrQvGhVo2sQ6osY3OMy2PYPThHwO/efviB29oIjzcsqNViNAp2wnnJWZiKC0Y5L6ihcSzsioqZ4diZjD2TjKN8xPT9Ao6Yb45CeCUAlXiAj6gLHjZwSemeUZ2BQOq8N7qJJH3KTX1D+xVTPQ="
-    )
-    assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
-    version = mock_variable_set.call_args[0][1].get("version")
+
+    cache_dict = mock_variable_set.call_args[0][1]
+
+    assert "raw_selectors_compressed" in cache_dict
+    assert "parsed_selectors_compressed" in cache_dict
+
+    raw_decoded = base64.b64decode(cache_dict["raw_selectors_compressed"].encode())
+    raw_decompressed = json.loads(zlib.decompress(raw_decoded).decode())
+    assert raw_decompressed == selectors.raw
+
+    parsed_decoded = base64.b64decode(cache_dict["parsed_selectors_compressed"].encode())
+    parsed_decompressed = json.loads(zlib.decompress(parsed_decoded).decode())
+    assert parsed_decompressed == selectors.parsed
+
+    assert cache_dict["last_modified"] == "2022-01-01T12:00:00"
+
+    version = cache_dict.get("version")
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
-    assert hash_selectors == "fbfa164dd765f83c2941eeb019a7f7b4"
-    assert hash_impl == "3bcd19c20c14f98095f50c11822b46e0"
+    assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
+    assert hash_impl == "3ae7ccd90b387308920fa408907de75d"
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("7e273d9b7569e959af96f4368b9a036e",)
+        assert hash_dir in ("67c608d42ca8bdeef6c3eb8fa888471b",)
     else:
         assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 
@@ -2134,7 +2146,11 @@ def test_get_dbt_ls_cache_returns_decoded_and_decompressed_value(mock_variable_g
 @patch(
     "cosmos.dbt.graph.Variable.get",
     return_value={
-        "yaml_selectors": "eJwtjjsKAkEQRAU/i4ImXkKTPYCHMDEykKF3p90dmI/MR00EzTuzvYync9ixkq6iXkM9J5/vqIjWrQvGhVo2sQ6osY3OMy2PYPThHwO/efviB29oIjzcsqNViNAp2wnnJWZiKC0Y5L6ihcSzsioqZ4diZjD2TjKN8xPT9Ao6Yb45CeCUAlXiAj6gLHjZwSemeUZ2BQOq8N7qJJH3KTX1D+xVTPQ="
+        # Compressed and encoded versions of the selectors
+        # raw_selectors: {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}}
+        # parsed_selectors: {"select": ["tag:tag_a"], "exclude": None}
+        "raw_selectors_compressed": "eJyrViouSUzPzEuPzy9KSS0qVrJSqFZKSU3LzMssyczPA3NzU0sy8lOATCWgUiUdBaWyxJzSVCg/PlGpFiiUl5gLFkEzrbYWAFRnILk=",
+        "parsed_selectors_compressed": "eJyrVkqtSM4pTUlVslLIK83J0VFQKk7NSU0uAfKjlUoS062AOD5RKbYWADB2DhQ=",
     },
 )
 def test_get_yaml_selectors_cache_returns_decoded_and_decompressed_value(mock_variable_get):
@@ -2374,13 +2390,20 @@ def test_get_yaml_selectors_remote_cache_dir(
         {"select": ["tag:tag_a"], "exclude": None},
     )
 
-    serialized_data = pickle.dumps(yaml_selectors)
-    compressed_data = zlib.compress(serialized_data)
-    encoded_data = base64.b64encode(compressed_data).decode("utf-8")
+    raw_selectors_json = json.dumps(yaml_selectors.raw, sort_keys=True)
+    compressed_raw = zlib.compress(raw_selectors_json.encode("utf-8"))
+    encoded_raw = base64.b64encode(compressed_raw)
+    raw_selectors_compressed = encoded_raw.decode("utf-8")
+
+    parsed_selectors_json = json.dumps(yaml_selectors.parsed, sort_keys=True)
+    compressed_parsed = zlib.compress(parsed_selectors_json.encode("utf-8"))
+    encoded_parsed = base64.b64encode(compressed_parsed)
+    parsed_selectors_compressed = encoded_parsed.decode("utf-8")
 
     cache_dict = {
         "version": "cache-version",
-        "yaml_selectors": encoded_data,
+        "raw_selectors_compressed": raw_selectors_compressed,
+        "parsed_selectors_compressed": parsed_selectors_compressed,
         "last_modified": "2024-08-13T12:34:56Z",
     }
 

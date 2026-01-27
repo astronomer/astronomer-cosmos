@@ -74,7 +74,7 @@ Example:
 
 .. code-block:: python
 
-    RenderConfig(airflow_vars_to_purge_dbt_ls_cache == ["refresh_cache"])
+    RenderConfig(airflow_vars_to_purge_dbt_ls_cache=["refresh_cache"])
 
 **Cleaning up stale cache**
 
@@ -151,7 +151,7 @@ Example:
 
 .. code-block:: python
 
-    RenderConfig(airflow_vars_to_purge_dbt_yaml_selectors_cache == ["refresh_cache"])
+    RenderConfig(airflow_vars_to_purge_dbt_yaml_selectors_cache=["refresh_cache"])
 
 **Cleaning up stale cache**
 

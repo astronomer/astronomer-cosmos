@@ -783,7 +783,7 @@ class YamlSelectors:
         Extract and validate a list of dictionaries from a given key in a dictionary.
 
         This helper method retrieves a value from a dictionary and ensures it's a list containing
-        either dictionaries with string keys or string values.
+        only dictionaries with string keys.
 
         :param dct: dict[str, Any] - The dictionary to extract from
         :param key: str - The key to look up in the dictionary
@@ -807,7 +807,7 @@ class YamlSelectors:
                 result.append(value)
             else:
                 raise CosmosValueError(
-                    f'Invalid value type {type(value)} in key "{key}", expected ' f"dict or str (value: {value})."
+                    f'Invalid value type {type(value)} in key "{key}", expected dict (value: {value}).'
                 )
 
         return result
@@ -942,7 +942,7 @@ class YamlSelectors:
 
     @classmethod
     def _parse_exclusions(
-        cls, definition: dict[str, Any], cache: dict[str, tuple[list[str], list[str]]] = {}
+        cls, definition: dict[str, Any], cache: dict[str, tuple[list[str], list[str]]] | None = None
     ) -> list[str]:
         """
         Parse exclusion definitions from a selector definition.
@@ -954,6 +954,8 @@ class YamlSelectors:
         :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
         :return: list[str] - List of exclusion selector strings
         """
+        cache = cache or {}
+
         exclusions = cls._get_list_dicts(definition, "exclude")
         exclude: list[str] = []
 
@@ -1004,7 +1006,7 @@ class YamlSelectors:
     def _parse_union_definition(
         cls,
         definition: dict[str, Any],
-        cache: dict[str, tuple[list[str], list[str]]] = {},
+        cache: dict[str, tuple[list[str], list[str]]] | None = None,
     ) -> tuple[list[str], list[str]]:
         """
         Parse a union selector definition.
@@ -1027,6 +1029,8 @@ class YamlSelectors:
         Example Output:
             (["tag:nightly", "path:models/staging"], [])
         """
+        cache = cache or {}
+
         union_def_parts = cls._get_list_dicts(definition, "union")
         return cls._parse_include_exclude_subdefs(union_def_parts, cache=cache)
 
@@ -1182,25 +1186,23 @@ class YamlSelectors:
     @classmethod
     def parse(cls, selectors: dict[str, dict[str, Any]]) -> YamlSelectors:
         """
-        Parse a complete dbt selectors YAML file into a YamlSelectors instance.
+        Parse selector definitions from a dbt manifest into a YamlSelectors instance.
 
-        This is the main entry point for parsing YAML selectors. It processes all selector
-        definitions in the YAML file and converts them to Cosmos format.
+        This is the main entry point for parsing manifest selector definitions. It processes all
+        selector definitions from the manifest and converts them to Cosmos format.
 
-        :param selectors: dict[str, dict[str, Any]] - The complete selectors YAML content as a dictionary with a 'selectors' key
+        :param selectors: dict[str, dict[str, Any]] - Dictionary of selector definitions from the manifest, keyed by selector name
         :return: YamlSelectors - A YamlSelectors instance containing both raw and parsed selector definitions
 
         Example Input:
             {
-                "selectors": [
-                    {
-                        "name": "nightly_models",
-                        "definition": {
-                            "method": "tag",
-                            "value": "nightly"
-                        }
+                "nightly_models": {
+                    "name": "nightly_models",
+                    "definition": {
+                        "method": "tag",
+                        "value": "nightly"
                     }
-                ]
+                }
             }
 
         Example Output:
@@ -1208,24 +1210,33 @@ class YamlSelectors:
             {
                 "nightly_models": {
                     "select": ["tag:nightly"],
-                    "exclude": None                }
+                    "exclude": None
+                }
             }
         """
         result: dict[str, dict[str, Any]] = {}
         cache: dict[str, tuple[list[str], list[str]]] = {}
 
         for name, definition in selectors.items():
-            name = definition.get("name", "")
-            selector_definition = definition.get("definition", {})
+            if not isinstance(definition, dict):
+                raise CosmosValueError(
+                    f"Invalid selector definition for '{name}'. Expected a dict, got {type(definition)}: {definition}"
+                )
+
+            if not definition.get("name") or not definition.get("definition"):
+                raise CosmosValueError(f"Selector definition for '{name}' must contain 'name' and 'definition' keys.")
+
+            selector_name = definition["name"]
+            selector_definition = definition["definition"]
 
             select, exclude = cls._parse_from_definition(selector_definition, cache=cache, rootlevel=True)
 
-            result[name] = {
+            result[selector_name] = {
                 "select": select if select else None,
                 "exclude": exclude if exclude else None,
             }
 
-            cache[name] = (select, exclude)
+            cache[selector_name] = (select, exclude)
 
         return cls(selectors, result)
 

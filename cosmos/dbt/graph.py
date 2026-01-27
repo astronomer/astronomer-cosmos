@@ -6,7 +6,6 @@ import functools
 import itertools
 import json
 import os
-import pickle
 import platform
 import tempfile
 import warnings
@@ -945,12 +944,12 @@ class DbtGraph:
 
     def get_yaml_selectors_cache(self) -> dict[str, Any]:
         """
-        Retrieve previously saved YAML selectors from an Airflow Variable.
+        Retrieve previously saved YAML selectors from an Airflow Variable, decompressing the selector data.
 
         Outputs:
         {
             "version": "cache-version",
-            "yaml_selectors": uncompressed YamlSelectors instance,
+            "yaml_selectors": YamlSelectors instance reconstructed from cached dictionaries,
             "last_modified": "Isoformat timestamp"
         }
         """
@@ -974,30 +973,41 @@ class DbtGraph:
         except tuple(airflow_variable_exceptions):
             return cache_dict
         else:
-            selectors_compressed = cache_dict.pop("yaml_selectors", None)
-            if selectors_compressed:
-                encoded_data = base64.b64decode(selectors_compressed.encode("utf-8"))
-                decompressed_data = zlib.decompress(encoded_data)
-                cache_dict["yaml_selectors"] = pickle.loads(decompressed_data)
+            raw_selectors_compressed = cache_dict.pop("raw_selectors_compressed", None)
+            parsed_selectors_compressed = cache_dict.pop("parsed_selectors_compressed", None)
+
+            if raw_selectors_compressed and parsed_selectors_compressed:
+                encoded_raw = base64.b64decode(raw_selectors_compressed.encode())
+                raw_selectors = json.loads(zlib.decompress(encoded_raw).decode())
+
+                encoded_parsed = base64.b64decode(parsed_selectors_compressed.encode())
+                parsed_selectors = json.loads(zlib.decompress(encoded_parsed).decode())
+
+                cache_dict["yaml_selectors"] = YamlSelectors(raw_selectors, parsed_selectors)
 
             return cache_dict
 
     def save_yaml_selectors_cache(self, yaml_selectors: YamlSelectors) -> None:
         """
-        Store parsed YAML selectors into an Airflow Variable.
+        Store compressed and encoded YAML selectors into an Airflow Variable.
 
         Stores:
         {
             "version": "cache-version",
-            "yaml_selectors": compressed YamlSelectors instance,
+            "raw_selectors_compressed": "compressed raw selector definitions",
+            "parsed_selectors_compressed": "compressed parsed selector definitions",
             "last_modified": "Isoformat timestamp"
         }
         """
+        raw_selectors_json = json.dumps(yaml_selectors.raw, sort_keys=True)
+        compressed_raw = zlib.compress(raw_selectors_json.encode("utf-8"))
+        encoded_raw = base64.b64encode(compressed_raw)
+        raw_selectors_compressed = encoded_raw.decode("utf-8")
 
-        serialized_data = pickle.dumps(yaml_selectors)
-        compressed_data = zlib.compress(serialized_data)
-        encoded_data = base64.b64encode(compressed_data)
-        selectors_encoded = encoded_data.decode("utf-8")
+        parsed_selectors_json = json.dumps(yaml_selectors.parsed, sort_keys=True)
+        compressed_parsed = zlib.compress(parsed_selectors_json.encode("utf-8"))
+        encoded_parsed = base64.b64encode(compressed_parsed)
+        parsed_selectors_compressed = encoded_parsed.decode("utf-8")
 
         cache_dict = {
             "version": cache._calculate_yaml_selectors_cache_current_version(
@@ -1006,7 +1016,8 @@ class DbtGraph:
                 yaml_selectors.raw,
                 self.get_dbt_yaml_selectors_cache_key_args(yaml_selectors.impl_version),
             ),
-            "yaml_selectors": selectors_encoded,
+            "raw_selectors_compressed": raw_selectors_compressed,
+            "parsed_selectors_compressed": parsed_selectors_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             **self.airflow_metadata,
         }

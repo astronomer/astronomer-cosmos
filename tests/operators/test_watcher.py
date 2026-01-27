@@ -240,7 +240,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     assert any("does not support Airflow retries" in message for message in caplog.messages)
     assert any("skipping execution" in message for message in caplog.messages)
 
-    
+
 @pytest.mark.parametrize(
     "event, expected_message",
     [

@@ -14,7 +14,6 @@ DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "jaffle_shop")
 DBT_PROJECT_PATH = DBT_ROOT_PATH / DBT_PROJECT_NAME
-DBT_EXECUTABLE_PATH = Path(__file__).parent.parent / "venv-subprocess/bin/dbt"
 
 
 profile_config = ProfileConfig(

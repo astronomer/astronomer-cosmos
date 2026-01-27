@@ -40,17 +40,21 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
-    node_info = log_line.get("data", {}).get("node_info", {})
-    node_status = node_info.get("node_status")
-    unique_id = node_info.get("unique_id")
+    else:
+        logger.debug("Log line: %s", log_line)
+        if "info" in log_line and "msg" in log_line["info"]:
+            logger.info(log_line["info"]["msg"])
+        node_info = log_line.get("data", {}).get("node_info", {})
+        node_status = node_info.get("node_status")
+        unique_id = node_info.get("unique_id")
 
-    logger.debug("Model: %s is in %s state", unique_id, node_status)
+        logger.debug("Model: %s is in %s state", unique_id, node_status)
 
-    # TODO: Handle and store all possible node statuses, not just the current success and failed
-    if node_status in ["success", "failed"]:
-        context = extra_kwargs.get("context")
-        assert context is not None  # Make MyPy happy
-        safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+        # TODO: Handle and store all possible node statuses, not just the current success and failed
+        if node_status in ["success", "failed"]:
+            context = extra_kwargs.get("context")
+            assert context is not None  # Make MyPy happy
+            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})

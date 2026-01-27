@@ -33,6 +33,8 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
+
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
 
 project_config = ProjectConfig(
@@ -548,48 +550,10 @@ class TestStoreDbtStatusFromLog:
         assert msg in caplog.text
         assert any(record.levelname == logging.getLevelName(dynamic_level) for record in caplog.records)
 
-    def test_process_log_line_callable_is_not_bound_method(self):
-        """Test that _process_log_line_callable is not bound as a method when accessed through an instance.
-
-        This test verifies the fix for the bug where accessing _process_log_line_callable through
-        an instance would create a bound method, causing 'self' to be passed as the first argument.
-        """
-        import inspect
-
-        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-
-        # Access the callable through the instance
-        callable_from_instance = op._process_log_line_callable
-
-        # Verify it's not a bound method (which would have __self__ attribute)
-        assert not inspect.ismethod(
-            callable_from_instance
-        ), "_process_log_line_callable should not be a bound method when accessed through instance"
-
-        # Verify it's the original function
-        assert callable_from_instance is store_dbt_resource_status_from_log
-
-    def test_process_log_line_callable_accepts_two_arguments(self):
-        """Test that the callable can be called with exactly 2 arguments (line, kwargs).
-
-        This tests the integration pattern used in subprocess.py where process_log_line(line, kwargs) is called.
-        """
-        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-        callable_from_instance = op._process_log_line_callable
-
-        ti = _MockTI()
-        ctx = {"ti": ti}
-
-        log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.test_model"}}})
-
-        # This should NOT raise TypeError about wrong number of arguments
-        callable_from_instance(log_line, {"context": ctx})
-
-        assert ti.store.get("model__pkg__test_model_status") == "success"
-
     def test_process_log_line_callable_integration_with_subprocess_pattern(self):
         """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs)."""
         op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+        op._process_log_line_callable = store_dbt_resource_status_from_log
 
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -604,10 +568,8 @@ class TestStoreDbtStatusFromLog:
         ]
 
         # Simulate the subprocess.py pattern
-        process_log_line = op._process_log_line_callable
         for line in log_lines:
-            if process_log_line:
-                process_log_line(line, kwargs)
+            op._process_log_line_callable(line, kwargs)
 
         assert ti.store.get("model__pkg__model_a_status") == "success"
         assert ti.store.get("model__pkg__model_b_status") == "failed"
@@ -1036,7 +998,7 @@ class TestDbtBuildWatcherOperator:
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
-def test_dbt_dag_with_watcher():
+def test_dbt_dag_with_watcher(capsys):
     """
     Run a DbtDag using `ExecutionMode.WATCHER`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.
@@ -1049,6 +1011,7 @@ def test_dbt_dag_with_watcher():
         dag_id="watcher_dag",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
@@ -1098,6 +1061,57 @@ def test_dbt_dag_with_watcher():
         "raw_orders_seed",
         "raw_customers_seed",
     }
+
+    # dbt runner logs are not captured by caplog, so we need to capture them using capsys
+    capsys_output = capsys.readouterr()
+    stdout = capsys_output.out
+
+    assert (
+        '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
+        not in stdout
+    )
+
+    assert "OK loaded seed file public.raw_orders" in stdout
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_subprocess(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    watcher_dag = DbtDag(
+        project_config=project_config,
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.SUBPROCESS,
+            dbt_executable_path=DBT_EXECUTABLE_PATH,
+        ),
+        render_config=RenderConfig(emit_datasets=False, select=["raw_orders"], test_behavior=TestBehavior.AFTER_ALL),
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+    )
+    dag_run = new_test_dag(watcher_dag)
+    assert dag_run.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 1
+
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test"]
+    assert tasks_names == expected_task_names
+    # Confirm that the dbt command was successfully run using the given dbt executable path:
+    assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text
+    # Confirm that the seed was successfully run and the log output was JSON:
+    assert (
+        '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
+        not in caplog.text
+    )
+    assert "OK loaded seed file public.raw_orders" in caplog.text
 
 
 # Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:

@@ -58,7 +58,7 @@ DOWNSTREAM_MANIFEST_PATH = DBT_DOWNSTREAM_PROJECT_PATH / "target" / "manifest.js
 # DOWNSTREAM_MANIFEST_PATH = "s3://your-bucket/dbt-manifests/downstream/manifest.json"
 # MANIFEST_CONN_ID = "aws_default"  # or "google_cloud_default" for GCS
 
-
+# [START cross_project_manifest_dag]
 # =============================================================================
 # Combined DAG with Task Groups - Using DBT_MANIFEST Load Mode
 # =============================================================================
@@ -154,3 +154,4 @@ with DAG(
 
     # Chain: Upstream runs first, then Downstream
     upstream_task_group >> downstream_task_group
+# [END cross_project_manifest_dag]

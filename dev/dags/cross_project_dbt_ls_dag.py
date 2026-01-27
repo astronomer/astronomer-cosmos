@@ -45,6 +45,7 @@ DBT_UPSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "upstream"
 DBT_DOWNSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "downstream"
 
 
+# [START cross_project_dbt_ls_dag]
 # =============================================================================
 # Combined DAG with Task Groups - Upstream runs first, then Downstream
 # =============================================================================
@@ -129,3 +130,4 @@ with DAG(
 
     # Chain: Upstream runs first, then Downstream
     upstream_task_group >> downstream_task_group
+# [END cross_project_dbt_ls_dag]

@@ -45,8 +45,7 @@ from cosmos.constants import (
     DEFAULT_PROFILES_FILE_NAME,
     _default_s3_conn,
 )
-from cosmos.exceptions import CosmosValueError
-from cosmos.settings import AIRFLOW_IO_AVAILABLE, dbt_profile_cache_dir_name
+from cosmos.settings import dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
@@ -405,14 +404,6 @@ def test_remote_cache_path_initialization_no_remote_cache_dir():
 
 
 @patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
-@patch("cosmos.cache.AIRFLOW_IO_AVAILABLE", new=False)
-def test_remote_cache_path_initialization_object_storage_unavailable_on_earlier_airflow_versions():
-    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
-        _configure_remote_cache_dir()
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
 @patch("airflow.io.path.ObjectStoragePath")
 def test_remote_cache_path_initialization_path_available_default_connection(mock_object_storage_path):
     mock_cache_dir_path = MagicMock()
@@ -424,7 +415,6 @@ def test_remote_cache_path_initialization_path_available_default_connection(mock
     assert configured_remote_cache_dir == mock_cache_dir_path
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
 @patch("airflow.io.path.ObjectStoragePath")
 def test_remote_cache_dir_initialization_path_not_exist_creates_path(mock_object_storage_path):
@@ -436,7 +426,6 @@ def test_remote_cache_dir_initialization_path_not_exist_creates_path(mock_object
     mock_cache_dir_path.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
 @patch("cosmos.cache.remote_cache_dir_conn_id", new="my_conn_id")
 @patch("airflow.io.path.ObjectStoragePath")

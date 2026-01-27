@@ -83,7 +83,7 @@ This example DAG:
     :end-before: [END local_example]
 
 
-Will trigger the following DAG to be run (when using Cosmos 1.1 when using Airflow 2.4 or newer):
+Will trigger the following DAG to be run:
 
 .. code-block:: python
 

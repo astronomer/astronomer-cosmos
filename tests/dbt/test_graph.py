@@ -37,7 +37,6 @@ from cosmos.dbt.graph import (
     run_command,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
@@ -2036,7 +2035,6 @@ def test_should_use_dbt_ls_cache(enable_cache, enable_cache_dbt_ls, cache_id, sh
         assert graph.should_use_dbt_ls_cache() == should_use
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
@@ -2060,7 +2058,6 @@ def test_save_dbt_ls_cache_remote_cache_dir(
     mock_remote_cache_key_path.open.assert_called_once_with("w")
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")

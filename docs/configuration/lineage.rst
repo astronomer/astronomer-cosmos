@@ -38,17 +38,13 @@ Contributions are also welcome in the `OpenLineage project <https://github.com/O
 Installation
 ------------
 
-If using Airflow 2.7 or higher, install ``apache-airflow-providers-openlineage``.
-
-Otherwise, install Cosmos using ``astronomer-cosmos[openlineage]``.
+Install ``apache-airflow-providers-openlineage``.
 
 
 Configuration
 -------------
 
-If using Airflow 2.7, follow `the instructions <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_ on how to configure OpenLineage.
-
-Otherwise, follow `these instructions <https://openlineage.io/docs/integrations/airflow/>`_.
+Follow `the instructions <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_ on how to configure OpenLineage.
 
 
 Namespace

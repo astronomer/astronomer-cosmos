@@ -669,7 +669,7 @@ class TestDbtConsumerWatcherSensor:
         }
 
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
-    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("2.7.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("2.9.0"))
     def test_get_producer_task_status_airflow2(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
@@ -685,7 +685,7 @@ class TestDbtConsumerWatcherSensor:
             status = sensor._get_producer_task_status(context)
 
         mock_builder.assert_called_once_with(
-            airflow_version=Version("2.7.0"),
+            airflow_version=Version("2.9.0"),
             dag_id="example_dag",
             run_id="run_1",
             producer_task_id=sensor.producer_task_id,
@@ -695,7 +695,7 @@ class TestDbtConsumerWatcherSensor:
         assert status == "success"
 
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
-    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("2.7.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("2.9.0"))
     def test_get_producer_task_status_airflow2_missing_instance(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
@@ -1034,7 +1034,6 @@ class TestDbtBuildWatcherOperator:
             DbtBuildWatcherOperator()
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
 def test_dbt_dag_with_watcher():
     """
@@ -1102,11 +1101,8 @@ def test_dbt_dag_with_watcher():
 
 # Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:
 # https://github.com/apache/airflow/issues/51816
-conditions_to_skip = (AIRFLOW_VERSION < Version("2.8"), AIRFLOW_VERSION == Version("3.0"))
-
-
 @pytest.mark.skipif(
-    conditions_to_skip,
+    AIRFLOW_VERSION == Version("3.0"),
     reason="Airflow hangs in these versions when trying to fetch XCom from the triggerer when using dags.test()",
 )
 @pytest.mark.integration
@@ -1188,7 +1184,6 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
     assert "Model 'model.micro_dbt_project.empty_model' was skipped by the dbt command" in caplog.text
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
 def test_dbt_task_group_with_watcher():
     """
@@ -1275,7 +1270,6 @@ def test_dbt_task_group_with_watcher():
     assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
 def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     """
@@ -1327,7 +1321,6 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     assert "--full-refresh" in full_cmd
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
 def test_dbt_task_group_with_watcher_has_correct_templated_dbt_cmd():
     """

@@ -32,13 +32,12 @@ if TYPE_CHECKING:  # pragma: no cover
 
 from attrs import define
 
-from cosmos import cache, settings
+try:
+    from airflow.sdk import ObjectStoragePath
+except ImportError:
+    from airflow.io.path import ObjectStoragePath
 
-if settings.AIRFLOW_IO_AVAILABLE:
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        from airflow.io.path import ObjectStoragePath
+from cosmos import cache, settings
 from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
@@ -142,9 +141,7 @@ except (ImportError, ModuleNotFoundError):
     try:
         from openlineage.airflow.extractors.base import OperatorLineage
     except (ImportError, ModuleNotFoundError):
-        logger.warning(
-            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
-        )
+        logger.warning("To enable emitting Openlineage events, install apache-airflow-providers-openlineage.")
         logger.debug(
             "Further details on lack of Openlineage Airflow provider:",
             stack_info=True,
@@ -320,13 +317,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Remote target connection not set. Please, configure [cosmos][remote_target_path_conn_id] or set the environment variable AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID"
             )
             return None, None
-
-        if not settings.AIRFLOW_IO_AVAILABLE:
-            raise CosmosValueError(
-                f"You're trying to specify remote target path {target_path_str}, but the required "
-                f"Object Storage feature is unavailable in Airflow version {AIRFLOW_VERSION}. Please upgrade to "
-                "Airflow 2.8 or later."
-            )
 
         _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 

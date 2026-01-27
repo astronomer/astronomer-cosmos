@@ -51,7 +51,6 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
 from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
 
@@ -1513,18 +1512,6 @@ def test_dbt_clone_local_operator_initialisation():
     assert "clone" in operator.base_cmd
 
 
-@patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
-@patch("cosmos.settings.AIRFLOW_IO_AVAILABLE", new=False)
-def test_configure_remote_target_path_object_storage_unavailable_on_earlier_airflow_versions():
-    operator = DbtCompileLocalOperator(
-        task_id="fake-task",
-        profile_config=profile_config,
-        project_dir="fake-dir",
-    )
-    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
-        operator._configure_remote_target_path()
-
-
 @pytest.mark.parametrize(
     "rem_target_path, rem_target_path_conn_id",
     [
@@ -1545,7 +1532,6 @@ def test_config_remote_target_path_unset_settings(rem_target_path, rem_target_pa
         assert target_conn is None
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.remote_target_path", new="s3://some-bucket/target")
 @patch("cosmos.operators.local.remote_target_path_conn_id", new="aws_s3_conn")
 @patch("cosmos.operators.local.ObjectStoragePath")
@@ -1607,7 +1593,6 @@ def test_upload_sql_files_xcom(tmp_path):
     mock_context["ti"].xcom_push.assert_called_once_with(key="dest.sql", value=compressed_b64_sql)
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.settings.upload_sql_to_xcom", False)
 @patch("cosmos.operators.local.ObjectStoragePath.copy")
 @patch("cosmos.operators.local.ObjectStoragePath")
@@ -1810,7 +1795,6 @@ def test_handle_post_execution_with_multiple_callbacks(
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("cosmos.operators.local.ObjectStoragePath")
 def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_configure_remote, caplog):
@@ -1864,7 +1848,6 @@ def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_p
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 def test_delete_sql_files_no_remote_target_configured(mock_configure_remote, caplog):
     """Test that _delete_sql_files exits early with a warning when remote path is not configured."""

@@ -5,13 +5,13 @@
 }}
 
 -- Fact table: Customer revenue analysis
--- Uses cross-project refs to dbt_loom_upstream_platform via dbt-loom
+-- Uses cross-project refs to upstream via dbt-loom
 with customer_orders as (
-    select * from {{ ref('dbt_loom_upstream_platform', 'int_customer_orders') }}
+    select * from {{ ref('upstream', 'int_customer_orders') }}
 ),
 
 customers as (
-    select * from {{ ref('dbt_loom_upstream_platform', 'stg_customers') }}
+    select * from {{ ref('upstream', 'stg_customers') }}
 )
 
 select

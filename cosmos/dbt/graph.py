@@ -318,8 +318,9 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
             # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
             # External nodes (e.g., from dbt-loom) may not have a file path - skip them
             # Only skip if it looks like a valid node (has unique_id) but no file path
+            # Check for both None and empty string since dbt-loom may set either
             node_file_path = node_dict.get("original_file_path") or node_dict.get("path")
-            if node_file_path is None and node_dict.get("unique_id"):
+            if not node_file_path and node_dict.get("unique_id"):
                 logger.debug(
                     "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
                     node_dict.get("unique_id"),
@@ -952,8 +953,9 @@ class DbtGraph:
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
                 # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+                # Check for both None and empty string since dbt-loom may set either
                 original_file_path = node_dict.get("original_file_path")
-                if original_file_path is None:
+                if not original_file_path:
                     logger.debug(
                         "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
                         unique_id,

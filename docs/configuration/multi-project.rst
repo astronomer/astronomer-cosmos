@@ -229,28 +229,120 @@ You can use either separate DAGs or a combined DAG with task groups:
 
 **Option 2: Separate DAGs with Datasets (Airflow 2.4+)**
 
+Cosmos automatically emits datasets from each task when ``emit_datasets=True`` (the default).
+You can use these datasets to trigger downstream DAGs.
+
+**Understanding Dataset Naming in Cosmos**
+
+When ``emit_datasets=True``, each dbt task emits a dataset with a name following this pattern:
+
+- ``{dag_id}__{task_id}`` for tasks directly in a DAG
+- ``{dag_id}__{task_group_id}__{task_id}`` for tasks in a TaskGroup
+
+For example, a model ``stg_customers`` in DAG ``upstream_dag`` emits: ``upstream_dag__stg_customers__run``
+
+**Example: Trigger Downstream DAG on Specific Upstream Models**
+
 .. code-block:: python
 
     from airflow.datasets import Dataset
-    from cosmos import DbtDag, ProfileConfig, ProjectConfig
+    from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
 
-    PLATFORM_DATASET = Dataset("upstream_platform_complete")
+    # Define datasets that the downstream DAG depends on
+    # These match the auto-generated names from upstream tasks
+    UPSTREAM_CUSTOMERS = Dataset("upstream_dag__stg_customers__run")
+    UPSTREAM_ORDERS = Dataset("upstream_dag__int_customer_orders__run")
 
-    # Upstream DAG produces the dataset
+    # Upstream DAG - tasks automatically emit datasets
     upstream_dag = DbtDag(
-        dag_id="upstream_platform_dag",
+        dag_id="upstream_dag",
         project_config=ProjectConfig(dbt_project_path=UPSTREAM_PATH),
-        # ... other config ...
+        profile_config=ProfileConfig(...),
+        render_config=RenderConfig(
+            emit_datasets=True,  # Default - each task emits a dataset
+        ),
         schedule="@daily",
-        outlets=[PLATFORM_DATASET],
     )
 
-    # Downstream DAG triggers when dataset is updated
+    # Downstream DAG triggers when specific upstream models complete
     downstream_dag = DbtDag(
-        dag_id="downstream_finance_dag",
+        dag_id="downstream_dag",
         project_config=ProjectConfig(dbt_project_path=DOWNSTREAM_PATH),
-        # ... other config ...
-        schedule=[PLATFORM_DATASET],  # Triggers on upstream completion
+        profile_config=ProfileConfig(...),
+        schedule=[UPSTREAM_CUSTOMERS, UPSTREAM_ORDERS],  # Triggers on upstream completion
+    )
+
+**Example: Using DatasetAlias (Airflow 2.10+)**
+
+DatasetAlias provides more flexible dataset matching:
+
+.. code-block:: python
+
+    from airflow.datasets import DatasetAlias
+    from cosmos import DbtDag, ProfileConfig, ProjectConfig
+
+    # Downstream DAG triggers on any task matching the alias pattern
+    downstream_dag = DbtDag(
+        dag_id="downstream_dag",
+        project_config=ProjectConfig(dbt_project_path=DOWNSTREAM_PATH),
+        profile_config=ProfileConfig(...),
+        schedule=[DatasetAlias(name="upstream_dag__int_customer_orders__run")],
+    )
+
+**Example: Manual Dataset for DAG-Level Dependency**
+
+If you want a single dataset to represent the entire upstream DAG completion,
+add a final task that emits a custom dataset:
+
+.. code-block:: python
+
+    from airflow import DAG
+    from airflow.datasets import Dataset
+    from airflow.operators.empty import EmptyOperator
+    from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
+
+    UPSTREAM_COMPLETE = Dataset("upstream_platform_complete")
+
+    with DAG(
+        dag_id="upstream_dag",
+        schedule="@daily",
+        # ...
+    ) as upstream_dag:
+
+        upstream_tasks = DbtTaskGroup(
+            group_id="upstream_platform",
+            project_config=ProjectConfig(dbt_project_path=UPSTREAM_PATH),
+            profile_config=ProfileConfig(...),
+        )
+
+        # Final task that emits a single "completion" dataset
+        mark_complete = EmptyOperator(
+            task_id="mark_complete",
+            outlets=[UPSTREAM_COMPLETE],
+        )
+
+        upstream_tasks >> mark_complete
+
+    # Downstream DAG triggers on the completion dataset
+    downstream_dag = DbtDag(
+        dag_id="downstream_dag",
+        project_config=ProjectConfig(dbt_project_path=DOWNSTREAM_PATH),
+        profile_config=ProfileConfig(...),
+        schedule=[UPSTREAM_COMPLETE],
+    )
+
+**Disabling Dataset Emission**
+
+To disable automatic dataset emission:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    dag = DbtDag(
+        dag_id="my_dag",
+        render_config=RenderConfig(emit_datasets=False),
+        # ...
     )
 
 Cross-Project Sources
@@ -430,13 +522,17 @@ Best Practices
 --------------
 
 1. **Use environment variables** for manifest paths to support different environments
-2. **Chain task groups** or use datasets to ensure proper execution order
+2. **Chain task groups** (same DAG) or **use datasets** (separate DAGs) to ensure proper execution order
 3. **Mark upstream models as public** using ``+access: public``
 4. **Generate manifests in CI** to ensure they're always available
 5. **Use persistent storage** (not in-memory databases) for cross-project data sharing
+6. **For dataset-based scheduling**, use a completion marker task or depend on specific model datasets
+7. **Consider DatasetAlias** (Airflow 2.10+) for more flexible dataset matching
 
 Limitations
 -----------
 
 - dbt-loom external nodes are skipped during Cosmos DAG generation (by design)
 - Cross-project lineage is not yet visualized in Airflow's lineage view
+- DAGs cannot have ``outlets`` directly; use a completion marker task or rely on task-level datasets
+- Dataset names are auto-generated from task IDs, which may change if you rename models

@@ -5,9 +5,9 @@
 }}
 
 -- Dimension table: Payment method analysis
--- Uses cross-project refs to dbt_loom_upstream_platform via dbt-loom
+-- Uses cross-project refs to upstream via dbt-loom
 with orders as (
-    select * from {{ ref('dbt_loom_upstream_platform', 'int_orders_enriched') }}
+    select * from {{ ref('upstream', 'int_orders_enriched') }}
 )
 
 select

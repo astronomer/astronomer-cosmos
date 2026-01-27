@@ -1,5 +1,5 @@
 product_id,product_name,category,cost_price,list_price,is_active
-P001,Widget Basic,Widgets,25.00,49.99,true
+P001,Widget Basic,Widgets,25.01,49.99,true
 P002,Gadget Mini,Gadgets,15.00,29.99,true
 P003,Widget Pro,Widgets,100.00,199.99,true
 P004,Gadget Standard,Gadgets,40.00,79.99,true

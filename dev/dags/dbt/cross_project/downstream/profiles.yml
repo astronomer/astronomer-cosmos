@@ -1,4 +1,4 @@
-dbt_loom_downstream_finance:
+downstream:
   target: dev
   outputs:
     dev:

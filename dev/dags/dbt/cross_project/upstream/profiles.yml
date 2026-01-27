@@ -1,4 +1,4 @@
-dbt_loom_upstream_platform:
+upstream:
   target: dev
   outputs:
     dev:

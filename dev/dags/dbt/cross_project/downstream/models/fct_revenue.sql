@@ -5,18 +5,18 @@
 }}
 
 -- Fact table: Daily revenue metrics
--- Uses cross-project refs to dbt_loom_upstream_platform via dbt-loom
+-- Uses cross-project refs to upstream via dbt-loom
 with orders as (
-    select * from {{ ref('dbt_loom_upstream_platform', 'int_orders_enriched') }}
+    select * from {{ ref('upstream', 'int_orders_enriched') }}
     where status = 'completed'
 ),
 
 order_items as (
-    select * from {{ ref('dbt_loom_upstream_platform', 'stg_order_items') }}
+    select * from {{ ref('upstream', 'stg_order_items') }}
 ),
 
 products as (
-    select * from {{ ref('dbt_loom_upstream_platform', 'stg_products') }}
+    select * from {{ ref('upstream', 'stg_products') }}
 )
 
 select

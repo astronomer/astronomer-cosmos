@@ -1,0 +1,14 @@
+manifests:
+  - name: upstream
+    type: file
+    config:
+      # Use environment variable for flexibility, with fallback to relative path
+      # path: '{{ env_var("PLATFORM_MANIFEST_PATH", "../upstream/target/manifest.json") }}'
+      # In production, set PLATFORM_MANIFEST_PATH to absolute path
+
+      # For GitHub Actions Integration Tests CI run, set the path to the manifest.json file
+      path: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt/cross_project/upstream/target/manifest.json
+#      path: ../upstream/target/manifest.json
+
+
+enable_telemetry: false

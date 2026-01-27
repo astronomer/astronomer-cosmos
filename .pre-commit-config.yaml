@@ -39,6 +39,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        exclude: ^dev/dags/dbt/cross_project/downstream/target/manifest.json$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml

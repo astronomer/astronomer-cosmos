@@ -298,6 +298,63 @@ def test_load_via_manifest_with_ms_windows_manifest_and_star_selector():
     assert len(dbt_graph.filtered_nodes) == 1
 
 
+def test_load_via_manifest_skips_dbt_loom_external_nodes(tmp_path, caplog):
+    """Test that nodes without original_file_path (e.g., dbt-loom external refs) are skipped."""
+    # Create a manifest with one normal node and one external node (no original_file_path)
+    manifest_content = {
+        "nodes": {
+            "model.my_project.local_model": {
+                "resource_type": "model",
+                "original_file_path": "models/local_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+            "model.upstream_project.external_model": {
+                "resource_type": "model",
+                "original_file_path": None,  # dbt-loom external node has no file path
+                "package_name": "upstream_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+
+    project_path = tmp_path / "my_project"
+    project_path.mkdir()
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        dbt_graph.load_from_dbt_manifest()
+
+    # Only the local model should be loaded, external node should be skipped
+    assert len(dbt_graph.nodes) == 1
+    assert "model.my_project.local_model" in dbt_graph.nodes
+    assert "model.upstream_project.external_model" not in dbt_graph.nodes
+
+    # Verify the skip message was logged
+    assert "Skipping node `model.upstream_project.external_model` because it has no file path" in caplog.text
+
+
 @pytest.mark.parametrize(
     "project_name,manifest_filepath,model_filepath",
     [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],

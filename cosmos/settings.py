@@ -57,6 +57,12 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
+# DBT Watcher Execution Mode Watcher Task Retry Queue
+# in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
+# since these tasks are sensors that require low memory/cpu on their first try,
+# this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
+watcher_retry_queue = conf.get("cosmos", "watcher_retry_queue", fallback=None)
+
 AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 
 # The following environment variable is populated in Astro Cloud

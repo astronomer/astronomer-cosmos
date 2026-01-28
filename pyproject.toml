@@ -119,6 +119,9 @@ gcp-cloud-run-job = [
     "apache-airflow-providers-google>=10.11.0",
 ]
 
+[project.entry-points.'airflow.policy']
+watcher_retry_policy = 'cosmos.cluster_policy.watcher_retry_policy'
+
 [project.entry-points.apache_airflow_provider]
 provider_info = "cosmos.provider_info:get_provider_info"
 

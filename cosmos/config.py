@@ -6,9 +6,10 @@ import contextlib
 import shutil
 import tempfile
 import warnings
+from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from airflow.version import version as airflow_version
@@ -64,6 +65,7 @@ class RenderConfig:
     :param selector: Name of a dbt YAML selector to use for parsing. Only supported when using ``load_method=LoadMode.DBT_LS``.
     :param dbt_deps: (deprecated) Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
+    :param node_conversion_by_task_group: A boolean that allows users to do node conversion at the task group level instead of task level.  Defaults to True.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
     :param env_vars: (Deprecated since Cosmos 1.3 use ProjectConfig.env_vars) A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
     :param dbt_project_path: Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
@@ -87,6 +89,7 @@ class RenderConfig:
     selector: str | None = None
     dbt_deps: bool | None = None
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
+    node_conversion_by_task_group: bool | None = True
     dbt_executable_path: str | Path = get_system_dbt()
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
@@ -163,8 +166,7 @@ class ProjectConfig:
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
-    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
-    snapshots
+    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to snapshots
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     :param manifest_conn_id: Name of the Airflow connection used to access the manifest file if it is not stored locally. Defaults to None
     :param project_name: Allows the user to define the project name.
@@ -350,6 +352,9 @@ class ProfileConfig:
         Check if profile object version is exist then reuse it
         Otherwise, create profile yml for requested object and return the profile path
         """
+        if self.profiles_yml_filepath:
+            return Path(self.profiles_yml_filepath)
+
         assert self.profile_mapping  # To satisfy MyPy
         current_profile_version = self.profile_mapping.version(self.profile_name, self.target_name, use_mock_values)
         cached_profile_path = get_cached_profile(current_profile_version)
@@ -418,8 +423,9 @@ class ExecutionConfig:
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     :param virtualenv_dir: Directory path to locate the (cached) virtual env that
     should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
-    :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC`(Experimental) is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
+    :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
     Example: `["dbt-postgres==1.5.0"]`
+    param setup_operator_args: A dictionary of producer operator parameters. These will override the values supplied in operator_args for producer operator.
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
@@ -432,6 +438,7 @@ class ExecutionConfig:
 
     project_path: Path | None = field(init=False)
     async_py_requirements: list[str] | None = None
+    setup_operator_args: dict[str, Any] | None = None
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.invocation_mode and self.execution_mode not in (

@@ -1,3 +1,4 @@
+import json
 import signal
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cosmos.hooks.subprocess import FullOutputSubprocessHook
+from cosmos.operators.watcher import store_dbt_resource_status_from_log
 
 OS_ENV_KEY = "SUBPROCESS_ENV_TEST"
 OS_ENV_VAL = "this-is-from-os-environ"
@@ -52,6 +54,14 @@ def test_subprocess_hook():
     assert result.full_output == ["foo"]
 
 
+def test_run_command_runtime_error():
+    hook = FullOutputSubprocessHook()
+
+    with patch("cosmos.hooks.subprocess.Popen", return_value=None):
+        with pytest.raises(RuntimeError, match="The subprocess should be created here and is None!"):
+            hook.run_command(["echo", "hello"])
+
+
 @patch("os.getpgid", return_value=123)
 @patch("os.killpg")
 def test_send_sigint(mock_killpg, mock_getpgid):
@@ -68,3 +78,41 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
     hook.sub_process = MagicMock()
     hook.send_sigterm()
     mock_killpg.assert_called_with(123, signal.SIGTERM)
+
+
+@pytest.mark.parametrize(
+    "status,context,should_push,expect_assert",
+    [
+        ("success", {"ti": MagicMock()}, True, False),
+        ("failed", {"ti": MagicMock()}, True, False),
+        ("running", {"ti": MagicMock()}, False, False),
+        (None, {"ti": MagicMock()}, False, False),
+        ("success", None, False, True),
+        ("failed", None, False, True),
+    ],
+)
+def test_store_dbt_resource_status_from_log_param(status, context, should_push, expect_assert):
+    # Prepare log line
+    log_line = {"data": {"node_info": {"node_status": status, "unique_id": "model.jaffle_shop.stg_orders"}}}
+    line = json.dumps(log_line)
+
+    with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+        if expect_assert:
+            with pytest.raises(AssertionError):
+                store_dbt_resource_status_from_log(line, {"context": context})
+        else:
+            store_dbt_resource_status_from_log(line, {"context": context})
+            if should_push:
+                mock_push.assert_called_once_with(
+                    task_instance=context["ti"], key="model__jaffle_shop__stg_orders_status", value=status
+                )
+            else:
+                mock_push.assert_not_called()
+
+
+def test_store_dbt_resource_status_from_log_invalid_json():
+    invalid_line = "{not a valid json}"
+
+    with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+        store_dbt_resource_status_from_log(invalid_line, {"context": {"ti": MagicMock()}})
+        mock_push.assert_not_called()

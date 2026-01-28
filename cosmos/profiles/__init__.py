@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Type
+from typing import Any
 
 from .athena import AthenaAccessKeyProfileMapping
 from .base import BaseProfileMapping, DbtProfileConfigVars
@@ -24,13 +24,14 @@ from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
 from .sqlserver.standard_sqlserver_auth import StandardSQLServerAuth
+from .starrocks import StarrocksUserPasswordProfileMapping
 from .teradata.user_pass import TeradataUserPasswordProfileMapping
 from .trino.certificate import TrinoCertificateProfileMapping
 from .trino.jwt import TrinoJWTProfileMapping
 from .trino.ldap import TrinoLDAPProfileMapping
 from .vertica.user_pass import VerticaUserPasswordProfileMapping
 
-profile_mappings: list[Type[BaseProfileMapping]] = [
+profile_mappings: list[type[BaseProfileMapping]] = [
     AthenaAccessKeyProfileMapping,
     ClickhouseUserPasswordProfileMapping,
     GoogleCloudServiceAccountFileProfileMapping,
@@ -47,6 +48,7 @@ profile_mappings: list[Type[BaseProfileMapping]] = [
     SnowflakeEncryptedPrivateKeyFilePemProfileMapping,
     SnowflakeEncryptedPrivateKeyPemProfileMapping,
     SnowflakePrivateKeyPemProfileMapping,
+    StarrocksUserPasswordProfileMapping,
     SparkThriftProfileMapping,
     ExasolUserPasswordProfileMapping,
     TeradataUserPasswordProfileMapping,
@@ -93,6 +95,7 @@ __all__ = [
     "SnowflakeUserPasswordProfileMapping",
     "SnowflakePrivateKeyPemProfileMapping",
     "SnowflakeEncryptedPrivateKeyFilePemProfileMapping",
+    "StarrocksUserPasswordProfileMapping",
     "SparkThriftProfileMapping",
     "ExasolUserPasswordProfileMapping",
     "TeradataUserPasswordProfileMapping",

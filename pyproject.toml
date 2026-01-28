@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
 keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt"]
 classifiers = [
@@ -21,15 +21,15 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
     "aenum",
     "attrs",
-    "apache-airflow>=2.4.0",
+    "apache-airflow>=2.6.0",
     "deprecation",  # Python 3.13 exposes a deprecated operator, we can remove this dependency in the future
     "Jinja2>=3.0.0",
     "msgpack",
@@ -50,12 +50,12 @@ dbt-all = [
     "dbt-databricks!=1.9.0",
     "dbt-duckdb",
     "dbt-exasol",
-    "dbt-duckdb",
     "dbt-mysql",
     "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
+    "dbt-starrocks",
     "dbt-spark",
     "dbt-sqlserver",
     "dbt-teradata",
@@ -72,6 +72,7 @@ dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
+dbt-starrocks = ["dbt-starrocks"]
 dbt-spark = ["dbt-spark"]
 dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
@@ -150,6 +151,7 @@ dependencies = [
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",
+    "pytest-rerunfailures",
     "requests-mock",
     "pytest-cov",
     "pytest-describe",
@@ -162,13 +164,14 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "methodtools",
+    "pytest-asyncio",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.9", "3.10", "3.11", "3.12"]
-airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
-dbt = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "2.0"]
+python = ["3.10", "3.11", "3.12", "3.13"]
+airflow = ["2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
+dbt = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "2.0"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
@@ -226,7 +229,12 @@ serve = "sphinx-autobuild docs docs/_build"
 ######################################
 [tool.black]
 line-length = 120
-target-version = ['py37', 'py38', 'py39', 'py310']
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.coverage.run]
+omit = [
+    "cosmos/airflow/_override.py"
+]
 
 [tool.isort]
 profile = "black"

@@ -37,6 +37,14 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
     }
 
     @property
+    def mock_profile(self) -> dict[str, Any | None]:
+        """Generates a mock profile."""
+        return {
+            **super().mock_profile,
+            "auth_type": "oauth",
+        }
+
+    @property
     def profile(self) -> dict[str, Any | None]:
         """Generates profile. The client-id and client-secret is stored in an environment variable."""
         return {

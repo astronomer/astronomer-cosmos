@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -54,39 +54,42 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        airflow-version: ["2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
         dbt-version: ["1.10"]
         exclude:
-          - python-version: "3.11"
-            airflow-version: "2.4"
-          - python-version: "3.11"
-            airflow-version: "2.5"
           # Apache Airflow versions prior to 2.9.0 have not been tested with Python 3.12.
           # Official support for Python 3.12 and the corresponding constraints.txt are available only for Apache Airflow >= 2.9.0.
           # See: https://github.com/apache/airflow/tree/2.9.0?tab=readme-ov-file#requirements
           # See: https://github.com/apache/airflow/tree/2.8.4?tab=readme-ov-file#requirements
-          - python-version: "3.12"
-            airflow-version: "2.4"
-          - python-version: "3.12"
-            airflow-version: "2.5"
           - python-version: "3.12"
             airflow-version: "2.6"
           - python-version: "3.12"
             airflow-version: "2.7"
           - python-version: "3.12"
             airflow-version: "2.8"
-          # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
-          # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.9"
+          # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
+          - python-version: "3.13"
+            airflow-version: "2.6"
+          - python-version: "3.13"
             airflow-version: "2.7"
+          - python-version: "3.13"
+            airflow-version: "2.8"
+          - python-version: "3.13"
+            airflow-version: "2.9"
+          - python-version: "3.13"
+            airflow-version: "2.10"
+          - python-version: "3.13"
+            airflow-version: "2.11"
+          - python-version: "3.13"
+            airflow-version: "3.0"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -109,7 +112,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-cov
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -123,25 +126,35 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
-        airflow-version: ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
-        dbt-version: ["1.10"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        airflow-version: ["2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
+        dbt-version: [ "1.11" ]
         exclude:
-          - python-version: "3.11"
-            airflow-version: "2.4"
-          - python-version: "3.11"
-            airflow-version: "2.5"
-          # It's observed that the dependencies resolution for Apache Airflow versions 2.7 are error-ring out with deep
-          # resolutions. This is a temporary exclusion until the issue is resolved.
-          - python-version: "3.9"
+          # Apache Airflow versions prior to 2.9.0 have not been tested with Python 3.12.
+          # Official support for Python 3.12 and the corresponding constraints.txt are available only for Apache Airflow >= 2.9.0.
+          # See: https://github.com/apache/airflow/tree/2.9.0?tab=readme-ov-file#requirements
+          # See: https://github.com/apache/airflow/tree/2.8.4?tab=readme-ov-file#requirements
+          - python-version: "3.12"
+            airflow-version: "2.6"
+          - python-version: "3.12"
             airflow-version: "2.7"
-          - python-version: "3.8"
+          - python-version: "3.12"
+            airflow-version: "2.8"
+          # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
+          - python-version: "3.13"
+            airflow-version: "2.6"
+          - python-version: "3.13"
+            airflow-version: "2.7"
+          - python-version: "3.13"
+            airflow-version: "2.8"
+          - python-version: "3.13"
+            airflow-version: "2.9"
+          - python-version: "3.13"
+            airflow-version: "2.10"
+          - python-version: "3.13"
+            airflow-version: "2.11"
+          - python-version: "3.13"
             airflow-version: "3.0"
-          # since 1.9, dbt no longer supports Python 3.8
-          - python-version: "3.8"
-            dbt-version: "1.9"
-          - python-version: "3.8"
-            dbt-version: "1.10"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -155,12 +168,12 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -207,7 +220,7 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -238,12 +251,12 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -286,7 +299,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -324,12 +337,12 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -385,7 +398,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.11", "3.0" ]
-        dbt-version: ["1.6", "1.7", "1.8", "1.9", "1.10"]
+        dbt-version: ["1.6", "1.7", "1.8", "1.9", "1.10", "1.11"]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -400,12 +413,12 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -428,7 +441,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-integration-dbt-async-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -470,12 +483,12 @@ jobs:
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -520,7 +533,7 @@ jobs:
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -567,12 +580,12 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -627,14 +640,14 @@ jobs:
       matrix:
         python-version: [ "3.12" ]
         airflow-version: [ "2.10", "3.0" ]
-        dbt-version: [ "1.10" ]
+        dbt-version: [ "1.11" ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -682,7 +695,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -700,7 +713,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -713,7 +726,7 @@ jobs:
         run: |
           pip3 install coverage
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: ./coverage
       - name: Combine coverage
@@ -722,7 +735,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7  # v5.5.1
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de  # v5.5.2
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

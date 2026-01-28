@@ -7,16 +7,18 @@ import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG
 
-from cosmos import DbtTestLocalOperator
 from cosmos.operators.watcher import DbtTestWatcherOperator
 
 try:
     # Airflow 3.1 onwards
+    from airflow.providers.standard.operators.empty import EmptyOperator
     from airflow.sdk import TaskGroup
     from airflow.sdk.definitions._internal.abstractoperator import DEFAULT_OWNER
 except ImportError:
     from airflow.models.abstractoperator import DEFAULT_OWNER
+    from airflow.operators.empty import EmptyOperator
     from airflow.utils.task_group import TaskGroup
+
 from packaging import version
 
 from cosmos.airflow.graph import (
@@ -41,6 +43,12 @@ from cosmos.constants import (
 from cosmos.converter import airflow_kwargs
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
+from cosmos.operators.local import (
+    DbtBuildLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtTestLocalOperator,
+)
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -70,6 +78,7 @@ parent_node = DbtNode(
     tags=["has_child"],
     config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
+    has_non_detached_test=True,
 )
 test_parent_node = DbtNode(
     unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test_parent",
@@ -125,10 +134,6 @@ def test_calculate_datached_node_name_under_is_under_250():
     assert calculate_detached_node_name(node) == "detached_1_test"
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_each():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -203,6 +208,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
             config={"materialized": "view"},
             depends_on=[],
             has_test=True,
+            has_non_detached_test=True,
         )
     output = generate_task_or_group(
         dag=dag,
@@ -221,18 +227,18 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
                 ),
             ),
         },
-        test_behavior=TestBehavior.AFTER_EACH,
+        dbt_project_name="astro_shop",
+        node_converters={},
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.AFTER_EACH,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        ),
         on_warning_callback=None,
-        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
     )
     assert isinstance(output, TaskGroup)
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_all():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -274,10 +280,6 @@ def test_build_airflow_graph_with_after_all():
     assert dag.leaves[0].select == ["tag:some"]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_build():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -317,10 +319,6 @@ def test_build_airflow_graph_with_build():
     assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4"),
-    reason="Airflow DAG did not have task_group_dict until the 2.4 release",
-)
 @pytest.mark.integration
 def test_build_airflow_graph_with_override_profile_config():
     nodes_subset = {parent_seed.unique_id: parent_seed, parent_node.unique_id: parent_node}
@@ -438,6 +436,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "model",
                     "depends_on": [],
                     "file_path": ".",
+                    "has_non_detached_test": False,
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -480,6 +479,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "resource_type": "snapshot",
                     "depends_on": [],
                     "file_path": ".",
+                    "has_non_detached_test": False,
                     "tags": [],
                     "config": {},
                     "has_test": False,
@@ -605,7 +605,9 @@ def test_create_task_metadata_source_with_rendering_options(
     metadata = create_task_metadata(
         child_node,
         execution_mode=ExecutionMode.LOCAL,
-        source_rendering_behavior=source_rendering_behavior,
+        render_config=RenderConfig(
+            source_rendering_behavior=source_rendering_behavior,
+        ),
         args={},
         dbt_dag_task_group_identifier="",
     )
@@ -912,10 +914,12 @@ def test_create_task_metadata_normalize_task_id(
         args=args,
         dbt_dag_task_group_identifier="",
         use_task_group=use_task_group,
-        normalize_task_id=normalize_task_id,
-        normalize_task_display_name=normalize_task_display_name,
-        source_rendering_behavior=SourceRenderingBehavior.ALL,
-        test_behavior=test_behavior,
+        render_config=RenderConfig(
+            normalize_task_id=normalize_task_id,
+            normalize_task_display_name=normalize_task_display_name,
+            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            test_behavior=test_behavior,
+        ),
     )
     assert metadata.id == expected_node_id
     if expected_display_name:
@@ -1093,10 +1097,14 @@ def test_owner(dbt_extra_config, expected_owner):
                 ),
             ),
         },
-        test_behavior=TestBehavior.AFTER_EACH,
+        dbt_project_name="astro_shop",
+        node_converters={},
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.AFTER_EACH,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            enable_owner_inheritance=True,
+        ),
         on_warning_callback=None,
-        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
-        enable_owner_inheritance=True,
     )
 
     assert len(output.leaves) == 1
@@ -1220,7 +1228,9 @@ def test_create_task_metadata_disable_owner_inheritance(enable_owner_inheritance
         execution_mode=ExecutionMode.LOCAL,
         args={"project_dir": SAMPLE_PROJ_PATH},
         dbt_dag_task_group_identifier="test_dag",
-        enable_owner_inheritance=enable_owner_inheritance,
+        render_config=RenderConfig(
+            enable_owner_inheritance=enable_owner_inheritance,
+        ),
     )
 
     assert task_metadata is not None
@@ -1310,11 +1320,14 @@ def test_generate_task_or_group_disable_owner_inheritance(enable_owner_inheritan
                     ),
                 ),
             },
-            test_behavior=TestBehavior.NONE,
-            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.NONE,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                enable_owner_inheritance=enable_owner_inheritance,
+            ),
             test_indirect_selection=TestIndirectSelection.EAGER,
             on_warning_callback=None,
-            enable_owner_inheritance=enable_owner_inheritance,
+            node_converters={},
         )
 
         assert task_or_group is not None
@@ -1343,6 +1356,7 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, enable_own
             config={"materialized": "view", "meta": {"owner": "test-owner"}},
             depends_on=[],
             has_test=True,
+            has_non_detached_test=True,
         )
 
         nodes = {node_with_owner.unique_id: node_with_owner}
@@ -1459,3 +1473,242 @@ def test_build_airflow_graph_disable_owner_inheritance_with_detached_tests():
 
         for task_id, task in tasks_map.items():
             assert task.owner == DEFAULT_OWNER, f"Task {task_id} should have default owner when inheritance is disabled"
+
+
+def convert_task(dag: DAG, task_group: TaskGroup, node: DbtNode, task_id: str, **kwargs):
+    """
+    Converts task to an empty operator.  Helper function to test node_converter logic.
+    """
+    return EmptyOperator(dag=dag, task_group=task_group, task_id=task_id)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "test_behavior,node_converters,expected_task_types",
+    [
+        (
+            TestBehavior.AFTER_EACH,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent.run": DbtRunLocalOperator,
+                "parent.test": EmptyOperator,
+                "child_run": DbtRunLocalOperator,
+                "child2_v2_run": DbtRunLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.AFTER_EACH,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent.run": EmptyOperator,
+                "parent.test": DbtTestLocalOperator,
+                "child_run": EmptyOperator,
+                "child2_v2_run": EmptyOperator,
+            },
+        ),
+        (
+            TestBehavior.AFTER_ALL,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": DbtRunLocalOperator,
+                "astro_shop_test": EmptyOperator,
+                "child_run": DbtRunLocalOperator,
+                "child2_v2_run": DbtRunLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.AFTER_ALL,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": EmptyOperator,
+                "astro_shop_test": DbtTestLocalOperator,
+                "child_run": EmptyOperator,
+                "child2_v2_run": EmptyOperator,
+            },
+        ),
+        (
+            TestBehavior.BUILD,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed_build": DbtBuildLocalOperator,
+                "parent_model_build": DbtBuildLocalOperator,
+                "child_model_build": DbtBuildLocalOperator,
+                "child2_v2_model_build": DbtBuildLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.BUILD,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed_build": DbtBuildLocalOperator,
+                "parent_model_build": EmptyOperator,
+                "child_model_build": EmptyOperator,
+                "child2_v2_model_build": EmptyOperator,
+            },
+        ),
+        (
+            TestBehavior.NONE,
+            {DbtResourceType("test"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": DbtRunLocalOperator,
+                "child_run": DbtRunLocalOperator,
+                "child2_v2_run": DbtRunLocalOperator,
+            },
+        ),
+        (
+            TestBehavior.NONE,
+            {DbtResourceType("model"): convert_task},
+            {
+                "seed_parent_seed": DbtSeedLocalOperator,
+                "parent_run": EmptyOperator,
+                "child_run": EmptyOperator,
+                "child2_v2_run": EmptyOperator,
+            },
+        ),
+    ],
+)
+def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, expected_task_types):
+    """
+    Tests node converter logic for different test behaviors.
+    Seed, Model, Snapshot, and Source should work fairly similarly in all situations,
+    so we'll choose just one of those DBT resource types (Model)
+    as well as Tests which behave very differently.
+    """
+
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=test_behavior,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                node_converters=node_converters,
+                node_conversion_by_task_group=False,
+            ),
+            dbt_project_name="astro_shop",
+        )
+
+    assert len(dag.task_dict) == len(expected_task_types)
+    for id, task in dag.task_dict.items():
+        assert isinstance(task, expected_task_types[id])
+
+
+def test_skip_test_task_when_only_detached_tests_exist():
+    """Test that no empty test task is created when only detached tests exist with AFTER_EACH test behavior."""
+    with DAG("test-skip-test-when-only-detached-tests-exist", start_date=datetime(2025, 1, 1)) as dag:
+
+        parent_node1 = DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
+            resource_type=DbtResourceType.MODEL,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent1.sql",
+            config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
+            depends_on=[],
+        )
+
+        parent_node2 = DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent2",
+            resource_type=DbtResourceType.MODEL,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent2.sql",
+            config={"materialized": "view", "meta": {"owner": "parent2-owner"}},
+            depends_on=[],
+        )
+
+        parent1_test_node = DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.my_folder.test_parent1",
+            resource_type=DbtResourceType.MODEL,
+            file_path=SAMPLE_PROJ_PATH / "gen2/models/test_parent1.sql",
+            config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
+            depends_on=[parent_node1.unique_id],
+        )
+
+        detached_test_node = DbtNode(
+            unique_id=f"{DbtResourceType.TEST.value}.my_folder.test_both_parents",
+            resource_type=DbtResourceType.TEST,
+            file_path=SAMPLE_PROJ_PATH / "gen2/tests/test_both_parents.sql",
+            config={"meta": {"owner": "test-owner"}},
+            depends_on=[parent_node1.unique_id, parent_node2.unique_id],
+        )
+
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+        nodes = {
+            parent_node1.unique_id: parent_node1,
+            parent_node2.unique_id: parent_node2,
+            parent1_test_node.unique_id: parent1_test_node,
+            detached_test_node.unique_id: detached_test_node,
+        }
+
+        tasks_map = build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.AFTER_EACH,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                should_detach_multiple_parents_tests=True,
+            ),
+            dbt_project_name="test_project",
+        )
+
+        expected_task_ids = [
+            "model.my_folder.parent1",
+            "model.my_folder.parent2",
+            "model.my_folder.test_parent1",
+            "test.my_folder.test_both_parents",
+        ]
+
+        assert list(tasks_map.keys()) == expected_task_ids
+
+
+def test_create_test_task_metadata_watcher_kubernetes_after_all():
+    """
+    Test that create_test_task_metadata creates a DbtTestKubernetesOperator
+    when test_behavior is AFTER_ALL and execution_mode is WATCHER_KUBERNETES.
+    """
+    render_config = RenderConfig(
+        test_behavior=TestBehavior.AFTER_ALL,
+    )
+
+    metadata = create_test_task_metadata(
+        test_task_name="my_project_test",
+        execution_mode=ExecutionMode.WATCHER_KUBERNETES,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"project_dir": SAMPLE_PROJ_PATH},
+        render_config=render_config,
+    )
+
+    assert metadata.id == "my_project_test"
+    assert metadata.operator_class == "cosmos.operators.kubernetes.DbtTestKubernetesOperator"

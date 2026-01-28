@@ -10,16 +10,19 @@ import urllib.parse
 import warnings
 import zlib
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
-import airflow
 import jinja2
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
+from packaging.version import Version
+
+from cosmos.io import _construct_dest_file_path
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -27,9 +30,7 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-from airflow.version import version as airflow_version
 from attrs import define
-from packaging.version import Version
 
 from cosmos import cache, settings
 
@@ -46,6 +47,7 @@ from cosmos.cache import (
 )
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
+    AIRFLOW_VERSION,
     DBT_DEPENDENCIES_FILE_NAMES,
     FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     InvocationMode,
@@ -117,8 +119,6 @@ from cosmos.operators.base import (
     _sanitize_xcom_key,
 )
 
-AIRFLOW_VERSION = Version(airflow.__version__)
-
 logger = get_logger(__name__)
 
 
@@ -184,6 +184,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         "compiled_sql": "sql",
         "freshness": "json",
     }
+    _process_log_line_callable: Callable[[str, Any], None] | None = None
 
     def __init__(
         self,
@@ -323,7 +324,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not settings.AIRFLOW_IO_AVAILABLE:
             raise CosmosValueError(
                 f"You're trying to specify remote target path {target_path_str}, but the required "
-                f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
+                f"Object Storage feature is unavailable in Airflow version {AIRFLOW_VERSION}. Please upgrade to "
                 "Airflow 2.8 or later."
             )
 
@@ -334,22 +335,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         return _configured_target_path, remote_conn_id
 
-    def _construct_dest_file_path(
-        self, dest_target_dir: Path | ObjectStoragePath, file_path: str, source_compiled_dir: Path, resource_type: str
-    ) -> str:
-        """
-        Construct the destination path for the compiled SQL files to be uploaded to the remote store.
-        """
-        dest_target_dir_str = str(dest_target_dir).rstrip("/")
-        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
-        rel_path = os.path.relpath(file_path, source_compiled_dir).lstrip("/")
-        run_id = self.extra_context["run_id"]
-
-        if settings.upload_sql_to_xcom:
-            return f"{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
-
-        return f"{dest_target_dir_str}/{dag_task_group_identifier}/{run_id}/{resource_type}/{rel_path}"
-
     def _upload_sql_files(self, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
 
@@ -358,10 +343,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not dest_target_dir:
             raise CosmosValueError("You're trying to upload SQL files, but the remote target path is not configured. ")
 
+        dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
+        run_id = self.extra_context["run_id"]
+
         source_run_dir = Path(tmp_project_dir) / f"target/{resource_type}"
         files = [str(file) for file in source_run_dir.rglob("*") if file.is_file()]
         for file_path in files:
-            dest_file_path = self._construct_dest_file_path(dest_target_dir, file_path, source_run_dir, resource_type)
+            rel_path = os.path.relpath(file_path, source_run_dir)
+            dest_file_path = _construct_dest_file_path(
+                dest_target_dir, rel_path, dag_task_group_identifier, run_id, resource_type
+            )
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             dest_object_storage_path.parent.mkdir(parents=True, exist_ok=True)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
@@ -447,12 +438,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     assert ti.task is not None
                 ti.task.template_fields = self.template_fields
                 rtif = RenderedTaskInstanceFields(ti, render_templates=False)
-
                 # delete the old records
                 session.query(RenderedTaskInstanceFields).filter(
                     RenderedTaskInstanceFields.dag_id == self.dag_id,  # type: ignore[attr-defined]
                     RenderedTaskInstanceFields.task_id == self.task_id,
                     RenderedTaskInstanceFields.run_id == ti.run_id,
+                    RenderedTaskInstanceFields.map_index == ti.map_index,
                 ).delete()
                 session.add(rtif)
             else:
@@ -460,27 +451,31 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         _override_rtif_airflow_2_x()
 
-    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+    def run_subprocess(
+        self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
+    ) -> FullOutputSubprocessResult:
         logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
             command=command,
             env=env,
             cwd=cwd,
             output_encoding=self.output_encoding,
+            process_log_line=self._process_log_line_callable,
+            **kwargs,
         )
         # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:
         output = "".join(subprocess_result.full_output)
         logger.info(output)
         return subprocess_result
 
-    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str) -> dbtRunnerResult:
+    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks)
+        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)
@@ -580,6 +575,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         logger.info("Outlets: %s", outlets)
         self.register_dataset(inlets, outlets, context)
 
+        if settings.enable_uri_xcom and (uris := [outlet.uri for outlet in outlets]):
+            context["ti"].xcom_push(key="uri", value=uris)
+            logger.info(f"Pushed outlet URI(s) to XCom: {uris}")
+
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
             return
@@ -668,7 +667,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self._handle_partial_parse(tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
-                (profile_path, env_vars) = profile_values
+                profile_path, env_vars = profile_values
                 env.update(env_vars)
                 logger.debug("Using environment variables keys: %s", env.keys())
 
@@ -687,6 +686,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     command=full_cmd,
                     env=env,
                     cwd=tmp_project_dir,
+                    context=context,
                 )
                 if is_openlineage_common_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
@@ -756,26 +756,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             if settings.use_dataset_airflow3_uri_standard:
                 dataset_uri = airflow_3_uri
             else:
-                logger.warning(
-                    f"""
+                logger.warning(f"""
                     Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) will no longer be valid.
                     Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <{airflow_3_uri}>.
                     Previously, with Airflow 2.x, the URI was <{airflow_2_uri}>.
                     If you want to use the Airflow 3 URI standard while still using Airflow 2, please, set:
                         export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
                     Remember to update any DAGs that are scheduled using this dataset.
-                    """
-                )
+                    """)
                 dataset_uri = airflow_2_uri
         else:
-            logger.warning(
-                f"""
+            logger.warning(f"""
                 Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) are no longer accepted.
                 Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <{airflow_3_uri}>.
                 Before, with Airflow 2.x, the URI used to be <{airflow_2_uri}>.
                 Please, change any DAGs that were scheduled using the old standard to the new one.
-                """
-            )
+                """)
             dataset_uri = airflow_3_uri
         return dataset_uri
 

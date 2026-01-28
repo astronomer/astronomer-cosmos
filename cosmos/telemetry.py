@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
 import platform
+import zlib
+from base64 import b64decode, b64encode
+from typing import Any
 from urllib import parse
 from urllib.parse import urlencode
 
@@ -31,7 +35,6 @@ def collect_standard_usage_metrics() -> dict[str, object]:
         "python_version": platform.python_version(),
         "platform_system": platform.system(),
         "platform_machine": platform.machine(),
-        "variables": {},
     }
     return metrics
 
@@ -42,11 +45,18 @@ def emit_usage_metrics(metrics: dict[str, object]) -> bool:
 
     The metrics must contain the necessary fields to build the TELEMETRY_URL.
     """
-    query_string = urlencode(metrics)
+    event_type = metrics.get("event_type")
+    metrics_for_query = {k: v for k, v in metrics.items() if k != "event_type"}
+    query_string = urlencode(metrics_for_query)
     telemetry_url = constants.TELEMETRY_URL.format(
-        **metrics, telemetry_version=constants.TELEMETRY_VERSION, query_string=query_string
+        telemetry_version=constants.TELEMETRY_VERSION, event_type=event_type, query_string=query_string
     )
-    logger.debug("Telemetry is enabled. Emitting the following usage metrics to %s: %s", telemetry_url, metrics)
+    logger.debug(
+        "Telemetry is enabled. Emitting the following usage metrics for event type %s to %s: %s",
+        event_type,
+        telemetry_url,
+        metrics,
+    )
     try:
         response = httpx.get(telemetry_url, timeout=constants.TELEMETRY_TIMEOUT, follow_redirects=True)
     except httpx.HTTPError as e:
@@ -76,10 +86,34 @@ def emit_usage_metrics_if_enabled(event_type: str, additional_metrics: dict[str,
     if should_emit():
         metrics = collect_standard_usage_metrics()
         metrics["event_type"] = event_type
-        metrics["variables"].update(additional_metrics)  # type: ignore[attr-defined]
         metrics.update(additional_metrics)
         is_success = emit_usage_metrics(metrics)
         return is_success
     else:
         logger.debug("Telemetry is disabled. To enable it, export AIRFLOW__COSMOS__ENABLE_TELEMETRY=True.")
         return False
+
+
+def _compress_telemetry_metadata(metadata: dict[str, Any]) -> str:
+    """
+    Compress and encode telemetry metadata to reduce serialized DAG size.
+
+    :param metadata: Telemetry metadata dictionary
+    :returns: Base64-encoded zlib-compressed JSON string
+    """
+    json_bytes = json.dumps(metadata).encode("utf-8")
+    compressed = zlib.compress(json_bytes, level=9)
+    return b64encode(compressed).decode("ascii")
+
+
+def _decompress_telemetry_metadata(compressed_data: str) -> dict[str, Any]:
+    """
+    Decompress and decode telemetry metadata.
+
+    :param compressed_data: Base64-encoded zlib-compressed JSON string
+    :returns: Original metadata dictionary
+    """
+    compressed_bytes = b64decode(compressed_data.encode("ascii"))
+    json_bytes = zlib.decompress(compressed_bytes)
+    result: dict[str, Any] = json.loads(json_bytes.decode("utf-8"))
+    return result

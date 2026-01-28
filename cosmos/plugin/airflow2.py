@@ -1,5 +1,5 @@
 import os.path as op
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 from urllib.parse import urlsplit
 
 from airflow.configuration import conf
@@ -10,8 +10,10 @@ from airflow.www.views import AirflowBaseView
 from flask import abort
 from flask_appbuilder import AppBuilder, expose
 
-from cosmos.listeners import dag_run_listener
+from cosmos import telemetry
+from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
+from cosmos.plugin.storage import get_storage_type_from_path
 from cosmos.settings import dbt_docs_conn_id, dbt_docs_dir, dbt_docs_index_file_name, in_astro_cloud
 
 if in_astro_cloud:
@@ -25,14 +27,14 @@ else:
     ]
 
 
-def bucket_and_key(path: str) -> Tuple[str, str]:
+def bucket_and_key(path: str) -> tuple[str, str]:
     parsed_url = urlsplit(path)
     bucket = parsed_url.netloc
     key = parsed_url.path.lstrip("/")
     return bucket, key
 
 
-def open_s3_file(path: str, conn_id: Optional[str]) -> str:
+def open_s3_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
     from botocore.exceptions import ClientError
 
@@ -50,7 +52,7 @@ def open_s3_file(path: str, conn_id: Optional[str]) -> str:
     return content  # type: ignore[no-any-return]
 
 
-def open_gcs_file(path: str, conn_id: Optional[str]) -> str:
+def open_gcs_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
     from google.cloud.exceptions import NotFound
 
@@ -66,7 +68,7 @@ def open_gcs_file(path: str, conn_id: Optional[str]) -> str:
     return content.decode("utf-8")  # type: ignore[no-any-return]
 
 
-def open_azure_file(path: str, conn_id: Optional[str]) -> str:
+def open_azure_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
     from azure.core.exceptions import ResourceNotFoundError
 
@@ -83,7 +85,7 @@ def open_azure_file(path: str, conn_id: Optional[str]) -> str:
     return content  # type: ignore[no-any-return]
 
 
-def open_http_file(path: str, conn_id: Optional[str]) -> str:
+def open_http_file(path: str, conn_id: str | None) -> str:
     from airflow.providers.http.hooks.http import HttpHook
     from requests.exceptions import HTTPError
 
@@ -101,7 +103,7 @@ def open_http_file(path: str, conn_id: Optional[str]) -> str:
     return res.text  # type: ignore[no-any-return]
 
 
-def open_file(path: str, conn_id: Optional[str] = None) -> str:
+def open_file(path: str, conn_id: str | None = None) -> str:
     """
     Retrieve a file from http, https, gs, s3, or wasb.
 
@@ -128,21 +130,35 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
     static_folder = op.join(op.dirname(__file__), "static")
 
     def create_blueprint(
-        self, appbuilder: AppBuilder, endpoint: Optional[str] = None, static_folder: Optional[str] = None
+        self, appbuilder: AppBuilder, endpoint: str | None = None, static_folder: str | None = None
     ) -> None:
         # Make sure the static folder is not overwritten, as we want to use it.
         return super().create_blueprint(appbuilder, endpoint=endpoint, static_folder=self.static_folder)  # type: ignore[no-any-return]
 
-    @expose("/dbt_docs")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
+    @expose("/dbt_docs")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
     def dbt_docs(self) -> str:
+        # Emit telemetry for dbt docs access
+        storage_type = "not_configured"
+        if dbt_docs_dir is not None:
+            storage_type = get_storage_type_from_path(dbt_docs_dir)
+
+        telemetry.emit_usage_metrics_if_enabled(
+            event_type="dbt_docs_access",
+            additional_metrics={
+                "storage_type": storage_type,
+                "docs_dir_configured": dbt_docs_dir is not None,
+                "uses_custom_conn": dbt_docs_conn_id is not None,
+            },
+        )
+
         if dbt_docs_dir is None:
             return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
         return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
 
-    @expose("/dbt_docs_index.html")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def dbt_docs_index(self) -> Tuple[str, int, Dict[str, Any]]:
+    @expose("/dbt_docs_index.html")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
+    def dbt_docs_index(self) -> tuple[str, int, dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -153,9 +169,9 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
             html = html.replace("</head>", f"{IFRAME_SCRIPT}</head>")
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}
 
-    @expose("/catalog.json")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def catalog(self) -> Tuple[str, int, Dict[str, Any]]:
+    @expose("/catalog.json")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
+    def catalog(self) -> tuple[str, int, dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -165,9 +181,9 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         else:
             return data, 200, {"Content-Type": "application/json"}
 
-    @expose("/manifest.json")  # type: ignore[misc]
-    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[misc]
-    def manifest(self) -> Tuple[str, int, Dict[str, Any]]:
+    @expose("/manifest.json")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
+    def manifest(self) -> tuple[str, int, dict[str, Any]]:
         if dbt_docs_dir is None:
             abort(404)
         try:
@@ -190,4 +206,4 @@ class CosmosPlugin(AirflowPlugin):
         "href": conf.get("webserver", "base_url") + "/cosmos/dbt_docs",
     }
     appbuilder_views = [item]
-    listeners = [dag_run_listener]
+    listeners = [dag_run_listener, task_instance_listener]

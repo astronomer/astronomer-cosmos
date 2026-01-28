@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
@@ -93,10 +93,11 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+    has_non_detached_test: bool = False
     downstream: list[str] = field(default_factory=lambda: [])
 
     @property
-    def meta(self) -> Dict[str, Any]:
+    def meta(self) -> dict[str, Any]:
         """
         Extract node-specific configuration declared in the model dbt YAML configuration.
         These will be used while instantiating Airflow tasks.
@@ -110,7 +111,7 @@ class DbtNode:
         return value
 
     @property
-    def operator_kwargs_to_override(self) -> Dict[str, Any]:
+    def operator_kwargs_to_override(self) -> dict[str, Any]:
         """
         Extract the configuration that will be used to override, at a node level, the keyword arguments passed to create
         the correspondent Airflow task (named `operator_args` at the `DbtDag` or `DbtTaskGroup` level).
@@ -127,7 +128,7 @@ class DbtNode:
         return operator_kwargs
 
     @property
-    def profile_config_to_override(self) -> Dict[str, Any]:
+    def profile_config_to_override(self) -> dict[str, Any]:
         """
         Extract the configuration that will be used to override, at a node level, the profile configuration.
 
@@ -179,12 +180,13 @@ class DbtNode:
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,
+            "has_non_detached_test": self.has_non_detached_test,
             "resource_name": self.resource_name,
             "name": self.name,
         }
 
 
-def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
+def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
     """Function to find if a source has null freshness. Scenarios where freshness
     looks like:
     "freshness": {
@@ -770,10 +772,13 @@ class DbtGraph:
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
-            with self.profile_config.ensure_profile(
-                use_mock_values=self.render_config.enable_mock_profile
-            ) as profile_values, environ(self.env_vars):
-                (profile_path, env_vars) = profile_values
+            with (
+                self.profile_config.ensure_profile(
+                    use_mock_values=self.render_config.enable_mock_profile
+                ) as profile_values,
+                environ(self.env_vars),
+            ):
+                profile_path, env_vars = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)
 
@@ -963,7 +968,8 @@ class DbtGraph:
 
     def update_node_dependency(self) -> None:
         """
-        This will update the property `has_test` if node has `dbt` test
+        This will update the property `has_test` if node has `dbt` test and update the property
+        `has_non_detached_test` if there's at least one non-detached `dbt` test
 
         Updates in-place:
         * self.filtered_nodes
@@ -974,6 +980,11 @@ class DbtGraph:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node
+                        if (
+                            len(node.depends_on) == 1
+                            or self.render_config.should_detach_multiple_parents_tests is False
+                        ):
+                            self.filtered_nodes[node_id].has_non_detached_test = True
             else:
                 for parent_node_id in node.depends_on:
                     parent_node = self.nodes.get(parent_node_id)

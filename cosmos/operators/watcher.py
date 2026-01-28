@@ -2,35 +2,33 @@ from __future__ import annotations
 
 import base64
 import json
-import logging
 import zlib
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, List, Union
+from typing import TYPE_CHECKING, Any
 
-import airflow
-from packaging.version import Version
-
-if TYPE_CHECKING:  # pragma: no cover
-    try:
-        from airflow.sdk.definitions.context import Context
-    except ImportError:
-        from airflow.utils.context import Context  # type: ignore[attr-defined]
-
-try:
-    from airflow.sdk.bases.sensor import BaseSensorOperator
-except ImportError:  # pragma: no cover
-    from airflow.sensors.base import BaseSensorOperator
 from airflow.exceptions import AirflowException
+
+from cosmos.config import ProfileConfig
+from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
-from cosmos.config import ProfileConfig
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID, InvocationMode
+
+from cosmos.constants import (
+    PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
+    PRODUCER_WATCHER_TASK_ID,
+    WATCHER_TASK_WEIGHT_RULE,
+    InvocationMode,
+)
+from cosmos.log import get_logger
+from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators.base import (
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -41,23 +39,23 @@ from cosmos.operators.local import (
     DbtSourceLocalOperator,
 )
 
-AIRFLOW_VERSION = Version(airflow.__version__)
-
-
 try:
     from dbt_common.events.base_types import EventMsg
 except ImportError:  # pragma: no cover
     EventMsg = None
 
-logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 
-CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 10
-PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT = 9999
-WEIGHT_RULE = "absolute"  # the default "downstream" does not work with dag.test()
+logger = get_logger(__name__)
 
 
-class DbtProducerWatcherOperator(DbtLocalBaseOperator):
+class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
     Executes **one** ``dbt build`` covering the whole selection.
@@ -82,34 +80,26 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
     feedback and granular task-level observability downstream.
     """
 
-    base_cmd = ["build"]
-    template_fields = DbtLocalBaseOperator.template_fields
+    template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
+    # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
+    # when accessed via instance, which would incorrectly pass `self` as the first argument
+    _process_log_line_callable = staticmethod(store_dbt_resource_status_from_log)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-        kwargs.setdefault("priority_weight", PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
-        kwargs.setdefault("weight_rule", WEIGHT_RULE)
-        on_failure_callback = self._set_on_failure_callback(kwargs.pop("on_failure_callback", None))
-        super().__init__(task_id=task_id, *args, on_failure_callback=on_failure_callback, **kwargs)
+        task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+        kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
+        kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
+        # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
+        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
+        # they have already processed output XCOMs from the first run of the producer, so we disable retries.
+        default_args = dict(kwargs.get("default_args", {}) or {})
+        default_args["retries"] = 0
+        kwargs["default_args"] = default_args
+        kwargs["retries"] = 0
+        super().__init__(task_id=task_id, *args, **kwargs)
 
-    def _set_on_failure_callback(
-        self, user_callback: Any
-    ) -> Union[Callable[[Context], None], List[Callable[[Context], None]]]:
-        default_callback = self._store_producer_task_state
-
-        if AIRFLOW_VERSION < Version("2.6.0"):
-            # Older versions only support a single callable
-            return default_callback
-        else:
-            if user_callback is None:
-                # No callback provided — use default in a list
-                return [default_callback]
-            elif isinstance(user_callback, list):
-                # Append to existing list of callbacks (make a copy to avoid side effects)
-                return user_callback + [default_callback]
-            else:
-                # Single callable provided — wrap it in a list and append ours
-                return [user_callback, default_callback]
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.log_format = "json"
 
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
@@ -145,26 +135,39 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
         context: Context,
     ) -> None:
         logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", event_message)
-        ti = context["ti"]
         uid = event_message.data.node_info.unique_id
         event_message_dict = self._serialize_event(event_message)
         compiled_sql = self._extract_compiled_sql_for_node_event(event_message)
         if compiled_sql:
             event_message_dict["compiled_sql"] = compiled_sql
         payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
-        ti.xcom_push(key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
+        safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
-        ti = context["ti"]
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
-            ti.xcom_push(key="dbt_startup_events", value=startup_events)
-
-    def _store_producer_task_state(self, context: Context) -> None:
-        ti = context["ti"]
-        ti.xcom_push(key="state", value="failed")
+            safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        task_instance = context.get("ti")
+        if task_instance is None:
+            raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
+
+        try_number = getattr(task_instance, "try_number", 1)
+
+        if try_number > 1:
+            self.log.info(
+                "Dbt WATCHER producer task does not support Airflow retries. "
+                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
+                try_number,
+            )
+            return None
+
+        self.log.info(
+            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
+            "downstream sensors own model-level retries."
+        )
+
         try:
             if not self.invocation_mode:
                 self._discover_invocation_mode()
@@ -177,11 +180,18 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
             if use_events:
 
                 def _callback(event_message: EventMsg) -> None:
-                    name = event_message.info.name
-                    if name in {"MainReportVersion", "AdapterRegistered"}:
-                        self._handle_startup_event(event_message, startup_events)
-                    elif name == "NodeFinished":
-                        self._handle_node_finished(event_message, context)
+                    try:
+                        name = event_message.info.name
+                        if name in {"MainReportVersion", "AdapterRegistered"}:
+                            self._handle_startup_event(event_message, startup_events)
+                        elif name == "NodeFinished":
+                            self._handle_node_finished(event_message, context)
+                    except Exception:
+                        event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
+                        logger.exception(
+                            "DbtProducerWatcherOperator: error while handling dbt event '%s'",
+                            event_name,
+                        )
 
                 self._dbt_runner_callbacks = [_callback]
                 result = super().execute(context=context, **kwargs)
@@ -193,34 +203,30 @@ class DbtProducerWatcherOperator(DbtLocalBaseOperator):
                 kwargs["push_run_results_to_xcom"] = True
                 return_value = super().execute(context=context, **kwargs)
 
-            context["ti"].xcom_push(key="task_status", value="completed")
+            safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             return return_value
 
         except Exception:
-            context["ti"].xcom_push(key="task_status", value="completed")
+            safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
 
 
-class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type: ignore[misc]
-    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
-    poke_retry_number: int = 0
+class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type: ignore[misc]
+    template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunLocalOperator.template_fields  # type: ignore[operator]
 
     def __init__(
         self,
         *,
+        project_dir: str,
         profile_config: ProfileConfig | None = None,
-        project_dir: str | None = None,
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
         timeout: int = 60 * 60,  # 1 h safety valve
         execution_timeout: timedelta = timedelta(hours=1),
+        deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
-        self.compiled_sql = ""
-        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
-        kwargs.setdefault("priority_weight", CONSUMER_OPERATOR_DEFAULT_PRIORITY_WEIGHT)
-        kwargs.setdefault("weight_rule", WEIGHT_RULE)
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -230,56 +236,8 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
             profiles_dir=profiles_dir,
             **kwargs,
         )
-        self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
-        self.producer_task_id = producer_task_id
-
-    @staticmethod
-    def _filter_flags(flags: list[str]) -> list[str]:
-        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
-        filtered = []
-        skip_next = False
-        for token in flags:
-            if skip_next:
-                if token.startswith("--"):
-                    skip_next = False
-                else:
-                    continue  # skip value of previous flag
-            if token in ("--select", "--exclude"):
-                skip_next = True
-                continue
-            filtered.append(token)
-        return filtered
-
-    def _fallback_to_local_run(self, try_number: int, context: Context) -> bool:
-        """
-        Handles logic for retrying a failed dbt model execution.
-        Reconstructs the dbt command by cloning the project and re-running the model
-        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
-        """
-        logger.info(
-            "Retry attempt #%s – Running model '%s' from project '%s' using ExecutionMode.LOCAL",
-            try_number - 1,
-            self.model_unique_id,
-            self.project_dir,
-        )
-
-        upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
-
-        extra_flags: list[str] = []
-        if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
-            raw_flags = upstream_task.add_cmd_flags()
-            extra_flags = self._filter_flags(raw_flags)
-
-        model_selector = self.model_unique_id.split(".")[-1]
-        cmd_flags = extra_flags + ["--select", model_selector]
-
-        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
-
-        logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
-        return True
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-
         dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
             logger.info("Dbt Startup Event: %s", dbt_startup_events)
@@ -291,11 +249,9 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
         if not compressed_b64_event_msg:
             return None
 
-        compressed_bytes = base64.b64decode(compressed_b64_event_msg)
-        event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
-        event_json = json.loads(event_json_str)
+        event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
-        logger.info("Node Info: %s", event_json_str)
+        logger.info("Node Info: %s", event_json)
 
         self.compiled_sql = event_json.get("compiled_sql", "")
         if self.compiled_sql:
@@ -303,83 +259,10 @@ class DbtConsumerWatcherSensor(BaseSensorOperator, DbtRunLocalOperator):  # type
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
-    def _get_status_from_run_results(self, ti: Any, context: Context) -> Any:
-        compressed_b64_run_results = ti.xcom_pull(task_ids=self.producer_task_id, key="run_results")
-
-        if not compressed_b64_run_results:
-            return None
-
-        compressed_bytes = base64.b64decode(compressed_b64_run_results)
-        run_results_str = zlib.decompress(compressed_bytes).decode("utf-8")
-        run_results_json = json.loads(run_results_str)
-
-        logger.debug("Run results: %s", run_results_json)
-
-        results = run_results_json.get("results", [])
-        node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
-
-        if not node_result:  # pragma: no cover
-            logger.warning("No matching result found for unique_id '%s'", self.model_unique_id)
-            return None
-
-        logger.info("Node Info: %s", run_results_str)
-        self.compiled_sql = node_result.get("compiled_code")
-        if self.compiled_sql:
-            self._override_rtif(context)
-
-        return node_result.get("status")
-
-    def _get_producer_task_state(self, ti: Any) -> Any:
-        return ti.xcom_pull(task_ids=self.producer_task_id, key="state")
-
-    def poke(self, context: Context) -> bool:
-        """
-        Checks the status of a dbt model run by pulling relevant XComs from the master task.
-        Handles retries and checks for successful completion of the model execution.
-        """
-        ti = context["ti"]
-        try_number = ti.try_number
-
-        logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s'",
-            try_number,
-            self.poke_retry_number,
-            self.producer_task_id,
-            self.model_unique_id,
-        )
-
-        if try_number > 1:
-            return self._fallback_to_local_run(try_number, context)
-
-        # We have assumption here that both the build producer and the sensor task will have same invocation mode
+    def use_event(self) -> bool:
         if not self.invocation_mode:
             self._discover_invocation_mode()
-        use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-
-        producer_task_state = self._get_producer_task_state(ti)
-        if use_events:
-            status = self._get_status_from_events(ti, context)
-        else:
-            status = self._get_status_from_run_results(ti, context)
-
-        if status is None:
-
-            if producer_task_state == "failed":
-                if self.poke_retry_number > 0:
-                    raise AirflowException(
-                        f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
-                    )
-                else:
-                    # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
-                    return self._fallback_to_local_run(try_number, context)
-
-            self.poke_retry_number += 1
-
-            return False
-        elif status == "success":
-            return True
-        else:
-            raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")
+        return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
@@ -415,7 +298,7 @@ class DbtSourceWatcherOperator(DbtSourceLocalOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
+    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields  # type: ignore[assignment]
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

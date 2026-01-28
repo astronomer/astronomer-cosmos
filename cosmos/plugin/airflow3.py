@@ -5,8 +5,9 @@ import json
 import logging
 import os
 import os.path as op
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
@@ -18,10 +19,14 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
 
+from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
+from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.plugin.snippets import IFRAME_SCRIPT
+from cosmos.plugin.storage import get_storage_type_from_path
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
+# Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 
@@ -87,7 +92,7 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
         return content  # type: ignore[no-any-return]
 
 
-def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
+def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
     """
     Load dbt docs projects configuration.
 
@@ -96,7 +101,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, Optional[str]]]:
     - Legacy single-project settings: dbt_docs_dir, dbt_docs_conn_id, dbt_docs_index_file_name
     """
     projects_raw = conf.get("cosmos", "dbt_docs_projects", fallback=None)
-    projects: dict[str, dict[str, Optional[str]]] = {}
+    projects: dict[str, dict[str, str | None]] = {}
     if projects_raw:
         parsed = None
         try:
@@ -147,8 +152,23 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             response_class=HTMLResponse,
         )
         def dbt_docs_index(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+            # Emit telemetry for dbt docs access
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
+            storage_type = "not_configured"
+            if docs_dir_local is not None:
+                storage_type = get_storage_type_from_path(str(docs_dir_local))
+
+            telemetry.emit_usage_metrics_if_enabled(
+                event_type="dbt_docs_access",
+                additional_metrics={
+                    "storage_type": storage_type,
+                    "docs_dir_configured": docs_dir_local is not None,
+                    "uses_custom_conn": cfg_local.get("conn_id") is not None,
+                    "has_custom_name": cfg_local.get("name") is not None,
+                },
+            )
+
             conn_id_local = cfg_local.get("conn_id")
             index_local = cfg_local.get("index") or "index.html"
             if not docs_dir_local:
@@ -261,6 +281,8 @@ class CosmosAF3Plugin(AirflowPlugin):
 
     # Register external views for navigation
     external_views: list[dict[str, Any]] = []
+
+    listeners = [dag_run_listener, task_instance_listener]
 
     def __init__(self) -> None:
         super().__init__()

@@ -1,22 +1,23 @@
 from __future__ import annotations
 
+import binascii
 import hashlib
-from typing import TYPE_CHECKING
+import json
+import zlib
+from typing import TYPE_CHECKING, Any
 
-from airflow import __version__ as airflow_version
 from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
     from airflow.models.dag import DAG
     from airflow.models.dagrun import DagRun
 
-from packaging import version
-
 from cosmos import telemetry
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 from cosmos.log import get_logger
+from cosmos.telemetry import _decompress_telemetry_metadata
 
-AIRFLOW_VERSION_MAJOR = version.parse(airflow_version).major
+AIRFLOW_VERSION_MAJOR = AIRFLOW_VERSION.major
 
 logger = get_logger(__name__)
 
@@ -60,6 +61,25 @@ def get_execution_modes(dag: DAG) -> str:
     return "__".join(sorted(modes))
 
 
+def get_cosmos_telemetry_metadata(dag: DAG) -> dict[str, Any]:
+    """
+    Extract Cosmos telemetry metadata from a DAG.
+
+    Returns the metadata dictionary stored by the converter in dag.params, or an empty dict if not present.
+    """
+    # Metadata is stored as compressed string in dag.params to survive serialization
+    compressed_metadata = dag.params.get("__cosmos_telemetry_metadata__")
+
+    if not compressed_metadata:
+        return {}
+
+    try:
+        return _decompress_telemetry_metadata(compressed_metadata)
+    except (binascii.Error, zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.warning(f"Failed to decompress telemetry metadata: {type(e).__name__}: {e}")
+        return {}
+
+
 @hookimpl
 def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     logger.debug("Running on_dag_run_success")
@@ -84,6 +104,10 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
         "execution_modes": get_execution_modes(serialized_dag),
     }
+
+    # Add Cosmos telemetry metadata if available
+    cosmos_metadata = get_cosmos_telemetry_metadata(serialized_dag)
+    additional_telemetry_metrics.update(cosmos_metadata)
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
     logger.debug("Completed on_dag_run_success")
@@ -113,6 +137,10 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
         "cosmos_task_count": total_cosmos_tasks(serialized_dag),
         "execution_modes": get_execution_modes(serialized_dag),
     }
+
+    # Add Cosmos telemetry metadata if available
+    cosmos_metadata = get_cosmos_telemetry_metadata(serialized_dag)
+    additional_telemetry_metrics.update(cosmos_metadata)
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
     logger.debug("Completed on_dag_run_failed")

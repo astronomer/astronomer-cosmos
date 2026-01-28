@@ -6,20 +6,17 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import airflow
 import pytest
 from airflow.models import DAG
 from airflow.models.connection import Connection
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, InvocationMode
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import test_dag as run_test_dag
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
@@ -397,10 +394,6 @@ def test__release_venv_lock_current_process(tmpdir):
     assert not lockfile.exists()
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.5"),
-    reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",
-)
 @pytest.mark.integration
 def test_integration_virtualenv_operator(caplog):
     """

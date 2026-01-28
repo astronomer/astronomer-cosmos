@@ -8,20 +8,13 @@
 
 from __future__ import annotations
 
+from functools import cache
 from pathlib import Path
 
-try:
-    from functools import cache
-except ImportError:
-    from functools import lru_cache as cache
-
-
-import airflow
 import pytest
 from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
-from packaging.version import Version
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 ALL_FILES_TO_IGNORE = [
@@ -29,7 +22,6 @@ ALL_FILES_TO_IGNORE = [
 ]
 
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 @provide_session

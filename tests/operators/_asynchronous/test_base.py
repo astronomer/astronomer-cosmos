@@ -3,19 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
-import airflow
 import pytest
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators._asynchronous import SetupAsyncOperator, TeardownAsyncOperator
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator, _create_async_operator_class
 from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
 from cosmos.operators._asynchronous.databricks import DbtRunAirflowAsyncDatabricksOperator
 from cosmos.operators.local import DbtRunLocalOperator
-
-AIRFLOW_VERSION = Version(airflow.__version__)
 
 
 @pytest.mark.parametrize(
@@ -49,12 +47,16 @@ def profile_config_mock():
 
 def test_create_async_operator_class_valid():
     """Test _create_async_operator_class returns the correct async operator class if available."""
-    with patch("cosmos.operators._asynchronous.base.importlib.import_module") as mock_import:
+    with patch("cosmos.operators._asynchronous.base.load_method_from_module") as mock_import:
         mock_class = MagicMock()
-        mock_import.return_value = MagicMock()
-        setattr(mock_import.return_value, "DbtRunAirflowAsyncBigqueryOperator", mock_class)
+
+        mock_import.return_value = mock_class
 
         result = _create_async_operator_class("bigquery", "DbtRun")
+
+        mock_import.assert_called_once_with(
+            "cosmos.operators._asynchronous.bigquery", "DbtRunAirflowAsyncBigqueryOperator"
+        )
         assert result == mock_class
 
 

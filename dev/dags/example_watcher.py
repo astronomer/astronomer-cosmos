@@ -91,3 +91,18 @@ with DAG(
     pre_dbt >> first_dbt_task_group
 # [END example_watcher_taskgroup]
 """
+
+# [START example_watcher_synchronous]
+example_watcher_synchronous = DbtDag(
+    # dbt/cosmos-specific parameters
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+    project_config=ProjectConfig(DBT_PROJECT_PATH),
+    profile_config=profile_config,
+    operator_args={**operator_args, "deferrable": False},
+    # normal dag parameters
+    schedule="@daily",
+    start_date=datetime(2025, 1, 1),
+    catchup=False,
+    dag_id="example_watcher_synchronous",
+)
+# [END example_watcher_synchronous]

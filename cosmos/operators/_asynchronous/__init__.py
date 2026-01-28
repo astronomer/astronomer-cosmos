@@ -31,7 +31,9 @@ class SetupAsyncOperator(DbtRunVirtualenvOperator):
         kwargs["emit_datasets"] = False
         super().__init__(*args, **kwargs)
 
-    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+    def run_subprocess(
+        self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
+    ) -> FullOutputSubprocessResult:
         profile_type = self.profile_config.get_profile_type()
         if not self._py_bin:
             raise AttributeError("_py_bin attribute not set for VirtualEnv operator")
@@ -49,7 +51,7 @@ class SetupAsyncOperator(DbtRunVirtualenvOperator):
         with open(dbt_executable_path, "w") as f:
             f.writelines(dbt_entrypoint_script)
 
-        return super().run_subprocess(command, env, cwd)
+        return super().run_subprocess(command, env, cwd, **kwargs)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
         async_context = {"profile_type": self.profile_config.get_profile_type(), "run_id": context["run_id"]}

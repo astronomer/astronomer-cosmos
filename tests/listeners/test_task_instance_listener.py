@@ -1,0 +1,358 @@
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import patch
+
+import pytest
+from airflow.models.connection import Connection
+
+try:  # Airflow 3
+    from airflow.sdk import Context
+except ImportError:  # Airflow 2
+    from airflow.utils.context import Context
+
+
+from cosmos import ProfileConfig
+from cosmos.constants import InvocationMode
+from cosmos.listeners import task_instance_listener
+from cosmos.operators.base import AbstractDbtBase
+from cosmos.profiles import get_automatic_profile_mapping
+
+try:
+    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
+except ImportError:
+    from airflow.models import BaseOperator  # Airflow 2
+
+DBT_PROJECT_PROFILE = Path(__file__).parent.parent / "sample/mini/profiles.yml"
+
+
+@pytest.fixture()
+def mock_postgres_conn():  # type: ignore
+    """
+    Sets the connection as an environment variable.
+    """
+    conn = Connection(
+        conn_id="my_postgres_connection",
+        conn_type="postgres",
+        host="my_host",
+        login="my_user",
+        password="my_password",
+        port=5432,
+        schema="my_database",
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
+class DummyOperator(BaseOperator):
+    def execute(self, context: Context) -> Any:
+        pass
+
+
+class DummyDbtOperator(AbstractDbtBase):
+    base_cmd = ["run"]
+
+    def __init__(
+        self,
+        *,
+        module: str = "cosmos.operators.local.fake",
+        install_deps: bool | None = True,
+        callback=None,
+        runner_callbacks=None,
+        profile_config=None,
+    ) -> None:
+        super().__init__(project_dir="/tmp")
+        self.invocation_mode = InvocationMode.DBT_RUNNER
+        self._task_module = module
+        self.profile_config = profile_config
+        if install_deps is not None:
+            self.install_deps = install_deps
+        if callback is not None:
+            self.callback = callback
+        if runner_callbacks is not None:
+            self._dbt_runner_callbacks = runner_callbacks
+
+    def build_and_run_cmd(
+        self, context, cmd_flags, run_as_async=False, async_context=None, **kwargs
+    ):  # pragma: no cover
+        return None
+
+
+class DummyDbtOperatorNoDeps(DummyDbtOperator):
+    base_cmd = ["seed"]
+
+    def __init__(self) -> None:
+        super().__init__(module="cosmos.operators.kubernetes.fake", install_deps=None)
+        self.invocation_mode = InvocationMode.SUBPROCESS
+        if hasattr(self, "install_deps"):
+            delattr(self, "install_deps")
+
+
+class CustomDbtSubclass(DummyDbtOperator):
+    def __init__(self) -> None:
+        super().__init__(module="custom.pipeline.dummy")
+
+
+class DummyDbtOperatorNoCommand(DummyDbtOperator):
+    base_cmd = None
+
+
+class DummyDbtOperatorStringCommand(DummyDbtOperator):
+    base_cmd = "deps"
+
+
+class DummyDbtOperatorTupleCommand(DummyDbtOperator):
+    base_cmd = ("run", None, "--full-refresh")
+
+
+class NonCosmosOperator:
+    __module__ = "airflow.operators.bash"
+
+    def __init__(self) -> None:
+        self._task_module = "airflow.operators.bash"
+
+
+def _make_task_instance(task, **overrides) -> SimpleNamespace:
+    defaults = dict(
+        dag_id="example_dag",
+        task_id="example_task",
+        task=task,
+        map_index=-1,
+        dag_run=SimpleNamespace(run_id="run-1"),
+        duration=7.0,
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+def test_profile_mapping_metrics(mock_postgres_conn):
+    profile_mapping = get_automatic_profile_mapping(
+        mock_postgres_conn.conn_id,
+        {"schema": "my_schema"},
+    )
+
+    operator = DummyDbtOperator(
+        profile_config=ProfileConfig(profile_name="postgres", target_name="test", profile_mapping=profile_mapping)
+    )
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["operator_name"] == "DummyDbtOperator"
+    assert metrics["dbt_command"] == "run"
+    assert metrics["install_deps"] is True
+    assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
+    assert metrics["execution_mode"] == "local"
+    assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["profile_strategy"] == "mapping"
+    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
+    assert metrics["database"] == "postgres"
+
+
+def test_profile_file_metrics():
+
+    operator = DummyDbtOperator(
+        profile_config=ProfileConfig(profiles_yml_filepath=DBT_PROJECT_PROFILE, profile_name="mini", target_name="dev")
+    )
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["operator_name"] == "DummyDbtOperator"
+    assert metrics["dbt_command"] == "run"
+    assert metrics["install_deps"] is True
+    assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
+    assert metrics["execution_mode"] == "local"
+    assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["profile_strategy"] == "yaml_file"
+    assert metrics["profile_mapping_class"] is None
+    assert metrics["database"] == "postgres"
+
+
+def test_profile_metrics_with_non_cosmos_operator():
+    operator = DummyOperator(task_id="test")
+    ti = _make_task_instance(operator)
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["operator_name"] == "DummyOperator"
+    assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["profile_strategy"] is None
+    assert metrics["profile_mapping_class"] is None
+    assert metrics["database"] is None
+
+
+def test_build_task_metrics_records_core_fields():
+    operator = DummyDbtOperator()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["operator_name"] == "DummyDbtOperator"
+    assert metrics["dbt_command"] == "run"
+    assert metrics["install_deps"] is True
+    assert metrics["invocation_mode"] == InvocationMode.DBT_RUNNER.value
+    assert metrics["execution_mode"] == "local"
+    assert metrics["is_cosmos_operator_subclass"] is False
+    assert metrics["is_mapped_task"] is False
+
+
+def test_build_task_metrics_detects_mapped_task():
+    operator = DummyDbtOperator()
+    ti = _make_task_instance(operator, map_index=2)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["is_mapped_task"] is True
+
+
+def test_build_task_metrics_ignores_missing_install_deps():
+    operator = DummyDbtOperatorNoDeps()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="failed")
+
+    assert metrics["dbt_command"] == "seed"
+    assert "install_deps" not in metrics
+    assert metrics["execution_mode"] == "kubernetes"
+
+
+def test_build_task_metrics_marks_custom_subclasses():
+    operator = CustomDbtSubclass()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["is_cosmos_operator_subclass"] is True
+    assert metrics["execution_mode"] is None
+    assert metrics["has_callback"] is False
+
+
+def test_build_task_metrics_sets_has_callback_for_callable():
+    operator = DummyDbtOperator(callback=lambda *_: None)
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["has_callback"] is True
+
+
+def test_build_task_metrics_interprets_tuple_callbacks():
+    operator = DummyDbtOperator(callback=(None, lambda *_: None))
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["has_callback"] is True
+
+
+def test_build_task_metrics_skips_dbt_command_when_missing():
+    operator = DummyDbtOperatorNoCommand()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert "dbt_command" not in metrics
+
+
+def test_build_task_metrics_handles_string_dbt_command():
+    operator = DummyDbtOperatorStringCommand()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["dbt_command"] == "deps"
+
+
+def test_build_task_metrics_flattens_iterable_commands():
+    operator = DummyDbtOperatorTupleCommand()
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["dbt_command"] == "run --full-refresh"
+
+
+def test_build_task_metrics_handles_missing_invocation_mode():
+    operator = DummyDbtOperator()
+    delattr(operator, "invocation_mode")
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["invocation_mode"] is None
+
+
+def test_build_task_metrics_handles_custom_invocation_mode_string():
+    operator = DummyDbtOperator()
+    operator.invocation_mode = "custom-mode"
+    ti = _make_task_instance(operator)
+
+    metrics = task_instance_listener._build_task_metrics(ti, status="success")
+
+    assert metrics["invocation_mode"] == "custom-mode"
+
+
+def test_has_callback_returns_false_for_non_cosmos_task():
+    ti = _make_task_instance(NonCosmosOperator())
+
+    assert task_instance_listener._has_callback(ti) is False
+
+
+def test_install_deps_returns_none_for_non_cosmos_task():
+    ti = _make_task_instance(NonCosmosOperator())
+
+    assert task_instance_listener._install_deps(ti) is None
+
+
+def test_dbt_command_returns_none_for_non_cosmos_task():
+    ti = _make_task_instance(NonCosmosOperator())
+
+    assert task_instance_listener._dbt_command(ti) is None
+
+
+@patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_task_instance_success_emits_for_cosmos_task(mock_emit):
+    operator = DummyDbtOperator()
+    ti = _make_task_instance(operator)
+
+    task_instance_listener.on_task_instance_success(None, ti, session=None)
+
+    mock_emit.assert_called_once()
+    args, _ = mock_emit.call_args
+    assert args[0] == task_instance_listener.TASK_INSTANCE_EVENT
+    assert args[1]["status"] == "success"
+    assert args[1]["dbt_command"] == "run"
+
+
+@patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_task_instance_failed_emits_failed_status(mock_emit):
+    operator = DummyDbtOperator()
+    ti = _make_task_instance(operator)
+
+    task_instance_listener.on_task_instance_failed(None, ti, error=None, session=None)
+
+    mock_emit.assert_called_once()
+    args, _ = mock_emit.call_args
+    assert args[0] == task_instance_listener.TASK_INSTANCE_EVENT
+    assert args[1]["status"] == "failed"
+
+
+@patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_task_instance_success_skips_non_cosmos_task(mock_emit):
+    ti = _make_task_instance(NonCosmosOperator())
+
+    task_instance_listener.on_task_instance_success(None, ti, session=None)
+
+    mock_emit.assert_not_called()
+
+
+@patch("cosmos.listeners.task_instance_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_task_instance_failed_skips_non_cosmos_task(mock_emit):
+    ti = _make_task_instance(NonCosmosOperator())
+
+    task_instance_listener.on_task_instance_failed(None, ti, error=None, session=None)
+
+    mock_emit.assert_not_called()

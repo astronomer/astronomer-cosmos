@@ -142,9 +142,6 @@ base_kwargs = {
     "no_version_check": True,
 }
 
-if version.parse(airflow_version) == version.parse("2.4"):
-    base_kwargs["name"] = "some-pod-name"
-
 result_map = {
     ("ls",): DbtLSKubernetesOperator(**base_kwargs),
     ("run",): DbtRunKubernetesOperator(**base_kwargs),
@@ -588,13 +585,17 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
         **kwargs,
     )
 
-    with patch(
-        "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook",
-        is_in_cluster=False,
-    ), patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.cleanup"), patch(
-        "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.get_or_create_pod",
-        side_effect=ValueError("Mock"),
-    ) as get_or_create_pod:
+    with (
+        patch(
+            "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook",
+            is_in_cluster=False,
+        ),
+        patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.cleanup"),
+        patch(
+            "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.get_or_create_pod",
+            side_effect=ValueError("Mock"),
+        ) as get_or_create_pod,
+    ):
         try:
             task.execute(context={})
         except ValueError as e:

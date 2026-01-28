@@ -32,7 +32,6 @@ from cosmos.dbt.parser.output import (
 )
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.io import _construct_dest_file_path
 from cosmos.operators.local import (
     AbstractDbtLocalBase,
     DbtBuildLocalOperator,
@@ -419,10 +418,9 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) >= version.parse("2.10")
+    version.parse(airflow_version) >= version.parse("2.10")
     or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
     "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
 )
 @pytest.mark.integration
@@ -658,9 +656,8 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
@@ -696,9 +693,8 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.4")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow DAG did not have datasets until the 2.4 release, inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
@@ -1461,9 +1457,10 @@ def test_handle_warnings(invocation_mode, expected_extract_function, mock_contex
         invocation_mode=invocation_mode,
     )
 
-    with patch(expected_extract_function) as mock_extract_issues, patch.object(
-        instance, "on_warning_callback"
-    ) as mock_on_warning_callback:
+    with (
+        patch(expected_extract_function) as mock_extract_issues,
+        patch.object(instance, "on_warning_callback") as mock_on_warning_callback,
+    ):
         mock_extract_issues.return_value = (["test_name1", "test_name2"], ["test_name1", "test_name2"])
 
         instance._handle_warnings(result, mock_context)
@@ -1812,100 +1809,6 @@ def test_handle_post_execution_with_multiple_callbacks(
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
 
 
-def test_construct_dest_file_path_with_run_id():
-    """Test _construct_dest_file_path uses run_id correctly."""
-    dest_target_dir = Path("/dest")
-    source_target_dir = Path("/project_dir/target")
-    file_path = "/project_dir/target/subdir/file.txt"
-    source_subpath = "target"
-
-    expected_path = "/dest/test_dag/test_run_id/test_task/1/target/subdir/file.txt"
-    context = {
-        "dag": MagicMock(dag_id="test_dag"),
-        "run_id": "test_run_id",
-        "task_instance": MagicMock(task_id="test_task", try_number=1),
-    }
-    result = _construct_dest_file_path(dest_target_dir, file_path, source_target_dir, source_subpath, context=context)
-
-    assert result == expected_path
-    assert "test_run_id" in result
-
-
-@patch("cosmos.settings.upload_sql_to_xcom", False)
-def test_operator_construct_dest_file_path_with_run_id():
-    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
-    operator = ConcreteDbtLocalBaseOperator(
-        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
-    )
-
-    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
-
-    dest_target_dir = Path("/dest")
-    source_compiled_dir = Path("/project_dir/target/compiled")
-    file_path = "/project_dir/target/compiled/models/my_model.sql"
-    resource_type = "compiled"
-
-    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
-    result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
-
-    assert result == expected_path
-    assert "test_run_id" in result
-
-
-@patch("cosmos.settings.upload_sql_to_xcom", False)
-def test_construct_dest_file_path_in_operator():
-    """Test that the operator's _construct_dest_file_path method uses run_id correctly."""
-    operator = ConcreteDbtLocalBaseOperator(
-        task_id="test_task", profile_config=profile_config, project_dir="/project_dir"
-    )
-
-    operator.extra_context = {"run_id": "test_run_id", "dbt_dag_task_group_identifier": "test_task_group"}
-
-    dest_target_dir = Path("/dest")
-    source_compiled_dir = Path("/project_dir/target/compiled")
-    file_path = "/project_dir/target/compiled/models/my_model.sql"
-    resource_type = "compiled"
-
-    expected_path = "/dest/test_task_group/test_run_id/compiled/models/my_model.sql"
-
-    with patch.object(
-        operator, "_construct_dest_file_path", wraps=operator._construct_dest_file_path
-    ) as mock_construct:
-        result = operator._construct_dest_file_path(dest_target_dir, file_path, source_compiled_dir, resource_type)
-
-        assert result == expected_path
-        assert "test_run_id" in result
-
-        mock_construct.assert_called_once_with(dest_target_dir, file_path, source_compiled_dir, resource_type)
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.operators.local.ObjectStoragePath")
-def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
-    """Test that parent directories are created during file uploads."""
-
-    operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="test-task",
-        project_dir="test/dir",
-    )
-
-    with patch.object(
-        operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
-    ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
-        "pathlib.Path.rglob", return_value=[Path("file.sql")]
-    ), patch(
-        "pathlib.Path.is_file", return_value=True
-    ):
-        mock_dest_path = MagicMock()
-        mock_dest_path.parent = MagicMock()
-        mock_object_storage_path.return_value = mock_dest_path
-
-        operator._upload_sql_files("tmp_dir", "compiled")
-
-        mock_dest_path.parent.mkdir.assert_called_with(parents=True, exist_ok=True)
-
-
 @pytest.mark.integration
 @pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
@@ -2012,6 +1915,63 @@ def test_override_rtif_airflow3_with_should_store_compiled_sql_false():
     context = {"task_instance": MagicMock()}
     operator._override_rtif(context)
     assert operator.overwrite_rtif_after_execution is False
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
+def test_override_rtif_airflow2_filters_by_map_index():
+    """Test that _override_rtif correctly filters by map_index for dynamically mapped tasks in Airflow 2.
+
+    This test ensures that when deleting old RenderedTaskInstanceFields records,
+    the map_index filter is applied so that only the current mapped task instance's
+    records are deleted, not records from other mapped task instances.
+
+    This addresses issue #2018 where SQL templated fields weren't properly rendered
+    for dynamically mapped tasks.
+    """
+    from airflow.models.renderedtifields import RenderedTaskInstanceFields
+
+    with DAG("test_dag", start_date=datetime(2023, 1, 1)) as dag:
+        operator = DbtRunLocalOperator(
+            task_id="test",
+            profile_config=profile_config,
+            project_dir="my/dir",
+            should_store_compiled_sql=True,
+            dag=dag,
+        )
+
+    mock_ti = MagicMock(spec=TaskInstance)
+    mock_ti.dag_id = "test_dag"
+    mock_ti.task_id = "test"
+    mock_ti.run_id = "test_run_1"
+    mock_ti.map_index = 2  # Simulating a mapped task instance
+    mock_ti.task = operator
+
+    context = {"ti": mock_ti}
+
+    mock_session = MagicMock()
+    mock_query = MagicMock()
+    mock_filter = MagicMock()
+
+    mock_session.query.return_value = mock_query
+    mock_query.filter.return_value = mock_filter
+    mock_filter.delete.return_value = None
+
+    with patch("airflow.utils.session.provide_session") as mock_provide_session:
+
+        def session_decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(session=mock_session)
+
+            return wrapper
+
+        mock_provide_session.side_effect = session_decorator
+
+        operator._override_rtif(context)
+
+        mock_session.query.assert_called_once_with(RenderedTaskInstanceFields)
+        mock_query.filter.assert_called_once()
+        filter_call_arg_map_index = str(mock_query.filter.call_args.args[-1])
+        assert filter_call_arg_map_index == "rendered_task_instance_fields.map_index = :map_index_1"
 
 
 def test_dbt_cmd_flags_templating():
@@ -2226,3 +2186,125 @@ def test_dbt_cmd_flags_all_templated():
     expected_flags = ["--select", "--exclude", "model1", "model2"]
 
     assert operator.dbt_cmd_flags == expected_flags
+
+
+@patch("cosmos.settings.enable_uri_xcom", False)
+def test_handle_datasets_does_not_push_uri_xcom_when_disabled():
+    """Test that _handle_datasets does not push URI to XCom when enable_uri_xcom is False (default)."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Create mock Asset objects with uri attribute
+    mock_outlet = MagicMock()
+    mock_outlet.uri = "postgres://0.0.0.0:5432/postgres.public.test_table"
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock get_datasets to return mock assets and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], [mock_outlet]]),
+        patch.object(operator, "register_dataset"),
+    ):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was NOT called with "uri" key
+    uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
+    assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when enable_uri_xcom is False"
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+def test_handle_datasets_pushes_uri_xcom_when_enabled():
+    """Test that _handle_datasets pushes URI to XCom when enable_uri_xcom is True."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Create mock Asset objects with uri attribute
+    mock_outlet = MagicMock()
+    mock_outlet.uri = "postgres://0.0.0.0:5432/postgres.public.test_table"
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock get_datasets to return mock assets and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], [mock_outlet]]),
+        patch.object(operator, "register_dataset"),
+    ):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was called with "uri" key and the correct value
+    mock_ti.xcom_push.assert_called_once()
+    call_kwargs = mock_ti.xcom_push.call_args[1]
+    assert call_kwargs["key"] == "uri"
+    assert isinstance(call_kwargs["value"], list)
+    assert len(call_kwargs["value"]) == 1
+    assert call_kwargs["value"][0] == "postgres://0.0.0.0:5432/postgres.public.test_table"
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+def test_handle_datasets_pushes_multiple_uris_to_xcom():
+    """Test that _handle_datasets pushes multiple URIs to XCom when there are multiple outlets."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    # Create mock Asset objects with uri attribute
+    mock_outlet1 = MagicMock()
+    mock_outlet1.uri = "postgres://0.0.0.0:5432/postgres.public.table1"
+    mock_outlet2 = MagicMock()
+    mock_outlet2.uri = "postgres://0.0.0.0:5432/postgres.public.table2"
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock get_datasets to return mock assets and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], [mock_outlet1, mock_outlet2]]),
+        patch.object(operator, "register_dataset"),
+    ):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was called with correct URIs
+    mock_ti.xcom_push.assert_called_once()
+    call_kwargs = mock_ti.xcom_push.call_args[1]
+    assert call_kwargs["key"] == "uri"
+    assert len(call_kwargs["value"]) == 2
+    assert "postgres://0.0.0.0:5432/postgres.public.table1" in call_kwargs["value"]
+    assert "postgres://0.0.0.0:5432/postgres.public.table2" in call_kwargs["value"]
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+def test_handle_datasets_does_not_push_xcom_when_no_outlets():
+    """Test that _handle_datasets does not push XCom when there are no outlets."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+
+    mock_ti = MagicMock()
+    mock_context = {"ti": mock_ti, "outlet_events": MagicMock()}
+
+    # Mock get_datasets to return empty lists and register_dataset to avoid database interactions
+    with (
+        patch.object(operator, "get_datasets", side_effect=[[], []]),
+        patch.object(operator, "register_dataset"),
+    ):
+        operator._handle_datasets(mock_context)
+
+    # Verify xcom_push was NOT called (no outlets to push)
+    uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
+    assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when there are no outlets"

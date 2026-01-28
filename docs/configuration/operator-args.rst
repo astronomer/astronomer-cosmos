@@ -39,7 +39,7 @@ Example of setting a Cosmos-specific operator argument:
 .. _operator-args-per-node:
 
 Overriding operator arguments per dbt node (or group of nodes)
--------------------------------------------------------------
+--------------------------------------------------------------
 
 .. versionadded:: 1.8.0
 

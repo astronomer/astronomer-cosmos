@@ -7,7 +7,7 @@ selectors:
 
   - name: core_models
     description: "Select core business logic models (non-staging)"
-    #default: true
+    default: true
     definition:
       method: tag
       value: core

@@ -166,9 +166,9 @@ As an example, the following clean-up DAG will delete any cache associated with 
     :start-after: [START cache_example]
     :end-before: [END cache_example]
 
-.. note::
-    Because the backing Airflow Variable is shared between the dbt ls cache and the YAML selectors cache, delete methods for the non-remote cache will delete the same Airflow variable.
-    In other words, if you call ``delete_unused_dbt_ls_cache``, it will also delete the YAML selectors cache for the same DAG or TaskGroup, and vice versa.
+.. warning::
+    Because the backing Airflow Variable is shared between the dbt ls cache and the YAML selectors cache, delete methods for the non-remote cache delete the same Airflow Variable.
+    In other words, if you call ``delete_unused_dbt_ls_cache``, it will also delete the YAML selectors cache for the same DAG or TaskGroup, and vice versa, and calling ``delete_unused_dbt_yaml_selectors_cache`` will delete the corresponding dbt ls cache.
 
 **Cache key**
 

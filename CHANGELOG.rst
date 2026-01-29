@@ -1,19 +1,53 @@
 Changelog
 =========
 
-1.13.0a2 (2026-01-22)
+1.13.0 (2026-01-29)
 ---------------------
-
-(Includes more changes)
 
 Features
 
-- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use watcher with ``KubernetesPodOperator`` by @tatiana in #2207
+- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use the watcher with ``KubernetesPodOperator`` by @tatiana in #2207
+- Leverage Airflow ``::group::`` to group logs associated with DAG parsing by @tatiana in #2235
+- Add support for StarRocks profile mapping by @kurkim0661 in #2256
+- Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
+- Add Scarf metrics to understand Cosmos feature usage patterns
+
+  - Add telemetry tracking for dbt docs plugin usage by @pankajkoti in #2240
+  - Add DAG run telemetry metrics for load mode, invocation, and render_config parameters by @pankajkoti in #2223
+  - Collect profile metrics for DAG runs by @pankajkastro in #2228
+  - Compress telemetry metadata to reduce serialized DAG size by @pankajkoti in #2252
+  - Skip storing telemetry metadata when emission is disabled by @pankajkoti in #2278
+
+Enhancements
+
+- Refactor: remove duplicate ``_construct_dest_file_path`` by @jx2lee in #2077
+- Hide telemetry metadata parameters from the Airflow trigger UI by @pankajkoti in #2247
+- Refactor ``DbtConsumerWatcherSensor`` for reusability by @tatiana in #2245
+- Restore plain text output when using ``ExecutionMode.WATCHER`` by @tiovader in #2241
 
 Bug Fixes
 
--  Fix running empty models or ephemeral nodes in ``ExecutionMode.WATCHER`` by @tatiana in #2279
+- Fix running empty models or ephemeral nodes in ``ExecutionMode.WATCHER`` by @tatiana in #2279
+- Improve watcher producer task priority in scheduling and the UI by @tatiana in #2237
+- Fix typos and formatting issues in documentation by @pankajkoti in #2259
+- Allow watcher producer retries without erroring by @tatiana in #2283
+- Fix ``TestBehavior.AFTER_ALL`` is missing project_name information when loading project using manifest file by @tuantran0910 in #2242
 
+Docs
+
+- Document newly added telemetry metrics in the privacy notice by @pankajkoti in #2249
+- Add compatibility policy document by @pankajkastro in #2251
+- Improve watcher documentation related to dbt threads by @tatiana in #2273
+- Fix link in watcher execution mode documentation by @jedcunningham in #2277
+- Update Apache Airflow minimum compatibility policy by @tatiana in #2285
+- Clarify Cosmos runtime support until "End of Basic Support" by @jedcunningham in #2286
+
+Others
+
+- Add dbt Core 1.11 to the test matrix by @tatiana in #2230
+- Update pre-commit hooks to the latest versions by @jedcunningham in #2289
+- Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274, and #2290
+- Dependabot updates by @dependabot in #2218, #2219, #2220, #2280, and #2284
 
 1.12.1 (2026-01-14)
 -------------------

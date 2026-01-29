@@ -19,7 +19,7 @@ from cosmos.profiles import DbtProfileConfigVars, PostgresUserPasswordProfileMap
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-execution_config = ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "jaffle_shop")
+execution_config = ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "altered_jaffle_shop")
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -47,11 +47,29 @@ with DAG(
 ):
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
+    # The selector `critical_path` only selects the `customers` model, which means we were lacking its upstream tasks.
+    # Without `stg_customers`, dbt will not be able to run the `customers` model
+    pre_condition = DbtTaskGroup(
+        group_id="pre_condition",
+        project_config=ProjectConfig(
+            manifest_path=DBT_ROOT_PATH / "altered_jaffle_shop" / "target" / "manifest.json",
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_MANIFEST,
+            select=["+customers"],
+            airflow_vars_to_purge_dbt_yaml_selectors_cache=["purge"],
+        ),
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
+
     # [START local_example]
     local_example = DbtTaskGroup(
         group_id="local_example",
         project_config=ProjectConfig(
-            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+            manifest_path=DBT_ROOT_PATH / "altered_jaffle_shop" / "target" / "manifest.json",
             project_name="jaffle_shop",
         ),
         profile_config=profile_config,
@@ -65,7 +83,7 @@ with DAG(
     aws_s3_example = DbtTaskGroup(
         group_id="aws_s3_example",
         project_config=ProjectConfig(
-            manifest_path="s3://cosmos-manifest-test/manifest.json",
+            manifest_path="s3://cosmos-manifest-test/manifest_with_selector.json",
             manifest_conn_id="aws_s3_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `aws_default` is used.
             project_name="jaffle_shop",
@@ -81,7 +99,7 @@ with DAG(
     gcp_gs_example = DbtTaskGroup(
         group_id="gcp_gs_example",
         project_config=ProjectConfig(
-            manifest_path="gs://cosmos_remote_target/manifest.json",
+            manifest_path="gs://cosmos_remote_target/manifest_with_selector.json",
             manifest_conn_id="gcp_gs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
             project_name="jaffle_shop",
@@ -97,7 +115,7 @@ with DAG(
     azure_abfs_example = DbtTaskGroup(
         group_id="azure_abfs_example",
         project_config=ProjectConfig(
-            manifest_path="abfs://cosmos-manifest-test/manifest.json",
+            manifest_path="abfs://cosmos-manifest-test/manifest_with_selector.json",
             manifest_conn_id="azure_abfs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
             project_name="jaffle_shop",
@@ -111,4 +129,4 @@ with DAG(
 
     post_dbt = EmptyOperator(task_id="post_dbt")
 
-    (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
+    (pre_dbt >> pre_condition >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)

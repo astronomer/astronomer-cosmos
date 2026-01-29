@@ -36,7 +36,7 @@ Bug Fixes
 Docs
 
 - Document newly added telemetry metrics in the privacy notice by @pankajkoti in #2249
-- Add compatibility policy document by @pankajkastro in #2251
+- Add compatibility policy document by @pankajastro in #2251
 - Improve watcher documentation related to dbt threads by @tatiana in #2273
 - Fix link in watcher execution mode documentation by @jedcunningham in #2277
 - Update Apache Airflow minimum compatibility policy by @tatiana in #2285

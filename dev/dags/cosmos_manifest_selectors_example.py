@@ -47,6 +47,24 @@ with DAG(
 ):
     pre_dbt = EmptyOperator(task_id="pre_dbt")
 
+    # The selector `critical_path` only selects the `customers` model, which means we were lacking its upstream tasks.
+    # Without `stg_customers`, dbt will not be able to run the `customers` model
+    pre_condition = DbtTaskGroup(
+        group_id="pre_condition",
+        project_config=ProjectConfig(
+            manifest_path=DBT_ROOT_PATH / "altered_jaffle_shop" / "target" / "manifest.json",
+            project_name="jaffle_shop",
+        ),
+        profile_config=profile_config,
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_MANIFEST,
+            select=["+customers"],
+            airflow_vars_to_purge_dbt_yaml_selectors_cache=["purge"],
+        ),
+        execution_config=execution_config,
+        operator_args={"install_deps": True},
+    )
+
     # [START local_example]
     local_example = DbtTaskGroup(
         group_id="local_example",
@@ -111,4 +129,4 @@ with DAG(
 
     post_dbt = EmptyOperator(task_id="post_dbt")
 
-    (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
+    (pre_dbt >> pre_condition >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)

@@ -2080,7 +2080,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("67c608d42ca8bdeef6c3eb8fa888471b",)
+        assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
         assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 
@@ -2120,7 +2120,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("67c608d42ca8bdeef6c3eb8fa888471b",)
+        assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
         assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 

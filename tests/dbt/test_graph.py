@@ -2174,7 +2174,47 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
         assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
-        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
+        assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
+
+
+@patch("cosmos.dbt.graph.datetime")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+    mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    graph.save_yaml_selectors_cache(selectors)
+    assert mock_variable_set.call_args[0][0] == "cosmos_cache__something"
+
+    cache_dict = mock_variable_set.call_args[0][1]
+
+    assert "raw_selectors_compressed" in cache_dict
+    assert "parsed_selectors_compressed" in cache_dict
+
+    raw_decoded = base64.b64decode(cache_dict["raw_selectors_compressed"].encode())
+    raw_decompressed = json.loads(zlib.decompress(raw_decoded).decode())
+    assert raw_decompressed == selectors.raw
+
+    parsed_decoded = base64.b64decode(cache_dict["parsed_selectors_compressed"].encode())
+    parsed_decompressed = json.loads(zlib.decompress(parsed_decoded).decode())
+    assert parsed_decompressed == selectors.parsed
+
+    assert cache_dict["last_modified"] == "2022-01-01T12:00:00"
+
+    version = cache_dict.get("version")
+    hash_dir, hash_selectors, hash_impl = version.split(",")
+
+    assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
+    assert hash_impl == "3ae7ccd90b387308920fa408907de75d"
+
+    if sys.platform == "darwin":
+        # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
+        assert hash_dir in ("67c608d42ca8bdeef6c3eb8fa888471b",)
+    else:
+        assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
 
 
 @patch("cosmos.dbt.graph.datetime")

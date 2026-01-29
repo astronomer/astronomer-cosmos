@@ -1556,6 +1556,41 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     assert expected_nodes == nodes
 
 
+def test_parse_dbt_ls_output_skips_dbt_loom_external_nodes(caplog):
+    """Test that parse_dbt_ls_output skips external nodes (e.g., from dbt-loom) that have no file path."""
+    # Simulates dbt ls output with:
+    # 1. A local model with file path
+    # 2. A dbt-loom injected model with empty file path
+    local_model = '{"resource_type": "model", "name": "local_model", "package_name": "my_project", "original_file_path": "models/local_model.sql", "unique_id": "model.my_project.local_model", "tags": [], "config": {}}'
+    external_model = '{"resource_type": "model", "name": "external_model", "package_name": "upstream", "original_file_path": "", "unique_id": "model.upstream.external_model", "tags": [], "config": {}}'
+
+    dbt_ls_output = f"{local_model}\n{external_model}"
+
+    with caplog.at_level(logging.DEBUG):
+        nodes = parse_dbt_ls_output(Path("my_project"), dbt_ls_output)
+
+    # Only local model should be parsed, external nodes should be skipped
+    assert len(nodes) == 1
+    assert "model.my_project.local_model" in nodes
+    assert "model.upstream.external_model" not in nodes
+
+    # Verify skip messages were logged
+    assert "Skipping model `model.upstream.external_model` because it has no file path" in caplog.text
+
+
+def test_parse_dbt_ls_output_does_not_skip_non_model_without_path(caplog):
+    """Test that non-model resource types without file paths are not skipped (they would fail later with a clearer error)."""
+    # This tests that only models are skipped - other resource types would fail during DbtNode creation
+    # which is the expected behavior (fail fast with a clear error)
+    source_without_path = '{"resource_type": "source", "name": "my_source", "package_name": "my_project", "original_file_path": "", "unique_id": "source.my_project.my_source", "tags": [], "config": {}}'
+
+    with caplog.at_level(logging.DEBUG):
+        _ = parse_dbt_ls_output(Path("my_project"), source_without_path)
+
+    # Source without path should NOT be skipped by the dbt-loom node check
+    assert "Skipping model" not in caplog.text
+
+
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")

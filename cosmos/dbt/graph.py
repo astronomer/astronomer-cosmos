@@ -317,12 +317,13 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
 
             # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
             # External nodes (e.g., from dbt-loom) may not have a file path - skip them
-            # Only skip if it looks like a valid node (has unique_id) but no file path
+            # dbt-loom injects upstream models with resource_type="model" and empty file path
             # Check for both None and empty string since dbt-loom may set either
             node_file_path = node_dict.get("original_file_path") or node_dict.get("path")
-            if not node_file_path and node_dict.get("unique_id"):
+            resource_type = node_dict.get("resource_type")
+            if not node_file_path and resource_type == "model" and node_dict.get("unique_id"):
                 logger.debug(
-                    "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                    "Skipping model `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
                     node_dict.get("unique_id"),
                 )
                 continue

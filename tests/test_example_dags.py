@@ -22,7 +22,12 @@ DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 
 MIN_VER_DAG_FILE: dict[str, list[str]] = {
-    "2.8": ["cosmos_manifest_example.py", "simple_dag_async.py", "cosmos_callback_dag.py"],
+    "2.8": [
+        "cosmos_manifest_example.py",
+        "simple_dag_async.py",
+        "cosmos_callback_dag.py",
+        "cosmos_manifest_selectors_example.py",
+    ],
 }
 
 IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubernetes.py"]
@@ -70,6 +75,9 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
         if AIRFLOW_VERSION < Version("2.8.0"):
             file.writelines("example_cosmos_dbt_build.py\n")
+
+        if AIRFLOW_VERSION >= Version("3.0.0"):
+            file.writelines("example_cosmos_cleanup_dag.py\n")
 
         # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
         # https://github.com/apache/airflow/issues/51566

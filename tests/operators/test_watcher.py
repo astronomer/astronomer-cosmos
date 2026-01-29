@@ -579,6 +579,22 @@ class TestStoreDbtStatusFromLog:
         # Verify the timestamp is formatted as HH:MM:SS
         assert any("13:16:05" in record.message and test_msg in record.message for record in caplog.records)
 
+    def test_store_dbt_resource_status_from_log_invalid_timestamp_falls_back_to_raw(self, caplog):
+        """Test that invalid timestamps fall back to raw value instead of raising an error."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "Running with dbt=1.10.11"
+        # Looks like a valid ISO timestamp but has invalid month (13) - triggers ValueError in fromisoformat()
+        invalid_ts = "2025-13-29T13:16:05.123456Z"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": invalid_ts}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Verify the raw timestamp is used when parsing fails
+        assert any(invalid_ts in record.message and test_msg in record.message for record in caplog.records)
+
     def test_process_log_line_callable_integration_with_subprocess_pattern(self):
         """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs)."""
         op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)

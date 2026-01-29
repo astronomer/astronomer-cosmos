@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
@@ -812,6 +811,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
+        from airflow import DAG
+
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
             raise AirflowCompatibilityError(

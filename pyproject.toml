@@ -125,6 +125,9 @@ watcher_retry_policy = 'cosmos.cluster_policy.watcher_retry_policy'
 [project.entry-points.apache_airflow_provider]
 provider_info = "cosmos.provider_info:get_provider_info"
 
+[project.entry-points.'airflow.policy']
+watcher_retry_policy = 'cosmos.plugin.cluster_policy'
+
 [project.entry-points."airflow.plugins"]
 cosmos = "cosmos.plugin:CosmosPlugin"
 

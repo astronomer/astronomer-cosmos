@@ -2082,14 +2082,14 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
         assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
-        assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
+        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
 
 
 @patch("cosmos.dbt.graph.datetime")
 @patch("cosmos.dbt.graph.Variable.set")
-def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_altered_dbt_project_dir):
     mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
-    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_altered_dbt_project_dir))
     selectors = YamlSelectors(
         {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
         {"select": ["tag:tag_a"], "exclude": None},
@@ -2120,9 +2120,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
+        assert hash_dir in ("2ef3979084ba9b8cc0f47213096f3be6",)
     else:
-        assert hash_dir == "fbe70f1477c038da4607f9efb7a8a4d8"
+        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
 
 
 @pytest.mark.integration

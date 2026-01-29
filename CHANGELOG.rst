@@ -52,8 +52,8 @@ Others
 - Add integration tests using InvocationMode.SUBPROCESS and validate output by @tatiana in #2287
 - Fix main branch failing tests by @tatiana in #2296
 - Update pre-commit hooks to the latest versions by @jedcunningham in #2289
-- Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274, and #2290
-- Dependabot updates by @dependabot in #2218, #2219, #2220, #2280, and #2284
+- Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274 and #2290
+- Dependabot updates by @dependabot in #2218, #2219, #2220, #2280 and #2284
 
 1.12.1 (2026-01-14)
 -------------------

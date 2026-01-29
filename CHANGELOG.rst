@@ -14,10 +14,10 @@ Features
 
   - Add telemetry tracking for dbt docs plugin usage by @pankajkoti in #2240
   - Add DAG run telemetry metrics for load mode, invocation, and render_config parameters by @pankajkoti in #2223
-  - Collect profile metrics for DAG runs by @pankajkastro in #2228
+  - Collect profile metrics for DAG runs by @pankajastro in #2228
   - Compress telemetry metadata to reduce serialized DAG size by @pankajkoti in #2252
   - Skip storing telemetry metadata when emission is disabled by @pankajkoti in #2278
-
+- Support cross-referencing models across dbt projects using dbt-loom by @pankajkoti in #2271
 Enhancements
 
 - Refactor: remove duplicate ``_construct_dest_file_path`` by @jx2lee in #2077
@@ -41,10 +41,12 @@ Docs
 - Fix link in watcher execution mode documentation by @jedcunningham in #2277
 - Update Apache Airflow minimum compatibility policy by @tatiana in #2285
 - Clarify Cosmos runtime support until "End of Basic Support" by @jedcunningham in #2286
+- Update watcher docs by @tatiana in #2298
 
 Others
 
 - Add dbt Core 1.11 to the test matrix by @tatiana in #2230
+- Add integration tests using InvocationMode.SUBPROCESS and validate output by @tatiana in #2287
 - Update pre-commit hooks to the latest versions by @jedcunningham in #2289
 - Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274, and #2290
 - Dependabot updates by @dependabot in #2218, #2219, #2220, #2280, and #2284

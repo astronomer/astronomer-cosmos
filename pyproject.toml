@@ -36,7 +36,7 @@ dependencies = [
     "packaging>=22.0",
     "pydantic>=1.10.0",
     "virtualenv",
-    "openlineage-integration-common"  # Without this dependency, Airflow datasets/assets don't work
+    "openlineage-integration-common",  # Without this dependency, Airflow datasets/assets don't work
 ]
 
 [project.optional-dependencies]
@@ -67,6 +67,7 @@ dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
+dbt-loom = ["dbt-loom"]
 dbt-mysql = ["dbt-mysql"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]

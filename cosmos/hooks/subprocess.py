@@ -18,6 +18,10 @@ try:
 except ImportError:
     from airflow.hooks.base import BaseHook
 
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
+
 
 class FullOutputSubprocessResult(NamedTuple):
     exit_code: int
@@ -60,7 +64,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                                     ``output``: the last line from stderr or stdout
                                     ``full_output``: all lines from stderr or stdout.
         """
-        self.log.info("Tmp dir root location: \n %s", gettempdir())
+        logger.info("Tmp dir root location: \n %s", gettempdir())
         log_lines = []
         with contextlib.ExitStack() as stack:
             if cwd is None:
@@ -73,7 +77,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                         signal.signal(getattr(signal, sig), signal.SIG_DFL)
                 os.setsid()
 
-            self.log.info("Running command: %s", command)
+            logger.info("Running command: %s", command)
 
             self.sub_process = Popen(
                 command,
@@ -91,7 +95,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
             if self.sub_process is None:
                 raise RuntimeError("The subprocess should be created here and is None!")
 
-            self.log.info("Command output:")
+            logger.info("Command output:")
 
             last_line: str = ""
             assert self.sub_process.stdout is not None
@@ -102,23 +106,23 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 if process_log_line:
                     process_log_line(line, kwargs)
                 else:
-                    self.log.info("%s", line)
+                    logger.info("%s", line)
 
             # Wait until process completes
             return_code = self.sub_process.wait()
 
-            self.log.info("Command exited with return code %s", return_code)
+            logger.info("Command exited with return code %s", return_code)
 
         return FullOutputSubprocessResult(exit_code=return_code, output=last_line, full_output=log_lines)
 
     def send_sigterm(self) -> None:
         """Sends SIGTERM signal to ``self.sub_process`` if one exists."""
-        self.log.info("Sending SIGTERM signal to process group")
+        logger.info("Sending SIGTERM signal to process group")
         if self.sub_process and hasattr(self.sub_process, "pid"):
             os.killpg(os.getpgid(self.sub_process.pid), signal.SIGTERM)
 
     def send_sigint(self) -> None:
         """Sends SIGINT signal to ``self.sub_process`` if one exists."""
-        self.log.info("Sending SIGINT signal to process group")
+        logger.info("Sending SIGINT signal to process group")
         if self.sub_process and hasattr(self.sub_process, "pid"):
             os.killpg(os.getpgid(self.sub_process.pid), signal.SIGINT)

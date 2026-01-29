@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import timedelta
 from typing import Any
 
@@ -50,6 +51,13 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
         context = extra_kwargs.get("context")
         assert context is not None  # Make MyPy happy
         safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+
+    # Additionally, log the message from dbt logs
+    log_info = log_line.get("info", {})
+    msg = log_info.get("msg")
+    level = log_info.get("level", "INFO").upper()
+    if msg is not None:
+        logger.log(getattr(logging, level, logging.INFO), msg)
 
 
 class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]

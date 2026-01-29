@@ -65,7 +65,7 @@ with DAG(
     aws_s3_example = DbtTaskGroup(
         group_id="aws_s3_example",
         project_config=ProjectConfig(
-            manifest_path="s3://cosmos-manifest-test/manifest.json",
+            manifest_path="s3://cosmos-manifest-test/manifest_with_selector.json",
             manifest_conn_id="aws_s3_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `aws_default` is used.
             project_name="jaffle_shop",
@@ -81,7 +81,7 @@ with DAG(
     gcp_gs_example = DbtTaskGroup(
         group_id="gcp_gs_example",
         project_config=ProjectConfig(
-            manifest_path="gs://cosmos_remote_target/manifest.json",
+            manifest_path="gs://cosmos_remote_target/manifest_with_selector.json",
             manifest_conn_id="gcp_gs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `google_cloud_default` is used.
             project_name="jaffle_shop",
@@ -97,7 +97,7 @@ with DAG(
     azure_abfs_example = DbtTaskGroup(
         group_id="azure_abfs_example",
         project_config=ProjectConfig(
-            manifest_path="abfs://cosmos-manifest-test/manifest.json",
+            manifest_path="abfs://cosmos-manifest-test/manifest_with_selector.json",
             manifest_conn_id="azure_abfs_conn",
             # `manifest_conn_id` is optional. If not provided, the default connection ID `wasb_default` is used.
             project_name="jaffle_shop",

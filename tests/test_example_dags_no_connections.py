@@ -17,7 +17,12 @@ MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.8": ["cosmos_manifest_example.py"],
 }
 
-IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubernetes.py"]
+IGNORED_DAG_FILES = [
+    "performance_dag.py",
+    "jaffle_shop_kubernetes.py",
+    "jaffle_shop_watcher_kubernetes.py",
+    "cosmos_manifest_selectors_example.py",
+]
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {

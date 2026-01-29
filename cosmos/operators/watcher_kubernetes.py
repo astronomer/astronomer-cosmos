@@ -87,7 +87,8 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
 
-        super().__init__(task_id=task_id, *args, callbacks=WatcherKubernetesCallback, **kwargs)
+        kwargs["callbacks"] = kwargs.get("callbacks", []) + [WatcherKubernetesCallback]
+        super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
     @cached_property

@@ -1,0 +1,76 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Staging layer for customer data. Cleans and standardizes raw customer information."
+    access: public
+    config:
+      contract:
+        enforced: false
+    columns:
+      - name: customer_id
+        description: "Unique identifier for each customer"
+        tests:
+          - unique
+          - not_null
+      - name: full_name
+        description: "Customer's full name (first + last)"
+      - name: email
+        description: "Customer's email address"
+        tests:
+          - unique
+      - name: segment
+        description: "Customer segment (Enterprise, SMB, Startup)"
+      - name: country
+        description: "Customer's country"
+
+  - name: stg_orders
+    description: "Staging layer for order data. Contains order header information."
+    access: public
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Foreign key to customer"
+        tests:
+          - not_null
+      - name: status
+        description: "Order status (completed, pending, cancelled)"
+        tests:
+          - accepted_values:
+              values: ['completed', 'pending', 'cancelled']
+
+  - name: stg_order_items
+    description: "Staging layer for order line items. Contains individual items within each order."
+    access: public
+    columns:
+      - name: order_item_id
+        description: "Unique identifier for each line item"
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: "Foreign key to order"
+      - name: product_id
+        description: "Foreign key to product"
+      - name: line_total
+        description: "Calculated total for this line (quantity * unit_price)"
+
+  - name: stg_products
+    description: "Staging layer for product data. Contains product catalog information."
+    access: public
+    columns:
+      - name: product_id
+        description: "Unique identifier for each product"
+        tests:
+          - unique
+          - not_null
+      - name: product_name
+        description: "Name of the product"
+      - name: category
+        description: "Product category"
+      - name: margin
+        description: "Profit margin (list_price - cost_price)"

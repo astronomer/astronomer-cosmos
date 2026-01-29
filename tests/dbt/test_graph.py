@@ -298,6 +298,63 @@ def test_load_via_manifest_with_ms_windows_manifest_and_star_selector():
     assert len(dbt_graph.filtered_nodes) == 1
 
 
+def test_load_via_manifest_skips_dbt_loom_external_nodes(tmp_path, caplog):
+    """Test that nodes without original_file_path (e.g., dbt-loom external refs) are skipped."""
+    # Create a manifest with one normal node and one external node (no original_file_path)
+    manifest_content = {
+        "nodes": {
+            "model.my_project.local_model": {
+                "resource_type": "model",
+                "original_file_path": "models/local_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+            "model.upstream_project.external_model": {
+                "resource_type": "model",
+                "original_file_path": None,  # dbt-loom external node has no file path
+                "package_name": "upstream_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+
+    project_path = tmp_path / "my_project"
+    project_path.mkdir()
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        dbt_graph.load_from_dbt_manifest()
+
+    # Only the local model should be loaded, external node should be skipped
+    assert len(dbt_graph.nodes) == 1
+    assert "model.my_project.local_model" in dbt_graph.nodes
+    assert "model.upstream_project.external_model" not in dbt_graph.nodes
+
+    # Verify the skip message was logged
+    assert "Skipping node `model.upstream_project.external_model` because it has no file path" in caplog.text
+
+
 @pytest.mark.parametrize(
     "project_name,manifest_filepath,model_filepath",
     [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
@@ -1497,6 +1554,41 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)
 
     assert expected_nodes == nodes
+
+
+def test_parse_dbt_ls_output_skips_dbt_loom_external_nodes(caplog):
+    """Test that parse_dbt_ls_output skips external nodes (e.g., from dbt-loom) that have no file path."""
+    # Simulates dbt ls output with:
+    # 1. A local model with file path
+    # 2. A dbt-loom injected model with empty file path
+    local_model = '{"resource_type": "model", "name": "local_model", "package_name": "my_project", "original_file_path": "models/local_model.sql", "unique_id": "model.my_project.local_model", "tags": [], "config": {}}'
+    external_model = '{"resource_type": "model", "name": "external_model", "package_name": "upstream", "original_file_path": "", "unique_id": "model.upstream.external_model", "tags": [], "config": {}}'
+
+    dbt_ls_output = f"{local_model}\n{external_model}"
+
+    with caplog.at_level(logging.DEBUG):
+        nodes = parse_dbt_ls_output(Path("my_project"), dbt_ls_output)
+
+    # Only local model should be parsed, external nodes should be skipped
+    assert len(nodes) == 1
+    assert "model.my_project.local_model" in nodes
+    assert "model.upstream.external_model" not in nodes
+
+    # Verify skip messages were logged
+    assert "Skipping model `model.upstream.external_model` because it has no file path" in caplog.text
+
+
+def test_parse_dbt_ls_output_does_not_skip_non_model_without_path(caplog):
+    """Test that non-model resource types without file paths are not skipped (they would fail later with a clearer error)."""
+    # This tests that only models are skipped - other resource types would fail during DbtNode creation
+    # which is the expected behavior (fail fast with a clear error)
+    source_without_path = '{"resource_type": "source", "name": "my_source", "package_name": "my_project", "original_file_path": "", "unique_id": "source.my_project.my_source", "tags": [], "config": {}}'
+
+    with caplog.at_level(logging.DEBUG):
+        _ = parse_dbt_ls_output(Path("my_project"), source_without_path)
+
+    # Source without path should NOT be skipped by the dbt-loom node check
+    assert "Skipping model" not in caplog.text
 
 
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)

@@ -185,9 +185,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         )
 
         try:
-            if not self.invocation_mode:
-                self._discover_invocation_mode()
-
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
             logger.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
 

@@ -93,3 +93,6 @@ else
     echo "Version does not match. Expected: $desired_version, but got: $actual_version"
     exit 1
 fi
+
+# Install dbt-loom for cross-project references
+uv pip install "dbt-loom"

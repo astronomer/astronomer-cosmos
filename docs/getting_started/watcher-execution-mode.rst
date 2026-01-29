@@ -9,7 +9,7 @@ Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime *
 
 - The amount of dbt ``threads`` set either via the dbt profile configuration or the dbt ``--threads`` flag
 - The topology of the dbt pipeline
-- The ``poke_interval`` and ``timeout`` settings of the ``DbtConsumerWatcherSensor`` operator, which determines the frequency and duration of the sensor's polling.
+- The ``poke_interval`` and ``timeout`` settings of the ``DbtConsumerWatcherSensor`` operator, which determine the frequency and duration of the sensor's polling.
 
 -------------------------------------------------------------------------------
 

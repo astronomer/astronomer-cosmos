@@ -19,7 +19,7 @@ from cosmos.profiles import DbtProfileConfigVars, PostgresUserPasswordProfileMap
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
-execution_config = ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "jaffle_shop")
+execution_config = ExecutionConfig(dbt_project_path=DBT_ROOT_PATH / "altered_jaffle_shop")
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -51,7 +51,7 @@ with DAG(
     local_example = DbtTaskGroup(
         group_id="local_example",
         project_config=ProjectConfig(
-            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+            manifest_path=DBT_ROOT_PATH / "altered_jaffle_shop" / "target" / "manifest.json",
             project_name="jaffle_shop",
         ),
         profile_config=profile_config,

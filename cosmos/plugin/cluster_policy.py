@@ -1,5 +1,6 @@
 from logging import getLogger
 
+from airflow.configuration import conf
 from airflow.models.taskinstance import TaskInstance
 from airflow.policies import hookimpl
 
@@ -28,11 +29,29 @@ def _is_watcher_sensor(task_instance: TaskInstance) -> bool:
 
 @hookimpl
 def task_instance_mutation_hook(task_instance: TaskInstance) -> None:
-
-    # from airflow.configuration import conf
-
-    # watcher_retry_queue = conf.get("cosmos", "watcher_retry_queue", fallback=None)
-
-    if task_instance.try_number and _is_watcher_sensor(task_instance):
-        if task_instance.try_number >= 1:
-            task_instance.queue = "test"
+    """
+    Set custom queue for Cosmos tasks on retry.
+    
+    Configure the retry queue via:
+    [cosmos]
+    retry_queue = <queue_name>
+    """
+    # Only apply on retries (try_number >= 2 means it's a retry attempt)
+    if not task_instance.try_number or task_instance.try_number < 2:
+        return
+    
+    if not _is_watcher_sensor(task_instance):
+        return
+    
+    retry_queue = conf.get("cosmos", "watcher_retry_queue", fallback=None)
+    if retry_queue:
+        log.info(
+            f"Setting retry queue '{retry_queue}' for Cosmos task {task_instance.task_id} "
+            f"(try_number: {task_instance.try_number})",
+        )
+        task_instance.queue = retry_queue
+    else:
+        log.info(
+            f"No retry_queue configured for Cosmos task {task_instance.task_id}. "
+            "Set [cosmos] retry_queue in airflow.cfg to enable custom retry queue.",
+        )

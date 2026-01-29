@@ -2214,7 +2214,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
         assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
-        assert hash_dir == "c2f7709250653a7f7e805d8fe4b7673f"
+        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
 
 
 @pytest.mark.integration

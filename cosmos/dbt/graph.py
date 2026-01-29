@@ -315,14 +315,26 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore
             )
 
+            # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
+            # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+            # dbt-loom injects upstream models with resource_type="model" and empty file path
+            # Check for both None and empty string since dbt-loom may set either
+            node_file_path = node_dict.get("original_file_path") or node_dict.get("path")
+            resource_type = node_dict.get("resource_type")
+            if not node_file_path and resource_type == "model" and node_dict.get("unique_id"):
+                logger.debug(
+                    "Skipping model `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                    node_dict.get("unique_id"),
+                )
+                continue
+
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
-                    file_path=base_path / (node_dict["original_file_path"] or node_dict.get("path")),
+                    file_path=base_path / node_file_path,  # type: ignore[arg-type]
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(
@@ -331,7 +343,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         else False
                     ),
                 )
-            except KeyError:
+            except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
             else:
                 nodes[node.unique_id] = node
@@ -1119,12 +1131,22 @@ class DbtGraph:
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
             for unique_id, node_dict in resources.items():
+                # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+                # Check for both None and empty string since dbt-loom may set either
+                original_file_path = node_dict.get("original_file_path")
+                if not original_file_path:
+                    logger.debug(
+                        "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                        unique_id,
+                    )
+                    continue
+
                 node = DbtNode(
                     unique_id=unique_id,
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
+                    file_path=self.execution_config.project_path / _normalize_path(original_file_path),
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(

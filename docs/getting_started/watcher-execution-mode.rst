@@ -5,10 +5,11 @@ Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Executi
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
 
-Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**. Since this execution mode improves the performance by leveraging `dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_, the performance gains will depend on two major factors:
+Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**. Since this execution mode improves the performance by leveraging `dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ and Airflow deferrable sensors, the performance gains will depend on three major factors:
 
-- The amount of ``threads`` set either via the dbt profile configuration or the dbt ``--threads`` flag
-- The topology of the dbt pipeline
+- The amount of dbt ``threads`` set either via the dbt profile configuration or the dbt ``--threads`` flag;
+- The topology of the dbt pipeline; and,
+- The ``poke_interval`` and ``timeout`` settings of the ``DbtConsumerWatcherSensor`` operator, which determines the frequency and duration of the sensor's polling.
 
 -------------------------------------------------------------------------------
 
@@ -245,31 +246,30 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
--------------------------------------------------------------------------------
-
-Known Limitations
--------------------
-
-These limitations will be revisited as the feature matures.
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``ExecutionMode.WATCHER`` works better when dbt and Airflow are installed in the same Python virtual environment, since it uses dbt `callback features <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_.
-In case that is not possible, the producer task will only trigger the consumer tasks by the end of the execution, after it generated the ``run_results.json`` file.
+Since Cosmos 1.12.0, the ``ExecutionMode.WATCHER`` works well regardless if dbt and Airflow are installed in the same Python virtual environment or not.
 
-We plan to improve this behaviour in the future by leveraging `dbt structured logging <https://docs.getdbt.com/reference/events-logging#structured-logging>`_.
+When dbt and Airflow are installed in the same Python virtual environment, the ``ExecutionMode.WATCHER`` uses dbt `callback features <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_.
 
-In the meantime, assuming you have Cosmos installed in ``requirements.txt`` file, you would modify it to also include your dbt adapters.
+When dbt and Airflow are not installed in the same Python virtual environment, the ``ExecutionMode.WATCHER`` consumes the dbt `structured logging <https://docs.getdbt.com/reference/events-logging#structured-logging>`_ to update the consumer tasks.
 
-Example of ``requirements.txt`` file:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Synchronous versus Asynchronous sensor execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: text
+In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
 
-    astronomer-cosmos==1.11.0
-    dbt-bigquery==1.10
+Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
+`deferrable (asynchronous) execution <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`_. Deferrable execution frees up the Airflow worker slot, while task status monitoring is handled by the Airflow triggerer component,
+which increases overall task throughput. By default, the sensor now runs in deferrable mode.
 
+-------------------------------------------------------------------------------
+
+Known Limitations
+-------------------
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Producer task implementation
@@ -278,6 +278,7 @@ Producer task implementation
 The producer task is implemented as a ``DbtProducerWatcherOperator`` operator and it currently relies on dbt being installed alongside the Airflow deployment, similar to the ``ExecutionMode.LOCAL`` implementation.
 
 There are discussions about allowing this node to be implemented as the ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.KUBERNETES`` execution modes, so that there is a higher isolation between dbt and Airflow dependencies.
+
 
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Individual dbt Operators
@@ -380,21 +381,10 @@ The consequence is that tasks may take longer to be updated if they are not sens
 
 We plan to review this behaviour and alternative approaches in the future.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Synchronous sensor execution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Asynchronous sensor execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
-`deferrable (asynchronous) execution <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`_. Deferrable execution frees up the Airflow worker slot, while task status monitoring is handled by the Airflow triggerer component,
-which increases overall task throughput. By default, the sensor now runs in deferrable mode.
-
-**Limitations:**
 
 - Deferrable execution is currently supported only for dbt models, seeds and snapshots.
 - Deferrable execution applies only to the first task attempt (try number 1). For subsequent retries, the sensor falls back to synchronous execution.
@@ -431,8 +421,6 @@ Troubleshooting
 
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
 Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
-
-
 
 
 Summary

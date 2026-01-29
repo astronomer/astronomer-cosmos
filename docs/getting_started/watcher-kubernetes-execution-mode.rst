@@ -101,7 +101,7 @@ Please ensure you have a compatible version installed:
 Producer watcher does not support deferrable mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Similar to ``ExecutionMode.WATCHER``, the ``ExecutionMode.WATCHER_KUBERNETES`` producer task, ``DbtProducerWatcherKubernetesSensor``,runs using synchronous mode (``deferrable=False``).
+Similar to ``ExecutionMode.WATCHER``, the ``ExecutionMode.WATCHER_KUBERNETES`` producer task, ``DbtProducerWatcherKubernetesSensor``, runs using synchronous mode (``deferrable=False``).
 
 This was a limitation in the Airflow kubernetes provider, which was fixed in `this PR <https://github.com/apache/airflow/pull/58684>`_, and we'll be updating Cosmos once it is released.
 

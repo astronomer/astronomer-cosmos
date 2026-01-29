@@ -18,6 +18,8 @@ Features
   - Compress telemetry metadata to reduce serialized DAG size by @pankajkoti in #2252
   - Skip storing telemetry metadata when emission is disabled by @pankajkoti in #2278
 - Support cross-referencing models across dbt projects using dbt-loom by @pankajkoti in #2271
+- Support use of YAML selectors when using ``LoadMode.DBT_MANIFEST`` by @YourRoyalLinus in #2261
+
 Enhancements
 
 - Refactor: remove duplicate ``_construct_dest_file_path`` by @jx2lee in #2077
@@ -32,6 +34,7 @@ Bug Fixes
 - Fix typos and formatting issues in documentation by @pankajkoti in #2259
 - Allow watcher producer retries without erroring by @tatiana in #2283
 - Fix ``TestBehavior.AFTER_ALL`` is missing project_name information when loading project using manifest file by @tuantran0910 in #2242
+- Fix duplicate log lines in watcher subprocess execution and format timestamps by @pankajkoti in #2301
 
 Docs
 
@@ -47,6 +50,7 @@ Others
 
 - Add dbt Core 1.11 to the test matrix by @tatiana in #2230
 - Add integration tests using InvocationMode.SUBPROCESS and validate output by @tatiana in #2287
+- Fix main branch failing tests by @tatiana in #2296
 - Update pre-commit hooks to the latest versions by @jedcunningham in #2289
 - Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274, and #2290
 - Dependabot updates by @dependabot in #2218, #2219, #2220, #2280, and #2284

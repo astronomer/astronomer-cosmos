@@ -10,13 +10,6 @@ Features
 - Leverage Airflow ``::group::`` to group logs associated with DAG parsing by @tatiana in #2235
 - Add support for StarRocks profile mapping by @kurkim0661 in #2256
 - Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
-- Add Scarf metrics to understand Cosmos feature usage patterns
-
-  - Add telemetry tracking for dbt docs plugin usage by @pankajkoti in #2240
-  - Add DAG run telemetry metrics for load mode, invocation, and render_config parameters by @pankajkoti in #2223
-  - Collect profile metrics for DAG runs by @pankajastro in #2228
-  - Compress telemetry metadata to reduce serialized DAG size by @pankajkoti in #2252
-  - Skip storing telemetry metadata when emission is disabled by @pankajkoti in #2278
 - Support cross-referencing models across dbt projects using dbt-loom by @pankajkoti in #2271
 - Support use of YAML selectors when using ``LoadMode.DBT_MANIFEST`` by @YourRoyalLinus in #2261
 
@@ -56,6 +49,13 @@ Others
 - Update pre-commit hooks to the latest versions by @jedcunningham in #2289
 - Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274 and #2290
 - Dependabot updates by @dependabot in #2218, #2219, #2220, #2280 and #2284
+- Add Scarf metrics to understand Cosmos feature usage patterns
+
+  - Add telemetry tracking for dbt docs plugin usage by @pankajkoti in #2240
+  - Add DAG run telemetry metrics for load mode, invocation, and render_config parameters by @pankajkoti in #2223
+  - Collect profile metrics for DAG runs by @pankajastro in #2228
+  - Compress telemetry metadata to reduce serialized DAG size by @pankajkoti in #2252
+  - Skip storing telemetry metadata when emission is disabled by @pankajkoti in #2278
 
 1.12.1 (2026-01-14)
 -------------------

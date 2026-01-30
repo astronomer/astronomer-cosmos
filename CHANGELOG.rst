@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.13.0a5 (2026-01-30)
+1.13.0 (2026-01-30)
 ---------------------
 
 Features
@@ -39,6 +39,7 @@ Docs
 * Update Apache Airflow minimum compatibility policy by @tatiana in #2285
 * Clarify Cosmos runtime support until "End of Basic Support" by @jedcunningham in #2286
 * Update watcher docs by @tatiana in #2298
+* Update watcher kubernetes documentation by @tatiana in #2306
 
 Others
 

@@ -11,6 +11,7 @@ Features
 * Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use the watcher with ``KubernetesPodOperator`` by @tatiana in #2207
 * Add support for StarRocks profile mapping by @kurkim0661 in #2256
 * Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
+* Support defining custom callbacks alongside the ``WATCHER_KUBERNETES`` callback by @johnhoran in #2307
 
 Enhancements
 

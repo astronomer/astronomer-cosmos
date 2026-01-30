@@ -101,7 +101,7 @@ Please ensure you have a compatible version installed:
 
     pip install "apache-airflow-providers-cncf-kubernetes>10.7.0"
 
-We successfully tested against the most recent release of the provider (`1.12.2 <https://pypi.org/project/apache-airflow-providers-cncf-kubernetes/10.12.2/>`_).
+We successfully tested against the most recent release of the provider (`10.12.2 <https://pypi.org/project/apache-airflow-providers-cncf-kubernetes/10.12.2/>`_).
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Support for KPO deferrable mode

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from airflow.exceptions import AirflowException
@@ -40,24 +40,37 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
-    node_info = log_line.get("data", {}).get("node_info", {})
-    node_status = node_info.get("node_status")
-    unique_id = node_info.get("unique_id")
+    else:
+        logger.debug("Log line: %s", log_line)
+        node_info = log_line.get("data", {}).get("node_info", {})
+        node_status = node_info.get("node_status")
+        unique_id = node_info.get("unique_id")
 
-    logger.debug("Model: %s is in %s state", unique_id, node_status)
+        logger.debug("Model: %s is in %s state", unique_id, node_status)
 
-    # TODO: Handle and store all possible node statuses, not just the current success and failed
-    if node_status in ["success", "failed"]:
-        context = extra_kwargs.get("context")
-        assert context is not None  # Make MyPy happy
-        safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+        # TODO: Handle and store all possible node statuses, not just the current success and failed
+        if node_status in ["success", "failed"]:
+            context = extra_kwargs.get("context")
+            assert context is not None  # Make MyPy happy
+            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})
     msg = log_info.get("msg")
     level = log_info.get("level", "INFO").upper()
+    ts = log_info.get("ts")
     if msg is not None:
-        logger.log(getattr(logging, level, logging.INFO), msg)
+        if ts:
+            # Format timestamp to match dbt runner format (HH:MM:SS)
+            try:
+                # Parse ISO format timestamp (e.g., "2025-01-29T13:16:05.123456Z")
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                formatted_ts = dt.strftime("%H:%M:%S")
+            except (ValueError, AttributeError):
+                formatted_ts = ts
+            logger.log(getattr(logging, level, logging.INFO), "%s  %s", formatted_ts, msg)
+        else:
+            logger.log(getattr(logging, level, logging.INFO), msg)
 
 
 class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]

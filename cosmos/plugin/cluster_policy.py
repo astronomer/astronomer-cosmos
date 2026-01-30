@@ -1,11 +1,12 @@
 from logging import getLogger
-from packaging.version import Version
 
 from airflow.models.taskinstance import TaskInstance
 from airflow.policies import hookimpl
-from cosmos.settings import watcher_retry_queue
+from packaging.version import Version
+
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.operators._watcher.base import BaseConsumerSensor
+from cosmos.settings import watcher_retry_queue
 
 log = getLogger(__name__)
 
@@ -29,7 +30,7 @@ def task_instance_mutation_hook(task_instance: TaskInstance) -> None:
 
     # In Airflow 3.x the task_instance_mutation_hook try_number starts at None or 0
     # in Airflow 2.x it starts at 1
-    if AIRFLOW_VERSION < Version("3.0.0"):
+    if AIRFLOW_VERSION >= Version("3.0.0"):
         first_try_number = 1
     else:
         first_try_number = 2

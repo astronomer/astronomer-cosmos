@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
@@ -33,6 +33,7 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     context = extra_kwargs.get("context")
     assert context is not None  # Make MyPy happy
     store_dbt_resource_status_to_xcom(line, context["ti"])
+
 
 def store_dbt_resource_status_to_xcom(line: str, task_instance: "TaskInstance") -> None:
     """

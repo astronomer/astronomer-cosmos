@@ -38,6 +38,12 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS``
 
+`enable_cache_dbt_yaml_selectors`_:
+    Enable or disable caching of the YAML selectors in case using ``LoadMode.DBT_MANIFEST`` with ``RenderConfig.selector`` in an Airflow Variable.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS``
+
 .. _enable_cache_partial_parse:
 
 `enable_cache_partial_parse`_:
@@ -248,7 +254,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
         :start-after: [START cosmos_explicit_imports]
         :end-before: [END cosmos_explicit_imports]
 
-    as opposed to the following approach you might be have when this option is disabled (default):
+    as opposed to the following approach you might have when this option is disabled (default):
 
     .. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
         :language: python
@@ -268,7 +274,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Environment Variable: ``AIRFLOW__OPENLINEAGE__NAMESPACE``
 
 .. note::
-    For more information, see `Openlieage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
+    For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~

@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -84,7 +84,7 @@ jobs:
           - python-version: "3.13"
             airflow-version: "3.0"
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -168,7 +168,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -197,6 +197,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration
         env:
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
@@ -251,7 +252,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -337,7 +338,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -413,7 +414,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -483,7 +484,7 @@ jobs:
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -521,6 +522,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf
         env:
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
@@ -580,7 +582,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -642,7 +644,7 @@ jobs:
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -713,7 +715,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false

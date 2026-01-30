@@ -1,12 +1,40 @@
 Changelog
 =========
 
-1.12.1a1 (2025-12-26)
-----------------------
+1.13.0a2 (2026-01-22)
+---------------------
+
+(Includes more changes)
+
+Features
+
+- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use watcher with ``KubernetesPodOperator`` by @tatiana in #2207
 
 Bug Fixes
 
-* Fix ``DbtSourceWatcherOperator.template_fields`` to inherit from ``DbtSourceLocalOperator`` instead of ``DbtConsumerWatcherSensor`` by @pankajkoti in #2214
+-  Fix running empty models or ephemeral nodes in ``ExecutionMode.WATCHER`` by @tatiana in #2279
+
+
+1.12.1 (2026-01-14)
+-------------------
+
+Bug Fixes
+
+* Fix ``DbtSourceWatcherOperator.template_fields`` to inherit from ``DbtSourceLocalOperator`` instead of ``DbtConsumerWatcherSensor`` by @pankajkoti in #2226
+* Fix ``TypeError`` in Watcher mode with subprocess invocation by @pankajkoti in #2227
+* Error when ``RenderConfig.invocation_mode`` is incorrectly set by @tatiana in #2267
+
+Docs
+
+* Fix minor documentation typo by @dnskr in #2093
+* Fix default values in documentation by @dnskr in #2092
+* Remove emitting event for ``ExecutionMode.AIRFLOW_ASYNC`` limitation in docs by @pankajastro in #2214
+
+Others
+
+* Add test to check profile metrics with non-Cosmos operator by @pankajastro in #2215
+* Fix CI main branch Airflow 2.6 tests by @tatiana in #2268
+
 
 1.12.0 (2025-12-18)
 ----------------------

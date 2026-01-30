@@ -9,6 +9,8 @@ from airflow.models.dagbag import DagBag
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
+from cosmos.constants import AIRFLOW_VERSION
+
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
@@ -17,7 +19,12 @@ MIN_VER_DAG_FILE: dict[str, list[str]] = {
     "2.8": ["cosmos_manifest_example.py"],
 }
 
-IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]
+IGNORED_DAG_FILES = [
+    "performance_dag.py",
+    "jaffle_shop_kubernetes.py",
+    "jaffle_shop_watcher_kubernetes.py",
+    "cosmos_manifest_selectors_example.py",
+]
 
 # Sort descending based on Versions and convert string to an actual version
 MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
@@ -53,6 +60,10 @@ def get_dag_bag() -> DagBag:
         for file_name in ["cosmos_profile_mapping.py"]:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
+
+        if AIRFLOW_VERSION >= Version("3.0.0"):
+            file.writelines("example_cosmos_cleanup_dag.py\n")
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

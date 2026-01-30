@@ -17,17 +17,16 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import ExecutionMode
-from cosmos.operators._watcher import WatcherTrigger
+from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
-    PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT,
     DbtBuildWatcherOperator,
     DbtConsumerWatcherSensor,
     DbtProducerWatcherOperator,
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
-    _store_dbt_resource_status_from_log,
+    store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
@@ -35,6 +34,8 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
+DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
 
 project_config = ProjectConfig(
     dbt_project_path=DBT_PROJECT_PATH,
@@ -104,7 +105,7 @@ def test_serialize_event(mock_mtd):
 def test_dbt_producer_watcher_operator_priority_weight_default():
     """Test that DbtProducerWatcherOperator uses default priority_weight of 9999."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert op.priority_weight == PRODUCER_OPERATOR_DEFAULT_PRIORITY_WEIGHT
+    assert op.priority_weight == PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT
 
 
 def test_dbt_producer_watcher_operator_priority_weight_override():
@@ -116,6 +117,18 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
 def test_dbt_producer_watcher_operator_retries_forced_to_zero():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     assert op.retries == 0
+
+
+@pytest.mark.parametrize(
+    "invocation_mode, expected_log_format",
+    (
+        (InvocationMode.SUBPROCESS, "json"),
+        (InvocationMode.DBT_RUNNER, None),
+    ),
+)
+def test_dbt_producer_log_format_adjusts_with_invocation(invocation_mode, expected_log_format):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=invocation_mode)
+    assert getattr(op, "log_format", None) == expected_log_format
 
 
 def test_dbt_producer_watcher_operator_retries_ignores_user_input():
@@ -185,6 +198,31 @@ def test_handle_startup_event():
     assert lst and lst[0]["name"] == "MainReportVersion"
 
 
+def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):
+    """Test that execute_complete logs an info message when model was skipped (model_not_run)."""
+    sensor = DbtConsumerWatcherSensor(
+        project_dir=".",
+        profiles_dir=".",
+        profile_config=profile_config,
+        model_unique_id="model.pkg.skipped_model",
+        poke_interval=1,
+        producer_task_id="dbt_producer_watcher_operator",
+        task_id="consumer_sensor",
+    )
+    sensor.model_unique_id = "model.pkg.skipped_model"
+
+    context = {"dag_run": MagicMock()}
+    event = {"status": "success", "reason": "model_not_run"}
+
+    with caplog.at_level(logging.INFO):
+        sensor.execute_complete(context, event)
+
+    assert any(
+        "Model 'model.pkg.skipped_model' was skipped by the dbt command" in message for message in caplog.messages
+    )
+    assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
+
+
 def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
@@ -199,33 +237,34 @@ def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
     assert any("forces Airflow retries to 0" in message for message in caplog.messages)
 
 
-def test_dbt_producer_watcher_operator_blocks_retry_attempt(caplog):
+def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
     context = {"ti": ti}
 
     with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.ERROR):
-            with pytest.raises(AirflowException) as excinfo:
-                op.execute(context=context)
+        with caplog.at_level(logging.INFO):
+            result = op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert "does not support Airflow retries" in str(excinfo.value)
+    assert result is None
     assert any("does not support Airflow retries" in message for message in caplog.messages)
+    assert any("skipping execution" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(
     "event, expected_message",
     [
         ({"status": "success"}, None),
+        ({"status": "success", "reason": "model_not_run"}, None),
         (
             {"status": "failed", "reason": "model_failed"},
-            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
+            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher' logs for details.",
         ),
         (
             {"status": "failed", "reason": "producer_failed"},
-            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
+            "Watcher producer task 'dbt_producer_watcher' failed before reporting model results. Check its logs for the underlying error.",
         ),
     ],
 )
@@ -426,8 +465,8 @@ def test_execute_fallback_mode(tmp_path):
     assert data["results"][0]["status"] == "success"
 
 
-class TestStoreDbStatusFromLog:
-    """Tests for _store_dbt_resource_status_from_log and _process_log_line_callable."""
+class TestStoreDbtStatusFromLog:
+    """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 
     def test_store_dbt_resource_status_from_log_success(self):
         """Test that success status is correctly parsed and stored in XCom."""
@@ -436,7 +475,7 @@ class TestStoreDbStatusFromLog:
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.my_model"}}})
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         assert ti.store.get("model__pkg__my_model_status") == "success"
 
@@ -447,7 +486,7 @@ class TestStoreDbStatusFromLog:
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "failed", "unique_id": "model.pkg.failed_model"}}})
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
 
@@ -460,7 +499,7 @@ class TestStoreDbStatusFromLog:
             {"data": {"node_info": {"node_status": "running", "unique_id": "model.pkg.running_model"}}}
         )
 
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         assert "model__pkg__running_model_status" not in ti.store
 
@@ -470,7 +509,7 @@ class TestStoreDbStatusFromLog:
         ctx = {"ti": ti}
 
         # Should not raise an exception
-        _store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
+        store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
 
         # No status should be stored
         assert len(ti.store) == 0
@@ -483,53 +522,83 @@ class TestStoreDbStatusFromLog:
         log_line = json.dumps({"data": {"other_key": "value"}})
 
         # Should not raise an exception
-        _store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
         # No status should be stored
         assert len(ti.store) == 0
 
-    def test_process_log_line_callable_is_not_bound_method(self):
-        """Test that _process_log_line_callable is not bound as a method when accessed through an instance.
-
-        This test verifies the fix for the bug where accessing _process_log_line_callable through
-        an instance would create a bound method, causing 'self' to be passed as the first argument.
-        """
-        import inspect
-
-        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-
-        # Access the callable through the instance
-        callable_from_instance = op._process_log_line_callable
-
-        # Verify it's not a bound method (which would have __self__ attribute)
-        assert not inspect.ismethod(
-            callable_from_instance
-        ), "_process_log_line_callable should not be a bound method when accessed through instance"
-
-        # Verify it's the original function
-        assert callable_from_instance is _store_dbt_resource_status_from_log
-
-    def test_process_log_line_callable_accepts_two_arguments(self):
-        """Test that the callable can be called with exactly 2 arguments (line, kwargs).
-
-        This tests the integration pattern used in subprocess.py where process_log_line(line, kwargs) is called.
-        """
-        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-        callable_from_instance = op._process_log_line_callable
-
+    @pytest.mark.parametrize(
+        "msg, level",
+        [
+            ("Running with dbt=1.10.11", "info"),
+            ("This is a warning", "warning"),
+            ("An error occurred", "error"),
+            ("Debugging info", "debug"),
+            ("Unknown level defaults to INFO", "unknown"),  # just to ensure it defaults
+        ],
+    )
+    def test_store_dbt_resource_status_from_log_outputs_dbt_info(self, caplog, msg, level):
+        """Test that dbt info messages are logged correctly."""
         ti = _MockTI()
         ctx = {"ti": ti}
 
-        log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.test_model"}}})
+        log_line = json.dumps({"info": {"msg": msg, "level": level}})
+        dynamic_level = getattr(logging, level.upper(), logging.INFO)
+        with caplog.at_level(dynamic_level):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
 
-        # This should NOT raise TypeError about wrong number of arguments
-        callable_from_instance(log_line, {"context": ctx})
+        assert msg in caplog.text
+        assert any(record.levelname == logging.getLevelName(dynamic_level) for record in caplog.records)
 
-        assert ti.store.get("model__pkg__test_model_status") == "success"
+    def test_store_dbt_resource_status_from_log_logs_message_only_once(self, caplog):
+        """Test that dbt log messages are logged exactly once (no duplicates)."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "1 of 5 START sql view model release_17.stg_customers"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": "2025-01-29T13:16:05.123456Z"}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Count how many times the message appears in log records
+        message_count = sum(1 for record in caplog.records if test_msg in record.message)
+        assert message_count == 1, f"Expected message to be logged exactly once, but found {message_count} times"
+
+    def test_store_dbt_resource_status_from_log_formats_timestamp(self, caplog):
+        """Test that the timestamp is formatted as HH:MM:SS to match dbt runner format."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "Running with dbt=1.10.11"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": "2025-01-29T13:16:05.123456Z"}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Verify the timestamp is formatted as HH:MM:SS
+        assert any("13:16:05" in record.message and test_msg in record.message for record in caplog.records)
+
+    def test_store_dbt_resource_status_from_log_invalid_timestamp_falls_back_to_raw(self, caplog):
+        """Test that invalid timestamps fall back to raw value instead of raising an error."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "Running with dbt=1.10.11"
+        # Looks like a valid ISO timestamp but has invalid month (13) - triggers ValueError in fromisoformat()
+        invalid_ts = "2025-13-29T13:16:05.123456Z"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": invalid_ts}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Verify the raw timestamp is used when parsing fails
+        assert any(invalid_ts in record.message and test_msg in record.message for record in caplog.records)
 
     def test_process_log_line_callable_integration_with_subprocess_pattern(self):
         """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs)."""
         op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+        op._process_log_line_callable = store_dbt_resource_status_from_log
 
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -544,10 +613,8 @@ class TestStoreDbStatusFromLog:
         ]
 
         # Simulate the subprocess.py pattern
-        process_log_line = op._process_log_line_callable
         for line in log_lines:
-            if process_log_line:
-                process_log_line(line, kwargs)
+            op._process_log_line_callable(line, kwargs)
 
         assert ti.store.get("model__pkg__model_a_status") == "success"
         assert ti.store.get("model__pkg__model_b_status") == "failed"
@@ -586,7 +653,6 @@ ENCODED_EVENT = base64.b64encode(zlib.compress(b'{"data": {"run_result": {"statu
 
 
 class TestDbtConsumerWatcherSensor:
-
     def make_sensor(self, **kwargs):
         extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
         kwargs["extra_context"] = extra_context
@@ -610,7 +676,7 @@ class TestDbtConsumerWatcherSensor:
         }
 
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
-    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("2.7.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("2.7.0"))
     def test_get_producer_task_status_airflow2(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
@@ -622,7 +688,7 @@ class TestDbtConsumerWatcherSensor:
 
         fetcher = MagicMock(return_value="success")
 
-        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=fetcher) as mock_builder:
+        with patch("cosmos.operators._watcher.base.build_producer_state_fetcher", return_value=fetcher) as mock_builder:
             status = sensor._get_producer_task_status(context)
 
         mock_builder.assert_called_once_with(
@@ -636,7 +702,7 @@ class TestDbtConsumerWatcherSensor:
         assert status == "success"
 
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="RuntimeTaskInstance path in Airflow >= 3.0")
-    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("2.7.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("2.7.0"))
     def test_get_producer_task_status_airflow2_missing_instance(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
@@ -648,14 +714,14 @@ class TestDbtConsumerWatcherSensor:
 
         fetcher = MagicMock(return_value=None)
 
-        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=fetcher):
+        with patch("cosmos.operators._watcher.base.build_producer_state_fetcher", return_value=fetcher):
             status = sensor._get_producer_task_status(context)
 
         fetcher.assert_called_once_with()
         assert status is None
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
-    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
     @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
     def test_get_producer_task_status_airflow3(self, mock_get_task_states):
         sensor = self.make_sensor()
@@ -676,7 +742,7 @@ class TestDbtConsumerWatcherSensor:
         )
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
-    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
     @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
     def test_get_producer_task_status_airflow3_missing_state(self, mock_get_task_states):
         sensor = self.make_sensor()
@@ -697,7 +763,7 @@ class TestDbtConsumerWatcherSensor:
         )
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
-    @patch("cosmos.operators.watcher.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
     def test_get_producer_task_status_airflow3_import_error(self):
         sensor = self.make_sensor()
         sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
@@ -707,7 +773,7 @@ class TestDbtConsumerWatcherSensor:
         ti.dag_id = "example_dag"
         context = self.make_context(ti, run_id="run_4")
 
-        with patch("cosmos.operators.watcher.build_producer_state_fetcher", return_value=None) as mock_builder:
+        with patch("cosmos.operators._watcher.base.build_producer_state_fetcher", return_value=None) as mock_builder:
             status = sensor._get_producer_task_status(context)
 
         mock_builder.assert_called_once_with(
@@ -748,7 +814,7 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value=None)
-    def _fallback_to_local_run(self, mock_get_producer_task_status):
+    def _fallback_to_non_watcher_run(self, mock_get_producer_task_status):
         sensor = self.make_sensor()
         sensor.invocation_mode = None
 
@@ -794,14 +860,14 @@ class TestDbtConsumerWatcherSensor:
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
 
-    def test_fallback_to_local_run(self):
+    def test_fallback_to_non_watcher_run(self):
         sensor = self.make_sensor()
         ti = MagicMock()
         ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
-        result = sensor._fallback_to_local_run(2, context)
+        result = sensor._fallback_to_non_watcher_run(2, context)
 
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
@@ -863,7 +929,7 @@ class TestDbtConsumerWatcherSensor:
         assert result == "success"
         assert sensor.compiled_sql == "select 42"
 
-    @patch("cosmos.operators.watcher.get_xcom_val")
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
     def test_producer_state_failed(self, mock_get_xcom_val):
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "failed"
@@ -881,10 +947,10 @@ class TestDbtConsumerWatcherSensor:
         ):
             sensor.poke(context)
 
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_local_run")
-    @patch("cosmos.operators.watcher.get_xcom_val")
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_non_watcher_run")
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_get_xcom_val, mock_fallback_to_local_run
+        self, mock_get_xcom_val, mock_fallback_to_non_watcher_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
@@ -901,7 +967,7 @@ class TestDbtConsumerWatcherSensor:
         context = self.make_context(ti)
 
         sensor.poke(context)
-        mock_fallback_to_local_run.assert_called_once()
+        mock_fallback_to_non_watcher_run.assert_called_once()
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_get_status_from_run_results_with_compiled_sql(self, mock_override_rtif, monkeypatch):
@@ -965,7 +1031,6 @@ class TestDbtConsumerWatcherSensor:
 
 
 class TestDbtBuildWatcherOperator:
-
     def test_dbt_build_watcher_operator_raises_not_implemented_error(self):
         expected_message = (
             "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
@@ -978,7 +1043,7 @@ class TestDbtBuildWatcherOperator:
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
 @pytest.mark.integration
-def test_dbt_dag_with_watcher():
+def test_dbt_dag_with_watcher(capsys):
     """
     Run a DbtDag using `ExecutionMode.WATCHER`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.
@@ -991,6 +1056,7 @@ def test_dbt_dag_with_watcher():
         dag_id="watcher_dag",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
@@ -1040,6 +1106,156 @@ def test_dbt_dag_with_watcher():
         "raw_orders_seed",
         "raw_customers_seed",
     }
+
+    # dbt runner logs are not captured by caplog, so we need to capture them using capsys
+    capsys_output = capsys.readouterr()
+    stdout = capsys_output.out
+
+    assert (
+        '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
+        not in stdout
+    )
+
+    log_message = "OK loaded seed file public.raw_orders"
+    assert log_message in stdout
+
+    # Verify that log messages are not duplicated (each dbt message should appear only once)
+    message_count = stdout.count(log_message)
+    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_subprocess(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER`.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    watcher_dag = DbtDag(
+        project_config=project_config,
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.SUBPROCESS,
+            dbt_executable_path=DBT_EXECUTABLE_PATH,
+        ),
+        render_config=RenderConfig(emit_datasets=False, select=["raw_orders"], test_behavior=TestBehavior.AFTER_ALL),
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+    )
+    dag_run = new_test_dag(watcher_dag)
+    assert dag_run.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 1
+
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test"]
+    assert tasks_names == expected_task_names
+    # Confirm that the dbt command was successfully run using the given dbt executable path:
+    assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text
+    # Confirm that the seed was successfully run and the log output was JSON:
+    assert (
+        '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
+        not in caplog.text
+    )
+
+    log_message = "OK loaded seed file public.raw_orders"
+    assert log_message in caplog.text
+
+    # Verify that log messages are not duplicated (each dbt message should appear only once)
+    message_count = sum(1 for record in caplog.records if log_message in record.message)
+    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+
+
+# Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:
+# https://github.com/apache/airflow/issues/51816
+conditions_to_skip = (AIRFLOW_VERSION < Version("2.8"), AIRFLOW_VERSION == Version("3.0"))
+
+
+@pytest.mark.skipif(
+    conditions_to_skip,
+    reason="Airflow hangs in these versions when trying to fetch XCom from the triggerer when using dags.test()",
+)
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_empty_model(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER` and a dbt project with an empty model. This was a situation observed by an Astronomer customer.
+    Confirm the right amount of tasks is created and that tasks are in the expected topological order.
+    Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECT_WITH_EMPTY_MODEL_PATH,
+    )
+    # There are two dbt projects defined in this folder.
+    # When we run `dbt ls`, we can see this:
+    #
+    # 10:32:30  Found 2 models, 464 macros
+    # micro_dbt_project.add_row
+    # micro_dbt_project.empty_model
+    #
+    # However, during `dbt build`, dbt skips running the empty model, and only runs the add_row model:
+    #
+    # 10:29:03  Running with dbt=1.11.2
+    # 10:29:03  Registered adapter: postgres=1.10.0
+    # 10:29:03  Found 2 models, 464 macros
+    # 10:29:03
+    # 10:29:03  Concurrency: 4 threads (target='dev')
+    # 10:29:03
+    # 10:29:03  1 of 1 START sql view model public.add_row ..................................... [RUN]
+    # 10:29:03  1 of 1 OK created sql view model public.add_row ................................ [CREATE VIEW in 0.06s]
+    # 10:29:03
+    # 10:29:03  Finished running 1 view model in 0 hours 0 minutes and 0.19 seconds (0.19s).
+    # 10:29:03
+    # 10:29:03  Completed successfully
+    # 10:29:03
+    # 10:29:03  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1
+
+    watcher_dag = DbtDag(
+        project_config=project_config,
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+        ),
+        render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+        operator_args={
+            "trigger_rule": "all_success",
+            "execution_timeout": timedelta(seconds=10),
+        },
+        dagrun_timeout=timedelta(seconds=30),
+    )
+    outcome = new_test_dag(watcher_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
+
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    expected_task_names = [
+        "dbt_producer_watcher",
+        "add_row_run",
+        "empty_model_run",
+    ]
+    assert tasks_names == expected_task_names
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["add_row_run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["empty_model_run"], DbtRunWatcherOperator)
+
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
+        "add_row_run",
+        "empty_model_run",
+    }
+
+    assert "Total filtered nodes: 2" in caplog.text
+    assert "Finished running node model.micro_dbt_project.add_row" in caplog.text
+    assert "Finished running node model.micro_dbt_project.empty_model_run" not in caplog.text
+    assert "Model 'model.micro_dbt_project.empty_model' was skipped by the dbt command" in caplog.text
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

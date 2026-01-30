@@ -13,6 +13,7 @@ from typing import Any
 from warnings import warn
 
 from airflow.models.dag import DAG
+from airflow.models.param import Param
 
 try:
     # Airflow 3.1 onwards
@@ -23,12 +24,17 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, LoadMode
+from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
+from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
+
+# TODO: Move _get_profile_config_attribute at common place
+from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
+from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
@@ -174,6 +180,16 @@ def validate_initial_user_config(
             "please use ProjectConfig.env_vars instead."
         )
 
+    if render_config is not None and render_config.invocation_mode == InvocationMode.DBT_RUNNER:
+        if not is_dbt_installed_in_same_environment():
+            raise CosmosValueError(
+                "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow. Use InvocationMode.SUBPROCESS instead."
+            )
+        if render_config.dbt_executable_path and render_config.dbt_executable_path != get_system_dbt():
+            raise CosmosValueError(
+                "RenderConfig.dbt_executable_path is set, but it is not the same as the system dbt executable path. Do not set render_config.dbt_executable_path when using InvocationMode.DBT_RUNNER."
+            )
+
 
 def validate_changed_config_paths(
     execution_config: ExecutionConfig | None, project_config: ProjectConfig, render_config: RenderConfig | None
@@ -268,10 +284,8 @@ class DbtToAirflowConverter:
         validate_changed_config_paths(execution_config, project_config, render_config)
 
         if execution_config.execution_mode != ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
-            logger.warning(
-                "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-            )
+            logger.warning("`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV.")
 
         cache_dir = None
         cache_identifier = None
@@ -279,6 +293,9 @@ class DbtToAirflowConverter:
         if settings.enable_cache:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
+
+        # Store the initial load method before it gets resolved by dbt_graph.load()
+        initial_load_method = render_config.load_method
 
         previous_time = time.perf_counter()
         self.dbt_graph = DbtGraph(
@@ -294,6 +311,9 @@ class DbtToAirflowConverter:
         self.dbt_graph.load(method=render_config.load_method, execution_mode=execution_config.execution_mode)
 
         self._add_dbt_project_hash_to_dag_docs(dag)
+        self._store_cosmos_telemetry_metadata_on_dag(
+            dag, render_config, project_config, profile_config, initial_load_method
+        )
 
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
@@ -334,7 +354,7 @@ class DbtToAirflowConverter:
             execution_mode=execution_config.execution_mode,
             task_args=task_args,
             test_indirect_selection=execution_config.test_indirect_selection,
-            dbt_project_name=render_config.project_name,
+            dbt_project_name=render_config.project_name or project_config.project_name,
             on_warning_callback=on_warning_callback,
             render_config=render_config,
             async_py_requirements=execution_config.async_py_requirements,
@@ -372,3 +392,63 @@ class DbtToAirflowConverter:
             logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
         except Exception as e:
             logger.warning(f"Failed to append dbt project hash to DAG documentation: {e}")
+
+    def _store_cosmos_telemetry_metadata_on_dag(  # noqa: C901
+        self,
+        dag: DAG | None,
+        render_config: RenderConfig,
+        project_config: ProjectConfig,
+        profile_config: ProfileConfig,
+        initial_load_method: LoadMode,
+    ) -> None:
+        """
+        Store Cosmos configuration metadata on the DAG for telemetry purposes.
+
+        This metadata is used by the DAG run listener to emit telemetry metrics
+        about how Cosmos is configured and used.
+
+        :param dag: The Airflow DAG to store metadata on. If None, no action is taken.
+        :param render_config: The render configuration
+        :param project_config: The project configuration
+        :param profile_config: The profile configuration
+        :param initial_load_method: The load method specified by the user (before automatic resolution)
+        """
+        if dag is None or not should_emit():
+            return
+
+        metadata: dict[str, Any] = {"used_automatic_load_mode": initial_load_method == LoadMode.AUTOMATIC}
+
+        if render_config is not None:
+            metadata["invocation_mode"] = str(render_config.invocation_mode.value)
+            metadata["install_deps"] = (
+                bool(render_config.dbt_deps) if render_config.dbt_deps is not None else project_config.install_dbt_deps
+            )
+            metadata["uses_node_converter"] = render_config.node_converters is not None
+            metadata["test_behavior"] = str(render_config.test_behavior.value)
+            metadata["source_behavior"] = str(render_config.source_rendering_behavior.value)
+
+        if self.dbt_graph is not None:
+            metadata["actual_load_mode"] = str(self.dbt_graph.load_method.value)
+            metadata["total_dbt_models"] = sum(
+                1 for node in self.dbt_graph.nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+            metadata["selected_dbt_models"] = sum(
+                1 for node in self.dbt_graph.filtered_nodes.values() if node.resource_type == DbtResourceType.MODEL
+            )
+        if profile_config is not None:
+            profile_strategy, profile_mapping_class, database = _get_profile_config_attribute(profile_config)
+            metadata.update(
+                {
+                    "profile_strategy": profile_strategy,
+                    "profile_mapping_class": profile_mapping_class,
+                    "database": database,
+                }
+            )
+
+        # Store metadata in dag.params which is preserved during serialization
+        # Using a key that's unlikely to conflict with user params
+        compressed_metadata = _compress_telemetry_metadata(metadata)
+        dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+        logger.debug(
+            f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+        )

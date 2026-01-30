@@ -12,8 +12,14 @@ from packaging.version import Version
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
-from cosmos.constants import AIRFLOW_VERSION
-from cosmos.listeners.dag_run_listener import on_dag_run_failed, on_dag_run_success, total_cosmos_tasks
+from cosmos.config import ExecutionConfig, RenderConfig
+from cosmos.constants import AIRFLOW_VERSION, InvocationMode, LoadMode, SourceRenderingBehavior, TestBehavior
+from cosmos.listeners.dag_run_listener import (
+    get_cosmos_telemetry_metadata,
+    on_dag_run_failed,
+    on_dag_run_success,
+    total_cosmos_tasks,
+)
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -79,6 +85,26 @@ def test_not_cosmos_dag():
         pass
 
     assert total_cosmos_tasks(dag) == 0
+
+
+def test_get_cosmos_telemetry_metadata_with_invalid_data():
+    """Test that get_cosmos_telemetry_metadata handles invalid compressed data gracefully."""
+    with DAG("test-dag", start_date=datetime(2022, 1, 1)) as dag:
+        # Set invalid base64 data that will fail decompression
+        dag.params["__cosmos_telemetry_metadata__"] = "invalid_base64_data!"
+
+    # Should return empty dict instead of raising exception
+    result = get_cosmos_telemetry_metadata(dag)
+    assert result == {}
+
+
+def test_get_cosmos_telemetry_metadata_with_no_metadata():
+    """Test that get_cosmos_telemetry_metadata returns empty dict when no metadata present."""
+    with DAG("test-dag", start_date=datetime(2022, 1, 1)) as dag:
+        pass
+
+    result = get_cosmos_telemetry_metadata(dag)
+    assert result == {}
 
 
 def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
@@ -183,3 +209,125 @@ def test_on_dag_run_failed(mock_emit_usage_metrics_if_enabled, caplog):
     assert "Running on_dag_run_failed" in caplog.text
     assert "Completed on_dag_run_failed" in caplog.text
     assert mock_emit_usage_metrics_if_enabled.call_count == 1
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION >= Version("3.1.0"),
+    reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
+)
+@pytest.mark.integration
+@patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, mock_should_emit, caplog):
+    """Test that DAG run success includes Cosmos telemetry metadata."""
+    caplog.set_level(logging.DEBUG)
+
+    dag = DbtDag(
+        project_config=ProjectConfig(
+            DBT_ROOT_PATH / "jaffle_shop",
+        ),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(invocation_mode=InvocationMode.SUBPROCESS),
+        render_config=RenderConfig(
+            load_method=LoadMode.AUTOMATIC,
+            test_behavior=TestBehavior.AFTER_EACH,
+            source_rendering_behavior=SourceRenderingBehavior.NONE,
+        ),
+        operator_args={"install_deps": True},
+        start_date=datetime(2023, 1, 1),
+        dag_id="cosmos_dag_with_metadata",
+    )
+    run_id = str(uuid.uuid1())
+    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+    dag_run = create_dag_run(dag, run_id, run_after)
+
+    on_dag_run_success(dag_run, msg="test success")
+    assert mock_emit_usage_metrics_if_enabled.call_count == 1
+
+    # Verify telemetry call includes new metrics
+    call_args = mock_emit_usage_metrics_if_enabled.call_args
+    metrics = call_args[0][1]  # Second argument is the metrics dict
+
+    # Check that Cosmos metadata fields are present
+    assert "used_automatic_load_mode" in metrics
+    assert "actual_load_mode" in metrics
+    assert "invocation_mode" in metrics
+    assert "install_deps" in metrics
+    assert "uses_node_converter" in metrics
+    assert "test_behavior" in metrics
+    assert "source_behavior" in metrics
+    assert "total_dbt_models" in metrics
+    assert "selected_dbt_models" in metrics
+    assert "profile_strategy" in metrics
+    assert "profile_mapping_class" in metrics
+    assert "database" in metrics
+
+    # Verify some expected values
+    assert metrics["used_automatic_load_mode"] is True
+    assert metrics["invocation_mode"] == "dbt_runner"
+    assert metrics["install_deps"] is True
+    assert metrics["uses_node_converter"] is False
+    assert metrics["test_behavior"] == "after_each"
+    assert metrics["source_behavior"] == "none"
+    assert metrics["profile_strategy"] == "mapping"
+    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
+    assert metrics["database"] == "postgres"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION >= Version("3.1.0"),
+    reason="TODO: Fix create_dag_run to work with AF 3.1 and remove this skip.",
+)
+@pytest.mark.integration
+@patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_enabled, mock_should_emit, caplog):
+    """Test that DAG run failure includes Cosmos telemetry metadata."""
+    caplog.set_level(logging.DEBUG)
+
+    dag = DbtDag(
+        project_config=ProjectConfig(
+            DBT_ROOT_PATH / "jaffle_shop",
+            manifest_path=DBT_ROOT_PATH / "jaffle_shop" / "target" / "manifest.json",
+        ),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(invocation_mode=InvocationMode.DBT_RUNNER),
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_MANIFEST,
+            test_behavior=TestBehavior.NONE,
+            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            dbt_deps=False,
+        ),
+        operator_args={"install_deps": True},
+        start_date=datetime(2023, 1, 1),
+        dag_id="cosmos_dag_with_metadata_failed",
+    )
+    run_id = str(uuid.uuid1())
+    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+    dag_run = create_dag_run(dag, run_id, run_after)
+
+    on_dag_run_failed(dag_run, msg="test failed")
+    assert mock_emit_usage_metrics_if_enabled.call_count == 1
+
+    # Verify telemetry call includes new metrics
+    call_args = mock_emit_usage_metrics_if_enabled.call_args
+    metrics = call_args[0][1]  # Second argument is the metrics dict
+
+    # Check that Cosmos metadata fields are present
+    assert "used_automatic_load_mode" in metrics
+    assert "actual_load_mode" in metrics
+    assert "invocation_mode" in metrics
+    assert "install_deps" in metrics
+    assert "uses_node_converter" in metrics
+    assert "test_behavior" in metrics
+    assert "source_behavior" in metrics
+    assert "total_dbt_models" in metrics
+    assert "selected_dbt_models" in metrics
+
+    # Verify some expected values for failed case
+    assert metrics["used_automatic_load_mode"] is False
+    assert metrics["invocation_mode"] == "dbt_runner"
+    assert metrics["install_deps"] is False
+    assert metrics["uses_node_converter"] is False
+    assert metrics["test_behavior"] == "none"
+    assert metrics["source_behavior"] == "all"

@@ -36,7 +36,7 @@ dependencies = [
     "packaging>=22.0",
     "pydantic>=1.10.0",
     "virtualenv",
-    "openlineage-integration-common"  # Without this dependency, Airflow datasets/assets don't work
+    "openlineage-integration-common",  # Without this dependency, Airflow datasets/assets don't work
 ]
 
 [project.optional-dependencies]
@@ -55,6 +55,7 @@ dbt-all = [
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
+    "dbt-starrocks",
     "dbt-spark",
     "dbt-sqlserver",
     "dbt-teradata",
@@ -66,11 +67,13 @@ dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
+dbt-loom = ["dbt-loom"]
 dbt-mysql = ["dbt-mysql"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
+dbt-starrocks = ["dbt-starrocks"]
 dbt-spark = ["dbt-spark"]
 dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
@@ -228,6 +231,11 @@ serve = "sphinx-autobuild docs docs/_build"
 [tool.black]
 line-length = 120
 target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.coverage.run]
+omit = [
+    "cosmos/airflow/_override.py"
+]
 
 [tool.isort]
 profile = "black"

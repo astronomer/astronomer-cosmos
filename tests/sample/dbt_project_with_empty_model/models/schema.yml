@@ -1,0 +1,8 @@
+version: 2
+
+models:
+  - name: add_row
+    description: "Model that selects data and adds an extra row"
+
+  - name: empty_model
+    description: "Empty model definition"

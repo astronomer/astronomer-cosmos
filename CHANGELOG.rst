@@ -16,6 +16,7 @@ Features
 Enhancements
 
 - Refactor: remove duplicate ``_construct_dest_file_path`` by @jx2lee in #2077
+- Leverage Airflow ``::group::`` to group logs associated with DAG parsing by @tatiana in #2235
 - Refactor ``DbtConsumerWatcherSensor`` for reusability by @tatiana in #2245
 - Restore plain text output when using ``ExecutionMode.WATCHER`` by @tiovader in #2241
 

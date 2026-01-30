@@ -87,7 +87,15 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
 
-        kwargs["callbacks"] = kwargs.get("callbacks", []) + [WatcherKubernetesCallback]
+        existing_callbacks = kwargs.get("callbacks")
+        if existing_callbacks is None:
+            normalized_callbacks: list[Any] = []
+        elif isinstance(existing_callbacks, (list, tuple)):
+            normalized_callbacks = list(existing_callbacks)
+        else:
+            normalized_callbacks = [existing_callbacks]
+        normalized_callbacks.append(WatcherKubernetesCallback)
+        kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 

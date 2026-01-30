@@ -853,6 +853,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     """
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_or_group: TaskGroup | BaseOperator | None
+    producer_task: TaskGroup | BaseOperator | None = None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
@@ -947,8 +948,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     create_airflow_task_dependencies(nodes, tasks_map)
 
-    if execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
-        setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
+    if producer_task:
         _add_watcher_dependencies(
             dag=dag,
             producer_airflow_task=producer_task,

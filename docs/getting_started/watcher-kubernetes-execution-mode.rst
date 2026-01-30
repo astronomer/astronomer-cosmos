@@ -137,6 +137,28 @@ The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer t
 
 Conversely, the consumer tasks that subclass ``DbtConsumerWatcherKubernetesSensor``run in deferrable mode by default when operating as a sensor.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Mandatory ``operator_args``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The  ``operator_args`` must define ``get_logs`` and ``log_events_on_failure``:
+
+.. code-block: python
+
+    dag = DbtDag(
+        dag_id="jaffle_shop_watcher_kubernetes",
+        # ... other DAG parameters ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER_KUBERNETES,
+            dbt_project_path=K8S_PROJECT_DIR,
+        ),
+        operator_args={
+            # ... other KPO mandatory args ...
+            "get_logs": True,
+            "log_events_on_failure": True,
+        },
+    )
+
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Other Inherited Limitations
